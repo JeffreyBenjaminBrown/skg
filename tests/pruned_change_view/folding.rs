@@ -1,5 +1,5 @@
-// Folding survives saves ('TODO/total-diff-view/04_plan-fixes.org',
-// "Folding survives, because nothing that exists is recreated"): the
+// Folding survives saves ('docs/diff-view.org', "The shallow model
+// subtree, and what it keeps"): the
 // server never changes the fold state of a viewnode that exists, and
 // a viewnode whose kind changes keeps its fold state. The fixtures
 // are described in 'buffer.rs' ('sets', 'kinds') and in

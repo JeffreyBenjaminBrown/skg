@@ -166,7 +166,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
                  input ); }
   Ok (( )) }
 
-/// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
+/// Regression: a subscribee
 /// pasted from the link stack arrives as a bare id under a
 /// 'subscribeeFolder' non-vognode, with no skgrepo.
 /// 'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'

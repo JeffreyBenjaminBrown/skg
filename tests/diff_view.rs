@@ -1,4 +1,4 @@
-// The diff view's tests ('TODO/total-diff-view/02_plan.org').
+// The diff view's tests ('docs/diff-view.org').
 
 #[path = "diff_view/roundtrip/mod.rs"]
 mod roundtrip;

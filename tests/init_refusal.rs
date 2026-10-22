@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_unit -E 'test(init_refusal::)'
 //
-// The init/rebuild refusal wiring
-// (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org): override invariants are
+// The init/rebuild refusal wiring ('docs/data-model_technical.org', "Hard
+// validation constraints"): override invariants are
 // validated not only at their own seam (tests/dbs/in_rust_graph/
 // override_invariants.rs) but actually BLOCK initialization. This
 // drives the graph validator shared by server start and rebuild.

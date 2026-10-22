@@ -3,8 +3,7 @@
 /// the noop filter), plus nodeMerge extraction from the same map.
 /// .
 /// The expectations were originally verified differentially against
-/// the old extraction path before its deletion
-/// (TODO/DONE/local-fieldintent-collection/3_plan.org). The cases marked
+/// the old extraction path before its deletion. The cases marked
 /// "new recursion surface" are the deliberate behavior changes.
 
 use ego_tree::Tree;

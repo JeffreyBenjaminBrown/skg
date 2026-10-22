@@ -1,6 +1,5 @@
 /// These tests pin the instructionMerge insert rules of
-/// server/from_text/local_fieldintent_collection/types.rs
-/// (TODO/DONE/local-fieldintent-collection/3_plan.org).
+/// server/from_text/local_fieldintent_collection/types.rs.
 
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, FieldIntent,

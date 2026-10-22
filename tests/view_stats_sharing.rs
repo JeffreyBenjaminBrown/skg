@@ -1,7 +1,9 @@
 // cargo nextest run --test grouped_overrides -E 'test(view_stats_sharing::)'
 //
 // The position-relative sharing view-stats
-// (TODO/DONE/full-schema/DONE/10_heralds-and-stats.org):
+// ('docs/api-and-formats.org', "Stats metadata: graphStats and
+// viewStats"; the tokens in 'docs/heralds.org', "Ancestor flags and
+// floors"):
 // - grandparentOverrides ("gO"): a subscribee-as-such whose folder recorder
 //   also overrides it;
 // - grandparentSubscribes ("gS"): an overriddenFolder member whose folder
@@ -104,7 +106,7 @@ fn assert_sharing_stats_in_view_of_R (
     assert! ( ! f_line . contains ("(overrides"),
       "{}: F, a subscribee R does not override, shows no override \
        relation:\n{}", label, buf ); }
-  { // Since override substitution (plan 11), a fresh view of R shows
+  { // Because of override substitution, a fresh view of R shows
     // C in place of P (C overrides P), marked; the Op position (C
     // under a shown P) is asserted from a view of P instead, in
     // assert_op_in_view_of_P.

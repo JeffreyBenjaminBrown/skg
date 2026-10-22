@@ -224,7 +224,8 @@ fn hide_floor_is_the_most_public_explaining_subscription (
 #[test]
 fn explicit_skgrepo_at_or_more_private_than_floor_is_honored (
 ) {
-  // Allowed-side acceptance (render-and-gating, 5_plan.org): an
+  // Allowed-side acceptance ('docs/telescopes.org', "Where new
+  // relationships land: the sticky-else-default rule"): an
   // explicit '(editRequest (relRepo ...))' skgrepo that is at least as private as
   // the default floor wins outright.
   let config : SkgConfig =
@@ -250,9 +251,10 @@ fn explicit_skgrepo_at_or_more_private_than_floor_is_honored (
 #[test]
 fn explicit_skgrepo_more_public_than_floor_is_rejected (
 ) {
-  // More-public-than-floor rejection (render-and-gating, 5_plan.org): an
-  // explicit skgrepo more PUBLIC than the DEFAULT floor is a save
-  // error naming the member, the offered skgrepo, and the floor.
+  // More-public-than-floor rejection ('docs/telescopes.org', "Setting a
+  // relationship's skgrepo"): an explicit skgrepo more PUBLIC than the
+  // DEFAULT floor is a save error naming the member, the offered skgrepo,
+  // and the floor.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "private"); // forces the default floor to "private"
@@ -276,9 +278,10 @@ fn explicit_skgrepo_more_public_than_floor_is_rejected (
 #[test]
 fn explicit_relRepo_moves_a_sticky_relationship_to_its_default (
 ) {
-  // The BUG-and-fix_make-edge-more-public.org fix: an explicit
-  // relRepo validates against the DEFAULT floor, not the disk relRepo,
-  // so it can lower a stuck relationship's privacy back to the default.
+  // ('docs/telescopes.org', "Setting a relationship's skgrepo"): an
+  // explicit relRepo validates against the DEFAULT floor, not the disk
+  // relRepo, so it can lower a stuck relationship's privacy back to the
+  // default.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : Graphnode = node_at ("child", "public");
@@ -396,9 +399,10 @@ fn explicit_at_a_more_public_than_default_disk_skgrepo_round_trips (
 #[test]
 fn explicit_lowering_moves_the_relationship_between_section_files (
 ) {
-  // The repro from BUG-and-fix_make-edge-more-public.org, as files:
-  // a child once homed in "private" was moved home to "trusted",
-  // but the containment relation stayed stuck at "private" (sticky).
+  // A stuck relationship lowered ('docs/telescopes.org', "Setting a
+  // relationship's skgrepo"), as files: a child once homed in "private" was
+  // moved home to "trusted", but the containment relation stayed stuck at
+  // "private" (sticky).
   // Explicitly lowering the relationship's privacy to its new default moves
   // the membership line from the recorder's private section file to a
   // trusted one, deleting the emptied private file.

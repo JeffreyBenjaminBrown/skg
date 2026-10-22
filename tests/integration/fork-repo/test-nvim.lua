@@ -89,12 +89,9 @@ save.request_save_buffer()
 local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
--- The elisp original asserts '(repo owned)' here, which is STALE:
--- the server always pre-fills the PICK-A-REPO placeholder and only
+-- The server always pre-fills the PICK-A-REPO placeholder and only
 -- SUGGESTS the inferred skgrepo in a comment line (fork.rs; documented
--- in COMMANDS.org and glossary.org). The emacs test fails on this
--- today -- see the problems.org entry filed with the vim-client port.
--- This mirror asserts the documented behavior instead.
+-- in COMMANDS.org and glossary.org), as the elisp original asserts too.
 local confirmation_text = T.buffer_text(confirm_buf)
 T.check(confirmation_text:find('(repo PICK-A-REPO)', 1, true),
         'clone-to-be carries the PICK-A-REPO placeholder')

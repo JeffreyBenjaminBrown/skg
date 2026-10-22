@@ -3,7 +3,8 @@
 // When the completion pass repairs a write-protected PartnerFolder in the
 // view the user just saved, the save succeeds and
 // SaveResponse.warnings says what was repaired
-// (TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org):
+// ('docs/sharing-model.org', "The write-protected folders: who
+// subscribes to, overrides, or hides this node"):
 // - a deleted generated member is restored, with a warning that
 //   explains membership is edited from the other side;
 // - a child parked with affectsParent true and a subtree, though not

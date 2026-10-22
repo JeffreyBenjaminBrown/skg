@@ -1,7 +1,7 @@
 tantivy_folder = "/tmp/placeholder"
 
 # owned/ is the default owned_folder, so "main" is owned and
-# "foreign" is write-protected. See TODO/DONE/override-ancestry-in-search-results.org.
+# "foreign" is write-protected. See docs/api-and-formats.org, "Skgrepos".
 [[repos]]
 name = "main"
 path = "owned/main"

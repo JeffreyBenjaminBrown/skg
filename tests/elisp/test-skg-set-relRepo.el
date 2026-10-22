@@ -1,14 +1,12 @@
 ;;; test-skg-set-relRepo.el --- Tests for skg-set-relRepo
 ;;;
-;;; skg-set-relRepo (C-c s r; formerly
-;;; skg-privatize-relationship, see
-;;; BUG-and-fix_make-edge-more-public.org) classifies the relationship the
-;;; headline at point represents, asks the server for that relationship's
-;;; (default, current) relRepos, and offers the skgrepos at least
-;;; as private as the default plus a no-override choice. These tests
-;;; cover the pure pieces (relationship classification, menu slicing, choice
-;;; application) and the response handler with the network and
-;;; minibuffer stubbed out.
+;;; skg-set-relRepo (C-c s r; formerly skg-privatize-relationship, see
+;;; docs/COMMANDS.org) classifies the relationship the headline at point
+;;; represents, asks the server for that relationship's (default, current)
+;;; relRepos, and offers the skgrepos at least as private as the default
+;;; plus a no-override choice. These tests cover the pure pieces
+;;; (relationship classification, menu slicing, choice application) and the
+;;; response handler with the network and minibuffer stubbed out.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
                              (file-name-directory load-file-name)))

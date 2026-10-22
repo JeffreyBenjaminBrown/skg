@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(extend_raw_overridden_children::)'
 //
-// Production change (2), the second half of the extension test
-// (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org): substitution does not
-// apply to the immediate children of an overridden node shown RAW.
+// Substitution does not apply to the immediate children of an
+// overridden node shown RAW ('docs/override.org', "Automatic override
+// substitution").
 //
 // Fixture (the docs/forks.org shape): clone R overrides original X, and
 // R's child R1 overrides X's child X1. Opening X as a view root shows

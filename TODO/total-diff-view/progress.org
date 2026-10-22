@@ -2867,3 +2867,55 @@ glossary did; it now uses the glossary's new phrase.
 nextest 867 passed; Emacs 381; Neovim all 31 specs passed. The
 changed integration scripts were checked for syntax only (the plan
 asks no integration run of this slice).
+** Slice 11: deviations
+*** the procedure
+I listed 114 citations, each with a docs target or a reason to delete
+it. A Sonnet judge read each comment and its target and rejected
+three. Four more turned up after the judging, found by a wider grep:
+the "plan-11" in 'content.rs:254', the two "stage 8" and the
+"stage 13". All four were deleted, the comments keeping their rule. For those I followed the judge: the sharing view-stats test
+now points to 'docs/api-and-formats.org', "Stats metadata: graphStats
+and viewStats"; the instructionMerge tests' header drops its citation,
+because no docs section states those rules; and the folded-root Emacs
+test drops its pointers to 'Dear_Claude.org' and to a Rust test,
+'tests/save/folded_single_root.rs', neither of which exists. It now
+says only that the server round-trip keeps the root.
+*** citations the plan's list did not name
+The plan lists the citations its grep found. The same rule covers
+more of them, so these were repointed or deleted too:
+- by bare name: 'BUG-and-fix_make-edge-more-public.org' (eleven,
+  docs/COMMANDS.org among them), 'metaplan_2.org', two 'vision.org',
+  'subscribeeFolder-maybe-todo.org', and the files that exist nowhere,
+  'profiling-save.org', 'buffer-update.org', 'Dear_Claude.org' and
+  'next.org';
+- by number: "plan 11" and "plan-11" (four), "4_discussion" without
+  '.org' (three), "work item save-leveling", "the plan's \"Dangling
+  anchors\" section", "per the plan's settled decisions" (Neovim's
+  version floor, which 'nvim/README.org' states), "stage 8" and
+  "stage 13" (the stages of the full-schema plan), "the trap from the
+  discussion", and two citations of 'progress.org'.
+*** comments that were history, or no longer true
+Where the cited plan carried a claim that is now false, the claim went
+with the citation: 'tests/repo_sets.rs' no longer says its tests
+"should fail until that feature is wired in", and the fork-repo
+integration tests no longer say that the Emacs test asserts
+'(repo owned)' or that it fails. The Emacs test asserts the
+placeholder, as the Neovim one does. "Production change (2)",
+"DEVIATION from the plan" and "Jeff approved the Err conversion" went
+the same way.
+*** relRepo gating points to the visible composition
+The comments that cited "render-and-gating" for relRepo gating point
+to 'docs/telescopes.org', "What lives where". That section says a
+restricted set sees only the unrestricted sections' contributions, and
+that each relationship lives in the section its relRepo names. The
+judge suggested 'docs/override.org', "Skgrepo-set behavior", as
+sharper for some of them. That section lists the gated surfaces, but
+under the override page, so I kept one target for all.
+*** what the closing grep still finds
+'docs/README.org:55', the corrected
+'docs/nvim-client-deviations.org:7' ('../TODO/problems.org'), and
+'bash/run-plan-slices.sh'. The last runs these plans: its 'TODO/'
+paths are operands, not citations.
+*** verification
+nextest 867 passed; Emacs 381; Neovim all specs passed. The changed
+integration scripts were checked for syntax only.

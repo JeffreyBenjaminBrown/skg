@@ -1,8 +1,8 @@
 // A buffer of the diff view is rendered from its sets recomputed after
 // the save wherever a save renders something new, but only the "integrate
 // unshown changes" request makes occurrences editable or appends roots
-// ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
-// only on command"). The 'fresh' fixture (one skgrepo, main): r
+// ('docs/diff-view.org', "A save makes nothing editable and appends no
+// root"). The 'fresh' fixture (one skgrepo, main): r
 // contains a, whose body changed, and w, unchanged; w contains w1
 // and w2; w1 contains w1a and subscribes to w2. s, unchanged,
 // contains s1. p and q are new, and contain each other. So the

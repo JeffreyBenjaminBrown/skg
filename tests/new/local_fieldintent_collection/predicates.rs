@@ -1,7 +1,6 @@
 /// These tests pin the membership predicates of
 /// server/from_text/local_fieldintent_collection/predicates.rs.
-/// There is one test per condition each predicate encodes
-/// (TODO/DONE/local-fieldintent-collection/3_plan.org, "testing").
+/// There is one test per condition each predicate encodes.
 
 use skg::from_text::local_fieldintent_collection::predicates::{
   unrestricted_child_counts_as_content,

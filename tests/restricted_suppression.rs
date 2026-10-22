@@ -1,13 +1,13 @@
 // cargo nextest run --test grouped_overrides -E 'test(restricted_suppression::)'
 //
-// TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, restricted-node rewrite
-// suppression: under a restricted skgrepo-set, any nodeInstruction that
-// would modify a restricted node is dropped, not executed and not
-// fatal, with the warning "Restricted nodes present in saved buffer
-// remain unchanged in graph." -- and only when something was
-// actually suppressed: an untouched stale node's identical-to-disk
-// nodeInstruction is discarded by the noop filter first, so it saves
-// silently.
+// Restricted-node rewrite suppression ('docs/api-and-formats.org',
+// "Restricted-skgrepo nodes: omission, retention, and save preservation"):
+// under a restricted skgrepo-set, any nodeInstruction that would modify a
+// restricted node is dropped, not executed and not fatal, with the warning
+// "Restricted nodes present in saved buffer remain unchanged in graph." --
+// and only when something was actually suppressed: an untouched stale
+// node's identical-to-disk nodeInstruction is discarded by the noop filter
+// first, so it saves silently.
 //
 // This lives in its own test target because the silent-untouched
 // case needs the explicit in-Rust graph installed (the noop

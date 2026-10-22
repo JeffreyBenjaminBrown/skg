@@ -1135,7 +1135,7 @@ Grep for 'draw' under 'server/', 'elisp/', 'nvim/', 'tests/' and
 Tests: the Rust suite (renames), the Emacs and Neovim suites (prose
 only).
 
-** TODO Slice 11: citations
+** DONE Slice 11: citations
 Make the changes under "Citations" above, by the procedure there.
 Grep for 'plan.org', 'discussion.org', 'more.org', 'TODO/' and
 'problems.org' under 'server/', 'elisp/', 'nvim/', 'tests/', 'bash/'

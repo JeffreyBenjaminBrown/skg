@@ -1,8 +1,6 @@
 // cargo nextest run --test grouped_repos -E 'test(repo_sets::)'
 //
-// These are feature-first tests for TODO/DONE/source-sets/plan.org. They
-// intentionally name the skgrepo-set API before the implementation
-// exists, and should fail until that feature is wired in.
+// Tests of skgrepo-sets ('docs/api-and-formats.org', "skgrepo-sets").
 
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
@@ -98,14 +96,15 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// PIN (the override-substitution-across-switch case discussed in
-/// TODO/strip-restricted-node-fields-progress.org): a shown override
-/// substitute whose skgrepo goes restricted on a skgrepo-set switch
-/// becomes an anonymous bare-atom 'restrictedNode'; the rerender shows the
-/// original directly (a restricted overrider does not substitute) with
-/// NO leak of the overrider's title or id, retaining the overrider's
-/// unrestricted descendant; and the container's contains still saves to the
-/// original, never to the overrider.
+/// PIN (the override-substitution-across-switch case,
+/// 'docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
+/// retention, and save preservation"): a shown override substitute whose
+/// skgrepo goes restricted on a skgrepo-set switch becomes an anonymous
+/// bare-atom 'restrictedNode'; the rerender shows the original directly (a
+/// restricted overrider does not substitute) with NO leak of the
+/// overrider's title or id, retaining the overrider's unrestricted
+/// descendant; and the container's contains still saves to the original,
+/// never to the overrider.
 ///
 /// Fixtures: public 'ovr-sub-container' -> 'ovr-sub-original' (N);
 /// private 'ovr-sub-overrider' (R) overrides ovr-sub-original and
@@ -322,7 +321,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: a switch RE-RENDERS
+  // ('docs/api-and-formats.org', "skgrepo-sets"): a switch RE-RENDERS
   // open views in place instead of closing them.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
@@ -390,9 +389,9 @@ async fn content_view_omits_restricted_contained_nodes (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: rendering OMITS
-  // restricted children (no placeholders); the weave preserves their
-  // memberships at save.
+  // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
+  // retention, and save preservation") rendering OMITS restricted children
+  // (no placeholders); the weave preserves their memberships at save.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config,
@@ -840,9 +839,10 @@ async fn stale_restricted_placeholders_under_folders_save_without_error (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: the formerly-unsavable
-  // buffer. A buffer rendered before a skgrepo-set switch can hold
-  // RestrictedVognodes under folders; saving it must not error.
+  // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
+  // retention, and save preservation") the formerly-unsavable buffer. A
+  // buffer rendered before a skgrepo-set switch can hold RestrictedVognodes
+  // under folders; saving it must not error.
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
         ** (skg subscriberFolder)
@@ -895,9 +895,10 @@ async fn weave_preserves_omitted_restricted_content_members (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org: under a restricted
-  // set, a buffer that omits restricted members must not delete them;
-  // visible edits (reorder, delete) still land.
+  // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
+  // retention, and save preservation") under a restricted set, a buffer
+  // that omits restricted members must not delete them; visible edits
+  // (reorder, delete) still land.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("public" . to_string ())) ?;
@@ -960,11 +961,12 @@ async fn restricted_save_preserves_invisible_override_targets (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The pipeline-level half of the second named regression
-  // (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org): a node overrides
-  // [ovr-visible, ovr-inactive] where ovr-inactive's skgrepo is
-  // restricted. Rendering restricted shows only ovr-visible; the
-  // set-difference merge must keep ovr-inactive across a restricted
-  // save, even when the visible member is deleted.
+  // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
+  // retention, and save preservation"): a node overrides [ovr-visible,
+  // ovr-inactive] where ovr-inactive's skgrepo is restricted. Rendering
+  // restricted shows only ovr-visible; the set-difference merge must keep
+  // ovr-inactive across a restricted save, even when the visible member is
+  // deleted.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           &config, SkgrepoSetName::from ("public") )?;

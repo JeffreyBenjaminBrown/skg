@@ -1,7 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_delete::)'
 //
-// TODO/more.org, "BUG :: make-content cleanup -> collateral view not
-// found": deleting a node whose viewnode is still present in ANOTHER
+// Deleting a node whose viewnode is still present in ANOTHER
 // open view must not make the save response complain about that
 // collateral view. Fixture mirrors the reported shape: P contains the
 // linking node L (whose title is one big link to X); a view of P
@@ -125,7 +124,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         write_protected_update );
       Ok (( )) } )) }
 
-/// TODO/more.org, "Warn the user when they make dangling links": a saved
+/// A saved
 /// title/body linking to an id that is neither in the graph nor
 /// created by the same save earns a nonfatal warning; a live link
 /// earns none. (Reuses this file's fixtures: X exists, L's title

@@ -1,5 +1,5 @@
 // The pruned change view and the "all changes" buffer of the diff view
-// ('TODO/total-diff-view/02_plan.org', its section on the pruned change view),
+// ('docs/diff-view.org', "C, R, U and D"),
 // over git fixtures in 'tests/pruned_change_view/fixtures/'.
 //
 // cargo nextest run --test grouped_repos -E 'test(pruned_change_view::)'

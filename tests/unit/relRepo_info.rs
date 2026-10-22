@@ -1,5 +1,5 @@
 //! Unit tests for the `relRepo info` endpoint's core
-//! ('relRepo_info', BUG-and-fix_make-edge-more-public.org): one
+//! ('relRepo_info'; 'docs/api-and-formats.org', "relRepo info"): one
 //! relationship's (default, current) relRepos, as served to the
 //! client's 'skg-set-relRepo' menu.
 

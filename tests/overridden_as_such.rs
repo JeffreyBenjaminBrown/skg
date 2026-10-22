@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(overridden_as_such::)'
 //
 // The overridden-as-such exception
-// (TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org), on
-// vision.org's R/E/G/H example: R subscribes to AND overrides E,
+// ('docs/override.org', "overriddenFolder: what this node overrides"),
+// on the R/E/G/H example: R subscribes to AND overrides E,
 // R hides H, E contains G and H. Extended with X overriding G, so
 // the no-cascade decision is observable:
 // - extending E under the subscribeeFolder applies R's hides (no H)

@@ -1,6 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(override_substitution::)'
 //
-// Override substitution (TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org):
+// Override substitution ('docs/override.org', "Automatic override
+// substitution"):
 // when completion would CREATE a viewnode for node N as recursive
 // content, and an owned, visible R overrides N, it shows R
 // instead, marked '(overridesHere N)' -- and saving such a view

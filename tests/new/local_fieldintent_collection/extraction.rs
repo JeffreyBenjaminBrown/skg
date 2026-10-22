@@ -1370,9 +1370,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
 }
 
 // The next several tests pin the membership-predicate wiring of
-// extraction, with one test per condition not already covered above
-// (TODO/DONE/local-fieldintent-collection/3_plan.org, predicate test
-// audit).
+// extraction, with one test per condition not already covered above.
 
 #[test]
 fn toDelete_member_is_excluded_from_subscribees (
@@ -1432,8 +1430,7 @@ fn independent_member_is_excluded_from_overriddens (
 fn duplicate_members_of_defining_folders_are_silently_deduplicated (
 ) {
   // Defining folders never squawk about repeats: emission
-  // deduplicates, preserving first-occurrence order
-  // (TODO/DONE/local-fieldintent-collection/3_plan.org).
+  // deduplicates, preserving first-occurrence order.
   let input : &str =
     indoc! {"
             * (skg (node (id recorder) (repo main))) recorder
@@ -1468,7 +1465,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
     MSV::Specified (vec![ID::from ("o1"), ID::from ("o2")])); }
 
 // The next four tests pin the editable-folder membership semantics that
-// the relationship matrix (stage 13) asks for at the cheapest seam:
+// the relationship matrix asks for at the cheapest seam:
 // subscribeeFolder order and one-member removal persist to
 // subscribesTo; overriddenFolder order does not matter (the
 // set-difference merge depends on this); and the write-protected hiddenFolder

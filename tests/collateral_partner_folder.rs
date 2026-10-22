@@ -1,8 +1,9 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_partner_folder::)'
 //
-// Two cells of the relationship matrix
-// (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org) that need an open
-// COLLATERAL view and the collateral rerender stream:
+// Two cells of the relationship matrix ('docs/sharing-model.org', "The
+// write-protected folders: who subscribes to, overrides, or hides this
+// node") that need an open COLLATERAL view and the collateral rerender
+// stream:
 //
 // 1. collateral folder-membership update: a view of N shows a
 //    subscriberFolder with member S; a save of a SECOND view that drops
@@ -13,8 +14,8 @@
 // 2. saved-view-only warning scoping: a repair that happens in the
 //    COLLATERAL view (a stale intruder under its subscriberFolder) while
 //    the saved buffer is clean must NOT add a repair warning to the
-//    save response -- collateral rerenders pass no warning sink
-//    (stage 8), so warnings stay scoped to the saved view.
+//    save response -- collateral rerenders pass no warning sink,
+//    so warnings stay scoped to the saved view.
 
 use std::error::Error;
 use std::io::BufReader;
@@ -148,14 +149,13 @@ fn collateral_partner_folder_update_and_warning_scoping
         n_collateral );
 
       // CELL 2 -- saved-view-only warning scoping: N's subscriberFolder
-      // changed in the collateral stream, but the change is not blamed
-      // on the saver -- the save response carries no folder-repair
-      // warning. (Stage 8 passes no warning sink to collateral
-      // rerenders; this pins the observable consequence. The stronger
-      // form -- a collateral view holding an UNREPAIRED stale member --
-      // is not reachable through register_view, whose viewforests are
-      // always post-reconciliation; that form stays enforced by
-      // construction. See progress.org.)
+      // changed in the collateral stream, but the change is not blamed on
+      // the saver -- the save response carries no folder-repair warning.
+      // (Collateral rerenders get no warning sink; this pins the observable
+      // consequence. The stronger form -- a collateral view holding an
+      // UNREPAIRED stale member -- is not reachable through register_view,
+      // whose viewforests are always post-reconciliation; that form stays
+      // enforced by construction.)
       assert! (
         ! response . warnings . iter () . any (
           |w| w . contains ("Repaired") ),

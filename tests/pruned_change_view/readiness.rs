@@ -2,7 +2,7 @@
 // readiness requests, the buffer is reconciled over the fresh graph
 // straddle with its readiness read from the store, and the response
 // carries the readiness summary
-// ('TODO/total-diff-view/02_plan.org', "Saving a diff-view buffer").
+// ('docs/diff-view.org', "The readiness summary").
 
 use crate::git_fixture::{Fixture, edit_line, save_cleanly};
 use crate::git_fixture_helpers::without_lines_containing;

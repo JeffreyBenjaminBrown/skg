@@ -1,5 +1,6 @@
 //! Flag suite for the telescope composition/decompose pair. The
-//! load-bearing laws (5_plan.org, section-format-and-fold):
+//! load-bearing laws ('docs/glossary.org', "composition (visible vs
+//! full), decomposition"):
 //! - compose(decompose(x)) == x for every list of relation partners ("round-trip");
 //! - decompose(compose(sections)) is idempotent from the first application
 //!   (decompose output is canonical);

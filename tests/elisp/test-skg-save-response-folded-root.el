@@ -2,12 +2,11 @@
 
 ;; Reproduces the bug where a single-root content view, saved while
 ;; fully folded (org-startup-folded behavior), comes back with the
-;; root headline missing from the buffer text. See Dear_Claude.org
-;; and the companion Rust test at tests/save/folded_single_root.rs.
+;; root headline missing from the buffer text.
 ;;
-;; The Rust test proves the server round-trip preserves the root, so
-;; the suspect is `skg-replace-buffer-with-new-content' and the
-;; client-side fold/unfold + focus processing it runs.
+;; The server round-trip preserves the root, so the suspect is
+;; `skg-replace-buffer-with-new-content' and the client-side fold/unfold +
+;; focus processing it runs.
 ;;
 ;; ROOT CAUSE (exposed by the failing test below):
 ;; After `skg-fold-marked-headlines' + `skg-remove-folded-metadata'

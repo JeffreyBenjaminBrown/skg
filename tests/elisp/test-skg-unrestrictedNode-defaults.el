@@ -426,7 +426,7 @@ here; see test-round-trip-with-links-in-herald's removal.)"
     (should (equal result sexp))))
 
 (ert-deftest test-fillIn-real-world-metadata ()
-  "Filling in a real-world metadata sexp (like from next.org bug report)
+  "Filling in a real-world metadata sexp (from a bug report)
 preserves repo and all fields."
   (let* ((sexp '(skg (node (id 6972d099)
                            (repo public)

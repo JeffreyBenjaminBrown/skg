@@ -1,13 +1,11 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_subscribee_staleness::)'
 //
-// Regression for the collateral-rerender staleness flagged in
-// subscribeeFolder-maybe-todo.org and fixed for forks (plan.org:
-// "Collateral-rerender staleness fix"). A EDITABLE subscriber open in
-// two views: changing its subscriptions in one view and saving must
+// Regression for a collateral-rerender staleness. A EDITABLE subscriber
+// open in two views: changing its subscriptions in one view and saving must
 // refresh the OTHER (collateral) view's subscribeeFolder from the graph,
 // not leave it showing the old subscription. Before the fix,
-// reconcile_subscribeeFolder_children skipped an editable subscriber,
-// so the collateral subscribeeFolder kept stale members.
+// reconcile_subscribeeFolder_children skipped an editable subscriber, so
+// the collateral subscribeeFolder kept stale members.
 //
 // Installs the explicit graph handle (the subscribee lookups read
 // the captured graph), so it lives among the grouped_overrides installers.

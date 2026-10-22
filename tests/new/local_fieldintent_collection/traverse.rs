@@ -1,8 +1,6 @@
 /// These are unit tests for the local-fieldintent-collection
 /// traversal
 /// (server/from_text/local_fieldintent_collection/traverse.rs).
-/// They cover the explicit case list in
-/// TODO/DONE/local-fieldintent-collection/3_plan.org, "testing".
 /// The traversal is pure and synchronous, so these tests need no db.
 
 use ego_tree::Tree;
@@ -144,7 +142,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
 
 #[test]
 fn aliasfolder_under_subscribee_as_such_emits_nothing () {
-  // This is the trap from the discussion: a naive implementation
+  // The trap: a naive implementation
   // would write the subscribee's aliases.
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"

@@ -133,7 +133,8 @@ async fn test_multi_root_view_logic (
                           "};
                           // 'omittedBody': node 1 HAS a body, and this
                           // (repeated, hence write-protected) occurrence of it
-                          // hides that body -- herald B (TODO/more.org).
+                          // hides that body -- herald B ('docs/heralds.org',
+                          // "Other heralds").
   assert_metadata_eq!(result, expected,
              "Multi-root view should produce exact expected output");
 

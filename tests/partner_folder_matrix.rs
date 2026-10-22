@@ -1,7 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_matrix::)'
 //
 // The batched relationship-matrix target
-// (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org). ONE test function builds
+// ('docs/sharing-model.org', "The write-protected folders: who
+// subscribes to, overrides, or hides this node"). ONE test function builds
 // ONE database of mutually independent subgraphs (IDs prefixed by
 // scenario), then runs the matrix scenarios serially against it: de
 // novo omission of unrequested write-protected folders, and -- after explicit
@@ -12,10 +13,8 @@
 // test fails once at the end, so one broken folder does not mask the
 // rest.
 //
-// DEVIATION from the plan (recorded in progress.org): instead of
-// before.org/after.org file pairs, each scenario uses a fixture-local graph
-// to render de novo. Rather than
-// hand-author expected buffers, each scenario renders de novo, edits
+// Instead of before.org/after.org file pairs or hand-authored expected
+// buffers, each scenario uses a fixture-local graph, renders de novo, edits
 // the real rendered text, saves, and asserts on the saved view, its
 // warnings, and (for editable folders) the would-be disk lists -- the
 // established style of partner_folder_order / partner_folder_warnings, which

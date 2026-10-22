@@ -336,7 +336,7 @@ For that binding to work, the function must satisfy `commandp'
                       ("another-id" "another") )))
     (kill-buffer "*skg-linkstack*") ))
 
-(progn ;; skg-nearest-id in a raw .skg file (TODO/more.org): bare
+(progn ;; skg-nearest-id in a raw .skg file: bare
   ;; UUIDs count, and nearest means nearest, with ambiguity between.
   (defconst test-skg--uuid-a "11111111-1111-4111-8111-111111111111")
   (defconst test-skg--uuid-b "22222222-2222-4222-8222-222222222222")

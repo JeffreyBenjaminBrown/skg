@@ -1,11 +1,11 @@
 // cargo nextest run --test grouped_saves -E 'test(merge::merge_hides_intersection)'
 //
-// TODO/more.org, "Take something like the intersection of hides when
-// merging": whatever EITHER member showed as unintegrated subscribed
-// content pre-merge -- contained in one of its subscribees, unhidden
-// by and not contained in that member -- the merged node must keep
-// showing, so such ids are dropped from the combined hides. Hides
-// nobody's view contradicted survive the union.
+// A nodeMerge takes something like the intersection of hides: whatever
+// EITHER member showed as unintegrated subscribed content pre-merge --
+// contained in one of its subscribees, unhidden by and not contained in
+// that member -- the merged node must keep showing, so such ids are dropped
+// from the combined hides. Hides nobody's view contradicted survive the
+// union.
 //
 // Fixture: a hides [x, z]; b subscribes to e and hides [y];
 // e contains [x, y]. So pre-merge b SHOWS x (e contains it, b

@@ -105,7 +105,7 @@
 (ert-deftest test-sexp-edit-herald-hints-appear-as-overlays ()
   "The metadata view appends, per field/value headline, the herald it
 produces -- as an overlay (never buffer text), colored tokens inside
-plain parens (TODO/more.org). Fields producing no herald get none."
+plain parens. Fields producing no herald get none."
   (skg-test-install-herald-rules)
   (with-temp-buffer
     (insert "* skg\n** node\n*** repo\n**** main\n*** writeProtected\n"

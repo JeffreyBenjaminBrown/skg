@@ -1,5 +1,5 @@
-// The "stage and commit" request ('TODO/total-diff-view/02_plan.org',
-// "the summary and the commit"), over the 'buffers' fixture, whose
+// The "stage and commit" request ('docs/diff-view.org', "Stage and
+// commit"), over the 'buffers' fixture, whose
 // owned skgrepos public and private both have changes, deletions
 // among them.
 

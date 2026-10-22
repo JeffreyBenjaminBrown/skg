@@ -1,15 +1,14 @@
 // cargo nextest run --test grouped_repos -E 'test(leak_battery::)'
 //
-// THE LEAK BATTERY (TODO/DONE/privacy-telescope/5_plan.org, work
-// item render-and-gating): a membership's relRepo, not just the
-// member node's own skgrepo, gates whether it renders. Fixtures pin
-// the shape the sweep exists to close: a PUBLIC node (N) whose
-// PRIVATE section privately contains/subscribesTo another PUBLIC
-// node (C) -- a private reading-list entry between two nodes that
-// are each individually visible at every skgrepo. Without relRepo
-// gating this leaks by omission (a public session would still show
-// the private membership) or by appearance (inbound surfaces would
-// reveal N/S even though the content direction hides them).
+// THE LEAK BATTERY ('docs/telescopes.org', "What lives where"): a
+// membership's relRepo, not just the member node's own skgrepo, gates
+// whether it renders. Fixtures pin the shape the sweep exists to close: a
+// PUBLIC node (N) whose PRIVATE section privately contains/subscribesTo
+// another PUBLIC node (C) -- a private reading-list entry between two nodes
+// that are each individually visible at every skgrepo. Without relRepo
+// gating this leaks by omission (a public session would still show the
+// private membership) or by appearance (inbound surfaces would reveal N/S
+// even though the content direction hides them).
 //
 // Fixture telescope (tests/leak_battery/fixtures):
 // - C: public home only ("leak-battery-C").
@@ -318,12 +317,12 @@ fn ancestor_heralds_gate_privately_recorded_relations (
 #[test]
 fn a_lowered_relationship_is_governed_by_its_new_level (
 ) {
-  // BUG-and-fix_make-edge-more-public.org: after the explicit
-  // gesture lowers a relationship's privacy to its default, the gated
-  // surfaces follow the NEW skgrepo -- the relationship appears under sets
-  // that include that skgrepo, while a sibling relationship still more private than its
-  // default stays hidden. Lowering to the default cannot leak: by
-  // definition both endpoints' homes are at least as public as it.
+  // ('docs/telescopes.org', "Setting a relationship's skgrepo"): after the
+  // explicit gesture lowers a relationship's privacy to its default, the
+  // gated surfaces follow the NEW skgrepo -- the relationship appears under
+  // sets that include that skgrepo, while a sibling relationship still more
+  // private than its default stays hidden. Lowering to the default cannot
+  // leak: by definition both endpoints' homes are at least as public as it.
   use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
   use skg::types::misc::{RelPartner, SkgrepoName};
   use skg::types::nodes::complete::empty_graphnode;

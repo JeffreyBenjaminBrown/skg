@@ -1,4 +1,4 @@
-// Binary grouping (TODO/DONE/faster-tests.org): view rendering and
+// Binary grouping: view rendering and
 // subscription-visibility tests. See tests/grouped_unit.rs for why
 // test files are grouped into a few [[test]] targets.
 

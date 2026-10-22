@@ -159,7 +159,7 @@ fn assert_hides_e1_in_subscribee_folder (
   buffer : &str,
 ) {
   assert! (
-    // 'folded': a new hidden folder begins folded (TODO/DONE/fork-fixes.org),
+    // 'folded': a new hidden folder begins folded,
     // expressed as a folded atom on each member.
     buffer . contains ("**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
     "Expected e1 to be rendered folded under HiddenInSubscribeeFolder:\n{}",
@@ -427,12 +427,12 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       r_skg . hidesFromSubs );
     Ok (( )) }
 
-/// The contains-removal rule (TODO/DONE/fork-fixes.org, "Editing a forked
-/// node is bad"): owned f contains [c, x] and subscribes to o, whose
-/// contains include c (but not x). Saving f WITHOUT its children must
-/// hide c (it would otherwise reappear under f as unintegrated
-/// subscribed content), and must NOT hide x (no subscribee contains
-/// it -- deleting it is an ordinary contains edit).
+/// The contains-removal rule ('docs/forks.org', "Editing the clone:
+/// deletions become hides"): owned f contains [c, x] and subscribes to o,
+/// whose contains include c (but not x). Saving f WITHOUT its children must
+/// hide c (it would otherwise reappear under f as unintegrated subscribed
+/// content), and must NOT hide x (no subscribee contains it -- deleting it
+/// is an ordinary contains edit).
 async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -600,7 +600,8 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
         "** (skg (node (id e1) (repo foreign) writeProtected" ),
       "Expected e1 to remain ordinary content of r:\n{}",
       rerendered );
-    // Regression (forks plan.org Prerequisite): e1, now contained by the
+    // Regression ('docs/forks.org', "Unintegrated content: the
+    // subscribeeFolder"): e1, now contained by the
     // subscriber r, must NOT also re-appear as unintegrated subscribee-as-such
     // content. Before the contains-subtraction fix it showed twice -- once as
     // r's integrated content (above) and once under the subscribee-as-such.

@@ -10,8 +10,7 @@ use ego_tree::Tree;
 // The orderkey closure is fallible: a managed child whose kind the
 // closure cannot extract an orderkey from must surface as an Err from
 // 'complete_managed_children_in_viewforest', not as a panic inside
-// the closure. (TODO/problems.org recorded the panic; Jeff approved
-// the Err conversion 2026-06-10.)
+// the closure.
 #[test]
 fn managed_child_of_wrong_kind_yields_err_not_panic () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());

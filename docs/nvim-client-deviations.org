@@ -4,7 +4,7 @@
 # why the difference was necessary (or, in two marked cases, an
 # improvement taken deliberately). Anything not listed here is
 # intended to behave identically; if it doesn't, that's a bug worth
-# reporting in ../problems.org.
+# reporting in ../TODO/problems.org.
 #
 # Wire compatibility is total: same protocol, same requests, same
 # metadata grammar, zero server changes.

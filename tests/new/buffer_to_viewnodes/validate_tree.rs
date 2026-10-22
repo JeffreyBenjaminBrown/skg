@@ -796,9 +796,10 @@ fn test_restricted_placeholder_content_edits_rejected_at_parse_time () {
 
 #[test]
 fn test_restricted_placeholder_unrestricted_children_allowed_locally () {
-  // TODO/DONE/full-schema/DONE/9-2_source-set-safety.org, the retained case:
-  // a restricted node stays on screen because of its unrestricted
-  // children, so a RestrictedVognode with unrestricted children must pass.
+  // The retained case ('docs/api-and-formats.org', "Restricted-skgrepo
+  // nodes: omission, retention, and save preservation"): a restricted node
+  // stays on screen because of its unrestricted children, so a
+  // RestrictedVognode with unrestricted children must pass.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
@@ -889,7 +890,7 @@ fn restricted_placeholder_does_not_collide_with_content () {
 fn duplicate_members_of_defining_folders_pass_validation () {
   // Defining folders (SubscribeeFolder, OverriddenFolder; aliases were always
   // exempt) silently deduplicate at emission instead of bouncing the
-  // save (TODO/DONE/local-fieldintent-collection/3_plan.org).
+  // save.
   let input : &str =
     indoc! {"
       * (skg (node (id recorder) (repo main))) recorder

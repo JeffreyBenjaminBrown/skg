@@ -496,8 +496,7 @@ for an alias headline. An Unknown phantom in one of those writable
 positions is supported too: it carries only its raw relationship member ID,
 never a node edit. (Formerly
 =skg-privatize-relationship=; renamed because the gesture now moves
-privacy in both directions, see
-=BUG-and-fix_make-edge-more-public.org=.)
+privacy in both directions.)
 
 For a node-to-node relationship, the command asks the server for its default
 relRepo and current relRepo (the

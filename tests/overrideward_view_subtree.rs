@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
 //
 // Overrideward view-subtrees + suppression in search results
-// (TODO/DONE/override-ancestry-in-search-results.org).
+// ('docs/override.org', "Overrideward view-subtrees in search results").
 //
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
 // "main" holds U, which overrides foreign F, which overrides foreign

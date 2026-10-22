@@ -1,7 +1,7 @@
-// The "investigate unknown node" request
-// ('TODO/total-diff-view/02_plan.org', "Investigating an unknown
-// node"). One gitrepo: p contains v, ghost and w; v, which contains w
-// and links to it, is deleted in a second commit; ghost never existed.
+// The "investigate unknown node" request ('docs/diff-view.org',
+// "Investigating an unknown node"). One gitrepo: p contains v, ghost and w;
+// v, which contains w and links to it, is deleted in a second commit; ghost
+// never existed.
 
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::serve::handlers::investigate_unknown_node::handle_investigate_unknown_node_request;

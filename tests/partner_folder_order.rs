@@ -2,7 +2,8 @@
 //
 // A FolderPolicy::WriteProtectedSet folder (here a SubscriberFolder) respects the
 // user's view-local member order across save and rerender
-// (TODO/DONE/full-schema/DONE/8_readonly-set-ergonomics.org): present members
+// ('docs/sharing-model.org', "The write-protected folders: who
+// subscribes to, overrides, or hides this node"): present members
 // keep their buffer order, and the order survives a further
 // unchanged save. The order never reaches disk; it is view-local.
 //

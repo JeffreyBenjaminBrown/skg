@@ -1,4 +1,4 @@
-// Binary grouping (TODO/DONE/faster-tests.org): override / PartnerFolder
+// Binary grouping: override / PartnerFolder
 // tests. See tests/grouped_unit.rs for why test files are grouped
 // into a few [[test]] targets.
 // Store-using tests across this binary are serialized by the fixture mutex in

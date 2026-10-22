@@ -9,8 +9,7 @@
 #   bash/migrate-to-author-folders.sh path/to/skgconfig.toml [owned_folder]
 #
 # Idempotent: a config with no 'user_owns_it' lines is left untouched.
-# See TODO/DONE/privacy-telescope/5_plan.org, work item
-# privacy-order.
+# See docs/api-and-formats.org, "Skgrepos".
 
 set -euo pipefail
 CONFIG="${1:?usage: migrate-to-author-folders.sh CONFIG [OWNED_FOLDER]}"

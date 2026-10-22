@@ -64,10 +64,7 @@ the clone landed in the rotated repo."
     (with-current-buffer confirm-buf
       ;; The server pre-fills the PICK-A-REPO placeholder and only
       ;; SUGGESTS the inferred skgrepo in a comment line (fork.rs;
-      ;; documented in docs/COMMANDS.org and glossary.org). An earlier
-      ;; version of this test asserted "(repo owned)" directly,
-      ;; which predates the placeholder mechanism -- see the 2026-07-02
-      ;; entry in TODO/problems.org.
+      ;; documented in docs/COMMANDS.org and glossary.org).
       (unless (string-match-p "(repo PICK-A-REPO)" (buffer-string))
         (test-fail "clone-to-be should carry the PICK-A-REPO placeholder:\n%s"
                    (buffer-string)))

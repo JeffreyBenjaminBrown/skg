@@ -1,4 +1,4 @@
-// Binary grouping (TODO/DONE/faster-tests.org): save-pipeline, merge,
+// Binary grouping: save-pipeline, merge,
 // and parsing/extraction tests. See tests/grouped_unit.rs for why
 // test files are grouped into a few [[test]] targets.
 
