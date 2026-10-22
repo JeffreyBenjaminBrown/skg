@@ -663,6 +663,29 @@ of the diff view are rerendered: each keeps its roots, its
 folding and what it drew editable, and what was committed no longer
 shows as a change. The
 commit lapses the marks of everything it committed.
+*** C-c r n c : skg-diffView-goto-next-change
+Moves point to the next change headline after point: a headline whose
+metadata carries a '(leaves ...)' fact, the server's count of the
+changes it names. Point lands on the headline's metadata, as with
+C-c i n. It does not wrap: past the last one it says "No further
+change" and leaves point. It works in any skg buffer; outside the
+diff view no headline names a change, so it finds none.
+*** C-c r n u : skg-diffView-goto-next-unready-change
+The same, visiting only change headlines that are not ready (see
+C-c r r for when a headline counts as ready). Past the last one it
+says "No further unready change".
+*** C-c r n r : skg-diffView-goto-next-ready-change
+The same, visiting only ready change headlines. Past the last one it
+says "No further ready change".
+*** C-c r p c : skg-diffView-goto-previous-change
+Like C-c r n c, backward: moves point to the previous change headline
+before point. Before the first one it says "No earlier change".
+*** C-c r p u : skg-diffView-goto-previous-unready-change
+Like C-c r n u, backward. Before the first one it says "No earlier
+unready change".
+*** C-c r p r : skg-diffView-goto-previous-ready-change
+Like C-c r n r, backward. Before the first one it says "No earlier
+ready change".
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the

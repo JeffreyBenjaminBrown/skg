@@ -525,6 +525,15 @@ descendant whose home moved between the same two skgrepos. Both work
 on write-protected occurrences. A gesture that would unmark more than
 one leaf, counting each request's leaves as '(leaves N ...)' does,
 first asks for a typed "yes".
+
+Six commands move point between change headlines, the headlines
+whose metadata carries a '(leaves ...)' fact: C-c r n c
+('skg-diffView-goto-next-change') to the next, C-c r n u to the next
+unready one and C-c r n r to the next ready one, and C-c r p c, C-c r
+p u and C-c r p r to the previous ones. A change headline is ready
+when its '(ready ...)' names every object its '(leaves ...)' lists.
+They do not wrap: at the end they say "No further change" (or "No
+earlier change", with "unready" or "ready" for the filtered forms).
 ** The readiness summary
 After every save of a buffer of the diff view, after C-c r u, and
 before a stage-and-commit that would leave changes behind, the client

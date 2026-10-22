@@ -31,6 +31,7 @@
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
 
+(require 'cl-lib)
 (require 'org)
 (require 'seq)
 (require 'skg-metadata)
@@ -306,6 +307,90 @@ on a property. A headline without the form gets one."
      (if (eq host metadata-sexp)
          `(skg ,diff-edit)
        `(skg (,(car host) ,diff-edit))))))
+
+;;; Moving between change headlines
+;;; A change headline is one whose metadata carries a '(leaves ...)'
+;;; fact. It is ready when its '(ready ...)' names every object that
+;;; fact lists, and otherwise unready. Outside the diff view no
+;;; headline carries one, so these commands report no change there.
+
+(defun skg-diffView-goto-next-change ()
+  "Move point to the next change headline after point."
+  (interactive)
+  (skg--diffView-goto-change 'next nil))
+
+(defun skg-diffView-goto-next-unready-change ()
+  "Move point to the next unready change headline after point."
+  (interactive)
+  (skg--diffView-goto-change 'next 'unready))
+
+(defun skg-diffView-goto-next-ready-change ()
+  "Move point to the next ready change headline after point."
+  (interactive)
+  (skg--diffView-goto-change 'next 'ready))
+
+(defun skg-diffView-goto-previous-change ()
+  "Move point to the previous change headline before point."
+  (interactive)
+  (skg--diffView-goto-change 'previous nil))
+
+(defun skg-diffView-goto-previous-unready-change ()
+  "Move point to the previous unready change headline before point."
+  (interactive)
+  (skg--diffView-goto-change 'previous 'unready))
+
+(defun skg-diffView-goto-previous-ready-change ()
+  "Move point to the previous ready change headline before point."
+  (interactive)
+  (skg--diffView-goto-change 'previous 'ready))
+
+(defun skg--diffView-goto-change (direction readiness)
+  "Move point to the nearest change headline after point (DIRECTION
+'next) or before it (DIRECTION 'previous), in buffer order, without
+wrapping: one whose readiness is READINESS ('ready or 'unready), or
+any change headline when READINESS is nil. Point lands where
+`skg-id-next' puts it on a headline, the opening paren of its
+metadata. When there is none, say so and leave point."
+  (let ((target (skg--diffView-change-position direction readiness)))
+    (if target
+        (goto-char target)
+      (message "%s"
+               (concat "No "
+                       (if (eq direction 'next) "further" "earlier")
+                       (when readiness
+                         (concat " " (symbol-name readiness)))
+                       " change")))))
+
+(defun skg--diffView-change-position (direction readiness)
+  "Where `skg--diffView-goto-change' would move point, or nil."
+  (let ((start-pos (point))
+        (step (if (eq direction 'next) 1 -1)))
+    (save-excursion
+      (beginning-of-line)
+      (cl-loop for change-pos = (skg--diffView-change-start-on-line
+                                 readiness)
+               when (and change-pos
+                         (if (eq direction 'next)
+                             (> change-pos start-pos)
+                           (< change-pos start-pos)))
+               return change-pos
+               while (and (zerop (forward-line step))
+                          (not (eobp)))))))
+
+(defun skg--diffView-change-start-on-line (readiness)
+  "On a change headline whose readiness is READINESS (any when nil),
+the position of its metadata's opening paren; otherwise nil."
+  (when (looking-at "^\\*+ (skg")
+    (let ((metadata-start (- (match-end 0) 4))
+          (metadata-sexp (ignore-errors
+                           (skg--metadata-sexp-at-point-or-nil))))
+      (when (and metadata-sexp
+                 (skg--readiness-leaves metadata-sexp)
+                 (pcase readiness
+                   ('ready (skg--readiness-ready-p metadata-sexp))
+                   ('unready (not (skg--readiness-ready-p metadata-sexp)))
+                   (_ t)))
+        metadata-start))))
 
 ;;; The readiness summary
 

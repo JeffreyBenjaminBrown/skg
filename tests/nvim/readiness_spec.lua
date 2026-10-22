@@ -330,3 +330,115 @@ describe('skg.save readiness summary', function ()
       end, shown))
   end)
 end)
+
+describe('skg.readiness moving between change headlines', function ()
+  -- Mirrors the 'goto-change' tests of
+  -- tests/elisp/test-skg-readiness.el.
+
+  ---Three change headlines (lines 2, 4 and 6), the middle one ready,
+  ---among headlines that carry no leaves fact, one of them a ready
+  ---folder; line 7 is empty, the buffer's end.
+  local change_headlines = {
+    '* (skg (node (id r) (repo main))) r',
+    '** (skg (node (id a) (repo main) (diff (presence node+) (leaves 1 node)))) a',
+    '*** (skg (node (id b) (repo main))) b',
+    '** (skg (node (id c) (repo main) (diff (presence node~) (leaves 2 all) (ready all)))) c',
+    '** (skg (containerFolder changed) (ready)) its containers',
+    '*** (skg removedAlias (diff (presence rel-) (leaves 1))) a1',
+    '' }
+
+  ---Fill a buffer with LINES, put the cursor at the start of line
+  ---FROM, and run COMMAND TIMES times. Return the line each run left
+  ---the cursor on, or the message of a run that did not move it. A
+  ---run that moves leaves the cursor on '(skg'.
+  local function goto_changes (lines, from, command, times)
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.api.nvim_set_current_buf(buf)
+    vim.api.nvim_win_set_cursor(0, { from, 0 })
+    local results = {}
+    local original_notify = vim.notify
+    local ok, err = pcall(function ()
+      for _ = 1, times do
+        local shown = nil
+        vim.notify = function (message) shown = message end
+        local before = vim.api.nvim_win_get_cursor(0)
+        command()
+        local after = vim.api.nvim_win_get_cursor(0)
+        if before[1] == after[1] and before[2] == after[2] then
+          table.insert(results, shown)
+        else
+          local line = vim.api.nvim_buf_get_lines(
+            buf, after[1] - 1, after[1], false)[1]
+          assert.are.equal('(skg', line:sub(after[2] + 1, after[2] + 4))
+          table.insert(results, after[1])
+        end
+      end
+    end)
+    vim.notify = original_notify
+    vim.api.nvim_buf_delete(buf, { force = true })
+    assert(ok, err)
+    return results
+  end
+
+  it('visits the change headlines of each kind and reports the ends',
+     function ()
+    assert.are.same({ 2, 4, 6, 'No further change' },
+      goto_changes(change_headlines, 1,
+                   readiness.diffView_goto_next_change, 4))
+    assert.are.same({ 2, 6, 'No further unready change' },
+      goto_changes(change_headlines, 1,
+                   readiness.diffView_goto_next_unready_change, 3))
+    assert.are.same({ 4, 'No further ready change' },
+      goto_changes(change_headlines, 1,
+                   readiness.diffView_goto_next_ready_change, 2))
+    assert.are.same({ 6, 4, 2, 'No earlier change' },
+      goto_changes(change_headlines, 7,
+                   readiness.diffView_goto_previous_change, 4))
+    assert.are.same({ 6, 2, 'No earlier unready change' },
+      goto_changes(change_headlines, 7,
+                   readiness.diffView_goto_previous_unready_change, 3))
+    assert.are.same({ 4, 'No earlier ready change' },
+      goto_changes(change_headlines, 7,
+                   readiness.diffView_goto_previous_ready_change, 2))
+    -- From the middle, each direction starts at the cursor.
+    assert.are.same({ 2 },
+      goto_changes(change_headlines, 3,
+                   readiness.diffView_goto_previous_change, 1))
+    assert.are.same({ 6 },
+      goto_changes(change_headlines, 3,
+                   readiness.diffView_goto_next_unready_change, 1))
+  end)
+
+  it('finds no change where no headline carries a leaves fact',
+     function ()
+    assert.are.same({ 'No further change' },
+      goto_changes({ '* (skg (node (id r) (repo main))) r',
+                     '** (skg (node (id a) (repo main))) a' }, 1,
+                   readiness.diffView_goto_next_change, 1))
+  end)
+
+  it('binds the six commands under <localleader>rn and rp', function ()
+    local keymaps = require('skg.keymaps')
+    local by_lhs = {}
+    for _, binding in ipairs(keymaps.content_view_bindings) do
+      by_lhs[binding[1]] = binding[2] end
+    local expected = {
+      rnc = { 'DiffViewGotoNextChange', 'diffView_goto_next_change' },
+      rnu = { 'DiffViewGotoNextUnreadyChange',
+              'diffView_goto_next_unready_change' },
+      rnr = { 'DiffViewGotoNextReadyChange', 'diffView_goto_next_ready_change' },
+      rpc = { 'DiffViewGotoPreviousChange', 'diffView_goto_previous_change' },
+      rpu = { 'DiffViewGotoPreviousUnreadyChange',
+              'diffView_goto_previous_unready_change' },
+      rpr = { 'DiffViewGotoPreviousReadyChange',
+              'diffView_goto_previous_ready_change' } }
+    for lhs, names in pairs(expected) do
+      assert.are.equal(names[1], by_lhs[lhs], lhs)
+      local spec = keymaps.commands[names[1]]
+      assert.are.equal('skg.readiness', spec.module, lhs)
+      assert.are.equal(names[2], spec.fn, lhs)
+      assert.is_function(readiness[spec.fn], lhs)
+    end
+  end)
+end)

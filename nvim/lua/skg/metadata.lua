@@ -83,6 +83,17 @@ function M.next_headline_line (line_number)
   return nil
 end
 
+---The 1-based line of the nearest headline before LINE_NUMBER, or
+---nil. The stand-in for outline-previous-heading.
+---@param line_number integer
+---@return integer|nil
+function M.previous_headline_line (line_number)
+  for candidate = line_number - 1, 1, -1 do
+    if M.at_headline_p(candidate) then return candidate end
+  end
+  return nil
+end
+
 ---The 1-based line of the nearest headline at or above LINE_NUMBER
 ---whose level is below LEVEL, or nil. The stand-in for
 ---org-up-heading-safe.

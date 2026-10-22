@@ -156,6 +156,93 @@ function M.ready_p (metadata_sexp)
          and child_with_head(metadata_sexp, 'ready') ~= nil
 end
 
+-- ── moving between change headlines ─────────────────────────────
+-- A change headline is one whose metadata carries a '(leaves ...)'
+-- fact. It is ready when its '(ready ...)' names every object that
+-- fact lists, and otherwise unready. Outside the diff view no
+-- headline carries one, so these commands report no change there.
+
+function M.diffView_goto_next_change ()
+  M.diffView_goto_change('next', nil)
+end
+
+function M.diffView_goto_next_unready_change ()
+  M.diffView_goto_change('next', 'unready')
+end
+
+function M.diffView_goto_next_ready_change ()
+  M.diffView_goto_change('next', 'ready')
+end
+
+function M.diffView_goto_previous_change ()
+  M.diffView_goto_change('previous', nil)
+end
+
+function M.diffView_goto_previous_unready_change ()
+  M.diffView_goto_change('previous', 'unready')
+end
+
+function M.diffView_goto_previous_ready_change ()
+  M.diffView_goto_change('previous', 'ready')
+end
+
+---Move point to the nearest change headline after point (DIRECTION
+---'next') or before it (DIRECTION 'previous'), in buffer order,
+---without wrapping: one whose readiness is READINESS ('ready' or
+---'unready'), or any change headline when READINESS is nil. Point
+---lands where id_next puts it on a headline, the opening paren of its
+---metadata. When there is none, say so and leave point.
+---@param direction string
+---@param readiness string|nil
+function M.diffView_goto_change (direction, readiness)
+  local target = M.diffView_change_position(direction, readiness)
+  if target then
+    vim.api.nvim_win_set_cursor(0, target)
+  else
+    vim.notify('No '
+               .. (direction == 'next' and 'further' or 'earlier')
+               .. (readiness and (' ' .. readiness) or '')
+               .. ' change') end
+end
+
+---Where diffView_goto_change would move point, as {line, col}, or nil.
+---@param direction string
+---@param readiness string|nil
+---@return table|nil
+function M.diffView_change_position (direction, readiness)
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local col = M.diffView_change_start_on_line(cursor[1], readiness)
+  if col and (direction == 'next' and col > cursor[2]
+              or direction == 'previous' and col < cursor[2]) then
+    return { cursor[1], col } end
+  local step = direction == 'next' and metadata.next_headline_line
+                                   or metadata.previous_headline_line
+  local line_number = step(cursor[1])
+  while line_number do
+    col = M.diffView_change_start_on_line(line_number, readiness)
+    if col then return { line_number, col } end
+    line_number = step(line_number)
+  end
+  return nil
+end
+
+---On a change headline at LINE_NUMBER whose readiness is READINESS
+---(any when nil), the 0-based column of its metadata's opening
+---paren; otherwise nil.
+---@param line_number integer
+---@param readiness string|nil
+---@return integer|nil
+function M.diffView_change_start_on_line (line_number, readiness)
+  local stars = metadata.line_text(line_number):match('^(%*+ )%(skg')
+  if not stars then return nil end
+  local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
+  if not (metadata_sexp and M.leaves(metadata_sexp)) then return nil end
+  if readiness == 'ready' and not M.ready_p(metadata_sexp)
+     or readiness == 'unready' and M.ready_p(metadata_sexp) then
+    return nil end
+  return #stars
+end
+
 ---The {old, new} skgrepos of METADATA_SEXP when it is a home move.
 ---@param metadata_sexp any
 ---@return string[]|nil

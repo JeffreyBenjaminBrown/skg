@@ -170,6 +170,24 @@ M.commands = {
     desc = 'Make every change of this diff-view buffer editable, appending roots as needed' },
   StageAndCommit = { module = 'skg.stage_and_commit', fn = 'stage_and_commit',
                      desc = 'Stage and git-commit every owned skgrepo with changes, with one message' },
+  DiffViewGotoNextChange = { module = 'skg.readiness',
+                             fn = 'diffView_goto_next_change',
+                             desc = 'Move to the next change headline' },
+  DiffViewGotoNextUnreadyChange = { module = 'skg.readiness',
+                                    fn = 'diffView_goto_next_unready_change',
+                                    desc = 'Move to the next unready change headline' },
+  DiffViewGotoNextReadyChange = { module = 'skg.readiness',
+                                  fn = 'diffView_goto_next_ready_change',
+                                  desc = 'Move to the next ready change headline' },
+  DiffViewGotoPreviousChange = { module = 'skg.readiness',
+                                 fn = 'diffView_goto_previous_change',
+                                 desc = 'Move to the previous change headline' },
+  DiffViewGotoPreviousUnreadyChange = { module = 'skg.readiness',
+                                        fn = 'diffView_goto_previous_unready_change',
+                                        desc = 'Move to the previous unready change headline' },
+  DiffViewGotoPreviousReadyChange = { module = 'skg.readiness',
+                                      fn = 'diffView_goto_previous_ready_change',
+                                      desc = 'Move to the previous ready change headline' },
   InvestigateUnknownNode = { module = 'skg.investigate_unknown_node',
                              fn = 'investigate_unknown_node',
                              desc = 'Show what git history says about an unknown node' },
@@ -271,6 +289,12 @@ M.content_view_bindings = {
   { 'rH', 'ToggleHomeSkgrepoMoveCommitReadyRecursive' }, -- C-u C-c r h
   { 'ru', 'DiffViewIntegrateUnshownChanges' }, -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
+  { 'rnc', 'DiffViewGotoNextChange' },            -- C-c r n c
+  { 'rnu', 'DiffViewGotoNextUnreadyChange' },     -- C-c r n u
+  { 'rnr', 'DiffViewGotoNextReadyChange' },       -- C-c r n r
+  { 'rpc', 'DiffViewGotoPreviousChange' },        -- C-c r p c
+  { 'rpu', 'DiffViewGotoPreviousUnreadyChange' }, -- C-c r p u
+  { 'rpr', 'DiffViewGotoPreviousReadyChange' },   -- C-c r p r
   { 'sx', 'SetFlagSearchMatching' },
   { 'sX', 'SetFlagSearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c

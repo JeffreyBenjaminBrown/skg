@@ -1103,7 +1103,7 @@ foreign skgrepo whose manifest contradicts the config (the fixture of
 'tests/unit/dependencies_manifest.rs:155-191'); the Rust, Emacs and
 Neovim suites.
 
-** TODO Slice 8: the clients: set-repo, the prologue, navigation
+** DONE Slice 8: the clients: set-repo, the prologue, navigation
 Make the changes under "The clients: set-repo, the prologue,
 navigation" above, in that order. Tests: Neovim gains the three
 set-repo cases Emacs has ('test-skg-set-relRepo.el:693, :725, :756'),

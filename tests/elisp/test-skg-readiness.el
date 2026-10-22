@@ -7,6 +7,7 @@
 (require 'org)
 (require 'skg-readiness)
 (require 'skg-request-save) ; for skg-handle-save-sexp
+(require 'skg-keymaps-and-aliases)
 
 (defun test-skg-readiness--run (lines line-number command
                                        &optional prefix answer)
@@ -313,3 +314,88 @@ siblings, or a child without metadata."
          "((content \"* (skg (node (id a))) a\n\") (errors ()) (warnings ()))"))
       (should-not (seq-some (lambda (line) (string-match-p "changed files" line))
                             shown)))))
+
+;;; Moving between change headlines
+
+(defconst test-skg-readiness--change-headlines
+  '("* (skg (node (id r) (repo main))) r"
+    "** (skg (node (id a) (repo main) (diff (presence node+) (leaves 1 node)))) a"
+    "*** (skg (node (id b) (repo main))) b"
+    "** (skg (node (id c) (repo main) (diff (presence node~) (leaves 2 all) (ready all)))) c"
+    "** (skg (containerFolder changed) (ready)) its containers"
+    "*** (skg removedAlias (diff (presence rel-) (leaves 1))) a1")
+  "Three change headlines (lines 2, 4 and 6), the middle one ready,
+among headlines that carry no leaves fact, one of them a ready folder.")
+
+(defun test-skg-readiness--goto-changes (lines from command times)
+  "Insert LINES, put point at the start of line FROM (or at the
+buffer's end when FROM is nil), and run COMMAND TIMES times. Return
+the line each run left point on, or the message of a run that did
+not move it. A run that moves leaves point on '(skg'."
+  (with-temp-buffer
+    (org-mode)
+    (insert (mapconcat #'identity lines "\n") "\n")
+    (if from
+        (progn (goto-char (point-min)) (forward-line (1- from)))
+      (goto-char (point-max)))
+    (let ((results '()))
+      (dotimes (_ times)
+        (let* ((before (point))
+               (shown nil))
+          (cl-letf (((symbol-function 'message)
+                     (lambda (fmt &rest args)
+                       (setq shown (apply #'format fmt args)))))
+            (funcall command))
+          (if (= before (point))
+              (push shown results)
+            (should (looking-at-p "(skg"))
+            (push (line-number-at-pos) results))))
+      (nreverse results))))
+
+(ert-deftest test-skg-diffView-goto-change-commands ()
+  "Each of the six commands visits the change headlines of its kind in
+buffer order and reports the end without wrapping."
+  (let ((lines test-skg-readiness--change-headlines))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines 1 #'skg-diffView-goto-next-change 4)
+                   '(2 4 6 "No further change")))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines 1 #'skg-diffView-goto-next-unready-change 3)
+                   '(2 6 "No further unready change")))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines 1 #'skg-diffView-goto-next-ready-change 2)
+                   '(4 "No further ready change")))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines nil #'skg-diffView-goto-previous-change 4)
+                   '(6 4 2 "No earlier change")))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines nil #'skg-diffView-goto-previous-unready-change 3)
+                   '(6 2 "No earlier unready change")))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines nil #'skg-diffView-goto-previous-ready-change 2)
+                   '(4 "No earlier ready change")))
+    ;; From the middle, each direction starts at point.
+    (should (equal (test-skg-readiness--goto-changes
+                    lines 3 #'skg-diffView-goto-previous-change 1)
+                   '(2)))
+    (should (equal (test-skg-readiness--goto-changes
+                    lines 3 #'skg-diffView-goto-next-unready-change 1)
+                   '(6)))))
+
+(ert-deftest test-skg-diffView-goto-change-outside-the-diff-view ()
+  "Where no headline carries a leaves fact, there is no change."
+  (should (equal (test-skg-readiness--goto-changes
+                  '("* (skg (node (id r) (repo main))) r"
+                    "** (skg (node (id a) (repo main))) a")
+                  1 #'skg-diffView-goto-next-change 1)
+                 '("No further change"))))
+
+(ert-deftest test-skg-diffView-goto-change-keybindings ()
+  (dolist (pair '(("C-c r n c" . skg-diffView-goto-next-change)
+                  ("C-c r n u" . skg-diffView-goto-next-unready-change)
+                  ("C-c r n r" . skg-diffView-goto-next-ready-change)
+                  ("C-c r p c" . skg-diffView-goto-previous-change)
+                  ("C-c r p u" . skg-diffView-goto-previous-unready-change)
+                  ("C-c r p r" . skg-diffView-goto-previous-ready-change)))
+    (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
+                (cdr pair)))))

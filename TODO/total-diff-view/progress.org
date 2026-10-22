@@ -2661,3 +2661,58 @@ holding a quote and a backslash, the repo sets and the flag state read
 back identically in Emacs's 'read' and Neovim's reader; "server
 warnings" serves the foreign manifest's order warning, which the log
 still shows.
+** Slice 8: deviations
+*** set-repo in Neovim
+The skipped IDs and the summary go through 'vim.notify' at the WARN
+level, and the summary points to ':messages' where Emacs's points to
+'*Messages*'; each ID's message is prefixed 'SkgSetRepo:'. The three
+tests sit in 'tests/nvim/metadata_spec.lua', which needs no config
+harness. The Emacs warning tests now also require the word "refuse".
+*** the prologue's answer handler is optional by passing nil
+'skg--send-streaming-request' and 'send_streaming_request' keep their
+parameter order; RESPONSE-TYPE and HANDLER may be nil, and the
+over-private-text retry is a new last optional parameter. The
+repo-set switch's one-shot handler is now registered after the stream
+begins, beside the stream handlers, so a switch refused because
+another stream is in flight leaves no handler behind.
+*** the function's own unwinding covers every step after the stream begins
+Both clients wrap everything from locking the buffers to the send:
+on an error they remove each handler type they may have registered
+(balancing the pending count for one-shot ones), end the stream,
+unlock the buffers and re-raise. That replaces the import's
+hand-written unwind in Emacs and the one in Neovim's
+'request_rerender_all_views_with_approval', which now goes through
+'send_streaming_request' too; a helper,
+'skg--unregister-response-handlers' / 'unregister_response_handlers',
+does the removal.
+*** where navigation lands
+Point lands on the change headline's metadata (its '(skg'), where
+'skg-id-next' and 'id_next' land on a headline. Emacs scans lines as
+'skg-id-next' does; Neovim steps from headline to headline with
+'next_headline_line' and the new 'previous_headline_line'. The
+commands live in 'elisp/skg-readiness.el' and
+'nvim/lua/skg/readiness.lua', beside the readers they use.
+*** tests
+Emacs: in 'tests/elisp/test-skg-streaming-request.el', the retry's
+place in the prologue, the unwinding of a failed send, and
+'test-skg-restrict-repo-set-confirmation-cancels-its-answer-and-retries';
+in 'tests/elisp/test-skg-readiness.el', the six commands over three
+change headlines (one ready, among headlines without a leaves fact,
+one a ready folder), a buffer without changes, and the key lookups.
+Neovim: the same in 'tests/nvim/stream_consumers_spec.lua' and in a
+new describe block of 'tests/nvim/readiness_spec.lua'.
+*** docs
+'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' gained the six
+entries after stage-and-commit; 'docs/COMMANDS-nvim.org' lost the
+set-repo deviation and gained the write-protected warning;
+'docs/nvim-client-deviations.org' did not list it. 'docs/diff-view.org'
+names the keys in a paragraph closing "Readiness requests and
+gestures", where it describes the gestures.
+*** seen, left
+Neovim runs the over-private-text retry at 'rerender-lock', Emacs at
+'rerender-done'. The import's own request sender in Emacs
+('skg--import-md-and-org-send') keeps its separate cleanup; it is not
+a streaming command.
+*** verification
+nextest 867 passed; Emacs 381; Neovim all 31 specs passed. No server
+code changed, so the integration suite was not run.

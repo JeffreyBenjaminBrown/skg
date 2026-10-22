@@ -445,6 +445,10 @@ as a headline, with that skgrepo's path as the headline body.
 The command only edits the node's metadata in the current buffer.
 Save the view afterward (':w') to apply the move.
 
+A write-protected occurrence is NOT changed -- the save would
+refuse its skgrepo edit -- and produces a loud WARNING,
+with the full ID list in ':messages'.
+
 What the move does to the relationships touching the moved nodes, the
 save decides, whether or not the view shows them. One it would leave
 more public than a node's new home (an inbound relationship of a move
@@ -458,10 +462,9 @@ Like 'SetRepo', but it also
 changes the skgrepo of every content descendent of the node at point
 whose skgrepo matches the original skgrepo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
-The save's handling of relationships described under
-<localleader>ss applies here too, across the whole subtree.
-Unlike Emacs, neither command skips or warns about a write-protected
-occurrence; the save refuses one whose skgrepo changed.
+The write-protected warning and the save's handling of relationships
+described under <localleader>ss apply here too, across the whole
+subtree.
 *** <localleader>sx : :SkgSetFlagSearchMatching
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and an
@@ -554,6 +557,30 @@ of the diff view are rerendered: each keeps its roots, its
 folding and what it drew editable, and what was committed no longer
 shows as a change. The
 commit lapses the marks of everything it committed.
+*** <localleader>rnc : :SkgDiffViewGotoNextChange
+Moves the cursor to the next change headline after it: a headline
+whose metadata carries a '(leaves ...)' fact, the server's count of
+the changes it names. The cursor lands on the headline's metadata, as
+with <localleader>in. It does not wrap: past the last one it says "No
+further change" and leaves the cursor. It works in any skg buffer;
+outside the diff view no headline names a change, so it finds none.
+*** <localleader>rnu : :SkgDiffViewGotoNextUnreadyChange
+The same, visiting only change headlines that are not ready (see
+<localleader>rr for when a headline counts as ready). Past the last
+one it says "No further unready change".
+*** <localleader>rnr : :SkgDiffViewGotoNextReadyChange
+The same, visiting only ready change headlines. Past the last one it
+says "No further ready change".
+*** <localleader>rpc : :SkgDiffViewGotoPreviousChange
+Like <localleader>rnc, backward: moves the cursor to the previous
+change headline before it. Before the first one it says "No earlier
+change".
+*** <localleader>rpu : :SkgDiffViewGotoPreviousUnreadyChange
+Like <localleader>rnu, backward. Before the first one it says "No
+earlier unready change".
+*** <localleader>rpr : :SkgDiffViewGotoPreviousReadyChange
+Like <localleader>rnr, backward. Before the first one it says "No
+earlier ready change".
 ** <localleader>m : other graph modifications
 *** <localleader>mc : :SkgReplaceLinkWithContent
 Replace the leaf at point with a content relationship to the
