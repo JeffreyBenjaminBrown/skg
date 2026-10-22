@@ -88,7 +88,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
 /// The goal item of a partner of a straddle-drawn folder: a node only
 /// in the before-graph is its historical phantom; a member whose
 /// relationship is only in the before-graph is removed (a non-member
-/// with '(diff rel-)', the one encoding of a removed relationship);
+/// with '(presence rel-)', the one encoding of a removed relationship);
 /// any other is a member. In a folder whose membership the save reads
 /// (an EditableSet), a removed member that is dangling is not drawn at
 /// all, since an unknown phantom there would read back as a member.

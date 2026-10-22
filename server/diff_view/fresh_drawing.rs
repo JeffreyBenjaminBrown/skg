@@ -161,7 +161,7 @@ fn detach_the_servers_below (
 
 /// Whether a viewnode below what the diff view drew is the user's:
 /// an unrestricted vognode born 'Unremarkable' that carries no
-/// '(diff ...)' fact and is not a member of the folder it stands in
+/// '(presence ...)' fact and is not a member of the folder it stands in
 /// ('parent_is_a_folder'). A role graft ('Birth::RoleGraft', which a
 /// buffer carries back), a removed member and a folder's member are
 /// the server's, as is every viewnode of another kind.
@@ -251,7 +251,7 @@ pub fn append_copy_of_subtree (
   Ok (copy) }
 
 /// A removed member: a viewnode the diff view drew as a non-member
-/// with '(diff rel-)', because its relationship to its viewparent is
+/// with '(presence rel-)', because its relationship to its viewparent is
 /// only in the before-graph (or, while a visit reconciles, is about
 /// to be). That is the one encoding of a removed relationship, in
 /// content, in a partner folder and in a historical phantom's old

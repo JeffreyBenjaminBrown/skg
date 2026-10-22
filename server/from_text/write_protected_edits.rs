@@ -506,9 +506,9 @@ mod tests {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id sub) (repo main) writeProtected (diff rel+))) sub
+      *** (skg (node (id sub) (repo main) writeProtected (diff (presence rel+)))) sub
       *** (skg (node (id private_sub) (repo private) writeProtected)) private_sub
-      *** (skg (node (id c1) (repo main) writeProtected (diff rel+))) c1
+      *** (skg (node (id c1) (repo main) writeProtected (diff (presence rel+)))) c1
     "});
     assert_eq! (refused_changes (&errors),
                 vec! ["changed subscriptions" . to_string ()]);
@@ -612,14 +612,14 @@ mod tests {
         .. node ("x") } ]) }
 
   /// A removed member, as the diff view draws one (a non-member with
-  /// '(diff rel-)'), is not counted, nor is any other non-member.
+  /// '(presence rel-)'), is not counted, nor is any other non-member.
   #[test]
   fn a_removed_member_is_not_counted () {
     assert_eq! (errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) (affectsParent false) writeProtected (diff rel-))) c1
+      *** (skg (node (id c1) (repo main) (affectsParent false) writeProtected (diff (presence rel-)))) c1
       *** (skg (node (id c2) (repo main) writeProtected (affectsParent false))) c2
     "}), vec! []);
   }
@@ -632,7 +632,7 @@ mod tests {
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) writeProtected (diff rel-))) c1
+      *** (skg (node (id c1) (repo main) writeProtected (diff (presence rel-)))) c1
     "})), vec! ["changed containers" . to_string ()]);
   }
 

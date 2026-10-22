@@ -172,7 +172,7 @@ pub fn append_acquired_folder (
 
 /// A removed member: the write-protected image of a node of the
 /// after-graph whose relationship to its viewparent is only in the
-/// before-graph, drawn as a non-member with '(diff rel-)', the one
+/// before-graph, drawn as a non-member with '(presence rel-)', the one
 /// encoding of a removed relationship ('is_unrestricted_removed_member'
 /// reads it). None if the after-graph lacks the node.
 pub fn mk_removed_member_viewnode (

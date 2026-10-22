@@ -15,14 +15,16 @@
 ///                                 [(linksIn N)])]
 ///                         [(editRequest <delete | (merge ID)>)]
 ///                         [(viewRequests REQUEST...)]
-///                         [(diff PRESENCE...)]
-///                         [(ready OBJECT...)]
-///                         [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)]))
-///   where PRESENCE is node+, node-, rel+ or rel-, and OBJECT is node,
-///   rel or (in a request only) all. The last three forms may also
+///                         [(diff [(presence SIGN...)]
+///                                [(leaves N OBJECT...)]
+///                                [(ready OBJECT...)]
+///                                [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]))
+///   where SIGN is node+, node-, rel+ or rel-, and OBJECT is node,
+///   rel or (in a request only) all. The '(diff ...)' form may also
 ///   appear in (deleted ...), (unknown ...) and (historical ...), and
 ///   at top level on an alias, id or flag property and on the
-///   diff view's properties other than bodyDiff.
+///   diff view's properties other than bodyDiff. A changed folder
+///   carries a bare '(ready)' at top level instead.
 ///   The diff view's own viewnodes:
 ///     (historical (id ID) (repo REPO) ...)   a historical phantom
 ///     (oldText titleAndBody | title | body)  the text at HEAD
@@ -76,9 +78,9 @@ pub struct ViewnodeMetadata {
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
-  // The diff view's '(diff ...)' and '(ready ...)' facts and
-  // readiness requests, on whichever vognode, phantom or property
-  // leaf carries them.
+  // The parts of the diff view's '(diff ...)' form, its facts and
+  // readiness request, on whichever vognode, phantom or property
+  // leaf carries it.
   pub change_facts: ChangeFacts,
   pub readiness_request: Option<ReadinessRequest>,
   pub property_relRepo : Option<SkgrepoName>,
@@ -371,8 +373,8 @@ pub fn parse_metadata_to_viewnodemd (
       _ => return Err ( "Expected metadata to be a list" . to_string () ),
     };
 
-  let mut top_level_change_facts : bool = false;
-  let mut top_level_facts_beyond_ready : bool = false;
+  let mut top_level_diff : bool = false;
+  let mut top_level_ready : bool = false;
   // Process each element
   for element in elements {
     match element {
@@ -446,13 +448,16 @@ pub fn parse_metadata_to_viewnodemd (
                            . to_string () ); }
             result . property_relRepo_request =
               request_metadata . relRepo_request; },
-          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" => {
-            // At top level, valid only on a property leaf, or as
-            // '(ready)' on a folder (checked below).
-            parse_change_fact_form (
+          "diff" => {
+            // At top level, valid only on a property leaf (checked
+            // below).
+            parse_diff_form ( &items[1..], &mut result ) ?;
+            top_level_diff = true; },
+          "ready" => {
+            // A changed folder's bare '(ready)' (checked below).
+            parse_change_fact_part (
               &first, &items[1..], &mut result ) ?;
-            top_level_change_facts = true;
-            if first != "ready" { top_level_facts_beyond_ready = true; }},
+            top_level_ready = true; },
           "flag" => {
             if items . len () != 2 {
               return Err ("flag requires exactly one flag name"
@@ -557,8 +562,10 @@ pub fn parse_metadata_to_viewnodemd (
   let is_folder : bool = matches! ( result . non_vognode,
     Some ( MpViewnodeKind::PartnerFolder (_)
            | MpViewnodeKind::PropertyFolder (_) ));
-  if top_level_change_facts
-     && ! ( is_folder && ! top_level_facts_beyond_ready )
+  if top_level_ready && ! is_folder
+  { return Err ( "A top-level ready is valid only on a folder; elsewhere it belongs in (diff ...)"
+                 . to_string () ); }
+  if top_level_diff
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Property (
                        Property::Alias { .. } | Property::ID { .. }
@@ -568,7 +575,7 @@ pub fn parse_metadata_to_viewnodemd (
                        | Property::HomeSkgrepoMove { .. }
                        | Property::RelRepoMove { .. }
                        | Property::ChangesetMarker { .. } )) )
-  { return Err ( "Top-level diff, ready, leaves and readiness requests are valid only on alias, id and flag properties and the diff view's properties other than bodyDiff (and ready on folders)"
+  { return Err ( "A top-level diff is valid only on alias, id and flag properties and the diff view's properties other than bodyDiff"
                  . to_string () ); }
   Ok (result) }
 
@@ -634,9 +641,8 @@ fn parse_node_sexp (
               "na"    => AffectsParent::NA,
               _ => return Err ( format! (
                 "Invalid affectsParent value: {}", value )), }; },
-          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" =>
-            parse_change_fact_form (
-              &key, &subitems[1..], metadata ) ?,
+          "diff" =>
+            parse_diff_form ( &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
@@ -714,9 +720,8 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }
             metadata . unknown_relRepo_request =
               request_metadata . relRepo_request; },
-          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" =>
-            parse_change_fact_form (
-              &key, &subitems[1..], metadata ) ?,
+          "diff" =>
+            parse_diff_form ( &subitems[1..], metadata ) ?,
           _ => { return Err ( format! (
             "Unknown 'unknown' key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in unknown sexp"
@@ -793,9 +798,8 @@ fn parse_deleted_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_skgrepo = Some ( SkgrepoName::from (value)); },
-          "diff" | "ready" | "leaves" | "readyRequest" | "unreadyRequest" =>
-            parse_change_fact_form (
-              &key, &subitems[1..], metadata ) ?,
+          "diff" =>
+            parse_diff_form ( &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
@@ -951,14 +955,31 @@ fn parse_viewrequests_sexp (
   Ok (( )) }
 
 
-/// Parse one of the diff view's forms -- '(diff PRESENCE...)',
-/// '(ready OBJECT...)', '(leaves N OBJECT...)', '(readyRequest
-/// OBJECT...)' or '(unreadyRequest OBJECT...)' -- whose head is 'key'
-/// and whose arguments are 'args', into 'metadata'. Each may appear
-/// once; a viewnode carries at most one readiness request.
-/// '(leaves ...)' is accepted and ignored: it serves only the
-/// clients' gestures, and the view derives it again.
-fn parse_change_fact_form (
+/// Parse the diff view's '(diff PART...)' form, whose parts are
+/// 'args', into 'metadata'. It may appear once.
+fn parse_diff_form (
+  args     : &[Sexp],
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  if metadata . change_facts != ChangeFacts::default ()
+     || metadata . readiness_request . is_some () {
+    return Err ( "diff may appear only once" . to_string () ); }
+  for part in args {
+    match part {
+      Sexp::List (items) if ! items . is_empty () => {
+        let head : String = atom_to_string (&items[0]) ?;
+        parse_change_fact_part ( &head, &items[1..], metadata ) ?; },
+      _ => return Err ( "Each part of diff must be a list" . to_string () ), }}
+  Ok (( )) }
+
+/// Parse one part of the diff view's '(diff ...)' form --
+/// '(presence SIGN...)', '(leaves N OBJECT...)', '(ready
+/// OBJECT...)', '(readyRequest OBJECT...)' or '(unreadyRequest
+/// OBJECT...)' -- whose head is 'key' and whose arguments are 'args',
+/// into 'metadata'. Each may appear once; a viewnode carries at most
+/// one readiness request. '(leaves ...)' is accepted and ignored: it
+/// serves only the clients' gestures, and the view derives it again.
+fn parse_change_fact_part (
   key      : &str,
   args     : &[Sexp],
   metadata : &mut ViewnodeMetadata,
@@ -966,17 +987,17 @@ fn parse_change_fact_form (
   let atoms : Vec<String> =
     args . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
   match key {
-    "diff" => {
+    "presence" => {
       if metadata . change_facts . presence != Default::default () {
-        return Err ( "diff may appear only once" . to_string () ); }
+        return Err ( "presence may appear only once" . to_string () ); }
       for atom in &atoms {
         let slot : &mut Option<Sign> = match atom . as_str () {
           "node+" | "node-" => &mut metadata . change_facts . presence . node,
           "rel+"  | "rel-"  => &mut metadata . change_facts . presence . rel,
           other => return Err ( format! (
-            "Unknown diff atom: {}", other )), };
+            "Unknown presence atom: {}", other )), };
         if slot . is_some () {
-          return Err ( format! ( "diff names an object twice: {}", atom )); }
+          return Err ( format! ( "presence names an object twice: {}", atom )); }
         *slot = Some ( if atom . ends_with ('+') { Sign::Plus }
                        else { Sign::Minus } ); }},
     "ready" => {
@@ -989,13 +1010,14 @@ fn parse_change_fact_form (
                      . to_string () ); }
       metadata . change_facts . ready = Some (objects); },
     "leaves" => {},
-    _ => { // readyRequest or unreadyRequest
+    "readyRequest" | "unreadyRequest" => {
       if metadata . readiness_request . is_some () {
         return Err ( "A viewnode may carry only one readiness request"
                      . to_string () ); }
       metadata . readiness_request = Some ( ReadinessRequest {
         ready   : key == "readyRequest",
-        objects : readiness_objects_from_atoms (&atoms) ?, } ); }, }
+        objects : readiness_objects_from_atoms (&atoms) ?, } ); },
+    other => return Err ( format! ( "Unknown part of diff: {}", other )), }
   Ok (( )) }
 
 fn readiness_objects_from_atoms (

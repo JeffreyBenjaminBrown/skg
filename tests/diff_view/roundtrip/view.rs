@@ -136,17 +136,17 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?;
     let atoms : [&str; 14] = [
-      "(historical (id gone) (repo main) (diff node- rel-))",
-      "(historical (id gc) (repo main) (diff node- rel-))",
-      "(diff rel-))) kept", // a surviving member under gone
-      "(unknown (id ghost) (diff rel-))",
+      "(historical (id gone) (repo main) (diff (presence node- rel-)))",
+      "(historical (id gc) (repo main) (diff (presence node- rel-)))",
+      "(diff (presence rel-)))) kept", // a surviving member under gone
+      "(unknown (id ghost) (diff (presence rel-)))",
       "(oldText titleAndBody)", "bodyDiff",
       "(homeSkgrepoMove (old main) (new elsewhere))",
       "(relRepoMove (old main) (new elsewhere))",
       "(changesetMarker content)", "(changesetMarker relRepo)",
       "(changesetMarker orderOnly)",
       "acquiredFolder", "acquiredByFolder",
-      "(historical (id acquired) (repo main) (diff node-))" ];
+      "(historical (id acquired) (repo main) (diff (presence node-)))" ];
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let mut saved : String = buffer;
     for _ in 0 .. 2 {
@@ -176,9 +176,9 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?
       . replace ( "(skg (oldText titleAndBody))",
-                  "(skg (oldText titleAndBody) (readyRequest))" )
-      . replace ( "(historical (id gone) (repo main) (diff node- rel-))",
-                  "(historical (id gone) (repo main) (diff node- rel-) (readyRequest node))" );
+                  "(skg (oldText titleAndBody) (diff (readyRequest)))" )
+      . replace ( "(historical (id gone) (repo main) (diff (presence node- rel-)))",
+                  "(historical (id gone) (repo main) (diff (presence node- rel-) (readyRequest node)))" );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
@@ -198,7 +198,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     let response : SaveResponse = save ( f,
       &response . saved_view . replace (
         "(skg (changesetMarker content))",
-        "(skg (changesetMarker content) (readyRequest all))" )) ?;
+        "(skg (changesetMarker content) (diff (readyRequest all)))" )) ?;
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     assert! ( ReadinessStore::load (&f . config . data_root) . marks
               . contains_key (&p_contains_gone) );

@@ -65,11 +65,11 @@ fn property (
 #[test]
 fn old_text_round_trips_each_aspect () {
   for (title, body, expected) in [
-    ( Some ("the old title"), Some ("the old body\n"), "(oldText titleAndBody) (ready)" ),
-    ( Some ("the old title"), None,                    "(oldText title) (ready)" ),
-    ( None,                   Some ("the old body\n"), "(oldText body) (ready)" ),
+    ( Some ("the old title"), Some ("the old body\n"), "(oldText titleAndBody) (diff (ready))" ),
+    ( Some ("the old title"), None,                    "(oldText title) (diff (ready))" ),
+    ( None,                   Some ("the old body\n"), "(oldText body) (diff (ready))" ),
     // A body HEAD lacked is the empty string.
-    ( None,                   Some (""),               "(oldText body) (ready)" ), ] {
+    ( None,                   Some (""),               "(oldText body) (diff (ready))" ), ] {
     assert_round_trip (
       property ( Property::OldText {
                    title : title . map (String::from),
@@ -91,20 +91,20 @@ fn skgrepo_moves_round_trip () {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("priv") } },
       ready (&[]), None ),
-    "(homeSkgrepoMove (old pub) (new priv)) (ready)" );
+    "(homeSkgrepoMove (old pub) (new priv)) (diff (ready))" );
   assert_round_trip (
     property ( Property::RelRepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("a repo") } },
       ChangeFacts::default (), request_all () ),
-    "(relRepoMove (old pub) (new \"a repo\")) (readyRequest all)" ); }
+    "(relRepoMove (old pub) (new \"a repo\")) (diff (readyRequest all))" ); }
 
 #[test]
 fn changeset_markers_round_trip () {
   for (kind, expected) in [
-    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (ready)" ),
-    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (ready)" ),
-    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (ready)" ), ] {
+    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (ready))" ),
+    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (ready))" ),
+    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (ready))" ), ] {
     assert_round_trip (
       property ( Property::ChangesetMarker { kind }, ready (&[]), None ),
       expected ); }}
@@ -118,11 +118,11 @@ fn removed_aliases_and_ids_round_trip () {
   assert_round_trip (
     property ( Property::RemovedAlias { text : "an old alias" . into () },
                removed . clone (), None ),
-    "removedAlias (diff rel-) (ready)" );
+    "removedAlias (diff (presence rel-) (ready))" );
   assert_round_trip (
     property ( Property::RemovedID { skgid : ID::from ("old-id") },
                removed, request_all () ),
-    "removedID (diff rel-) (ready) (readyRequest all)" ); }
+    "removedID (diff (presence rel-) (ready) (readyRequest all))" ); }
 
 #[test]
 fn a_historical_phantom_round_trips () {
@@ -138,7 +138,7 @@ fn a_historical_phantom_round_trips () {
         ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
         leaves   : None },
       request_all () ),
-    "(historical (id gone) (repo main) (diff node- rel-) (ready node) (readyRequest all))" ); }
+    "(historical (id gone) (repo main) (diff (presence node- rel-) (ready node) (readyRequest all)))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {
@@ -182,6 +182,6 @@ fn malformed_diff_view_metadata_is_refused () {
     "(skg (homeSkgrepoMove (old a) (old b) (new c)))",      // old twice
     "(skg (relRepoMove a b))",                       // bare names
     "(skg (changesetMarker sideways))",
-    "(skg bodyDiff (ready))", ] {                    // a body diff is no leaf
+    "(skg bodyDiff (diff (ready)))", ] {                    // a body diff is no leaf
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
               "should refuse {}", metadata ); }}

@@ -81,10 +81,10 @@ fn a_deleted_subtree_is_drawn_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
     "* (skg (node (id r)",
-    "** (skg (changesetMarker content) (leaves 1 all))",
-    "** (skg (historical (id del) (repo main) (diff node- rel-) (leaves 2 node rel))) del",
+    "** (skg (changesetMarker content) (diff (leaves 1 all)))",
+    "** (skg (historical (id del) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) del",
     "the body del had",
-    "*** (skg (historical (id delc) (repo main) (diff node- rel-) (leaves 2 node rel))) delc",
+    "*** (skg (historical (id delc) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) delc",
     "** (skg (node (id keep)" ] );
   Ok (( )) }
 
@@ -93,10 +93,10 @@ fn an_in_changed_only_change_shows_its_changed_containers (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
     "* (skg (node (id ln)",
-    "** (skg (changesetMarker content) (leaves 1 all))",
-    "** (skg (node (id lo)", "(diff rel+) (leaves 1 rel))) lo",
+    "** (skg (changesetMarker content) (diff (leaves 1 all)))",
+    "** (skg (node (id lo)", "(diff (presence rel+) (leaves 1 rel)))) lo",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id ln) (repo main) writeProtected", "(diff rel+) (leaves 1 rel))) ln",
+    "**** (skg (node (id ln) (repo main) writeProtected", "(diff (presence rel+) (leaves 1 rel)))) ln",
     "**** (skg (node (id lp) (repo main) writeProtected" ] );
   Ok (( )) }
 
@@ -105,7 +105,7 @@ fn a_text_change_shows_the_old_text_and_its_body_diff (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id txt)", "txt, retitled\nline one\nline 2\n",
-    "** (skg (oldText titleAndBody) (leaves 1)) txt\nline one\nline two\n",
+    "** (skg (oldText titleAndBody) (diff (leaves 1))) txt\nline one\nline two\n",
     "*** (skg bodyDiff)\n line one\n-line two\n+line 2\n" ] );
   Ok (( )) }
 
@@ -114,10 +114,10 @@ fn a_content_change_tags_the_members_and_draws_the_removed_one (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id ct)",
-    "** (skg (changesetMarker content) (leaves 2 all))",
-    "** (skg (node (id k1) (repo public) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) k1",
+    "** (skg (changesetMarker content) (diff (leaves 2 all)))",
+    "** (skg (node (id k1) (repo public) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) k1",
     "** (skg (node (id ctx) (repo public) writeProtected",
-    "** (skg (node (id k2) (repo public)", "(diff rel+) (leaves 1 rel))) k2" ] );
+    "** (skg (node (id k2) (repo public)", "(diff (presence rel+) (leaves 1 rel)))) k2" ] );
   Ok (( )) }
 
 #[test]
@@ -126,19 +126,19 @@ fn alias_id_and_flag_changes_fill_their_folders (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg (aliasFolder changed))",
-    "*** (skg removedAlias (diff rel-) (leaves 1)) a1",
+    "*** (skg removedAlias (diff (presence rel-) (leaves 1))) a1",
     "*** (skg alias) a2",
-    "*** (skg alias (diff rel+) (leaves 1)) a3",
+    "*** (skg alias (diff (presence rel+) (leaves 1))) a3",
     "** (skg (idFolder changed))",
     "*** (skg id) ali",
-    "*** (skg removedID (diff rel-) (leaves 1)) ali-old" ] );
+    "*** (skg removedID (diff (presence rel-) (leaves 1))) ali-old" ] );
   assert_lines_in_order ( &buffer, &[
     "** (skg (idFolder changed))",
     "*** (skg id) acq",
-    "*** (skg id (diff rel+) (leaves 1)) acqd" ] );
+    "*** (skg id (diff (presence rel+) (leaves 1))) acqd" ] );
   assert_lines_in_order ( &buffer, &[
     "** (skg (flagsFolder changed))",
-    "*** (skg (flag hadId) (diff rel+) (leaves 1))" ] );
+    "*** (skg (flag hadId) (diff (presence rel+) (leaves 1)))" ] );
   Ok (( )) }
 
 #[test]
@@ -148,13 +148,13 @@ fn a_subscription_change_shows_on_both_sides (
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id sub)",
     "** (skg (subscribeeFolder changed))",
-    "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) s1",
-    "*** (skg (node (id s2)", "(diff rel+) (leaves 1 rel))) s2" ] );
+    "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) s1",
+    "*** (skg (node (id s2)", "(diff (presence rel+) (leaves 1 rel)))) s2" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id s1)",
     "** (skg (subscriberFolder changed))",
     "*** (skg (node (id sub) (repo public) (affectsParent false) writeProtected",
-    "(diff rel-) (leaves 1 rel))) sub" ] );
+    "(diff (presence rel-) (leaves 1 rel)))) sub" ] );
   Ok (( )) }
 
 #[test]
@@ -163,12 +163,12 @@ fn home_and_relRepo_moves_are_drawn (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id mv) (repo private)",
-    "** (skg (homeSkgrepoMove (old public) (new private)) (leaves 1))" ] );
+    "** (skg (homeSkgrepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id rr)",
-    "** (skg (changesetMarker relRepo) (leaves 1 all))",
+    "** (skg (changesetMarker relRepo) (diff (leaves 1 all)))",
     "** (skg (node (id rm)",
-    "*** (skg (relRepoMove (old public) (new private)) (leaves 1))" ] );
+    "*** (skg (relRepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   Ok (( )) }
 
 #[test]
@@ -178,9 +178,9 @@ fn a_node_merge_draws_both_acquisition_folders (
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id acq)",
     "** (skg acquiredFolder)",
-    "*** (skg (historical (id acqd) (repo public) (diff node-) (leaves 1 node))) acqd" ] );
+    "*** (skg (historical (id acqd) (repo public) (diff (presence node-) (leaves 1 node)))) acqd" ] );
   assert_lines_in_order ( &buffer, &[
-    "* (skg (historical (id acqd) (repo public) (diff node-) (leaves 1 node))) acqd",
+    "* (skg (historical (id acqd) (repo public) (diff (presence node-) (leaves 1 node)))) acqd",
     "** (skg acquiredByFolder)",
     "*** (skg (node (id acq) (repo public) writeProtected" ] );
   Ok (( )) }
@@ -194,12 +194,12 @@ fn marks_in_the_store_show_as_ready (
     let buffer : String = all_changes_buffer_with_marks ( f, &[
       LeafKey::Node { pid : ID::from ("txt"), aspect : NodeAspect::Text },
       alias ("a1") ] ) ? . unwrap ();
-    assert! ( buffer . contains ("** (skg (oldText titleAndBody) (ready) (leaves 1)) txt"),
+    assert! ( buffer . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
       "** (skg (aliasFolder changed))", // a3 is not ready, so neither is the folder
-      "*** (skg removedAlias (diff rel-) (ready) (leaves 1)) a1",
-      "*** (skg alias (diff rel+) (leaves 1)) a3" ] );
+      "*** (skg removedAlias (diff (presence rel-) (leaves 1) (ready))) a1",
+      "*** (skg alias (diff (presence rel+) (leaves 1))) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (
       f, &[ alias ("a1"), alias ("a3") ] ) ? . unwrap ();
     assert! ( buffer . contains ("** (skg (aliasFolder changed) (ready))"),
@@ -212,7 +212,7 @@ fn a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder (
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id orph)",
     "** (skg (subscriberFolder changed))",
-    "*** (skg (historical (id gone) (repo public) (diff node- rel-) (leaves 2 node rel))) gone" ] );
+    "*** (skg (historical (id gone) (repo public) (diff (presence node- rel-) (leaves 2 node rel)))) gone" ] );
   Ok (( )) }
 
 #[test]
@@ -238,7 +238,7 @@ fn removed_partners_buffer (
   Ok (buffer) }
 
 /// x's container folder draws b, the container it lost, between the
-/// two it kept, as a removed member: a non-member with '(diff rel-)'.
+/// two it kept, as a removed member: a non-member with '(diff (presence rel-))'.
 #[test]
 fn a_removed_container_is_drawn_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
@@ -246,7 +246,7 @@ fn a_removed_container_is_drawn_between_the_kept_ones (
     "** (skg (node (id x) (repo main) (rels",
     "*** (skg (containerFolder changed))",
     "**** (skg (node (id a) (repo main) writeProtected",
-    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) b",
+    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) b",
     "**** (skg (node (id c) (repo main) writeProtected" ] );
   Ok (( )) }
 
@@ -259,7 +259,7 @@ fn a_removed_subscribee_is_drawn_where_it_stood (
     "* (skg (node (id s)",
     "** (skg (subscribeeFolder changed))",
     "*** (skg (node (id s1) (repo main) writeProtected",
-    "*** (skg (node (id s2) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) s2",
+    "*** (skg (node (id s2) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) s2",
     "*** (skg (node (id s3) (repo main) writeProtected" ] );
   Ok (( )) }
 
@@ -270,7 +270,7 @@ fn the_removed_partners_buffer_saves_back_unchanged (
 
 /// In the 'historical_content' fixture h, which contained m, was
 /// deleted: h's historical phantom draws its old content m as a
-/// removed member, a non-member with '(diff rel-)'. A buffer showing
+/// removed member, a non-member with '(diff (presence rel-))'. A buffer showing
 /// it saves back unchanged.
 #[test]
 fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
@@ -280,6 +280,6 @@ fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
     buffer = buffer_of (f) ?;
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
-    "** (skg (historical (id h) (repo main) (diff node- rel-) (leaves 2 node rel))) h",
-    "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel))) m, retitled" ] );
+    "** (skg (historical (id h) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) h",
+    "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) m, retitled" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

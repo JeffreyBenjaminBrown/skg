@@ -267,26 +267,28 @@ fn changed_folder_rules (
     changed (PartnerFolder::Hidden . repr_in_client (), true,
              "the nodes it hides changed (this file)") ] }
 
-/// The diff view's facts on a vognode: '(diff ...)' as ∃+ ∃-
-/// (the node itself) and ~+ ~- (its relationship to its viewparent),
-/// each followed by a ✓ when '(ready ...)' names that diff object,
-/// then the readiness request. '(leaves ...)' is for the clients'
-/// gestures and shows nothing. The same form is matched once per object, so each ✓ lands
-/// after its own object whatever the raw order.
+/// The diff view's '(diff ...)' form on a vognode: its '(presence
+/// ...)' as ∃+ ∃- (the node itself) and ~+ ~- (its relationship to
+/// its viewparent), each followed by a ✓ when '(ready ...)' names
+/// that diff object, then the readiness request. '(leaves ...)' is
+/// for the clients' gestures and shows nothing. The same part is
+/// matched once per object, so each ✓ lands after its own object
+/// whatever the raw order.
 fn change_fact_rules_for_two_objects (
 ) -> Vec<RuleChild> {
   vec! [
     rule ("diff", vec! [
-      leaf_styled_as ("diff", "node+", "∃+"),
-      leaf_styled_as ("diff", "node-", "∃-") ]),
-    rule ("ready", vec! [ leaf_abut_styled_as ("ready", "node", "✓") ]),
-    rule ("diff", vec! [
-      leaf_styled_as ("diff", "rel+", "~+"),
-      leaf_styled_as ("diff", "rel-", "~-") ]),
-    rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
-    vac ("leaves"),
-    readiness_request_rule ("readyRequest",   "request:ready"),
-    readiness_request_rule ("unreadyRequest", "request:unready") ] }
+      rule ("presence", vec! [
+        leaf_styled_as ("presence", "node+", "∃+"),
+        leaf_styled_as ("presence", "node-", "∃-") ]),
+      rule ("ready", vec! [ leaf_abut_styled_as ("ready", "node", "✓") ]),
+      rule ("presence", vec! [
+        leaf_styled_as ("presence", "rel+", "~+"),
+        leaf_styled_as ("presence", "rel-", "~-") ]),
+      rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
+      vac ("leaves"),
+      readiness_request_rule ("readyRequest",   "request:ready"),
+      readiness_request_rule ("unreadyRequest", "request:unready") ]) ] }
 
 /// The same for a leaf with a single diff object (a property leaf, a deleted
 /// or unknown phantom), whose '(ready)' names no object. 'plus' and
@@ -297,14 +299,15 @@ fn change_fact_rules_for_one_object (
 ) -> Vec<RuleChild> {
   vec! [
     rule ("diff", vec! [
-      leaf_styled_as ("diff", "node+", plus),
-      leaf_styled_as ("diff", "node-", minus),
-      leaf_styled_as ("diff", "rel+",  plus),
-      leaf_styled_as ("diff", "rel-",  minus) ]),
-    rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
-    vac ("leaves"),
-    readiness_request_rule ("readyRequest",   "request:ready"),
-    readiness_request_rule ("unreadyRequest", "request:unready") ] }
+      rule ("presence", vec! [
+        leaf_styled_as ("presence", "node+", plus),
+        leaf_styled_as ("presence", "node-", minus),
+        leaf_styled_as ("presence", "rel+",  plus),
+        leaf_styled_as ("presence", "rel-",  minus) ]),
+      rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
+      vac ("leaves"),
+      readiness_request_rule ("readyRequest",   "request:ready"),
+      readiness_request_rule ("unreadyRequest", "request:unready") ]) ] }
 
 /// "request:ready", then ":OBJECT" for each object the request names.
 fn readiness_request_rule (
@@ -440,6 +443,8 @@ pub fn herald_rule_table () -> HeraldRule {
       // its presence, ✓ when ready.
       change_fact_rules_for_one_object ("+", "-"),
       vec! [
+      // A changed folder's bare '(ready)', outside any '(diff ...)'.
+      rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
       crule ("deadViewnode", vec! [ s ("DELETED") ]),
       crule ("deleted", vec! [
         s ("DELETED"),
@@ -715,21 +720,22 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( change_fact_atoms () );
   atoms . into_iter () . collect () }
 
-/// The diff view's forms, from org_to_text.rs's
-/// 'change_fact_forms': their heads, the presence atoms and the
-/// diff objects.
+/// The diff view's form, from org_to_text.rs's 'change_fact_forms':
+/// its head, the heads of its parts, the presence atoms and the diff
+/// objects.
 fn change_fact_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ChangeFacts;
   fn guard ( facts : ChangeFacts, object : DiffObject ) {
     let ChangeFacts {
-      presence : _, // -> diff, with DiffPresence::EMITTABLE_ATOMS
+      presence : _, // -> presence, with DiffPresence::EMITTABLE_ATOMS
       ready : _,    // -> ready, with the objects
       leaves : _,   // -> leaves, with the objects
     } = facts;
     match object { // compile error here = update DiffObject::ALL
       DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
   let _ = guard;
-  [ vec! [ "diff", "ready", "leaves", "readyRequest", "unreadyRequest",
+  [ vec! [ "diff", "presence", "ready", "leaves", "readyRequest",
+           "unreadyRequest",
            "changed" ], // the head of a changed folder's form
     DiffPresence::EMITTABLE_ATOMS . to_vec (),
     DiffObject::ALL . into_iter () . map (DiffObject::wire_name)

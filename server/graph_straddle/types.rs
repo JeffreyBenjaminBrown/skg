@@ -124,7 +124,7 @@ impl Presence {
       (false, true)  => Some (Presence::OnlyAfter),
       (false, false) => None, } }
 
-  /// The sign of the '(diff ...)' atom for this presence: + for only
+  /// The sign of the '(presence ...)' atom for this presence: + for only
   /// after, - for only before, none for both.
   pub fn diff_sign (
     self,

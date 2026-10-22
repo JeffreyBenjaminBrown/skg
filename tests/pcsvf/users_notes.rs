@@ -91,7 +91,7 @@ fn a_note_under_a_historical_phantom_survives (
   with_fixture ("users_notes", &["main"], |f| {
     let phantom : &str = "** (skg (historical (id h)";
     let old_member : &str =
-      "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff rel-)";
+      "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff (presence rel-)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;
@@ -133,7 +133,7 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, removed, &note (3, "a note under x") )) ?;
     let parent : &str = parent_line_of (&saved, "a note under x");
-    assert! ( parent . starts_with (removed) && parent . contains ("(diff rel-)"),
+    assert! ( parent . starts_with (removed) && parent . contains ("(diff (presence rel-)"),
               "{}", saved );
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,

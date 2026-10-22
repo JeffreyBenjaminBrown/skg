@@ -110,7 +110,7 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
     let c_line : &str = node_lines (&created, "c") [0];
     let marked : String = save ( f, &created . replacen (
       c_line, &c_line . replacen (
-        "(repo main) ", "(repo main) (readyRequest all) ", 1 ), 1 )) ?
+        "(diff ", "(diff (readyRequest all) ", 1 ), 1 )) ?
       . saved_view;
     assert! ( node_lines (&marked, "c") [0] . contains ("(ready "), "{}", marked );
     let response : SaveResponse =
@@ -302,7 +302,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
 
 /// In the 'kinds' fixture the worktree removed sub's subscription to
 /// s1, so the buffer draws s1's subscriber folder holding sub as a
-/// removed member, a non-member marked '(diff rel-)'. Write-protected,
+/// removed member, a non-member marked '(diff (presence rel-))'. Write-protected,
 /// s1 saves unchanged: the check of a write-protected occurrence's
 /// partner folders counts only members.
 #[test]
@@ -321,7 +321,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     assert! ( s1_and_folder [0] . contains ("writeProtected")
               && s1_and_folder [1] == "** (skg (subscriberFolder changed))"
               && s1_and_folder [2] . starts_with ("*** (skg (node (id sub) ")
-              && s1_and_folder [2] . ends_with ("(diff rel-) (leaves 1 rel))) sub")
+              && s1_and_folder [2] . ends_with ("(diff (presence rel-) (leaves 1 rel)))) sub")
               && s1_and_folder [2] . contains ("(affectsParent false)"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
@@ -329,7 +329,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     let response : SaveResponse = save (f, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before );
-    assert! ( response . saved_view . contains ("(diff rel-) (leaves 1 rel))) sub"),
+    assert! ( response . saved_view . contains ("(diff (presence rel-) (leaves 1 rel)))) sub"),
               "{}", response . saved_view );
     Ok (( )) }) }
 

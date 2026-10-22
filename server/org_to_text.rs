@@ -349,34 +349,36 @@ fn property_metadata_to_string (
   }
   Ok ( parts . join (" ")) }
 
-/// The diff view's forms for one viewnode: '(diff ...)',
-/// '(ready ...)', '(leaves ...)', and its readiness request. Empty
-/// outside the diff view.
+/// The diff view's one form for a viewnode, '(diff (presence
+/// SIGN...) (leaves N OBJECT...) (ready OBJECT...) REQUEST)', each
+/// part present only when it has something to say. None outside the
+/// diff view, and wherever no part has: '(diff)' is never written.
 fn change_fact_forms (
   facts   : &ChangeFacts,
   request : &Option<ReadinessRequest>,
-) -> Vec<String> {
+) -> Option<String> {
   let form = |head : &str, atoms : Vec<&str>| -> String {
     if atoms . is_empty () { format! ("({})", head) }
     else { format! ("({} {})", head, atoms . join (" ")) } };
-  let mut forms : Vec<String> = Vec::new ();
+  let mut parts : Vec<String> = Vec::new ();
   let presence : Vec<&'static str> = facts . presence . atoms ();
   if ! presence . is_empty () {
-    forms . push ( form ("diff", presence) ); }
-  if let Some (objects) = &facts . ready {
-    forms . push ( form ( "ready",
-      objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
+    parts . push ( form ("presence", presence) ); }
   if let Some (leaves) = &facts . leaves {
     let count : String = leaves . count . to_string ();
-    forms . push ( form ( "leaves",
+    parts . push ( form ( "leaves",
       once ( count . as_str () )
       . chain ( leaves . objects . iter () . map ( |object| object . wire_name () ))
       . collect () )); }
+  if let Some (objects) = &facts . ready {
+    parts . push ( form ( "ready",
+      objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
   if let Some (request) = request {
-    forms . push ( form ( request . form_head (),
+    parts . push ( form ( request . form_head (),
       request . objects . iter () . map ( |object| object . wire_name () )
       . collect () )); }
-  forms }
+  if parts . is_empty () { None }
+  else { Some ( format! ( "(diff {})", parts . join (" ") )) } }
 
 /// Render metadata for an UnrestrictedVognode:
 ///   (skg [focused] [folded] (node ...))

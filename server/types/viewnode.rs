@@ -47,12 +47,13 @@ pub enum Birth {
   RoleGraft (RelationRole),
 }
 
-/// The diff view's facts about one viewnode: which graphs of
-/// the graph straddle hold its node and its relationship to its
-/// viewparent ('(diff ...)'), which of its change-forest leaves
-/// are marked commit-ready ('(ready ...)'), and which leaves a
-/// request on it may name ('(leaves ...)'). Display facts: the view
-/// derives them, and a save reads nothing from them.
+/// The diff view's facts about one viewnode, the parts of its
+/// '(diff ...)' form: which graphs of the graph straddle hold its
+/// node and its relationship to its viewparent ('(presence ...)'),
+/// which leaves a request on it may name ('(leaves ...)'), and which
+/// of its change-forest leaves are marked commit-ready ('(ready
+/// ...)'). Display facts: the view derives them, and a save reads
+/// nothing from them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangeFacts {
   pub presence : DiffPresence,
@@ -75,7 +76,7 @@ pub struct LeavesFact {
   pub objects : BTreeSet<DiffObject>,
 }
 
-/// The '(diff ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.
+/// The '(presence ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.
 /// None on an object means the node (or relationship) is in both
 /// graphs of the straddle, or that the object does not apply.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -825,7 +826,7 @@ impl Phantom {
 }
 
 impl DiffPresence {
-  /// The '(diff ...)' atoms, the node object first.
+  /// The '(presence ...)' atoms, the node object first.
   pub fn atoms (
     &self,
   ) -> Vec<&'static str> {

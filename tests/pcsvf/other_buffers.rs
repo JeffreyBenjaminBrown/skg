@@ -120,9 +120,9 @@ fn the_skgrepo_changes_buffer_draws_the_recorder_of_a_relRepo_move (
     buffer_of_case ("kinds", DiffViewBufferKind::SkgrepoChanges) ?;
   assert_lines_in_order ( &text, &[
     "* (skg (node (id rr)",
-    "** (skg (changesetMarker relRepo) (leaves 1 all))",
+    "** (skg (changesetMarker relRepo) (diff (leaves 1 all)))",
     "** (skg (node (id rm)",
-    "*** (skg (relRepoMove (old public) (new private)) (leaves 1))" ] );
+    "*** (skg (relRepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   assert! ( ! headline_of (&text, "rr") . contains ("homeSkgrepoMove"),
             "rr's home did not move:\n{}", text );
   assert! ( ! text . contains ("(id txt)"),
@@ -140,7 +140,7 @@ fn the_merges_buffer_draws_only_the_merge (
   assert! ( child_headlines_of_editable (&text, "acq") . iter ()
             . any ( |line| line . contains ("(node (id pres)") ),
             "the text preserver is drawn in acq's content:\n{}", text );
-  assert! ( headline_of (&text, "pres") . contains ("(diff node+ rel+)"),
+  assert! ( headline_of (&text, "pres") . contains ("(diff (presence node+ rel+)"),
             "the text preserver is new in acq's content:\n{}", text );
   assert! ( text . contains ("acquiredByFolder")
             && text . contains ("acquiredFolder"), "{}", text );
@@ -185,7 +185,7 @@ fn the_order_only_buffer_is_a_flat_list_with_markers (
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   assert! ( lines [0] . starts_with ("* (skg bodyFolded (node (id ord)"),
             "{}", text );
-  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (ready))" );
+  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (ready)))" );
   assert! ( lines [2] . contains ("(node (id o2) (repo public) writeProtected")
             && lines [3] . contains ("(node (id o1) (repo public) writeProtected"),
             "the content is drawn in its new order, as leaves:\n{}", text );

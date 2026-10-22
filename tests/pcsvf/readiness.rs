@@ -18,7 +18,7 @@ use skg::types::views_state::DiffViewBufferKind;
 use std::error::Error;
 
 /// A headline that names change-forest leaves says which, in
-/// '(leaves N OBJECT...)'. With ctx removed from ct in the buffer
+/// '(diff (leaves N OBJECT...))'. With ctx removed from ct in the buffer
 /// too, ct's content changeset marker aggregates three content
 /// relationships (k1 and ctx removed, k2 added); the historical
 /// phantom of gone, in orph's subscriber folder, names a leaf on each
@@ -33,9 +33,9 @@ fn a_headline_carries_the_leaves_it_names (
     let saved : String =
       save_cleanly (f, &all_changes_view (), &without_ctx) ? . saved_view;
     for line in [
-      "** (skg (changesetMarker content) (leaves 3 all))",
-      "*** (skg (historical (id gone) (repo public) (diff node- rel-) (leaves 2 node rel))) gone",
-      "** (skg (oldText titleAndBody) (leaves 1)) txt" ] {
+      "** (skg (changesetMarker content) (diff (leaves 3 all)))",
+      "*** (skg (historical (id gone) (repo public) (diff (presence node- rel-) (leaves 2 node rel)))) gone",
+      "** (skg (oldText titleAndBody) (diff (leaves 1))) txt" ] {
       assert! ( saved . lines () . any ( |l| l == line ),
                 "{:?} in:\n{}", line, saved ); }
     Ok (( )) }) }
@@ -50,15 +50,15 @@ fn a_mark_shows_on_both_images_of_a_relationship (
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = edit_line (
       &buffer, "*** (skg (node (id s1)",
-      |line| line . replace ( "(diff rel-) (leaves 1 rel))) s1",
-                              "(diff rel-) (leaves 1 rel) (readyRequest rel))) s1" ));
+      |line| line . replace ( "(diff (presence rel-) (leaves 1 rel)))) s1",
+                              "(diff (presence rel-) (leaves 1 rel) (readyRequest rel)))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( saved . contains (
-      "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff rel-) (ready rel) (leaves 1 rel))) s1" ),
+      "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel) (ready rel)))) s1" ),
       "the image under sub is ready:\n{}", saved );
     assert! ( saved . lines () . any ( |line|
       line . starts_with ("*** (skg (node (id sub)")
-      && line . ends_with ("(diff rel-) (ready rel) (leaves 1 rel))) sub") ),
+      && line . ends_with ("(diff (presence rel-) (leaves 1 rel) (ready rel)))) sub") ),
       "the image under s1 is ready:\n{}", saved );
     assert! ( ! saved . contains ("readyRequest"),
               "the request was consumed:\n{}", saved );
@@ -71,14 +71,14 @@ fn marking_a_removed_entry_marks_its_leaf (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let marked : String = [ "*** (skg removedAlias (diff rel-) (leaves 1)) a1",
-                            "*** (skg removedID (diff rel-) (leaves 1)) ali-old" ]
+    let marked : String = [ "*** (skg removedAlias (diff (presence rel-) (leaves 1))) a1",
+                            "*** (skg removedID (diff (presence rel-) (leaves 1))) ali-old" ]
       . into_iter () . fold ( buffer, |marked, line|
         edit_line ( &marked, line, |line| line . replacen (
-          "(diff rel-) (leaves 1))", "(diff rel-) (leaves 1) (readyRequest))", 1 )) );
+          "(diff (presence rel-) (leaves 1)))", "(diff (presence rel-) (leaves 1) (readyRequest)))", 1 )) );
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
-    for line in [ "*** (skg removedAlias (diff rel-) (ready) (leaves 1)) a1",
-                  "*** (skg removedID (diff rel-) (ready) (leaves 1)) ali-old" ] {
+    for line in [ "*** (skg removedAlias (diff (presence rel-) (leaves 1) (ready))) a1",
+                  "*** (skg removedID (diff (presence rel-) (leaves 1) (ready))) ali-old" ] {
       assert! ( saved . lines () . any ( |l| l == line ),
                 "{:?} must be ready:\n{}", line, saved ); }
     assert! ( ! saved . contains ("readyRequest"),
@@ -93,16 +93,16 @@ fn editing_a_node_lapses_its_mark (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = edit_line (
-      &buffer, "** (skg (oldText titleAndBody) (leaves 1)) txt",
-      |_| "** (skg (oldText titleAndBody) (leaves 1) (readyRequest)) txt" . to_string () );
+      &buffer, "** (skg (oldText titleAndBody) (diff (leaves 1))) txt",
+      |_| "** (skg (oldText titleAndBody) (diff (leaves 1) (readyRequest))) txt" . to_string () );
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
-    assert! ( saved . contains ("** (skg (oldText titleAndBody) (ready) (leaves 1)) txt"),
+    assert! ( saved . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
               "the old text is ready:\n{}", saved );
     let edited : String = edit_line (
       &saved, "* (skg (node (id txt)",
       |line| line . replace ( "txt, retitled", "txt, retitled again" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &edited) ? . saved_view;
-    assert! ( saved . contains ("** (skg (oldText titleAndBody) (leaves 1)) txt"),
+    assert! ( saved . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
               "the edit lapsed the mark:\n{}", saved );
     Ok (( )) }) }
 
@@ -122,8 +122,8 @@ fn the_save_reports_the_readiness_summary (
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_eq! ( summary_of ( &save_cleanly (f, &all_changes_view (), &buffer) ? ), summary (0, 6, 0) );
     let marked : String = edit_line (
-      &buffer, "** (skg (oldText title) (leaves 1)) mc",
-      |_| "** (skg (oldText title) (leaves 1) (readyRequest)) mc" . to_string () );
+      &buffer, "** (skg (oldText title) (diff (leaves 1))) mc",
+      |_| "** (skg (oldText title) (diff (leaves 1) (readyRequest))) mc" . to_string () );
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &marked) ?;
     assert_eq! ( summary_of (&response), summary (1, 6, 0),
                  "mc's file records only its text change" );
@@ -237,7 +237,7 @@ fn a_member_deleted_in_the_buffer_is_redrawn_as_removed (
       f, &buffer, "** (skg bodyFolded (node (id cy1)", "cy1" ) ?;
     assert! ( ! saved . contains ("(deleted (id cy1)"), "{}", saved );
     let historical : &str =
-      "(historical (id cy1) (repo main) (diff node- rel-) (leaves 2 node rel))) cy1";
+      "(historical (id cy1) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) cy1";
     assert_eq! ( saved . matches (historical) . count (), 2,
                  "in cy2's content and in its container folder:\n{}", saved );
     assert! ( saved . contains ( &format! ("** (skg bodyFolded {}", historical) ),
@@ -252,7 +252,7 @@ fn a_root_deleted_in_the_buffer_is_redrawn_as_removed (
     let saved : String = save_deleting (
       f, &buffer, "* (skg (node (id flg)", "flg" ) ?;
     assert! ( saved . contains (
-      "* (skg (historical (id flg) (repo public) (diff node-) (leaves 1 node))) flg" ),
+      "* (skg (historical (id flg) (repo public) (diff (presence node-) (leaves 1 node)))) flg" ),
       "{}", saved );
     assert! ( ! saved . contains ("(deleted (id flg)"), "{}", saved );
     Ok (( )) }) }

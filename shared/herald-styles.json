@@ -49,7 +49,7 @@
     "homeRepoHerald":                  "normal",
     "ready":                           "go",
     "changed":                         "message",
-    "diff":                            "nonstandard",
+    "presence":                        "nonstandard",
     "readyRequest":                    "nonstandard",
     "unreadyRequest":                  "nonstandard",
     "delete":                          "nonstandard",
