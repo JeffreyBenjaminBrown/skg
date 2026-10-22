@@ -2,7 +2,7 @@
 -- skgrepo that has changes, with one message
 -- ('docs/diff-view.org', "Stage and commit").
 -- When the readiness summary is incomplete, or some owned gitrepo
--- has entries staged already, the server asks for confirmation
+-- has entries already staged, the server asks for confirmation
 -- instead and changes nothing; only the typed word "yes" resends the
 -- request confirmed. Every answer is followed by a rerender
 -- stream, which after a commit redraws the open buffers of the
@@ -50,7 +50,7 @@ function M.handler (message, response)
     local summary = readiness.readiness_summary_from_response(response)
     local typed = vim.fn.input(
       readiness.readiness_summary_message(summary):gsub('%.$', '')
-      .. M.pre_staged_message(payload.field(response, 'pre-staged'))
+      .. M.already_staged_message(payload.field(response, 'already-staged'))
       .. '. Type yes to commit anyway: ')
     if typed == 'yes' then
       rerender.after_empty_stream = function () M.send(message, true) end
@@ -60,15 +60,15 @@ function M.handler (message, response)
   end
 end
 
----The prompt's clause for PRE_STAGED, '((GITREPO PATH...) ...)', or
+---The prompt's clause for ALREADY_STAGED, '((GITREPO PATH...) ...)', or
 ---the empty string when there is none.
----@param pre_staged any
+---@param already_staged any
 ---@return string
-function M.pre_staged_message (pre_staged)
-  if pre_staged == nil or not sexpr.is_list(pre_staged)
-     or #pre_staged == 0 then return '' end
+function M.already_staged_message (already_staged)
+  if already_staged == nil or not sexpr.is_list(already_staged)
+     or #already_staged == 0 then return '' end
   local gitrepos = {}
-  for _, gitrepo_and_paths in ipairs(pre_staged) do
+  for _, gitrepo_and_paths in ipairs(already_staged) do
     local paths = {}
     for i = 2, #gitrepo_and_paths do
       table.insert(paths, sexpr.atom_text(gitrepo_and_paths[i])) end

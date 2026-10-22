@@ -2,7 +2,7 @@
 //! "Stage and commit"): stage everything and git-commit it,
 //! in every owned skgrepo that has changes, with one message. When the
 //! readiness summary is incomplete, or some owned gitrepo has entries
-//! staged already, and the request lacks '(confirmed . t)', the answer
+//! already staged, and the request lacks '(confirmed . t)', the answer
 //! asks for confirmation and nothing changes.
 //!
 //! Every answer is followed by a rerender stream, as the
@@ -16,8 +16,8 @@ use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ReadinessSummary, readiness_response_sexp,
   readiness_response_trailing_entries};
 use crate::git_ops::stage_and_commit::{
-  PreStagedGitrepo, SkgrepoCommitOutcome,
-  pre_staged_entries_of_owned_gitrepos, stage_and_commit_owned_skgrepos};
+  AlreadyStagedGitrepo, SkgrepoCommitOutcome,
+  already_staged_entries_of_owned_gitrepos, stage_and_commit_owned_skgrepos};
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
@@ -46,11 +46,11 @@ use std::sync::{Arc, MutexGuard};
 pub enum StageAndCommitAnswer {
   /// Nothing was attempted.
   Refused (String),
-  /// The readiness summary is incomplete or 'pre_staged' is not
+  /// The readiness summary is incomplete or 'already_staged' is not
   /// empty, and the request was not confirmed. Nothing changed.
   NeedsConfirmation {
-    summary    : ReadinessSummary,
-    pre_staged : Vec<PreStagedGitrepo>, },
+    summary        : ReadinessSummary,
+    already_staged : Vec<AlreadyStagedGitrepo>, },
   /// Each owned skgrepo's outcome, and any error met after the
   /// git-commits.
   Committed {
@@ -134,11 +134,11 @@ pub fn stage_and_commit (
       let store : MutexGuard<ReadinessStore> =
         env . runtime . lock_readiness_store ();
       straddle . change_leaves () . readiness_summary (&store) };
-    let pre_staged : Vec<PreStagedGitrepo> =
-      pre_staged_entries_of_owned_gitrepos (&runtime . config);
-    if ! summary . is_complete () || ! pre_staged . is_empty () {
+    let already_staged : Vec<AlreadyStagedGitrepo> =
+      already_staged_entries_of_owned_gitrepos (&runtime . config);
+    if ! summary . is_complete () || ! already_staged . is_empty () {
       return StageAndCommitAnswer::NeedsConfirmation {
-        summary, pre_staged }; }}
+        summary, already_staged }; }}
   let outcomes : Vec<(SkgrepoName, SkgrepoCommitOutcome)> =
     stage_and_commit_owned_skgrepos (&runtime . config, message);
   let mut errors : Vec<String> = Vec::new ();
@@ -158,12 +158,12 @@ pub fn stage_and_commit (
 
 /// Format, for each answer:
 ///   ((errors ("REFUSAL")) (warnings ()))
-///   ((needs-confirmation . t) [(pre-staged (("GITREPO" "PATH"...) ...))]
+///   ((needs-confirmation . t) [(already-staged (("GITREPO" "PATH"...) ...))]
 ///    (readiness-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))
 /// The readiness summary has the save response's form, with an
-/// not-editable count of 0. 'pre-staged' is there only when some
-/// gitrepo had entries staged already. 'commits' lists the skgrepos git-committed; a
+/// not-editable count of 0. 'already-staged' is there only when some
+/// gitrepo had entries already staged. 'commits' lists the skgrepos git-committed; a
 /// skgrepo without changes is in neither list, a failed one is an
 /// error.
 pub fn stage_and_commit_response_sexp (
@@ -173,7 +173,7 @@ pub fn stage_and_commit_response_sexp (
     StageAndCommitAnswer::Refused (error) =>
       sexp_to_client_string ( &readiness_response_sexp (
         Vec::new (), None, &[ error . clone () ], &[] )),
-    StageAndCommitAnswer::NeedsConfirmation { summary, pre_staged } => {
+    StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } => {
       let trailing_entries : Vec<Sexp> =
         readiness_response_trailing_entries (
           Some ( &BufferReadinessSummary {
@@ -182,8 +182,8 @@ pub fn stage_and_commit_response_sexp (
       let entries : Vec<String> =
         once ( sexp_to_client_string (
           &true_entry_sexp ("needs-confirmation") ))
-        . chain ( ( ! pre_staged . is_empty () ) . then (
-          || pre_staged_sexp (pre_staged) ))
+        . chain ( ( ! already_staged . is_empty () ) . then (
+          || already_staged_sexp (already_staged) ))
         . chain ( trailing_entries . iter () . map (sexp_to_client_string) )
         . collect ();
       format! ( "({})", entries . join (" ") ) },
@@ -207,17 +207,17 @@ pub fn stage_and_commit_response_sexp (
           Sexp::List (commits) ] ) ],
         None, &all_errors, &[] )) }, }}
 
-/// Format: (pre-staged (("GITREPO" "PATH"...) ...))
+/// Format: (already-staged (("GITREPO" "PATH"...) ...))
 /// Printed by hand, each path through 'quote_sexp_string': the 'sexp'
 /// crate prints an atom bare unless it holds whitespace or a quote,
 /// and a bare path holding ';' or '(' would not read back as one atom.
-fn pre_staged_sexp (
-  pre_staged : &[PreStagedGitrepo],
+fn already_staged_sexp (
+  already_staged : &[AlreadyStagedGitrepo],
 ) -> String {
   let path_atom = |path : &Path| -> String {
     quote_sexp_string ( &path . display () . to_string () ) };
   let gitrepo_lists : Vec<String> =
-    pre_staged . iter ()
+    already_staged . iter ()
     . map ( |gitrepo| format! (
       "({})",
       once ( gitrepo . gitrepo . as_path () )
@@ -226,4 +226,4 @@ fn pre_staged_sexp (
         . collect::<Vec<String>> ()
         . join (" ") ))
     . collect ();
-  format! ( "(pre-staged ({}))", gitrepo_lists . join (" ") ) }
+  format! ( "(already-staged ({}))", gitrepo_lists . join (" ") ) }

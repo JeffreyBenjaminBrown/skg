@@ -4,7 +4,7 @@
 ;;; skgrepo that has changes, with one message
 ;;; ('docs/diff-view.org', "Stage and commit").
 ;;; When the readiness summary is incomplete, or some owned gitrepo
-;;; has entries staged already, the server asks for confirmation
+;;; has entries already staged, the server asks for confirmation
 ;;; instead and changes nothing; only the typed word "yes" resends the
 ;;; request confirmed. Every answer is followed by a rerender
 ;;; stream, which after a commit redraws the open buffers of the
@@ -19,7 +19,7 @@
 (defun skg-stage-and-commit ()
   "Stage every change and git-commit it, in every owned skgrepo
 that has changes, with one message. If not every changed file is
-commit-ready, or some owned gitrepo has entries staged already,
+commit-ready, or some owned gitrepo has entries already staged,
 show the readiness summary and those entries, and proceed only if
 the user types \"yes\"."
   (interactive)
@@ -59,7 +59,7 @@ confirmed once the empty rerender stream that follows is done."
 
 (defun skg--stage-and-commit-confirmed-p (response)
   "Show the readiness summary of RESPONSE, a request for confirmation,
-and the entries it lists as staged already; non-nil iff the user
+and the entries it lists as already staged; non-nil iff the user
 types exactly \"yes\"."
   (string= "yes"
            (read-string
@@ -67,13 +67,13 @@ types exactly \"yes\"."
                     (string-remove-suffix
                      "." (skg--readiness-summary-message
                           (assq 'readiness-summary response)))
-                    (skg--stage-and-commit-pre-staged-message
-                     (cadr (assq 'pre-staged response)))))))
+                    (skg--stage-and-commit-already-staged-message
+                     (cadr (assq 'already-staged response)))))))
 
-(defun skg--stage-and-commit-pre-staged-message (pre-staged)
-  "The prompt's clause for PRE-STAGED, '((GITREPO PATH...) ...)', or
+(defun skg--stage-and-commit-already-staged-message (already-staged)
+  "The prompt's clause for ALREADY-STAGED, '((GITREPO PATH...) ...)', or
 the empty string when there is none."
-  (if (null pre-staged) ""
+  (if (null already-staged) ""
     (format ". Staged already, so committed too: %s"
             (mapconcat
              (lambda (gitrepo-and-paths)
@@ -81,7 +81,7 @@ the empty string when there is none."
                        (car gitrepo-and-paths)
                        (mapconcat (lambda (path) (format "%s" path))
                                   (cdr gitrepo-and-paths) ", ")))
-             pre-staged "; "))))
+             already-staged "; "))))
 
 (defun skg--stage-and-commit-result-message (response)
   "The line shown for RESPONSE, '((commits ((SKGREPO COMMIT-ID) ...))

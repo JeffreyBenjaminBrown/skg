@@ -94,7 +94,7 @@ describe('skg stage and commit', function ()
     assert.are.equal(1, #requests, vim.inspect(requests))
   end)
 
-  it('names the gitrepos with entries staged already in the prompt', function ()
+  it('names the gitrepos with entries already staged in the prompt', function ()
     local requests, prompts = {}, {}
     local typed = { 'one message', 'no' }
     vim.fn.input = function (prompt)
@@ -104,7 +104,7 @@ describe('skg stage and commit', function ()
       table.insert(requests, line)
       respond(helpers.framed(
         '((response-type stage-and-commit) (needs-confirmation . t)'
-        .. ' (pre-staged ((/data/public notes.txt "a b.skg")))'
+        .. ' (already-staged (("/data/public" "notes.txt" "a b.skg")))'
         .. ' (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0))'
         .. ' (errors ()) (warnings ()))'))
       respond(helpers.framed('((response-type rerender-lock) (lock-views ()))'))

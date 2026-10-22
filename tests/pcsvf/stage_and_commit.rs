@@ -9,7 +9,7 @@ use crate::pcsvf::common::{
   send_stage_and_commit_request, view_id_of, with_fixture};
 
 use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey};
-use skg::git_ops::stage_and_commit::PreStagedGitrepo;
+use skg::git_ops::stage_and_commit::AlreadyStagedGitrepo;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::stage_and_commit::{
@@ -104,11 +104,11 @@ fn an_incomplete_summary_needs_confirmation_and_commits_nothing (
       . collect::<Result<_, _>> () ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
       &env, &mut f . views_state, &all_skgrepos, "the message", false );
-    let StageAndCommitAnswer::NeedsConfirmation { summary, pre_staged } = &answer
+    let StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } = &answer
       else { panic! ("expected a request for confirmation, got {:?}", answer) };
     assert! ( summary . changed_files > 0 && summary . ready_files < summary . changed_files,
               "{:?}", summary );
-    assert! ( pre_staged . is_empty (), "{:?}", pre_staged );
+    assert! ( already_staged . is_empty (), "{:?}", already_staged );
     let response : String = stage_and_commit_response_sexp (&answer);
     assert! ( response . starts_with ( "((needs-confirmation . t) (readiness-summary (ready " ),
               "{}", response );
@@ -160,7 +160,7 @@ fn a_complete_summary_commits_without_confirmation_and_lapses_the_marks (
 /// a fully ready commit for confirmation, naming the gitrepo and the
 /// file; the confirmed resend commits it with the '.skg' files.
 #[test]
-fn an_entry_staged_beforehand_needs_confirmation_and_is_then_committed (
+fn an_already_staged_entry_needs_confirmation_and_is_then_committed (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
@@ -176,16 +176,16 @@ fn an_entry_staged_beforehand_needs_confirmation_and_is_then_committed (
       . map ( |skgrepo| head_id (f, skgrepo) ) . collect::<Result<_, _>> () ?;
     let answer : StageAndCommitAnswer = stage_and_commit (
       &env, &mut f . views_state, &all_skgrepos, "with notes", false );
-    let StageAndCommitAnswer::NeedsConfirmation { summary, pre_staged } = &answer
+    let StageAndCommitAnswer::NeedsConfirmation { summary, already_staged } = &answer
       else { panic! ("expected a request for confirmation, got {:?}", answer) };
     assert! ( summary . is_complete (), "{:?}", summary );
-    let [ PreStagedGitrepo { gitrepo : public_root, paths } ] = pre_staged . as_slice ()
-      else { panic! ("expected one gitrepo, got {:?}", pre_staged) };
+    let [ AlreadyStagedGitrepo { gitrepo : public_root, paths } ] = already_staged . as_slice ()
+      else { panic! ("expected one gitrepo, got {:?}", already_staged) };
     assert! ( public_root . ends_with ("public"), "{:?}", public_root );
     assert_eq! ( paths, &vec! [ PathBuf::from ("notes.txt") ] );
     let response : String = stage_and_commit_response_sexp (&answer);
     assert! ( response . starts_with ( &format! (
-      "((needs-confirmation . t) (pre-staged ((\"{}\" \"notes.txt\"))) (readiness-summary (ready ",
+      "((needs-confirmation . t) (already-staged ((\"{}\" \"notes.txt\"))) (readiness-summary (ready ",
       public_root . display () )),
               "{}", response );
     for (i, skgrepo) in SKGREPOS . iter () . enumerate () {
@@ -198,7 +198,7 @@ fn an_entry_staged_beforehand_needs_confirmation_and_is_then_committed (
     { let public : Repository = gitrepo (f, "public") ?;
       let committed_tree : Tree = public . head () ? . peel_to_tree () ?;
       assert! ( committed_tree . get_path ( Path::new ("notes.txt") ) . is_ok (),
-                "the file staged beforehand is committed" ); }
+                "the already-staged file is committed" ); }
     Ok (( )) }) }
 
 #[test]

@@ -4,8 +4,8 @@
 //! A skgrepo whose staged tree equals its HEAD's has no changes and
 //! gets no commit. The author and committer are the gitrepo's
 //! configured user. Only '.skg' files are staged here, but a
-//! git-commit records the whole git index, so whatever was staged
-//! beforehand is committed too; 'pre_staged_entries_of_owned_gitrepos'
+//! git-commit records the whole git index, so whatever was already
+//! staged is committed too; 'already_staged_entries_of_owned_gitrepos'
 //! finds it first, so that the user can be asked.
 
 use crate::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
@@ -41,18 +41,18 @@ pub fn stage_and_commit_owned_skgrepos (
 /// staged: the gitrepo's worktree, and each path staged in it,
 /// relative to that worktree.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PreStagedGitrepo {
+pub struct AlreadyStagedGitrepo {
   pub gitrepo : PathBuf,
   pub paths   : Vec<PathBuf>,
 }
 
 /// Each gitrepo holding an owned skgrepo, once and in config order,
-/// that has entries staged already. A skgrepo outside any gitrepo, or
+/// that has entries already staged. A skgrepo outside any gitrepo, or
 /// whose git index cannot be read, adds nothing here; staging it
 /// reports the failure.
-pub fn pre_staged_entries_of_owned_gitrepos (
+pub fn already_staged_entries_of_owned_gitrepos (
   config : &SkgConfig,
-) -> Vec<PreStagedGitrepo> {
+) -> Vec<AlreadyStagedGitrepo> {
   let mut gitrepos_seen : HashSet<PathBuf> = HashSet::new ();
   config . owned_skgrepos_in_config_order () . into_iter ()
     . filter_map ( |skgrepo_name| config . skgrepos . get (&skgrepo_name) )
@@ -61,7 +61,7 @@ pub fn pre_staged_entries_of_owned_gitrepos (
     . filter_map ( |gitrepo| {
       let paths : Vec<PathBuf> = staged_paths (&gitrepo) . ok () ?;
       if paths . is_empty () { None }
-      else { Some ( PreStagedGitrepo {
+      else { Some ( AlreadyStagedGitrepo {
         gitrepo : gitrepo_root (&gitrepo), paths } ) }} )
     . collect () }
 
