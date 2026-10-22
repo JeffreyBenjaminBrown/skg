@@ -164,7 +164,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       nodeMerge_instructions_from_pairs (
         &nodeMerge_acquisitions, graph, config )
  } . map_err (SaveError::DatabaseError) ?;
-  // C's repo is inferred from N's nearest OWNED vognode ancestor in
+  // C's repo is inferred from N's nearest owned vognode ancestor in
   // the view. The flat NodeInstructions have lost that ancestry, so resolve
   // it here, where the placed viewforest is live, keyed by foreign pid.
   let owned_ancestor_skgrepo : HashMap<ID, SkgrepoName> =
@@ -184,7 +184,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     new_foreign_nodes_adopting_clone_skgrepos (
       &viewforest, & new_with_inherited_skgrepo, config ) };
   let explicit_child_skgrepo : HashMap<ID, SkgrepoName> = {
-    // A clone skgrepo the user already SPECIFIED, via explicit owned
+    // A clone skgrepo the user already specified, via explicit owned
     // skgrepos on the forked node's new children (fork-fixes Case 2):
     // the confirmation flow shows it as settled instead of asking.
     let new_with_explicit_skgrepo : HashSet<ID> =
@@ -195,12 +195,12 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       &viewforest, & new_with_explicit_skgrepo, config ) };
   let default_clone_skgrepo : Option<SkgrepoName> = {
     // The active-aware default for a fork whose skgrepo can be neither
-    // user-set nor inferred: prefer the CONFIG-FIRST owned skgrepo that
-    // is UNRESTRICTED under the restricted set, so the fork reaches the
+    // user-set nor inferred: prefer the config-first owned skgrepo that
+    // is unrestricted under the restricted set, so the fork reaches the
     // confirmation buffer (where the user can rotate it) instead of
     // dead-ending on ForkRepoRestricted when a restricted owned skgrepo
     // happens to sort first. Falls back to the config-first owned skgrepo
-    // -- then ForkRepoRestricted fires only when the user owns no UNRESTRICTED
+    // -- then ForkRepoRestricted fires only when the user owns no unrestricted
     // skgrepo at all (the genuine "activate one first" case), and
     // ForkRepoUnresolved only when the user owns no skgrepo at all.
     let owned_in_order : Vec<SkgrepoName> =
@@ -234,9 +234,9 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       errors, warnings : parsing_warnings . clone () } ) ?;
   let fork_specs : Vec<ForkSpec> = {
     // Explicit 'skg-fork-node' gesture: a node carrying ViewRequest::Fork
-    // is an OWNED node the user asked to fork. Unlike the implicit
+    // is an owned node the user asked to fork. Unlike the implicit
     // foreign fork (where N's own save is dropped), N keeps its own save
-    // (it is owned); we only ADD the clone C overriding N. C copies N's
+    // (it is owned); we only add the clone C overriding N. C copies N's
     // saved state on disk -- the client refuses to fork a dirty buffer,
     // so disk == what the user sees. These specs join the implicit ones
     // for the shared confirmation / skgsave-commit pipeline below.
@@ -300,7 +300,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos (
   buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     buffer_text, &graph, config, skgrepo_restriction, fork_skgrepos ) }
 
-/// One nonfatal warning per DANGLING link this save writes: a
+/// One nonfatal warning per dangling link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in
 /// the graph nor created by this same save. Only nodes the save actually
 /// writes are scanned -- the noop filter has already dropped
@@ -338,13 +338,13 @@ fn dead_link_warnings (
   warnings }
 
 /// Build a ForkSpec for each node carrying 'ViewRequest::Fork' (the
-/// explicit 'skg-fork-node' gesture, for an OWNED node). The clone C is
+/// explicit 'skg-fork-node' gesture, for an owned node). The clone C is
 /// built from N's current disk/graph snapshot (not the buffer): the
 /// client refuses to fork a dirty buffer, so disk == what the user sees,
 /// and N's own owned save proceeds separately. The clone skgrepo resolves
 /// user-set-else-config-first-owned: the shared 'CloneRepoInputs'
 /// carries the explicit-child and inferred-ancestor maps too, but both
-/// are keyed by FOREIGN pids, so an owned fork target never hits them.
+/// are keyed by foreign pids, so an owned fork target never hits them.
 /// D2's 'validate_fork_view_requests' has already rejected an unsaved
 /// or already-forked target, and a second request for one, so this
 /// only builds.

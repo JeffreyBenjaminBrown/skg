@@ -4,7 +4,7 @@ use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::error::Error;
 
-/// ERRORS if the ancestor is not found or cannot provide both PID and skgrepo.
+/// Errors if the ancestor is not found or cannot provide both PID and skgrepo.
 pub fn pid_and_skgrepo_from_ancestor (
   tree       : &Tree<Viewnode>,
   node       : NodeId,

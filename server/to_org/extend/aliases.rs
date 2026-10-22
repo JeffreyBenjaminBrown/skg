@@ -35,7 +35,7 @@ pub fn build_and_integrate_aliases_view_then_drop_request (
 /// update_buffer) is only called on an AliasFolder already in the tree.
 /// These two distinct ways of populating an AliasFolder are necessary,
 /// because in 'complete_or_restore_each_node_in_branch',
-/// view requests are only processed AFTER recursing to children
+/// view requests are only processed after recursing to children
 /// (for reasons explained in that function's header comment),
 /// so any newly-created empty AliasFolder
 /// would not be visited in the same save cycle.

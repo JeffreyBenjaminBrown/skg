@@ -1,4 +1,4 @@
-//! The telescope invariant validator: ONE shared primitive
+//! The telescope invariant validator: one shared primitive
 //! ('telescope_violations_of') consulted at both gates -- init /
 //! rebuild (whole graph, aggregated report) and save (affected recorders)
 //! -- because two divergent validators once nearly let bad data
@@ -6,7 +6,7 @@
 //!
 //! ENFORCEMENT STRENGTH ('docs/telescopes.org', "What leaks, and what
 //! repair fixes"): cross-file violations are
-//! WARNINGS with repair guidance, never load refusals -- they can
+//! warnings with repair guidance, never load refusals -- they can
 //! arise from two perfectly correct saves on different machines, so
 //! a pull must never brick a skgrepo. Only single-file malformations
 //! (unparseable YAML, empty-string title, pid/filename mismatch,
@@ -25,7 +25,7 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// THE leak shape: a relationship instance whose relRepo is
+  /// The leak shape: a relationship instance whose relRepo is
   /// more public than its target's home, so the (more public) file
   /// names an ID whose node is more private -- exactly what the
   /// telescope exists to prevent. Repair: move the membership's relRepo
@@ -62,7 +62,7 @@ pub enum TelescopeViolation {
   IgnoredForeignPidFolderlision {
     ignored_skgrepos : Vec<SkgrepoName>,
   },
-  /// Anything the COMPOSITION noticed while combining a node's sections
+  /// Anything the composition noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
   /// title, ...). These were logged and dropped before; they
   /// belong in the report with the rest.
@@ -100,7 +100,7 @@ impl fmt::Display for TelescopeViolation {
       TelescopeViolation::Composition (w) =>
         write! ( f, "{}", w ), }}}
 
-/// THE PRIMITIVE both gates call: one node's telescope violations,
+/// The one primitive both gates call: one node's telescope violations,
 /// judged against the whole graph (targets' homes) and the config
 /// (the privacy order).
 pub fn telescope_violations_of (
@@ -230,7 +230,7 @@ pub fn validate_all_telescopes (
   all }
 
 /// The whole init/rebuild report: what the graph shows
-/// ('validate_all_telescopes') plus what the LOAD saw that the
+/// ('validate_all_telescopes') plus what the load saw that the
 /// graph cannot show -- compose complaints and ignored foreign pid
 /// collisions, which
 /// need a node's section list rather than its composition. Reporting
@@ -274,7 +274,7 @@ pub fn report_telescope_violations (
   content . push_str ("#+title: Telescope warnings\n");
   content . push_str ("#+date: <generated at initialization>\n\n");
   content . push_str ( & format! (
-    "{} telescope warning(s). These are WARNINGS, not errors: the data loads, but the shapes below should be repaired -- each line says how.\n\n",
+    "{} telescope warning(s). These are warnings, not errors: the data loads, but the shapes below should be repaired -- each line says how.\n\n",
     violations . len () ));
   let mut current : Option<&ID> = None;
   for (pid, v) in violations {

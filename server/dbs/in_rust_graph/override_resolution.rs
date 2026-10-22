@@ -1,4 +1,4 @@
-//! The override resolver: given an ID, which node should be SHOWN
+//! The override resolver: given an ID, which node should be shown
 //! in its place? Follows owned 'overrides' relationships from
 //! overridden to overrider, transitively, with a seen-set cycle
 //! guard. Foreign override relationships never participate in substitution;
@@ -6,7 +6,7 @@
 //! and paths).
 //!
 //! Two gates, applied per relationship:
-//! - OWNERSHIP is set-independent: a relationship is followed only if its
+//! - ownership is set-independent: a relationship is followed only if its
 //!   overrider's skgrepo is owned, regardless of the
 //!   skgrepo restriction.
 //! - VISIBILITY: when an 'ShowSkgrepoRestriction' is supplied, a relationship is
@@ -107,14 +107,14 @@ pub fn resolve_override (
     path . push ( next . clone () );
     current = next; }}
 
-/// Whether 'carrier' is a node ON 'original''s owned override
+/// Whether 'carrier' is a node on 'original''s owned override
 /// chain — i.e. a node the server could legitimately show, marked
 /// '(overridesHere original)', wherever 'original' would appear as
 /// content. The tamper check at save uses this: with chains the shown
-/// node can be any link of the chain (a MIDDLE carrier, when a later
+/// node can be any link of the chain (a middle carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) fact.
-/// VISIBILITY-UNGATED ('unrestricted' = None) so a fact that was honest
+/// Visibility-ungated ('unrestricted' = None) so a fact that was honest
 /// when rendered does not start failing after a skgrepo-set switch;
 /// 'path' is the full owned chain (ownership still gates).
 pub fn carrier_on_owned_chain (

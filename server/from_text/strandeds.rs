@@ -2,7 +2,7 @@
 //! strands ('docs/diff-view.org', "Strandeds").
 //!
 //! A relationship touching a moved node, in either direction and
-//! whether or not any view shows it, is STRANDED when it sat at its
+//! whether or not any view shows it, is stranded when it sat at its
 //! default relRepo before the save and the sticky-else-default rule
 //! ('apply_sticky_relRepos_in_graph_with_prospective_homes') would
 //! leave it off its new default. A stranded relationship left more

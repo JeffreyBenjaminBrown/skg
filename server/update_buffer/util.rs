@@ -31,15 +31,15 @@ where
     } ) . map_err( |e| -> String { e . into() } )?; }
   Ok( () ) }
 
-/// A NEW hiddenInSubscribee or
+/// A new hiddenInSubscribee or
 /// hiddenOutsideOfSubscribee folder begins folded. Creation sites stamp
 /// 'folded' on the newborn folder; this runs at the folder's own BFS visit
 /// (its members now reconciled in) and transfers the stamp: every
 /// child is marked folded and the folder's own flag is cleared. That
 /// encoding is the client's (elisp/skg-org-fold.el): 'folded' on a
-/// headline means it is hidden inside its folded PARENT, so a folder's
+/// headline means it is hidden inside its folded parent, so a folder's
 /// collapse lives on its members -- left on the folder itself it would
-/// instead fold the folder's parent. A folder PARSED from a buffer carries
+/// instead fold the folder's parent. A folder parsed from a buffer carries
 /// 'folded' only when it sat inside a folded ancestor; its members
 /// then already carry the mark, so the transfer changes nothing.
 pub fn fold_members_of_newborn_folder (
@@ -233,9 +233,9 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: unmanaged first, then managed in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
-///   USER-FACING CONSEQUENCE for PartnerFolders: a non-member
+///   User-facing consequence for PartnerFolders: a non-member
 ///   child a user parks inside a folder is "unmanaged" here, so it is moved
-///   ABOVE the generated members on save. This is deliberate -- the
+///   above the generated members on save. This is deliberate -- the
 ///   membership is generated and ordered, so a parked note stays but is
 ///   visibly separated from the live membership. Documented in docs/glossary.org
 ///   ("PartnerFolder") and docs/sharing-model.org.
@@ -302,7 +302,7 @@ where
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     summary . deleted_duplicates . push( orderkey . clone() ); }
   // Stale members: make_stale_a_nonMember may keep one (a branch made a
-  // non-member); only a node it does NOT keep is detached, and only that
+  // non-member); only a node it does not keep is detached, and only that
   // detach can lose focus.
   for ( treeid, orderkey ) in &invalid_skgids {
     if make_stale_a_nonMember( tree, *treeid )? {

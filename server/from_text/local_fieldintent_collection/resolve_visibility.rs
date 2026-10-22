@@ -174,13 +174,13 @@ fn apply_hiddenoutside_edits (
   Ok (candidates) }
 
 /// Deleting (or moving away) a child of an owned subscriber F, where
-/// that child is disk-content of a node F subscribes to, HIDES the
+/// that child is disk-content of a node F subscribes to, hides the
 /// child from F's subscriptions -- otherwise the child would
 /// reappear under F as unintegrated subscribed content the user just
 /// dismissed (docs/sharing-model.org: branches deleted from a clone
 /// become hides). Symmetrically, re-adding such a child to F's
 /// contains drops a stale hide of it by F. Details:
-/// - Members invisible under the restricted skgrepo-set were OMITTED
+/// - Members invisible under the restricted skgrepo-set were omitted
 ///   from the buffer, not removed, so they never count as removals.
 /// - A child the same save explicitly shows through one of F's
 ///   subscriptions (a subscribee-as-such signal) is not hidden here:

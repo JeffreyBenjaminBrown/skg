@@ -92,7 +92,7 @@ pub fn fetch_all_graphnodestats_with_skgrepo_set (
 /// not the raw GraphnodeInRust lists / recorderward relmaps -- a membership
 /// recorded at a skgrepo outside 'unrestricted' must not inflate a count or
 /// appear in these maps, in either direction, even when the member
-/// NODE itself is unrestricted (still checked separately via
+/// node itself is unrestricted (still checked separately via
 /// 'pid_repo_is_unrestricted', matching every other render surface's
 /// two-part gate).
 fn fetch_all_graphnodestats_in_rust (

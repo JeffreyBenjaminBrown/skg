@@ -1,7 +1,7 @@
 /// Typed warnings emitted by view completion into the
 /// 'CompletionContext' warning sink. One kind:
 /// - 'FolderRepair': repairs that completion makes to write-protected
-///   PartnerFolders. Only the SAVED view's completion gets a sink (de
+///   PartnerFolders. Only the saved view's completion gets a sink (de
 ///   novo renders, collateral rerenders and rerender-all repair
 ///   silently, because their repairs do not correspond to edits the
 ///   user just made); delivered through 'SaveResponse.warnings'.

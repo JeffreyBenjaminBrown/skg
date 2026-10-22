@@ -164,7 +164,7 @@ pub enum Phantom {
 
 /// A phantom for a node whose .skg file a save just
 /// removed -- one of the three phantom kinds, alongside PhantomHistorical and
-/// PhantomUnknown. All three stand in for something that is NOT a current
+/// PhantomUnknown. All three stand in for something that is not a current
 /// graphnode (so all three are save-inert on save and excluded from the view's
 /// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
 /// absent and thus in how much they can still say about it.
@@ -172,7 +172,7 @@ pub enum Phantom {
 /// ARISES: during post-save / collateral re-render, when
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Unrestricted content child flips here via
-/// `mutate_unrestrictedVognode_to_deletednode`. (A Restricted node is NOT flipped: it is an
+/// `mutate_unrestrictedVognode_to_deletednode`. (A Restricted node is not flipped: it is an
 /// anonymous restricted vognode, and turning it into a DELETED placeholder would leak that a
 /// hidden node vanished, so it just lingers until the next full rerender drops
 /// it.) So it marks a node that genuinely no longer exists in the graph, killed
@@ -216,9 +216,9 @@ pub struct PhantomDeleted {
 /// converts to a DeadViewnode (`convert_nonmember_unknown_children_to_dead`) and
 /// is pruned.
 ///
-/// DISTINCT INFO: it carries ONLY the `id`. Unlike PhantomDeleted it has no skgrepo
+/// DISTINCT INFO: it carries only the `id`. Unlike PhantomDeleted it has no skgrepo
 /// (it is the one Phantom kind for which `pid_and_repo` returns None) and no
-/// last-seen text; unlike PhantomHistorical it has no old text. That emptiness IS
+/// last-seen text; unlike PhantomHistorical it has no old text. That emptiness is
 /// the information: a reference exists, but we have no record of its target.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomUnknown {
@@ -256,15 +256,15 @@ pub struct PhantomHistorical {
 }
 
 /// An anonymous "something from a restricted repo is/was here"
-/// vognode. It carries NO data on purpose: a restricted node's id,
+/// vognode. It carries no data on purpose: a restricted node's id,
 /// skgrepo, title, etc. describe content the user hid by restricting
 /// the skgrepo restriction, so rendering any of it would leak.
 ///
-/// SCOPE: a RestrictedVognode arises ONLY from a skgrepo-set REDUCTION of an
+/// SCOPE: a RestrictedVognode arises only from a skgrepo-set reduction of an
 /// already-rendered buffer ('update_buffer/repo_switch.rs' converts
 /// now-restricted Unrestricted nodes in place), where it is kept to host
 /// already-extended unrestricted descendants. A de-novo render under a
-/// restricted set NEVER creates one: restricted content members are
+/// restricted set never creates one: restricted content members are
 /// omitted from goal lists ('omit_restricted_members') and their content
 /// is never extended (completion does nothing at a restricted node's
 /// visit). So a public node reachable only through a private parent
@@ -354,7 +354,7 @@ pub struct GraphnodeStats {
 pub struct ViewnodeStats {
   pub cycle                 : bool,
   pub homeSkgrepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest unrestrictedVognode ancestor.
-  /// The relationship heralds as the SEMANTIC `(rels ...)` sexp string
+  /// The relationship heralds as the semantic `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
   /// plus the birth. None when there is nothing to say. The
@@ -363,7 +363,7 @@ pub struct ViewnodeStats {
   pub rel_heralds           : Option<String>,
   /// Some(N) means this viewnode is shown here in place of N,
   /// which it (transitively) overrides. Herald pink "ĥ" after "O".
-  /// LOAD-BEARING, unlike the other view stats: save extraction
+  /// Load-bearing, unlike the other view stats: save extraction
   /// collects N (not this node's own ID) into the parent's lists
   /// wherever this fact appears, so a substituted child
   /// round-trips to the original ID instead of rewriting the
@@ -381,7 +381,7 @@ pub struct ViewnodeStats {
   /// binding relationship to its viewparent represents (=contains= for an
   /// ordinary content child; the folder's relation for a simple
   /// PartnerFolder member -- see 'PartnerFolder::relation_member_role')
-  /// is recorded in a skgrepo that DIFFERS from that relationship's DEFAULT
+  /// is recorded in a skgrepo that differs from that relationship's default
   /// (see the relationship-default policy in 'SkgConfig'). None when
   /// equal to the default:
   /// the suppression is deliberate (see 'docs/telescopes.org',
@@ -529,8 +529,8 @@ pub enum NodeEditRequest {
 }
 
 /// Which relation's folders a 'Folder' view-request builds. A Folder
-/// builds BOTH folders of its relation, so it is named by the RELATION
-/// (relname), unlike a Path, which is named by a single partner ROLE.
+/// builds both folders of its relation, so it is named by the relation
+/// (relname), unlike a Path, which is named by a single partner role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderRelation {
   Aliases,
@@ -573,7 +573,7 @@ impl FolderRelation {
 
 /// Requests for viewbranches related to a node.
 /// Multiple view requests can be unrestricted simultaneously.
-/// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
+/// - 'Folder(rel)' builds both folders of the relation, populated from the graph.
 /// - 'RoleTree(role)' builds the role tree for that one partner role.
 /// - 'Editable' makes the (write-protected) node editable.
 /// - 'WriteProtected' makes the (editable) node write-protected,
@@ -624,7 +624,7 @@ impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
 }
 
 impl UnrestrictedVognode {
-  /// The COLLECTED ID: what this viewnode contributes to its
+  /// The collected ID: what this viewnode contributes to its
   /// parent's collected lists -- the 'overridesHere' original when
   /// the node is shown in place of one, else its own ID. Save
   /// extraction, the distinctness validators and the content
@@ -872,9 +872,9 @@ impl ReadinessRequest {
 }
 
 impl ViewRequest {
-  /// The MATCH-position atoms the server can emit inside
+  /// The match-position atoms the server can emit inside
   /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
-  /// '(folder ...)' / '(roleTree ...)' forms are VALUE-position (echoed by the
+  /// '(folder ...)' / '(roleTree ...)' forms are value-position (echoed by the
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).

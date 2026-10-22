@@ -72,13 +72,13 @@ fn extract_view_requests (
           => t . view_requests . clone(),
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  // A view-ROOT's Containerward request is NOT fulfilled here. finish_viewforest
+  // A view-root's Containerward request is not fulfilled here. finish_viewforest
   // builds root containerward as a separate ContainerwardRoleTree subtree (handling a
   // cyclic root) and drops the request; routing a root through
   // build_and_integrate_containerward here would instead merge the ancestry into
   // existing content and panic on a cyclic root (one whose containerward cycles
   // back to the root). So leave view-root Containerward for the tail. A
-  // Containerward request a USER put on a non-root node still extends here.
+  // Containerward request a user put on a non-root node still extends here.
   let is_view_root : bool =
     tree . get (node)
       . and_then ( |n| n . parent () )
@@ -86,7 +86,7 @@ fn extract_view_requests (
       . unwrap_or (false);
   if is_view_root {
     view_requests . remove (& ViewRequest::RoleTree (RelationRole::CONTAINER)); }
-  // A Fork request is consumed on the SAVE path (fork detection in
+  // A Fork request is consumed on the save path (fork detection in
   // from_text), not during rendering; it must never reach the
   // render-time view-request pass.
   view_requests . remove (& ViewRequest::Fork);

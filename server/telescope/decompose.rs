@@ -1,7 +1,7 @@
-//! The UNFOLD: a node's effective lists of relation partners ->
-//! per-repo sections. Placements are DERIVED, never stored in
+//! The unfold: a node's effective lists of relation partners ->
+//! per-repo sections. Placements are derived, never stored in
 //! memory: a repo-s run is a maximal streak of repo-s members, anchored to
-//! the nearest preceding STRICTLY more public member (or joining the
+//! the nearest preceding strictly more public member (or joining the
 //! prepend if none precedes it). Derivation is canonical and stable:
 //! if the more-public members did not move, the derived anchors do
 //! not change, so an unchanged section serializes byte-identically
@@ -38,7 +38,7 @@ pub struct DecompositionInput<'a> {
 }
 
 /// A complete on-disk telescope prepared by the decomposition boundary.
-/// Construction proves that it is nonempty, starts at HOME, and
+/// Construction proves that it is nonempty, starts at home, and
 /// contains same-pid sections at configured unique skgrepos in
 /// privacy order. Ownership is deliberately not part of this type;
 /// the filesystem writer checks it before mutation.
@@ -182,7 +182,7 @@ pub fn decompose_node (
 /// partners with that relRepo, each anchored to the nearest preceding strictly
 /// more public member; a streak with none joins the prepend. The
 /// most public skgrepo mentioning the relation yields an anchor-free base by
-/// construction (nothing precedes its members more publicly ONLY
+/// construction (nothing precedes its members more publicly only
 /// when it is first -- middle skgrepos can and do anchor). Returns
 /// None when the skgrepo has no members of this relation.
 fn decompose_ordered (

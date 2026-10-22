@@ -15,14 +15,14 @@ use std::collections::{HashMap, HashSet};
 ///
 /// Returns the kept (owned) NodeInstructions plus the forks the buffer
 /// requested. Editing a foreign node N is read as a request to clone
-/// it: N's own foreign SaveNode is DROPPED (N stays untouched on disk)
+/// it: N's own foreign SaveNode is dropped (N stays untouched on disk)
 /// and a ForkSpec for the clone C is collected instead. The clone is
-/// NOT folded into the returned NodeInstructions here -- a save carrying
+/// not folded into the returned NodeInstructions here -- a save carrying
 /// forks is gated on the user's confirmation, so the handler skgsave-commits
 /// the clones only on approval.
 ///
 /// ERRORS: if an nodeInstruction
-/// - Would DELETE a foreign node (deleting, unlike editing, is not a fork)
+/// - Would delete a foreign node (deleting, unlike editing, is not a fork)
 /// - Would create a node in a foreign skgrepo
 /// - Requests a fork whose clone skgrepo cannot be resolved
 ///
@@ -46,9 +46,9 @@ pub fn validate_and_filter_foreign_instructions(
     nodeMerge_instructions . iter ()
     . flat_map ( |nodeMerge| nodeMerge . to_vec () )
     . collect ();
-  // Only a DIRECT edit of a foreign node forks it. A foreign node
+  // Only a direct edit of a foreign node forks it. A foreign node
   // reached through a nodeMerge (merging into it, or deleting it as an
-  // acquiree) is NOT a fork -- it stays a ModifiedForeignNode rejection.
+  // acquiree) is not a fork -- it stays a ModifiedForeignNode rejection.
   for instruction in instructions . iter () {
     outcomes . push (
       apply_foreign_policy(
@@ -90,8 +90,8 @@ enum ForeignPolicyOutcome {
   Keep, // Safe to pass through to persistence.
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
   ForkCandidate(Graphnode, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the NodeInstructions; a ForkSpec is collected instead.
-               Graphnode), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
-  AdoptCloneSkgrepo(ID), // A NEW node (bare headline) whose foreign skgrepo was inherited from the named forked node N: kept, but rewritten to N's clone's skgrepo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
+               Graphnode), // N's disk node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
+  AdoptCloneSkgrepo(ID), // A new node (bare headline) whose foreign skgrepo was inherited from the named forked node N: kept, but rewritten to N's clone's skgrepo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
@@ -125,7 +125,7 @@ fn apply_foreign_policy(
             // ModifiedForeignNode error -- that rejection was the
             // absence of forking). The buffer node carries the edited
             // content the clone will copy. A nodeMerge-derived change to
-            // a foreign node is NOT a fork and still rejects.
+            // a foreign node is not a fork and still rejects.
             if fork_eligible {
               Ok (ForeignPolicyOutcome::ForkCandidate(
                 node . clone(), disk_node ))
@@ -141,7 +141,7 @@ fn apply_foreign_policy(
           }}
         Ok (None) => {
           // Foreign skgrepo & PID not found => trying to create a
-          // foreign node. Not allowed -- EXCEPT for a bare new
+          // foreign node. Not allowed -- except for a bare new
           // headline whose foreign skgrepo was merely inherited from a
           // forked parent: that one adopts the parent's clone's skgrepo.
           if let Some (forked) = adopt_clone_skgrepo . get (&node . pid) {
@@ -173,7 +173,7 @@ fn collect_foreign_policy_outcomes(
 /// and any that is a fork candidate (N's own save is never written --
 /// N stays untouched on disk; the clone C is skgsave-committed separately,
 /// gated on confirmation). A new node adopting a clone's skgrepo is
-/// KEPT, rewritten into that skgrepo -- its fork must exist among the
+/// kept, rewritten into that skgrepo -- its fork must exist among the
 /// specs, else it degrades to the foreign-creation rejection it would
 /// otherwise have been.
 fn finalize_foreign_policy_instructions(
@@ -220,7 +220,7 @@ fn finalize_foreign_policy_instructions(
 /// telescope whose old-home section is foreign (or can sort before the new
 /// home), and the checked writer correctly rejects it.
 ///
-/// Preserve members explicitly recorded at any OTHER skgrepo. Only facts whose
+/// Preserve members explicitly recorded at any other skgrepo. Only facts whose
 /// relRepo equals the inherited home are part of this implicit adoption.
 fn rehome_inherited_new_node (
   node        : &mut Graphnode,
@@ -340,7 +340,7 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   } else { Err (errors) }}
 
 /// Restricted-node rewrite suppression (the API doc's "Restricted-skgrepo nodes"): under a restricted skgrepo-set, any nodeInstruction that
-/// would modify a restricted node is DROPPED rather than executed or
+/// would modify a restricted node is dropped rather than executed or
 /// fatal.  A stale buffer (rendered before a skgrepo-set switch) can
 /// legitimately hold whole now-restricted subtrees; aborting would
 /// force the user to delete them from view, which would itself be

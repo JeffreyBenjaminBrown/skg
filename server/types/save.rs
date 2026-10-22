@@ -56,7 +56,7 @@ pub struct SavePlan {
   pub nodeMerge_instructions : Vec<NodeMerge>,
   pub skgrepo_moves          : Vec<SkgrepoMove>,
   /// Forks detected this save: editing a foreign node N is read as a
-  /// request to clone it. Held SEPARATE from 'node_instructions' because a
+  /// request to clone it. Held separate from 'node_instructions' because a
   /// save carrying forks is gated on the user's confirmation -- the
   /// clones are skgsave-committed only on approval (see ForkSpec, the save handler's
   /// fork-confirmation stage). Empty for an ordinary save.
@@ -74,7 +74,7 @@ pub enum PostSkgsaveCommitNoticeCandidate {
 
 /// One fork: the user made a foreign node N (write-protected, in a skgrepo
 /// they do not own) editable and edited it; that edit is read as a
-/// request to clone N. 'clone' is the new OWNED node C, built from the
+/// request to clone N. 'clone' is the new owned node C, built from the
 /// edited buffer node -- a fresh pid, an owned skgrepo, the edited
 /// title/body/contains, 'subscribesTo = [N]' and
 /// 'overrides = [N]', no hides. N itself is left untouched on
@@ -86,7 +86,7 @@ pub struct ForkSpec {
   pub original_skgid   : ID,
   pub original_title   : String,
   pub original_skgrepo : SkgrepoName,
-  /// True iff the clone's skgrepo was SPECIFIED by the user (in the
+  /// True iff the clone's skgrepo was specified by the user (in the
   /// confirmation buffer, or via explicit skgrepos on N's new children
   /// in the saved metadata), as opposed to inferred or defaulted. A
   /// confirmed skgrepo renders as settled in the confirmation buffer;

@@ -26,7 +26,7 @@ pub struct SearchOptions {
   pub exclude_overPrivateText_telescope : bool, // Apply telescope-coarse exclusion in the query, before TopDocs and ranking.
 }
 
-/// Returns ALL matching Tantivy "Documents" (see glossary).
+/// Returns all matching Tantivy "Documents" (see glossary).
 /// No limit: context-based reranking (multipliers up to 100x)
 /// can reorder results arbitrarily, so the caller must see
 /// every match. The caller truncates after reranking.
@@ -147,7 +147,7 @@ fn build_parser_query (
 /// With operators=true, the pattern is parsed as a boolean
 /// expression over the pieces ('parse_regex_operator_query'):
 /// AND / OR / NOT with conventional precedence, +foo / -foo
-/// prefixes, and grouping via parens that stand ALONE between
+/// prefixes, and grouping via parens that stand alone between
 /// whitespace (the API doc's "Text search").
 fn build_regex_query (
   tantivy_index : &TantivyIndex,
@@ -192,7 +192,7 @@ fn build_regex_query (
 /// - An Or group SHOULD-combines its positive children; an And group
 ///   MUST-combines them. In either group, a Not child contributes a
 ///   MUST_NOT clause and a Must child ('+piece') a MUST clause.
-/// - A group holding ONLY exclusions matches nothing (Tantivy needs
+/// - A group holding only exclusions matches nothing (Tantivy needs
 ///   a positive clause), same as the pre-grouping behavior of a
 ///   lone 'NOT x'.
 fn regex_op_expr_to_query (
@@ -276,7 +276,7 @@ enum RegexOpExpr {
 ///   not     := 'NOT' not | primary
 ///   primary := '(' or ')' | piece
 ///
-/// A paren is a GROUPING token only when it stands alone between
+/// A paren is a grouping token only when it stands alone between
 /// whitespace; attached to a pattern it is ordinary (Rust-flavor)
 /// regex syntax inside that piece, so '(cat|dog).*' still works.
 /// '+piece' / '-piece' force that piece to MUST / MUST_NOT within

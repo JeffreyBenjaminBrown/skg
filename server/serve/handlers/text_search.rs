@@ -559,8 +559,8 @@ pub fn group_matches_by_skgid (
               . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
         if let Some (a) = restriction {
-          // Per-DOCUMENT skgrepo filtering, BEFORE grouping: an
-          // alias document carries the ALIAS's relRepo as
+          // Per-document skgrepo filtering, before grouping: an
+          // alias document carries the alias's relRepo as
           // its skgrepo, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
           // nor shift ranking ('docs/api-and-formats.org', "Text search"). The
@@ -595,11 +595,11 @@ pub fn group_matches_by_skgid (
 ///
 /// Forest structure: each root is a search result, with AliasFolder +
 /// Alias children if aliases matched.
-/// The result ids to drop from the top level because an OWNED
+/// The result ids to drop from the top level because an owned
 /// result recursively overrides them: they will reappear as
 /// overriddenward role-graft descendants of that owned result
 /// (the API doc's "Text search"). A
-/// FOREIGN overrider never suppresses -- so a pure-foreign mutual
+/// foreign overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
 /// the node it overrides. Reachability follows relRepo-visible
 /// outbound overrides, matching what the role graft will actually show.
@@ -619,7 +619,7 @@ pub fn suppressed_result_skgids (
   for owned in candidates . iter () . filter ( |skgid|
     graph . nodes . get (*skgid)
       . map_or ( false, |n| config . skgrepo_is_owned (&n . home_skgrepo) ) )
-  { // Walk owned's overriddenward closure; any HIT in it is suppressed
+  { // Walk owned's overriddenward closure; any hit in it is suppressed
     // (it will hang under 'owned'). Cycle-guarded: foreign relationships in the
     // chain can form cycles even though owned ones cannot.
     let mut stack : Vec<ID> = vec![ owned . clone () ];

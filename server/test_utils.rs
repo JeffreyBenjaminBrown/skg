@@ -136,7 +136,7 @@ where
   } )
 }
 
-/// Serializes store-using tests (shared groups AND the per-test
+/// Serializes store-using tests (shared groups and the per-test
 /// run_with_test_stores family) within one process. Under nextest every
 /// test is its own process, so this is uncontended there; under
 /// plain 'cargo test' (threads in one process) it keeps tests from racing on
@@ -146,7 +146,7 @@ static TEST_STORE_GROUPS_MUTEX : std::sync::Mutex<()> =
 
 /// One fixture workspace, shared by a whole group of
 /// sequential sub-tests. 'reset' restores a pristine state between
-/// sub-tests by wiping the DATA in place (~10ms) instead of
+/// sub-tests by wiping the data in place (~10ms) instead of
 /// deleting and recreating the fixture stores (~250ms).
 pub struct SharedStoreSession {
   pub test_name    : String,
@@ -174,7 +174,7 @@ impl SharedStoreSession {
     self . reset_with_fixture_prep (
       subtest_name, fixtures_folder, |_| Ok (( )) ) }
 
-  /// Like 'reset', but runs `prep` on the temp fixture copy BEFORE
+  /// Like 'reset', but runs `prep` on the temp fixture copy before
   /// the config is loaded and the graph snapshot populated -- for
   /// sub-tests whose fixtures need mutation that the graph snapshot must
   /// reflect (e.g. git-initializing a skgrepo and leaving a

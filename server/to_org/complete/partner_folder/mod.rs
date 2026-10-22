@@ -147,7 +147,7 @@ pub fn maybe_add_subscribeeFolder_branch (
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
-    // relRepo-GATED from the captured graph: hides and memberships
+    // relRepo-gated from the captured graph: hides and memberships
     // recorded outside the skgrepo restriction must not shape this derived folder.
     let r_hides : HashSet < ID > =
           graph . outbound_pids_for_relation_gated (
@@ -231,7 +231,7 @@ pub fn maybe_add_default_partnerFolder_branches (
 /// have visible members.
 /// Conditions determining the 'maybe' are commented.
 /// 'force_create_when_empty' overrides the empty-skip: a Folder view-request
-/// uses it to materialize the EDITABLE folder (Overridden) as an empty
+/// uses it to materialize the editable folder (Overridden) as an empty
 /// "add here" surface even when the relation has no members. (Only ever
 /// passed 'true' for an editable folder; an empty write-protected folder would just
 /// be pruned again.)
@@ -313,7 +313,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = {
-      // relRepo-GATED from the captured graph: hides and memberships
+      // relRepo-gated from the captured graph: hides and memberships
       // outside the skgrepo restriction must not shape this derived folder.
       {
         let subscriber_hides : HashSet<ID> =

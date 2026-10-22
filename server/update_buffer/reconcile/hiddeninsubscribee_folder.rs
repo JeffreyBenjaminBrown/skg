@@ -33,7 +33,7 @@ struct HiddenInContext {
 ///                    └─ [hidden UnrestrictedVognode children]
 ///
 /// The HiddenInSubscribeeFolder collects nodes that the subscriber
-/// hides from its subscriptions AND that are top-level content
+/// hides from its subscriptions and that are top-level content
 /// of the subscribee.
 pub fn reconcile_hiddenInSubscribeeFolder_children (
   node                           : NodeId,
@@ -59,7 +59,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
     omit_restricted_members (
       goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
-  // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
+  // The node budget: a folder fills its members whole and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it extended, so adding all
   // the hidden members here costs nothing and never truncates the group.
   let goal_items : Vec<FolderGoalItem> =
@@ -104,7 +104,7 @@ fn read_hiddenin_context (
       tree, node, 2, kind . caller_label () ) ?;
   // relRepo gating ('docs/telescopes.org', "What lives where"): these are the
   // subscribee's and subscriber's own outbound lists (contains,
-  // hidesFromSubs), read here to compute a DERIVED
+  // hidesFromSubs), read here to compute a derived
   // membership for a third node (the HiddenInSubscribeeFolder) -- like
   // 'content_goal_list's grandparent subtrahends. A membership
   // recorded in a restricted skgrepo must not participate, in either

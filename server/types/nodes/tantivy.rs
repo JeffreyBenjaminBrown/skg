@@ -12,10 +12,10 @@ use crate::types::nodes::complete::{Flag, Graphnode};
 pub struct GraphnodeInTantivy {
   pub pid          : ID,
   pub home_skgrepo : SkgrepoName, // the home; each alias doc instead
-                            // carries ITS OWN level (see 'aliases')
+                            // carries its own level (see 'aliases')
   pub title   : String,
   pub overPrivateText_telescope : bool,
-  // Aliases keep their PRIVACY LEVELS: each alias document's
+  // Aliases keep their privacy levels: each alias document's
   // repo field is the alias's relRepo, not the node's home, so a
   // restricted search cannot match a private alias of a public
   // node ('docs/api-and-formats.org', "Text search").

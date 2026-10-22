@@ -67,7 +67,7 @@ pub fn open_gitrepo (
 ///
 /// `None` when the skgrepo directory is not itself a gitrepo,
 /// has no remotes, or the chosen remote carries no (utf-8) URL. The
-/// path is opened EXACTLY, without searching parent directories, so a
+/// path is opened exactly, without searching parent directories, so a
 /// bare skgrepo directory that merely sits inside some unrelated
 /// enclosing gitrepo is never mistaken for a gitrepo of its own (and
 /// its enclosing gitrepo's remote never misreported as the skgrepo's).

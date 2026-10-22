@@ -55,12 +55,12 @@ pub fn handle_skgrepo_set_request (
       refuse_unwinding (stream, skgrepo_restriction, &e), }}
 
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a repo-set switch
-/// RE-RENDERS open views in place rather than closing them.  Each
+/// re-renders open views in place rather than closing them.  Each
 /// view gets the convert-and-prune prepass (now-restricted unrestricted vognodes
 /// become RestrictedVognodes; childless restricted branches, properties of
 /// restricted recorders, write-protected partners, emptied folders and dead
 /// non-vognodes are pruned), then completion with PartnerFolder creation
-/// enabled, because a switch can also ACTIVATE skgrepos, revealing
+/// enabled, because a switch can also activate skgrepos, revealing
 /// members and folders.  Results stream via the rerender-all message
 /// flow (lock, per-view, done).
 fn set_skgrepo_restriction (
@@ -149,7 +149,7 @@ fn send_skgrepo_restriction_response (
 
 /// The unwinding refusal shape (the quiet shape): the endpoint's
 /// normal skgrepo-restriction response-type carrying explanatory text
-/// and the UNCHANGED skgrepo restriction, followed by an empty rerender
+/// and the unchanged skgrepo restriction, followed by an empty rerender
 /// stream.  Emacs locks all Skg buffers and sets its stream guard
 /// before sending a switch request; a response-type it has no
 /// handler for would leave it wedged, so refusals and errors alike

@@ -589,7 +589,7 @@ fn validate_restricted_node (
 /// id present, no
 /// wrong-structure child, and distinct content-child ids. `label` ("UnrestrictedVognode"
 /// / "Phantom") is woven into the messages so each kind reports itself.
-/// Repo validity is NOT checked here: skgrepo is load-bearing only for a
+/// Repo validity is not checked here: skgrepo is load-bearing only for a
 /// UnrestrictedVognode (it is the node's .skg file path), so validate_unrestrictedVognode adds that
 /// check; a phantom writes nothing and is ignored at save, so its skgrepo --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
@@ -654,7 +654,7 @@ fn cannot_be_child_of_vognode (
       | Property::RemovedAlias { .. } | Property::RemovedID { .. }) |
     MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
   || ( ! affects_parent_subscribee_as_such
-       // validate_hiddenin REQUIRES a vognode parent; a
+       // validate_hiddenin requires a vognode parent; a
        // subscribee-as-such is the position that warrants one.
        && matches!(&node . kind,
             MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)) ) }

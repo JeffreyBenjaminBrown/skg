@@ -31,9 +31,9 @@ struct ViewnodeLineCol {
 /// into the relevant ancestor) and without supplementing information
 /// (e.g. missing IDs).
 ///
-/// RETURNS (tree, parsing_errors).
+/// Returns (tree, parsing_errors).
 ///
-/// SHARES RESPONSIBILITY for error detection
+/// Shares responsibility for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
 /// That function detects the majority of possible errors,
 /// but it can't detect them all because it uses a tree of MpViewnodes,

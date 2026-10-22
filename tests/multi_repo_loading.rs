@@ -102,8 +102,8 @@ fn test_load_from_multiple_skgrepos() {
   set_skgrepo_retagging_relRepos ( &mut node2, &SkgrepoName::from ("main") );
   write_graphnode_to_skgrepo(&node2, &config) . unwrap();
 
-  // Create a node in the shared skgrepo. Written RAW: 'shared' is
-  // foreign, and the node writer is the SAVE path, which refuses a
+  // Create a node in the shared skgrepo. Written raw: 'shared' is
+  // foreign, and the node writer is the save path, which refuses a
   // foreign home rather than drop the title silently. Planting a
   // foreign fixture is a filesystem act, not a save.
   fs::write (
@@ -160,11 +160,11 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
     test_config (skgrepos, temp_dir . path () . to_path_buf ()) };
 
   // Same pid in both skgrepos: no longer a duplicate -- they are the
-  // SECTIONS of one privacy telescope, folded into one node whose
+  // sections of one privacy telescope, folded into one node whose
   // home is the more public section (alphabetical fallback order for
   // this dummy config: "main" precedes "shared"). The stray second
   // title is a composition warning, not an error. The section files are
-  // written RAW: a whole-node write would (correctly) sweep the
+  // written raw: a whole-node write would (correctly) sweep the
   // pid's sections at other skgrepos, so two sequential
   // write_graphnode_to_repo calls cannot build a telescope.
   fs::write (
@@ -187,7 +187,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
     &nodes, &config . data_root)
     . expect ("a telescope is not an id conflict");
 
-  { // What REMAINS a conflict: one id claimed by two distinct pids
+  { // What remains a conflict: one id claimed by two distinct pids
     // (here via extra_ids).
     let mut node_a : Graphnode = empty_graphnode();
     node_a . pid = ID::new ("pid-a");
@@ -248,7 +248,7 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   set_skgrepo_retagging_relRepos ( &mut node1, &SkgrepoName::from ("main") );
   write_graphnode_to_skgrepo(&node1, &config) . unwrap();
 
-  // Create node in shared that has one overlapping ID. Written RAW:
+  // Create node in shared that has one overlapping ID. Written raw:
   // 'shared' is foreign, and the node writer refuses a foreign home.
   fs::write (
     config . skgrepos . get (&SkgrepoName::from ("shared"))
@@ -385,9 +385,9 @@ fn test_many_skgid_conflicts_create_org_file() {
   );
   let config : SkgConfig = test_config (skgrepos, temp_dir . path () . to_path_buf ());
 
-  // Create 15 GENUINE id conflicts: same-pid files across skgrepos
+  // Create 15 genuine id conflicts: same-pid files across skgrepos
   // are telescope sections now, so a conflict means one id claimed
-  // by two DISTINCT pids -- here via extra_ids. In-memory nodes
+  // by two distinct pids -- here via extra_ids. In-memory nodes
   // suffice; the check takes the folded node list.
   let mut nodes : Vec<Graphnode> = Vec::new ();
   for i in 1..=15 {
@@ -428,7 +428,7 @@ fn test_many_skgid_conflicts_create_org_file() {
   let mut expected : String = String::new();
   expected . push_str ("#+title: IDs claimed by more than one node\n");
   expected . push_str ("#+date: <generated at initialization>\n\n");
-  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS REPOS are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
+  expected . push_str ("15 id(s) claimed by more than one node. Same-id files across repos are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
 
   // IDs are sorted alphabetically (lexicographic), not numerically
   // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...

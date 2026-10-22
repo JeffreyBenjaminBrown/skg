@@ -374,7 +374,7 @@ pub(crate) fn path_is_skgrepo_skg (
       false, |ext| ext == "skg" )
 }
 
-/// One FILE's contents as a section (pid-checked against the file
+/// One file's contents as a section (pid-checked against the file
 /// stem). The snapshot composes same-pid sections into one telescope.
 pub(crate) fn parse_blob_section (
   bytes    : &[u8],
@@ -397,7 +397,7 @@ pub(crate) fn parse_blob_section (
   Ok (node_fs)
 }
 
-/// One FILE as a whole node -- the per-blob view the vanished-node
+/// One file as a whole node -- the per-blob view the vanished-node
 /// history search uses (it inspects one historical blob at a time,
 /// so there is no telescope to compose).
 pub(crate) fn parse_blob_node (

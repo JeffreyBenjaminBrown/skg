@@ -71,7 +71,7 @@ pub struct SaveResponse {
   pub errors              : Vec<String>,
   pub warnings            : Vec<String>,
   pub save_point_position : Option<SavePointPosition>,
-  /// Some when this save found fork candidates and was NOT pre-approved:
+  /// Some when this save found fork candidates and was not pre-approved:
   /// nothing was skgsave-committed, 'saved_view' instead holds the write-protected
   /// fork-confirmation buffer, and this holds the one-line minibuffer
   /// prompt. The handler then sends a 'fork-confirmation' message rather
@@ -161,7 +161,7 @@ pub fn handle_save_buffer_request (
     text_approved_pids_from_request (request);
   let strandeds_review : StrandedsReview =
     strandeds_review_from_request (request);
-  { // Send the early broad lock BEFORE reading the buffer, so the client's
+  { // Send the early broad lock before reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
     // save-result would arrive, leaving the count unbalanced and wedging the
@@ -576,7 +576,7 @@ fn fork_approved_from_request (
     . unwrap_or (false) }
 
 /// Parse the optional '(fork-repos ((N . REPO) ...))' field of a
-/// save request into a map from each forked node's id N to the OWNED
+/// save request into a map from each forked node's id N to the owned
 /// skgrepo the user chose for its clone (rotated, or left at the default,
 /// in the fork-confirmation buffer). Absent on an ordinary save and on
 /// the first (unapproved) save -- then every clone skgrepo resolves by
@@ -775,7 +775,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     repair_saves_for_unwritten_candidates (
       &hoist_candidates, &nonmerge_nodeInstructions, &runtime . config ) ? );
   if ! fork_specs . is_empty () && ! approved_forks {
-    // A save that found forks but was not pre-approved skgsave-commits NOTHING.
+    // A save that found forks but was not pre-approved skgsave-commits nothing.
     // Return a write-protected fork-confirmation buffer; the client shows it,
     // and on approval re-issues the save with (approved-forks . "true").
     // (Monogamy and skgrepo validation already ran in

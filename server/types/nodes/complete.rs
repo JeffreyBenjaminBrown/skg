@@ -4,7 +4,7 @@
 //! from GraphnodeOnDisk) plus 'home_repo', which is inferred from file
 //! location and held only in the in-Rust graph.
 //!
-//! Graphnode itself is NOT Serialize/Deserialize. The on-disk
+//! Graphnode itself is not Serialize/Deserialize. The on-disk
 //! round-trip goes through 'GraphnodeOnDisk'
 //! ([[./fs.rs][server/types/nodes/fs.rs]]):
 //! read YAML as 'GraphnodeOnDisk', then attach skgrepo via
@@ -81,10 +81,10 @@ pub fn set_flag (
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Graphnode {
-  // There is a 1-to-1 correspondence between Graphnodes and privacy TELESCOPES (families of same-pid .skg files, one section per skgrepo; see docs/telescopes.org). Reading FOLDS the sections into a Graphnode; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. Graphnode initializes the in-memory graph and Tantivy index.
+  // There is a 1-to-1 correspondence between Graphnodes and privacy telescopes (families of same-pid .skg files, one section per skgrepo; see docs/telescopes.org). Reading folds the sections into a Graphnode; writing unfolds it back into sections, byte-stably. The files are the only permanent data. Graphnode initializes the in-memory graph and Tantivy index.
   // The graph indexes this complete record for structural queries. Tantivy
   // receives the searchable subset. The filesystem remains authoritative.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/flags.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple Graphnodes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under decompose each section records exactly the relationships recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the composition.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/flags.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple Graphnodes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful on disk too: a section that omits a field has no opinion about it (Unspecified), while under decompose each section records exactly the relationships recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the composition.
 
   pub title: String,
   /// True when the selected title or body came from below the home.
@@ -97,7 +97,7 @@ pub struct Graphnode {
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Not indexed by the structural graph. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
-  // Each relationship member carries the privacy LEVEL of the relationship
+  // Each relationship member carries the privacy level of the relationship
   // (see 'RelPartner'). List order is composition order.
   pub contains                     : Vec<RelPartner<ID>>, // See docs/data-model_technical.org.
   pub subscribesTo                 : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use super::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 
-/// A node's HOME read from disk. When owned and non-owned files use
+/// A node's home read from disk. When owned and non-owned files use
 /// the same pid, the owned telescope wins; otherwise the home is
 /// the most public skgrepo holding a section. Returns None if no
 /// skgrepo holds one.
@@ -14,7 +14,7 @@ use super::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 /// never 'config.repos' -- that is a HashMap, whose iteration
 /// order Rust randomizes per process, so returning its first hit
 /// answered arbitrarily for any node with more than one section.
-/// Since the home is DEFINITIONALLY the most public section
+/// Since the home is definitionally the most public section
 /// (docs/telescopes.org), the first hit in privacy order is the
 /// answer; a home whose section carries no title is a violation the
 /// composition reports, not a reason to keep looking.

@@ -51,7 +51,7 @@ pub(crate) fn insert_full_containerward_role_trees_into_search_view (
 /// under the given parent. Role tree nodes are prepended.
 fn insert_full_containerward_role_tree(
   node          : &ContainerwardRoleTree,
-  contained_skgid  : &ID, // the node this role-tree step CONTAINS
+  contained_skgid  : &ID, // the node this role-tree step contains
   parent_treeid : NodeId,
   viewforest        : &mut Tree<Viewnode>,
   graph          : &InRustGraph,
@@ -61,7 +61,7 @@ fn insert_full_containerward_role_tree(
 ) {
   if ! restriction . is_all () {
     // relRepo gating ('docs/telescopes.org', "What lives where"): a private
-    // MEMBERSHIP must not surface through enrichment role tree even
+    // membership must not surface through enrichment role tree even
     // when both nodes are public. The relationship's recorder is the
     // container (this role-tree step).
     let rel_is_visible : bool =
@@ -87,22 +87,22 @@ fn insert_full_containerward_role_tree(
 /// role-graft birth it stamps on each grafted relative.
 #[derive(Clone, Copy)]
 enum OverrideDir {
-  /// The nodes this node OVERRIDES (outbound `overrides`).
+  /// The nodes this node overrides (outbound `overrides`).
   /// Birth OVERRIDDEN; renders herald "aO" (parent overrides child).
   Overriddenward,
-  /// The nodes that OVERRIDE this node (inbound). Birth OVERRIDER;
+  /// The nodes that override this node (inbound). Birth OVERRIDER;
   /// renders herald "Oa" (child overrides parent).
   Overriderward,
 }
 
-/// Graft each result's override relatives -- BOTH directions -- as
+/// Graft each result's override relatives -- both directions -- as
 /// inverted write-protected viewdescendants, so an overridden
 /// node and the node(s) overriding it are navigable straight from the
 /// search results
 /// (the API doc's "Text search"). Each direction is
 /// its own one-directional chain hanging under the result, recursive
 /// and cycle-guarded. Reads the in-Rust graph (override relationships are
-/// direct graph-index lookups); a relative whose override RELATIONSHIP is
+/// direct graph-index lookups); a relative whose override relationship is
 /// relRepo-hidden, or whose own skgrepo is restricted, is skipped.
 pub fn insert_overrideward_view_subtrees (
   viewforest     : &mut Tree<Viewnode>,

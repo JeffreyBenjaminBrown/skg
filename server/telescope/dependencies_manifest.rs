@@ -1,10 +1,10 @@
 //! OTHER_SKGREPO_DEPENDENCIES.toml: the publisher-side fix for the one structural
 //! regression the telescope carries relative to the retired chain
-//! design -- a foreign telescope's composition ORDER lives in the
+//! design -- a foreign telescope's composition order lives in the
 //! receiver's config, not in the data ('docs/api-and-formats.org',
 //! "OTHER_SKGREPO_DEPENDENCIES.toml").
 //!
-//! PUBLISHER half: at init, every OWNED skgrepo directory gets a
+//! Publisher half: at init, every owned skgrepo directory gets a
 //! OTHER_SKGREPO_DEPENDENCIES.toml whose `dependencies` is a list of pairs, one per
 //! Skgrepo its telescope sections may reference -- itself and
 //! everything more public, in privacy order, the skgrepo itself last.
@@ -18,7 +18,7 @@
 //! values itself. Clobbering a preexisting manifest is a feature;
 //! writes are byte-stable.
 //!
-//! RECEIVER half: at config validation, a FOREIGN skgrepo carrying a
+//! Receiver half: at config validation, a foreign skgrepo carrying a
 //! manifest is read, its entries matched to the receiver's skgrepos
 //! by final path component (the skgrepo name -- the receiver's author
 //! folder for the publisher differs from the publisher's "owned").

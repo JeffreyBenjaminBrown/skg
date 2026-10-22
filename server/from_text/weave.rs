@@ -3,19 +3,19 @@
 /// see (the API doc's "Restricted-skgrepo nodes").
 ///
 /// VOCABULARY (shared by both functions):
-/// - A disk member is VISIBLE iff its relRepo is unrestricted
+/// - A disk member is visible iff its relRepo is unrestricted
 ///   and, when it resolves, its node home is unrestricted too.  An
 ///   unresolvable raw member has no home, so an unrestricted relationship
 ///   skgrepo makes it visible as an Unknown and lets the user delete it.
-/// - A disk member is POSITIONED iff it appears in the buffer list.
+/// - A disk member is positioned iff it appears in the buffer list.
 ///   Only visible members ever do: save extraction never puts an
 ///   restricted (invisible) member into a container's list (see
 ///   'content_members' / 'subscribeeFolder_members' in
 ///   local_fieldintent_collection/traverse.rs), so every invisible
 ///   disk member is non-positioned and the weave alone decides its
 ///   presence and position.
-/// - A visible disk member absent from the buffer was DELETED by
-///   the user; an invisible one absent from the buffer was OMITTED
+/// - A visible disk member absent from the buffer was deleted by
+///   the user; an invisible one absent from the buffer was omitted
 ///   by rendering and must survive.
 
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -65,7 +65,7 @@ pub fn relationship_member_is_visible (
 /// The anchored weave, for order-meaningful lists ('contains',
 /// 'subscribesTo').  Invisible disk members cling to the visible
 /// sibling they followed: each maximal run of invisible,
-/// non-positioned disk members attaches to the nearest PRECEDING
+/// non-positioned disk members attaches to the nearest preceding
 /// positioned disk member (or to START), and is emitted right after
 /// it, wherever the buffer put it.  Positioned members appear in
 /// buffer order; deleted (visible, absent) members disappear; new

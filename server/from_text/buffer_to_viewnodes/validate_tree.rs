@@ -22,13 +22,13 @@ use std::collections::HashSet;
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
 ///
-/// SHARES RESPONSIBILITY for error detection
+/// Shares responsibility for error detection
 /// with 'org_to_uninterpreted_nodes',
 /// which runs earlier and detects a few errors that this one can't,
 /// because this one acts on a tree of MpViewnodes rather than raw text.
 /// (Namely, Alias and AliasFolder should not have body text.)
 ///
-/// ASSUMES that in the viewforest:
+/// Assumes that in the viewforest:
 /// - IDs have been replaced with PIDs, per
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
@@ -173,11 +173,11 @@ fn idFolder_membership_errors (
 /// fact the server would not have rendered must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
-/// must be ON N's owned override chain
-/// ('carrier_on_owned_chain', VISIBILITY-UNGATED so ownership
+/// must be on N's owned override chain
+/// ('carrier_on_owned_chain', visibility-ungated so ownership
 /// still gates but a fact honest when rendered does not start
 /// failing after a skgrepo-set switch). With chains the shown node can
-/// be a MIDDLE link (when a later link's mentioner is hidden), so the
+/// be a middle link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// fact. Facts on retained RestrictedVognodes are checked identically.
 /// The explicit graph is required, so every present fact is checked against

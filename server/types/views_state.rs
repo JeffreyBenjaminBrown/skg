@@ -118,7 +118,7 @@ impl OpenViews {
     self . views . get (view_id)
       . map ( |vs| &vs . viewforest ) }
 
-  /// Returns the first (if any exists) CONTENT buffer (not a search
+  /// Returns the first (if any exists) content buffer (not a search
   /// view) for which the ID is a root
   /// (level-1 headline).
   pub fn content_view_id_for_root_skgid (

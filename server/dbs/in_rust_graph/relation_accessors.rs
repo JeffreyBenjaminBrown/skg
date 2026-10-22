@@ -178,7 +178,7 @@ impl RelationRole {
       . expect ( "RelationRole::glyph: role absent from PARTNER_ROLE_VOCAB" ) }
 
   /// The '(relation, input_role, output_role)' triple the role tree
-  /// engine consumes: output_role is THIS (partner) role, input_role
+  /// engine consumes: output_role is this (partner) role, input_role
   /// is the origin's (opposite) role.
   pub fn role_tree_triple (
     self,
@@ -192,9 +192,9 @@ impl RelationRole {
 }
 
 /// Each row is (ROLENAME, RelationRole, glyph). The role-tree triple is
-/// DERIVED from the RelationRole ('RelationRole::role_tree_triple'), so
-/// it is not stored here. A folder is named by its RELATION (spanning both
-/// roles); a path and a birth are named by the one ROLE the grafted
+/// derived from the RelationRole ('RelationRole::role_tree_triple'), so
+/// it is not stored here. A folder is named by its relation (spanning both
+/// roles); a path and a birth are named by the one role the grafted
 /// partner plays. 'Contains, Second' is absent (see the consts above).
 pub const PARTNER_ROLE_VOCAB
   : &[ (&'static str, RelationRole, &'static str) ] = &[
@@ -356,7 +356,7 @@ impl InRustGraph {
 
   /// The relRepo of the relationship from RECORDER to TARGET under RELATION,
   /// read from the recorder's outbound list. None when no such relationship
-  /// exists. This is how INBOUND
+  /// exists. This is how inbound
   /// surfaces gate: an inbound partner P of X is visible at the
   /// skgrepo restriction iff relRepo(P, R, X) is unrestricted -- private
   /// memberships must not surface through ancestry, role trees, or
@@ -417,7 +417,7 @@ impl InRustGraph {
       . filter_map ( |member| self . pid_of (member) )
       . collect () }
 
-  /// Inbound partners whose RELATIONSHIPS to this node are visible at the
+  /// Inbound partners whose relationships to this node are visible at the
   /// skgrepo restriction (see 'relRepo'). Pass None for all of them.
   pub fn inbound_pids_for_relation_gated (
     &self,
@@ -480,7 +480,7 @@ impl InRustGraph {
     self . other_member_pids_gated (pid, role, None) }
 
   /// 'other_member_pids' with relRepo gating: partners whose
-  /// RELATIONSHIP is above the skgrepo restriction are omitted, in both
+  /// relationship is above the skgrepo restriction are omitted, in both
   /// directions (see 'relRepo').
   pub fn other_member_pids_gated (
     &self,

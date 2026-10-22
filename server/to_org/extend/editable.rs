@@ -81,7 +81,7 @@ pub fn execute_view_requests (
       ViewRequest::RoleTree (role) => {
         // Relation-generic: every partner role routes through the one
         // role-tree engine (container, mentioner, and the seven new
-        // roles alike). A view-ROOT's container request is handled
+        // roles alike). A view-root's container request is handled
         // separately (finish_viewforest) and removed before this pass.
         build_and_integrate_role_tree_then_drop_request (
           viewforest, treeid, graph, role, config, errors,
@@ -105,7 +105,7 @@ pub fn execute_view_requests (
           to the view-request pass; it should have been consumed at the \
           node's visit" . into () ),
       ViewRequest::Fork =>
-        // A Fork request is consumed on the SAVE path (fork detection),
+        // A Fork request is consumed on the save path (fork detection),
         // and 'extract_view_requests' strips it before this render-time
         // pass; reaching here means that stripping was bypassed.
         return Err ( "execute_view_requests: a ViewRequest::Fork survived \
@@ -126,7 +126,7 @@ pub enum EditabilityOutcome {
 }
 
 /// Apply the editability rule (see the module comment) for a node carrying
-/// 'ViewRequest::Editable', WITHOUT extending its content:
+/// 'ViewRequest::Editable', without extending its content:
 /// - defer to an existing Final occurrence (drop the EVR, stay
 ///   write-protected) -> 'EditabilityOutcome::Deferred';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark

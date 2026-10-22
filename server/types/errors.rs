@@ -39,13 +39,13 @@ pub enum BufferValidationError {
   // Fork errors. Editing a foreign node N is read as a request to
   // clone it (the clone C lives in an owned skgrepo, subscribes to and
   // overrides N). These are the ways that request can be refused.
-  ForkSkgrepoUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
+  ForkSkgrepoUnresolved           (ID), // N's pid: no owned vognode ancestor in the view to inherit C's skgrepo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid
                                   ID),  // the existing owned clone that already overrides N (monogamy: a node may have at most one owned overrider)
   ForkSkgrepoRestricted             (ID,           // N's pid
-                                  SkgrepoName),  // C's resolved owned skgrepo, which is RESTRICTED under the skgrepo restriction
+                                  SkgrepoName),  // C's resolved owned skgrepo, which is restricted under the skgrepo restriction
   ForkSkgrepoNotOwned             (ID,           // N's pid
-                                  SkgrepoName),  // C's chosen skgrepo, which the user does NOT own (a typed or hand-edited skgrepo the rotation would never offer)
+                                  SkgrepoName),  // C's chosen skgrepo, which the user does not own (a typed or hand-edited skgrepo the rotation would never offer)
   ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),

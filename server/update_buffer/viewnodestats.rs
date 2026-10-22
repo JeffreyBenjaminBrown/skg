@@ -329,8 +329,8 @@ fn birth_facts_for_folder (
     // Filter folders. In
     //   subscriber > subscribeeFolder > subscribee
     //     > hiddenInSubscribeeFolder > member
-    // the subscriber (generation 4) HIDES the member, and the
-    // subscribee (generation 2) CONTAINS it. In
+    // the subscriber (generation 4) hides the member, and the
+    // subscribee (generation 2) contains it. In
     //   subscriber > subscribeeFolder
     //     > hiddenOutsideOfSubscribeeFolder > member
     // the subscriber (generation 3) hides it.
@@ -412,7 +412,7 @@ fn set_relRepo (
             . and_then ( |p| unrestricted_vognode_pid (tree, p . id ()) )
           else { break 'compute None; };
           if role . is_first_role () {
-            // This position's own node OWNS the outbound relationship (e.g.
+            // This position's own node owns the outbound relationship (e.g.
             // a subscriberFolder member, which itself subscribes to
             // the folder's anchor).
             (node_pid . clone (), role . relation, anchor_pid)

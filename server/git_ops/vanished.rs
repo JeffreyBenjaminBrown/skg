@@ -42,7 +42,7 @@ pub struct CommitStamp {
 }
 
 /// Investigate each id of 'ids' in the git history of every skgrepo:
-/// walk each skgrepo's FIRST-PARENT chain from HEAD looking for the most
+/// walk each skgrepo's first-parent chain from HEAD looking for the most
 /// recent commit whose tree holds '<id>.skg'. A skgrepo that cannot be
 /// opened or walked contributes nothing. One walk per skgrepo covers
 /// all ids.
@@ -118,7 +118,7 @@ fn commit_stamp (
                 . unwrap_or ("") . to_string (), } }
 
 /// The whole picture of the id at 'commit' (where its file exists):
-/// its own title and outbound lists, plus every OTHER node in that
+/// its own title and outbound lists, plus every other node in that
 /// tree that referenced it, by relation -- links included.
 fn sighting_at_commit (
   gitrepo        : &Repository,

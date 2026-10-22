@@ -110,7 +110,7 @@ pub fn extend_true_content_at_unrestrictedVognode (
       clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
   // The node budget: this vognode is editable and about to extend -- extend its whole
-  // content group, and (via the BFS) its folders. Each extension costs ONE budget
+  // content group, and (via the BFS) its folders. Each extension costs one budget
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node write-protected if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
@@ -119,7 +119,7 @@ pub fn extend_true_content_at_unrestrictedVognode (
   let graphnode : Graphnode =
     graphnode_graphFirst_by_pid_and_skgrepo (
       graph_snap, config, &pid, &initial_skgrepo ) ?;
-  // EVERY editable node re-syncs title/body/repo from the snapshot,
+  // Every editable node re-syncs title/body/repo from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
@@ -205,7 +205,7 @@ fn reconcile_content_children (
   // 'pid_and_repo_from_id'; this makes the rerender consistent.)
   let content_members : Vec<RelPartner<RelationshipMemberKey>> =
     // relRepo gating ('docs/telescopes.org', "What lives where"): a
-    // membership whose REPO is restricted is invisible here even
+    // membership whose repo is restricted is invisible here even
     // when the member node itself is unrestricted -- the private
     // reading-list case. Node-repo omission still happens
     // below, in omit_restricted_members.
@@ -240,7 +240,7 @@ fn reconcile_content_children (
       |skgid : &ID| graph_snap . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
-  // The content group is extended WHOLE -- never truncated mid-group. The
+  // The content group is extended whole -- never truncated mid-group. The
   // budget is spent once per extending vognode (in extend_true_content_at_unrestrictedVognode),
   // not per child, so a node either fully extends or is left write-protected; we
   // never create a silent partial sibling set.
@@ -252,9 +252,9 @@ fn reconcile_content_children (
   let substitution_for_children : bool =
     // The raw-shown-override rule (generalized 2026-06-12 from the
     // overridden-as-such case): when this node is itself
-    // overridden but shown RAW by its position -- a write-protected folder
+    // overridden but shown raw by its position -- a write-protected folder
     // member, an overriddenFolder member, or a view root -- the user is
-    // looking at the ORIGINAL, so its immediate children are shown raw too.
+    // looking at the original, so its immediate children are shown raw too.
     // Depth one level: a content child is not a raw position, so
     // substitution resumes there (matching the overridden-as-such
     // precedent).
@@ -418,7 +418,7 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
         body, } ) ))); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// Whether this node is overridden yet shown RAW by its position, so
+/// Whether this node is overridden yet shown raw by its position, so
 /// that substitution must be disabled for its immediate children (one
 /// level; a content child is a substituting position, so substitution
 /// resumes there). Generalizes the overridden-as-such rule (an
@@ -426,9 +426,9 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
 /// this node overrides") to every raw-shown position. Decided
 /// 2026-06-12:
 /// - POSITION: a member of any PartnerFolder that shows its members raw -- every folder
-///   EXCEPT the editable subscribeeFolder, whose subscribees-as-such DO
+///   except the editable subscribeeFolder, whose subscribees-as-such do
 ///   substitute (the subscriber's view of them) -- or a view root.
-/// - OVERRIDDEN: ownership-gated, visibility-UNGATED ('unrestricted' = None),
+/// - OVERRIDDEN: ownership-gated, visibility-ungated ('unrestricted' = None),
 ///   so even a node whose only overrider is invisible counts as
 ///   "overridden but shown raw".
 /// - A node carrying an 'overridesHere' fact is a substitute, not a
@@ -491,8 +491,8 @@ fn is_subscribee (
   Ok( is_member_of_parent && affects_parent_subscribeeFolder ) }
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
-/// in order. For a subscribee-as-such (the glossary's "subscribee as such") it is contains MINUS what the
-/// subscriber neither HIDES nor CONTAINS: the hidden remainder shows in the
+/// in order. For a subscribee-as-such (the glossary's "subscribee as such") it is contains minus what the
+/// subscriber neither hides nor contains: the hidden remainder shows in the
 /// HiddenInSubscribeeFolder, and content the subscriber has integrated into its
 /// own graph (any node it contains) has dropped out of "unintegrated subscribed
 /// content" entirely. Hiding is the explicit integration signal; containing is
@@ -521,15 +521,15 @@ fn content_goal_list (
         graph_snap, config, &grandparent_pid, &grandparent_skgrepo ) ?;
     // Resolve the subtrahends through extra_id -> pid the same way
     // 'content_ids' (the minuend) was resolved by the caller. Without
-    // this, a child the subscriber has integrated under a now-MERGED id
+    // this, a child the subscriber has integrated under a now-merged id
     // (its contains holds the pre-merge acquiree alias, while the
     // subscribee's contains holds the acquirer's primary) would not
     // cancel, and would double-show as unintegrated subscribed content.
     // relRepo gating ('docs/telescopes.org', "What lives where"): a member
-    // the grandparent-subscriber HIDES or CONTAINS only in a skgrepo
+    // the grandparent-subscriber hides or contains only in a skgrepo
     // outside the skgrepo restriction must not subtract the subscribee's
     // content here -- else a privately-contained/-hidden member
-    // would vanish from a public view even though no UNRESTRICTED relationship
+    // would vanish from a public view even though no unrestricted relationship
     // explains its absence (leak by omission). Mirrors the
     // 'reconcile_content_children' gate on 'graphnode.contains'
     // just above.
@@ -605,14 +605,14 @@ fn complete_content_children (
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling relationship.
         => true,
-      // A RestrictedVognode is UNMANAGED: never matched against the goal
+      // A RestrictedVognode is unmanaged: never matched against the goal
       // list, so it is preserved as-is (a retained placeholder hosting
       // already-extended unrestricted descendants) and needs no id. The goal
       // omits every restricted member (omit_restricted_members), so it is
       // never created here either.
       _ => false },
     |vn : &Viewnode| match &vn . kind {
-      // Unrestricted and Unknown children participate. COLLECTED
+      // Unrestricted and Unknown children participate. Collected
       // ids (the overridesHere original when present), so goal lists
       // stay in original IDs, an existing shown substitute satisfies
       // its original goal member, and only genuinely missing members
@@ -805,7 +805,7 @@ fn build_child_creation_data (
           // containerward ancestor, or a stale branch made a non-member), so its goal id
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
-          // Keys are COLLECTED ids, matching the reconcile's orderkey:
+          // Keys are collected ids, matching the reconcile's orderkey:
           // an existing shown substitute registers under its original.
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if t . affectsParent == AffectsParent::True

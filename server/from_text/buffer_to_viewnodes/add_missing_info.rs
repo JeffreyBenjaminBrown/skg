@@ -19,12 +19,12 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use uuid::Uuid;
 
-/// Which nodes enrichment INVENTED data for, as opposed to reading it
+/// Which nodes enrichment invented data for, as opposed to reading it
 /// from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
 /// 'inherited_skgrepo_nodes' had no skgrepo (so they inherited that of
 /// their nearest unrestricted ancestor). Downstream policy needs the
-/// distinction the enriched tree itself has erased -- e.g. a NEW node
-/// whose INHERITED skgrepo is foreign is not a foreign-creation error
+/// distinction the enriched tree itself has erased -- e.g. a new node
+/// whose inherited skgrepo is foreign is not a foreign-creation error
 /// but a rider on its ancestor's fork, whereas an explicitly foreign
 /// new node is the error.
 /// It also needs a fact the tree does not show:

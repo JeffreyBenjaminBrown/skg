@@ -62,7 +62,7 @@ pub struct DefiningFolderRecorder {
 /// request (the 'skg-set-relRepo' gesture), None meaning
 /// "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
-/// validates the explicit skgrepos against each relationship's DEFAULT floor
+/// validates the explicit skgrepos against each relationship's default floor
 /// at save time ('docs/telescopes.org', "Setting a relationship's
 /// skgrepo").
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -166,7 +166,7 @@ impl CollectedFieldIntents {
   /// The rules are:
   /// - a combineable fieldIntent always pushes;
   /// - an exclusive fieldIntent into an empty slot fills it;
-  /// - an exclusive fieldIntent into an occupied slot with an EQUAL
+  /// - an exclusive fieldIntent into an occupied slot with an equal
   ///   payload is a silent no-op;
   /// - an exclusive fieldIntent into an occupied slot with a different
   ///   payload is an error. Upstream validation should preclude this

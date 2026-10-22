@@ -11,9 +11,9 @@
 //!
 //! "Generalized orphan": traditionally in CS an "orphan" is a node whose
 //! *immediate parent* is gone. Ours is generalized to the *whole required
-//! ancestry chain*: a folder is a generalized orphan if ANY ancestor in its
+//! ancestry chain*: a folder is a generalized orphan if any ancestor in its
 //! required-ancestry chain -- not only the parent -- is the wrong viewnode
-//! kind. Death is a VIEW property, not a graph property: a position that must
+//! kind. Death is a view property, not a graph property: a position that must
 //! be a vognode holding anything but Vognode::Unrestricted, or a position that must
 //! be a specific folder holding anything but that folder, is dead. No
 //! graph / Graphnode read is involved. This is sound because, in BFS order,
@@ -107,8 +107,8 @@ fn matches_expected (
                  ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) ),
   } }
 
-/// Whether `kind` is a FOLDER -- a folder is a
-/// *collecting* non-vognode, i.e. a PropertyFolder (ID/Alias) or a PartnerFolder. (A NON-VOGNODE
+/// Whether `kind` is a folder -- a folder is a
+/// *collecting* non-vognode, i.e. a PropertyFolder (ID/Alias) or a PartnerFolder. (A non-vognode
 /// is any non-Vognode viewnode; the non-folders -- Property leaves, BufferRoot,
 /// DeadViewnode -- are excluded here.) Folders are the kinds that carry a required
 /// ancestry and so are subject to the generalized-orphan check.
@@ -128,7 +128,7 @@ fn ancestor_treeid (
     node_ref = node_ref . parent () ?; }
   Some ( node_ref . id () ) }
 
-/// A folder is a *generalized orphan* (see module doc -- ANY required ancestor in
+/// A folder is a *generalized orphan* (see module doc -- any required ancestor in
 /// the full chain, not just the parent, is the wrong viewnode kind) iff,
 /// walking its required ancestry nearest -> farthest, some required ancestor's
 /// actual viewnode kind does not match the spec. Short-circuits on the first
@@ -155,7 +155,7 @@ pub fn folder_is_generalized_orphan (
 /// The NodeId of the folder's i-th required ancestor (per the required-ancestry table for its
 /// kind); `None` if i is past the end of the table for this kind.
 ///
-/// RELIES ON THE ORPHAN PRE-CHECK: it does NOT re-validate that each ancestor is
+/// RELIES ON THE ORPHAN PRE-CHECK: it does not re-validate that each ancestor is
 /// the kind the table demands. 'folder_is_generalized_orphan' runs in the BFS
 /// dispatch and deadens any folder with a wrong-kind required ancestry *before* its
 /// reconcile runs, and every caller of this is inside a reconcile -- so by the
@@ -224,13 +224,13 @@ pub fn deaden_generalized_orphan_folder (
 /// - a member (affectsParent=true Unrestricted) view-leaf -> delete;
 /// - a member branch (has children) -> make it a non-member (affectsParent=false), so
 ///   the user's subtree survives;
-/// - a nested folder (PropertyFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
+/// - a nested folder (PropertyFolder / PartnerFolder) -> leave it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and
-///   disposes ITS OWN children -- at its own BFS visit. (Converting a nested
+///   disposes its own children -- at its own BFS visit. (Converting a nested
 ///   folder to DeadViewnode here would freeze it before it could dispose its
 ///   own leaf members, leaving them stranded under a dead chain. Leaving it to
 ///   self-deaden is what makes leaf members at every depth die. A Property
-///   leaf does NOT self-dispatch, so it is still converted below.)
+///   leaf does not self-dispatch, so it is still converted below.)
 /// - any other non-vognode, non-phantom child (a Property, a DeadViewnode) -> convert
 ///   to DeadViewnode;
 /// - any other child (a non-member vognode -- a non-member Unrestricted or an

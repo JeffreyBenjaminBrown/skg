@@ -65,7 +65,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
   let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
-    // Whatever EITHER member showed as unintegrated subscribed
+    // Whatever either member showed as unintegrated subscribed
     // content before the merge, the merged node must keep showing,
     // so these ids are dropped from the combined
     // hides below.
@@ -99,7 +99,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
 ///   - 'Novel' = not among the acquirer's contents
 /// - Combined relationship fields (subscribesTo, overrides)
 /// - Filtered hidesFromSubs: can't hide your own
-///   content, and can't hide what either member SHOWED pre-merge
+///   content, and can't hide what either member showed pre-merge
 ///   ('shown_pre_merge')
 fn three_nodeMerged_graphnodes(
   config: &SkgConfig,
@@ -130,9 +130,9 @@ fn three_nodeMerged_graphnodes(
     updated_acquirer . extra_ids =
       dedup_vector (combined_extra_ids); }
   // Combining lists of relation partners (compose both, concatenate
-  // acquiree-after-acquirer, dedup, decompose): relRepos are PRESERVED, so
+  // acquiree-after-acquirer, dedup, decompose): relRepos are preserved, so
   // a merge cannot silently de-privatize a relationship. On a member both
-  // sides carry, the more PRIVATE skgrepo wins (the safe tie-break); every
+  // sides carry, the more private skgrepo wins (the safe tie-break); every
   // skgrepo clamps at the acquirer's home, since no section may be more
   // public than its home.
   let combine_rel_partners =
@@ -196,7 +196,7 @@ fn three_nodeMerged_graphnodes(
             acquiree_from_disk . subscribesTo . or_default () ] )); }
   { // Combine hidesFromSubs, filtering to hide
     // nothing that the acquirer contains, and nothing either member
-    // SHOWED through its subscriptions pre-merge: if it was
+    // showed through its subscriptions pre-merge: if it was
     // contained in one member's subscribee and unhidden by (and not
     // contained in) that member, the merge keeps showing it -- one
     // member's hide never silences the other's view. ("Something

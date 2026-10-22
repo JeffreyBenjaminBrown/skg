@@ -4,7 +4,7 @@
 //! 'writer.commit()' — used to block the
 //! response, even though the save's re-rendered result is built from
 //! the in-Rust graph and never reads the search index. The save now
-//! ENQUEUES its search-index update here and returns; the tantivy-commit happens off
+//! enqueues its search-index update here and returns; the tantivy-commit happens off
 //! the critical path.
 //!
 //! A single worker thread applies the queued updates in FIFO order, so
@@ -14,7 +14,7 @@
 //! far (read-your-writes), at the cost of waiting through any in-flight
 //! tantivy-commit.
 //!
-//! 'lock_tantivy_writes' serializes EVERY Tantivy writer (this worker,
+//! 'lock_tantivy_writes' serializes every Tantivy writer (this worker,
 //! search-make-link's 'update_index_with_nodes', the init/rebuild
 //! context pass), since backgrounding the worker means it can now run
 //! concurrently with those. On a background-write failure the worker

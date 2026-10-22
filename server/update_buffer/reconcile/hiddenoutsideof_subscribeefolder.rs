@@ -34,7 +34,7 @@ struct HiddenOutsideContext {
 ///               └─ [hidden UnrestrictedVognode children]
 ///
 /// Collects nodes that the subscriber hides from its subscriptions
-/// but that are NOT top-level content of any subscribee.
+/// but that are not top-level content of any subscribee.
 pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
@@ -64,7 +64,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
     omit_restricted_members (
       goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
-  // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
+  // The node budget: a folder fills its members whole and is budget-neutral -- the owning
   // subscriber already spent its budget unit when it extended, so adding all
   // these hidden members here costs nothing and never truncates the group.
   let goal_items : Vec<FolderGoalItem> =

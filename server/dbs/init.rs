@@ -186,7 +186,7 @@ pub fn create_empty_tantivy_index (
     Index::create_in_dir ( index_path, mk_tantivy_schema () ) ? ) }
 
 /// An empty in-RAM Tantivy index (no folder IO, nothing wiped). Used to build a
-/// SkgEnv for a DE-NOVO render driven through post-save view completion in paths/tests
+/// SkgEnv for a de-novo render driven through post-save view completion in paths/tests
 /// that have no real tantivy on hand: find_repo falls back past an empty search index
 /// to the in-Rust graph / disk, so the search index's contents don't matter there.
 pub fn empty_in_ram_tantivy_index (

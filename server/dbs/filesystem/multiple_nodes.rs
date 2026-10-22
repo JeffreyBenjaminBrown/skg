@@ -21,7 +21,7 @@ use std::fs::{self, DirEntry, ReadDir};
 /// If any files fail to load, writes a detailed report to an
 /// org file in the config's data_root and returns a summary error.
 ///
-/// Load-time telescope violations are LOGGED here and dropped.
+/// Load-time telescope violations are logged here and dropped.
 /// Callers that report them to the user (init and rebuild) take
 /// 'read_all_skg_files_from_repos_collecting_violations' instead.
 pub fn read_all_skg_files_from_skgrepos (
@@ -54,7 +54,7 @@ pub(crate) fn read_all_skg_files_from_skgrepos_read_only (
 /// in DATA_ROOT/telescope-warnings.org.
 ///
 /// Two kinds arise here and nowhere else, because only here are a
-/// node's SECTION LIST and the config both in hand:
+/// node's section list and the config both in hand:
 /// - every 'CompositionWarning' (wrapped as 'TelescopeViolation::Composition'),
 /// - 'IgnoredForeignPidFolderlision', where owned and non-owned files
 ///   use the same pid. The owned telescope wins before composition.
@@ -187,11 +187,11 @@ fn compose_grouped_sections (
   Ok (( all_nodes, all_violations )) }
 
 /// NOT AN ERROR: same-id files across skgrepos. Those are the
-/// SECTIONS of one privacy telescope, grouped and composed at load,
+/// sections of one privacy telescope, grouped and composed at load,
 /// and they are the feature -- see docs/telescopes.org. Sections of
 /// one telescope share a pid, so they can never trip this check.
 ///
-/// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
+/// THE ERROR: one id claimed by two different nodes -- an id
 /// (primary or extra) appearing among the all_ids() of two nodes
 /// with distinct pids. Nothing about it is cross-repo; both
 /// claimants can sit in one skgrepo. If any exists, writes a detailed
@@ -262,7 +262,7 @@ pub fn read_skg_sections_from_folder (
 
 /// Like `read_all_skg_files_from_repos` but only for telescopes
 /// with at least one section file whose mtime is more recent than
-/// `since`. A touched SECTION reloads its WHOLE telescope (all its
+/// `since`. A touched section reloads its whole telescope (all its
 /// sections, however old), since the composition needs every skgrepo.
 pub fn read_recently_modified_skgfiles_from_skgrepos (
   config : &SkgConfig,
@@ -297,7 +297,7 @@ pub fn read_recently_modified_skgfiles_from_skgrepos (
   Ok (all_nodes) }
 
 /// Reports each id claimed by more than one node, naming every
-/// CLAIMANT as "pid (home)" -- the pids are what the reader must
+/// claimant as "pid (home)" -- the pids are what the reader must
 /// open to repair the conflict, and both claimants can share one
 /// home, so the homes alone identify nothing.
 /// If there are none, removes a stale report, so the file's
@@ -329,7 +329,7 @@ fn report_skgids_claimed_by_two_nodes(
     content . push_str ("#+title: IDs claimed by more than one node\n");
     content . push_str ("#+date: <generated at initialization>\n\n");
     content . push_str( &format!(
-      "{} id(s) claimed by more than one node. Same-id files ACROSS REPOS are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
+      "{} id(s) claimed by more than one node. Same-id files across repos are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
     let mut sorted_skgids: Vec<(&ID, &Vec<(ID, SkgrepoName)>)> =
       // for deterministic output
@@ -355,7 +355,7 @@ fn report_skgids_claimed_by_two_nodes(
   Ok (( )) }
 
 /// Delete a report whose condition no longer holds, so that a
-/// report file left on disk always describes the LAST run rather
+/// report file left on disk always describes the last run rather
 /// than some earlier one.
 fn remove_stale_report (
   report_path : &Path,
@@ -422,7 +422,7 @@ pub fn write_all_nodes_to_fs (
     telescope . verify_hoist (&config) ?; }
   Ok (prepared . len ()) }
 
-/// Deleting a node deletes its whole TELESCOPE: every owned
+/// Deleting a node deletes its whole telescope: every owned
 /// section file of that pid, in whatever skgrepo. (The RepoName in
 /// each target is the caller's belief about the home; kept in the
 /// signature for its callers, but every owned skgrepo is swept.)

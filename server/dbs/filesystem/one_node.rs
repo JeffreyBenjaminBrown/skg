@@ -32,7 +32,7 @@ pub fn graphnode_from_skgid (
 
 
 /// Reads a Graphnode from disk given its PID: the whole
-/// TELESCOPE -- every same-pid section file across the configured
+/// telescope -- every same-pid section file across the configured
 /// skgrepos, composed. The 'repo' parameter survives only as the
 /// caller's belief about the home; the composition derives the true home
 /// (the most public section), so a stale belief cannot corrupt the
@@ -87,7 +87,7 @@ pub(crate) fn telescope_from_disk (
 
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
-/// ERRORS are propagated only if they are not of the 'not found' kind.
+/// Errors are propagated only if they are not of the 'not found' kind.
 pub fn optgraphnode_from_skgid (
   config : &SkgConfig,
   skgid  : &ID
@@ -120,7 +120,7 @@ pub fn fetch_aliases_from_file (
 
 /// Write a node as its telescope: decompose into per-repo sections,
 /// write each section file only when its bytes changed
-/// (no-cosmetic-rewrites), and delete OWNED section files whose
+/// (no-cosmetic-rewrites), and delete owned section files whose
 /// skgrepo lost its last member. Foreign skgrepos are never written or
 /// deleted -- 'error_unless_home_is_writable' refuses rather than
 /// skipping, so a foreign home cannot silently lose the title, and
@@ -384,7 +384,7 @@ pub(super) fn read_graphnode
         io::ErrorKind::InvalidData,
         e . to_string () )) ? };
   if node_fs . title . as_deref () == Some ("") {
-    // Absent title = a non-home section, fine; PRESENT-but-empty is
+    // Absent title = a non-home section, fine; present-but-empty is
     // malformed.
     return Err(io::Error::new(
       io::ErrorKind::InvalidData,

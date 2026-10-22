@@ -51,11 +51,11 @@ pub(crate) struct CompletionContext<'a> {
   /// a content list is extended whole); when it reaches 0 no later
   /// vognode other than a root extends (and the cascade stops).
   pub(super) node_budget                    : usize,
-  /// True only for a DE-NOVO (initial) render driven through
+  /// True only for a de-novo (initial) render driven through
   /// view completion. When set, each fresh editable node gets its default
   /// PartnerFolders created at its visit, the way
   /// build_node_branch_minus_content does at node birth.
-  /// FALSE for post-save rerender, where existing PartnerFolders round-trip
+  /// False for post-save rerender, where existing PartnerFolders round-trip
   /// from the saved buffer. A node made editable by a request still gets its
   /// defaults independently of this flag.
   pub(super) create_partnerFolders_for_fresh_nodes : bool,
@@ -207,7 +207,7 @@ pub(crate) fn complete_viewforest (
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
   // The single level-order BFS: each node's visit
-  // (dispatch_node_update) does ALL of its own update -- content
+  // (dispatch_node_update) does all of its own update -- content
   // reconcile, the editability rule and the cascade for editable-view
   // requests, the other view requests, ensuring an editable
   // subscribee's HiddenInSubscribeeFolder, and per-folder reconciliation. Folders and
@@ -290,7 +290,7 @@ fn dispatch_node_update (
       visit_normal_node (tree, treeid, context, &settings) ?,
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
       if settings . subscribeeFolder_has_own_reconciler =>
-      // A folder fills its members WHOLE and is budget-neutral (the node budget): the owning
+      // A folder fills its members whole and is budget-neutral (the node budget): the owning
       // vognode already spent its 1 budget unit when it extended, so extending all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribeeFolder_children (
@@ -415,7 +415,7 @@ fn update_normal_node (
   // extend_true_content_at_unrestrictedVognode); once it hits 0 every later vognode is left
   // write-protected -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already extended keep all their members); we only stop
-  // STARTING new extensions. EXCEPTION: a view root (child of the BufferRoot) is
+  // starting new extensions. EXCEPTION: a view root (child of the BufferRoot) is
   // the node the user explicitly opened, so it always extends -- never truncated.
   // (The ancestor read is short-circuited to only run when the budget is spent.)
   if context . node_budget == 0
@@ -493,11 +493,11 @@ fn update_normal_node (
 /// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden/
 ///   Container/Mentioner/AcquiredBy/Acquired (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
-///   just noise) -- but NOT Overridden (the editable interface for adding
+///   just noise) -- but not Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasFolder).
 /// - HiddenInSubscribeeFolder / HiddenOutsideOfSubscribeeFolder.
 /// - PropertyFolder::ID (largely moot -- an IDFolder always holds at least the PID).
-/// PRESERVED when empty (so NOT here): PartnerFolder(Subscribee), PartnerFolder
+/// Preserved when empty (so not here): PartnerFolder(Subscribee), PartnerFolder
 /// (Overridden), PropertyFolder(Alias) -- each an *editable interface onto the origin*
 /// that the user must be able to refill, removed only by hand.
 fn is_self_deletable_when_empty (

@@ -92,10 +92,10 @@ pub fn reconcile_partnerFolder_children (
         // Likewise unreachable here: HiddenOutside has its own
         // hide-derived reconciler, rather than a relation role.
         graph_members, }};
-  // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
+  // The node budget: a folder fills its members whole and is budget-neutral -- the owning
   // vognode already spent its budget unit when it extended, so adding all the
   // relation members here costs nothing and never truncates the group. (The
-  // budget bounds how many vognodes EXTEND, not how big one group is.)
+  // budget bounds how many vognodes extend, not how big one group is.)
   let relRepos : HashMap<ID, SkgrepoName> = // of unknown members, for their heralds
     raw_outbound_members (graph_snap, &recorder_pid, member_role, skgrepo_restriction)
       . into_iter ()
@@ -116,7 +116,7 @@ pub fn reconcile_partnerFolder_children (
       tree, node, kind, &goal_items, &child_data, graph_snap,
       deleted_by_this_save_extra_ids ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
-    // Repairs to an editable folder are not repairs: its membership IS
+    // Repairs to an editable folder are not repairs: its membership is
     // whatever the user saved. Write-protected folders warn (when there is a
     // sink, i.e. when this completion serves the just-saved view).
     if let Some (sink) = warning_sink {
@@ -145,7 +145,7 @@ pub fn partnerFolder_members_in_graph (
       . map ( |(_pid, src)| src )
       . or_else ( || home_from_disk (skgid, config) ) };
   let members : Vec<ID> =
-    if recorder_role . is_first_role () { // the folder shows a list in the RECORDER's file
+    if recorder_role . is_first_role () { // the folder shows a list in the recorder's file
       raw_outbound_members (graph, recorder_pid, member_role, skgrepo_restriction)
         . into_iter ()
         . map ( |member| member . member . into_id () )
@@ -160,7 +160,7 @@ pub fn partnerFolder_members_in_graph (
 
 /// The recorder's partners in the member role's relation, as its file
 /// lists them, each tagged by whether the graph resolves it, if the
-/// folder shows a list in the RECORDER's file; else none.
+/// folder shows a list in the recorder's file; else none.
 fn raw_outbound_members (
   graph               : &InRustGraph,
   recorder_pid        : &ID,

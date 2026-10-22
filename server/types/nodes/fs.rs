@@ -1,10 +1,10 @@
-//! GraphnodeOnDisk: the on-disk shape of one telescope SECTION.
+//! GraphnodeOnDisk: the on-disk shape of one telescope section.
 //!
 //! One node = one ID = one privacy telescope: same-ID .skg files, at
 //! most one per skgrepo, each an "telescope section" holding the
 //! slice of the node recorded at that privacy level. The most public
-//! section (the HOME) alone carries title and body. Ordered
-//! relations are ONE flat sequence of 'ListItem's -- members render
+//! section (the home) alone carries title and body. Ordered
+//! relations are one flat sequence of 'ListItem's -- members render
 //! as bare "- ID" lines in every section and anchors as
 //! "- anchor: ID" lines, so a membership moving between sections
 //! diffs as a clean one-line delete/add pair. Unordered relations
@@ -16,8 +16,8 @@
 //! - 'GraphnodeOnDisk::into_section_slices' feeds the composition
 //!   ('server/telescope/compose.rs'), which is how Graphnode values
 //!   are born; 'graphnode_on_disk_from_section' is the decomposition-side inverse.
-//! - 'GraphnodeOnDisk::into_complete_as_single_section (repo)' treats ONE
-//!   section as a whole node. Used only where a single FILE is the
+//! - 'GraphnodeOnDisk::into_complete_as_single_section (repo)' treats one
+//!   section as a whole node. Used only where a single file is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   the git fallback of "titles by ids" ('server/git_ops/diff.rs'),
 //!   which reads only titles and filters them by the skgrepo
@@ -92,7 +92,7 @@ impl GraphnodeOnDisk {
       overrides                    :
         nonempty_skgids ( self . overrides ), }}
 
-  /// Treat ONE section as a whole node: exact for single-section
+  /// Treat one section as a whole node: exact for single-section
   /// telescopes; the per-file git/diff paths use it as interim
   /// behavior (see the module comment). A titleless section gets an
   /// empty title rather than erroring, since blob-parsers must be

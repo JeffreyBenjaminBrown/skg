@@ -1,5 +1,5 @@
-//! PURPOSE: a TEST helper for comparing rendered org buffers while
-//! ignoring the sibling ORDER inside `(skg ...)` metadata sexps.
+//! PURPOSE: a test helper for comparing rendered org buffers while
+//! ignoring the sibling order inside `(skg ...)` metadata sexps.
 //!
 //! Metadata is an "unordered tree after the first element": in any
 //! metadata list the first element is a keyword that must come first,
@@ -16,12 +16,12 @@
 //! compare two buffers with
 //!   assert_eq! ( canonicalize_metadata_ordering (&actual),
 //!                canonicalize_metadata_ordering (&expected) );
-//! so a change to the ORDER the server emits metadata siblings in never
-//! breaks a test, while any change to the CONTENT still does. `assert_eq!`
+//! so a change to the order the server emits metadata siblings in never
+//! breaks a test, while any change to the content still does. `assert_eq!`
 //! keeps a readable diff (both sides are canonicalized identically, so
 //! non-metadata text and structure still line up).
 //!
-//! CAVEAT: this deliberately makes sibling order invisible EVERYWHERE in
+//! CAVEAT: this deliberately makes sibling order invisible everywhere in
 //! metadata, including the ordered relationship-herald spans inside a
 //! `(rels ...)` form. Span display-order is pinned separately by the
 //! `herald_tokens` unit tests, which assert the assembled order directly.
@@ -33,11 +33,11 @@
 
 use sexp::{Atom, Sexp};
 
-/// Assert two rendered org buffers equal, ignoring the sibling ORDER
+/// Assert two rendered org buffers equal, ignoring the sibling order
 /// inside every `(skg ...)` metadata sexp (see this module's docs).
 /// A drop-in for `assert_eq!` at buffer-comparison sites: both sides
 /// are run through `canonicalize_metadata_ordering` first, so the diff
-/// stays readable and any CONTENT difference still fails. Accepts an
+/// stays readable and any content difference still fails. Accepts an
 /// optional trailing message like `assert_eq!`.
 #[macro_export]
 macro_rules! assert_metadata_eq {
@@ -83,7 +83,7 @@ pub fn canonicalize_metadata_ordering (
 
 /// Canonical string for a sexp: an atom serialized unambiguously; a
 /// list as its head (position 0, unchanged) followed by its remaining
-/// elements each canonicalized and then SORTED. Sorting the already-
+/// elements each canonicalized and then sorted. Sorting the already-
 /// canonical child strings makes two tails that are equal as multisets
 /// (order-independent) produce identical output, and keeps duplicates.
 pub fn canon_sexp (
@@ -116,7 +116,7 @@ fn canon_atom (
     Atom::I (i) => i . to_string (),
     Atom::F (f) => f . to_string (), } }
 
-/// Byte length of the balanced sexp that `s` STARTS with (s[0] == '('),
+/// Byte length of the balanced sexp that `s` starts with (s[0] == '('),
 /// counting through to and including the matching ')'. Respects
 /// double-quoted strings (parens and escaped quotes inside them are
 /// literal), so a herald like `(rels (blue "a(b,c)L"))` scans correctly.

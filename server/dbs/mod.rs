@@ -1,5 +1,5 @@
-// DON'T IMPORT these re-exports. They are for documentation.
-// INSTEAD, imports in the codebase should use the original,
+// Don't import these re-exports. They are for documentation.
+// Instead, imports in the codebase should use the original,
 // longer definition path. That makes it easier to find definitions.
 
 pub mod filesystem;

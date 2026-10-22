@@ -15,14 +15,14 @@ pub mod view_requests;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoName};
 
-/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits EVERY
+/// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits every
 /// restricted member from goal lists (no placeholders are created).  A
 /// member whose skgrepo cannot be resolved is omitted too: it might be
 /// private, and rendering must not leak; saving preserves it
 /// regardless (the weave / set-difference merge treat unresolvable as
 /// invisible).  A retained restricted vognode (one already rendered,
 /// kept because it hosts unrestricted descendants after a skgrepo-set
-/// reduction) does NOT come back through the goal list: each
+/// reduction) does not come back through the goal list: each
 /// reconciler treats it as an unmanaged child, preserved as-is.
 pub fn omit_restricted_members (
   goal     : Vec<ID>,

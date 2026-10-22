@@ -125,7 +125,7 @@ fn supplement_nodeSaveIntent_from_disk (
       // A brand-new node has no sticky skgrepos (no disk relationships to be
       // sticky about), but an explicit '(editRequest (relRepo ...))'
       // request must
-      // still be validated against the DEFAULT floor -- an empty
+      // still be validated against the default floor -- an empty
       // disk stand-in reuses 'apply_sticky_relRepos' unchanged (its
       // sticky lookups simply find nothing, falling through to
       // default every time).
@@ -266,7 +266,7 @@ fn preserve_invisible_members (
         MSV::Specified (rel_partners_at_relRepo (&recorder_skgrepo, merged)); }}
   supplemented }
 
-/// Deleting a node deletes its whole TELESCOPE, including sections
+/// Deleting a node deletes its whole telescope, including sections
 /// the skgrepo restriction cannot see; refuse rather than silently
 /// destroy them. (The agreed small leak: the refusal reveals that
 /// restricted sections exist.)
@@ -287,19 +287,19 @@ pub fn refuse_delete_with_restricted_sections (
 
 /// THE STICKY-ELSE-DEFAULT RULE ('docs/telescopes.org', "Where new
 /// relationships land: the sticky-else-default rule"), with its
-/// EXPLICIT third path. The lowering stages tag every relationship with the
+/// explicit third path. The lowering stages tag every relationship with the
 /// node's own skgrepo (a placeholder); this pass resolves the real
 /// relRepos:
 /// - EXPLICIT: a member named in 'explicit' (the buffer headline's
 ///   '(relRepo NAME)' atom, threaded in as a side-channel because
 ///   Graphnode's 'RelPartner::skgrepo' carries no "was this
-///   explicit" flag) wins outright, PROVIDED it is at least as
-///   private as the DEFAULT floor -- normally the more private of the two
-///   endpoints' homes, NOT the disk relRepo. An explicit atom is therefore
+///   explicit" flag) wins outright, provided it is at least as
+///   private as the default floor -- normally the more private of the two
+///   endpoints' homes, not the disk relRepo. An explicit atom is therefore
 ///   the one path that can make an existing relationship more public, down
 ///   to but never more public than its default ('docs/telescopes.org',
 ///   "Setting a relationship's skgrepo"). One exception keeps the
-///   render->save round-trip lossless: when the DISK relRepo already sits
+///   render->save round-trip lossless: when the disk relRepo already sits
 ///   more public than the default (a legacy or hand-authored shape), the
 ///   explicit floor relaxes to that disk skgrepo -- such a relationship can
 ///   be held or made more private, never moved still more public. A choice
@@ -307,14 +307,14 @@ pub fn refuse_delete_with_restricted_sections (
 ///   member, offered skgrepo, and floor.
 /// - STICKY: absent an explicit skgrepo, a relationship that already exists
 ///   on disk (same relation, same endpoints, through 'pid_of')
-///   keeps its DISK relRepo. Renormalization never lowers a relationship's
+///   keeps its disk relRepo. Renormalization never lowers a relationship's
 ///   privacy silently; removing the atom means "no opinion", not
 ///   "reset to default".
 /// - DEFAULT: a new relationship between owned nodes gets the more private
 ///   endpoint home. If the member is foreign and the recorder is owned,
 ///   the relationship instead stays at the recorder's home: the relationship
 ///   and foreign ID are intentionally shared with that skgrepo.
-/// - HIDES additionally floor at the most public EXPLAINING
+/// - hides additionally floor at the most public explaining
 ///   subscription (see 'hide_repo'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
 ///   inference that a private subscription exists. Hides carry no
@@ -352,7 +352,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       .or_else ( || graph . pid_and_skgrepo (skgid)
       . map ( |(_pid, src)| src )
       . or_else ( || home_from_disk (skgid, config) ) ) };
-  // The DEFAULT floor for one member. Owned-to-owned relationships use the
+  // The default floor for one member. Owned-to-owned relationships use the
   // more private endpoint home. An owned-to-foreign relationship stays at
   // the recorder's home; Skg never proposes writing a foreign section.
   // An unknown target also falls back to the recorder's home.
@@ -362,7 +362,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         config . default_relRepo (
           &recorder_home, &target_home ),
       None => recorder_home . clone (), }};
-  // The sticky-else-default relRepo for one member -- what an ABSENT
+  // The sticky-else-default relRepo for one member -- what an absent
   // atom resolves to.
   let sticky_skgrepo_for = |disk_list : &[RelPartner<ID>],
                             member    : &ID|
@@ -374,7 +374,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
           break 'unclamped d . relRepo . clone (); }}
       default_floor_for (member) };
     // Clamp: no section may be more public than the home (the
-    // "extends on the other side" junk shape), so when a HOME SKGREPO MOVE
+    // "extends on the other side" junk shape), so when a home skgrepo move
     // makes the node more private, its relationships rise with it. (The
     // converse move leaves old, more-private skgrepos in place:
     // publicizing memberships takes the explicit gesture.)
@@ -385,11 +385,11 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       . find (|disk| member_key (&disk . member) == key)
       . map (|disk| disk . member . clone ())
       . unwrap_or_else (|| member . clone ()) };
-  // EXPLICIT wins when at least as private as its floor: the more PUBLIC of
-  // the DEFAULT floor and the sticky skgrepo. Flooring at the default (not
-  // at sticky) is what lets an atom LOWER a stuck relationship's privacy
+  // Explicit wins when at least as private as its floor: the more public of
+  // the default floor and the sticky skgrepo. Flooring at the default (not
+  // at sticky) is what lets an atom lower a stuck relationship's privacy
   // back down to the default ('docs/telescopes.org', "Setting a
-  // relationship's skgrepo"); admitting the sticky skgrepo when IT sits
+  // relationship's skgrepo"); admitting the sticky skgrepo when it sits
   // more public than the default covers legacy or hand-authored data.
   // Render emits the '(relRepo ...)' atom for every off-default
   // relationship, and that atom must round-trip through save unchanged.
@@ -418,7 +418,7 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
         let default : SkgrepoName = default_floor_for (member);
         let sticky  : SkgrepoName =
           sticky_skgrepo_for (disk_list, member);
-        let floor : SkgrepoName = // the more PUBLIC of the two
+        let floor : SkgrepoName = // the more public of the two
           if config . is_strictly_more_public (&sticky, &default) {
             sticky } else { default };
         if config . is_strictly_more_public (skgrepo, &floor) {
@@ -510,8 +510,8 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
             sticky_or_default, recorder_home . clone () ); } }} }
   Ok (supplemented) }
 
-/// A NEW hide's relRepo: at least the more private of the endpoints'
-/// homes, and at least the most PUBLIC subscription of the hider
+/// A new hide's relRepo: at least the more private of the endpoints'
+/// homes, and at least the most public subscription of the hider
 /// that explains it (one whose subscribee contains the hidden
 /// node). The most public explanation is the floor because the
 /// inference "the hider subscribes to something containing X" is
@@ -546,7 +546,7 @@ pub(crate) fn hide_skgrepo (
       . collect () };
   let subscription_floor : Option<SkgrepoName> =
     explaining_skgrepos . into_iter ()
-    . reduce ( |a, b| // keep the more PUBLIC of the two
+    . reduce ( |a, b| // keep the more public of the two
                if config . is_strictly_more_public (&a, &b) { a }
                else { b } );
   match subscription_floor {

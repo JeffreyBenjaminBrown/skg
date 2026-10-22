@@ -2,7 +2,7 @@
 /// Build a string intended as buffer-text,
 /// to represent an 'inital view' (content relationships only).
 ///
-/// METHOD: the de-novo render runs the ONE post-save view
+/// METHOD: the de-novo render runs the single post-save view
 /// completion path (multi_root_view_via_env -> render_initial_view)
 /// over a stub forest. View completion (complete_viewforest) completes each node
 /// at its BFS visit. After view completion, the shared finish_viewforest
@@ -51,7 +51,7 @@ pub fn multi_root_view (
 }
 
 /// The parts-based de-novo entry -- a thin shim that assembles a
-/// SkgEnv and routes through the ONE view completion path (multi_root_view_via_env). Used only
+/// SkgEnv and routes through the single view completion path (multi_root_view_via_env). Used only
 /// by tests (production calls multi_root_view_via_env directly).
 /// The shim builds a fixture-local graph from disk and, when Tantivy is not
 /// supplied, uses an empty in-RAM search index.
@@ -82,7 +82,7 @@ fn multi_root_view_inner (
     // caller (the single-root handler) surfaces them.
     &mut Vec::new () ) }
 
-/// The de-novo view, built through the ONE view completion path
+/// The de-novo view, built through the single view completion path
 /// (render_initial_view). Takes a SkgEnv (carries
 /// config/driver/tantivy/graph), runs view completion over a stub forest of the
 /// requested roots, then attaches containerward role tree and stats and renders.

@@ -27,13 +27,13 @@ use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 /// where the user did not mention the field from the case
 /// where the user wants it empty.
 ///
-/// THE FOLDER RULE these values encode at save extraction
+/// The folder rule these values encode at save extraction
 /// ('server/from_text/local_fieldintent_collection/traverse.rs'
 /// enforces it; 'supplement_unspecified_fields_from_disk' consumes
-/// it): a buffer with NO folder for a field (no AliasFolder, SubscribeeFolder
+/// it): a buffer with no folder for a field (no AliasFolder, SubscribeeFolder
 /// or OverriddenFolder under the defining node) emits no intent for that
 /// field, which lowers to 'Unspecified' -- no opinion, so the value
-/// is filled from disk. A PRESENT-BUT-EMPTY folder emits an empty list,
+/// is filled from disk. A present-but-empty folder emits an empty list,
 /// which lowers to 'Specified(vec![])' -- the user explicitly wants
 /// the field empty.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -94,7 +94,7 @@ pub struct Skgrepo {
   pub name         : SkgrepoName,
   pub abbreviation : Option<String>,
   pub path         : PathBuf,
-  // DERIVED at config load, never written in TOML (a raw
+  // Derived at config load, never written in TOML (a raw
   // 'user_owns_it' key is rejected): true iff the skgrepo's
   // as-written path sits under the config's 'owned_folder' (its
   // first component equals it). See 'derive_ownership_and_labels'
@@ -132,7 +132,7 @@ impl From<SkgrepoToml> for Skgrepo {
 /// One entry in a node's relationship list: the member and the
 /// relationship instance's relRepo (the skgrepo whose telescope
 /// section records the relationship). The relRepo is about the
-/// RELATIONSHIP, not the member node (a public node can be a private
+/// relationship, not the member node (a public node can be a private
 /// member). Its default comes from the applicable relRepo rule;
 /// 'skg-set-relRepo' may move its privacy anywhere at least as
 /// private as that default;
@@ -190,8 +190,8 @@ pub fn members_msv<T : Clone> (
     MSV::Specified (v)   =>
       MSV::Specified ( members_of (v) ), }}
 
-/// Identifies a skgrepo-set CHOICE. Skgrepo-sets are no longer defined
-/// by hand: they are the PREFIXES of the config's skgrepo order (most
+/// Identifies a skgrepo-set choice. Skgrepo-sets are no longer defined
+/// by hand: they are the prefixes of the config's skgrepo order (most
 /// public first), so a choice is either "all" (every skgrepo) or the
 /// name of a configured skgrepo -- meaning "that skgrepo and everything
 /// more public", i.e. the most private skgrepo to make available.
@@ -230,7 +230,7 @@ pub struct SkgConfig {
   pub default_skgrepo_set : SkgrepoSetName,
 
   // The directory (as a first path component under the data root)
-  // whose skgrepos the user OWNS; every other skgrepo is foreign
+  // whose skgrepos the user owns; every other skgrepo is foreign
   // (write-protected). Replaces the retired per-repo 'user_owns_it'
   // TOML key. The intended layout is data/AUTHOR/REPO, with this
   // field naming the user's own author folder.
@@ -535,7 +535,7 @@ impl SkgConfig {
       . collect () }
 
   /// The default owned skgrepo for a fork's clone when its skgrepo could
-  /// not be inferred or user-set: the user's CONFIG-FIRST owned skgrepo
+  /// not be inferred or user-set: the user's config-first owned skgrepo
   /// (matching the Emacs client's 'skg--default-repo', which is
   /// TOML-first). None only when the user owns no skgrepo at all -- the
   /// one case 'ForkRepoUnresolved' still fires.
@@ -556,7 +556,7 @@ impl SkgConfig {
   ) -> &SkgrepoSetName {
     &self . default_skgrepo_set }
 
-  /// THE COMPARISON CHOKEPOINT, with the methods below it. Every
+  /// The comparison chokepoint, with the methods below it. Every
   /// skgrepo name, in privacy order: most public first, most private
   /// last (TOML declaration order). Falls back to alphabetical when
   /// declaration order is unavailable (a dummy/test config, whose
@@ -582,7 +582,7 @@ impl SkgConfig {
     self . ordered_skgrepos () . iter ()
       . position ( |s| s == skgrepo ) }
 
-  /// True iff 'a' is STRICTLY more public than 'b' (earlier in the
+  /// True iff 'a' is strictly more public than 'b' (earlier in the
   /// privacy order). A skgrepo absent from the config counts as
   /// maximally private, so nothing is less public than it.
   pub fn is_strictly_more_public (

@@ -46,7 +46,7 @@ pub struct NodeSaveIntent {
   // carried an '(editRequest (relRepo NAME))' request (see
   // 'UnrestrictedVognode_Generic::relRepo_request', 'FieldIntent'); None means
   // "derive" (sticky-else-default). 'requested_relRepos' extracts the
-  // Some entries into a side-channel BEFORE 'into_graphnode'
+  // Some entries into a side-channel before 'into_graphnode'
   // discards them, for 'apply_sticky_relRepos' to validate against
   // each relationship's floor.
   pub contains          : MSV<(ID, Option<SkgrepoName>)>,
@@ -198,7 +198,7 @@ impl NodeSaveIntent {
                           . map ( |skgid| (skgid, None) ) . collect () ); }}
 
   /// The skgrepos the buffer explicitly requested (its headlines'
-  /// '(relRepo NAME)' atoms), read out BEFORE 'into_graphnode'
+  /// '(relRepo NAME)' atoms), read out before 'into_graphnode'
   /// discards the Option<RepoName> payload. See 'RequestedRelRepos'.
   pub fn requested_relRepos (
     &self,
@@ -308,7 +308,7 @@ pub fn lower_collected_fieldIntents (
   let CollectedFieldIntents { order, lowerable_order, mut by_pid }
     = collected;
   let visibility : Vec<(ID, SubscribeeVisibility)> = {
-    // The signals are extracted across ALL entries, in
+    // The signals are extracted across all entries, in
     // first-emission order -- including from the signals-only
     // entries, which lower to no NodeIntent.
     let mut visibility : Vec<(ID, SubscribeeVisibility)> =
@@ -356,7 +356,7 @@ pub fn lower_collected_fieldIntents (
         pid )); }}
   Ok (LoweringOutput { intents, visibility, hidden_outside }) }
 
-/// This ASSUMES the entry is lowerable: it holds a delete or a
+/// This assumes the entry is lowerable: it holds a delete or a
 /// title/body, having been named by 'lowerable_order'.
 fn lower_one_entry (
   pid   : &ID,

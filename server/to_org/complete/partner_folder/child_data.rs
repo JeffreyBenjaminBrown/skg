@@ -228,7 +228,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   let summary : RepairSummary<ID> =
     complete_managed_children_in_viewforest (
     tree, folder_node,
-    // A RestrictedVognode child is UNMANAGED
+    // A RestrictedVognode child is unmanaged
     // (the API doc's "Restricted-skgrepo nodes"): the goal omits
     // every restricted member, and a retained placeholder already in the
     // folder survives as an unmanaged child (preserved as-is, not

@@ -105,8 +105,8 @@ fn create_documents_from_node (
   let mut documents: Vec<TantivyDocument> =
     Vec::new();
   let mut titles_and_aliases: Vec<(String, SkgrepoName)> =
-    // Each entry with the REPO its document will carry: the home
-    // for the title, the alias's own privacy LEVEL for an alias --
+    // Each entry with the repo its document will carry: the home
+    // for the title, the alias's own privacy level for an alias --
     // so restricted search filtering excludes private aliases of
     // public nodes ('docs/api-and-formats.org', "Text search").
     vec![ ( node . title . clone(),

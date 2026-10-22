@@ -1,6 +1,6 @@
 //! The "strip body whitespace" request (the API doc's "Strip body whitespace"): strips
 //! trailing whitespace from every line of every body (and trailing
-//! blank lines from the body's tail), in every OWNED skgrepo in the
+//! blank lines from the body's tail), in every owned skgrepo in the
 //! config -- foreign skgrepos are never written, and stripping them would
 //! make them diverge from their upstreams (Jeff settled on owned
 //! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two session-lifetime stores, the in-Rust graph
@@ -81,7 +81,7 @@ fn strip_body_whitespace_and_refresh_caches (
     changed . len (), owned_checked, breakdown )) }
 
 /// Reads every node from every skgrepo in the config, then strips
-/// trailing whitespace from each line of each OWNED node's body,
+/// trailing whitespace from each line of each owned node's body,
 /// rewriting exactly the files whose bodies changed (a file with a
 /// clean body is left byte-identical). Foreign skgrepos are read (the
 /// caller rebuilds whole-graph caches from the returned nodes) but

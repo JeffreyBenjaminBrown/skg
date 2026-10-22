@@ -2,7 +2,7 @@
 /// metadata. Emacs and Neovim render semantic relationship facts and
 /// their per-character styles themselves.
 ///
-/// The DATA lives here; the code that USES the data (the lens
+/// The data lives here; the code that uses the data (the lens
 /// engine, 'elisp/skg-sexpr/skg-lens.el') lives entirely in Emacs.
 /// Emacs fetches the table over the "herald rules" endpoint at
 /// connect time and hands it, unchanged, to that engine. Rust never
@@ -338,7 +338,7 @@ fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
 
 /// The placeholder token the `rels` rule emits. The relationship
 /// heralds are per-character styled spans the lens engine cannot style,
-/// so the rule only POSITIONS them: it emits this sentinel where the
+/// so the rule only positions them: it emits this sentinel where the
 /// relationship heralds belong, and the client
 /// (`heralds-from-metadata`) replaces the sentinel token with the
 /// spans it renders itself from the `(rels ...)` payload. Kept in sync
@@ -350,7 +350,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 //
 
 /// The complete herald rule table, as a single root rule labeled
-/// "skg". Rule ORDER is presentation order, independent of the raw
+/// "skg". Rule order is presentation order, independent of the raw
 /// metadata order.
 ///
 /// A few patterns (full engine semantics in skg-lens.el):
@@ -398,7 +398,7 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("editRequest", vec! [
         crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
-      // The WRITE-PROTECTED folders carry ☮ ("cannot be changed
+      // The write-protected folders carry ☮ ("cannot be changed
       // from here"); the editable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
       write_protected_leaves (PartnerFolder::HiddenInSubscribee . repr_in_client (),
@@ -495,9 +495,9 @@ pub fn herald_rule_table () -> HeraldRule {
         // Emitted only on a write-protected node whose graphnode has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
         leaf_abut ("omittedBody", "B"),
-        // The relationship heralds are per-CHARACTER styled spans that
+        // The relationship heralds are per-character styled spans that
         // the lens cannot style, so the server assembles semantic
-        // (rels ...) facts and the CLIENT renders them. This rule only POSITIONS them: the
+        // (rels ...) facts and the client renders them. This rule only positions them: the
         // ANY child makes it match the (rels ...) list form and consumes
         // the span sub-forms, and it emits the sentinel token, which the
         // client swaps for the rendered spans.
@@ -511,7 +511,7 @@ pub fn herald_rule_table () -> HeraldRule {
           // relRepo is a display fact, not a save request.  It
           // echoes its own value directly:
           // "~" + the skgrepo name, ugly, immediately before the ⌂
-          // homeRepoHerald below (table ORDER is presentation order,
+          // homeRepoHerald below (table order is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
           crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
@@ -557,7 +557,7 @@ pub fn herald_rule_table () -> HeraldRule {
 //
 
 /// Serialize the whole table to the sexp the lens engine interprets.
-/// Strings are ALWAYS quoted (unlike the 'sexp' crate, which leaves
+/// Strings are always quoted (unlike the 'sexp' crate, which leaves
 /// space-free strings bare): the engine distinguishes strings from
 /// symbols -- e.g. an INTERC's separator may be the empty string, and
 /// a bare prefix string would be misread as the INTERC's label.
@@ -593,7 +593,7 @@ fn serialize_rule (
 pub fn herald_styles_inconsistencies () -> Vec<String> {
   herald_styles_inconsistencies_of ( herald_styles () ) }
 
-/// Every tier FILE names (in 'tier_order', 'node_heralds' or
+/// Every tier file names (in 'tier_order', 'node_heralds' or
 /// 'relationship_heralds') that is not a key of its 'styles', and
 /// every styled atom of the rule table that has no entry in its
 /// 'node_heralds'.
@@ -619,7 +619,7 @@ pub fn herald_styles_inconsistencies_of (
     . collect ();
   [ undefined_tiers, unstyled_atoms ] . concat () }
 
-/// Each tier FILE names, with the path where it does so.
+/// Each tier file names, with the path where it does so.
 fn tiers_named_in_herald_styles (
   file : &Value,
 ) -> Vec<(String, &str)> {
@@ -676,7 +676,7 @@ pub fn atoms_in_rule_table () -> std::collections::HashSet<&'static str> {
     . filter ( |label| *label != "ANY" && *label != "skg" )
     . collect () }
 
-/// Every metadata atom the server can emit in a MATCH (label)
+/// Every metadata atom the server can emit in a match (label)
 /// position. Value-position data (counts, IDs, skgrepo names,
 /// the homeRepoHerald payload) is consumed by ANY/IT
 /// rules and so is deliberately absent.

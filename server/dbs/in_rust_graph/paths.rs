@@ -20,7 +20,7 @@ pub struct PathToFirstNonlinearity {
 }
 
 /// The partners one step from a node in a role tree: those playing
-/// 'role' toward it (the role the PARTNER plays, as in
+/// 'role' toward it (the role the partner plays, as in
 /// 'PARTNER_ROLE_VOCAB'). The role-tree engine walks any such
 /// function: the live graph's ('role_partners_in_graph_gated'), or the
 /// union of a graph straddle's ('GraphStraddle::partners').

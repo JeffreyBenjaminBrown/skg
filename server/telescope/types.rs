@@ -5,9 +5,9 @@
 //! One node = one ID = one telescope: a set of same-ID .skg files,
 //! at most one per skgrepo ("sections"). Every relationship instance
 //! is recorded in exactly one section, whose skgrepo is the relationship's
-//! relRepo. On disk each ordered relation is ONE flat sequence of
+//! relRepo. On disk each ordered relation is one flat sequence of
 //! items -- members and anchors -- whose role (base list vs
-//! placement) follows from WHICH section holds it, not from its
+//! placement) follows from which section holds it, not from its
 //! shape: the most public section mentioning a relation holds its
 //! anchor-free base; a more private section's items before the first
 //! anchor are its prepend, and each anchor starts a run inserted
@@ -23,11 +23,11 @@ use crate::types::nodes::fs::GraphnodeOnDisk;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-/// ONE NODE, as it sits on disk: its sections, in privacy order,
+/// One node, as it sits on disk: its sections, in privacy order,
 /// most public first.
 ///
 /// The point of the type is that "several files, one node" is a
-/// VALUE rather than a condition to be discovered. Before it,
+/// value rather than a condition to be discovered. Before it,
 /// grouping the same-pid files ended in an anonymous
 /// 'Vec<(RepoName, GraphnodeOnDisk)>', and any function tempted to answer a
 /// one-file question about a many-file node could do so without
@@ -38,7 +38,7 @@ use std::fmt;
 ///
 /// Construction is checked against the config, so a value is always
 /// nonempty, contains only same-pid sections at configured unique
-/// skgrepos, and is ordered most public first. The HOME is therefore
+/// skgrepos, and is ordered most public first. The home is therefore
 /// unambiguously the first section.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Telescope {
@@ -241,7 +241,7 @@ pub enum ListItem {
 impl<'de> Deserialize<'de> for ListItem {
   /// Manual rather than derive(untagged): untagged deserialization
   /// buffers into a self-describing form in which a plain YAML
-  /// scalar like `11` is an INTEGER, so `Member(ID)` (a String
+  /// scalar like `11` is an integer, so `Member(ID)` (a String
   /// newtype) would reject numeric-looking IDs that the old direct
   /// Vec<ID> path accepted. Any scalar is a member; a one-key
   /// {anchor: ...} map is an anchor.
@@ -277,7 +277,7 @@ impl<'de> Deserialize<'de> for ListItem {
         ListItem::Member ( s . into_skgid () ), } ) }}
 
 /// What one section contributes to its node, in section-local form.
-/// This is the PARSED shape of a section file's list fields; the
+/// This is the parsed shape of a section file's list fields; the
 /// serde wiring of GraphnodeOnDisk to this shape lands with the rest of the
 /// section format. Ordered relations carry items (anchors legal);
 /// unordered relations and aliases carry plain members.
@@ -292,7 +292,7 @@ pub struct SectionSlices {
   pub overrides                    : Option<Vec<ID>>,
 }
 
-/// Nonfatal compose trouble. The compose is TOTAL: junk degrades to one of
+/// Nonfatal compose trouble. The compose is total: junk degrades to one of
 /// these, never to an error or a panic, because a dangling anchor
 /// can arise from two perfectly correct saves on different machines
 /// ('docs/api-and-formats.org', "The .skg file format").
@@ -311,7 +311,7 @@ pub enum CompositionWarning {
   /// The home -- the most public section -- carries no title, so
   /// the text sits at 'title_at', where a reader restricted to the
   /// home skgrepo cannot see it. Distinct from 'NonHomeTitle' (a
-  /// stray SECOND title) and 'MissingTitle' (no title anywhere).
+  /// stray second title) and 'MissingTitle' (no title anywhere).
   TitleBelowHome {
     home     : crate::types::misc::SkgrepoName,
     title_at : crate::types::misc::SkgrepoName,

@@ -400,7 +400,7 @@ pub(crate) fn emit_telescope_warnings (
 /// hidesFromSubs, overrides).
 ///
 /// 'deleted_id_set' includes both the primary pid of each delete
-/// AND the extra_ids of that node from the in-Rust graph.
+/// and the extra_ids of that node from the in-Rust graph.
 /// Referencers may have stored any of those ids (the graph resolves
 /// aliases to their primary IDs, but the on-disk
 /// list is whatever the buffer that wrote it had); we want all of
@@ -408,7 +408,7 @@ pub(crate) fn emit_telescope_warnings (
 ///
 /// Skipped fields:
 /// - extra_ids of referencers: per the data model, an id can only
-///   be an extra_id of ONE node, so a referencer cannot legitimately
+///   be an extra_id of one node, so a referencer cannot legitimately
 ///   carry a deleted node's id in its extra_ids.
 /// - linksTo: lives in body text; stripping requires body
 ///   rewriting. Dangling link targets render as PhantomUnknown
@@ -603,7 +603,7 @@ pub(crate) fn prepare_fs_update (
   // Repo moves need no file relocation of their own anymore: the
   // telescope write above places every section in its skgrepo and
   // sweeps owned sections whose skgrepo lost its last member. An
-  // explicit old-path delete here would even be WRONG for a
+  // explicit old-path delete here would even be wrong for a
   // private->public home skgrepo move, where the old (more private) skgrepo
   // legitimately retains a section holding the node's private
   // memberships. (repo_moves still matter to Tantivy, handled elsewhere.)

@@ -208,7 +208,7 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
 /// minting a new clone. Returns the first such overrider (monogamy
 /// guarantees at most one in a valid graph). 'overridden' may be a
 /// primary or extra id; it is resolved to a pid first, matching how the
-/// graph and override relationships resolve. Read against the LIVE graph before
+/// graph and override relationships resolve. Read against the live graph before
 /// the save, so a fork of an already-forked node is rejected with a
 /// helpful "you already forked this; your clone is X" rather than the
 /// raw MultipleOwnedOverriders crash at skgsave-commit.

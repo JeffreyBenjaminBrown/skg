@@ -2,7 +2,7 @@
 /// instruction collection (the glossary's "local fieldIntent collection").
 /// .
 /// The traversal is one recursive DFS preorder over the placed
-/// viewforest. Recursion is UNCONDITIONAL: every node's children are
+/// viewforest. Recursion is unconditional: every node's children are
 /// visited, whatever the node's kind, because the user can attach
 /// independent nodes anywhere. Only emission is conditional, on the
 /// pair (kind, context). Each visit reads the node and its direct
@@ -10,7 +10,7 @@
 /// fieldIntent emission needs from above arrives in its
 /// 'LocalContext'.
 /// .
-/// The traversal ASSUMES that 'find_buffer_errors_for_saving' has
+/// The traversal assumes that 'find_buffer_errors_for_saving' has
 /// passed. In particular it assumes that:
 /// - every vognode has a PID and a config-valid skgrepo;
 /// - each ID has at most one editable instance
@@ -372,9 +372,9 @@ fn visit_overridden_folder (
     &LocalContext::UnderVognode { parent_if_editable : None },
     collected) }
 
-/// As 'dedup_vector', but dedups members carrying skgrepos by ID ALONE
+/// As 'dedup_vector', but dedups members carrying skgrepos by ID alone
 /// (first occurrence wins) rather than by the full (ID, skgrepo) pair: a
-/// duplicate ID with a DIFFERENT skgrepo request must still
+/// duplicate ID with a different skgrepo request must still
 /// be silently dropped, matching the existing defining-folder dedup
 /// policy ("duplicate defining-folder members are silently deduped").
 fn dedup_members_by_skgid (
@@ -393,7 +393,7 @@ fn dedup_members_by_skgid (
 /// first-occurrence order. Each member is paired with its headline's
 /// explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'FieldIntent').  (Restricted
-/// children are NOT members here: the overriddenFolder omits restricted
+/// children are not members here: the overriddenFolder omits restricted
 /// members from display, and the set-difference merge preserves
 /// them at save; see the API doc's "Restricted-skgrepo nodes".)
 fn partnerFolder_members (
@@ -445,7 +445,7 @@ fn subscribeeFolder_members (
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'FieldIntent').
 ///
-/// Restricted children contribute NOTHING here: a restricted node emits
+/// Restricted children contribute nothing here: a restricted node emits
 /// no save intention for its container. Its membership in the
 /// container's contains is owned entirely by disk supplementation
 /// ('preserve_invisible_members' -> weave in from_text/weave.rs),

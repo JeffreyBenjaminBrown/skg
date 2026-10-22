@@ -47,12 +47,12 @@ pub struct SkgrepoDiff {
 #[derive(Debug, Clone)]
 pub struct GraphnodeDiff {
   pub status: GitDiffStatus,
-  /// The "before" state of this stage: HEAD for staged, INDEX for
+  /// The "before" state of this stage: HEAD for staged, index for
   /// unstaged. Populated only for Deleted status; read by
   /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
   /// Name reflects the stage's baseline rather than always-HEAD.
   pub before_node: Option<Graphnode>,
-  /// The "after" state of this stage: INDEX for staged, worktree for
+  /// The "after" state of this stage: index for staged, worktree for
   /// unstaged. Populated only for Added status; used for unindexed
   /// titles of new files.
   pub after_node: Option<Graphnode>,

@@ -380,7 +380,7 @@ fn rerender_collateral_view (
     viewforest,
   }) }
 
-/// Build a DE-NOVO (initial) content view by running the ONE
+/// Build a de-novo (initial) content view by running the single
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
 /// creates each fresh node's default PartnerFolders
@@ -398,14 +398,14 @@ pub fn render_initial_view (
   restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(ViewForest, Vec<String>), Box<dyn Error>> {
   // Build the stub roots. Its EditableMap is discarded: view completion below uses
-  // a FRESH one, so each root is a first occurrence (make_write-protected_if_repeat treats
+  // a fresh one, so each root is a first occurrence (make_write-protected_if_repeat treats
   // any pid already in the map as a repeat and would wrongly write-protect them).
   let mut stub_editable_map : EditableMap = EditableMap::new ();
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_skgids (
       root_skgids, &runtime . graph, &runtime . config, &mut stub_editable_map,
       restriction ) ?;
-  // De-novo (and ONLY de-novo) asks each view-root for its containerward
+  // De-novo (and only de-novo) asks each view-root for its containerward
   // ancestry, as a self-consuming view request. The during-completion dispatch
   // leaves view-root Containerward alone (extract_view_requests); finish_viewforest
   // fulfills it via the ContainerwardRoleTree attach and drops it. So root containerward is
@@ -426,7 +426,7 @@ pub fn render_initial_view (
     runtime, &graph_snap, &mut editable_map, &mut errors, restriction,
     &mut sink );
   complete_viewforest ( &mut viewforest, &mut context ) ?;
-  // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
+  // De-novo rendering repairs silently: the sink's ColRepairs do not
   // correspond to edits the user just made, so a fresh view carries no
   // completion warnings.
   drop (sink);
@@ -584,14 +584,14 @@ pub fn rerender_view (
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
 
-/// The shared post-completion tail for BOTH render paths: the de-novo
+/// The shared post-completion tail for both render paths: the de-novo
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose UnrestrictedVognode
 /// content has already been completed, it:
-///   - fulfills a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-ROOT (only de-novo
+///   - fulfills a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-root (only de-novo
 ///     sets it; see render_initial_view), building that root's
 ///     containerward role tree and dropping the request. This is data-driven:
-///     post-save roots come from the saved buffer WITHOUT the request, so a save
+///     post-save roots come from the saved buffer without the request, so a save
 ///     never re-generates the containerward (it round-trips as ordinary content).
 ///   - marks view-root and orphan affectsParent,
 ///   - validates affectsParent against the captured graph (the de-novo path could
@@ -714,15 +714,15 @@ fn remove_id_folders (
       } else { Ok (true) } } ) ?;
   Ok (( )) }
 
-/// Fulfill a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-ROOT: attach that
-/// root's full containerward role tree as its first children, then DROP the
+/// Fulfill a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-root: attach that
+/// root's full containerward role tree as its first children, then drop the
 /// request so it does not round-trip into the saved buffer (a later save must not
 /// re-generate the containerward -- it round-trips as ordinary content instead).
 ///
 /// Only the de-novo render sets this request (render_initial_view), so
 /// this is a no-op post-save. The during-completion view-request dispatch
 /// deliberately leaves view-root Containerward alone (extract_view_requests) so it
-/// reaches here: this ContainerwardRoleTree-based attach builds a SEPARATE containerward
+/// reaches here: this ContainerwardRoleTree-based attach builds a separate containerward
 /// subtree and handles a cyclic root, whereas the dispatch's
 /// build_and_integrate_containerward would merge it into existing content and
 /// panic on a cyclic root (one whose containerward path cycles back to the root,

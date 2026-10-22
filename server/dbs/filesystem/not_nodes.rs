@@ -51,7 +51,7 @@ fn skgrepo_order_from_toml (
 /// '[[repo_sets]]' would silently mean something else than its
 /// author intended, so its presence is a hard error. Likewise
 /// 'user_owns_it': ownership is now derived from the skgrepo's path
-/// (under 'owned_folder' = owned), and serde would silently IGNORE
+/// (under 'owned_folder' = owned), and serde would silently ignore
 /// the unknown key -- a silent ownership flip -- so it too is a hard
 /// error.
 fn reject_retired_config_keys (
@@ -77,7 +77,7 @@ fn reject_retired_config_keys (
   if has_skgrepo_sets {
     return Err ( concat! (
       "This config defines [[repo_sets]], a retired mechanism. ",
-      "Repo-sets are now the PREFIXES of the [[repos]] order: ",
+      "Repo-sets are now the prefixes of the [[repos]] order: ",
       "list your repos most-public-first, and select a set by ",
       "naming the most private repo to make available (or 'all'). ",
       "See docs/telescopes.org, \"The privacy order\". ",
@@ -104,9 +104,9 @@ fn reject_retired_config_keys (
       "docs/telescopes.org, \"The privacy order\"." ) . into () ); }
   Ok (( )) }
 
-/// Fills the DERIVED parts of each skgrepo. Must run AFTER
+/// Fills the derived parts of each skgrepo. Must run after
 /// 'make_paths_absolute' (so 'data_root' and absolute paths exist),
-/// with 'raw_paths' captured from the skgrepos BEFORE it:
+/// with 'raw_paths' captured from the skgrepos before it:
 /// - 'owned': true iff the skgrepo's absolute path sits under
 ///   DATA_ROOT/OWNED_FOLDER (the author-folder layout: the user's
 ///   own author folder holds exactly the owned skgrepos).

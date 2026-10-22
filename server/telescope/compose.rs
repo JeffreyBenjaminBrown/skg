@@ -1,8 +1,8 @@
-//! The COMPOSITION: sections (per-repo slices, most public first) -> the
+//! The composition: sections (per-repo slices, most public first) -> the
 //! node's effective lists of relation partners. Total and deterministic: junk
 //! degrades to 'CompositionWarning's, never errors (see types.rs).
 //!
-//! Semantics, per ordered relation: the composition THROUGH skgrepo k is
+//! Semantics, per ordered relation: the composition through skgrepo k is
 //! exactly what a repo-k viewer sees. The most public section
 //! mentioning the relation contributes the base list; each more
 //! private section's prepend lands at the front, and each of its
@@ -34,7 +34,7 @@ pub struct ComposedNode {
   pub body                         : Option<String>,
   pub body_skgrepo                 : Option<SkgrepoName>,
   pub home                         : Option<SkgrepoName>,
-  // None = NO section mentioned the field (lowers to
+  // None = no section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
   // Graphnode's.
   pub aliases                      : Option<Vec<RelPartner<String>>>,
@@ -44,14 +44,14 @@ pub struct ComposedNode {
   pub overrides                    : Option<Vec<RelPartner<ID>>>,
 }
 
-/// THE compose entry point: one telescope on disk -> the effective
+/// The compose entry point: one telescope on disk -> the effective
 /// node, plus whatever the composition complained about. 'resolve' maps
 /// extra ids to pids for anchor resolution and must be built from
 /// the whole corpus, not just this telescope (else a nodeMerge can
 /// dangle an anchor).
 ///
 /// Errors only when no section anywhere carries a title. A title
-/// present but BELOW the home composes fine, carrying a
+/// present but below the home composes fine, carrying a
 /// 'TitleBelowHome' warning.
 pub fn compose_telescope_collecting_warnings (
   telescope : Telescope,
@@ -88,7 +88,7 @@ pub fn compose_telescope (
 /// The compose as a Graphnode. None iff the telescope has no
 /// sections at all, or no section carried a title anywhere -- the
 /// caller decides whether that is a hard load error (it is, at
-/// init) or a warning. A title present but BELOW the home is not
+/// init) or a warning. A title present but below the home is not
 /// such a case: it composes, carrying a 'TitleBelowHome' warning.
 pub fn graphnode_from_composition (
   pid       : ID,
@@ -124,7 +124,7 @@ pub fn graphnode_from_composition (
     overrides                    : msv ( composed . overrides ),
     flags, } ) }
 
-/// Compose SECTIONS (already sorted most public first -- the caller
+/// Compose sections (already sorted most public first -- the caller
 /// orders them via 'SkgConfig::ordered_skgrepos') into effective
 /// lists. 'resolve' maps any ID to its primary ID ('pid_of');
 /// anchors and members are compared through it.

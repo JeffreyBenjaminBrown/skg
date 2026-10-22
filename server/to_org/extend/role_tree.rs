@@ -112,10 +112,10 @@ pub fn build_and_integrate_role_tree_then_drop_request (
     errors, result ) }
 
 /// Build the role tree for one partner 'role', and -- for every role
-/// EXCEPT the container role -- attach each grafted partner's
+/// except the container role -- attach each grafted partner's
 /// containerward role tree beneath it, so the partner is shown in its
 /// own container context (as mentionerward has always done for link
-/// skgrepos). The container role itself IS that role tree, so it does not
+/// skgrepos). The container role itself is that role tree, so it does not
 /// re-attach.
 pub fn build_and_integrate_role_tree_with_skgrepo_set (
   tree      : &mut Tree<Viewnode>,
@@ -177,7 +177,7 @@ pub fn build_and_integrate_mentionerward_role_tree (
 /// this will generate a path at each branch.
 /// Otherwise it will only generate one path.
 ///
-/// RETURNS the deduplicated set of pids that appear anywhere in
+/// Returns the deduplicated set of pids that appear anywhere in
 /// the integrated paths (including branches and cycle nodes).
 /// Mentionerward callers use this to fetch role trees for each
 /// link skgrepo; containerward callers can ignore it.
@@ -533,7 +533,7 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
       { if ! restriction . contains_skgrepo (&skgrepo)
         { return Ok (None); }} }
     // relRepo gating ('docs/telescopes.org', "What lives where"): the partner
-    // NODE's skgrepo (above) is not enough -- the RELATIONSHIP grafting it
+    // node's skgrepo (above) is not enough -- the relationship grafting it
     // here can be recorded in a more private skgrepo than either
     // endpoint's home (a private reading-list membership between two
     // public nodes). 'birth' names the role the partner plays toward
@@ -556,11 +556,11 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
 
 /// The relRepo of the relationship grafting 'partner' at role tree role 'role'
 /// toward 'origin' (the node the partner is being attached under).
-/// 'role' names the role the PARTNER plays (per RelationRole's doc:
-/// "output_role is THIS (partner) role") -- the inverse of
+/// 'role' names the role the partner plays (per RelationRole's doc:
+/// "output_role is this (partner) role") -- the inverse of
 /// 'other_member_pids_gated's convention, where the role belongs to
 /// the node asking the question. When the partner plays the relation's
-/// FIRST position (e.g. CONTAINER), the partner owns the relationship (an
+/// first position (e.g. CONTAINER), the partner owns the relationship (an
 /// inbound partner of origin, in the "someone else's outbound list
 /// names me" sense); otherwise origin owns it.
 fn role_graft_relRepo (

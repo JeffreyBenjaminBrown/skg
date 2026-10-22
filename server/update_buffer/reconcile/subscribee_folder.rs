@@ -52,7 +52,7 @@ pub fn reconcile_subscribeeFolder_children (
       context . worktree_subscribees . clone (), skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
 
-  // An exception to the prune sweep ('prune_self_deletable_when_empty'): an *empty* SubscribeeFolder is PRESERVED, not
+  // An exception to the prune sweep ('prune_self_deletable_when_empty'): an *empty* SubscribeeFolder is preserved, not
   // self-deleted. It is the editable interface onto the origin's outgoing
   // subscriptions; if it vanished when emptied, the user would lose the place
   // to add one back. (A SubscribeeFolder is only *created* when subscribesTo is
@@ -61,16 +61,16 @@ pub fn reconcile_subscribeeFolder_children (
   // headline so the user can re-add.) Its children still reconcile to empty
   // below, and the HiddenOutsideOfSubscribeeFolder is still ensured last.
   //
-  // The subscribeeFolder's children ALWAYS reconcile from the graph -- like every
+  // The subscribeeFolder's children always reconcile from the graph -- like every
   // other PartnerFolder (reconcile_partnerFolder_children is unconditional). A
   // generated folder states "these nodes stand in this relationship to the
   // recorder" and must not lie, including in the saved view: reconciliation runs
-  // strictly AFTER extraction and the graph update, so the graph already holds
+  // strictly after extraction and the graph update, so the graph already holds
   // the user's just-saved subscriptions and reconciling reproduces them rather
-  // than clobbering them. This also refreshes a EDITABLE subscriber's
+  // than clobbering them. This also refreshes a editable subscriber's
   // subscribeeFolder during a collateral rerender, which would otherwise
   // go stale.
-  { // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
+  { // The node budget: a folder fills its members whole and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it extended, so adding all
     // its subscribees here costs nothing and never truncates the group.
     let goal_items : Vec<FolderGoalItem> =
@@ -111,7 +111,7 @@ fn read_subscribeeFolder_context (
     . ok_or ("reconcile_subscribeeFolder_children: parent is not an UnrestrictedVognode") ?;
   let worktree_members : Vec<RelPartner<ID>> =
     // relRepo gating ('docs/telescopes.org', "What lives where"): this is the
-    // RECORDER's own outbound list (like 'contains' in
+    // recorder's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
     // restricted level must not appear here even though the
     // subscribee node itself may be unrestricted.

@@ -1,8 +1,8 @@
-/// Fulfill a '(viewRequests (folder RELNAME))' request: build BOTH folders of
+/// Fulfill a '(viewRequests (folder RELNAME))' request: build both folders of
 /// the relation (one, for 'containers' and 'mentioners', whose other side
-/// is the node's content or its links), each POPULATED from the graph, reusing the de-novo
-/// PartnerFolder generators. The EDITABLE folder of the relation is created
-/// even when empty (its editable "add here" surface); the WRITE-PROTECTED
+/// is the node's content or its links), each populated from the graph, reusing the de-novo
+/// PartnerFolder generators. The editable folder of the relation is created
+/// even when empty (its editable "add here" surface); the write-protected
 /// folders are built only when populated (an empty write-protected
 /// folder is pruned by 'is_self_deletable_when_empty').
 ///

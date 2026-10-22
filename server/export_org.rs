@@ -299,17 +299,17 @@ fn write_export_file (
 
 /// Returns (root_pid -> ExportRoot, set of marker child pids).
 ///
-/// A MARKER is a node whose title links to EXPORT_MARKER_ID AND
+/// A marker is a node whose title links to EXPORT_MARKER_ID and
 /// whose body yields a `target_filepath` -- the precise definition
 /// from the spec. A node that merely links to the instruction node
-/// in its title for documentation (no target_filepath) is NOT a
+/// in its title for documentation (no target_filepath) is not a
 /// marker: it renders as ordinary content. Marker pids are excluded
 /// from rendered content; a node whose title links to the
 /// instruction node but whose target_filepath is malformed is also
 /// excluded (it is a broken marker, not content) and warned about,
 /// but does not mark a parent for export.
 ///
-/// A node is an export ROOT iff one of its `contains` children (in
+/// A node is an export root iff one of its `contains` children (in
 /// order) is a marker; that child's target_filepath is the file.
 fn discover_roots (
   nodes        : &[Graphnode],
@@ -443,7 +443,7 @@ fn parse_target_filepath (
 /// event stream rendered (and used to build homes). Iterative (an
 /// explicit stack), so an arbitrarily deep outline cannot overflow
 /// the call stack. A monotonic per-file `rendered` set means each
-/// node's content is exported at most ONCE per file: a node reached again
+/// node's content is exported at most once per file: a node reached again
 /// (whether as a diamond's later branch or as a cycle back to an
 /// ancestor) becomes a LinkLeaf to its home rather than having
 /// its content exported again -- so a wide DAG cannot blow up and content is not
@@ -475,7 +475,7 @@ fn collect_events (
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
-      if ! relRepo_is_unrestricted (member, restriction) { continue; } // the RELATIONSHIP's
+      if ! relRepo_is_unrestricted (member, restriction) { continue; } // the relationship's
         // skgrepo is restricted: the visible composition omits it, even when
         // the child's home is unrestricted.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
@@ -746,7 +746,7 @@ fn node_unrestricted (
 ) -> bool {
   restriction . is_all () || restriction . contains_skgrepo (&node . home_skgrepo) }
 
-/// Whether an RELATIONSHIP is visible under the skgrepo restriction: its recorded
+/// Whether an relationship is visible under the skgrepo restriction: its recorded
 /// relRepo must be unrestricted. (The visible composition = unrestricted
 /// sections' lists only.)
 fn relRepo_is_unrestricted (

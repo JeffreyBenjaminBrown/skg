@@ -71,7 +71,7 @@ pub fn import_org_roam_directory (
       node . home_skgrepo = skgrepo . clone();
       { // Re-tag the parse-time placeholder skgrepos with the real
         // skgrepo, so the skgrepos are honest even before the FS
-        // boundary drops them (see RelPartner's INTERIM note).
+        // boundary drops them (see RelPartner's interim note).
         for m in node . contains . iter_mut () {
           m . relRepo = skgrepo . clone (); }
         node . aliases = rel_partners_at_relRepo_msv (
@@ -142,7 +142,7 @@ fn merge_into_existing (
   if ! existing . flags . contains (&Flag::Was_Overloaded) {
     existing . flags . push (Flag::Was_Overloaded); }
   { // Merge contents. New members are tagged with the owning
-    // (existing) node's skgrepo; DEGENERATE (see RelPartner).
+    // (existing) node's skgrepo; degenerate (see RelPartner).
     for child in &newcomer . contains {
       let child_skgid : &ID = & child . member;
       if ! existing . contains . iter ()
@@ -162,7 +162,7 @@ fn merge_into_existing (
       existing . body . get_or_insert_with (String::new);
     body . push_str (&appendage); }
   { // Merge aliases. New members are tagged with the owning
-    // (existing) node's skgrepo; DEGENERATE (see RelPartner).
+    // (existing) node's skgrepo; degenerate (see RelPartner).
     let newcomer_aliases : MSV<String> = members_msv (&newcomer . aliases);
     let new_aliases : &[String] = newcomer_aliases . or_default();
     if ! new_aliases . is_empty() {

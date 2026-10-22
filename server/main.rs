@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok (( )) },
       Err (e) => die_bad_config (&config_path, e) }; }
 
-  // The real server start. load_config runs on EVERY launch -- via
+  // The real server start. load_config runs on every launch -- via
   // start-servers.sh, a cargo-watch auto-restart, or a manual
   // 'cargo run' -- so routing its failure through 'die_bad_config'
   // guarantees a bad skgconfig.toml is reported clearly (in red on a

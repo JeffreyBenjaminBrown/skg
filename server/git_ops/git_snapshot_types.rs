@@ -11,6 +11,6 @@ pub enum GitSnapshotKind {
 
 #[derive(Clone, Debug, Default)]
 pub struct GraphSnapshot {
-  /// One entry per TELESCOPE (keyed by pid, sections folded).
+  /// One entry per telescope (keyed by pid, sections folded).
   pub nodes     : HashMap<ID, Graphnode>,
 }

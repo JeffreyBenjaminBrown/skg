@@ -137,7 +137,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
 ///   title text, which the server discards: folder headlines are
 ///   titleless server-side (heralds supply their labels), so any
 ///   text there is a user edit that cannot be saved. Property leaves
-///   are exempt -- their title IS their data.
+///   are exempt -- their title is their data.
 pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,
   title    : String,
@@ -728,7 +728,7 @@ fn parse_unknownnode_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
-/// Parse the LEGACY list form '(restrictedNode ...)'. The server now
+/// Parse the legacy list form '(restrictedNode ...)'. The server now
 /// emits the bare atom 'restrictedNode' (handled in the atom arm), but an
 /// older server's field-bearing list form is tolerated here -- its
 /// children (id/repo/membership/overridesHere) are discarded -- so a
@@ -836,7 +836,7 @@ fn parse_viewstats_sexp (
         match key . as_str () {
           "homeRepoHerald" => {}, // output-only, silently discard
           "overridesHere" => {
-            // LOAD-BEARING, unlike the other view stats: save
+            // Load-bearing, unlike the other view stats: save
             // extraction round-trips the original ID through it.
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
