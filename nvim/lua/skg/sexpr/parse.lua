@@ -5,13 +5,13 @@
 --
 -- The grammar matched here is pinned by the two peers, not by full
 -- elisp:
--- - what the server EMITS: 'quote_sexp_string' (server/sexp_string.rs)
+-- - what the server emits: 'quote_sexp_string' (server/sexp_string.rs)
 --   escapes only backslash and double-quote inside strings; bare atoms
 --   may contain any non-delimiter bytes (e.g. the homeRepoHerald atom
 --   '⌂:public'); counts are bare integers; dotted notation appears in
 --   a few responses (busy-initializing, titles-by-ids).
--- - what the server PARSES: the Rust 'sexp' crate (Cargo.toml), which
---   has strings, integers, floats, symbols and lists -- NO comment
+-- - what the server parses: the Rust 'sexp' crate (Cargo.toml), which
+--   has strings, integers, floats, symbols and lists -- no comment
 --   syntax and no quote ('x) syntax. Accordingly this reader treats
 --   ';' and "'" as ordinary atom characters. (Emacs 'read' would not,
 --   but nothing on the wire contains them outside strings.)

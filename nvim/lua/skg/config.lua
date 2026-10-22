@@ -62,7 +62,7 @@ function M.owned_folder_from_toml (file)
   return 'owned'
 end
 
----Names of the OWNED skgrepos in FILE, in declaration order. A skgrepo
+---Names of the owned skgrepos in FILE, in declaration order. A skgrepo
 ---is owned iff its path (resolved against FILE's directory, the data
 ---root) sits under the data root's owned_folder (default 'owned') --
 ---the author-folder layout, mirroring the server's rule. A skgrepo

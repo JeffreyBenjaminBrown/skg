@@ -218,7 +218,7 @@ describe('skg.metadata commands', function ()
       '** (skg (node (id e) (repo private) writeProtected)) e',
       '*** (skg (node (id f) (repo private))) f' }, '\n'))
     local notices = notices_of_set_repo('public', true)
-    assert.is_true(some_notice_matches(notices, 'NOT changed', ': e',
+    assert.is_true(some_notice_matches(notices, 'not changed', ': e',
                                        'refuse'))
     assert.is_true(some_notice_matches(notices, 'WARNING', ':messages',
                                        'refuse'))
@@ -240,7 +240,7 @@ describe('skg.metadata commands', function ()
       '*** (skg (node (id x) (repo private) writeProtected)) x again' },
       '\n'))
     local notices = notices_of_set_repo('trusted', true)
-    assert.is_false(some_notice_matches(notices, 'NOT changed'))
+    assert.is_false(some_notice_matches(notices, 'not changed'))
     assert.is_false(some_notice_matches(notices, 'WARNING'))
     assert.is_true(subtree_p(metadata.metadata_sexp_at_line_or_nil(3),
       '(skg (node (id x) (repo trusted)))'))

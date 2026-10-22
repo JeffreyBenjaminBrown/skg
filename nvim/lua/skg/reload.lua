@@ -18,7 +18,7 @@
 -- of the session. The reload error itself still propagates.
 --
 -- One deliberate deviation from elisp: the open TCP connection is
--- CLOSED before the module holding it is discarded. (Emacs keeps the
+-- closed before the module holding it is discarded. (Emacs keeps the
 -- process object alive in its global process list even after the
 -- variable naming it is unbound; a dropped Lua uv handle would instead
 -- linger open until garbage collection, invisibly.) The client

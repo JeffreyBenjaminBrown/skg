@@ -19,7 +19,7 @@
 -- - Body text in org is discarded (hence "roughly" bijective).
 -- - Multi-word headlines become symbols with spaces (constructed
 --   programmatically; such symbols cannot round-trip through the
---   sexp READER, but the edit-buffer pipeline never needs them to).
+--   sexp reader, but the edit-buffer pipeline never needs them to).
 -- - Childless non-root headlines become bare atoms, not lists.
 --
 -- ENTRY POINTS: sexp_to_org, org_to_sexp.

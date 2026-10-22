@@ -67,7 +67,7 @@ Returns a list of (start end id-string) triples."
 
 (defun skg-readable-ids--annotate-buffer ()
   "Clear overlays, scan for IDs, shorten their display, annotate
-from the session title cache, and request only the UNCACHED titles
+from the session title cache, and request only the uncached titles
 from the server. When every ID is cached (the common case after
 the first scan -- e.g. on each magit refresh a staging event
 triggers), no request is sent."

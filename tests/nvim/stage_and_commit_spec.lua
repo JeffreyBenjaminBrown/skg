@@ -115,7 +115,7 @@ describe('skg stage and commit', function ()
     vim.wait(3000, function ()
       return #prompts == 2 and lock.stream_in_progress == nil end, 10)
     assert.are.equal(
-      'COMMIT READY. All 3 of 3 changed files are ready.'
+      'Commit ready. All 3 of 3 changed files are ready.'
       .. ' Staged already, so committed too: /data/public (notes.txt, a b.skg).'
       .. ' Type yes to commit anyway: ',
       prompts[2])

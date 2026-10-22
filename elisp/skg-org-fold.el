@@ -51,9 +51,9 @@ with a message, unless its children need to be revealed."
 Restore the user's fold state from per-headline metadata atoms.
 .
 Two atoms are recognised:
-- 'folded'      : THIS headline is hidden inside a folded ancestor.
+- 'folded'      : this headline is hidden inside a folded ancestor.
                   We restore that by folding its parent's subtree.
-- 'bodyFolded'  : THIS headline is visible but its body is hidden
+- 'bodyFolded'  : this headline is visible but its body is hidden
                   (e.g. via `org-fold-hide-entry'). We restore that
                   by hiding this headline's entry directly.
 .
@@ -176,7 +176,7 @@ already covered by the ancestor's subtree fold."
 Operationally:
 - The first line after this headline must exist, must not itself be
   a headline, and must be invisible.
-- AND the next headline in the buffer (this headline's first child
+- and the next headline in the buffer (this headline's first child
   or its next sibling) must be visible — or absent. If the next
   headline is also hidden, the body's hiddenness is a consequence of
   this headline's subtree being folded, which the existing `folded'

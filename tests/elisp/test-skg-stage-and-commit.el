@@ -88,7 +88,7 @@ when every changed file is ready; \"yes\" resends confirmed."
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
      (should (equal (car (funcall prompts))
-                    "COMMIT READY. All 3 of 3 changed files are ready. Staged already, so committed too: /data/public (notes.txt, a b.skg); /data/private (c.skg). Type yes to commit anyway: "))
+                    "Commit ready. All 3 of 3 changed files are ready. Staged already, so committed too: /data/public (notes.txt, a b.skg); /data/private (c.skg). Type yes to commit anyway: "))
      (funcall skg--rerender-after-empty-stream)
      (should (string-match-p (regexp-quote "(confirmed . t)")
                              (car (funcall sent)))))))

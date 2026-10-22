@@ -33,7 +33,7 @@ and hide INTERNAL from M-x completion."
   (global-set-key (kbd "C-c f RET") #'skg-search)
   (global-set-key (kbd "C-c f i")   #'skg-search-interactive)
   (global-set-key (kbd "C-c f l")   #'skg-search-make-link)
-  (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from ANY buffer: it only reads a typed/pasted ID.
+  (global-set-key (kbd "C-c g i")   #'skg-goto-by-id) ;; Global because it works from any buffer: it only reads a typed/pasted ID.
   (global-set-key (kbd "C-c v l")   #'skg-restrict-repo-set))
 
 (with-eval-after-load 'magit ;; Magit
@@ -68,7 +68,7 @@ and hide INTERNAL from M-x completion."
 ;; the keymap object identity captured by `define-derived-mode' /
 ;; `define-minor-mode' while ensuring that new bindings added to
 ;; this file take effect on reload. A naive `(defvar MAP (let ((m
-;; (make-sparse-keymap))) …bindings… m))' does NOT re-run its
+;; (make-sparse-keymap))) …bindings… m))' does not re-run its
 ;; initialiser on a second load, so edits to the bindings would
 ;; silently do nothing.
 
@@ -118,7 +118,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
     (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
-  (progn;; show FOLDERS (C-c l) and PATHS (C-c p): request a local
+  (progn;; show folders (C-c l) and paths (C-c p): request a local
     ;; view change the server fulfills on save. Each command auto-saves.
     (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)
     (define-key map (kbd "C-c l o") #'skg-show-folderOf-overrides)

@@ -13,7 +13,7 @@
 With a prefix argument RECURSIVE, also mark every unrestrictedNode
 viewdescendant (equivalent to `skg-delete-recursive').
 Edits the metadata to include `delete` in the `editRequest` section.
-Does NOT save; call `skg-request-save-buffer' afterward."
+Does not save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if recursive
       (skg-delete-recursive)
@@ -24,7 +24,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 (defun skg-delete-recursive ()
   "Mark the headline at point, and every unrestrictedNode viewdescendant of it,
 for deletion. Descendent headlines that are not unrestrictedNodes (phantoms,
-aliasFolder, id-folder, etc.) are skipped. Does NOT save;
+aliasFolder, id-folder, etc.) are skipped. Does not save;
 call `skg-request-save-buffer' afterward."
   (interactive)
   (unless (org-at-heading-p)
@@ -138,11 +138,11 @@ at their old, more private repos come back for review before anything
 is written (see `skg--strandeds-confirmation-handler'), and those it would
 leave more public than a node's new home are raised automatically.
 
-Write-protected occurrences are NOT changed -- the save would refuse
+Write-protected occurrences are not changed -- the save would refuse
 their repo edits -- and produce a loud warning, with the
 full ID list in *Messages*.
 
-Does NOT save; call `skg-request-save-buffer' afterward."
+Does not save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if (skg--headline-metadata-empty-p)
       (skg--populate-minimal-node-metadata)
@@ -161,7 +161,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 This is the recursive form of `skg-set-repo': it changes every
 content-descendent whose repo matches the repo at point.
 Only descendents for which affectsParent=true are traversed.
-Does NOT save; call `skg-request-save-buffer' afterward."
+Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-repo t))
 
@@ -177,7 +177,7 @@ when write-protected occurrences were skipped."
          (changed-count (car change-result))
          (write-protected-skgids (cdr change-result)))
     (dolist (skgid write-protected-skgids)
-      (message "skg-set-repo: write-protected occurrence NOT changed (the save would refuse its edit): %s"
+      (message "skg-set-repo: write-protected occurrence not changed (the save would refuse its edit): %s"
                skgid))
     (message "%s"
              (concat
@@ -185,7 +185,7 @@ when write-protected occurrences were skipped."
                       old-skgrepo new-skgrepo changed-count
                       (if (= changed-count 1) "" "s"))
               (when write-protected-skgids
-                (format "  WARNING: %d write-protected node%s NOT changed -- the save would refuse their edits. See *Messages* for the ID list."
+                (format "  WARNING: %d write-protected node%s not changed -- the save would refuse their edits. See *Messages* for the ID list."
                         (length write-protected-skgids)
                         (if (= (length write-protected-skgids) 1) "" "s")))))))
 
@@ -213,7 +213,7 @@ be meaningless.")
 (defconst skg--writable-folder-relations
   '((subscribeeFolder . "subscribesTo")
     (overriddenFolder . "overrides"))
-  "The PartnerFolder atoms whose members' relationships are WRITABLE
+  "The PartnerFolder atoms whose members' relationships are writable
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The folder's viewparent (the anchor) owns the
@@ -336,9 +336,9 @@ server's save-time floor check backstops any stale offer)."
 
 (defconst skg--relRepo-no-override
   "(no override: follow sticky-else-default)"
-  "The menu entry that REMOVES the pending `(editRequest (relRepo ...))' request instead of
-setting one. For an relationship already on disk this means the SAVED repo
-survives (sticky); it does NOT mean \"reset to the default\". To
+  "The menu entry that removes the pending `(editRequest (relRepo ...))' request instead of
+setting one. For an relationship already on disk this means the saved repo
+survives (sticky); it does not mean \"reset to the default\". To
 lower an relationship's privacy to its default, choose the default relRepo
 explicitly.")
 
@@ -385,7 +385,7 @@ next save will do with the relationship."
 
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
-     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The relationship belongs to the role graft's own contains list, wherever that list is shown editable; it cannot be set from the role graft's position.")
+     "The node would contain its view-parent -- the shape of a containerward role graft. The relationship belongs to the role graft's own contains list, wherever that list is shown editable; it cannot be set from the role graft's position.")
     ("content" content
      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child relationship.")
     ("mentioner" nil
@@ -436,14 +436,14 @@ subtree at point.
 
 First presents an org-menu of the schema's five node-node relations
 (level-1 headlines) and their roles (level-2 headlines); pick, with
-RET, the role the view-CHILDREN should play toward their
+RET, the role the view-children should play toward their
 view-parents. Only three roles are settable from the child's
 position: `content' (ordinary content), `subscribee' (a
 subscribeeFolder member) and `overridden' (an overriddenFolder member);
 RET on any other role explains why it cannot be set from there.
 
 Then prompts for a repo over the whole ladder, plus the
-no-override choice that instead REMOVES existing `(relRepo ...)'
+no-override choice that instead removes existing `(relRepo ...)'
 atoms. Unlike `skg-set-relRepo', no per-relationship default is
 fetched: the subtree's relationships have different defaults, so the save's
 floor check (see `apply_sticky_relRepos') is what validates each one.
@@ -457,7 +457,7 @@ collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
 Like other metadata edits, this only modifies the buffer; it does
-NOT save. Call `skg-request-save-buffer' afterward."
+not save. Call `skg-request-save-buffer' afterward."
   (interactive)
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
@@ -498,7 +498,7 @@ explains the refusal; q aborts."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert "# What kind of relationships to the view-parent should qualify?\n"
-                "# Each level-2 headline is a role the view-CHILD would play toward\n"
+                "# Each level-2 headline is a role the view-child would play toward\n"
                 "# its view-parent. RET on one picks it; q aborts.\n")
         (dolist (relation (skg--relationship-kind-menu-tree))
           (insert (format "* %s\n" (car relation)))
@@ -690,7 +690,7 @@ it carries one of the `skg--writable-folder-relations' atoms."
   "Prompt for ACQUIREE-ID-OR-LINK and mark the node at point to merge it.
 The command is run from the acquirer.  The prompt accepts either a
 bare ID or an org id link like [[id:ID][label]].
-Does NOT save; call `skg-request-save-buffer' afterward."
+Does not save; call `skg-request-save-buffer' afterward."
   (interactive
    (list (skg--read-id-or-link "Acquiree ID or link: ")))
   (let ((acquiree-skgid (skg--id-from-link-or-text acquiree-id-or-link)))
@@ -732,7 +732,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
-A write-protected occurrence is NOT edited -- the save would refuse
+A write-protected occurrence is not edited -- the save would refuse
 its repo edit -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about,
 unless the walk also changed that ID's editable occurrence: that one
@@ -1152,7 +1152,7 @@ except 'graphStats' and 'viewStats' which are already complete s-expressions."
     (stars metadata-sexp title)
   "Format a headline with STARS, METADATA-SEXP, and TITLE.
 METADATA-SEXP should be the complete (skg ...) s-expression,
-OR the empty string.
+or the empty string.
 Handles empty metadata correctly."
   (if (string-empty-p metadata-sexp)
       (format "%s(skg) %s" stars title)

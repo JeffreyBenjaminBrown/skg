@@ -32,7 +32,7 @@
 ;;; `skg-replace-links-with-labels' (see skg-id-search.el).
 
 (require 'skg-id-search)
-;; NOTE: deliberately NOT requiring skg-request-text-search here.
+;; NOTE: deliberately not requiring skg-request-text-search here.
 ;; skg-request-text-search requires skg-client, and skg-client requires
 ;; this file — a real require cycle. The symbols we touch from there
 ;; (`skg-search', `skg--search-buffer-setup-hook') are referenced only
@@ -76,14 +76,14 @@ this buffer at the position point currently has."
   ;; buffers are not file-visiting (their text comes from the
   ;; server, not from disk).
   ;;
-  ;; PITFALL: do NOT call `skg-request-save-buffer' here. See the
+  ;; PITFALL: do not call `skg-request-save-buffer' here. See the
   ;; commentary at the top of this file.
   (setq skg--link-from-search-pending
         (cons (current-buffer) (point)))
   (skg-search search-terms))
 
 (defun skg--maybe-activate-link-from-search-mode ()
-  "If a `skg-search-make-link' was pending, configure THIS buffer for it.
+  "If a `skg-search-make-link' was pending, configure this buffer for it.
 Called from `skg--display-search-phase1' immediately after the
 search buffer is set up. Sets the buffer-local target and turns
 on `skg-search-make-link-mode'; clears the pending var so a later

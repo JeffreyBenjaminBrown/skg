@@ -24,7 +24,7 @@ The server sends three LP messages around the save:
 All skg buffers are locked immediately.  The broad acknowledgement does not
 unlock client-only views; save-relax-lock is the first narrowing point.
 
-If the save edited any FOREIGN node, the server reads that as a request
+If the save edited any foreign node, the server reads that as a request
 to fork (clone) it and -- unless FORK-APPROVED is non-nil -- replies with
 a `fork-confirmation' message instead of `save-result', skgsave-committing
 nothing. `skg--fork-confirmation-handler' then shows the confirmation
@@ -98,8 +98,8 @@ reviewed the relationships a home skgrepo move strands (see
       ;; targets plus dirty conflict-check inputs. Buffers locked early that
       ;; are absent can unlock. The saved buffer stays
       ;; locked (skg--unlock-non-collateral-buffers keeps saved-view-id) until
-      ;; save-result. Registered NON-one-shot (like collateral-view) so it does
-      ;; NOT add to skg-lp--pending-count: an *invalid* save errors before the
+      ;; save-result. Registered non-one-shot (like collateral-view) so it does
+      ;; not add to skg-lp--pending-count: an *invalid* save errors before the
       ;; server reaches the point that emits save-relax-lock, so a one-shot
       ;; count would leak (never decremented) and hang the next save's wait.
       ;; save-result removes it.
@@ -118,9 +118,9 @@ reviewed the relationships a home skgrepo move strands (see
        (lambda (_tcp-proc payload)
          (skg--save-result-handler save-buffer payload))
        t)
-      ;; fork-confirmation: the ALTERNATIVE terminal message to
+      ;; fork-confirmation: the alternative terminal message to
       ;; save-result. The server sends exactly one of the two. Registered
-      ;; NON-one-shot (does NOT bump skg-lp--pending-count); whichever
+      ;; non-one-shot (does not bump skg-lp--pending-count); whichever
       ;; terminal handler fires removes the other (and the fork handler
       ;; decrements the count for the unfired save-result one-shot), so
       ;; the pending count balances either way.
@@ -372,7 +372,7 @@ Unlocks and updates the buffer for the given view ID."
   "Handle the full save-result LP message (tagged with response-type).
 Removes the collateral-view handler, unlocks all save-locked buffers,
 then processes the save response.
-Unlock must happen BEFORE `skg-handle-save-sexp' because
+Unlock must happen before `skg-handle-save-sexp' because
 `skg-replace-buffer-with-new-content' calls erase-buffer + insert,
 which would trigger overlay modification-hooks if still present."
   (setq skg-response-handler-map
@@ -414,7 +414,7 @@ forks. `skg-approve-fork' re-saves it (approved); `skg-decline-fork'
 leaves things untouched.")
 
 (defvar-local skg--fork-suppress-strip-on-kill nil
-  "When non-nil, `skg--fork-confirmation-on-kill' does NOT strip the
+  "When non-nil, `skg--fork-confirmation-on-kill' does not strip the
 source's fork atom. `skg-approve-fork' sets it before killing this
 buffer, because its re-save still needs the atom to skgsave-commit the fork.")
 
@@ -429,7 +429,7 @@ into a durable success/failure message.")
 
 (defun skg--fork-confirmation-on-kill ()
   "`kill-buffer-hook' for a fork-confirmation buffer: dismissing it
-WITHOUT approving strips the lingering (viewRequests fork) atom from the
+without approving strips the lingering (viewRequests fork) atom from the
 source buffer, so the next save does not silently re-fork. This covers
 killing the buffer directly (C-x k, q, etc.); `skg-decline-fork' already
 strips explicitly, and `skg-approve-fork' suppresses this (its re-save
@@ -514,13 +514,13 @@ Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
 
 (defun skg--fork-confirmation-handler (save-buffer payload &optional strandeds-review)
   "Handle a `fork-confirmation' LP message: the save edited foreign
-node(s) and was not pre-approved, so NOTHING was skgsave-committed. Show the
+node(s) and was not pre-approved, so nothing was skgsave-committed. Show the
 confirmation buffer (which lists the nodes that would be forked) and,
 interactively, prompt for any clone repo not yet specified, then ask
 whether to approve.
 
 Terminal, like `skg--save-result-handler': remove the streaming handlers
-AND the unfired save-result one-shot (decrementing the pending count for
+and the unfired save-result one-shot (decrementing the pending count for
 it), end the stream, and unlock. STRANDEDS-REVIEW is the review the save
 carried, which the approving re-save carries again."
   (setq skg-response-handler-map
@@ -547,7 +547,7 @@ carried, which the approving re-save carries again."
   (skg--unlock-all-save-locked)
   (let ((confirm-buf
          ;; The condition-case guards only response parsing/display.
-         ;; The interactive flow below runs OUTSIDE it: a refusal
+         ;; The interactive flow below runs outside it: a refusal
          ;; (user-error) from `skg-approve-fork' must reach the user,
          ;; not the log -- nesting it here used to swallow the
          ;; \"pick a repo first\" refusal, so approving with a
@@ -819,7 +819,7 @@ placeholder): no redundant ask."
 SAVE-BUFFER as its source, and return the buffer. The buffer is a
 navigable content view (so id-push / search work). It is editable so
 each clone's repo can be set (the handler's minibuffer prompts write
-into it; C-c s s on a clone-to-be works too), but it is NOT an ordinary
+into it; C-c s s on a clone-to-be works too), but it is not an ordinary
 save target: skg-view-id is left nil (tripping the nil-view-id save
 guard) and C-x C-s is rebound to refuse, because a stray normal save of
 its id-less clone-to-be parents would create bare nodes. Only C-c C-c
@@ -1028,7 +1028,7 @@ moves point to focused headline, and removes focus atom."
         (skg--inhibit-dirty-view-confirmation t))
     (erase-buffer)
     (insert new-content)
-    (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse
+    (;; PITFALL: `erase-buffer' does not remove overlays — they collapse
      ;; but persist at the buffer boundaries. Fold overlays left over
      ;; from the previous save cycle will re-expand over freshly inserted
      ;; text, making some headlines already folded here. We MUST unfold
@@ -1038,7 +1038,7 @@ moves point to focused headline, and removes focus atom."
      ;; cover the hidden subtree — clobbering the root.
      org-fold-show-all)
     (progn
-      ;; Process focus atom BEFORE fold atoms, while the buffer is
+      ;; Process focus atom before fold atoms, while the buffer is
       ;; guaranteed unfolded by the `org-fold-show-all' above.
       (skg-goto-focused-headline)
       (skg-remove-focused-metadata))

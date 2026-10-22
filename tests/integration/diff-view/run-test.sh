@@ -15,7 +15,7 @@
 #     view only counts).
 #
 # The client opens the diff view, marks everything commit-ready
-# through the gestures, sees "COMMIT READY", stages and commits, and
+# through the gestures, sees "Commit ready", stages and commits, and
 # sees the buffers keep their roots, which show no change any more. Then r's file is made to contain d again,
 # by hand; the client opens a view of r, where d is an unknown node,
 # and investigates it.

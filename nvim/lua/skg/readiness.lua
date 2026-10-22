@@ -535,7 +535,7 @@ function M.readiness_summary_message (summary)
   local parts = {}
   if complete then
     table.insert(parts, string.format(
-      'COMMIT READY. All %d of %d changed files are ready',
+      'Commit ready. All %d of %d changed files are ready',
       summary.ready, summary.changed))
   else
     table.insert(parts, string.format(

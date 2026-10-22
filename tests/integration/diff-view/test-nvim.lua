@@ -5,7 +5,7 @@
 -- Phase 1: Open the diff view; its buffers open.
 -- Phase 2: Mark every change commit-ready, through the recursive
 --          gesture on each root of the "all changes" buffer, and see
---          "COMMIT READY".
+--          "Commit ready".
 -- Phase 3: Stage and commit; every owned skgrepo is committed, the
 --          foreign one is not, and the buffers keep their roots,
 --          which show no change any more.
@@ -114,7 +114,7 @@ for i = 1, #root_lines() do
 end
 do
   local summary = newest_notification('changed files are ready')
-  T.check(summary and summary:find('^COMMIT READY%.'),
+  T.check(summary and summary:find('^Commit ready%.'),
           'commit-ready after marking every root: ' .. tostring(summary)
           .. '\n' .. T.buffer_text(all_changes))
 end

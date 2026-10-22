@@ -69,7 +69,7 @@ function M.unlock_all_save_locked ()
   end
 end
 
----Unlock skg buffers whose view_id is NOT in VIEW_ID_LIST.
+---Unlock skg buffers whose view_id is not in VIEW_ID_LIST.
 ---@param view_id_list string[]
 function M.unlock_buffers_not_in_view_id_list (view_id_list)
   local keep = {}

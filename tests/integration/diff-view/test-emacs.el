@@ -4,7 +4,7 @@
 ;;; Phase 1: Open the diff view; its buffers open.
 ;;; Phase 2: Mark every change commit-ready, through the recursive
 ;;;          gesture on each root of the "all changes" buffer, and see
-;;;          "COMMIT READY".
+;;;          "Commit ready".
 ;;; Phase 3: Stage and commit; every owned skgrepo is committed, the
 ;;;          foreign one is not, and the buffers keep their roots,
 ;;;          which show no change any more.
@@ -118,7 +118,7 @@
     (let ((summary (cl-find-if
                     (lambda (m) (string-match-p "changed files are ready" m))
                     test-messages)))
-      (unless (string-match-p "^COMMIT READY\\." summary)
+      (unless (string-match-p "^Commit ready\\." summary)
         (test-fail "Not commit-ready after marking every root: %s\n%s"
                    summary (buffer-string)))
       (test-pass "%s" summary))))

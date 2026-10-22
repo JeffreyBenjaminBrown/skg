@@ -14,7 +14,7 @@
 -- surface can be complete while modules land incrementally; invoking
 -- a not-yet-ported command reports so instead of erroring. The elisp
 -- alias/completion-predicate machinery has no analog here: the Ex
--- command names ARE the public names.
+-- command names are the public names.
 
 local M = {}
 

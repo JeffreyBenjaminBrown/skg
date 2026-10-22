@@ -13,7 +13,7 @@ local state = require('skg.state')
 local M = {}
 
 ---Export REPO_SET (prompted when absent; choose a public-facing set
----so private notes stay private) to OUTPUT_DIR, which the SERVER
+---so private notes stay private) to OUTPUT_DIR, which the server
 ---resolves against its own project root -- possibly inside a
 ---container whose filesystem differs from this editor's, hence no
 ---path completion on the prompt. Defaults to 'org-exports'.

@@ -17,7 +17,7 @@
 (require 'skg-sexpr-search)
 (require 'skg-shared)
 
-;; Defined in skg-request-herald-rules.el, which requires THIS file, so
+;; Defined in skg-request-herald-rules.el, which requires this file, so
 ;; we cannot require it back (circular). `heralds--ensure-rules' reaches
 ;; it through `fboundp' instead; this declaration is just for the
 ;; byte-compiler.
@@ -26,13 +26,13 @@
 (defvar heralds--transform-rules nil
   "Rules for lensing `(skg ...)` metadata into a line of herald tokens.
 
-The table itself LIVES IN RUST (`server/heralds.rs`) and supplies
+The table itself lives in Rust (`server/heralds.rs`) and supplies
 non-relationship match atoms, labels, styles, and placement. This
 client renders semantic relationship facts and their styles. Emacs fetches it
 over the \"herald rules\" endpoint at connect time
 (`skg-request-herald-rules', called by `skg-client-init') and caches
 it here; re-running `skg-client-init' re-fetches it. (A lazy
-reconnect by a request function does NOT re-fetch -- the cached
+reconnect by a request function does not re-fetch -- the cached
 table survives, which is correct unless the server binary changed
 under the session.) Tests inject a table directly via
 `heralds-install-rules' (see `skg-test-install-herald-rules'), so
@@ -252,9 +252,9 @@ buffer-local `heralds-overlays' list) are also deleted."
 
 (defconst heralds--rels-sentinel "__RELS_SPANS__"
   "Placeholder token the server's `rels' rule emits (RELS_SPANS_SENTINEL
-in server/heralds.rs). The relationship heralds are per-CHARACTER styled
+in server/heralds.rs). The relationship heralds are per-character styled
 spans -- more than the rule table's atom-level coloring can express -- so
-the rule only POSITIONS them by emitting this sentinel, and
+the rule only positions them by emitting this sentinel, and
 `heralds-from-metadata' swaps it for the spans it renders itself from the
 `(rels (STYLE \"text\") ...)' payload.")
 
@@ -262,7 +262,7 @@ the rule only POSITIONS them by emitting this sentinel, and
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
   "Return a display-ready herald string for METADATA-SEXP.
 Most composition lives in `heralds--transform-rules' (the served rule
-table); the one exception is the relationship heralds, whose SEMANTIC
+table); the one exception is the relationship heralds, whose semantic
 `(rels ...)' facts the rule table only positions with a sentinel token
 that this function replaces with `heralds--render-rel-facts' output.
 Returns nil if METADATA-SEXP doesn't parse as an `(skg ...)' form."
@@ -298,8 +298,8 @@ na anyway) any stray sentinel token is dropped."
                for found = (and (consp child) (heralds--find-rels child))
                when found return found))))
 
-;; ── relationship heralds: render the server's SEMANTIC facts ─────────
-;; ALL presentation lives here (letters, styles, order, count-omission,
+;; ── relationship heralds: render the server's semantic facts ─────────
+;; All presentation lives here (letters, styles, order, count-omission,
 ;; fractions); the server sends only facts. The letters and order come
 ;; from shared/relations.json, and the tiers and floors from
 ;; shared/herald-styles.json, which the nvim client

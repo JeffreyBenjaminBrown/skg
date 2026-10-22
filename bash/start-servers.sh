@@ -38,14 +38,14 @@ preflight_check_config() {
   echo "Validating config: $SKG_CONFIG"
   if ! cargo build -q $CARGO_PROFILE_FLAG --bin skg; then
     printf '\033[1;31m%s\033[0m\n' \
-      "ERROR: skg failed to compile (see errors above). Servers NOT started."
+      "ERROR: skg failed to compile (see errors above). Servers not started."
     exit 1
   fi
   local config_err
   if ! config_err="$( cargo run -q $CARGO_PROFILE_FLAG --bin skg -- check-config "$SKG_CONFIG" 2>&1 )"; then
     printf '\033[1;31m'   # bold red
     echo "=================================================================="
-    echo "ERROR: invalid skg config '$SKG_CONFIG' -- servers NOT started:"
+    echo "ERROR: invalid skg config '$SKG_CONFIG' -- servers not started:"
     echo "------------------------------------------------------------------"
     echo "$config_err"
     echo "------------------------------------------------------------------"
@@ -85,7 +85,7 @@ kill_stale_skg() {
   # binary itself ('target/debug/skg <config>'), which neither old
   # pattern caught -- cargo-watch does not always take its child down
   # with it. Kill cargo-watch first so it cannot respawn skg.
-  # Every pattern is scoped to THIS config, so skg instances serving
+  # Every pattern is scoped to this config, so skg instances serving
   # other configs (other ports, other data) are left alone. Each matches
   # the debug and the release (SKG_RELEASE=1) form of its command.
   # bash/stop-servers.sh signals this script's process group, whose
@@ -110,7 +110,7 @@ wait_for_free_api_port() {
   echo "ERROR: TCP port $port (from $SKG_CONFIG) is still in use, by"
   echo "something this script did not start and cannot identify as an"
   echo "skg server for this config. skg would die with"
-  echo "'Address already in use'. Servers NOT started. Find the holder:"
+  echo "'Address already in use'. Servers not started. Find the holder:"
   echo "  ss -tlnp | grep $port"
   echo "=================================================================="
   printf '\033[0m'      # reset color

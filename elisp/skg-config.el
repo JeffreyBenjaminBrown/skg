@@ -163,7 +163,7 @@ foreign. Replaces the retired per-repo `user_owns_it' key."
       "owned")))
 
 (defun skg-owned-repos-from-toml (file)
-  "Return the names of the OWNED repos in FILE, in declaration order.
+  "Return the names of the owned repos in FILE, in declaration order.
 A repo is owned iff its path (resolved against FILE's directory,
 the data root) sits under the data root's `owned_folder' (default
 \"owned\") -- the author-folder layout, mirroring the server's

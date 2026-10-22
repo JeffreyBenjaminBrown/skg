@@ -7,7 +7,7 @@
 ;;; re-fetches it; `heralds-minor-mode' calls `skg-herald-rules-ensure'
 ;;; to self-heal a missing table when the user turns heralds on.
 ;;;
-;;; There is deliberately NO user-facing command here. A missing table
+;;; There is deliberately no user-facing command here. A missing table
 ;;; is recovered automatically (see `skg-herald-rules-ensure'), and a
 ;;; hard failure surfaces an informative message at that point, so a
 ;;; manual re-fetch command is unnecessary.
@@ -30,7 +30,7 @@ A one-shot handler calls `heralds-install-rules' when the reply
 arrives; a malformed reply leaves the cache untouched and logs why.
 
 This is the low-level fetch, used at connect time by `skg-client-init'
-and per-attempt by `skg-herald-rules-ensure'. It does NOT wait for or
+and per-attempt by `skg-herald-rules-ensure'. It does not wait for or
 guarantee a result, and is intentionally not an interactive command:
 callers that need the table should go through `skg-herald-rules-ensure'."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))

@@ -408,7 +408,7 @@ from SUMMARY, the save response's
          (complete (= ready changed)))
     (concat
      (if complete
-         (format "COMMIT READY. All %d of %d changed files are ready"
+         (format "Commit ready. All %d of %d changed files are ready"
                  ready changed)
        (format "%d of %d changed files are ready" ready changed))
      (if (> not-editable 0)

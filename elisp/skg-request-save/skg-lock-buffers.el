@@ -6,7 +6,7 @@
 ;;; - Custom error message ("skg: buffer locked -- save in progress")
 ;;;   instead of the generic "Buffer is read-only".
 ;;; - inhibit-read-only (used by skg-replace-buffer-with-new-content)
-;;;   does NOT suppress overlay hooks, so we must explicitly remove
+;;;   does not suppress overlay hooks, so we must explicitly remove
 ;;;   overlays before updating buffer content -- which is what we want.
 
 (defvar skg--stream-in-progress nil
@@ -58,7 +58,7 @@ the TCP sentinel, and the busy-initializing handler.")
         (skg--lock-for-save)) )) )
 
 (defun skg--unlock-buffers-not-in-view-id-list (view-id-list)
-  "Unlock skg buffers whose view ID is NOT in VIEW-ID-LIST."
+  "Unlock skg buffers whose view ID is not in VIEW-ID-LIST."
   (dolist (buf (buffer-list))
     (when (and (buffer-live-p buf)
                (buffer-local-value 'skg-view-id buf)

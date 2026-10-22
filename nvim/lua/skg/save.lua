@@ -29,7 +29,7 @@ M.fork_repo_placeholder = 'PICK-A-REPO'
 
 ---Send the current buffer to the server. Before sending, 'folded'
 ---and 'focused' atoms are added (for the wire) and then removed
----from what the user sees. If the save edited any FOREIGN node the
+---from what the user sees. If the save edited any foreign node the
 ---server replies fork-confirmation instead of save-result, skgsave-committing
 ---nothing, unless FORK_APPROVED rides along; FORK_REPOS then pairs
 ---each forked node's id with the owned skgrepo chosen for its clone.
@@ -47,7 +47,7 @@ function M.request_save_buffer (approved_forks, fork_skgrepos,
   local save_buf = vim.api.nvim_get_current_buf()
   local saved_view_id = vim.b[save_buf].skg_view_id
   if not saved_view_id then
-    -- A nil view-id causes an unfiltered save AND the server won't
+    -- A nil view-id causes an unfiltered save and the server won't
     -- update its in-Rust graph: slow and wasted. Refuse.
     error(string.format(
       "Cannot save: view ID is nil in buffer '%s'. Re-open the view.",
@@ -88,7 +88,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
       M.broad_save_lock_handler(response)
     end, true)
   -- save-relax-lock carries collateral targets plus every dirty input checked
-  -- during preparation. Registered NON-one-shot so it does not add to
+  -- during preparation. Registered non-one-shot so it does not add to
   -- the pending count: an invalid save errors before the server
   -- reaches the point that emits it, and a one-shot count would leak.
   -- save-result removes it.
@@ -105,7 +105,7 @@ function M.send_save_buffer (save_buf, saved_view_id, approved_forks, fork_skgre
     function (_payload_text, response)
       M.save_result_handler(save_buf, response)
     end, true)
-  -- fork-confirmation: the ALTERNATIVE terminal message. The server
+  -- fork-confirmation: the alternative terminal message. The server
   -- sends exactly one of the two; whichever fires removes the other
   -- (the fork handler also decrements the count of the never-fired
   -- save-result one-shot), so the pending count balances either way.
@@ -531,10 +531,10 @@ end
 -- ── the fork-confirmation flow ─────────────────────────────────────
 
 ---Handle a fork-confirmation message: the save edited foreign
----node(s) and was not pre-approved, so NOTHING was skgsave-committed. Show
+---node(s) and was not pre-approved, so nothing was skgsave-committed. Show
 ---the confirmation buffer; interactively, ask whether to approve.
 ---Terminal like save_result_handler: removes the streaming handlers
----AND the unfired save-result one-shot (decrementing its pending
+---and the unfired save-result one-shot (decrementing its pending
 ---count), ends the stream, unlocks.
 ---@param save_buf integer
 ---@param response any
@@ -556,7 +556,7 @@ function M.fork_confirmation_handler (save_buf, response, strandeds_review)
   local confirm_buf = nil
   local ok, err = pcall(function ()
     -- The pcall guards only response parsing/display. The interactive
-    -- flow below runs OUTSIDE it: a refusal from approve_fork must
+    -- flow below runs outside it: a refusal from approve_fork must
     -- reach the user, not the log -- nesting it here used to swallow
     -- the "pick a repo first" refusal, so approving with a
     -- placeholder skgrepo silently did nothing.
@@ -835,7 +835,7 @@ end
 
 ---Show CONTENT in the fork-confirmation buffer, recording SAVE_BUF as
 ---its source; returns the buffer. It is a navigable, editable content
----view (so the user can rotate each clone's skgrepo), but NOT an
+---view (so the user can rotate each clone's skgrepo), but not an
 ---ordinary save target: it has no view ID (tripping the nil-view_id save
 ---guard) and its ':w' refuses. Only approve (<localleader>cc) and
 ---decline (<localleader>ck) act on it. Dismissing it without

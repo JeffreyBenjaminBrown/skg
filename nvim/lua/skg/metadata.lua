@@ -370,7 +370,7 @@ end
 -- ── user commands ──────────────────────────────────────────────────
 
 ---Mark the headline at point for deletion (metadata gains
----(editRequest delete)). Does NOT save.
+---(editRequest delete)). Does not save.
 function M.delete ()
   M.edit_metadata_at_point(
     sexpr.read('(skg (node (editRequest delete)))'))
@@ -380,7 +380,7 @@ end
 
 ---Mark the headline at point, and every unrestrictedNode viewdescendant,
 ---for deletion. Non-unrestrictedNode descendants (phantoms, folders, ...) are
----skipped. Does NOT save.
+---skipped. Does not save.
 function M.delete_recursive ()
   if not M.at_headline_p() then error('Not on a headline') end
   local edits = sexpr.read('(skg (node (editRequest delete)))')
@@ -454,9 +454,9 @@ end
 ---cycle owned skgrepos; typed names accepted). With RECURSIVE, also
 ---changes every true content descendant whose skgrepo matches. On
 ---a metadata-less headline, populates it minimally instead.
----Write-protected occurrences are NOT changed -- the save would
+---Write-protected occurrences are not changed -- the save would
 ---refuse their skgrepo edits -- and produce a loud warning, with the
----full ID list in :messages. Does NOT save.
+---full ID list in :messages. Does not save.
 ---@param recursive boolean|nil
 function M.set_repo (recursive)
   if M.headline_metadata_empty_p() then
@@ -500,7 +500,7 @@ function M.change_repo_and_report (old_skgrepo, new_skgrepo, recursive)
         M.current_line_number(), new_skgrepo) end
   for _, skgid in ipairs(writeProtected_skgids) do
     vim.notify(
-      'SkgSetRepo: write-protected occurrence NOT changed '
+      'SkgSetRepo: write-protected occurrence not changed '
         .. '(the save would refuse its edit): ' .. skgid,
       vim.log.levels.WARN) end
   local summary = string.format(
@@ -511,7 +511,7 @@ function M.change_repo_and_report (old_skgrepo, new_skgrepo, recursive)
     vim.notify(summary)
   else
     vim.notify(summary .. string.format(
-      '  WARNING: %d write-protected node%s NOT changed -- the save '
+      '  WARNING: %d write-protected node%s not changed -- the save '
         .. 'would refuse their edits. See :messages for the ID list.',
       #writeProtected_skgids,
       #writeProtected_skgids == 1 and '' or 's'),
@@ -534,7 +534,7 @@ end
 
 ---Change OLD_REPO to NEW_REPO in this content subtree (root
 ---inclusive; only affectsParent=true descendants are traversed).
----A write-protected occurrence is NOT edited -- the save would
+---A write-protected occurrence is not edited -- the save would
 ---refuse its skgrepo edit -- and its ID is returned instead, for the
 ---caller to warn about, unless the walk also changed that ID's
 ---editable occurrence: that one carries the move, and the rerender
@@ -596,7 +596,7 @@ end
 
 ---Mark the node at point to merge ACQUIREE_ID_OR_LINK (a bare id or
 ---an [[id:ID][label]] link), prompting when not given. Run from the
----acquirer. Does NOT save.
+---acquirer. Does not save.
 ---@param acquiree_id_or_link string|nil
 function M.set_merge_request (acquiree_id_or_link)
   local answer = acquiree_id_or_link

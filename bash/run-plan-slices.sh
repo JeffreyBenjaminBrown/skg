@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the slices of TODO/total-diff-view/15_plan.org unattended, one
-# FRESH Claude Code session per slice, so that each slice starts with an
+# fresh Claude Code session per slice, so that each slice starts with an
 # empty context. The plan, progress.org, git and the auto-memory
 # directory are the memory between slices.
 #
@@ -24,7 +24,7 @@
 # The loop stops when a slice ends without its headline marked DONE (the
 # agent stopped for a question; read progress.org) or when claude exits
 # nonzero. Every slice's session id is logged, so a stopped slice can be
-# continued WITH its context:  claude --resume <session-id>
+# continued with its context:  claude --resume <session-id>
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 

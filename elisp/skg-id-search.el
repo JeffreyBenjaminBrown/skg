@@ -74,9 +74,9 @@ Otherwise nil."
   "Return (id . label) for the nearest ID on the current line, or nil,
 or the symbol `ambiguous'.
 In a buffer visiting a raw .skg file (`skg-file-minor-mode'), IDs are
-the line's bare UUIDs and nearest means NEAREST:
+the line's bare UUIDs and nearest means literally nearest:
 point on an ID wins; a single-ID line needs no proximity; when every
-ID sits on one side of point, the closest one; IDs on BOTH sides are
+ID sits on one side of point, the closest one; IDs on both sides are
 `ambiguous' -- the caller should say so and visit nothing.
 Elsewhere (content views, magit, search buffers) the prior behavior
 stands: point on an ID, else the first ID after point on this line,

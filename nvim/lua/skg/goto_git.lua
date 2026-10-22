@@ -221,7 +221,7 @@ function M.goto_in_git ()
                       M.open_git_status_at_file)
 end
 
----Open the PARENT's file's diff at the first line containing this
+---Open the parent's file's diff at the first line containing this
 ---node's id.
 function M.goto_in_git_parent ()
   local node = M.node_info_at_point()

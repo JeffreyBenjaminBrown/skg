@@ -2,7 +2,7 @@
 
 # all-tests.sh — Run emacs, nextest, doctests, and integration tests politely.
 #
-# RESULTS ARE WRITTEN here:
+# Results are written here:
 # - tests/results/ALL.org: a plain-text org-mode summary
 # - tests/results/*.log: individual test results
 #

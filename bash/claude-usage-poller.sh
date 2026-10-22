@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # claude-usage-poller.sh — background daemon that refreshes a usage snapshot
-# on a fixed cadence, so many agents can read current usage WITHOUT each
+# on a fixed cadence, so many agents can read current usage without each
 # spending an API call.
 #
 #   claude-usage-poller.sh [interval_seconds] [out_file]
@@ -10,7 +10,7 @@
 # Agents then just read the JSON file (free). The file gains a "polled_at"
 # epoch so a reader can tell how stale the snapshot is.
 #
-# Trade: instead of every agent-check costing a call, ONE poller spends a
+# Trade: instead of every agent-check costing a call, one poller spends a
 # tiny max_tokens=1 Haiku call every `interval`. Over a 5h window at 180s
 # that's ~100 negligible calls.
 set -euo pipefail

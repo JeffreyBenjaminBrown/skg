@@ -8,7 +8,7 @@
 -- module owns it, which is also what skg.reload preserves across a
 -- reload).
 --
--- There is deliberately NO user-facing command here. A missing table
+-- There is deliberately no user-facing command here. A missing table
 -- is recovered automatically (see ensure_rules), and a hard failure
 -- surfaces an informative message at that point.
 

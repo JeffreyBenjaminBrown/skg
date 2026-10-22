@@ -80,7 +80,7 @@ skg-config-dir is set and `skg--repo-names' works."
                       :relation "contains"))))))
 
 (ert-deftest test-rel-writable-folder-member ()
-  "A subscribeeFolder member's relationship: recorder = the folder's ANCHOR (its
+  "A subscribeeFolder member's relationship: recorder = the folder's anchor (its
 viewparent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
@@ -221,7 +221,7 @@ is offered; the server's save-time floor check backstops."
 
 (ert-deftest test-apply-relRepo-removes-override ()
   "The no-override choice removes only a pending request, preserving
-the displayed relRepo fact; its message says the SAVED skgrepo survives
+the displayed relRepo fact; its message says the saved skgrepo survives
 (sticky), not that anything resets to the default."
   (test--with-skg-content-view
    "* (skg (node (id x) (repo public) (viewStats (relRepo private)) (editRequest (relRepo trusted)))) x\n"
@@ -379,7 +379,7 @@ repo, and applies the selection."
                                (test--buffer-line 2)))))))
 
 (ert-deftest test-relRepo-handler-more-public-current-prefills-default ()
-  "A legacy CURRENT more public than the default is not among the
+  "A legacy current more public than the default is not among the
 choices, so the prompt pre-fills with the default instead."
   (test--with-skg-content-view
    (concat
@@ -689,7 +689,7 @@ window plumbing are stubbed as in the other handler tests."
       (cons (funcall fn) (nreverse messages)))))
 
 (ert-deftest test-set-repo-recursive-warns-about-write-protected ()
-  "A write-protected matching instance is NOT edited; its ID goes to
+  "A write-protected matching instance is not edited; its ID goes to
 *Messages* and the summary carries a loud WARNING. Nothing is asked:
 what a move strands, the save decides."
   (test--with-skg-content-view
@@ -708,7 +708,7 @@ what a move strands, the save decides."
        (let ((msgs (cdr (test--messages-during
                          (lambda () (skg-set-repo t))))))
          (should (seq-find (lambda (m)
-                             (and (string-match-p "NOT changed" m)
+                             (and (string-match-p "not changed" m)
                                   (string-match-p ": e" m)
                                   (string-match-p "refuse" m)))
                            msgs))
@@ -741,7 +741,7 @@ the node does move."
        (let ((msgs (cdr (test--messages-during
                          (lambda () (skg-set-repo t))))))
          (should-not (seq-find (lambda (m)
-                                 (or (string-match-p "NOT changed" m)
+                                 (or (string-match-p "not changed" m)
                                      (string-match-p "WARNING" m)))
                                msgs))))
      (should (string-match-p "(repo trusted)" (test--line-of-id "x")))

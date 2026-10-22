@@ -10,7 +10,7 @@
 -- property (the metadata text stays in the buffer but is shown as the
 -- herald string), here one extmark per headline conceals the metadata
 -- extent and renders the heralds as inline virtual text whose chunk
--- list carries per-chunk highlight groups. The buffer TEXT is
+-- list carries per-chunk highlight groups. The buffer text is
 -- untouched either way, so saves round-trip the full metadata.
 -- Concealment needs window-local options (conceallevel=2), applied by
 -- an autocmd to any window showing a heralded buffer; with
@@ -34,8 +34,8 @@ M.namespace = vim.api.nvim_create_namespace('skg-heralds')
 
 -- The placeholder token the server's `rels` rule emits
 -- (RELS_SPANS_SENTINEL in server/heralds.rs). The relationship heralds
--- are per-CHARACTER styled spans -- more than the rule table's
--- atom-level coloring can express -- so the rule only POSITIONS them by
+-- are per-character styled spans -- more than the rule table's
+-- atom-level coloring can express -- so the rule only positions them by
 -- emitting this sentinel, which `chunks_from_metadata' replaces with the
 -- spans it renders from semantic `(rels ...)' facts. The
 -- analog of `heralds--rels-sentinel' in elisp.
@@ -229,8 +229,8 @@ function M.find_rels (sexp)
   return nil
 end
 
--- ── relationship heralds: render the server's SEMANTIC facts ─────────
--- ALL presentation lives here (letters, styles, order, count-omission,
+-- ── relationship heralds: render the server's semantic facts ─────────
+-- All presentation lives here (letters, styles, order, count-omission,
 -- fractions); the server sends only facts. The letters and order come
 -- from shared/relations.json, and the tiers and floors from
 -- shared/herald-styles.json, which the elisp renderer

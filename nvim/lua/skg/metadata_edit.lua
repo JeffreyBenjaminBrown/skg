@@ -6,7 +6,7 @@
 --
 -- DEVIATION: the elisp made the display-only title group read-only
 -- with text properties; nvim has no per-range read-only text, so
--- title edits are simply DISCARDED at apply (the strip step drops
+-- title edits are simply discarded at apply (the strip step drops
 -- the title group whatever it holds).
 --
 -- DEVIATION: the elisp advised org-insert-heading-respect-content so

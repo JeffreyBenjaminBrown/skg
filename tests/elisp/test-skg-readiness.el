@@ -307,7 +307,7 @@ siblings, or a child without metadata."
                  " (readiness-summary (ready 14) (changed 14) (foreign 0)"
                  " (order-only 0) (notEditable 0)))")))
       (should (equal (car shown)
-                     "COMMIT READY. All 14 of 14 changed files are ready."))
+                     "Commit ready. All 14 of 14 changed files are ready."))
       (setq shown '())
       (with-temp-buffer
         (skg-handle-save-sexp

@@ -11,14 +11,14 @@
 -- fold, what 'bodyFolded' records). Three consequences worth naming:
 -- - a closed vim fold always displays a one-line placeholder, where
 --   org hid the text entirely -- cosmetic, recorded as a deviation;
--- - vim cannot CLOSE a single-line fold, so a one-line body cannot be
+-- - vim cannot close a single-line fold, so a one-line body cannot be
 --   body-folded here (a 'bodyFolded' atom on one degrades
 --   gracefully: the body stays visible and the atom is not
 --   re-recorded at the next save) -- recorded as a deviation;
--- - fold state is per-WINDOW in vim, so the atom readers/writers
+-- - fold state is per-window in vim, so the atom readers/writers
 --   here operate on the current window, which is where saves happen.
 --
--- The atom PROTOCOL is unchanged from the Emacs client: 'folded' on
+-- The atom protocol is unchanged from the Emacs client: 'folded' on
 -- each headline hidden inside a folded ancestor, 'bodyFolded' on each
 -- visible headline whose body is hidden; both round-trip through the
 -- server, are acted on after each redraw, and are stripped from the

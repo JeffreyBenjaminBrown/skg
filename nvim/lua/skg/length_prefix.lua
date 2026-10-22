@@ -1,11 +1,11 @@
 -- PURPOSE: Read length-prefixed messages from the server and dispatch
 -- by response-type via the handler map in skg.state.
 -- The Lua port of elisp/skg-length-prefix.el. (Like the elisp, this
--- file does not ADD length prefixes to outgoing messages; that is
+-- file does not add length prefixes to outgoing messages; that is
 -- easier and done inline where messages are sent.)
 --
 -- One wire fact the dispatcher relies on: the server's sexp printer
--- (the Rust 'sexp' crate) prints string atoms BARE unless they
+-- (the Rust 'sexp' crate) prints string atoms bare unless they
 -- contain quotes, whitespace, or look numeric -- so 'response-type'
 -- and its values arrive as bare atoms (symbols to our reader). The
 -- dispatcher extracts the type via atom_text, which also tolerates a
@@ -46,7 +46,7 @@ end
 
 ---Parse PAYLOAD as a sexp, extract its response-type, and dispatch
 ---via the handler map. A one-shot handler is removed after a
----SUCCESSFUL call (an error leaves it registered, mirroring elisp,
+---successful call (an error leaves it registered, mirroring elisp,
 ---where the removal is skipped when the handler signals).
 ---@param payload string
 function M.dispatch_by_type (payload)

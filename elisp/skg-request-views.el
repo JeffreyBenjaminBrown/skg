@@ -3,9 +3,9 @@
 ;;; Commands that request viewbranches by adding a (viewRequests ...)
 ;;; atom to the headline at point and saving, letting Rust fulfill the
 ;;; request during completion. Two families, both auto-saving (Q10):
-;;;   - FOLDERS, `skg-show-folder-*' : (folder RELNAME), builds
-;;;     BOTH folders of the relation (one for containers and mentioners);
-;;;   - ROLE TREES, `skg-show-*ward-tree' : (roleTree ROLENAME), the
+;;;   - folders, `skg-show-folder-*' : (folder RELNAME), builds
+;;;     both folders of the relation (one for containers and mentioners);
+;;;   - role trees, `skg-show-*ward-tree' : (roleTree ROLENAME), the
 ;;;     role tree for that one partner role.
 ;;; (`skg-request-editable-view' and the write-protect requests, a
 ;;; different concept, are also here.)
@@ -84,7 +84,7 @@ On a write-protected headline, the save makes it the node's editable
 occurrence and write-protects the one that was, which keeps what it
 shows. On an editable headline, the save extends its content editable,
 up to the server's initial_node_limit extensions. A buffer may carry
-one such request per node. Does NOT auto-save."
+one such request per node. Does not auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)
@@ -99,7 +99,7 @@ and makes each of its direct children not affect it, keeping their own
 editability and subtrees. A no-op on a write-protected headline.
 Requesting an editable view (\\[skg-request-editable-view]) of another
 occurrence of the node in the same save moves editability there.
-Does NOT auto-save."
+Does not auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)
@@ -111,7 +111,7 @@ Does NOT auto-save."
 and its whole content subtree. At the next save, after the subtree's
 own edits are saved, the server makes the occurrence and every node of
 its content subtree write-protected, each child under them not
-affecting its parent. Does NOT auto-save."
+affecting its parent. Does not auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)
@@ -121,13 +121,13 @@ affecting its parent. Does NOT auto-save."
 (defun skg-fork-node ()
   "Fork the (owned) node at point: create a private clone that overrides it.
 This is the explicit counterpart to the implicit foreign fork: it forks a
-node you ALREADY own, deepening an override chain (e.g. E overrides D
+node you already own, deepening an override chain (e.g. E overrides D
 overrides C overrides N).
 
 Refuses if the buffer has unsaved changes (\"Save the buffer before
 forking.\"), so the clone's saved state matches what you see. Otherwise
 stamps (viewRequests fork) into the headline's own (skg (node ...)) --
-targeting the headline's OWN id, never an (overridesHere N) fact it may
+targeting the headline's own id, never an (overridesHere N) fact it may
 carry -- and auto-saves (unlike `skg-request-editable-view'). The server
 returns the usual fork-confirmation buffer; Emacs prompts for the clone's
 repo (unless already specified), then approve with C-c C-c or decline

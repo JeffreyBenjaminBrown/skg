@@ -5,7 +5,7 @@
 -- and inserts [[id:X][LABEL]] there. The Lua port of
 -- elisp/skg-search-make-link.el.
 --
--- PITFALL (inherited): do NOT save the source buffer eagerly before
+-- PITFALL (inherited): do not save the source buffer eagerly before
 -- the search. The server's rerender can collapse a freshly-typed
 -- blank line, leaving the recorded position dangling on the next
 -- headline, so the inserted link glues itself to the wrong spot.

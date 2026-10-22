@@ -1,8 +1,8 @@
 -- PURPOSE: Commands that request viewbranches by adding a
 -- (viewRequests ...) atom to the headline at point and saving,
 -- letting the server fulfill the request during completion. Two
--- families, both auto-saving: FOLDERS (folder RELNAME), building
--- both folders of the relation, and ROLE TREES (roleTree ROLENAME), the role tree
+-- families, both auto-saving: folders (folder RELNAME), building
+-- both folders of the relation, and role trees (roleTree ROLENAME), the role tree
 -- for one partner role. Also the editable-view and write-protect
 -- requests (no auto-save) and the explicit fork. The Lua port of
 -- elisp/skg-request-views.el.
@@ -53,7 +53,7 @@ end
 ---occurrence and write-protects the one that was, which keeps what it
 ---shows. On an editable headline, the save extends its content
 ---editable, up to the server's initial_node_limit extensions. A buffer
----may carry one such request per node. Does NOT auto-save.
+---may carry one such request per node. Does not auto-save.
 function M.set_editable ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
@@ -67,7 +67,7 @@ end
 ---makes each of its direct children not affect it, keeping their own
 ---editability and subtrees. A no-op on a write-protected headline.
 ---Requesting an editable view (set_editable) of another occurrence of
----the node in the same save moves editability there. Does NOT
+---the node in the same save moves editability there. Does not
 ---auto-save.
 function M.request_write_protected ()
   local line = focus.owning_headline_line()
@@ -80,7 +80,7 @@ end
 ---content subtree. At the next save, after the subtree's own edits
 ---are saved, the server makes the occurrence and every node of its
 ---content subtree write-protected, each child under them not
----affecting its parent. Does NOT auto-save.
+---affecting its parent. Does not auto-save.
 function M.request_write_protected_recursive ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end

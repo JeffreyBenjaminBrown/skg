@@ -46,16 +46,16 @@
   (skg-tcp-connect-to-rust)
   (skg-connection-verify)
   ;; Re-fetch the herald rule table from the (possibly rebuilt) server,
-  ;; DISCARDING any cached table first and WAITING for the reply. So a
+  ;; discarding any cached table first and waiting for the reply. So a
   ;; reconnect -- including one right after `skg-reload', which
   ;; deliberately preserves the previous table across the unload -- ends
-  ;; up with the CURRENT server's table, ready before this returns. The
+  ;; up with the current server's table, ready before this returns. The
   ;; bare async `skg-request-herald-rules' left the stale table in place
   ;; until its reply happened to land, so a server whose rule table had
   ;; changed (e.g. the styled-span heralds) rendered raw metadata.
   (setq heralds--transform-rules nil)
   (let ((rules (skg-herald-rules-ensure)))
-    ;; Report the outcome in a SHORT string, rather than returning the
+    ;; Report the outcome in a short string, rather than returning the
     ;; rule table: `skg-herald-rules-ensure' returns the (large) table,
     ;; and as the last form it would otherwise become
     ;; `skg-client-init''s value -- which an interactive eval echoes in
@@ -72,7 +72,7 @@
                  skg-port (1- (length rules)))
       (message
        (concat "skg connected on port %s, but the herald rule table"
-               " came back EMPTY, so heralds will not render."
+               " came back empty, so heralds will not render."
                " See %slogs/server-to-user.log .")
        skg-port skg-config-dir))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
