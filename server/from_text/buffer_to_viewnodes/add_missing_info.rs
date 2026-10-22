@@ -181,9 +181,7 @@ fn make_alias_if_appropriate(
       org . kind = MpViewnodeKind::Property (
         Property::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
-                      relRepo_request: t . relRepo_request . clone (),
-                      change_facts: t . change_facts . clone (),
-                      readiness_request: t . readiness_request . clone () } ); }}
+                      relRepo_request: t . relRepo_request . clone () } ); }}
   Ok (( )) }
 
 /// Inherit parent's skgrepo if both:

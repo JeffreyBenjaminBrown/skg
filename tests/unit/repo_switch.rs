@@ -3,7 +3,7 @@ use crate::skgrepo_sets::SkgrepoSetName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, mk_editable_viewnode,
-  viewforest_root_viewnode, AffectsParent };
+  viewforest_root_viewnode, viewnode_of, AffectsParent };
 
 use std::collections::BTreeSet;
 
@@ -23,11 +23,7 @@ fn writeProtected (skgid : &str, skgrepo : &str) -> Viewnode {
     skgid . to_string (), AffectsParent::True ) }
 
 fn folder (kind : PartnerFolder) -> Viewnode {
-  Viewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : ViewnodeKind::PartnerFolder (kind) } }
+  viewnode_of (ViewnodeKind::PartnerFolder (kind)) }
 
 // A now-restricted childless branch disappears; a now-restricted node
 // with an unrestricted child is retained as a RestrictedVognode (converted,

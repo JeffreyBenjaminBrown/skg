@@ -16,8 +16,8 @@ use skg::types::git::Sign;
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::viewnode::{
-  ChangeFacts, DiffPresence, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
-  Vognode, mk_editable_viewnode, viewforest_root_viewnode};
+  DiffPresence, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  Vognode, mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
 use skg::update_buffer::reconcile::partner_folder::{
   PartnerFolderGoalSource, reconcile_partnerFolder_children};
 
@@ -78,15 +78,12 @@ fn children_with_presence (
 ) -> Vec<(String, DiffPresence)> {
   node . children ()
     . filter_map ( |child| {
-      let (skgid, facts) : (&ID, &ChangeFacts) = match &child . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          (&t . skgid, &t . change_facts),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-          (&u . skgid, &u . change_facts),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-          (&h . skgid, &h . change_facts),
+      let skgid : &ID = match &child . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . skgid,
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) => &u . skgid,
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => &h . skgid,
         _ => return None, };
-      Some (( skgid . 0 . clone (), facts . presence )) } )
+      Some (( skgid . 0 . clone (), child . value () . change_facts . presence )) } )
     . collect () }
 
 #[test]
@@ -94,9 +91,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
-  let folder : NodeId = tree . get_mut (r) . unwrap () . append ( Viewnode {
-    focused : false, org_folded : false, org_body_folded : false,
-    kind : ViewnodeKind::PartnerFolder (PartnerFolder::Container) } ) . id ();
+  let folder : NodeId = tree . get_mut (r) . unwrap () . append ( viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)) ) . id ();
   reconcile_partnerFolder_children (
     folder, &mut tree, PartnerFolder::Container,
     PartnerFolderGoalSource::GraphStraddle (&f . straddle),

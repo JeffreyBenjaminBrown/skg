@@ -8,7 +8,7 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_skgid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, viewforest_root_viewnode, default_unrestrictedVognode};
+use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, viewforest_root_viewnode, viewnode_of, default_unrestrictedVognode};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
@@ -34,10 +34,7 @@ fn mk_test_viewnode (
     .. default_unrestrictedVognode ( ID::from (skgid),
                           SkgrepoName::from ("main"),
                           title . to_string() ) };
-  Viewnode { focused         : false,
-            org_folded      : false,
-            org_body_folded : false,
-            kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) }}
+  viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (t))) }
 
 #[test]
 fn all_tests

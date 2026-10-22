@@ -38,9 +38,7 @@ pub fn append_old_text (
     Property::OldText {
       title : title_changed . then ( || before . title . clone () ),
       body  : body_changed
-              . then ( || before . body . clone () . unwrap_or_default () ),
-      change_facts      : ChangeFacts::default (),
-      readiness_request : None } ));
+              . then ( || before . body . clone () . unwrap_or_default () ) } ));
   let old_text_treeid : NodeId =
     tree . get_mut (parent) ? . append (old_text) . id ();
   if body_changed {
@@ -79,9 +77,7 @@ pub fn mk_home_move_viewnode (
     Property::HomeSkgrepoMove {
       skgrepo_change : SkgrepoChange {
         old : before . home_skgrepo . clone (),
-        new : after  . home_skgrepo . clone () },
-      change_facts      : ChangeFacts::default (),
-      readiness_request : None } )) ) }
+        new : after  . home_skgrepo . clone () } } )) ) }
 
 /// "relationship moved from X to Y", for a partner whose relationship
 /// is in both graphs in different skgrepos. It goes under the member.
@@ -93,18 +89,13 @@ pub fn mk_relRepo_move_viewnode (
     Property::RelRepoMove {
       skgrepo_change : SkgrepoChange {
         old : partner . relRepo_before . clone () ?,
-        new : partner . relRepo_after  . clone () ? },
-      change_facts      : ChangeFacts::default (),
-      readiness_request : None } )) ) }
+        new : partner . relRepo_after  . clone () ? } } )) ) }
 
 pub fn mk_changeset_marker_viewnode (
   kind : ChangesetMarkerKind,
 ) -> Viewnode {
   viewnode_of ( ViewnodeKind::Property (
-    Property::ChangesetMarker {
-      kind,
-      change_facts      : ChangeFacts::default (),
-      readiness_request : None } )) }
+    Property::ChangesetMarker { kind } )) }
 
 /// The historical phantom of 'pid', a node of the before-graph that
 /// the after-graph lacks. 'rel' is the presence sign of its
@@ -116,17 +107,17 @@ pub fn mk_historical_viewnode (
   rel      : Option<Sign>,
 ) -> Option<Viewnode> {
   let before : &GraphnodeInRust = straddle . before . get (pid) ?;
-  Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
-    Phantom::Historical ( PhantomHistorical {
-      skgid        : pid . clone (),
-      home_skgrepo : before . home_skgrepo . clone (),
-      title        : before . title . clone (),
-      body         : before . body . clone (),
-      change_facts : ChangeFacts {
-        presence : DiffPresence { node : Some (Sign::Minus), rel },
-        ready    : None,
-        leaves   : None },
-      readiness_request : None } )))) ) }
+  Some ( Viewnode {
+    change_facts : ChangeFacts {
+      presence : DiffPresence { node : Some (Sign::Minus), rel },
+      ready    : None,
+      leaves   : None },
+    .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
+      Phantom::Historical ( PhantomHistorical {
+        skgid        : pid . clone (),
+        home_skgrepo : before . home_skgrepo . clone (),
+        title        : before . title . clone (),
+        body         : before . body . clone () } )))) } ) }
 
 /// Under 'phantom', the historical phantom of 'pid' standing where
 /// content stands, what it holds: if a nodeMerge acquired it, an "it
@@ -142,19 +133,20 @@ pub fn append_historical_phantom_content (
   pid      : &ID,
 ) -> Option<()> {
   if let Some (acquirer) = straddle . acquirer_of (pid) {
-    if let Some (acquirer_viewnode) =
-      mk_member_viewnode (straddle, &acquirer, None) {
-      let folder : NodeId = tree . get_mut (phantom) ? . append (
-        viewnode_of ( ViewnodeKind::PartnerFolder (
-          PartnerFolder::AcquiredBy ))) . id ();
-      tree . get_mut (folder) ? . append (acquirer_viewnode); }}
+    let acquirer_viewnode : Viewnode =
+      mk_member_viewnode (straddle, &acquirer, None);
+    let folder : NodeId = tree . get_mut (phantom) ? . append (
+      viewnode_of ( ViewnodeKind::PartnerFolder (
+        PartnerFolder::AcquiredBy ))) . id ();
+    tree . get_mut (folder) ? . append (acquirer_viewnode); }
   for partner in straddle . partners (pid, RelationRole::CONTENT) {
     let member : Option<Viewnode> =
       match straddle . node_presence (&partner . id) {
         Some (Presence::OnlyBefore) =>
           mk_historical_viewnode (straddle, &partner . id, Some (Sign::Minus)),
         Some (_) => mk_removed_member_viewnode (straddle, &partner . id),
-        None => mk_member_viewnode (straddle, &partner . id, Some (Sign::Minus)), };
+        None => Some ( mk_member_viewnode (
+          straddle, &partner . id, Some (Sign::Minus) )), };
     if let Some (member) = member {
       tree . get_mut (phantom) ? . append (member); }}
   Some (( )) }
@@ -191,11 +183,10 @@ pub fn mk_removed_member_viewnode (
   let mut member : Viewnode = mk_writeProtected_viewnode (
     pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
     AffectsParent::False );
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut member . kind {
-    t . change_facts . presence = DiffPresence {
-      node : straddle . node_presence (pid)
-             . and_then ( |presence| presence . diff_sign () ),
-      rel  : Some (Sign::Minus) }; }
+  member . change_facts . presence = DiffPresence {
+    node : straddle . node_presence (pid)
+           . and_then ( |presence| presence . diff_sign () ),
+    rel  : Some (Sign::Minus) };
   Some (member) }
 
 /// A write-protected image of a node of the after-graph, whose
@@ -205,17 +196,11 @@ fn mk_member_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
   rel      : Option<Sign>,
-) -> Option<Viewnode> {
-  let presence : DiffPresence = DiffPresence { node : None, rel };
+) -> Viewnode {
   let mut viewnode : Viewnode = match straddle . after . get (pid) {
     Some (node) => mk_writeProtected_viewnode (
       pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
       AffectsParent::True ),
     None => mk_unknown_viewnode ( pid . clone () ), };
-  match &mut viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      t . change_facts . presence = presence,
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-      u . change_facts . presence = presence,
-    _ => return None, }
-  Some (viewnode) }
+  viewnode . change_facts . presence = DiffPresence { node : None, rel };
+  viewnode }

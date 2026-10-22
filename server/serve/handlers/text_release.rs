@@ -173,7 +173,7 @@ pub fn exclude_overPrivateText_nodes_from_viewforest (
     if should_convert {
       let mut node : NodeMut<crate::types::viewnode::Viewnode> =
         viewforest . get_mut (treeid) . unwrap ();
-      node . value () . kind = mk_restricted_viewnode () . kind; }}
+      node . value () . replace_kind ( mk_restricted_viewnode () . kind ); }}
 }
 
 fn canonical_overPrivateText_pids (

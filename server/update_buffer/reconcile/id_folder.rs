@@ -5,7 +5,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{ChangeFacts, PropertyFolder, Property};
+use crate::types::viewnode::{PropertyFolder, Property, viewnode_of};
 use crate::update_buffer::util::complete_managed_children_in_viewforest;
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -53,15 +53,9 @@ pub fn reconcile_idFolder_children (
       _ => Err ( "reconcile_idFolder_children: managed child is not an ID property"
                  . to_string() ), };
   let create_skgid = |skgid: &ID| -> Result<Viewnode, String> {
-    Ok ( Viewnode {
-      focused         : false,
-      org_folded      : false,
-      org_body_folded : false,
-      kind            : ViewnodeKind::Property (
+    Ok ( viewnode_of (ViewnodeKind::Property (
         Property::ID {
-          skgid: skgid . clone(),
-          change_facts: ChangeFacts::default (),
-          readiness_request: None } ) } ) };
+          skgid: skgid . clone() } )) ) };
   complete_managed_children_in_viewforest(
     tree,
     idfolder_treeid,

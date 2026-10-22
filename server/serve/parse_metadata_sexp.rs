@@ -150,8 +150,6 @@ pub fn viewnode_from_metadata (
                 skgid           : uid . clone (),
                 relRepo         : metadata . unknown_relRepo . clone (),
                 relRepo_request : metadata . unknown_relRepo_request . clone (),
-                change_facts      : metadata . change_facts . clone (),
-                readiness_request : metadata . readiness_request . clone (),
               } ) )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other (
@@ -180,8 +178,6 @@ pub fn viewnode_from_metadata (
                              . unwrap_or_else ( || SkgrepoName::from ("")),
               title,
               body,
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone (),
             } ) )), None, None )
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Vognode (MpVognode::Phantom (
@@ -192,8 +188,6 @@ pub fn viewnode_from_metadata (
                        . unwrap_or_else ( || SkgrepoName::from ("")),
             title,
             body,
-            change_facts      : metadata . change_facts . clone (),
-            readiness_request : metadata . readiness_request . clone (),
           } ) )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
@@ -230,31 +224,21 @@ pub fn viewnode_from_metadata (
                               relRepo:
                                 metadata . property_relRepo . clone (),
                               relRepo_request:
-                                metadata . property_relRepo_request . clone (),
-                              change_facts: metadata . change_facts . clone (),
-                              readiness_request: metadata . readiness_request . clone () }),
+                                metadata . property_relRepo_request . clone () }),
           MpViewnodeKind::Property (Property::ID { .. }) =>
             MpViewnodeKind::Property (Property::ID {
-                              skgid: title . clone () . into (),
-                              change_facts: metadata . change_facts . clone (),
-                              readiness_request: metadata . readiness_request . clone () }),
+                              skgid: title . clone () . into () }),
           MpViewnodeKind::Property (Property::RemovedAlias { .. }) =>
             MpViewnodeKind::Property (Property::RemovedAlias {
-              text              : title . clone (),
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+              text              : title . clone () }),
           MpViewnodeKind::Property (Property::RemovedID { .. }) =>
             MpViewnodeKind::Property (Property::RemovedID {
-              skgid             : title . clone () . into (),
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+              skgid             : title . clone () . into () }),
           MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
             MpViewnodeKind::Property (Property::Flag {
               flag : *flag,
               title    : title . clone (),
-              body     : body . clone (),
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+              body     : body . clone () }),
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
             MpViewnodeKind::PropertyFolder (PropertyFolder::Flags {
               title : title . clone (), body : body . clone () }),
@@ -265,27 +249,19 @@ pub fn viewnode_from_metadata (
             MpViewnodeKind::Property (Property::OldText {
               title : title_changed . as_ref () . map ( |_| title . clone () ),
               body  : body_changed . as_ref ()
-                      . map ( |_| body . clone () . unwrap_or_default () ),
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+                      . map ( |_| body . clone () . unwrap_or_default () ) }),
           MpViewnodeKind::Property (Property::BodyDiff { .. }) =>
             MpViewnodeKind::Property (Property::BodyDiff {
               diff : body . clone () . unwrap_or_default () }),
           MpViewnodeKind::Property (Property::HomeSkgrepoMove { skgrepo_change, .. }) =>
             MpViewnodeKind::Property (Property::HomeSkgrepoMove {
-              skgrepo_change    : skgrepo_change . clone (),
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+              skgrepo_change    : skgrepo_change . clone () }),
           MpViewnodeKind::Property (Property::RelRepoMove { skgrepo_change, .. }) =>
             MpViewnodeKind::Property (Property::RelRepoMove {
-              skgrepo_change    : skgrepo_change . clone (),
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+              skgrepo_change    : skgrepo_change . clone () }),
           MpViewnodeKind::Property (Property::ChangesetMarker { kind, .. }) =>
             MpViewnodeKind::Property (Property::ChangesetMarker {
-              kind : *kind,
-              change_facts      : metadata . change_facts . clone (),
-              readiness_request : metadata . readiness_request . clone () }),
+              kind : *kind }),
           other => other . clone () };
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
@@ -323,8 +299,6 @@ pub fn viewnode_from_metadata (
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
-            change_facts      : metadata . change_facts . clone (),
-            readiness_request : metadata . readiness_request . clone (),
             view_requests    : metadata . view_requests . clone (),
             editability, };
         let node_kind : MpViewnodeKind =
@@ -332,10 +306,24 @@ pub fn viewnode_from_metadata (
         ( node_kind,
           error, None ) }
     };
-  ( MpViewnode { focused         : metadata . focused,
-                       org_folded      : metadata . org_folded,
-                       org_body_folded : metadata . org_body_folded,
-                       kind },
+  let never_carries_a_change : bool = // so the facts parsed are dropped
+    matches! ( kind,
+               MpViewnodeKind::PropertyFolder (_)
+               | MpViewnodeKind::PartnerFolder (_)
+               | MpViewnodeKind::BufferRoot
+               | MpViewnodeKind::DeadViewnode
+               | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
+               | MpViewnodeKind::Property (Property::BodyDiff { .. }) );
+  ( MpViewnode { focused           : metadata . focused,
+                 org_folded        : metadata . org_folded,
+                 org_body_folded   : metadata . org_body_folded,
+                 kind,
+                 change_facts      :
+                   if never_carries_a_change { ChangeFacts::default () }
+                   else { metadata . change_facts . clone () },
+                 readiness_request :
+                   if never_carries_a_change { None }
+                   else { metadata . readiness_request . clone () } },
     error, warning ) }
 
 fn maybeplaced_kind_error_label (
@@ -353,12 +341,9 @@ fn maybeplaced_kind_error_label (
     MpViewnodeKind::DeadViewnode =>
       "deadViewnode" . to_string (),
     MpViewnodeKind::Vognode (_) =>
-      MpViewnode {
-        focused         : false,
-        org_folded      : false,
-        org_body_folded : false,
-        kind            : kind . clone (),
-      } . error_label (), } }
+      MpViewnode { kind : kind . clone (),
+                   .. MpViewnode::default () }
+      . error_label (), } }
 
 
 /// Parse metadata from org-mode headline into ViewnodeMetadata.
@@ -416,21 +401,15 @@ pub fn parse_metadata_to_viewnodemd (
             result . non_vognode = Some ( MpViewnodeKind::Property (
               Property::OldText {
                 title : title_changed . then (String::new),
-                body  : body_changed  . then (String::new),
-                change_facts : ChangeFacts::default (),
-                readiness_request : None } )); },
+                body  : body_changed  . then (String::new) } )); },
           "homeSkgrepoMove" | "relRepoMove" => {
             let skgrepo_change : SkgrepoChange =
               parse_old_and_new_skgrepos (&first, &items[1..]) ?;
             result . non_vognode = Some ( MpViewnodeKind::Property (
               if first == "homeSkgrepoMove" {
-                Property::HomeSkgrepoMove {
-                  skgrepo_change, change_facts : ChangeFacts::default (),
-                  readiness_request : None }
+                Property::HomeSkgrepoMove { skgrepo_change }
               } else {
-                Property::RelRepoMove {
-                  skgrepo_change, change_facts : ChangeFacts::default (),
-                  readiness_request : None } } )); },
+                Property::RelRepoMove { skgrepo_change } } )); },
           "changesetMarker" => {
             let name : String = single_argument (&first, &items[1..]) ?;
             let kind : ChangesetMarkerKind =
@@ -438,9 +417,7 @@ pub fn parse_metadata_to_viewnodemd (
               . ok_or_else ( || format! (
                 "Unknown changesetMarker kind: {}", name )) ?;
             result . non_vognode = Some ( MpViewnodeKind::Property (
-              Property::ChangesetMarker {
-                kind, change_facts : ChangeFacts::default (),
-                readiness_request : None } )); },
+              Property::ChangesetMarker { kind } )); },
           "unknown" => {
             // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No skgrepo/title/body.
@@ -485,9 +462,7 @@ pub fn parse_metadata_to_viewnodemd (
               . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
             result . non_vognode = Some (MpViewnodeKind::Property (
               Property::Flag {
-                flag, title: String::new (), body: None,
-                change_facts: ChangeFacts::default (),
-                readiness_request: None })); },
+                flag, title: String::new (), body: None })); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -520,7 +495,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, change_facts: ChangeFacts::default(), readiness_request: None } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
             MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
@@ -549,13 +524,11 @@ pub fn parse_metadata_to_viewnodemd (
           "removedAlias" =>
             result . non_vognode = Some (MpViewnodeKind::Property (
               Property::RemovedAlias {
-                text : String::new (), change_facts : ChangeFacts::default (),
-                readiness_request : None } )),
+                text : String::new () } )),
           "removedID" =>
             result . non_vognode = Some (MpViewnodeKind::Property (
               Property::RemovedID {
-                skgid : ID::default (), change_facts : ChangeFacts::default (),
-                readiness_request : None } )),
+                skgid : ID::default () } )),
           "overriddenFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
           "overriderFolder" =>
@@ -567,7 +540,7 @@ pub fn parse_metadata_to_viewnodemd (
           "idFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default(), change_facts: ChangeFacts::default(), readiness_request: None } ) ),
+            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default() } ) ),
           "deadViewnode" => result . is_dead_viewnode = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",

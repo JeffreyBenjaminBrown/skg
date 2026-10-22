@@ -163,13 +163,13 @@ pub fn keep_stale_child_holding_the_users (
        || ! holds_the_users (node) {
       return Ok (false); }}
   let mut node_mut : NodeMut<Viewnode> = tree . get_mut (stale) . unwrap ();
-  let kind : &mut ViewnodeKind = &mut node_mut . value () . kind;
-  match kind {
+  let viewnode : &mut Viewnode = node_mut . value ();
+  match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
       t . affectsParent = AffectsParent::False;
       t . birth         = Birth::Unremarkable;
-      t . change_facts  = ChangeFacts::default (); },
-    _ => *kind = ViewnodeKind::DeadViewnode, }
+      viewnode . change_facts = ChangeFacts::default (); },
+    _ => viewnode . replace_kind (ViewnodeKind::DeadViewnode), }
   Ok (true) }
 
 /// Viewnode-specialized version of complete_managed_children.

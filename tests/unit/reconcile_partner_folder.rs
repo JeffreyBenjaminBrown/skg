@@ -1,5 +1,5 @@
 use super::*;
-use crate::types::viewnode::{AffectsParent, ViewnodeKind, mk_writeProtected_viewnode, viewforest_root_viewnode};
+use crate::types::viewnode::{AffectsParent, ViewnodeKind, mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of};
 
 fn unrestricted_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
@@ -12,11 +12,7 @@ fn unrestricted_independent (id_str : &str) -> Viewnode {
     id_str . to_string (), AffectsParent::False ) }
 
 fn mk_folder (kind : PartnerFolder) -> Viewnode {
-  Viewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : ViewnodeKind::PartnerFolder (kind) } }
+  viewnode_of (ViewnodeKind::PartnerFolder (kind)) }
 
 // The user's view order of present members survives; missing graph
 // members are appended in graph order; non-member children

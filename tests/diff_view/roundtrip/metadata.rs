@@ -11,7 +11,7 @@ use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
-  ViewnodeKind, Vognode, mk_writeProtected_viewnode_with_birth};
+  ViewnodeKind, Vognode, mk_writeProtected_viewnode_with_birth, viewnode_of};
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -27,10 +27,12 @@ fn request_all () -> Option<ReadinessRequest> {
     ready   : true,
     objects : [ DiffObject::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
 
-fn viewnode (
-  kind : ViewnodeKind,
+fn with_facts (
+  kind              : ViewnodeKind,
+  change_facts      : ChangeFacts,
+  readiness_request : Option<ReadinessRequest>,
 ) -> Viewnode {
-  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
+  Viewnode { change_facts, readiness_request, .. viewnode_of (kind) } }
 
 /// Render 'node', check its metadata against 'expected', parse it
 /// back with its headline and body, and check that the result is
@@ -53,9 +55,12 @@ fn assert_round_trip (
   assert_eq! ( Viewnode::try_from (parsed) . unwrap (), node ); }
 
 fn property (
-  property : Property,
+  property          : Property,
+  change_facts      : ChangeFacts,
+  readiness_request : Option<ReadinessRequest>,
 ) -> Viewnode {
-  viewnode ( ViewnodeKind::Property (property) ) }
+  with_facts ( ViewnodeKind::Property (property),
+               change_facts, readiness_request ) }
 
 #[test]
 fn old_text_round_trips_each_aspect () {
@@ -67,15 +72,16 @@ fn old_text_round_trips_each_aspect () {
     ( None,                   Some (""),               "(oldText body) (ready)" ), ] {
     assert_round_trip (
       property ( Property::OldText {
-        title : title . map (String::from),
-        body  : body  . map (String::from),
-        change_facts : ready (&[]), readiness_request : None } ),
+                   title : title . map (String::from),
+                   body  : body  . map (String::from) },
+                 ready (&[]), None ),
       expected ); }}
 
 #[test]
 fn body_diff_round_trips () {
   assert_round_trip (
-    property ( Property::BodyDiff { diff : " line one\n-line two\n+line 2\n" . into () } ),
+    property ( Property::BodyDiff { diff : " line one\n-line two\n+line 2\n" . into () },
+               ChangeFacts::default (), None ),
     "bodyDiff" ); }
 
 #[test]
@@ -83,14 +89,14 @@ fn skgrepo_moves_round_trip () {
   assert_round_trip (
     property ( Property::HomeSkgrepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
-                                       new : SkgrepoName::from ("priv") },
-      change_facts : ready (&[]), readiness_request : None } ),
+                                       new : SkgrepoName::from ("priv") } },
+      ready (&[]), None ),
     "(homeSkgrepoMove (old pub) (new priv)) (ready)" );
   assert_round_trip (
     property ( Property::RelRepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
-                                       new : SkgrepoName::from ("a repo") },
-      change_facts : ChangeFacts::default (), readiness_request : request_all () } ),
+                                       new : SkgrepoName::from ("a repo") } },
+      ChangeFacts::default (), request_all () ),
     "(relRepoMove (old pub) (new \"a repo\")) (readyRequest all)" ); }
 
 #[test]
@@ -100,8 +106,7 @@ fn changeset_markers_round_trip () {
     ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (ready)" ),
     ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (ready)" ), ] {
     assert_round_trip (
-      property ( Property::ChangesetMarker {
-        kind, change_facts : ready (&[]), readiness_request : None } ),
+      property ( Property::ChangesetMarker { kind }, ready (&[]), None ),
       expected ); }}
 
 #[test]
@@ -111,38 +116,37 @@ fn removed_aliases_and_ids_round_trip () {
     ready    : Some (BTreeSet::new ()),
     leaves   : None };
   assert_round_trip (
-    property ( Property::RemovedAlias {
-      text : "an old alias" . into (),
-      change_facts : removed . clone (), readiness_request : None } ),
+    property ( Property::RemovedAlias { text : "an old alias" . into () },
+               removed . clone (), None ),
     "removedAlias (diff rel-) (ready)" );
   assert_round_trip (
-    property ( Property::RemovedID {
-      skgid : ID::from ("old-id"),
-      change_facts : removed, readiness_request : request_all () } ),
+    property ( Property::RemovedID { skgid : ID::from ("old-id") },
+               removed, request_all () ),
     "removedID (diff rel-) (ready) (readyRequest all)" ); }
 
 #[test]
 fn a_historical_phantom_round_trips () {
   assert_round_trip (
-    viewnode ( ViewnodeKind::Vognode ( Vognode::Phantom (
-      Phantom::Historical ( PhantomHistorical {
-        skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
-        title : "gone" . into (), body : Some ("its body\n" . into ()),
-        change_facts : ChangeFacts {
-          presence : DiffPresence { node : Some (Sign::Minus),
-                                    rel  : Some (Sign::Minus) },
-          ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
-          leaves   : None },
-        readiness_request : request_all () } )))),
+    with_facts (
+      ViewnodeKind::Vognode ( Vognode::Phantom (
+        Phantom::Historical ( PhantomHistorical {
+          skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
+          title : "gone" . into (), body : Some ("its body\n" . into ()) } ))),
+      ChangeFacts {
+        presence : DiffPresence { node : Some (Sign::Minus),
+                                  rel  : Some (Sign::Minus) },
+        ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
+        leaves   : None },
+      request_all () ),
     "(historical (id gone) (repo main) (diff node- rel-) (ready node) (readyRequest all))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {
   assert_round_trip (
-    viewnode ( ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy) ),
+    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy) ),
     "acquiredByFolder" );
   assert_round_trip (
-    viewnode ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ),
+    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ),
     "acquiredFolder" ); }
 
 /// A role graft's birth survives a save, so the diff view's

@@ -683,18 +683,15 @@ fn relrepo_fact_and_request_round_trip_separately (
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::viewnode::{
-    default_unrestrictedVognode, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode };
+    default_unrestrictedVognode, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode,
+    viewnode_of };
 
   let mut t : UnrestrictedVognode =
     default_unrestrictedVognode (
       ID::new ("n"), SkgrepoName::from ("public"), "N" . to_string () );
   t . viewStats . relRepo = Some ( SkgrepoName::from ("private") );
   t . relRepo_request = Some ( SkgrepoName::from ("secret") );
-  let viewnode : Viewnode = Viewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ), };
+  let viewnode : Viewnode = viewnode_of (ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ));
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let rendered : String =
@@ -750,7 +747,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
   use crate::types::nodes::complete::Flag;
   use crate::types::viewnode::{
     default_unrestrictedVognode, UnrestrictedVognode, NodeEditRequest, Viewnode,
-    ViewnodeKind, Vognode};
+    ViewnodeKind, Vognode, viewnode_of};
 
   for value in [false, true] {
     let mut restriction : UnrestrictedVognode = default_unrestrictedVognode (
@@ -761,11 +758,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
         flag : Flag::NoSearchMatching,
         value, }); }
     else { unreachable! (); }
-    let mut node : Viewnode = Viewnode {
-      focused         : false,
-      org_folded      : false,
-      org_body_folded : false,
-      kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)), };
+    let mut node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)));
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (

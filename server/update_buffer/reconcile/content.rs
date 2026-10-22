@@ -1,6 +1,6 @@
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::viewnode::{ChangeFacts, mk_restricted_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{mk_restricted_viewnode, mk_unknown_viewnode};
 use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend_editable_map};
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -392,7 +392,7 @@ fn convert_nonmember_unknown_children_to_dead (
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
         ! member_set . contains (&u . skgid),
       _ => false },
-    |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; },
+    |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::DeadViewnode); },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
@@ -410,14 +410,12 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
         _ => ( String::new(), None ) } ) ?;
   write_at_node_in_tree ( tree, node,
     |vn : &mut Viewnode| {
-      vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
+      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (
         Phantom::Deleted ( PhantomDeleted {
         skgid           : pid . clone(),
         home_skgrepo : skgrepo . clone(),
         title,
-        body,
-        change_facts      : ChangeFacts::default (),
-        readiness_request : None, } ) )); }
+        body, } ) ))); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Whether this node is overridden yet drawn RAW by its position, so
@@ -698,14 +696,12 @@ fn normalize_relationship_backed_content_unknowns (
         || deleted_by_this_save_extra_ids . get (&unrestricted_skgid)
            . is_some_and (|extra_ids| extra_ids . contains (*raw_member)))
         . expect ("normalization predicate found a raw member") . clone ();
-      vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
+      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
         crate::types::viewnode::PhantomUnknown {
           relRepo: unresolved_relRepos . get (&skgid) . cloned ()
             . filter (|skgrepo| skgrepo != recorder_home),
           relRepo_request: None,
-          change_facts: ChangeFacts::default (),
-          readiness_request: None,
-          skgid }))); })
+          skgid })))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 

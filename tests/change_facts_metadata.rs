@@ -15,7 +15,8 @@ use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   AffectsParent, ChangeFacts, DiffPresence, LeavesFact, Phantom,
   PhantomDeleted, PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
-  ViewnodeKind, Vognode, mk_editable_viewnode, mk_writeProtected_viewnode};
+  ViewnodeKind, Vognode, mk_editable_viewnode, mk_writeProtected_viewnode,
+  viewnode_of};
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -38,11 +39,6 @@ fn request (
   on    : &[DiffObject],
 ) -> Option<ReadinessRequest> {
   Some ( ReadinessRequest { ready, objects : objects (on) } ) }
-
-fn viewnode (
-  kind : ViewnodeKind,
-) -> Viewnode {
-  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
 
 /// Render 'node', check its metadata against 'expected', parse it
 /// back, and check that the result is 'node' again.
@@ -67,9 +63,8 @@ fn with_facts (
   change_facts      : ChangeFacts,
   readiness_request : Option<ReadinessRequest>,
 ) -> Viewnode {
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut node . kind {
-    t . change_facts = change_facts;
-    t . readiness_request = readiness_request; }
+  node . change_facts = change_facts;
+  node . readiness_request = readiness_request;
   node }
 
 #[test]
@@ -95,40 +90,45 @@ fn a_vognode_round_trips_its_presence_readiness_and_request () {
 #[test]
 fn phantoms_round_trip_their_change_facts () {
   assert_round_trip (
-    viewnode ( ViewnodeKind::Vognode ( Vognode::Phantom (
-      Phantom::Deleted ( PhantomDeleted {
-        skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
-        title : "D" . into (), body : None,
-        change_facts : facts ( Some (Sign::Minus), None, Some (&[]) ),
-        readiness_request : request (false, &[]), } )))),
+    with_facts (
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
+        Phantom::Deleted ( PhantomDeleted {
+          skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
+          title : "D" . into (), body : None, } )))),
+      facts ( Some (Sign::Minus), None, Some (&[]) ),
+      request (false, &[]) ),
     "(deleted (id d) (repo main) (diff node-) (ready) (unreadyRequest))" );
   assert_round_trip (
-    viewnode ( ViewnodeKind::Vognode ( Vognode::Phantom (
-      Phantom::Unknown ( PhantomUnknown {
-        skgid : ID::from ("u"), relRepo : None, relRepo_request : None,
-        change_facts : facts ( None, Some (Sign::Plus), None ),
-        readiness_request : request (true, &[]), } )))),
+    with_facts (
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
+        Phantom::Unknown ( PhantomUnknown {
+          skgid : ID::from ("u"), relRepo : None, relRepo_request : None, } )))),
+      facts ( None, Some (Sign::Plus), None ),
+      request (true, &[]) ),
     "(unknown (id u) (diff rel+) (readyRequest))" ); }
 
 #[test]
 fn property_leaves_round_trip_their_change_facts () {
   assert_round_trip (
-    viewnode ( ViewnodeKind::Property ( Property::Alias {
-      text : "an alias" . into (), relRepo : None, relRepo_request : None,
-      change_facts : facts ( None, Some (Sign::Plus), Some (&[]) ),
-      readiness_request : None, } )),
+    with_facts (
+      viewnode_of ( ViewnodeKind::Property ( Property::Alias {
+        text : "an alias" . into (), relRepo : None, relRepo_request : None, } )),
+      facts ( None, Some (Sign::Plus), Some (&[]) ),
+      None ),
     "alias (diff rel+) (ready)" );
   assert_round_trip (
-    viewnode ( ViewnodeKind::Property ( Property::ID {
-      skgid : ID::from ("x"),
-      change_facts : facts ( None, Some (Sign::Minus), None ),
-      readiness_request : request (true, &[]), } )),
+    with_facts (
+      viewnode_of ( ViewnodeKind::Property ( Property::ID {
+        skgid : ID::from ("x"), } )),
+      facts ( None, Some (Sign::Minus), None ),
+      request (true, &[]) ),
     "id (diff rel-) (readyRequest)" );
   assert_round_trip (
-    viewnode ( ViewnodeKind::Property ( Property::Flag {
-      flag : Flag::NoSearchMatching, title : String::new (), body : None,
-      change_facts : facts ( None, Some (Sign::Plus), None ),
-      readiness_request : None, } )),
+    with_facts (
+      viewnode_of ( ViewnodeKind::Property ( Property::Flag {
+        flag : Flag::NoSearchMatching, title : String::new (), body : None, } )),
+      facts ( None, Some (Sign::Plus), None ),
+      None ),
     &format! ( "(flag {}) (diff rel+)", Flag::NoSearchMatching . wire_name () )); }
 
 /// '(leaves N OBJECT...)' is written beside '(ready ...)', and the

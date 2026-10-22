@@ -142,24 +142,11 @@ pub fn folder_change_facts (
     . filter_map ( |member| {
       let relRepo_move_ready : Option<bool> =
         member . children () . find_map ( |child| match &child . value () . kind {
-          ViewnodeKind::Property (Property::RelRepoMove { change_facts, .. }) =>
-            Some ( change_facts . ready . is_some () ),
+          ViewnodeKind::Property (Property::RelRepoMove { .. }) =>
+            Some ( child . value () . change_facts . ready . is_some () ),
           _ => None, } );
-      let presence_ready : Option<bool> = match &member . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          rel_change_ready (&t . change_facts),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-          single_change_ready (&u . change_facts),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-          rel_change_ready (&h . change_facts),
-        ViewnodeKind::Property (
-          Property::Alias { change_facts, .. }
-          | Property::ID { change_facts, .. }
-          | Property::Flag { change_facts, .. }
-          | Property::RemovedAlias { change_facts, .. }
-          | Property::RemovedID { change_facts, .. } ) =>
-          single_change_ready (change_facts),
-        _ => None, };
+      let presence_ready : Option<bool> =
+        member_change_ready (&member . value () . change_facts);
       match (presence_ready, relRepo_move_ready) {
         (None, None) => None,
         (a, b) => Some ( a . unwrap_or (true) && b . unwrap_or (true) ), } } )
@@ -168,20 +155,22 @@ pub fn folder_change_facts (
   Some ( FolderChangeFacts {
     ready : member_changes . iter () . all ( |ready| *ready ) } ) }
 
-/// Some (whether ready) when the relationship object changed.
-fn rel_change_ready (
-  change_facts : &ChangeFacts,
+/// Some (whether ready) when a folder member's relationship to the
+/// folder changed, which its 'rel' sign says. (A property entry and
+/// an unknown phantom carry no other sign.) The member is ready when
+/// its '(ready ...)' names 'rel' if its '(leaves ...)' lists 'rel',
+/// and otherwise when it carries any '(ready ...)'.
+fn member_change_ready (
+  facts : &ChangeFacts,
 ) -> Option<bool> {
-  change_facts . presence . rel . map ( |_| change_facts . ready . as_ref ()
-    . is_some_and ( |objects| objects . contains (&DiffObject::Rel) )) }
-
-/// Some (whether ready) when a single-object leaf changed.
-fn single_change_ready (
-  change_facts : &ChangeFacts,
-) -> Option<bool> {
-  let changed : bool = change_facts . presence . node . is_some ()
-    || change_facts . presence . rel . is_some ();
-  changed . then ( || change_facts . ready . is_some () ) }
+  facts . presence . rel ?;
+  let rel_is_listed : bool =
+    facts . leaves . as_ref () . is_some_and (
+      |leaves| leaves . objects . contains (&DiffObject::Rel) );
+  Some ( match &facts . ready {
+    None => false,
+    Some (objects) => ! rel_is_listed
+                      || objects . contains (&DiffObject::Rel), } ) }
 
 fn viewnode_to_text_with_folder_facts (
   level        : usize,
@@ -236,7 +225,8 @@ fn viewnode_to_string_with_folder_facts (
     ViewnodeKind::Property (property) =>
       property_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, property ),
+        viewnode . org_body_folded, property,
+        &viewnode . change_facts, &viewnode . readiness_request ),
     ViewnodeKind::PartnerFolder (partnerFolder) =>
       Ok ( folder_atom_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
@@ -251,19 +241,23 @@ fn viewnode_to_string_with_folder_facts (
     ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
       Ok ( unrestrictedVognode_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, unrestrictedVognode, config )),
+        viewnode . org_body_folded, unrestrictedVognode,
+        &viewnode . change_facts, &viewnode . readiness_request, config )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted_node))) =>
       Ok ( phantomDeleted_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, deleted_node )),
+        viewnode . org_body_folded, deleted_node,
+        &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown_node))) =>
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, unknown_node )),
+        viewnode . org_body_folded, unknown_node,
+        &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
       Ok ( phantomHistorical_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, historical )),
+        viewnode . org_body_folded, historical,
+        &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       Ok ( restricted_node_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
@@ -305,14 +299,15 @@ fn property_metadata_to_string (
   org_folded      : bool,
   org_body_folded : bool,
   property        : &Property,
+  facts           : &ChangeFacts,
+  request         : &Option<ReadinessRequest>,
 ) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if org_folded  { parts . push ( "folded"     . to_string () ); }
   if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match property {
-    Property::Alias { relRepo, relRepo_request,
-                      change_facts, readiness_request, .. } => {
+    Property::Alias { relRepo, relRepo_request, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (skgrepo) = relRepo {
         parts . push ( format! (
@@ -321,36 +316,36 @@ fn property_metadata_to_string (
         parts . push ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (skgrepo) ) ); }
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
-    Property::ID { change_facts, readiness_request, .. } => {
+      parts . extend ( change_fact_forms (facts, request) ); }
+    Property::ID { .. } => {
       parts . push ( "id" . to_string () );
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
-    Property::Flag { flag, change_facts, readiness_request, .. } => {
+      parts . extend ( change_fact_forms (facts, request) ); }
+    Property::Flag { flag, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
-    Property::RemovedAlias { change_facts, readiness_request, .. }
-      | Property::RemovedID { change_facts, readiness_request, .. } => {
+      parts . extend ( change_fact_forms (facts, request) ); }
+    Property::RemovedAlias { .. }
+      | Property::RemovedID { .. } => {
       parts . push ( property . repr_in_client () . to_string () );
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
-    Property::OldText { title, body, change_facts, readiness_request } => {
+      parts . extend ( change_fact_forms (facts, request) ); }
+    Property::OldText { title, body } => {
       parts . push ( format! ( "(oldText {})",
         match (title . is_some (), body . is_some ()) {
           (true, true)  => "titleAndBody",
           (true, false) => "title",
           _             => "body", } ));
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+      parts . extend ( change_fact_forms (facts, request) ); }
     Property::BodyDiff { .. } =>
       parts . push ( "bodyDiff" . to_string () ),
-    Property::HomeSkgrepoMove { skgrepo_change, change_facts, readiness_request }
-      | Property::RelRepoMove { skgrepo_change, change_facts, readiness_request } => {
+    Property::HomeSkgrepoMove { skgrepo_change }
+      | Property::RelRepoMove { skgrepo_change } => {
       parts . push ( format! ( "({} (old {}) (new {}))",
         property . repr_in_client (),
         metadata_value_atom (&skgrepo_change . old),
         metadata_value_atom (&skgrepo_change . new) ));
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
-    Property::ChangesetMarker { kind, change_facts, readiness_request } => {
+      parts . extend ( change_fact_forms (facts, request) ); }
+    Property::ChangesetMarker { kind } => {
       parts . push ( format! ( "(changesetMarker {})", kind . wire_name () ));
-      parts . extend ( change_fact_forms (change_facts, readiness_request) ); }
+      parts . extend ( change_fact_forms (facts, request) ); }
   }
   Ok ( parts . join (" ")) }
 
@@ -390,10 +385,14 @@ fn unrestrictedVognode_metadata_to_string (
   org_folded          : bool,
   org_body_folded     : bool,
   unrestrictedVognode : & UnrestrictedVognode,
+  facts               : & ChangeFacts,
+  request             : & Option<ReadinessRequest>,
   config              : & SkgConfig,
 ) -> String {
   fn node_sexp (
     unrestrictedVognode : & UnrestrictedVognode,
+    facts     : & ChangeFacts,
+    request   : & Option<ReadinessRequest>,
     config    : & SkgConfig,
   ) -> String {
     fn rels_herald ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
@@ -492,15 +491,13 @@ fn unrestrictedVognode_metadata_to_string (
     { parts . push (s); }
     if let Some (s) = view_requests (unrestrictedVognode)
     { parts . push (s); }
-    parts . extend ( change_fact_forms (
-      &unrestrictedVognode . change_facts,
-      &unrestrictedVognode . readiness_request ));
+    parts . extend ( change_fact_forms (facts, request) );
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if org_folded  { parts . push ( "folded"     . to_string () ); }
   if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( node_sexp (unrestrictedVognode, config));
+  parts . push ( node_sexp (unrestrictedVognode, facts, request, config));
   parts . join (" ") }
 
 /// Render metadata for a PhantomDeleted:
@@ -510,6 +507,8 @@ fn phantomDeleted_metadata_to_string (
   org_folded      : bool,
   org_body_folded : bool,
   deleted_node    : &PhantomDeleted,
+  facts           : &ChangeFacts,
+  request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -520,8 +519,7 @@ fn phantomDeleted_metadata_to_string (
       format! ("(repo {})",
                metadata_value_atom (&deleted_node . home_skgrepo)) ]
     . into_iter ()
-    . chain ( change_fact_forms (
-      &deleted_node . change_facts, &deleted_node . readiness_request ))
+    . chain ( change_fact_forms (facts, request) )
     . collect ();
   parts . push ( format! ( "(deleted {})", deleted_parts . join (" ") ));
   parts . join (" ") }
@@ -533,6 +531,8 @@ fn phantomHistorical_metadata_to_string (
   org_folded      : bool,
   org_body_folded : bool,
   historical      : &PhantomHistorical,
+  facts           : &ChangeFacts,
+  request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -543,8 +543,7 @@ fn phantomHistorical_metadata_to_string (
       format! ("(repo {})",
                metadata_value_atom (&historical . home_skgrepo)) ]
     . into_iter ()
-    . chain ( change_fact_forms (
-      &historical . change_facts, &historical . readiness_request ))
+    . chain ( change_fact_forms (facts, request) )
     . collect ();
   parts . push ( format! ( "(historical {})", historical_parts . join (" ") ));
   parts . join (" ") }
@@ -557,6 +556,8 @@ fn phantomUnknown_metadata_to_string (
   org_folded      : bool,
   org_body_folded : bool,
   unknown_node    : &PhantomUnknown,
+  facts           : &ChangeFacts,
+  request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -570,8 +571,7 @@ fn phantomUnknown_metadata_to_string (
   if let Some (skgrepo) = &unknown_node . relRepo_request {
     unknown_parts . push ( format! (
       "(editRequest (relRepo {}))", metadata_value_atom (skgrepo)) ); }
-  unknown_parts . extend ( change_fact_forms (
-    &unknown_node . change_facts, &unknown_node . readiness_request ));
+  unknown_parts . extend ( change_fact_forms (facts, request) );
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 

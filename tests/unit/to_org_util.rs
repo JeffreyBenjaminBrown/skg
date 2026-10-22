@@ -2,7 +2,7 @@ use crate::types::misc::{MSV, rel_partners_at_relRepo};
 use crate::types::viewnode::{ mk_writeProtected_viewnode, mk_writeProtected_viewnode_with_birth };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::dbs::in_rust_graph::add_to_inverse_indexes;
-use crate::types::viewnode::viewforest_root_viewnode;
+use crate::types::viewnode::{viewforest_root_viewnode, viewnode_of};
 
 use super::*;
 
@@ -141,30 +141,25 @@ fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
   // §A (Jeff's invariant): a member Unrestricted node under a non-container
   // parent (Deleted phantom / DeadViewnode) is made a non-member; a legitimate
   // folder MEMBER (member Unrestricted under a PartnerFolder) is left untouched.
-  use crate::types::viewnode::{ ChangeFacts, PartnerFolder, Phantom, PhantomDeleted };
+  use crate::types::viewnode::{ PartnerFolder, Phantom, PhantomDeleted };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
   let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
-    Viewnode { focused: false, org_folded: false, org_body_folded: false,
-               kind: ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
+    viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
                  PhantomDeleted {
                    skgid : skgid ("PH"), home_skgrepo : src (),
-                   title : "PH" . to_string (), body : None,
-                   change_facts : ChangeFacts::default (),
-                   readiness_request : None }))) }
+                   title : "PH" . to_string (), body : None }))))
   ) . id ();
   let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("A"), src (), "A" . to_string (),
                               AffectsParent::True) ) . id ();
   let dead : NodeId = vf . get_mut (root) . unwrap () . append (
-    Viewnode { focused: false, org_folded: false, org_body_folded: false,
-               kind: ViewnodeKind::DeadViewnode } ) . id ();
+    viewnode_of (ViewnodeKind::DeadViewnode) ) . id ();
   let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("B"), src (), "B" . to_string (),
                               AffectsParent::True) ) . id ();
   let folder : NodeId = vf . get_mut (root) . unwrap () . append (
-    Viewnode { focused: false, org_folded: false, org_body_folded: false,
-               kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) } ) . id ();
+    viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) ) . id ();
   let member : NodeId = vf . get_mut (folder) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               AffectsParent::True) ) . id ();

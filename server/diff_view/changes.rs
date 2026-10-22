@@ -243,7 +243,7 @@ pub(crate) fn align_content_members_with_straddle (
             node . title . clone (), node . body . clone () )),
       _ => None, };
     if let Some (member) = returned {
-      viewnode . kind = member . kind; }}
+      viewnode . replace_kind (member . kind); }}
   Ok (( )) }
 
 /// What a historical phantom's visit did.
@@ -282,10 +282,10 @@ pub(crate) fn process_historical_phantom_visit (
       in_content_position (node) ) };
   if at_root {
     if let Some (node) = straddle . after . get (&skgid) {
-      tree . get_mut (treeid) . unwrap () . value () . kind =
+      tree . get_mut (treeid) . unwrap () . value () . replace_kind (
         mk_editable_viewnode (
           skgid . clone (), node . home_skgrepo . clone (),
-          node . title . clone (), node . body . clone () ) . kind;
+          node . title . clone (), node . body . clone () ) . kind );
       return Ok (HistoricalPhantomVisit::RootIsLive); }}
   let Some (fresh_phantom) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, None) else {
@@ -298,10 +298,8 @@ pub(crate) fn process_historical_phantom_visit (
             skgid             : h . skgid . clone (),
             home_skgrepo      : h . home_skgrepo . clone (),
             title             : h . title . clone (),
-            body              : h . body . clone (),
-            change_facts      : ChangeFacts::default (),
-            readiness_request : None } )));
-        node_mut . value () . kind = deleted; }
+            body              : h . body . clone () } )));
+        node_mut . value () . replace_kind (deleted); }
       let empty : Tree<Viewnode> = Tree::new (fresh_root ());
       reconcile_children_with_fresh_drawing (
         tree, treeid, &empty, empty . root () . id (), &straddle . after,
@@ -371,7 +369,10 @@ pub(crate) fn deleted_phantom_becomes_historical (
       . and_then ( |partner| partner . presence . diff_sign () ));
   let Some (historical) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, rel) else { return Ok (false); };
-  tree . get_mut (treeid) . unwrap () . value () . kind = historical . kind;
+  let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid) . unwrap ();
+  let viewnode : &mut Viewnode = node_mut . value ();
+  viewnode . replace_kind (historical . kind);
+  viewnode . change_facts = historical . change_facts;
   Ok (true) }
 
 /// The root of a scratch tree that holds a fresh drawing.
@@ -492,14 +493,15 @@ fn tag_content_members (
   for member in members {
     let mut moved : Option<Viewnode> = None;
     { let mut member_mut = tree . get_mut (member) . unwrap ();
-      match &mut member_mut . value () . kind {
+      let viewnode : &mut Viewnode = member_mut . value ();
+      match &mut viewnode . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . affectsParent == AffectsParent::True
           || by_id . contains_key (&t . skgid) => {
           // A non-member whose node is content (as under a
           // write-protected node) is tagged too, but never redrawn.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
-          t . change_facts . presence = DiffPresence {
+          viewnode . change_facts . presence = DiffPresence {
             node : straddle . node_presence (&t . skgid)
                    . and_then ( |presence| presence . diff_sign () ),
             rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
@@ -510,7 +512,7 @@ fn tag_content_members (
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
-          unknown . change_facts . presence . rel =
+          viewnode . change_facts . presence . rel =
             by_id . get (&unknown . skgid)
             . and_then ( |p| p . presence . diff_sign () ); },
         _ => continue, }}
@@ -657,11 +659,11 @@ fn append_changed_property_folders (
       signed_union ( &before . alias_texts (), &after . alias_texts () )
       . into_iter ()
       . map ( |(text, sign)| match sign {
-        Some (Sign::Minus) => Property::RemovedAlias {
-          text, change_facts : facts_of_entry (sign), readiness_request : None },
-        _ => Property::Alias {
-          text, relRepo : None, relRepo_request : None,
-          change_facts : facts_of_entry (sign), readiness_request : None }, } )
+        Some (Sign::Minus) => entry_viewnode (
+          Property::RemovedAlias { text }, sign ),
+        _ => entry_viewnode (
+          Property::Alias { text, relRepo : None, relRepo_request : None },
+          sign ), } )
       . collect () ); }
   if aspects . extra_ids {
     let ids = |node : &GraphnodeInRust| -> Vec<ID> {
@@ -671,10 +673,9 @@ fn append_changed_property_folders (
       tree, treeid, PropertyFolder::ID,
       signed_union ( &ids (before), &ids (after) ) . into_iter ()
       . map ( |(skgid, sign)| match sign {
-        Some (Sign::Minus) => Property::RemovedID {
-          skgid, change_facts : facts_of_entry (sign), readiness_request : None },
-        _ => Property::ID {
-          skgid, change_facts : facts_of_entry (sign), readiness_request : None }, } )
+        Some (Sign::Minus) => entry_viewnode (
+          Property::RemovedID { skgid }, sign ),
+        _ => entry_viewnode ( Property::ID { skgid }, sign ), } )
       . collect () ); }
   if aspects . flags {
     append_property_folder (
@@ -688,9 +689,9 @@ fn append_changed_property_folders (
             (true,  false) => Some (Sign::Minus),
             (true,  true)  => None,
             (false, false) => return None, };
-        Some ( Property::Flag {
-          flag, title : String::new (), body : None,
-          change_facts : facts_of_entry (sign), readiness_request : None } ) } )
+        Some ( entry_viewnode (
+          Property::Flag { flag, title : String::new (), body : None },
+          sign )) } )
       . collect () ); }
   }
 
@@ -711,24 +712,29 @@ fn signed_union<T : Clone + Eq + Hash + Ord> (
         (x, sign) }, } )
     . collect () }
 
-fn facts_of_entry (
-  sign : Option<Sign>,
-) -> ChangeFacts {
-  ChangeFacts { presence : DiffPresence { node : None, rel : sign },
-                ready    : None,
-                leaves   : None } }
+/// A property folder's entry, whose presence in the folder is 'sign'.
+fn entry_viewnode (
+  property : Property,
+  sign     : Option<Sign>,
+) -> Viewnode {
+  Viewnode {
+    change_facts : ChangeFacts {
+      presence : DiffPresence { node : None, rel : sign },
+      ready    : None,
+      leaves   : None },
+    .. viewnode_of ( ViewnodeKind::Property (property) ) } }
 
 /// Under 'treeid', a folder 'kind' holding 'entries'.
 fn append_property_folder (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   kind    : PropertyFolder,
-  entries : Vec<Property>,
+  entries : Vec<Viewnode>,
 ) {
   let folder : NodeId =
     append ( tree, treeid, viewnode_of ( ViewnodeKind::PropertyFolder (kind) ));
   for entry in entries {
-    append ( tree, folder, viewnode_of ( ViewnodeKind::Property (entry) )); }}
+    append ( tree, folder, entry ); }}
 
 /// The node's partner folder of this kind, or a new one appended.
 fn child_folder_or_new (

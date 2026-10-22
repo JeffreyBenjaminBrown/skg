@@ -52,7 +52,7 @@ fn convert_now_restricted_vognodes (
             => Some ( mk_restricted_viewnode () . kind ),
           _ => None } );
     if let Some (kind) = conversion {
-      tree . get_mut (skgid) . unwrap () . value () . kind = kind; }}}
+      tree . get_mut (skgid) . unwrap () . value () . replace_kind (kind); }}}
 
 /// Recursively prune 'node's descendants, then report whether 'node'
 /// itself should be detached (the parent's loop detaches it, so the

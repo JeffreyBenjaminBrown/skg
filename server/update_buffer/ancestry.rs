@@ -216,7 +216,7 @@ pub fn deaden_generalized_orphan_folder (
   for cid in child_skgids {
     dispose_orphaned_folder_child (tree, cid) ?; }
   write_at_node_in_tree ( tree, folder,
-    |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; } )
+    |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::DeadViewnode); } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
@@ -259,7 +259,7 @@ fn dispose_orphaned_folder_child (
     // Leave it: a nested folder self-deadens at its own visit (see doc above).
   } else if ! is_vognode_or_phantom {
     write_at_node_in_tree ( tree, child,
-      |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; } )
+      |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::DeadViewnode); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   // else: a non-member vognode or a phantom -- kept untouched.
   Ok (( )) }

@@ -29,8 +29,8 @@ use skg::types::git::Sign;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, Phantom, Property, Viewnode, ViewnodeKind,
-  Vognode};
+  ChangesetMarkerKind, Phantom, Property, Viewnode, ViewnodeKind,
+  Vognode, viewnode_of};
 use skg::types::views_state::ViewId;
 
 use ego_tree::{NodeId, Tree};
@@ -110,12 +110,9 @@ fn buffer_with_every_new_viewnode (
     append_old_text (&mut tree, a, &straddle, &ID::from ("a"))
       . expect ("a's text changed"); }
   { let mut b_mut = tree . get_mut (b) . unwrap ();
-    b_mut . append ( Viewnode {
-      focused : false, org_folded : false, org_body_folded : false,
-      kind : ViewnodeKind::Property ( Property::HomeSkgrepoMove {
+    b_mut . append ( viewnode_of (ViewnodeKind::Property ( Property::HomeSkgrepoMove {
         skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("main"),
-                                         new : SkgrepoName::from ("elsewhere") },
-        change_facts : ChangeFacts::default (), readiness_request : None } ) } );
+                                         new : SkgrepoName::from ("elsewhere") } } )) );
     b_mut . append ( mk_relRepo_move_viewnode ( &Partner {
       id : ID::from ("b"), presence : Presence::Both,
       relRepo_before : Some (SkgrepoName::from ("main")),

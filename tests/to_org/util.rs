@@ -2,7 +2,7 @@
 
 use skg::to_org::util::get_skgid_from_viewnode_at;
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, default_unrestrictedVognode};
-use skg::types::viewnode::PropertyFolder;
+use skg::types::viewnode::{PropertyFolder, viewnode_of};
 use skg::types::misc::{ID, SkgrepoName};
 use ego_tree::{NodeId,Tree};
 
@@ -16,10 +16,7 @@ fn test_get_skgid_from_viewnode_at_with_skgid() {
                        SkgrepoName::from ("main"),
                        "Test" . to_string() );
   let viewnode : Viewnode =
-    Viewnode { focused         : false,
-              org_folded      : false,
-              org_body_folded : false,
-              kind            : ViewnodeKind::Vognode (Vognode::Unrestricted (t)) };
+    viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (t)));
   let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_skgid : NodeId = tree . root() . id();
   let result : Result<ID, Box<dyn std::error::Error>> =
@@ -33,12 +30,8 @@ fn test_get_skgid_from_viewnode_at_non_vognode() {
   // Non-vognode → returns error
   let viewnode :
     Viewnode =
-    Viewnode {
-      focused         : false,
-      org_folded      : false,
-      org_body_folded : false,
-      kind            : ViewnodeKind::PropertyFolder (
-        PropertyFolder::Alias) };
+    viewnode_of (ViewnodeKind::PropertyFolder (
+        PropertyFolder::Alias));
   let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_skgid : NodeId = tree . root() . id();
   let result :

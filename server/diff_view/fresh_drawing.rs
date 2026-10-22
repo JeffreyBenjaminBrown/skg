@@ -172,7 +172,7 @@ pub fn is_the_users_viewnode (
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . birth == Birth::Unremarkable
-         && t . change_facts . presence == DiffPresence::default ()
+         && viewnode . change_facts . presence == DiffPresence::default ()
          && ! ( parent_is_a_folder && t . affectsParent == AffectsParent::True )) }
 
 /// What the diff view's reconciler manages below what it drew,
@@ -205,13 +205,19 @@ fn is_folder (
     ViewnodeKind::PartnerFolder (_) | ViewnodeKind::PropertyFolder (_) ) }
 
 /// Give 'existing' the kind and facts of 'fresh', keeping its fold
-/// state and focus. An unrestricted vognode keeps what the view
-/// decides about it (its view requests, its stats), and becomes
-/// write-protected when the fresh one is.
+/// state and focus. Of the facts, it takes the presence, and its
+/// '(ready ...)' and '(leaves ...)' are cleared, for the pass after
+/// completion to set. An unrestricted vognode keeps what the view
+/// decides about it (its view requests, its stats, its readiness
+/// request), and becomes write-protected when the fresh one is.
 pub fn adopt_fresh_facts (
   existing : &mut Viewnode,
   fresh    : &Viewnode,
 ) {
+  existing . change_facts = ChangeFacts {
+    presence : fresh . change_facts . presence,
+    ready    : None,
+    leaves   : None };
   match ( &mut existing . kind, &fresh . kind ) {
     ( ViewnodeKind::Vognode (Vognode::Unrestricted (e)),
       ViewnodeKind::Vognode (Vognode::Unrestricted (f)) ) => {
@@ -219,13 +225,11 @@ pub fn adopt_fresh_facts (
       e . home_skgrepo  = f . home_skgrepo . clone ();
       e . affectsParent = f . affectsParent;
       e . birth         = f . birth; // a buffer does not carry it back
-      e . change_facts  = ChangeFacts {
-        presence : f . change_facts . presence,
-        ready    : None,
-        leaves   : None };
       if f . is_writeProtected () {
         e . write_protect (); }},
-    (kind, fresh_kind) => *kind = fresh_kind . clone (), }}
+    (kind, fresh_kind) => {
+      *kind = fresh_kind . clone ();
+      existing . readiness_request = fresh . readiness_request . clone (); }, }}
 
 /// Append under 'parent' a copy of the subtree of 'fresh' at
 /// 'fresh_node'.
@@ -260,4 +264,4 @@ pub fn is_unrestricted_removed_member (
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . affectsParent == AffectsParent::False
          && t . birth == Birth::Unremarkable
-         && t . change_facts . presence . rel == Some (Sign::Minus) ) }
+         && viewnode . change_facts . presence . rel == Some (Sign::Minus) ) }

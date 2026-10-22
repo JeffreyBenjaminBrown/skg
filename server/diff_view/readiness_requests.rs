@@ -35,10 +35,10 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
+  ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
-use ego_tree::{NodeId, NodeRef};
+use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::collections::BTreeSet;
 use std::sync::{Arc, MutexGuard};
 
@@ -92,7 +92,7 @@ pub fn readiness_requests_in_viewforest (
     graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
   viewforest . root () . descendants ()
     . filter_map ( |node| {
-      let request : &ReadinessRequest = node . value () . kind . readiness_request () ?;
+      let request : &ReadinessRequest = node . value () . readiness_request . as_ref () ?;
       let named : NamedLeaves = leaves_named_at (node, &request . objects, &pid_of) ?;
       Some ( RequestedReadiness {
         ready    : request . ready,
@@ -248,17 +248,17 @@ pub fn set_ready_facts_in_viewforest (
           ViewnodeKind::Property ( Property::ChangesetMarker {
             kind : ChangesetMarkerKind::OrderOnly, .. } ) =>
             Some (BTreeSet::new ()),
-          kind @ ViewnodeKind::Property (_)
-            if kind . change_facts () . is_some () =>
+          ViewnodeKind::Property (property)
+            if ! matches! (property, Property::BodyDiff { .. }) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           _ => return None, };
       Some (( node . id (), ready, leaves_fact_at (node, forest, &pid_of) )) } )
     . collect ();
   for (treeid, ready, leaves) in facts {
-    if let Some (change_facts) =
-      viewforest . get_mut (treeid) . unwrap () . value () . kind . change_facts_mut () {
-      change_facts . ready  = ready;
-      change_facts . leaves = leaves; }}}
+    let mut node_mut : NodeMut<Viewnode> = viewforest . get_mut (treeid) . unwrap ();
+    let change_facts : &mut ChangeFacts = &mut node_mut . value () . change_facts;
+    change_facts . ready  = ready;
+    change_facts . leaves = leaves; }}
 
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
 /// on an unrestricted vognode or a historical phantom, each of 'node'

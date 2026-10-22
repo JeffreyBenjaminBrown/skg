@@ -116,6 +116,14 @@ pub struct Viewnode {
   pub org_folded      : bool, // Is this     hidden in its parent?
   pub org_body_folded : bool, // Is the body hidden in this?
   pub kind            : ViewnodeKind,
+  /// The diff view's display facts. Empty on a kind that never
+  /// carries a change (a folder, a restricted vognode, the buffer
+  /// root, a dead viewnode, 'BodyDiff'), and outside the diff view.
+  pub change_facts      : ChangeFacts,
+  /// Save intent, like 'relRepo_request', but allowed on a
+  /// write-protected occurrence, and beside an edit request.
+  /// None on a kind that never carries a change.
+  pub readiness_request : Option<ReadinessRequest>,
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -183,8 +191,6 @@ pub struct PhantomDeleted {
   pub home_skgrepo : SkgrepoName,
   pub title        : String,
   pub body         : Option < String >,
-  pub change_facts      : ChangeFacts,
-  pub readiness_request : Option<ReadinessRequest>,
 }
 
 /// A phantom for a reference that resolves to nothing --
@@ -217,8 +223,6 @@ pub struct PhantomUnknown {
   pub relRepo         : Option<SkgrepoName>,
   /// A pending relRepo change, consumed only by save.
   pub relRepo_request : Option<SkgrepoName>,
-  pub change_facts      : ChangeFacts,
-  pub readiness_request : Option<ReadinessRequest>,
 }
 
 /// A phantom for a node that the before-graph of the diff
@@ -235,17 +239,16 @@ pub struct PhantomUnknown {
 /// vognodes under it are not its members. The diff view's
 /// reconciler owns it.
 ///
-/// DISTINCT INFO: the before-graph's title, body and home skgrepo,
-/// and the change facts of its existence (node-) and of its
-/// relationship to its viewparent (rel-), each a change-forest leaf.
+/// DISTINCT INFO: the before-graph's title, body and home skgrepo.
+/// Its viewnode's change facts are those of its existence (node-) and
+/// of its relationship to its viewparent (rel-), each a change-forest
+/// leaf.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomHistorical {
   pub skgid             : ID,
   pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
-  pub change_facts      : ChangeFacts,
-  pub readiness_request : Option<ReadinessRequest>,
 }
 
 /// An anonymous "something from a restricted repo is/was here"
@@ -289,10 +292,6 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   /// A requested skgrepo for this occurrence's binding relationship. Unlike
   /// `viewStats.relRepo`, this is save intent.
   pub relRepo_request : Option<SkgrepoName>,
-  pub change_facts      : ChangeFacts,
-  /// Save intent, like 'relRepo_request', but allowed on a
-  /// write-protected occurrence, and beside an edit request.
-  pub readiness_request : Option<ReadinessRequest>,
 
   pub view_requests : HashSet < ViewRequest >,
   pub editability  : Editability,
@@ -420,72 +419,43 @@ pub enum PropertyFolder {
 pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<SkgrepoName>,
-          relRepo_request: Option<SkgrepoName>,
-          change_facts: ChangeFacts,
-          readiness_request: Option<ReadinessRequest> },
-  ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
-       change_facts: ChangeFacts,
-       readiness_request: Option<ReadinessRequest> },
+          relRepo_request: Option<SkgrepoName> },
+  ID { skgid: ID }, // an ID of grandparent (the parent being an IDFolder)
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
     flag : Flag,
     title    : String,
-    body     : Option<String>,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+    body     : Option<String>, },
   // The diff view's properties, below, are display-only and
   // save-inert: the validator ignores them, and the diff view's
   // reconciler owns them. Each but BodyDiff is a change-forest leaf or
-  // aggregate, so it carries '(ready ...)' and a readiness request.
+  // aggregate, so its viewnode carries '(ready ...)' and a
+  // readiness request.
   /// In an alias folder: an alias the worktree lost since HEAD. The
   /// alias reader never reads it. Its change-forest leaf is that alias.
-  RemovedAlias {
-    text              : String,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+  RemovedAlias { text : String },
   /// In an ID folder: an extra ID the worktree lost since HEAD. The
   /// ID check never counts it. Its change-forest leaf is that ID.
-  RemovedID {
-    skgid             : ID,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+  RemovedID { skgid : ID },
   /// The node's text at HEAD, under a node whose text changed.
   /// 'title' is Some iff the title changed, 'body' Some iff the body
   /// changed (the empty string for a body HEAD lacked). Its
   /// change-forest leaf is the node's text change.
   OldText {
-    title             : Option<String>,
-    body              : Option<String>,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+    title : Option<String>,
+    body  : Option<String>, },
   /// The line diff of the node's body, under its OldText.
   BodyDiff { diff : String },
   /// The node's home skgrepo changed. Its change-forest leaf is the
   /// node's home skgrepo.
-  HomeSkgrepoMove {
-    skgrepo_change    : SkgrepoChange,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+  HomeSkgrepoMove { skgrepo_change : SkgrepoChange },
   /// Under a member: the relationship to its viewparent moved from
   /// one skgrepo to another. Its change-forest leaf is that
   /// relationship's relRepo.
-  RelRepoMove {
-    skgrepo_change    : SkgrepoChange,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+  RelRepoMove { skgrepo_change : SkgrepoChange },
   /// A childless stand-in for a set of changes recorded in its
   /// parent's files, carrying their derived readiness.
-  ChangesetMarker {
-    kind              : ChangesetMarkerKind,
-    change_facts      : ChangeFacts,
-    readiness_request : Option<ReadinessRequest>,
-  },
+  ChangesetMarker { kind : ChangesetMarkerKind },
 }
 
 /// Which changes a 'Property::ChangesetMarker' stands for.
@@ -790,88 +760,6 @@ impl Property {
       _ => None, } }
 }
 
-/// The diff view's pair of a change-facts and a readiness request
-/// ('ChangeFacts', 'ReadinessRequest') is carried by the unrestricted
-/// vognode, the three phantoms and every property but 'BodyDiff'. A
-/// kind without the pair answers None.
-impl ViewnodeKind {
-  pub fn change_facts (
-    &self,
-  ) -> Option<&ChangeFacts> {
-    self . change_facts_and_readiness_request ()
-      . map ( |(change_facts, _)| change_facts ) }
-
-  pub fn change_facts_mut (
-    &mut self,
-  ) -> Option<&mut ChangeFacts> {
-    self . change_facts_and_readiness_request_mut ()
-      . map ( |(change_facts, _)| change_facts ) }
-
-  /// The readiness request a save consumes, if one is present.
-  pub fn readiness_request (
-    &self,
-  ) -> Option<&ReadinessRequest> {
-    self . change_facts_and_readiness_request ()
-      . and_then ( |(_, readiness_request)| readiness_request . as_ref () ) }
-
-  /// The slot of the readiness request, on a kind that has one.
-  pub fn readiness_request_mut (
-    &mut self,
-  ) -> Option<&mut Option<ReadinessRequest>> {
-    self . change_facts_and_readiness_request_mut ()
-      . map ( |(_, readiness_request)| readiness_request ) }
-
-  fn change_facts_and_readiness_request (
-    &self,
-  ) -> Option<( &ChangeFacts, &Option<ReadinessRequest> )> {
-    match self {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        Some (( &t . change_facts, &t . readiness_request )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
-        Some (( &d . change_facts, &d . readiness_request )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-        Some (( &u . change_facts, &u . readiness_request )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-        Some (( &h . change_facts, &h . readiness_request )),
-      ViewnodeKind::Property (
-        Property::Alias { change_facts, readiness_request, .. }
-        | Property::ID { change_facts, readiness_request, .. }
-        | Property::Flag { change_facts, readiness_request, .. }
-        | Property::RemovedAlias { change_facts, readiness_request, .. }
-        | Property::RemovedID { change_facts, readiness_request, .. }
-        | Property::OldText { change_facts, readiness_request, .. }
-        | Property::HomeSkgrepoMove { change_facts, readiness_request, .. }
-        | Property::RelRepoMove { change_facts, readiness_request, .. }
-        | Property::ChangesetMarker { change_facts, readiness_request, .. } ) =>
-        Some (( change_facts, readiness_request )),
-      _ => None, } }
-
-  fn change_facts_and_readiness_request_mut (
-    &mut self,
-  ) -> Option<( &mut ChangeFacts, &mut Option<ReadinessRequest> )> {
-    match self {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        Some (( &mut t . change_facts, &mut t . readiness_request )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
-        Some (( &mut d . change_facts, &mut d . readiness_request )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-        Some (( &mut u . change_facts, &mut u . readiness_request )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-        Some (( &mut h . change_facts, &mut h . readiness_request )),
-      ViewnodeKind::Property (
-        Property::Alias { change_facts, readiness_request, .. }
-        | Property::ID { change_facts, readiness_request, .. }
-        | Property::Flag { change_facts, readiness_request, .. }
-        | Property::RemovedAlias { change_facts, readiness_request, .. }
-        | Property::RemovedID { change_facts, readiness_request, .. }
-        | Property::OldText { change_facts, readiness_request, .. }
-        | Property::HomeSkgrepoMove { change_facts, readiness_request, .. }
-        | Property::RelRepoMove { change_facts, readiness_request, .. }
-        | Property::ChangesetMarker { change_facts, readiness_request, .. } ) =>
-        Some (( change_facts, readiness_request )),
-      _ => None, } }
-}
-
 impl ChangesetMarkerKind {
   pub const ALL : [ChangesetMarkerKind; 3] = [
     ChangesetMarkerKind::Content,
@@ -999,6 +887,17 @@ impl AsMut<Viewnode> for Viewnode {
     self }}
 
 impl Viewnode {
+  /// Make this viewnode one of kind 'kind', keeping its focus and
+  /// fold state. The diff view's facts and the readiness request
+  /// describe the kind replaced, so they go with it.
+  pub fn replace_kind (
+    &mut self,
+    kind : ViewnodeKind,
+  ) {
+    self . kind              = kind;
+    self . change_facts      = ChangeFacts::default ();
+    self . readiness_request = None; }
+
   /// The node's ID, when this viewnode is an editable occurrence of
   /// it: an unrestricted vognode that is not write-protected.
   pub fn editable_skgid (
@@ -1017,8 +916,7 @@ impl Viewnode {
   pub fn consume_edit_request_after_save (
     &mut self,
   ) {
-    if let Some (readiness_request) = self . kind . readiness_request_mut () {
-      *readiness_request = None; }
+    self . readiness_request = None;
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
         restriction . relRepo_request = None;
@@ -1176,8 +1074,6 @@ pub fn default_unrestrictedVognode (
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relRepo_request : None,
-    change_facts      : ChangeFacts::default (),
-    readiness_request : None,
     view_requests  : HashSet::new(),
     editability    : Editability::Editable {
       body         : None,
@@ -1206,29 +1102,16 @@ pub fn mk_editable_viewnode (
 pub fn mk_unknown_viewnode (
   skgid : ID,
 ) -> Viewnode {
-  Viewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : ViewnodeKind::Vognode (Vognode::Phantom (
-      Phantom::Unknown ( PhantomUnknown {
-        skgid,
-        relRepo         : None,
-        relRepo_request : None,
-        change_facts      : ChangeFacts::default (),
-        readiness_request : None,
-      } ) )),
-  }}
+  viewnode_of ( ViewnodeKind::Vognode (Vognode::Phantom (
+    Phantom::Unknown ( PhantomUnknown {
+      skgid,
+      relRepo         : None,
+      relRepo_request : None, } ) )) ) }
 
 pub fn mk_restricted_viewnode (
 ) -> Viewnode {
-  Viewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : ViewnodeKind::Vognode (
-      Vognode::Restricted ( RestrictedVognode ) ),
-  }}
+  viewnode_of ( ViewnodeKind::Vognode (
+    Vognode::Restricted ( RestrictedVognode ) )) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.
@@ -1266,7 +1149,7 @@ pub fn mk_writeProtected_from_viewnode (
   match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
       // Mutate in place, so that every field not named here
-      // (the other view_requests, change facts, graphStats,
+      // (the other view_requests, graphStats,
       // viewStats, and any field added later) is preserved rather
       // than silently reset.
       t . affectsParent = affectsParent;
@@ -1290,32 +1173,32 @@ pub fn mk_viewnode (
   editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> Viewnode {
-  Viewnode { focused         : false,
-             org_folded      : false,
-             org_body_folded : false,
-             kind            : ViewnodeKind::Vognode (
-               Vognode::Unrestricted (
-                 UnrestrictedVognode { affectsParent,
+  viewnode_of ( ViewnodeKind::Vognode (
+    Vognode::Unrestricted (
+      UnrestrictedVognode { affectsParent,
                             birth,
                             view_requests,
                             editability,
                             .. default_unrestrictedVognode (
-                              skgid, skgrepo, title ) } ) ) }}
+                              skgid, skgrepo, title ) } ) )) }
 
 /// Helper to create a BufferRoot Viewnode.
 pub fn viewforest_root_viewnode () -> Viewnode {
-  Viewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : ViewnodeKind::BufferRoot,
-  }}
+  viewnode_of (ViewnodeKind::BufferRoot) }
 
-/// A viewnode of the given kind, unfocused and not org-folded.
+/// A viewnode of the given kind, unfocused and not org-folded,
+/// carrying no change facts and no readiness request. A literal that
+/// sets other fields can take the rest from it:
+/// 'Viewnode { org_folded : true, .. viewnode_of (kind) }'.
 pub fn viewnode_of (
   kind : ViewnodeKind,
 ) -> Viewnode {
-  Viewnode { focused : false, org_folded : false, org_body_folded : false, kind } }
+  Viewnode { focused           : false,
+             org_folded        : false,
+             org_body_folded   : false,
+             kind,
+             change_facts      : ChangeFacts::default (),
+             readiness_request : None } }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

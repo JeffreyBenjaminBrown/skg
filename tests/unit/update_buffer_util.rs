@@ -45,8 +45,7 @@ fn a_stale_child_survives_only_with_the_users_below_it () {
   let mut graft : Viewnode = mk_writeProtected_viewnode_with_birth (
     ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
     AffectsParent::True, Birth::RoleGraft (RelationRole::CONTAINER) );
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &mut graft . kind {
-    u . change_facts . presence . rel = Some (Sign::Minus); }
+  graft . change_facts . presence . rel = Some (Sign::Minus);
   let vognode : NodeId = t . get_mut (root) . unwrap () . append (graft) . id ();
   let folder : NodeId = t . get_mut (root) . unwrap () . append (
     viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) )) . id ();
@@ -58,12 +57,12 @@ fn a_stale_child_survives_only_with_the_users_below_it () {
   for kept in [vognode, folder] {
     assert! ( keep_stale_child_holding_the_users (&mut t, kept, &has_children) . unwrap () ); }
   assert! ( ! keep_stale_child_holding_the_users (&mut t, childless, &has_children) . unwrap () );
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) =
-    &t . get (vognode) . unwrap () . value () . kind
+  let kept_vognode : &Viewnode = t . get (vognode) . unwrap () . value ();
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &kept_vognode . kind
     else { panic! ("the vognode stays an unrestricted vognode") };
   assert_eq! ( u . affectsParent, AffectsParent::False );
   assert_eq! ( u . birth, Birth::Unremarkable );
-  assert_eq! ( u . change_facts . presence, DiffPresence::default () );
+  assert_eq! ( kept_vognode . change_facts . presence, DiffPresence::default () );
   assert_eq! ( t . get (folder) . unwrap () . value () . kind, ViewnodeKind::DeadViewnode );
   assert_eq! ( t . get (childless) . unwrap () . value () . kind,
                ViewnodeKind::PartnerFolder (PartnerFolder::Container) ); }

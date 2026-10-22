@@ -4,7 +4,7 @@ use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_requ
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
-use crate::types::viewnode::{ChangeFacts, PropertyFolder, Property};
+use crate::types::viewnode::{PropertyFolder, Property};
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 
@@ -72,8 +72,6 @@ pub fn build_and_integrate_aliases (
                         .and_then ( |home|
                           if &alias . relRepo == home { None }
                           else { Some (alias . relRepo . clone ()) } ),
-                      relRepo_request: None,
-                      change_facts: ChangeFacts::default (),
-                      readiness_request: None } ),
+                      relRepo_request: None } ),
       false ) ?; }
   Ok (( )) }

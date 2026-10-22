@@ -33,42 +33,40 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Editable] . into_iter () . collect () );
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (node)) = &mut restriction . kind {
-    node . relRepo_request = Some (SkgrepoName::from ("private"));
-    node . readiness_request = Some (ReadinessRequest {
-      ready : true, objects : [DiffObject::All] . into_iter () . collect () }); }
+    node . relRepo_request = Some (SkgrepoName::from ("private")); }
+  restriction . readiness_request = Some (ReadinessRequest {
+    ready : true, objects : [DiffObject::All] . into_iter () . collect () });
   restriction . consume_edit_request_after_save ();
+  assert_eq! (restriction . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &restriction . kind
   else { panic! ("expected unrestricted node"); };
   assert_eq! (restriction . relRepo_request, None);
-  assert_eq! (restriction . readiness_request, None);
   assert_eq! (restriction . edit_request (), None);
   assert! (restriction . view_requests . contains (&ViewRequest::Editable));
 
   let mut unknown : Viewnode = Viewnode {
-    focused : false, org_folded : false, org_body_folded : false,
-    kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (PhantomUnknown {
-      skgid : ID::from ("unknown"),
-      relRepo : None,
-      relRepo_request : Some (SkgrepoName::from ("private")),
-      change_facts : ChangeFacts::default (),
-      readiness_request : Some (ReadinessRequest {
-        ready : true, objects : BTreeSet::new () }), }))) };
+    readiness_request : Some (ReadinessRequest {
+      ready : true, objects : BTreeSet::new () }),
+    .. viewnode_of ( ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
+      PhantomUnknown {
+        skgid : ID::from ("unknown"),
+        relRepo : None,
+        relRepo_request : Some (SkgrepoName::from ("private")), })))) };
   unknown . consume_edit_request_after_save ();
+  assert_eq! (unknown . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
   else { panic! ("expected unknown node"); };
   assert_eq! (unknown . relRepo_request, None);
-  assert_eq! (unknown . readiness_request, None);
 
   let mut alias : Viewnode = Viewnode {
-    focused : false, org_folded : false, org_body_folded : false,
-    kind : ViewnodeKind::Property (Property::Alias {
+    readiness_request : Some (ReadinessRequest {
+      ready : false, objects : BTreeSet::new () }),
+    .. viewnode_of ( ViewnodeKind::Property (Property::Alias {
       text : "alias" . into (),
       relRepo : None,
-      relRepo_request : Some (SkgrepoName::from ("private")),
-      change_facts : ChangeFacts::default (),
-      readiness_request : Some (ReadinessRequest {
-        ready : false, objects : BTreeSet::new () }), }) };
+      relRepo_request : Some (SkgrepoName::from ("private")), })) };
   alias . consume_edit_request_after_save ();
+  assert_eq! (alias . readiness_request, None);
   let ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =
     &alias . kind
   else { panic! ("expected alias"); };
@@ -136,85 +134,3 @@ fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
                [ "root", "in-folder", "member" ] . into_iter ()
                . map (ID::from) . collect::<HashSet<ID>> () ); }
 
-// The four accessors of the (change facts, readiness request) pair
-// reach it on every kind that carries it, and answer None on every
-// kind that does not.
-#[test]
-fn the_change_facts_and_readiness_request_accessors_cover_every_kind () {
-  let facts : ChangeFacts = ChangeFacts {
-    presence : DiffPresence { node : Some (Sign::Plus), rel : None },
-    ready    : None,
-    leaves   : None };
-  let request : ReadinessRequest = ReadinessRequest {
-    ready : true, objects : [DiffObject::Node] . into_iter () . collect () };
-  let unrestricted : ViewnodeKind = {
-    let mut t : UnrestrictedVognode = default_unrestrictedVognode (
-      ID::from ("node"), SkgrepoName::from ("public"), "node" . into () );
-    t . change_facts      = facts . clone ();
-    t . readiness_request = Some (request . clone ());
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) };
-  let carriers : Vec<ViewnodeKind> = vec! [
-    unrestricted,
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (PhantomDeleted {
-      skgid : ID::from ("deleted"), home_skgrepo : SkgrepoName::from ("public"),
-      title : "deleted" . into (), body : None,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }))),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (PhantomUnknown {
-      skgid : ID::from ("unknown"), relRepo : None, relRepo_request : None,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }))),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (PhantomHistorical {
-      skgid : ID::from ("historical"), home_skgrepo : SkgrepoName::from ("public"),
-      title : "historical" . into (), body : None,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }))),
-    ViewnodeKind::Property (Property::Alias {
-      text : "alias" . into (), relRepo : None, relRepo_request : None,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::ID {
-      skgid : ID::from ("id"),
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::Flag {
-      flag : Flag::NoSearchMatching, title : "flag" . into (), body : None,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::RemovedAlias {
-      text : "alias" . into (),
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::RemovedID {
-      skgid : ID::from ("id"),
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::OldText {
-      title : Some ("old" . into ()), body : None,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::HomeSkgrepoMove {
-      skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("public"),
-                                       new : SkgrepoName::from ("private") },
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::RelRepoMove {
-      skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("public"),
-                                       new : SkgrepoName::from ("private") },
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }),
-    ViewnodeKind::Property (Property::ChangesetMarker {
-      kind : ChangesetMarkerKind::Content,
-      change_facts : facts . clone (), readiness_request : Some (request . clone ()) }), ];
-  for mut kind in carriers {
-    assert_eq! (kind . change_facts (), Some (&facts), "{:?}", kind);
-    assert_eq! (kind . readiness_request (), Some (&request), "{:?}", kind);
-    kind . change_facts_mut () . unwrap () . ready = Some (BTreeSet::new ());
-    assert_eq! ( kind . change_facts () . unwrap () . ready,
-                 Some (BTreeSet::new ()), "{:?}", kind );
-    *kind . readiness_request_mut () . unwrap () = None;
-    assert_eq! (kind . readiness_request (), None, "{:?}", kind);
-    assert! (kind . readiness_request_mut () . is_some (), "{:?}", kind); }
-  let others : Vec<ViewnodeKind> = vec! [
-    ViewnodeKind::Vognode (Vognode::Restricted (RestrictedVognode)),
-    ViewnodeKind::PropertyFolder (PropertyFolder::ID),
-    ViewnodeKind::PropertyFolder (PropertyFolder::Alias),
-    ViewnodeKind::PropertyFolder (PropertyFolder::flags ()),
-    ViewnodeKind::Property (Property::BodyDiff { diff : "diff" . into () }),
-    ViewnodeKind::PartnerFolder (PartnerFolder::Container),
-    ViewnodeKind::BufferRoot,
-    ViewnodeKind::DeadViewnode, ];
-  for mut kind in others {
-    assert_eq! (kind . change_facts (), None, "{:?}", kind);
-    assert_eq! (kind . readiness_request (), None, "{:?}", kind);
-    assert! (kind . change_facts_mut () . is_none (), "{:?}", kind);
-    assert! (kind . readiness_request_mut () . is_none (), "{:?}", kind); }}

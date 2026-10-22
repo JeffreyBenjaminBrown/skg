@@ -8,7 +8,7 @@ pub use super::viewnode::MpUnrestrictedVognode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ ChangeFacts, ReadinessRequest, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -22,10 +22,12 @@ use std::collections::{HashMap, HashSet};
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MpViewnode {
-  pub focused         : bool,
-  pub org_folded      : bool,
-  pub org_body_folded : bool,
-  pub kind            : MpViewnodeKind,
+  pub focused           : bool,
+  pub org_folded        : bool,
+  pub org_body_folded   : bool,
+  pub kind              : MpViewnodeKind,
+  pub change_facts      : ChangeFacts,
+  pub readiness_request : Option<ReadinessRequest>,
 }
 
 // MpUnrestrictedVognode is defined in viewnode.rs.
@@ -75,8 +77,6 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       relRepo_request : u . relRepo_request,
-      change_facts      : u . change_facts,
-      readiness_request : u . readiness_request,
       view_requests  : u . view_requests,
       editability   : u . editability,
     })
@@ -116,10 +116,12 @@ impl TryFrom<MpViewnode> for Viewnode {
 
   fn try_from(u: MpViewnode) -> Result<Self, Self::Error> {
     Ok(Viewnode {
-      focused         : u . focused,
-      org_folded      : u . org_folded,
-      org_body_folded : u . org_body_folded,
-      kind            : ViewnodeKind::try_from(u . kind)?,
+      focused           : u . focused,
+      org_folded        : u . org_folded,
+      org_body_folded   : u . org_body_folded,
+      kind              : ViewnodeKind::try_from(u . kind)?,
+      change_facts      : u . change_facts,
+      readiness_request : u . readiness_request,
     })
   }
 }
@@ -137,8 +139,6 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       relRepo_request : t . relRepo_request,
-      change_facts      : t . change_facts,
-      readiness_request : t . readiness_request,
       view_requests  : t . view_requests,
       editability   : t . editability,
     }
@@ -174,10 +174,12 @@ impl From<ViewnodeKind> for MpViewnodeKind {
 impl From<Viewnode> for MpViewnode {
   fn from(o: Viewnode) -> Self {
     MpViewnode {
-      focused         : o . focused,
-      org_folded      : o . org_folded,
-      org_body_folded : o . org_body_folded,
-      kind            : MpViewnodeKind::from(o . kind),
+      focused           : o . focused,
+      org_folded        : o . org_folded,
+      org_body_folded   : o . org_body_folded,
+      kind              : MpViewnodeKind::from(o . kind),
+      change_facts      : o . change_facts,
+      readiness_request : o . readiness_request,
     }
   }
 }
@@ -250,8 +252,6 @@ impl Default for MpUnrestrictedVognode {
       graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),
       relRepo_request : None,
-      change_facts      : ChangeFacts::default (),
-      readiness_request : None,
       view_requests  : HashSet::new(),
       editability    : Editability::Editable {
         body         : None,
@@ -263,11 +263,13 @@ impl Default for MpUnrestrictedVognode {
 impl Default for MpViewnode {
   fn default() -> Self {
     MpViewnode {
-      focused         : false,
-      org_folded      : false,
-      org_body_folded : false,
-      kind            : MpViewnodeKind::Vognode (
+      focused           : false,
+      org_folded        : false,
+      org_body_folded   : false,
+      kind              : MpViewnodeKind::Vognode (
         MpVognode::Unrestricted (MpUnrestrictedVognode::default())),
+      change_facts      : ChangeFacts::default (),
+      readiness_request : None,
     }
   }
 }
@@ -378,7 +380,5 @@ impl MpViewnode {
 
 pub fn maybePlaced_viewforest_root_viewnode() -> MpViewnode {
   MpViewnode {
-    focused         : false,
-    org_folded      : false,
-    org_body_folded : false,
-    kind            : MpViewnodeKind::BufferRoot, }}
+    kind : MpViewnodeKind::BufferRoot,
+    .. MpViewnode::default () }}

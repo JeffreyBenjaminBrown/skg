@@ -26,7 +26,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::diff_view::fresh_drawing::{
   adopt_fresh_facts, is_unrestricted_removed_member};
-use crate::types::viewnode::{ChangeFacts, DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -274,7 +274,7 @@ fn drawing_of_goal_item (
         match shape { FolderGoalShape::Removed => AffectsParent::False,
                       _ => AffectsParent::True, } ) } }, };
   if let Some (presence) = item . presence {
-    set_presence (&mut drawn, presence); }
+    drawn . change_facts . presence = presence; }
   Ok (drawn) }
 
 /// Give each child that a goal item matched the item's shape, keeping
@@ -315,21 +315,8 @@ fn apply_goal_shapes (
       _ => adopt_fresh_facts (
         viewnode, &drawing_of_goal_item (item, child_data, label) ? ), }
     if let Some (presence) = item . presence {
-      set_presence (viewnode, presence); }}
+      viewnode . change_facts . presence = presence; }}
   Ok (( )) }
-
-fn set_presence (
-  viewnode : &mut Viewnode,
-  presence : DiffPresence,
-) {
-  match &mut viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      t . change_facts . presence = presence,
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-      u . change_facts . presence = presence,
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-      h . change_facts . presence = presence,
-    _ => {}, }}
 
 /// An already-open PartnerFolder can still hold an Unrestricted occurrence after its
 /// graphnode was deleted.  When the rebuilt raw goal retains that membership,
@@ -367,19 +354,17 @@ fn normalize_relationship_backed_partner_unknowns (
         . clone () };
       let relRepo : Option<SkgrepoName> = child_data . get (&skgid)
         . and_then (|data| data . relRepo . clone ());
-      vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
+      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (
         crate::types::viewnode::Phantom::Unknown (
           crate::types::viewnode::PhantomUnknown {
-            skgid, relRepo, relRepo_request: None,
-            change_facts: ChangeFacts::default (),
-            readiness_request: None }))); })
+            skgid, relRepo, relRepo_request: None })))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::viewnode::mk_writeProtected_viewnode;
+  use crate::types::viewnode::{mk_writeProtected_viewnode, viewnode_of};
 
   fn skgid (text : &str) -> ID { ID::from (text) }
   fn skgrepo (text : &str) -> SkgrepoName { SkgrepoName::from (text) }
@@ -397,8 +382,7 @@ mod tests {
         home_skgrepo : skgrepo ("main"),
         .. crate::types::nodes::complete::empty_graphnode () } ]);
     let mut tree : Tree<Viewnode> = Tree::new (
-      Viewnode { focused: false, org_folded: false, org_body_folded: false,
-                 kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) });
+      viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)));
     let folder : NodeId = tree . root () . id ();
     let member : Viewnode = mk_writeProtected_viewnode (
       skgid ("x2"), skgrepo ("main"), "x" . to_string (), AffectsParent::True );
@@ -423,8 +407,7 @@ mod tests {
     let primary : ID = skgid ("deleted-primary");
     let raw_extra : ID = skgid ("surviving-extra");
     let mut tree : Tree<Viewnode> = Tree::new (
-      Viewnode { focused: false, org_folded: false, org_body_folded: false,
-                 kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) });
+      viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)));
     let folder : NodeId = tree . root () . id ();
     let mut child : Viewnode = mk_writeProtected_viewnode (
       primary . clone (), skgrepo ("main"), "last seen" . to_string (),
