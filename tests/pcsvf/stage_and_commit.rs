@@ -185,7 +185,7 @@ fn an_entry_staged_beforehand_needs_confirmation_and_is_then_committed (
     assert_eq! ( paths, &vec! [ PathBuf::from ("notes.txt") ] );
     let response : String = stage_and_commit_response_sexp (&answer);
     assert! ( response . starts_with ( &format! (
-      "((needs-confirmation . t) (pre-staged (({} notes.txt))) (readiness-summary (ready ",
+      "((needs-confirmation . t) (pre-staged ((\"{}\" \"notes.txt\"))) (readiness-summary (ready ",
       public_root . display () )),
               "{}", response );
     for (i, skgrepo) in SKGREPOS . iter () . enumerate () {

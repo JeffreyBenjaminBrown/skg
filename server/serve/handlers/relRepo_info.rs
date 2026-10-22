@@ -13,6 +13,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix,
   value_from_request_sexp };
+use crate::sexp_string::quote_sexp_string;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgrepoName};
 
@@ -27,7 +28,7 @@ pub fn handle_relRepo_info_request (
     match relRepo_info_response_body (request, env) {
       Ok  (body) => body,
       Err (msg)  => format! (
-        "(error {})", quoted (&msg) ) };
+        "(error {})", quote_sexp_string (&msg) ) };
   send_response_with_length_prefix ( stream, & format! (
     "((response-type {}) {})",
     TcpToClient::RelRepoInfo . repr_in_client (),
@@ -53,10 +54,10 @@ fn relRepo_info_response_body (
       &runtime . graph, &runtime . config,
       &recorder, &member, relation ) ?;
   let mut body : String = format! (
-    "(default {})", quoted ( & default . 0 ));
+    "(default {})", quote_sexp_string ( & default . 0 ));
   if let Some (skgrepo) = current {
     body . push_str ( & format! (
-      " (current {})", quoted ( & skgrepo . 0 ))); }
+      " (current {})", quote_sexp_string ( & skgrepo . 0 ))); }
   Ok (body) }
 
 /// One relationship's (default relRepo, current relRepo). Between owned nodes,
@@ -100,19 +101,6 @@ fn relation_from_client_string (
     other => Err ( format! (
       "unsupported relation '{}': the explicit-relRepo path covers \
        contains, subscribesTo and overrides", other )), }}
-
-fn quoted (
-  s : &str,
-) -> String {
-  let mut result : String = String::from ("\"");
-  for ch in s . chars () {
-    match ch {
-      '\\' => result . push_str ("\\\\"),
-      '"'  => result . push_str ("\\\""),
-      '\n' => result . push_str ("\\n"),
-      _    => result . push (ch), }}
-  result . push ('"');
-  result }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/relRepo_info.rs"]

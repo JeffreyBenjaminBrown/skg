@@ -13,7 +13,8 @@
 //! changes were all committed comes back as plain context.
 
 use crate::diff_view::change_leaves::{
-  BufferReadinessSummary, ReadinessSummary, readiness_response_sexp};
+  BufferReadinessSummary, ReadinessSummary, readiness_response_sexp,
+  readiness_response_trailing_entries};
 use crate::git_ops::stage_and_commit::{
   PreStagedGitrepo, SkgrepoCommitOutcome,
   pre_staged_entries_of_owned_gitrepos, stage_and_commit_owned_skgrepos};
@@ -28,6 +29,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, sexp_to_client_string,
   tag_sexp_response, true_entry_sexp, value_from_request_sexp};
+use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoName;
@@ -156,7 +158,7 @@ pub fn stage_and_commit (
 
 /// Format, for each answer:
 ///   ((errors ("REFUSAL")) (warnings ()))
-///   ((needs-confirmation . t) [(pre-staged ((GITREPO PATH...) ...))]
+///   ((needs-confirmation . t) [(pre-staged (("GITREPO" "PATH"...) ...))]
 ///    (readiness-summary ...) (errors ()) (warnings ()))
 ///   ((commits (("SKGREPO" "COMMIT-ID") ...)) (errors (...)) (warnings ()))
 /// The readiness summary has the save response's form, with an
@@ -167,19 +169,24 @@ pub fn stage_and_commit (
 pub fn stage_and_commit_response_sexp (
   answer : &StageAndCommitAnswer,
 ) -> String {
-  let response : Sexp = match answer {
+  match answer {
     StageAndCommitAnswer::Refused (error) =>
-      readiness_response_sexp (
-        Vec::new (), None, &[ error . clone () ], &[] ),
-    StageAndCommitAnswer::NeedsConfirmation { summary, pre_staged } =>
-      readiness_response_sexp (
-        once ( true_entry_sexp ("needs-confirmation") )
-          . chain ( ( ! pre_staged . is_empty () ) . then (
-            || pre_staged_sexp (pre_staged) ))
-          . collect (),
-        Some ( &BufferReadinessSummary {
-          summary : summary . clone (), changes_not_editable_here : 0 } ),
-        &[], &[] ),
+      sexp_to_client_string ( &readiness_response_sexp (
+        Vec::new (), None, &[ error . clone () ], &[] )),
+    StageAndCommitAnswer::NeedsConfirmation { summary, pre_staged } => {
+      let trailing_entries : Vec<Sexp> =
+        readiness_response_trailing_entries (
+          Some ( &BufferReadinessSummary {
+            summary : summary . clone (), changes_not_editable_here : 0 } ),
+          &[], &[] );
+      let entries : Vec<String> =
+        once ( sexp_to_client_string (
+          &true_entry_sexp ("needs-confirmation") ))
+        . chain ( ( ! pre_staged . is_empty () ) . then (
+          || pre_staged_sexp (pre_staged) ))
+        . chain ( trailing_entries . iter () . map (sexp_to_client_string) )
+        . collect ();
+      format! ( "({})", entries . join (" ") ) },
     StageAndCommitAnswer::Committed { outcomes, errors } => {
       let commits : Vec<Sexp> = outcomes . iter ()
         . filter_map ( |(skgrepo, outcome)| match outcome {
@@ -194,26 +201,29 @@ pub fn stage_and_commit_response_sexp (
           Ok (_) => None, } )
         . chain ( errors . iter () . cloned () )
         . collect ();
-      readiness_response_sexp (
+      sexp_to_client_string ( &readiness_response_sexp (
         vec! [ Sexp::List ( vec! [
           Sexp::Atom ( Atom::S ( "commits" . to_string () )),
           Sexp::List (commits) ] ) ],
-        None, &all_errors, &[] ) }, };
-  sexp_to_client_string (&response) }
+        None, &all_errors, &[] )) }, }}
 
-/// Format: (pre-staged ((GITREPO PATH...) ...))
+/// Format: (pre-staged (("GITREPO" "PATH"...) ...))
+/// Printed by hand, each path through 'quote_sexp_string': the 'sexp'
+/// crate prints an atom bare unless it holds whitespace or a quote,
+/// and a bare path holding ';' or '(' would not read back as one atom.
 fn pre_staged_sexp (
   pre_staged : &[PreStagedGitrepo],
-) -> Sexp {
-  let path_atom = |path : &Path| -> Sexp {
-    Sexp::Atom ( Atom::S ( path . display () . to_string () )) };
-  Sexp::List ( vec! [
-    Sexp::Atom ( Atom::S ( "pre-staged" . to_string () )),
-    Sexp::List (
-      pre_staged . iter ()
-        . map ( |gitrepo| Sexp::List (
-          once ( gitrepo . gitrepo . as_path () )
-            . chain ( gitrepo . paths . iter () . map ( PathBuf::as_path ) )
-            . map (path_atom)
-            . collect () ))
-        . collect () ) ] ) }
+) -> String {
+  let path_atom = |path : &Path| -> String {
+    quote_sexp_string ( &path . display () . to_string () ) };
+  let gitrepo_lists : Vec<String> =
+    pre_staged . iter ()
+    . map ( |gitrepo| format! (
+      "({})",
+      once ( gitrepo . gitrepo . as_path () )
+        . chain ( gitrepo . paths . iter () . map ( PathBuf::as_path ) )
+        . map (path_atom)
+        . collect::<Vec<String>> ()
+        . join (" ") ))
+    . collect ();
+  format! ( "(pre-staged ({}))", gitrepo_lists . join (" ") ) }

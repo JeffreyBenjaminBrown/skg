@@ -5,6 +5,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
+use crate::sexp_string::quote_sexp_string;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{
@@ -19,7 +20,7 @@ pub fn handle_flag_state_request (
 ) {
   let response : String = match flag_state_response_body (request, env) {
     Ok (body) => body,
-    Err (message) => format! ("(error {})", quoted (&message)), };
+    Err (message) => format! ("(error {})", quote_sexp_string (&message)), };
   send_response_with_length_prefix (stream, &format! (
     "((response-type {}) {})",
     TcpToClient::FlagState . repr_in_client (), response));
@@ -38,9 +39,10 @@ fn flag_state_response_body (
     &runtime . graph, &runtime . config, &skgid, flag) ?;
   Ok (format! (
     "(id {}) (flag {}) (value {}) (repo {}) (owned {})",
-    quoted (&pid . 0), quoted (flag . wire_name ()),
-    quoted (if value { "true" } else { "false" }),
-    quoted (&skgrepo . 0), quoted (if owned { "true" } else { "false" })))
+    quote_sexp_string (&pid . 0), quote_sexp_string (flag . wire_name ()),
+    quote_sexp_string (if value { "true" } else { "false" }),
+    quote_sexp_string (&skgrepo . 0),
+    quote_sexp_string (if owned { "true" } else { "false" })))
 }
 
 pub fn flag_state (
@@ -56,18 +58,6 @@ pub fn flag_state (
   let value : bool = flag_is_true (&node . flags, flag);
   let owned : bool = config . skgrepo_is_owned (&skgrepo);
   Ok ((pid, skgrepo, value, owned))
-}
-
-fn quoted (s : &str) -> String {
-  let mut result : String = String::from ("\"");
-  for ch in s . chars () {
-    match ch {
-      '\\' => result . push_str ("\\\\"),
-      '"'  => result . push_str ("\\\""),
-      '\n' => result . push_str ("\\n"),
-      _    => result . push (ch), }}
-  result . push ('"');
-  result
 }
 
 #[cfg(test)]

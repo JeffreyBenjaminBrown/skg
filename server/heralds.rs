@@ -20,6 +20,7 @@
 /// nested RULE. The special label ANY matches any leaf; IT echoes
 /// the matched value(s).
 
+use crate::sexp_string::quote_sexp_string;
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangesetMarkerKind, DiffPresence, PartnerFolder, Property, PropertyFolder,
@@ -571,23 +572,17 @@ fn serialize_rule (
     parts . push ( style_repr_in_client (style) ); }
   if let Some (sep) = rule . interc {
     parts . push ( "INTERC" . to_string () );
-    parts . push ( quote_string (sep) ); }
+    parts . push ( quote_sexp_string (sep) ); }
   if let Some (label) = rule . label {
     parts . push ( label . to_string () ); }
   if rule . abut {
     parts . push ( "ABUT" . to_string () ); }
   for child in & rule . children {
     parts . push ( match child {
-      RuleChild::Str (text) => quote_string (text),
+      RuleChild::Str (text) => quote_sexp_string (text),
       RuleChild::It         => "IT" . to_string (),
       RuleChild::Rule (r)   => serialize_rule (r), } ); }
   format! ( "({})", parts . join (" ")) }
-
-fn quote_string (
-  text : &str,
-) -> String {
-  format! ( "\"{}\"",
-            text . replace ('\\', "\\\\") . replace ('"', "\\\"") ) }
 
 //
 // Consistency of shared/herald-styles.json

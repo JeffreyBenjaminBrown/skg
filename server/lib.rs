@@ -18,6 +18,7 @@ pub mod nodeMerge;
 pub mod org_to_text;
 pub mod save;
 pub mod serve;
+pub mod sexp_string;
 pub mod skgrepo_sets;
 pub mod test_utils;
 pub mod to_org;

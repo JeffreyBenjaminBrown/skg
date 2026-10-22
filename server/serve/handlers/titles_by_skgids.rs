@@ -8,6 +8,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::handlers::save_buffer::compute_diff_for_every_skgrepo;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, sexp_to_client_string};
+use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::{
   SkgrepoRestriction,
   SkgrepoSetName,
@@ -129,8 +130,8 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
     . map ( |(skgid, title)|
       format! (
         "({} . {})",
-        elisp_string_literal (skgid . as_str ()),
-        elisp_string_literal (title)) )
+        quote_sexp_string (skgid . as_str ()),
+        quote_sexp_string (title)) )
     . collect ();
   let response : String =
     format! (
@@ -138,25 +139,9 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
       TcpToClient::TitlesByIds . repr_in_client (),
       content_pairs . join (" "),
       warnings . iter ()
-      . map ( |warning| elisp_string_literal (warning) )
+      . map ( |warning| quote_sexp_string (warning) )
       . collect::<Vec<String>> () . join (" ") );
   send_response_with_length_prefix (stream, &response); }
-
-fn elisp_string_literal (
-  s : &str,
-) -> String {
-  let mut result : String =
-    String::from ("\"");
-  for ch in s . chars () {
-    match ch {
-      '\\' => result . push_str ("\\\\"),
-      '"'  => result . push_str ("\\\""),
-      '\n' => result . push_str ("\\n"),
-      '\r' => result . push_str ("\\r"),
-      '\t' => result . push_str ("\\t"),
-      _    => result . push (ch), }}
-  result . push ('"');
-  result }
 
 pub fn add_deleted_node_titles_by_skgids (
   title_map     : &mut HashMap<ID, String>,

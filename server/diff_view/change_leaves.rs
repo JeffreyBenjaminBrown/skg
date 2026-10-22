@@ -125,10 +125,21 @@ pub fn readiness_response_sexp (
 ) -> Sexp {
   Sexp::List (
     leading . into_iter ()
-      . chain ( summary . map ( |summary| summary . to_sexp () ))
-      . chain ( [ format_string_list_sexp ("errors", errors),
-                  format_string_list_sexp ("warnings", warnings) ] )
+      . chain ( readiness_response_trailing_entries (
+        summary, errors, warnings ))
       . collect () ) }
+
+/// The entries of 'readiness_response_sexp' after the leading ones,
+/// for a response whose leading entries are printed by hand.
+pub fn readiness_response_trailing_entries (
+  summary  : Option<&BufferReadinessSummary>,
+  errors   : &[String],
+  warnings : &[String],
+) -> Vec<Sexp> {
+  summary . map ( |summary| summary . to_sexp () ) . into_iter ()
+    . chain ( [ format_string_list_sexp ("errors", errors),
+                format_string_list_sexp ("warnings", warnings) ] )
+    . collect () }
 
 /// See the module comment.
 #[derive(Clone, Debug, Default)]

@@ -4,6 +4,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
+use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -45,7 +46,7 @@ pub fn handle_link_statuses_request (
   let response : String = match link_statuses_response (
     request, graph, config, restriction ) {
     Ok (body) => body,
-    Err (message) => format! ("(error {})", quoted (&message)), };
+    Err (message) => format! ("(error {})", quote_sexp_string (&message)), };
   send_response_with_length_prefix (stream, &format! (
     "((response-type {}) {})",
     TcpToClient::LinkStatuses . repr_in_client (), response)); }
@@ -67,27 +68,16 @@ fn link_statuses_response (
     graph, config, restriction, &skgids)
     .into_iter ()
     .map (|(skgid, status)| match status {
-      LinkStatus::Missing => format! ("({} missing)", quoted (&skgid . 0)),
-      LinkStatus::Restricted => format! ("({} restricted)", quoted (&skgid . 0)),
+      LinkStatus::Missing => format! ("({} missing)", quote_sexp_string (&skgid . 0)),
+      LinkStatus::Restricted => format! ("({} restricted)", quote_sexp_string (&skgid . 0)),
       LinkStatus::Resolved { pid, skgrepo_label } => format! (
         "({} resolved {} {})",
-        quoted (&skgid . 0), quoted (&pid . 0), quoted (&skgrepo_label)), })
+        quote_sexp_string (&skgid . 0),
+        quote_sexp_string (&pid . 0),
+        quote_sexp_string (&skgrepo_label)), })
     .collect ();
   Ok (format! ("(request-id {}) (results ({}))",
-    quoted (&request_id), rows . join (" "))) }
-
-fn quoted (s : &str) -> String {
-  let mut result : String = String::from ("\"");
-  for ch in s . chars () {
-    match ch {
-      '\\' => result . push_str ("\\\\"),
-      '"' => result . push_str ("\\\""),
-      '\n' => result . push_str ("\\n"),
-      '\r' => result . push_str ("\\r"),
-      '\t' => result . push_str ("\\t"),
-      _ => result . push (ch), }}
-  result . push ('"');
-  result }
+    quote_sexp_string (&request_id), rows . join (" "))) }
 
 #[cfg(test)]
 mod tests {

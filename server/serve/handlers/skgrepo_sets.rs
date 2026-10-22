@@ -12,6 +12,7 @@ use crate::serve::util::{
   request_type_from_request,
   send_response_with_length_prefix,
   value_from_request_sexp};
+use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoSetName;
@@ -121,14 +122,14 @@ fn send_skgrepo_sets_response (
   names . push ("all" . to_string ());
   let names_sexp : String =
     names . iter ()
-    . map ( |name| format! ("\"{}\"", escape_string (name)) )
+    . map ( |name| quote_sexp_string (name) )
     . collect::<Vec<String>> ()
     . join (" ");
   let response : String =
     format! (
-      "((response-type {}) (restriction \"{}\") (sets ({})))",
+      "((response-type {}) (restriction {}) (sets ({})))",
       TcpToClient::SkgrepoSets . repr_in_client (),
-      escape_string (&restriction . name . 0),
+      quote_sexp_string (&restriction . name . 0),
       names_sexp );
   send_response_with_length_prefix (stream, &response); }
 
@@ -140,10 +141,10 @@ fn send_skgrepo_restriction_response (
     &restriction . name . 0;
   let response : String =
     format! (
-      "((response-type {}) (restriction \"{}\") (content \"Skgrepo restriction: {}\"))",
+      "((response-type {}) (restriction {}) (content {}))",
       TcpToClient::SkgrepoRestriction . repr_in_client (),
-      escape_string (name),
-      escape_string (name));
+      quote_sexp_string (name),
+      quote_sexp_string (&format! ("Skgrepo restriction: {}", name)) );
   send_response_with_length_prefix (stream, &response); }
 
 /// The unwinding refusal shape (the quiet shape): the endpoint's
@@ -160,16 +161,9 @@ fn refuse_unwinding (
 ) {
   let response : String =
     format! (
-      "((response-type {}) (restriction \"{}\") (content \"{}\"))",
+      "((response-type {}) (restriction {}) (content {}))",
       TcpToClient::SkgrepoRestriction . repr_in_client (),
-      escape_string (&restriction . name . 0),
-      escape_string (msg));
+      quote_sexp_string (&restriction . name . 0),
+      quote_sexp_string (msg));
   send_response_with_length_prefix (stream, &response);
   stream_empty_rerender (stream); }
-
-fn escape_string (
-  s : &str,
-) -> String {
-  s . replace ('\\', "\\\\")
-    . replace ('"', "\\\"")
-    . replace ('\n', "\\n") }

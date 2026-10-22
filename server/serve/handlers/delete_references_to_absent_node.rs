@@ -9,6 +9,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response, tag_text_response,
   value_from_request_sexp };
+use crate::sexp_string::quote_sexp_string;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
@@ -49,8 +50,10 @@ pub fn handle_delete_references_to_absent_node_request (
   if ! current . links . is_empty () && approved . is_none () {
     let content = preview_warning_org (&current);
     let response = format! (
-      "((id \"{}\") (approved-preview \"{}\") (content \"{}\") (prompt \"Remove the structured references?\"))",
-      escape (&raw_skgid . 0), escape (&current . opaque_approval ()), escape (&content));
+      "((id {}) (approved-preview {}) (content {}) (prompt \"Remove the structured references?\"))",
+      quote_sexp_string (&raw_skgid . 0),
+      quote_sexp_string (&current . opaque_approval ()),
+      quote_sexp_string (&content));
     send_response_with_length_prefix (
       stream, &tag_sexp_response (
         TcpToClient::DeleteReferencesConfirmation, &response));
@@ -70,8 +73,8 @@ pub fn handle_delete_references_to_absent_node_request (
   drop (_mutation_guard);
   let result = result_org (&current);
   let response = format! (
-    "((content \"{}\") (changed-nodes {}) (changed-memberships {}))",
-    escape (&result), current . changed_nodes (), current . structural . len ());
+    "((content {}) (changed-nodes {}) (changed-memberships {}))",
+    quote_sexp_string (&result), current . changed_nodes (), current . structural . len ());
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DeleteReferencesResult, &response));
   let affected_recorder_pids : HashSet<ID> = current . structural . iter ()
@@ -84,11 +87,6 @@ fn refuse (stream : &mut TcpStream, error : &str) {
   send_response_with_length_prefix (
     stream, &tag_text_response (TcpToClient::Error, error));
   stream_empty_rerender (stream);
-}
-
-fn escape (text : &str) -> String {
-  text . replace ('\\', "\\\\") . replace ('\"', "\\\"")
-    . replace ('\n', "\\n")
 }
 
 /// The absent-reference command only removes relationships to an ID freshly proven to

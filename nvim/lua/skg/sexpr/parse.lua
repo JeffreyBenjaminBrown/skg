@@ -5,7 +5,7 @@
 --
 -- The grammar matched here is pinned by the two peers, not by full
 -- elisp:
--- - what the server EMITS: 'quote_herald' in server/org_to_text.rs
+-- - what the server EMITS: 'quote_sexp_string' (server/sexp_string.rs)
 --   escapes only backslash and double-quote inside strings; bare atoms
 --   may contain any non-delimiter bytes (e.g. the homeRepoHerald atom
 --   '⌂:public'); counts are bare integers; dotted notation appears in
