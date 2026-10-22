@@ -343,8 +343,11 @@ So far there are these endpoints:
   - Request: ((request . "server warnings"))
   - Response: LP =((response-type server-warnings) (warnings ("WARNING" ...)))=,
     or =(warnings ())= when there are none. The warnings are the ones
-    the server raised as it started; today, one per top-level key of
-    skgconfig.toml it does not know (see "skgconfig.toml", below).
+    the server raised as it started: one per top-level key of
+    skgconfig.toml it does not know (see "skgconfig.toml", below), and
+    one per foreign skgrepo whose dependencies manifest orders two
+    skgrepos differently than the config does (see
+    "OTHER_SKGREPO_DEPENDENCIES.toml", below).
     A reload of the config ("Rebuild session-lifetime stores") does
     not change them.
   - Each client sends this once per connection, as soon as the
@@ -415,11 +418,11 @@ So far there are these endpoints:
   - Response: LP response-type "stage-and-commit", then a rerender
     stream (rerender-lock, rerender-view*, rerender-done). The
     response is one of:
-    - =((needs-confirmation . t) (pre-staged (("GITREPO" "PATH" ...) ...)) (readiness-summary ...) (errors ()) (warnings ()))=
+    - =((needs-confirmation . t) (already-staged (("GITREPO" "PATH" ...) ...)) (readiness-summary ...) (errors ()) (warnings ()))=
       when the request is not confirmed and either the readiness
       summary (the save response's form, with =(notEditable 0)=) is
-      incomplete or some owned gitrepo has entries staged already.
-      =pre-staged= is present only in the second case: each such
+      incomplete or some owned gitrepo has entries already staged.
+      =already-staged= is present only in the second case: each such
       gitrepo's worktree path, then its staged paths relative to it,
       read from the git index before anything is staged. Nothing
       changes, and the rerender stream is empty. A resend with
@@ -429,7 +432,7 @@ So far there are these endpoints:
       staged (deletions included; the command stages nothing else) and
       git-committed with MESSAGE, by the gitrepo's configured user. A
       git-commit records the whole git index, so the commit of a
-      gitrepo with entries staged beforehand includes them. A skgrepo without changes is in
+      gitrepo with an already-staged entry includes it. A skgrepo without changes is in
       neither list; one that failed is an error. When something was
       committed, the rerender stream rerenders each open buffer of
       the diff view over the rebuilt graph straddle, as any
@@ -1178,7 +1181,9 @@ dependencies = [
 It is generated output — hand edits are clobbered — and lets someone
 who receives one of your skgrepos see what it depends on and where to get
 it. When a FOREIGN skgrepo's manifest orders two skgrepos differently
-than this config does, the server warns at init. (The receiver also
+than this config does, the server warns at init, in its log and in
+the startup warnings each client shows on connect (see "Server
+warnings", above). (The receiver also
 still reads the older bare-string =dependencies= shape, so manifests
 published before this change keep working.)
 

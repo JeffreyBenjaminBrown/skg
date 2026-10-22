@@ -43,8 +43,9 @@ pub struct SharedRuntime {
   /// and written back after every change.
   pub readiness_store : SyncMutex<ReadinessStore>,
   /// What the server warned about as it started (unknown config
-  /// keys), recorded once by 'main' and served by the "server
-  /// warnings" request.
+  /// keys, foreign manifests whose order the config contradicts),
+  /// recorded once by 'main' and served by the "server warnings"
+  /// request.
   startup_warnings : OnceLock<Vec<String>>,
 }
 

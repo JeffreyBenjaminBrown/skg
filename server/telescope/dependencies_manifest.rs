@@ -136,8 +136,8 @@ fn dependency_entry_path (e : &toml::Value) -> Option<String> {
 
 /// The receiver half: warnings (never errors, never reordering) for
 /// each foreign manifest whose relative order the receiver's config
-/// contradicts. Returned as strings so init can log them and tests
-/// can pin them.
+/// contradicts. Returned as strings so 'main' can log them and
+/// record them as startup warnings, and tests can pin them.
 pub fn foreign_manifest_order_warnings (
   config : &SkgConfig,
 ) -> Vec<String> {

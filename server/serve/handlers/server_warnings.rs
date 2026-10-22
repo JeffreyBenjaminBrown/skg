@@ -1,5 +1,6 @@
 /// PURPOSE: Serve the warnings the server raised as it started (see
-/// 'unknown_top_level_config_key_warnings'). Each client asks once per
+/// 'unknown_top_level_config_key_warnings' and
+/// 'foreign_manifest_order_warnings'). Each client asks once per
 /// connection, before it requests any view, and shows a non-empty
 /// answer in a buffer of its own.
 

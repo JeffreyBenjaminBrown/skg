@@ -1093,7 +1093,7 @@ occurrence's folder showing an unknown phantom with the sign '-' saves
 unchanged, and one showing an unknown member without it is compared as
 today; the Rust suite.
 
-** TODO Slice 7: one sexp string printer, "already staged", and the manifest warnings served
+** DONE Slice 7: one sexp string printer, "already staged", and the manifest warnings served
 Make the changes under the heading of that name above, printer first,
 then the rename, then the warnings. Tests: a unit test of the printer
 (backslash, quote, newline, a path with ';' and '('); the pre-staged

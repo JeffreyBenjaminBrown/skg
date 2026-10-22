@@ -1,12 +1,14 @@
 // The startup warnings: 'load_config' warns about the top-level keys
-// of skgconfig.toml it does not know, and the "server warnings"
-// request serves what the server recorded.
+// of skgconfig.toml it does not know, 'foreign_manifest_order_warnings'
+// about a foreign manifest whose order the config contradicts, and the
+// "server warnings" request serves what the server recorded.
 // Fixture: 'tests/server_warnings/fixtures/skgconfig.toml', a config
 // with no skgrepos that sets an old spelling and an unknown key.
 
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::serve::handlers::server_warnings::handle_server_warnings_request;
 use skg::serve::protocol::RequestType;
+use skg::telescope::dependencies_manifest::foreign_manifest_order_warnings;
 use skg::test_utils::read_lp_message;
 use skg::types::misc::SkgConfig;
 
@@ -46,6 +48,44 @@ fn the_server_warnings_request_answers_with_each_recorded_warning (
   assert_eq! (
     served_warnings_response (&[]) ?,
     "((response-type server-warnings) (warnings ()))" );
+  Ok (( )) }
+
+/// A foreign skgrepo whose manifest calls 'extra' more public than
+/// 'work', under a config that orders them the other way, yields a
+/// warning that the request serves beside the config's own, as 'main'
+/// records them.
+#[test]
+fn a_foreign_manifest_the_config_contradicts_is_served_as_a_warning (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let tmp : tempfile::TempDir = tempfile::tempdir () ?;
+  for skgrepo_folder in ["owned/mine", "colleague/work", "colleague/extra"] {
+    std::fs::create_dir_all ( tmp . path () . join (skgrepo_folder) ) ?; }
+  std::fs::write (
+    tmp . path () . join ("skgconfig.toml"),
+    "tantivy_folder = \"tantivy\"\n\
+     [[repos]]\nname = \"mine\"\npath = \"owned/mine\"\n\
+     [[repos]]\nname = \"her-work\"\npath = \"colleague/work\"\n\
+     [[repos]]\nname = \"her-extra\"\npath = \"colleague/extra\"\n" ) ?;
+  std::fs::write (
+    tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml"),
+    "dependencies = [\n  \
+     { path = \"owned/extra\" },\n  \
+     { path = \"owned/work\" },\n]\n" ) ?;
+  let (config, config_warnings) : (SkgConfig, Vec<String>) =
+    load_config ( &tmp . path () . join ("skgconfig.toml")
+                  . display () . to_string () ) ?;
+  assert! (config_warnings . is_empty (), "{:?}", config_warnings);
+  let startup_warnings : Vec<String> =
+    config_warnings . into_iter ()
+    . chain ( foreign_manifest_order_warnings (&config) )
+    . collect ();
+  assert_eq! (startup_warnings . len (), 1, "{:?}", startup_warnings);
+  let response : String = served_warnings_response (&startup_warnings) ?;
+  assert! (response . starts_with (
+             "((response-type server-warnings) (warnings (\"Repo 'her-work' ships" ),
+           "{}", response);
+  assert! (response . contains ("placing 'extra' more public than 'work'"),
+           "{}", response);
   Ok (( )) }
 
 /// What 'handle_server_warnings_request' writes for WARNINGS, read

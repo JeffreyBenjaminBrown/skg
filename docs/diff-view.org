@@ -557,12 +557,12 @@ When the readiness summary is incomplete and the request lacks
 the typed word "yes" and resends confirmed.
 
 Before staging anything, the server also
-reads the index of every owned gitrepo. If any has entries staged
-already, the answer is the same confirmation with a second reason,
-'(pre-staged ((GITREPO PATH...) ...))', and nothing is staged or
+reads the index of every owned gitrepo. If any has entries already
+staged, the answer is the same confirmation with a second reason,
+'(already-staged ((GITREPO PATH...) ...))', and nothing is staged or
 committed; the client lists those paths and asks the typed "yes".
 One confirmed resend covers both reasons, and the commit of such a
-gitrepo then includes what was staged before, as a git commit
+gitrepo then includes its already-staged entries, as a git commit
 records the whole index.
 ** After the commit
 The straddle is rebuilt over the new HEAD, the store keeps only the

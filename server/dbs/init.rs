@@ -10,7 +10,7 @@ use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::GraphnodeInTantivy;
 use crate::types::nodes::complete::Graphnode;
-use crate::telescope::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
+use crate::telescope::dependencies_manifest::write_dependencies_manifests;
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
@@ -73,8 +73,6 @@ pub fn initialize_dbs (
   if let Err (e) = write_dependencies_manifests (config) {
     tracing::warn! (
       error = %e, "could not write OTHER_SKGREPO_DEPENDENCIES.toml manifests" ); }
-  for warning in foreign_manifest_order_warnings (config) {
-    tracing::warn! ("{}", warning); }
   (env, handoff, nodes)
 }
 

@@ -2612,3 +2612,52 @@ have a repo that exists in the config."). In that of 'partner_ids', a
 subscribee folder under the write-protected recorder holding an
 unknown phantom with '(presence rel-)' beside recorder's partners
 saved without error.
+** Slice 7: deviations
+*** a seventh printer
+'elisp_string_literal' ('server/serve/handlers/titles_by_skgids.rs'),
+which the plan does not list, was one more hand-written sexp string
+printer; it goes too. It escaped '\r' and '\t', which Neovim's reader
+turned into 'r' and 't'. The TOML quoter in
+'server/telescope/dependencies_manifest.rs' prints TOML, not a sexp,
+and stays.
+*** the confirmation is printed entry by entry
+'stage_and_commit_response_sexp' builds the '(needs-confirmation ...)'
+answer from printed entries: the hand-printed '(already-staged ...)'
+between '(needs-confirmation . t)' and the trailing entries, which a
+new 'readiness_response_trailing_entries'
+('server/diff_view/change_leaves.rs') supplies and
+'readiness_response_sexp' now uses too. The entry order is unchanged.
+*** prose and names beyond the plan's list
+The test 'an_entry_staged_beforehand_needs_confirmation_and_is_then_committed'
+became 'an_already_staged_entry_needs_confirmation_and_is_then_committed';
+"entries staged already" and "staged beforehand" in comments, test
+names and docs became "entries already staged" and "already staged".
+The clients' prompt text ("Staged already, so committed too: ...")
+stays, as the plan names no message change. The clients' tests now
+send the paths quoted, as the server does.
+*** a stale citation
+'nvim/lua/skg/sexpr/parse.lua' said the server's strings were printed
+by 'quote_herald' in 'server/org_to_text.rs', which no longer exists;
+it now names 'quote_sexp_string'.
+*** tests
+'tests/unit/sexp_string.rs' (backslash, quote, newline, a path with
+';' and '(', the empty string); 'tests/pcsvf/stage_and_commit.rs'
+expects quoted paths under 'already-staged'; the clients' tests send
+the new key; 'tests/server_warnings.rs',
+'a_foreign_manifest_the_config_contradicts_is_served_as_a_warning',
+loads the fixture's config from a temporary data root, joins the
+manifest warning to the config's as 'main' does, and reads it back
+from the handler.
+*** docs
+'docs/api-and-formats.org' ("Server warnings" and
+"OTHER_SKGREPO_DEPENDENCIES.toml") says the manifest warnings are
+served; "already staged" in it and in 'docs/diff-view.org'.
+*** verification
+nextest 867 passed; Emacs 376; Neovim all specs passed. Over TCP, on
+an isolated server ('tests/results/15-slice7/verify.sh', logs beside
+it): the stage-and-commit confirmation lists
+'(already-staged (("…/owned/mine" "odd;(name).txt")))'; a title
+holding a quote and a backslash, the repo sets and the flag state read
+back identically in Emacs's 'read' and Neovim's reader; "server
+warnings" serves the foreign manifest's order warning, which the log
+still shows.
