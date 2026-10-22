@@ -1059,7 +1059,7 @@ two objects names both without asking, and that a headline listing
 as they are; all three unit suites and the integration suite (the
 recursive gesture over every root still makes every file ready).
 
-** TODO Slice 5: a removed member follows the editability rule
+** DONE Slice 5: a removed member follows the editability rule
 Make the changes under "A removed member follows the editability rule"
 above. Tests: on 'removed_partners', x is editable under b, carries
 its content list and its "its containers changed (other files)" folder

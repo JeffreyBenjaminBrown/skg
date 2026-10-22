@@ -34,7 +34,7 @@ use skg::types::viewnode::{
 use skg::types::views_state::ViewId;
 
 use ego_tree::{NodeId, Tree};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::error::Error;
 use std::path::Path;
 
@@ -65,7 +65,9 @@ fn treeid_of (
     . id () }
 
 /// Under 'parent', the historical phantom of 'pid' with its old
-/// content, a deleted member of which with its own.
+/// content, a deleted member of which with its own. The view is a
+/// content view, which has no U, so its removed members are
+/// write-protected.
 fn append_historical_phantom (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
@@ -75,7 +77,8 @@ fn append_historical_phantom (
 ) -> Option<NodeId> {
   let phantom : NodeId = tree . get_mut (parent) ? . append (
     mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
-  append_historical_phantom_content (tree, phantom, straddle, pid) ?;
+  let no_u : BTreeSet<ID> = BTreeSet::new ();
+  append_historical_phantom_content (tree, phantom, straddle, pid, &no_u) ?;
   let deleted_members : Vec<(NodeId, ID)> =
     tree . get (phantom) ? . children ()
     . filter_map ( |child| match &child . value () . kind {
@@ -84,7 +87,7 @@ fn append_historical_phantom (
       _ => None, } )
     . collect ();
   for (member, skgid) in deleted_members {
-    append_historical_phantom_content (tree, member, straddle, &skgid) ?; }
+    append_historical_phantom_content (tree, member, straddle, &skgid, &no_u) ?; }
   Some (phantom) }
 
 /// The view of p, with every one of the diff view's viewnodes

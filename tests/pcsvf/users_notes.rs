@@ -2,10 +2,11 @@
 // rerender ('docs/diff-view.org', "What a reconciler keeps").
 //
 // The 'users_notes' fixture: a (retitled) contains x, which b no
-// longer contains, so x's container folder holds a, with a's member
-// role tree (p contains a), and b as a removed member; b holds x as a
-// removed member; r held h, which is deleted, with m in its old
-// content; acq acquired acqd.
+// longer contains; b holds x as a removed member, x's first
+// occurrence, so editable there, and x's container folder holds a,
+// with a's member role tree (p contains a), and b as a removed
+// member; r held h, which is deleted, with m in its old content; acq
+// acquired acqd.
 
 use crate::pcsvf::common::{
   assert_lines_in_order, insert_after_line_starting, open_all_changes_buffer,
@@ -62,9 +63,9 @@ fn parent_line_of<'a> (
     . find ( |line| depth (line) + 1 == depth (headlines [at]) )
     . unwrap_or_else ( || panic! ( "{:?} has no parent in\n{}", title, buffer )) }
 
-const MEMBER_A : &str = "***** (skg (node (id a) (repo main) writeProtected";
+const MEMBER_A : &str = "**** (skg (node (id a) (repo main) writeProtected";
 const GRAFT_P  : &str =
-  "****** (skg (node (id p) (repo main) (affectsParent false) (birth roleGraft container) writeProtected";
+  "***** (skg (node (id p) (repo main) (affectsParent false) (birth roleGraft container) writeProtected";
 
 /// A note under a member of a changed container folder survives, and
 /// the member's role tree is still drawn around it, once.
@@ -75,7 +76,7 @@ fn a_note_under_a_changed_folders_member_survives (
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_lines_in_order (&buffer, &[ MEMBER_A, GRAFT_P ]);
     let saved : String = saved_and_rerendered ( f,
-      &insert_after_line_starting ( &buffer, MEMBER_A, &note (6, "a note under a") )) ?;
+      &insert_after_line_starting ( &buffer, MEMBER_A, &note (5, "a note under a") )) ?;
     assert! ( parent_line_of (&saved, "a note under a") . starts_with (MEMBER_A), "{}", saved );
     assert_lines_in_order (&saved, &[ MEMBER_A, " a note under a\n", GRAFT_P ]);
     assert_eq! ( saved . matches (GRAFT_P) . count (), 1, "{}", saved );
@@ -91,7 +92,7 @@ fn a_note_under_a_historical_phantom_survives (
   with_fixture ("users_notes", &["main"], |f| {
     let phantom : &str = "** (skg (historical (id h)";
     let old_member : &str =
-      "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff (presence rel-)";
+      "*** (skg (node (id m) (repo main) (affectsParent false) (diff (presence rel-)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;
@@ -128,7 +129,7 @@ fn a_note_in_the_acquired_folder_survives (
 fn a_note_under_a_removed_member_survives_it_going_stale (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let removed : &str = "** (skg (node (id x) (repo main) (affectsParent false) writeProtected";
+    let removed : &str = "** (skg (node (id x) (repo main) (affectsParent false) ";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, removed, &note (3, "a note under x") )) ?;

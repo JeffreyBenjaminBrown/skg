@@ -894,11 +894,13 @@ content position draws its old content under it.
 
 *** removed member, former member
 
-A *removed member* is an unrestricted vognode drawn as a non-member,
-write-protected, with the fact '(presence rel-)': its node survives, but
-its relationship to its viewparent exists in the before-graph only.
-It is drawn so in content, in a partner folder and in a historical
-phantom's old content alike. A
+A *removed member* is an unrestricted vognode, a non-member, with the
+fact '(presence rel-)': its node survives, but its relationship to its
+viewparent exists in the before-graph only. It is encoded so in
+content, in a partner folder and in a historical phantom's old content
+alike. In content position it follows the editability rule as a
+member does: editable at its node's first occurrence in level order,
+write-protected at a later one. A
 *former member* is any viewnode standing for such a before-only
 relationship, historical phantoms included.
 

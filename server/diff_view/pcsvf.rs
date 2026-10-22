@@ -415,8 +415,8 @@ pub fn root_skgids_of_buffer (
 /// Before the view completion of a rerender that integrates the
 /// changes not editable in the view ('rerender_view'): each node of the buffer's recomputed U that
 /// has no editable occurrence becomes editable where it
-/// stands, at its BFS-first content occurrence (a root, or a member
-/// of a vognode's content), or if it has none at its BFS-first
+/// stands, at its BFS-first content occurrence (a root, a member of
+/// a vognode's content, or a removed member), or if it has none at its BFS-first
 /// folder occurrence, with its body from the live graph, as a freshly
 /// drawn editable viewnode has it. Completion then draws its content
 /// list. A node of U with no occurrence is reached through the node
@@ -450,9 +450,10 @@ pub fn ensure_editableOccurrences_exist (
   Ok (( )) }
 
 /// The viewforest's unrestricted vognodes in content position
-/// ('in_content_position') that are roots or members there, in level
-/// order. The walk passes through a historical phantom in content
-/// position, to its old content, the removed members under it.
+/// ('in_content_position') that are roots, members or removed members
+/// there, in level order. The walk passes through a historical
+/// phantom in content position, to its old content, the removed
+/// members under it.
 fn content_occurrences_in_level_order (
   viewforest : &ViewForest,
 ) -> Vec<NodeId> {
@@ -467,7 +468,9 @@ fn content_occurrences_in_level_order (
           t . affectsParent == AffectsParent::True
           || node . parent () . is_some_and ( |parent| match parent . value () . kind {
                ViewnodeKind::BufferRoot => true,
-               ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) =>
+               ViewnodeKind::Vognode (
+                 Vognode::Unrestricted (_)
+                 | Vognode::Phantom (Phantom::Historical (_)) ) =>
                  is_unrestricted_removed_member ( node . value () ),
                _ => false, } );
         if ! is_root_or_member { continue; }

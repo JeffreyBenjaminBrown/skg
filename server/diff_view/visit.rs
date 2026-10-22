@@ -95,7 +95,6 @@ pub fn diffView_visit_before_expansion<'a> (
   kind                       : &ViewnodeKind,
   straddle                   : Option<&'a GraphStraddle>,
   diffView_buffer_kind       : Option<DiffViewBufferKind>,
-  editable_before_completion : &HashSet<NodeId>,
 ) -> Result<DiffViewVisit<'a>, Box<dyn Error>> {
   let (Some (straddle), Some (diffView_buffer_kind)) =
     (straddle, diffView_buffer_kind) else {
@@ -113,7 +112,7 @@ pub fn diffView_visit_before_expansion<'a> (
     // A historical phantom where content stands draws its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {
       if process_historical_phantom_visit (
-           tree, treeid, straddle, editable_before_completion ) ?
+           tree, treeid, straddle, diffView_buffer_kind ) ?
         == HistoricalPhantomVisit::Done {
         return Ok (DiffViewVisit::Done); }
       true },
@@ -148,7 +147,7 @@ pub fn diffView_visit_after_expansion (
     NormalNodeUpdate::DeletedBySave =>
       if deleted_phantom_becomes_historical (tree, treeid, straddle) ? {
         process_historical_phantom_visit (
-          tree, treeid, straddle, editable_before_completion ) ?; },
+          tree, treeid, straddle, diffView_buffer_kind ) ?; },
     NormalNodeUpdate::NoLongerUnrestricted => {},
     NormalNodeUpdate::Updated =>
       // Tag the content, draw what was removed, and add the change

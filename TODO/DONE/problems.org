@@ -1,3 +1,22 @@
+* A multiply-contained node reached only through a removed container is editable nowhere (2026-10-20; fixed 2026-10-22)
+  In a fixture where a, b and c contain x at HEAD and b alone then
+  drops x (nothing else changes; 'tests/pcsvf/fixtures/removed_partners'
+  with a's retitling undone), x is in C (its set of containers
+  changed) and, having three containers in the union, is a content
+  origin. 'kept_content_origins' ('server/diff_view/pcsvf.rs')
+  discards x because its containerward walk within U reaches b, a
+  kept content origin, through the removed relationship. So the
+  buffer draws x only as b's removed member, write-protected: x's
+  container folder is not drawn, and a change x itself records (try
+  retitling it) is not editable in the buffer, although nothing in
+  the buffer is wrong about it. Present before slice 14 (checked with
+  its changes stashed). The fix is probably to let D's walk follow
+  only relationships of the after-graph, or to let a node reached
+  only through a removed relationship stay a root.
+  Fixed 2026-10-22 in slice 5 of [[file:../total-diff-view/15_plan.org][the TDV fixes, features and vocabulary plan]]:
+  a removed member in content position follows the editability rule,
+  so x is editable as b's removed member, its first occurrence, with
+  its content list and its container folder. The sets are unchanged.
 * 'ViewForest::nodes' yields every root twice (2026-10-19; fixed 2026-10-20)
   'nodes' ('server/types/tree/forest.rs') chains each root with
   'root . descendants ()', but ego_tree's 'descendants' already

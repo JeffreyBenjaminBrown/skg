@@ -332,15 +332,30 @@ two lists ('interleaved_diff_without_reorders'); recorders, which no
 list orders, come sorted by ID. So every drawing of the union of the
 two graphs places a removed entry by the LCS.
 ** One encoding of a removed relationship
-A removed member whose node survives is an unrestricted vognode drawn
-as a non-member, write-protected, with the fact '(presence rel-)': its
-relationship to its viewparent exists in the before-graph only. That
-is the one encoding of a removed relationship, wherever it stands: in
-content, in a partner folder, and in a historical phantom's old
-content ('mk_removed_member_viewnode', 'FolderGoalShape::Removed').
-'is_unrestricted_removed_member' is its one reader. Since a removed
-member is never a member, the save's check of a write-protected
-occurrence's folders counts only members.
+A removed member whose node survives is an unrestricted vognode, a
+non-member, with the fact '(presence rel-)': its relationship to its
+viewparent exists in the before-graph only. That is the one encoding
+of a removed relationship, wherever it stands: in content, in a
+partner folder, and in a historical phantom's old content
+('mk_removed_member_viewnode', 'FolderGoalShape::Removed').
+'is_unrestricted_removed_member' is its one reader, and tests nothing
+about editability. Since a removed member is never a member, the
+save's check of a write-protected occurrence's folders counts only
+members.
+
+Its editability is a member's. In content position (under an
+unrestricted vognode or a historical phantom) a removed member is
+created editable, its body from the after-graph, when its node is in
+U, which it always is (its node is in C), and write-protected
+otherwise; the editability rule at its own visit keeps it editable
+when its node is unclaimed and write-protects it when another
+occurrence claimed the node first. An editable removed member's visit
+extends it as any editable occurrence's does, with its content list
+and its change viewnodes, among them its container folder listing the
+container that dropped it; a write-protected one holds nothing of its
+node. A removed member that was editable when a rerender began stays
+editable ('adopt_fresh_facts' only ever write-protects). In a partner
+folder a removed member stays as the folder's other members are.
 
 A removed dangling ID is not drawn in content or in a folder whose
 membership the save reads (an unknown phantom there would read back
@@ -359,7 +374,11 @@ and the node budget, described in the module comment of
 When a buffer is first drawn, a node of U is editable at its first
 occurrence and its whole content list is drawn; a member outside U is
 a write-protected member drawn without its content. No size cap
-applies: the node budget is not charged for any of this.
+applies: the node budget is not charged for any of this. A removed
+member in content position counts as an occurrence here: a node
+whose first occurrence is a removed member (one its only container
+dropped, say, or one first reached through a container that dropped
+it) is editable there ("One encoding of a removed relationship").
 ** The budget bounds only requests outside U
 An editable-view request (C-c s d) behaves as in any view: it makes
 its occurrence the editable one, write-protecting the other with its
@@ -383,9 +402,10 @@ date and recomputes the buffer's sets. Every node of U without an
 editable occurrence becomes editable (its body read from the live
 graph) at its first content occurrence in level order, else at its
 first partner-folder occurrence ('ensure_editableOccurrences_exist').
-The walk for content occurrences passes through a historical phantom
-in content position into its old content, whose removed members then
-stay editable at the phantom's visit.
+The walk for content occurrences counts a removed member under an
+unrestricted vognode or a historical phantom as a content occurrence,
+and passes through a historical phantom in content position into its
+old content.
 The buffer is then rerendered as after a save, which draws the
 content list of each node made editable, and last, each content
 origin of D that the buffer draws nowhere is appended as a root, in ID

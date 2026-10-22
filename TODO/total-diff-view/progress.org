@@ -2488,3 +2488,74 @@ nextest 854 passed; Emacs 376; Neovim all specs passed;
 'bash/integration-tests.sh': only the baseline 'import-md-and-org'
 fails, and the diff-view test (the recursive gesture over every
 root) passes.
+** Slice 5: deviations
+*** the fixture 'removed_partners' grew to reach every test
+The plan's tests read 'removed_partners' as the problem described it,
+so a's retitling (slice 14's workaround) is undone: x is then drawn
+first as b's removed member. Beyond that:
+- x contains xc in both graphs, so that x's content list shows;
+- d contained c at HEAD only, so x's container folder holds a role
+  graft from a before-only relationship (d under c), the end-to-end
+  case of the straddle-aware birth check; no fixture had one, and the
+  test fails with that check disabled;
+- e dropped x too, so e's removed member x is a later occurrence and
+  stays write-protected.
+x's folder then lists b and e marked '~-' beside the kept containers
+a and c (the plan says "its kept container", singular).
+**** why not b containing c
+I first gave b the containment of c for the later-occurrence case. c
+then had two containers in its containerward tree, whose order
+'full_containerward_role_tree' takes from a 'HashSet', so it varied
+from run to run and "integrate unshown changes" followed by a save
+reordered them. Recorded in 'TODO/problems.org'; the fixture avoids it.
+*** 'kinds': k1 contains k1c
+In both graphs, so that k1, editable as ct's removed member, shows
+its content list (k1c, a write-protected member without its content).
+*** the historical phantom's visit takes the buffer kind
+'process_historical_phantom_visit' needs U for its removed members, so
+it takes 'diffView_buffer_kind' in place of 'editable_before_completion',
+which only the restore block read; 'diffView_visit_before_expansion'
+lost that parameter. The roundtrip test, a content view, passes an
+empty U to 'append_historical_phantom_content'.
+*** tests
+New in 'tests/pcsvf/buffer.rs':
+'a_node_its_only_container_dropped_is_editable_as_the_removed_member',
+'a_removed_member_first_in_level_order_is_editable_with_its_changes',
+'a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected',
+'a_role_graft_under_an_editable_removed_member_keeps_its_birth_through_a_save',
+'a_removed_member_editable_before_a_save_stays_editable_after_it'
+(which retitles x through the removed member). New in
+'tests/pcsvf/recomputed_sets.rs':
+'the_command_makes_a_removed_member_under_a_live_vognode_editable'
+(the user write-protects x under b by a write-protected-view request).
+**** expectations adapted
+The removed members that are their node's first occurrence: k1 and
+m in 'buffer.rs', x and m in 'users_notes.rs' (x's container folder,
+with MEMBER_A and GRAFT_P, now stands one level higher, under b's x).
+The two tests of plan 13's slice 5 in 'recomputed_sets.rs' found m
+write-protected under h at first; each now write-protects it first
+(the command test by a request, the walk test in the viewforest), and
+the command test passes without the restore block. Deleting k1 in
+'editing.rs' deletes its subtree ('without_subtree_starting', new in
+'common.rs'), and the folding test finds k1's next sibling past its
+children.
+*** docs
+'docs/diff-view.org': "One encoding of a removed relationship" lost
+"write-protected" and gained a paragraph on a removed member's
+editability; "A node of U is editable, with its whole content list"
+and "Integrating unshown changes" say what counts as an occurrence.
+The glossary's "removed member" likewise. Problem 1 moved from
+'TODO/problems.org' to 'TODO/DONE/problems.org'.
+*** seen, left
+A role graft drawn from a before-only relationship (d under c in x's
+folder) carries no relationship sign, only '(leaves 1 all)'.
+*** verification
+nextest 860, all passed but 'rebuild::complete_aliasfolder::all_tests'
+in the full run, which passed alone. 'bash/integration-tests.sh':
+only the baseline 'import-md-and-org' fails; the diff-view tests
+pass. Emacs 376; Neovim all specs passed.
+Over TCP, on an isolated server over 'removed_partners'
+('tests/results/15-slice5-verify/'): x is editable as b's removed
+member; the buffer saved unchanged reports no error and nothing
+unshown; x retitled there is written (five changed files, from four)
+and stays editable, marked 'node~' with its old title.

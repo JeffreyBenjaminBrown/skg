@@ -317,6 +317,29 @@ pub fn insert_after_line_starting (
   assert! ( inserted, "no line starts {:?}:\n{}", prefix, buffer );
   lines . join ("\n") + "\n" }
 
+/// 'buffer' without its first line starting 'prefix' and the
+/// headlines below it, with their bodies.
+pub fn without_subtree_starting (
+  buffer : &str,
+  prefix : &str,
+) -> String {
+  let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
+  let mut subtree_depth : Option<usize> = None;
+  let mut found : bool = false;
+  let mut kept : Vec<&str> = Vec::new ();
+  for line in buffer . lines () {
+    if let Some (own) = subtree_depth {
+      if line . starts_with ('*') && depth (line) <= own {
+        subtree_depth = None; }
+      else { continue; }}
+    if ! found && line . starts_with (prefix) {
+      found = true;
+      subtree_depth = Some ( depth (line) );
+      continue; }
+    kept . push (line); }
+  assert! ( found, "no line starts {:?}:\n{}", prefix, buffer );
+  kept . join ("\n") + "\n" }
+
 /// Panic unless 'lines' occur in 'buffer' in this order.
 pub fn assert_lines_in_order (
   buffer : &str,

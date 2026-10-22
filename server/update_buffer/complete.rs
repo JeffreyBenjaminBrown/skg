@@ -282,8 +282,7 @@ fn dispatch_node_update (
     return Ok (( )); }
   let settings : VisitSettings =
     match diffView_visit_before_expansion (
-      tree, treeid, &kind, context . straddle, context . diffView_buffer_kind,
-      context . editable_before_completion ) ? {
+      tree, treeid, &kind, context . straddle, context . diffView_buffer_kind ) ? {
       DiffViewVisit::Done => return Ok (( )),
       DiffViewVisit::Complete (settings) => settings, };
   match &kind {

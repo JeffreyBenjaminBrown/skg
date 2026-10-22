@@ -6,7 +6,7 @@
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pcsvf::common::{
   insert_after_line_starting, open_all_changes_buffer, save, view_id_of,
-  with_fixture};
+  with_fixture, without_subtree_starting};
 use crate::git_fixture_helpers::{
   mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
 
@@ -106,15 +106,16 @@ fn a_removed_id_does_not_abort_the_save (
     Ok (( )) }) }
 
 /// Deleting the save-inert images of removed things changes nothing:
-/// k1, removed from ct's content, and gone, a deleted subscriber of
-/// orph. Both are drawn again where they stood.
+/// k1, removed from ct's content (an editable non-member, deleted
+/// with what it holds), and gone, a deleted subscriber of orph. Both
+/// are drawn again where they stood.
 #[test]
 fn deleted_images_of_removed_members_respawn (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String = without_lines_containing (
-      &without_lines_containing (&buffer, "(id k1)"),
+      &without_subtree_starting (&buffer, "** (skg (node (id k1)"),
       "*** (skg (historical (id gone)" );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &edited) ?;

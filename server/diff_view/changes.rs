@@ -173,7 +173,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   tag_content_members (
     tree, treeid, straddle, &content,
     Some (( &sets . u, editable_before_completion )) ) ?;
-  reconcile_removed_content_members (tree, treeid, straddle, &pid) ?;
+  reconcile_removed_content_members (tree, treeid, straddle, &pid, &sets . u) ?;
   let aspects : ChangedAspects = // read only for a node in C
     if in_c { ChangedAspects::of_node (straddle . change_leaves (), &pid) }
     else { ChangedAspects::default () };
@@ -280,14 +280,15 @@ pub(crate) enum HistoricalPhantomVisit {
 /// holds already; a node drawn above itself holds nothing. In a
 /// folder it holds nothing new. A root whose node is back becomes an
 /// editable vognode, and one whose node is in neither graph (a
-/// deletion since committed) a deleted phantom. A member of its old
-/// content that was editable before completion
-/// ('editable_before_completion') stays editable.
+/// deletion since committed) a deleted phantom. A removed member of
+/// its old content is created editable when its node is in U of the
+/// buffer being completed ('pcsvf_sets_of_buffer'); one that stands
+/// already keeps its editability ('adopt_fresh_facts').
 pub(crate) fn process_historical_phantom_visit (
-  tree     : &mut Tree<Viewnode>,
-  treeid   : NodeId,
-  straddle : &GraphStraddle,
-  editable_before_completion : &HashSet<NodeId>,
+  tree                 : &mut Tree<Viewnode>,
+  treeid               : NodeId,
+  straddle             : &GraphStraddle,
+  diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<HistoricalPhantomVisit, Box<dyn Error>> {
   let (skgid, at_root, in_content_position) : (ID, bool, bool) = {
     let node : NodeRef<Viewnode> = tree . get (treeid)
@@ -337,27 +338,13 @@ pub(crate) fn process_historical_phantom_visit (
   let mut fresh : Tree<Viewnode> = Tree::new (fresh_root ());
   if ! drawn_above_itself {
     let root : NodeId = fresh . root () . id ();
-    append_historical_phantom_content (&mut fresh, root, straddle, &skgid); }
-  let editable_members : Vec<(NodeId, Editability)> =
-    // The fresh drawing write-protects them; nothing writable is
-    // write-protected again.
-    tree . get (treeid) . unwrap () . children ()
-    . filter ( |child| editable_before_completion . contains (&child . id ()) )
-    . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if ! t . is_writeProtected () =>
-        Some (( child . id (), t . editability . clone () )),
-      _ => None, } )
-    . collect ();
+    append_historical_phantom_content (
+      &mut fresh, root, straddle, &skgid,
+      & pcsvf_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
   let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
     &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
-  for (member, editability) in editable_members {
-    if ! kept . contains (&member) { continue; }
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-      &mut tree . get_mut (member) . unwrap () . value () . kind {
-      t . editability = editability; }}
   arrange_last_children (tree, treeid, &kept) ?;
   Ok (HistoricalPhantomVisit::Done) }
 
@@ -550,8 +537,9 @@ fn tag_content_members (
 /// after-graph's lacks, each where 'phantom_insertion_plan' places it
 /// (immediately before the next surviving member of the old order): a
 /// deleted node as its historical phantom (whose own visit draws its
-/// old content), a surviving one as a write-protected vognode that
-/// does not affect its parent. Each is matched by its skgid to what
+/// old content), a surviving one as a removed member
+/// ('mk_removed_member_viewnode'), created editable when its node is
+/// in 'u'. Each is matched by its skgid to what
 /// stands under the node already, and moved, not redrawn. Membership
 /// is by set difference; the LCS only positions, so a reorder shows
 /// nothing. A removed dangling ID is not drawn: an unknown phantom
@@ -562,6 +550,7 @@ fn reconcile_removed_content_members (
   treeid   : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
+  u        : &BTreeSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let plan : Vec<(ID, Option<ID>)> = removal_plan (straddle, pid);
   let removed : HashSet<ID> =
@@ -573,7 +562,7 @@ fn reconcile_removed_content_members (
       Some (Presence::OnlyBefore) =>
         mk_historical_viewnode (straddle, &removed, Some (Sign::Minus)),
       Some (_) => Some (
-        mk_removed_member_viewnode (straddle, &removed)
+        mk_removed_member_viewnode (straddle, &removed, u)
         . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? ),
       None => None, };
     if let Some (drawn) = drawn {

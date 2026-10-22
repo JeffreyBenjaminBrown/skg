@@ -807,21 +807,6 @@ gap too. Details, options and questions:
    defence-in-depth, and add hidden-sibling-fork and mixed-visibility
    diamond regressions.
 * Problems found while executing slice 14 of TODO/total-diff-view/13_plan.org (2026-10-20)
-** A multiply-contained node reached only through a removed container is editable nowhere
-   In a fixture where a, b and c contain x at HEAD and b alone then
-   drops x (nothing else changes; 'tests/pcsvf/fixtures/removed_partners'
-   with a's retitling undone), x is in C (its set of containers
-   changed) and, having three containers in the union, is a content
-   origin. 'kept_content_origins' ('server/diff_view/pcsvf.rs')
-   discards x because its containerward walk within U reaches b, a
-   kept content origin, through the removed relationship. So the
-   buffer draws x only as b's removed member, write-protected: x's
-   container folder is not drawn, and a change x itself records (try
-   retitling it) is not editable in the buffer, although nothing in
-   the buffer is wrong about it. Present before slice 14 (checked with
-   its changes stashed). The fix is probably to let D's walk follow
-   only relationships of the after-graph, or to let a node reached
-   only through a removed relationship stay a root.
 ** A dangling removed member of a write-protected-set folder counts as a member
    In a write-protected-set folder drawn over the straddle (in
    practice only the hidden folder, whose members can be dangling), a
@@ -844,3 +829,22 @@ gap too. Details, options and questions:
    notes; typing one is still awkward. Inheriting from the nearest
    unrestricted ancestor, or from the owned skgrepo of the recorder,
    would fix it.
+* Problems found while executing slice 5 of TODO/total-diff-view/15_plan.org (2026-10-22)
+** A containerward role tree orders its branches at random
+   'full_containerward_role_tree'
+   ('server/dbs/in_rust_graph/containerward_role_tree.rs') iterates the
+   'HashSet' its 'partners_of' returns, so the branches of a node with
+   two or more containers come in an order that varies from call to
+   call. In the diff view a folder member's containerward tree is
+   reconciled in the order of each new walk
+   ('attach_memberRoleTrees_under_straddle_folder_members' arranges the
+   kept children in that order), so such a tree can reorder at any
+   rerender, and a buffer then does not save back to itself. Seen
+   while building slice 5's fixture: with b also containing c in
+   'tests/pcsvf/fixtures/removed_partners', c's containers b and d
+   under x's container folder came in either order from run to run,
+   and "integrate unshown changes" followed by a save reordered them.
+   The fixture avoids the case. Not checked whether the live-graph
+   views, which walk the same function ('containers_in_inRustGraph'),
+   keep the standing order. A fix is probably to sort the containers
+   in the walk.

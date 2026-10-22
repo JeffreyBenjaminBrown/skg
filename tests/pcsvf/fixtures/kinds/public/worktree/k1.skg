@@ -1,2 +1,4 @@
 pid: k1
 title: k1
+contains:
+- k1c

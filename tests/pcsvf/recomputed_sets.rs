@@ -27,6 +27,8 @@ use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::DiffViewBufferKind;
 use skg::types::viewnode::{Phantom, ViewnodeKind, Vognode};
 
+use ego_tree::NodeId;
+
 use std::error::Error;
 use std::sync::Arc;
 
@@ -477,11 +479,11 @@ fn an_editable_container_folder_member_outside_u_stays_editable (
 /// The 'historical_content' fixture (one skgrepo, main): at HEAD r
 /// contains h and k, and h contains m. Since then h was deleted and m
 /// retitled, so the buffer draws h as a historical phantom under r,
-/// holding its old content m, a node of U drawn as a write-protected
-/// removed member.
-/// The walk that finds the occurrences to make editable passes
-/// through a historical phantom in content position, so it makes m
-/// editable there.
+/// holding its old content m, a node of U, as an editable removed
+/// member.
+/// Once m is write-protected there, the walk that finds the
+/// occurrences to make editable passes through a historical phantom
+/// in content position, so it makes m editable there again.
 #[test]
 fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 ) -> Result<(), Box<dyn Error>> {
@@ -493,7 +495,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
       &runtime, &straddle, &ReadinessStore::default (),
       DiffViewBufferKind::AllChanges ) ?
       . expect ("the buffer is not empty") . viewforest;
-    let m_under_h = |viewforest : &ViewForest| -> Option<bool> {
+    let m_under_h = |viewforest : &ViewForest| -> Option<NodeId> {
       viewforest . nodes () . find_map ( |node| match &node . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . skgid == ID::from ("m")
@@ -501,30 +503,72 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
                &parent . value () . kind,
                ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
                  if h . skgid == ID::from ("h") )) =>
-          Some ( node . value () . editable_skgid () . is_some () ),
+          Some ( node . id () ),
         _ => None, } ) };
-    assert_eq! ( m_under_h (&viewforest), Some (false),
-                 "m is drawn write-protected under h" );
+    let m_under_h_is_editable = |viewforest : &ViewForest| -> Option<bool> {
+      m_under_h (viewforest) . map ( |m| viewforest . get (m) . unwrap ()
+                                           . value () . editable_skgid () . is_some () ) };
+    assert_eq! ( m_under_h_is_editable (&viewforest), Some (true),
+                 "m is editable under h" );
+    let m : NodeId = m_under_h (&viewforest) . unwrap ();
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      &mut viewforest . get_mut (m) . unwrap () . value () . kind {
+      t . write_protect (); }
+    assert_eq! ( m_under_h_is_editable (&viewforest), Some (false) );
     ensure_editableOccurrences_exist (
       &straddle, DiffViewBufferKind::AllChanges,
       &mut viewforest, &runtime . graph, &runtime . config ) ?;
-    assert_eq! ( m_under_h (&viewforest), Some (true) );
+    assert_eq! ( m_under_h_is_editable (&viewforest), Some (true) );
     Ok (( )) } ) }
 
-/// The same fixture: the command makes m editable under h, so every
-/// change is editable in the buffer, and m stays editable through a
-/// save of it.
+/// The same fixture: once the user write-protects m under h, the
+/// command makes it editable there again, so every change is
+/// editable in the buffer, and m stays editable through a save of it.
 #[test]
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
     let m_line : &str = "*** (skg (node (id m) (repo main) (affectsParent false) (diff (presence node~ rel-) (leaves 2 rel all)))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( ! buffer . contains (m_line), "{}", buffer );
+    assert! ( buffer . contains (m_line), "{}", buffer );
+    let requested : String = buffer . replacen (
+      "(node (id m) (repo main) ",
+      "(node (id m) (repo main) (viewRequests writeProtectedView) ", 1 );
+    let protected : String =
+      save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
+    assert! ( ! drawn_editable (&protected, "m"), "{}", protected );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert_eq! ( not_editable, 0, "{}", shown );
     assert! ( shown . contains (m_line), "{}", shown );
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
     assert! ( response . saved_view . contains (m_line),
               "{}", response . saved_view );
+    Ok (( )) } ) }
+
+/// The 'removed_partners' fixture (described in 'buffer.rs'): x
+/// stands first as b's removed member, editable there. Once the user
+/// write-protects it, x has no editable occurrence, and the command
+/// makes that removed member editable again, not x's later
+/// occurrences under e and c; a save keeps it so.
+#[test]
+fn the_command_makes_a_removed_member_under_a_live_vognode_editable (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("removed_partners", &["main"], |f| {
+    let x_under_b : &str = "** (skg (node (id x) (repo main) (affectsParent false) (rels";
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( buffer . contains (x_under_b), "{}", buffer );
+    let requested : String = buffer . replacen (
+      "(node (id x) (repo main) (affectsParent false) ",
+      "(node (id x) (repo main) (affectsParent false) (viewRequests writeProtectedView) ", 1 );
+    let protected : String =
+      save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
+    assert! ( ! drawn_editable (&protected, "x"), "{}", protected );
+    let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
+    assert_eq! ( not_editable, 0, "{}", shown );
+    assert! ( shown . contains (x_under_b), "{}", shown );
+    assert_eq! ( node_lines (&shown, "x") . iter ()
+                 . filter ( |line| ! line . contains ("writeProtected") ) . count (),
+                 1, "{}", shown );
+    let response : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
+    assert_eq! ( response . saved_view, shown );
     Ok (( )) } ) }

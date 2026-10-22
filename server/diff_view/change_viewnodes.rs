@@ -12,13 +12,14 @@ use crate::types::git::{NodeSign, Sign};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
-  AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffPresence,
-  PartnerFolder, Phantom, PhantomHistorical, Property, Viewnode,
-  ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_viewnode,
-  viewnode_of};
+  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
+  Editability, PartnerFolder, Phantom, PhantomHistorical, Property,
+  Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
+  mk_writeProtected_viewnode, viewnode_of};
 
 use ego_tree::{NodeId, Tree};
 use similar::{ChangeTag, TextDiff};
+use std::collections::{BTreeSet, HashSet};
 
 /// Under 'parent', the old text of the node 'pid', with a body diff
 /// under it when the body changed. None (and nothing appended) when
@@ -124,13 +125,14 @@ pub fn mk_historical_viewnode (
 /// was acquired by" folder, and then its old content as removed
 /// members: a deleted member as a historical phantom (whose own visit
 /// draws its old content), a surviving one as a removed member
-/// ('mk_removed_member_viewnode'), and a dangling one as an unknown
-/// phantom.
+/// ('mk_removed_member_viewnode', editable when its node is in 'u'),
+/// and a dangling one as an unknown phantom.
 pub fn append_historical_phantom_content (
   tree     : &mut Tree<Viewnode>,
   phantom  : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
+  u        : &BTreeSet<ID>,
 ) -> Option<()> {
   if let Some (acquirer) = straddle . acquirer_of (pid) {
     let acquirer_viewnode : Viewnode =
@@ -144,7 +146,7 @@ pub fn append_historical_phantom_content (
       match straddle . node_presence (&partner . id) {
         Some (Presence::OnlyBefore) =>
           mk_historical_viewnode (straddle, &partner . id, Some (Sign::Minus)),
-        Some (_) => mk_removed_member_viewnode (straddle, &partner . id),
+        Some (_) => mk_removed_member_viewnode (straddle, &partner . id, u),
         None => Some ( mk_member_viewnode (
           straddle, &partner . id, Some (Sign::Minus) )), };
     if let Some (member) = member {
@@ -170,19 +172,29 @@ pub fn append_acquired_folder (
       tree . get_mut (folder) ? . append (phantom); }}
   Some (folder) }
 
-/// A removed member: the write-protected image of a node of the
-/// after-graph whose relationship to its viewparent is only in the
-/// before-graph, drawn as a non-member with '(presence rel-)', the one
-/// encoding of a removed relationship ('is_unrestricted_removed_member'
-/// reads it). None if the after-graph lacks the node.
+/// A removed member: the image of a node of the after-graph whose
+/// relationship to its viewparent is only in the before-graph, a
+/// non-member with '(presence rel-)', the one encoding of a removed
+/// relationship ('is_unrestricted_removed_member' reads it). It is
+/// created editable, with its body from the after-graph, when its
+/// node is in 'u' (U of the buffer being completed), and
+/// write-protected otherwise; the editability rule at its own visit
+/// then write-protects an editable one whose node another occurrence
+/// claimed first, as for a member. None if the after-graph lacks the
+/// node.
 pub fn mk_removed_member_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
+  u        : &BTreeSet<ID>,
 ) -> Option<Viewnode> {
   let node : &GraphnodeInRust = straddle . after . get (pid) ?;
-  let mut member : Viewnode = mk_writeProtected_viewnode (
+  let mut member : Viewnode = mk_viewnode (
     pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
-    AffectsParent::False );
+    AffectsParent::False, Birth::Unremarkable,
+    if u . contains (pid) {
+      Editability::Editable { body : node . body . clone (), edit_request : None } }
+    else { Editability::WriteProtected },
+    HashSet::new () ); // view_requests
   member . change_facts . presence = DiffPresence {
     node : straddle . node_sign (pid),
     rel  : Some (Sign::Minus) };

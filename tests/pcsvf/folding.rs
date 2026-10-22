@@ -170,7 +170,10 @@ fn a_removed_member_keeps_its_fold_state_and_its_place (
       let k1 : usize = lines . iter ()
         . position ( |line| line . starts_with ("** (skg folded (node (id k1)") )
         . unwrap_or_else ( || panic! ("k1 stays org_folded:\n{}", saved) );
-      assert! ( lines [k1 + 1] . starts_with ("** (skg (node (id ctx)"),
+      let next_sibling : &str = lines [k1 + 1 ..] . iter ()
+        . find ( |line| line . starts_with ("* ") || line . starts_with ("** ") )
+        . expect ("k1 has a next sibling");
+      assert! ( next_sibling . starts_with ("** (skg (node (id ctx)"),
                 "k1 stays before ctx:\n{}", saved ); }
     assert_eq! ( saved, folded );
     Ok (( )) }) }

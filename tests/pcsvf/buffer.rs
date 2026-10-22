@@ -2,21 +2,24 @@
 // fixture is described in 'sets.rs'. In the 'kinds' fixture (owned
 // skgrepos public and private) each root shows one kind of change:
 // txt is retitled and its body edited; ali loses alias a1 and gains
-// a3, and loses its extra ID ali-old; flg gains a flag; ct drops k1 and gains k2 (ctx, with its
-// content, is unchanged); sub subscribes to s2 instead of s1; mv
+// a3, and loses its extra ID ali-old; flg gains a flag; ct drops k1
+// (which contains k1c) and gains k2 (ctx, with its content, is unchanged); sub subscribes to s2 instead of s1; mv
 // moves from public to private; rr's containment of rm moves to
 // private; acq acquired acqd by a nodeMerge; gone, which subscribed
 // to orph, is deleted.
 
-use crate::git_fixture::Fixture;
+use crate::git_fixture::{Fixture, save_cleanly, skg_files};
+use crate::git_fixture_helpers::read_graphnode;
 use crate::pcsvf::common::{
-  all_changes_buffer, all_changes_buffer_with_marks, assert_lines_in_order,
+  all_changes_buffer, all_changes_buffer_with_marks, all_changes_view,
+  assert_lines_in_order, node_lines, open_all_changes_buffer,
   saves_back_unchanged, with_fixture};
 
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect};
 use skg::types::misc::ID;
 use skg::types::views_state::DiffViewBufferKind;
 
+use std::collections::BTreeMap;
 use std::error::Error;
 
 fn buffer_of (
@@ -115,9 +118,26 @@ fn a_content_change_tags_the_members_and_draws_the_removed_one (
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id ct)",
     "** (skg (changesetMarker content) (diff (leaves 2 all)))",
-    "** (skg (node (id k1) (repo public) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) k1",
+    "** (skg (node (id k1) (repo public) (affectsParent false) (rels (contains (out 1))) (diff (presence rel-) (leaves 1 rel)))) k1",
     "** (skg (node (id ctx) (repo public) writeProtected",
     "** (skg (node (id k2) (repo public)", "(diff (presence rel+) (leaves 1 rel)))) k2" ] );
+  Ok (( )) }
+
+/// k1, whose only container ct dropped it, stands only as ct's
+/// removed member. That is its first occurrence, so it is editable
+/// there, with its content list (k1c, outside U, a write-protected
+/// member without its content) and its changed container folder.
+#[test]
+fn a_node_its_only_container_dropped_is_editable_as_the_removed_member (
+) -> Result<(), Box<dyn Error>> {
+  let buffer : String = kinds_buffer () ?;
+  assert_lines_in_order ( &buffer, &[
+    "* (skg (node (id ct)",
+    "** (skg (node (id k1) (repo public) (affectsParent false) (rels",
+    "*** (skg (containerFolder changed))",
+    "**** (skg (node (id ct) (repo public) (affectsParent false) writeProtected",
+    "*** (skg (node (id k1c) (repo public) writeProtected" ] );
+  assert_eq! ( node_lines (&buffer, "k1") . len (), 1, "{}", buffer );
   Ok (( )) }
 
 #[test]
@@ -225,10 +245,11 @@ fn the_kinds_buffer_saves_back_unchanged (
 ) -> Result<(), Box<dyn Error>> {
   saves_back_unchanged ("kinds", &["public", "private"], DiffViewBufferKind::AllChanges) }
 
-/// The 'removed_partners' fixture (one skgrepo, main): at HEAD a, b
-/// and c contain x, and s subscribes to s1, s2 and s3. Since then b
-/// stopped containing x, s stopped subscribing to s2, and a was
-/// retitled, so that x is drawn editable in a's content.
+/// The 'removed_partners' fixture (one skgrepo, main): at HEAD a, b,
+/// c and e contain x, which contains xc; d contains c; s subscribes
+/// to s1, s2 and s3. Since then b and e stopped containing x, d
+/// stopped containing c, and s stopped subscribing to s2. So b, d and
+/// e are roots, and b's removed member x is x's first occurrence.
 fn removed_partners_buffer (
 ) -> Result<String, Box<dyn Error>> {
   let mut buffer : String = String::new ();
@@ -243,12 +264,102 @@ fn removed_partners_buffer (
 fn a_removed_container_is_drawn_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
-    "** (skg (node (id x) (repo main) (rels",
+    "** (skg (node (id x) (repo main) (affectsParent false) (rels",
     "*** (skg (containerFolder changed))",
     "**** (skg (node (id a) (repo main) writeProtected",
-    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) b",
+    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected",
+    "(diff (presence rel-) (leaves 1 rel)))) b",
     "**** (skg (node (id c) (repo main) writeProtected" ] );
   Ok (( )) }
+
+/// x stands first as b's removed member, so it is editable there,
+/// with its content list (xc) and its container folder: b and e
+/// marked '~-' beside its kept containers a and c, each with its
+/// containerward tree, under c the role graft d, which contained c
+/// at HEAD only. Its member occurrence under c (d's removed member,
+/// editable too) is write-protected.
+#[test]
+fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
+) -> Result<(), Box<dyn Error>> {
+  let buffer : String = removed_partners_buffer () ?;
+  assert_lines_in_order ( &buffer, &[
+    "* (skg (node (id b)",
+    "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (presence rel-) (leaves 1 rel)))) x",
+    "*** (skg (containerFolder changed))",
+    "**** (skg (node (id a) (repo main) writeProtected",
+    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected",
+    "**** (skg (node (id c) (repo main) writeProtected",
+    "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected",
+    "**** (skg (node (id e) (repo main) (affectsParent false) writeProtected",
+    "*** (skg (node (id xc) (repo main) writeProtected",
+    "* (skg (node (id d)",
+    "** (skg (node (id c) (repo main) (affectsParent false) (rels",
+    "*** (skg (node (id x) (repo main) writeProtected" ] );
+  let editable : Vec<&str> = node_lines (&buffer, "x") . into_iter ()
+    . filter ( |line| ! line . contains ("writeProtected") ) . collect ();
+  assert_eq! ( editable . len (), 1, "{}", buffer );
+  Ok (( )) }
+
+/// x is editable as b's removed member, which stands before e's, so
+/// e's removed member x is write-protected, and holds nothing.
+#[test]
+fn a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected (
+) -> Result<(), Box<dyn Error>> {
+  assert_lines_in_order ( &removed_partners_buffer () ?, &[
+    "* (skg (node (id b)",
+    "** (skg (node (id x) (repo main) (affectsParent false) (rels",
+    "* (skg (node (id e)",
+    "** (skg (node (id x) (repo main) (affectsParent false) writeProtected (rels (contains (in 2) (out 1))) (diff (presence rel-) (leaves 1 rel)))) x\n* " ] );
+  Ok (( )) }
+
+/// The role graft d under c in x's container folder, from a
+/// relationship only the before-graph has, keeps its birth through
+/// a save, and is not shown a second time.
+#[test]
+fn a_role_graft_under_an_editable_removed_member_keeps_its_birth_through_a_save (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("removed_partners", &["main"], |f| {
+    let graft : &str =
+      "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected";
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert_eq! ( buffer . matches (graft) . count (), 1, "{}", buffer );
+    let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;
+    let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
+    for view in [ &saved, &again ] {
+      assert_eq! ( view . matches (graft) . count (), 1, "{}", view );
+      assert_lines_in_order ( view, &[
+        "** (skg (node (id x) (repo main) (affectsParent false)",
+        "**** (skg (node (id c) (repo main) writeProtected",
+        graft ] ); }
+    Ok (( )) }) }
+
+/// x, editable as b's removed member, is retitled there. The save
+/// writes the title, and x stays editable where it was, now marked
+/// modified, its old title beneath it.
+#[test]
+fn a_removed_member_editable_before_a_save_stays_editable_after_it (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("removed_partners", &["main"], |f| {
+    let x_line : &str =
+      "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (presence rel-) (leaves 1 rel)))) x\n";
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( buffer . contains (x_line), "{}", buffer );
+    let retitled : String = buffer . replacen (
+      x_line, &x_line . replacen ( ")))) x\n", ")))) x, retitled\n", 1 ), 1 );
+    let files_before : BTreeMap<String, String> = skg_files (f) ?;
+    let saved : String = save_cleanly (f, &all_changes_view (), &retitled) ? . saved_view;
+    assert_ne! ( skg_files (f) ?, files_before );
+    assert_eq! ( read_graphnode ( &f . root . path () . join ("main"), "x" ) ? . title,
+                 "x, retitled" );
+    assert_lines_in_order ( &saved, &[
+      "* (skg (node (id b)",
+      "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (presence node~ rel-)",
+      "x, retitled\n",
+      "*** (skg (oldText title)" ] );
+    let editable : Vec<&str> = node_lines (&saved, "x") . into_iter ()
+      . filter ( |line| ! line . contains ("writeProtected") ) . collect ();
+    assert_eq! ( editable . len (), 1, "{}", saved );
+    Ok (( )) }) }
 
 /// s's subscribee folder draws s2, the subscribee it lost, where it
 /// stood in s's list, not after the subscribees it kept.
@@ -271,7 +382,8 @@ fn the_removed_partners_buffer_saves_back_unchanged (
 /// In the 'historical_content' fixture h, which contained m, was
 /// deleted: h's historical phantom draws its old content m as a
 /// removed member, a non-member with '(diff (presence rel-))', beside
-/// 'node~' since m was retitled. A buffer showing it saves back
+/// 'node~' since m was retitled. It is m's first occurrence, so it is
+/// editable, its old title beneath it. A buffer showing it saves back
 /// unchanged.
 #[test]
 fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
@@ -282,5 +394,6 @@ fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg (historical (id h) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) h",
-    "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff (presence node~ rel-) (leaves 2 rel all)))) m, retitled" ] );
+    "*** (skg (node (id m) (repo main) (affectsParent false) (diff (presence node~ rel-) (leaves 2 rel all)))) m, retitled",
+    "**** (skg (oldText title) (diff (leaves 1))) m" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }
