@@ -2292,3 +2292,58 @@ remains, a quasi-duplicate of the shared pair's write end.
 nextest 849 passed; Emacs 374; Neovim all specs passed;
 'bash/integration-tests.sh': only the baseline 'import-md-and-org'
 fails, and the diff-view test prints the new banner.
+** Slice 1: deviations
+*** 'MpViewnode' carries the two fields too
+The parser fills the maybe-placed viewnode, so it carries them as
+'Viewnode' does, and the conversions carry them across. Where
+'viewnode_from_metadata' builds it, a kind that never carries a change
+(a folder, a restricted vognode, the buffer root, a dead viewnode,
+'BodyDiff') gets the empty defaults, so a folder's bare '(ready)' is
+still accepted and dropped.
+*** 'Viewnode::replace_kind'
+Thirteen sites made a viewnode another kind by assigning its kind:
+to a dead viewnode, a restricted vognode, a deleted or unknown
+phantom, a historical phantom turned live, and back. Each new kind
+used to be built with empty facts and no request, so the swap reset
+them. 'replace_kind' now does that explicitly; a deleted phantom that
+becomes historical then takes the historical phantom's facts, as it
+took them with its kind before.
+*** which members make a folder changed
+'folder_change_facts' counts a member as changed when it carries a
+'rel' sign. That is today's rule for vognodes and historical phantoms;
+a property entry or an unknown phantom carries no other sign, so it is
+today's rule for them too. Readiness then follows the plan's rule
+('member_change_ready').
+*** the readiness request across 'adopt_fresh_facts'
+Every kind now takes the fresh presence and has '(ready ...)' and
+'(leaves ...)' cleared. An unrestricted vognode keeps its own
+readiness request, as before; a viewnode that takes a fresh kind also
+takes the fresh request (none), as it did with the kind.
+'keep_stale_child_holding_the_users' likewise keeps an unrestricted
+vognode's request and clears a dead viewnode's.
+*** smaller choices
+- 'set_ready_facts_in_viewforest' picks every property but 'BodyDiff'
+  with a match, where it asked the kind accessor.
+- 'set_presence' is gone; its two callers write the field.
+- 'mk_member_viewnode' returns a 'Viewnode', since without the match
+  it can no longer fail.
+- In 'changes.rs', 'facts_of_entry' became 'entry_viewnode', which
+  builds a property folder's entry with its facts.
+- The literals go through 'viewnode_of', or
+  'Viewnode { org_folded : true, .. viewnode_of (kind) }'; the
+  'MpViewnode' literals through '.. MpViewnode::default ()'.
+*** tests
+The unit test of the six accessors went with them. The folder test is
+'a_folder_is_ready_when_each_changed_member_is' in
+'tests/change_facts_metadata.rs'. That file and
+'tests/diff_view/roundtrip/metadata.rs' each define a small helper
+that puts facts on a viewnode, a quasi-duplicate left as it is, as the
+two take different arguments.
+*** docs
+Only 'docs/api-and-formats.org', "The metadata headers", needed a
+word: it now names 'Viewnode' as the carrier of the two types.
+*** verification
+nextest 849 passed; Emacs 374; Neovim all 31 specs passed. Over TCP,
+on a scratch copy of the 'kinds' fixture, the four diff-view buffers,
+a save carrying a readiness request and the rerendered "all changes"
+buffer were byte-identical between this slice and its parent commit.

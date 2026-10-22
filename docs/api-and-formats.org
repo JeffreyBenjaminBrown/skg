@@ -1271,8 +1271,9 @@ and right before another whitespace and the node's title.
 The metadata grammar (which keys are recognized and how they're
 parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
-=server/types/viewnode.rs= (=ViewnodeKind=, =Vognode=, =PropertyFolder=,
-=Property=, =PartnerFolder=, =ChangeFacts=, =ReadinessRequest=).
+=server/types/viewnode.rs= (=Viewnode=, =ViewnodeKind=, =Vognode=,
+=PropertyFolder=, =Property=, =PartnerFolder=, and the diff view's
+=ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode=, whose rule table is

@@ -1017,7 +1017,7 @@ Make the changes under "Small housekeeping" above. Tests: the Rust
 suite; the integration suite once, since the banners changed (the
 baseline failure stands).
 
-** TODO Slice 1: the change facts and the readiness request live on the viewnode
+** DONE Slice 1: the change facts and the readiness request live on the viewnode
 Make the changes under "The change facts and the readiness request live
 on the viewnode" above. Order: the two fields and the constructor; the
 thirteen kinds lose theirs and every reader follows; the accessors go;

@@ -5,7 +5,7 @@
 // that carries them: each renders, then parses back to the same
 // viewnode. '(leaves ...)' renders and parses back to nothing.
 
-use skg::org_to_text::viewnode_to_string;
+use skg::org_to_text::{FolderChangeFacts, folder_change_facts, viewnode_to_string};
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::git::Sign;
@@ -15,9 +15,10 @@ use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   AffectsParent, ChangeFacts, DiffPresence, LeavesFact, Phantom,
   PhantomDeleted, PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
-  ViewnodeKind, Vognode, mk_editable_viewnode, mk_writeProtected_viewnode,
-  viewnode_of};
+  PartnerFolder, ViewnodeKind, Vognode, mk_editable_viewnode,
+  mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
+use ego_tree::{NodeId, Tree};
 use std::collections::{BTreeSet, HashMap};
 
 fn objects (
@@ -167,3 +168,61 @@ fn malformed_change_facts_are_refused () {
     "(skg (node (id a) (readyRequest sideways)))", ] {
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
               "should refuse {}", metadata ); }}
+
+/// The facts of a folder holding 'members', as the renderer derives
+/// them.
+fn facts_of_folder_holding (
+  members : &[Viewnode],
+) -> Option<FolderChangeFacts> {
+  let mut tree : Tree<Viewnode> = Tree::new (
+    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) ));
+  let folder : NodeId = tree . root () . id ();
+  for member in members {
+    tree . get_mut (folder) . unwrap () . append (member . clone ()); }
+  folder_change_facts ( tree . get (folder) . unwrap () ) }
+
+/// A folder is drawn as changed when some member's relationship to it
+/// carries a sign, and is ready when each such member is: a member
+/// whose '(leaves ...)' lists 'rel' when its '(ready ...)' names
+/// 'rel'; any other when it carries a '(ready ...)'. A relationship
+/// the member records nothing of leaves the folder unchanged.
+#[test]
+fn a_folder_is_ready_when_each_changed_member_is () {
+  let rel_leaf = |ready : Option<&[DiffObject]>| -> ChangeFacts {
+    let mut change_facts : ChangeFacts = facts ( None, Some (Sign::Plus), ready );
+    change_facts . leaves = Some ( LeavesFact {
+      count : 2, objects : objects (&[DiffObject::Node, DiffObject::Rel]) } );
+    change_facts };
+  let member = |id : &str| -> Viewnode {
+    mk_writeProtected_viewnode (
+      ID::from (id), SkgrepoName::from ("main"), id . into (),
+      AffectsParent::True ) };
+  let rel_ready : Viewnode = with_facts (
+    member ("ready"), rel_leaf ( Some (&[DiffObject::Rel]) ), None );
+  let rel_unready : Viewnode = with_facts (
+    member ("unready"), rel_leaf ( Some (&[DiffObject::Node]) ), None );
+  let unknown_ready : Viewnode = {
+    let mut change_facts : ChangeFacts = facts ( None, Some (Sign::Plus), Some (&[]) );
+    change_facts . leaves = Some ( LeavesFact { count : 1, objects : BTreeSet::new () } );
+    with_facts ( mk_unknown_viewnode (ID::from ("unknown")), change_facts, None ) };
+  let entry_unready : Viewnode = with_facts (
+    viewnode_of ( ViewnodeKind::Property ( Property::Alias {
+      text : "an alias" . into (), relRepo : None, relRepo_request : None } )),
+    facts ( None, Some (Sign::Minus), None ),
+    None );
+  let unchanged : Viewnode = with_facts (
+    member ("unchanged"), facts ( Some (Sign::Plus), None, Some (&[DiffObject::Node]) ),
+    None );
+  let ready   : Option<FolderChangeFacts> = Some ( FolderChangeFacts { ready : true } );
+  let unready : Option<FolderChangeFacts> = Some ( FolderChangeFacts { ready : false } );
+  assert_eq! ( facts_of_folder_holding (&[ rel_ready . clone () ]), ready );
+  assert_eq! ( facts_of_folder_holding (&[ rel_unready . clone () ]), unready );
+  assert_eq! ( facts_of_folder_holding (&[ unknown_ready . clone () ]), ready );
+  assert_eq! ( facts_of_folder_holding (&[ entry_unready . clone () ]), unready );
+  assert_eq! ( facts_of_folder_holding (&[ unchanged . clone () ]), None );
+  assert_eq! ( facts_of_folder_holding (
+                 &[ rel_ready . clone (), unknown_ready . clone (), unchanged ] ),
+               ready );
+  assert_eq! ( facts_of_folder_holding (
+                 &[ rel_ready, rel_unready, unknown_ready, entry_unready ] ),
+               unready ); }
