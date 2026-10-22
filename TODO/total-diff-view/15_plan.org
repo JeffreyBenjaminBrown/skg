@@ -1012,7 +1012,7 @@ in the tests. 'cargo nextest run' is the Rust suite ('bash/nextest.sh');
 'bash/integration-tests.sh' is the integration suite, which a slice
 runs when it changes what the server writes into a buffer.
 
-** TODO Slice 0: small housekeeping
+** DONE Slice 0: small housekeeping
 Make the changes under "Small housekeeping" above. Tests: the Rust
 suite; the integration suite once, since the banners changed (the
 baseline failure stands).

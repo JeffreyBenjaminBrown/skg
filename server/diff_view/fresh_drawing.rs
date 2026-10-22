@@ -120,11 +120,11 @@ pub fn reconcile_children_with_fresh_drawing (
         adopt_fresh_facts (
           tree . get_mut (existing) . unwrap () . value (), fresh_viewnode );
         if descend (fresh_viewnode) {
-          let in_folder : bool =
+          let parent_is_a_folder : bool =
             is_folder ( tree . get (existing) . unwrap () . value () );
           let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
             tree, existing, fresh, fresh_child, graph,
-            &|viewnode| is_drawn_by_the_diff_view (viewnode, in_folder, graph),
+            &|viewnode| is_drawn_by_the_diff_view (viewnode, parent_is_a_folder, graph),
             descend ) ?;
           arrange_last_children (tree, existing, &kept) ?; }
         result . push (existing); },
@@ -144,7 +144,7 @@ fn detach_the_servers_below (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
-  let (in_folder, children) : (bool, Vec<NodeId>) = {
+  let (parent_is_a_folder, children) : (bool, Vec<NodeId>) = {
     let node_ref : NodeRef<Viewnode> = tree . get (node)
       . ok_or ("detach_the_servers_below: node not found") ?;
     ( is_folder ( node_ref . value () ),
@@ -152,7 +152,7 @@ fn detach_the_servers_below (
   for child in children {
     let (users, holds_users) : (bool, bool) = {
       let child_ref : NodeRef<Viewnode> = tree . get (child) . unwrap ();
-      ( is_the_users_viewnode ( child_ref . value (), in_folder ),
+      ( is_the_users_viewnode ( child_ref . value (), parent_is_a_folder ),
         holds_the_users (child_ref) ) };
     if users { continue; }
     if holds_users { detach_the_servers_below (tree, child) ?; }
@@ -162,31 +162,31 @@ fn detach_the_servers_below (
 /// Whether a viewnode below what the diff view drew is the user's:
 /// an unrestricted vognode born 'Unremarkable' that carries no
 /// '(diff ...)' fact and is not a member of the folder it stands in
-/// ('in_folder'). A role graft ('Birth::RoleGraft', which a buffer
-/// carries back), a removed member and a folder's member are the
-/// server's, as is every viewnode of another kind.
+/// ('parent_is_a_folder'). A role graft ('Birth::RoleGraft', which a
+/// buffer carries back), a removed member and a folder's member are
+/// the server's, as is every viewnode of another kind.
 pub fn is_the_users_viewnode (
-  viewnode  : &Viewnode,
-  in_folder : bool,
+  viewnode           : &Viewnode,
+  parent_is_a_folder : bool,
 ) -> bool {
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . birth == Birth::Unremarkable
          && t . change_facts . presence == DiffPresence::default ()
-         && ! ( in_folder && t . affectsParent == AffectsParent::True )) }
+         && ! ( parent_is_a_folder && t . affectsParent == AffectsParent::True )) }
 
 /// What the diff view's reconciler manages below what it drew,
 /// where it descends and under a member of a changed folder or a
 /// historical phantom: every viewnode with a match key except the
-/// user's, which stays where it stands. 'in_folder' is whether its
-/// parent is a folder.
+/// user's, which stays where it stands. 'parent_is_a_folder' is
+/// whether its parent is a folder.
 pub fn is_drawn_by_the_diff_view (
-  viewnode  : &Viewnode,
-  in_folder : bool,
-  graph     : &InRustGraph,
+  viewnode           : &Viewnode,
+  parent_is_a_folder : bool,
+  graph              : &InRustGraph,
 ) -> bool {
   match_key (viewnode, graph) . is_some ()
-  && ! is_the_users_viewnode (viewnode, in_folder) }
+  && ! is_the_users_viewnode (viewnode, parent_is_a_folder) }
 
 /// Whether something of the user's ('is_the_users_viewnode') stands
 /// anywhere below 'node'.

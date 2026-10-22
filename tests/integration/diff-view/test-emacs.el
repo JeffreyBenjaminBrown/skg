@@ -203,7 +203,7 @@
       (test-pass "d's history:\n%s" text))))
 
 (defun run-all-tests ()
-  (message "=== SKG Total Diff View Integration Test ===")
+  (message "=== SKG Diff View Integration Test ===")
   (phase-1-open-the-diff-view)
   (phase-2-mark-everything)
   (phase-3-stage-and-commit)

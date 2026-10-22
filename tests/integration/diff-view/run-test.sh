@@ -29,7 +29,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Total Diff View Integration Test ==="
+echo "=== SKG Diff View Integration Test ==="
 
 DATA="$TEST_DIR/data"
 ALPHA="$DATA/owned/alpha"

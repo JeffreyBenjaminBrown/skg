@@ -2276,3 +2276,19 @@ rm, no txt; a save of it draws the same buffer, and so does reopening
 it. The closing greps (retired names, 'TODO/' citations under
 'server/', 'elisp/' and 'nvim/', "(from slice" in 'docs/diff-view.org')
 come back empty.
+* Fixes, features and vocabulary
+** Slice 0: deviations
+*** the shared helpers are declared in three more test targets
+The four test files sit in the grouped_unit, grouped_views and
+grouped_overrides targets, and 'tests/shared/git_fixture_helpers.rs'
+was declared only in grouped_repos. Each of those three targets now
+declares it once, with '#[allow(dead_code)]', since each uses only
+some of its helpers. Its header comment names the four targets.
+*** 'hidden_from_subscriptions.rs' keeps its 'mk_test_tcp_stream'
+As the plan says, that file drops only its 'mk_test_tcp_stream_pair'.
+Its 'mk_test_tcp_stream' (a write end whose listener is dropped)
+remains, a quasi-duplicate of the shared pair's write end.
+*** verification
+nextest 849 passed; Emacs 374; Neovim all specs passed;
+'bash/integration-tests.sh': only the baseline 'import-md-and-org'
+fails, and the diff-view test prints the new banner.

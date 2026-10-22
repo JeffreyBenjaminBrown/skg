@@ -10,7 +10,7 @@ use std::path::PathBuf;
 // Types
 //
 
-/// One step of change along a diff axis.
+/// One step of change between the two graphs of a straddle.
 /// '+' (Plus) means a transition from absent to present
 ///   (node file added, or relationship added).
 /// '-' (Minus) means present to absent.

@@ -57,7 +57,7 @@ local function git_head_summary (skgrepo)
     { 'git', '-C', data_dir .. skgrepo, 'log', '-1', '--format=%s' }))
 end
 
-print('=== SKG Total Diff View Integration Test ===')
+print('=== SKG Diff View Integration Test ===')
 
 -- PHASE 1: open the diff view.
 print('=== PHASE 1: Open the diff view ===')

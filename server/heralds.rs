@@ -391,7 +391,7 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("editRequest", vec! [
         crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
-      // The six WRITE-PROTECTED folders carry ☮ ("cannot be changed
+      // The WRITE-PROTECTED folders carry ☮ ("cannot be changed
       // from here"); the editable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
       write_protected_leaves (PartnerFolder::HiddenInSubscribee . repr_in_client (),
