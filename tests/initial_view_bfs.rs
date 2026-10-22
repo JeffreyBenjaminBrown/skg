@@ -59,11 +59,11 @@ async fn test_bfs_limit_across_multiple_trees (
       //     323
       //   33
       //
-      // §5.5 node budget: the budget counts vognode EXPANSIONS (cost 1 each), in
+      // §5.5 node budget: the budget counts vognode EXTENSIONS (cost 1 each), in
       // level order; a whole child group is always drawn (never truncated
       // mid-group), and once the budget hits 0 every later vognode is left
       // write-protected (visible, collapsed -- graphStats(contents N) still shows it
-      // has hidden content). View roots are never truncated. limit=7 expansions:
+      // has hidden content). View roots are never truncated. limit=7 extensions:
       // 1,2,3,11,12,13,21. So 12 drew its whole gen-3 group 121..123 (all then
       // write-protected); 22,23,31,32,33 are reached after the budget is spent and
       // stay write-protected.
@@ -108,8 +108,8 @@ async fn test_bfs_limit_9_three_branches (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // §5.5 node budget, limit=9 (cost 1 per expansion): expansions are
-      // 1,2,3,11,12,13,21,22,23. So roots 1 and 2 fully expand (12 and 22 each
+      // §5.5 node budget, limit=9 (cost 1 per extension): extensions are
+      // 1,2,3,11,12,13,21,22,23. So roots 1 and 2 fully extend (12 and 22 each
       // draw their whole gen-3 group, write-protected); root 3 is reached after the
       // budget is spent, so 31,32,33 stay write-protected. (Contrast limit=7, which
       // runs out one root sooner.)
@@ -149,7 +149,7 @@ async fn test_bfs_limit_9_three_branches (
                               ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 33
                               "};
       assert_metadata_eq!(result, expected,
-                 "BFS limit=9 fully expands the first two roots; the third stays write-protected");
+                 "BFS limit=9 fully extends the first two roots; the third stays write-protected");
 
       Ok (( )) }
 
@@ -157,8 +157,8 @@ async fn test_bfs_limit_8_two_branches (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // §5.5 node budget, limit=8, roots [1,2] (cost 1 per expansion): expansions
-      // are 1,2,11,12,13,21,22,23 -- both roots fully expand their gen-2. 12 and
+      // §5.5 node budget, limit=8, roots [1,2] (cost 1 per extension): extensions
+      // are 1,2,11,12,13,21,22,23 -- both roots fully extend their gen-2. 12 and
       // 22 each draw their whole gen-3 group (121..123, 221..223), all left
       // write-protected (budget spent by then). Whole groups, never a partial set.
 
@@ -193,14 +193,14 @@ async fn test_bfs_limit_8_two_branches (
                               ** (skg (node (id 23) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 23
                               "};
       assert_metadata_eq!(result, expected,
-                 "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + writeProtected");
+                 "BFS limit=8 fully extends both roots' gen-2; gen-3 groups whole + writeProtected");
 
       Ok (( )) }
 
 // §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills WHOLE
 // and is budget-NEUTRAL. Fixture: root r -> content chain c1 -> c2, and r also
 // subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
-// the chain fully expands (c2 is editable, body and all), AND both subscribers
+// the chain fully extends (c2 is editable, body and all), AND both subscribers
 // are shown (the folder is whole), write-protected. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
 // write-protected -- it is not, which is the guarantee this test pins. Subscribers
@@ -228,6 +228,6 @@ async fn test_budget_content_beats_subscribers (
                               *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) c2
                               "};
       assert_metadata_eq!(result, expected,
-                 "budget 3 expands the whole content chain; the SubscribeeFolder is whole + budget-neutral");
+                 "budget 3 extends the whole content chain; the SubscribeeFolder is whole + budget-neutral");
 
       Ok (( )) }

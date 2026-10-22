@@ -30,14 +30,14 @@
 //!   ('pass_editableViewRequest_to_content_children' in
 //!   'server/update_buffer/reconcile/content.rs'), each of which applies
 //!   the draw rule at its own visit and cascades in turn. So a request
-//!   on an editable occurrence means "unfold this subtree editable".
+//!   on an editable occurrence means "extend this subtree editable".
 //! - The node budget ('CompletionContext::node_budget') starts at
-//!   'initial_node_limit' at each completion. Each expansion of an
+//!   'initial_node_limit' at each completion. Each extension of an
 //!   editable vognode's content costs one; a folder fills its members
 //!   for free, and a content list is drawn whole or not at all. Once the
 //!   budget is spent, every later occurrence other than a root is drawn
 //!   write-protected and loses its request, which is what bounds the
-//!   cascade. The diff view charges only some expansions; see
+//!   cascade. The diff view charges only some extensions; see
 //!   'docs/diff-view.org', "Editability in the diff view".
 //!
 //! This file also dispatches the view requests that remain after the
@@ -45,10 +45,10 @@
 //! requests ('apply_writeProtect_request', C-c s w and C-c s W).
 
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
-use crate::to_org::expand::role_tree::build_and_integrate_role_tree_then_drop_request;
-use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
-use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
+use crate::to_org::extend::aliases::build_and_integrate_aliases_view_then_drop_request;
+use crate::to_org::extend::role_tree::build_and_integrate_role_tree_then_drop_request;
+use crate::to_org::extend::folder_request::build_and_integrate_folder_then_drop_request;
+use crate::to_org::extend::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, make_member_children_nonMembers, unrestrictedVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{ Viewnode, ViewRequest, FolderRelation, Editability };
@@ -118,7 +118,7 @@ pub fn execute_view_requests (
 /// EVR, or one the cascade passed down).
 pub enum DrawOutcome {
   /// An existing Final occurrence of this id won: the EVR was dropped and
-  /// the node left write-protected. No content expansion should follow.
+  /// the node left write-protected. No content extension should follow.
   Deferred,
   /// The node was made Final (and any prior Tentative occurrence of its id
   /// write-protectd). The caller draws its content next, and cascades.
@@ -126,7 +126,7 @@ pub enum DrawOutcome {
 }
 
 /// Apply the draw rule (see the module comment) for a node carrying
-/// 'ViewRequest::Editable', WITHOUT expanding its content:
+/// 'ViewRequest::Editable', WITHOUT extending its content:
 /// - defer to an existing Final occurrence (drop the EVR, stay
 ///   write-protected) -> 'DrawOutcome::Deferred';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark
@@ -150,7 +150,7 @@ pub fn apply_editable_draw_rule (
       // the node write-protected. (Setting write-protected matters for a
       // cascade EVR landing on a freshly-created editable child whose id
       // is already Final elsewhere; for a user EVR on an already-write-protected
-      // node it is a no-op. The expand step then clobbers/refreshes it.)
+      // node it is a no-op. The extend step then clobbers/refreshes it.)
       write_at_unrestrictedVognode_in_tree (
         viewforest, treeid,
         |t| { t . write_protect (); } )
@@ -177,7 +177,7 @@ pub fn apply_editable_draw_rule (
 /// Apply a write-protect request -- 'ViewRequest::WriteProtected' or
 /// 'ViewRequest::WriteProtectedSubtree' -- that the occurrence at
 /// 'treeid' carries, and consume it. Call at the occurrence's visit,
-/// before it expands, so that the expansion takes the write-protected
+/// before it extends, so that the extension takes the write-protected
 /// path and draws nothing under it.
 /// - The plain form write-protects the occurrence and makes each of its
 ///   direct unrestricted children a non-member; the children keep

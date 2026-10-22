@@ -29,7 +29,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
-use skg::to_org::expand::role_tree::build_and_integrate_containerward_role_tree_with_skgrepo_set;
+use skg::to_org::extend::role_tree::build_and_integrate_containerward_role_tree_with_skgrepo_set;
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;

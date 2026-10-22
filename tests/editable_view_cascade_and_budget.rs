@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_views -E 'test(editable_view_cascade_and_budget::)'
 //
-// Tests for editable view request expansion.
+// Tests for editable view request extension.
 // These tests verify that when a node has a "Editable" view request,
-// its content children are expanded from disk using BFS with truncation.
+// its content children are extended from disk using BFS with truncation.
 
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use indoc::indoc;
@@ -152,9 +152,9 @@ fn budget_aliasfolder_is_neutral (
     |config, tantivy| Box::pin ( test_budget_aliasfolder_is_neutral (config, tantivy) )) }
 
 // ===================================================
-// Test: Editable view with an ample budget -> everything expands.
-// §5.5 budget counts vognode EXPANSIONS (cost 1 each); the full subtree here is
-// 12 expansions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
+// Test: Editable view with an ample budget -> everything extends.
+// §5.5 budget counts vognode EXTENSIONS (cost 1 each); the full subtree here is
+// 12 extensions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
 // 20 is ample and nothing is left write-protected.
 // ===================================================
 async fn test_editable_view_ample_budget (
@@ -189,7 +189,7 @@ async fn test_editable_view_ample_budget (
 
       println!("Result with ample budget (20):\n{}", result);
 
-      // With an ample budget, all children should be expanded
+      // With an ample budget, all children should be extended
       let expected = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
@@ -214,7 +214,7 @@ async fn test_editable_view_ample_budget (
       "};
 
       assert_metadata_eq!(result, expected,
-        "Editable view with an ample budget should expand all children");
+        "Editable view with an ample budget should extend all children");
 
       Ok (( )) }
 
@@ -276,15 +276,15 @@ async fn test_editable_view_limit_5_or_6 (
       println!("Result with limit=5:\n{}", result_5);
       println!("Result with limit=6:\n{}", result_6);
 
-      // §5.5: the budget counts vognode EXPANSIONS (cost 1 each), in BFS order.
-      // The expansion order here is 1, 2, 11, 12, 13, 121, 122, ... A folder fills
+      // §5.5: the budget counts vognode EXTENSIONS (cost 1 each), in BFS order.
+      // The extension order here is 1, 2, 11, 12, 13, 121, 122, ... A folder fills
       // WHOLE for free, so a node's whole content group is always drawn -- the
-      // budget only governs how many of those children then EXPAND in turn; the
+      // budget only governs how many of those children then EXTEND in turn; the
       // rest stay write-protected (visible, collapsed). Never a partial group.
       //
-      // limit=5: expansions 1,2,11,12,13 spend the budget. 12 (the 4th) expanded
+      // limit=5: extensions 1,2,11,12,13 spend the budget. 12 (the 4th) extended
       // and drew its WHOLE group 121..124, but the budget hit 0 at 13, so when
-      // 121..124 are visited they stay write-protected (none expands -> no gen-3).
+      // 121..124 are visited they stay write-protected (none extends -> no gen-3).
       let expected_5 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
@@ -297,7 +297,7 @@ async fn test_editable_view_limit_5_or_6 (
         ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
-      // limit=6: one more expansion than limit=5 -- 121 (the 6th) now expands and
+      // limit=6: one more extension than limit=5 -- 121 (the 6th) now extends and
       // draws its whole gen-3 group 1211,1212 (both then write-protected, budget
       // spent); 122..124 remain write-protected.
       let expected_6 = indoc! {"
@@ -317,9 +317,9 @@ async fn test_editable_view_limit_5_or_6 (
       "};
 
       assert_metadata_eq!(result_5, expected_5,
-        "limit=5: 121 expands one gen-3 child (1211), rest writeProtected (§5.5)");
+        "limit=5: 121 extends one gen-3 child (1211), rest writeProtected (§5.5)");
       assert_metadata_eq!(result_6, expected_6,
-        "limit=6: 121 expands both gen-3 children, rest writeProtected (§5.5)");
+        "limit=6: 121 extends both gen-3 children, rest writeProtected (§5.5)");
 
       Ok (( )) }
 
@@ -379,14 +379,14 @@ async fn test_editable_view_limit_1_to_4 (
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
 
-      // §5.5: the budget counts vognode EXPANSIONS (cost 1 each), in BFS order:
+      // §5.5: the budget counts vognode EXTENSIONS (cost 1 each), in BFS order:
       // 1, 2, 11, 12, 13, then 12's content 121..124, ... A view ROOT is never
-      // truncated (the user opened it), so roots 1 and 2 always expand; other
+      // truncated (the user opened it), so roots 1 and 2 always extend; other
       // vognodes reached after the budget is spent are left write-protected.
       //
-      // limit=1: root 1 expands (budget 1->0) and draws its WHOLE group 11,12,13;
-      // all three are then write-protected (budget spent), so 12 never expands and
-      // none of 121.. is created. Root 2 still expands (root exemption).
+      // limit=1: root 1 extends (budget 1->0) and draws its WHOLE group 11,12,13;
+      // all three are then write-protected (budget spent), so 12 never extends and
+      // none of 121.. is created. Root 2 still extends (root exemption).
       let expected_1 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
@@ -397,7 +397,7 @@ async fn test_editable_view_limit_1_to_4 (
       // omittedBody marks only 12: the saved buffer drew 11 and 13
       // editable with no body text, WIPING their bodies, while
       // write-protected 12 kept its body -- which this render hides.
-      // limit=4: expansions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
+      // limit=4: extensions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
       // whole group 121..124, all write-protected (budget spent); 13 is reached
       // after the budget is gone, so it too is write-protected.
       let expected_4 = indoc! {"
@@ -463,7 +463,7 @@ async fn test_editable_view_conflicting (
       let expected = indoc! {
         // The first 12 (child of 1) should become write-protected,
         // its child 122 no longer a member.
-        // The second 12 (root with request) should be expanded.
+        // The second 12 (root with request) should be extended.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
         "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 1))))) 1
@@ -482,7 +482,7 @@ async fn test_editable_view_conflicting (
       Ok (( )) }
 
 // ===================================================
-// Test: Editable view expansion detects cycles
+// Test: Editable view extension detects cycles
 // ===================================================
 // Create fixtures for a cycle: a contains b contains a
 
@@ -515,7 +515,7 @@ async fn test_editable_view_with_cycle (
 
       println!("Result with cycle:\n{}", result);
 
-      // a should expand to show b, and b's child a should be marked as cycle
+      // a should extend to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
         * (skg (node (id cyc-a) (repo main) (affectsParent na) (rels (contains (in 1) (out 1))))) cyc-a
         cyc-a body
@@ -530,10 +530,10 @@ async fn test_editable_view_with_cycle (
       Ok (( )) }
 
 // ===================================================
-// Test: Editable view expansion detects repeats
+// Test: Editable view extension detects repeats
 // ===================================================
 // If a node is already visited (editable elsewhere), it should be
-// marked write-protected when encountered again during expansion.
+// marked write-protected when encountered again during extension.
 
 async fn test_editable_view_with_repeat (
   config : &SkgConfig,
@@ -693,11 +693,11 @@ fn subtree_headlines<'a> (
     . collect () }
 
 // ===================================================
-// Test: a request on an editable node unfolds its content
+// Test: a request on an editable node extends its content
 // ===================================================
 // Opened with a budget of 1, root 1 draws 11, 12 and 13
 // write-protected. A request on 1, already editable, passes to them
-// (the cascade). With a budget of 3, the expansions of 1, 11 and 12
+// (the cascade). With a budget of 3, the extensions of 1, 11 and 12
 // spend it: 11 and 12 become editable, 12 draws its whole group
 // 121..124 write-protected, and 13 stays write-protected.
 async fn test_editable_view_request_on_an_editable_node (
@@ -742,14 +742,14 @@ async fn test_editable_view_request_on_an_editable_node (
         ** (skg (node (id 13) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
       "};
       assert_metadata_eq!(result, expected,
-        "a request on editable 1 unfolds its content within the budget");
+        "a request on editable 1 extends its content within the budget");
       Ok (( )) }
 
 // ===================================================
 // Test: a request on a write-protected occurrence moves editability
 // ===================================================
 // A view of 1 and 12 draws root 12 editable, with its content, and
-// the 12 under 1 as an unexpanded write-protected member. A request on it
+// the 12 under 1 as a write-protected member without its content. A request on it
 // moves editability to it; root 12 is write-protected and keeps its
 // drawn content, no longer as members. A request on root 12, whose
 // drawn children are unchanged, moves editability back: root 12 is
@@ -829,8 +829,8 @@ async fn test_editable_view_request_moves_editability_back (
 // neither of which takes node_budget.
 //
 // Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
-// counts vognode EXPANSIONS (cost 1), so the whole content here is exactly 3
-// expansions: r, c1, c2. With limit=3 the chain fully expands (c2 editable)
+// counts vognode EXTENSIONS (cost 1), so the whole content here is exactly 3
+// extensions: r, c1, c2. With limit=3 the chain fully extends (c2 editable)
 // AND the AliasFolder shows BOTH aliases. The alias members are non-vognodes, so they
 // cost nothing: were they charged, the 3 units could not also cover c2, which
 // would then be left write-protected (verified: at limit=2 c2 *is* write-protected
@@ -873,7 +873,7 @@ async fn test_budget_aliasfolder_is_neutral (
         *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) c2
       "};
       assert_metadata_eq!(result, expected,
-        "budget 3 expands the whole content chain; the AliasFolder is whole + budget-neutral");
+        "budget 3 extends the whole content chain; the AliasFolder is whole + budget-neutral");
 
       Ok (( )) }
 
@@ -986,8 +986,8 @@ async fn test_writeProtect_subtree_request (
 // ===================================================
 // Test: a write-protect request on a write-protected occurrence is a no-op
 // ===================================================
-// A view of 1 and 12 draws the 12 under 1 as an unexpanded
-// write-protected member.
+// A view of 1 and 12 draws the 12 under 1 as a write-protected member
+// without its content.
 async fn test_writeProtect_request_on_a_writeProtected_occurrence (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,

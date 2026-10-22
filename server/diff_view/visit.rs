@@ -1,7 +1,7 @@
 //! Where view completion reads the diff-view switch
 //! ('CompletionContext::straddle'): once before a node's
-//! visit expands anything ('diffView_visit_before_expansion') and once
-//! after an unrestricted vognode's visit ('diffView_visit_after_expansion').
+//! visit extends anything ('diffView_visit_before_extension') and once
+//! after an unrestricted vognode's visit ('diffView_visit_after_extension').
 //! ('docs/diff-view.org', "Completion over the straddle".) In a buffer
 //! of the diff view, completion changes so:
 //! - at an editable node's visit, its children are aligned with the
@@ -16,7 +16,7 @@
 //!   its old content ('process_historical_phantom_visit');
 //! - no default partner folders and no hidden-in-subscribee folder
 //!   are created;
-//! - the node budget bounds only the expansions an editable-view
+//! - the node budget bounds only the extensions an editable-view
 //!   request makes outside U ('VisitSettings::charges_node_budget');
 //! - each unrestricted vognode's visit ends with the per-visit step
 //!   ('process_unrestrictedVognode_changes');
@@ -41,7 +41,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
 
 /// What view completion does at a node's visit, as
-/// 'diffView_visit_before_expansion' decides.
+/// 'diffView_visit_before_extension' decides.
 pub enum DiffViewVisit<'a> {
   /// The diff view did the whole visit.
   Done,
@@ -73,7 +73,7 @@ pub struct VisitSettings<'a> {
 }
 
 /// What became of an unrestricted vognode at its visit, before
-/// 'diffView_visit_after_expansion'.
+/// 'diffView_visit_after_extension'.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NormalNodeUpdate {
   /// This save deleted its node: it is now a deleted phantom.
@@ -84,12 +84,12 @@ pub enum NormalNodeUpdate {
   Updated,
 }
 
-/// The diff view's part of a visit, before the node expands: outside
+/// The diff view's part of a visit, before the node extends: outside
 /// the diff view, nothing but the ordinary settings. In it, a
 /// property folder's visit is done (the per-visit step reconciles it);
 /// a historical phantom draws its old content, and is then visited as
 /// an editable vognode only if its node is back.
-pub fn diffView_visit_before_expansion<'a> (
+pub fn diffView_visit_before_extension<'a> (
   tree                       : &mut Tree<Viewnode>,
   treeid                     : NodeId,
   kind                       : &ViewnodeKind,
@@ -131,7 +131,7 @@ pub fn diffView_visit_before_expansion<'a> (
 /// a node this save deleted that HEAD has is drawn as history; one
 /// still unrestricted gets the per-visit step. Nothing outside the
 /// diff view.
-pub fn diffView_visit_after_expansion (
+pub fn diffView_visit_after_extension (
   tree                       : &mut Tree<Viewnode>,
   treeid                     : NodeId,
   update                     : NormalNodeUpdate,
@@ -159,12 +159,12 @@ pub fn diffView_visit_after_expansion (
   Ok (( )) }
 
 impl<'a> VisitSettings<'a> {
-  /// Whether this expansion of 'pid' is charged to the node budget (see
-  /// the module comment of 'to_org/expand/editable.rs'). In an ordinary
-  /// view, every expansion is. The diff view deviates
+  /// Whether this extension of 'pid' is charged to the node budget (see
+  /// the module comment of 'to_org/extend/editable.rs'). In an ordinary
+  /// view, every extension is. The diff view deviates
   /// ('docs/diff-view.org', "Editability in the diff view"): a node of U
   /// is never charged, whether the pruned change view's rule or a request
-  /// made it editable, so the budget bounds only the expansions that an
+  /// made it editable, so the budget bounds only the extensions that an
   /// editable-view request makes outside U.
   pub fn charges_node_budget (
     &self,
@@ -178,7 +178,7 @@ impl<'a> VisitSettings<'a> {
   /// In the diff view, align an editable node's members with the
   /// straddle, after the draw rule settles its editability and before
   /// the content reconciler runs ('align_content_members_with_straddle').
-  pub fn align_content_members_before_expansion (
+  pub fn align_content_members_before_extension (
     &self,
     tree   : &mut Tree<Viewnode>,
     treeid : NodeId,

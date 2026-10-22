@@ -624,7 +624,7 @@ async fn test_editable_view_request_on_an_editable_node_with_content_is_allowed 
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // A request on an editable node with content children passes:
-  // completion hands it to those children, unfolding them editable.
+  // completion hands it to those children, extending them editable.
   // So does a request on a write-protected node with drawn children.
       let input : &str =
         indoc! {"

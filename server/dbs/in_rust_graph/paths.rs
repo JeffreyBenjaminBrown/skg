@@ -77,7 +77,7 @@ pub fn paths_to_first_nonlinearities_via (
 }
 
 /// Graph-native containerward path traversal used by tests and callers
-/// that need one path rather than the branch-expanded representation.
+/// that need one path rather than the branching representation.
 pub fn path_containerward_to_first_nonlinearity_in_graph (
   graph : &InRustGraph,
   node  : &ID,

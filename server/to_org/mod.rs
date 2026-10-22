@@ -1,4 +1,4 @@
 pub mod complete;
-pub mod expand;
+pub mod extend;
 pub mod render;
 pub mod util;

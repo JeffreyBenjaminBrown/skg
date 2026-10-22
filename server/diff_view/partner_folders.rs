@@ -20,7 +20,7 @@ use crate::to_org::complete::partner_folder::child_data::{
   FolderGoalShape,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
-use crate::to_org::expand::role_tree::{
+use crate::to_org::extend::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set,
   build_and_integrate_role_tree_with_skgrepo_set};
 use crate::types::env::RuntimeGeneration;

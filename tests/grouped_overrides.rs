@@ -23,11 +23,11 @@ mod fork;
 #[path = "collateral_repo_move.rs"]
 mod collateral_skgrepo_move;
 
-#[path = "expand_partner_folder_member.rs"]
-mod expand_partner_folder_member;
+#[path = "extend_partner_folder_member.rs"]
+mod extend_partner_folder_member;
 
-#[path = "expand_raw_overridden_children.rs"]
-mod expand_raw_overridden_children;
+#[path = "extend_raw_overridden_children.rs"]
+mod extend_raw_overridden_children;
 
 #[path = "idempotence.rs"]
 mod idempotence;

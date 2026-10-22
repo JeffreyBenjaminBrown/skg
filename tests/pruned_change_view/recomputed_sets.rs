@@ -6,8 +6,8 @@
 // contains a, whose body changed, and w, unchanged; w contains w1
 // and w2; w1 contains w1a and subscribes to w2. s, unchanged,
 // contains s1. p and q are new, and contain each other. So the
-// buffer's roots are q and r, and w is an unexpanded write-protected
-// member.
+// buffer's roots are q and r, and w is a write-protected member
+// without its content.
 
 use crate::git_fixture::{graph_straddle, save_cleanly};
 use crate::pruned_change_view::common::{
@@ -69,7 +69,7 @@ fn subtree_starting<'a> (
     . collect () }
 
 /// w changes after the buffer opened, while the buffer draws it only
-/// as an unexpanded write-protected member. After the next save it is
+/// as a write-protected member without its content. After the next save it is
 /// still one, and its change is counted as not editable. The command makes it editable,
 /// with its change drawn, and its members, outside U, write-protected.
 /// Its origin r is drawn already, so no root is added, and no change
@@ -85,7 +85,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     let saved : &str = &response . saved_view;
     assert! ( ! node_lines (saved, "w") . is_empty ()
               && ! drawn_editable (saved, "w"),
-              "w must stay an unexpanded write-protected member:\n{}", saved );
+              "w must stay a write-protected member without its content:\n{}", saved );
     assert! ( node_lines (saved, "w1") . is_empty (), "{}", saved );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
@@ -95,12 +95,12 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     for member in [ "w1", "w2" ] {
       assert! ( ! node_lines (&shown, member) . is_empty ()
                 && ! drawn_editable (&shown, member),
-                "{} must be an unexpanded write-protected member:\n{}", member, shown ); }
+                "{} must be a write-protected member without its content:\n{}", member, shown ); }
     assert_eq! ( root_ids (&shown), vec! [ "q", "r" ] );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
 
-/// w1a, two levels under the unexpanded write-protected member w,
+/// w1a, two levels under the write-protected member w without its content,
 /// changes. The next save draws nothing of it and counts it as not editable. The command
 /// makes w, w1 and w1a editable and draws w1a's change under them;
 /// w2 stays write-protected.
@@ -231,7 +231,7 @@ fn the_command_on_a_buffer_with_every_change_editable_changes_nothing (
 
 /// An editable-view request on w, a write-protected member outside
 /// U, cascades through its content as in an ordinary view, until the
-/// node budget (2 here) is spent: w and w1 expand; w2 and w1a stay
+/// node budget (2 here) is spent: w and w1 extend; w2 and w1a stay
 /// write-protected. No default folder is added (w1 subscribes to w2),
 /// and the nodes made editable stay so after the next save.
 #[test]
@@ -359,12 +359,12 @@ fn an_editable_view_request_moves_editability_back (
 
 /// An editable-view request on r, an editable node of U, cascades
 /// through its content as in an ordinary view: its members outside U
-/// expand until the node budget (2 here) is spent, so w and w1 become
+/// extend until the node budget (2 here) is spent, so w and w1 become
 /// editable while w2 and w1a stay write-protected. r and a, in U,
 /// are not charged; were either charged, w1 would stay
 /// write-protected. A further save changes nothing.
 #[test]
-fn an_editable_view_request_on_a_node_of_u_unfolds_its_members (
+fn an_editable_view_request_on_a_node_of_u_extends_its_members (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("fresh", &["main"], |f| {
     f . config . initial_node_limit = 2;

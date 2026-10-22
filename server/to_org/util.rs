@@ -26,7 +26,7 @@ use std::time;
 /// saved/completed editable). A EVR clobbers a Tentative occurrence
 /// but defers to a Final one: the draw rule, described with the editable
 /// map, the cascade and the node budget in the module comment of
-/// 'server/to_org/expand/editable.rs'. A user writes at most one EVR
+/// 'server/to_org/extend/editable.rs'. A user writes at most one EVR
 /// per ID (validation forbids two), so a second EVR reaching a Final
 /// ID is one the cascade passed down. NodeId is the occurrence's
 /// position in the viewforest.
@@ -44,12 +44,12 @@ impl Finalizable {
 }
 
 /// The editable map: tracks which IDs have been rendered as editable
-/// and where (see the module comment of 'server/to_org/expand/editable.rs').
+/// and where (see the module comment of 'server/to_org/extend/editable.rs').
 /// - Key: the ID that was visited
 /// - Value: Finalizable (its NodeId in the viewforest, tagged Tentative/Final)
 ///
 /// Uses:
-/// - prevent duplicate editable expansions
+/// - prevent duplicate editable extensions
 /// - locate the conflict when an earlier editable view
 ///   conflicts with a new editable view request
 pub type EditableMap =

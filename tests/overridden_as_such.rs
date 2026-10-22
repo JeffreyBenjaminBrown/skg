@@ -5,9 +5,9 @@
 // vision.org's R/E/G/H example: R subscribes to AND overrides E,
 // R hides H, E contains G and H. Extended with X overriding G, so
 // the no-cascade decision is observable:
-// - expanding E under the subscribeeFolder applies R's hides (no H)
+// - extending E under the subscribeeFolder applies R's hides (no H)
 //   and the GENERAL substitution rule (G draws as X, marked);
-// - expanding E under the overriddenFolder applies neither: full
+// - extending E under the overriddenFolder applies neither: full
 //   contains, raw G and raw H -- the user asked for the original.
 // The folder members themselves (each E copy) always draw raw: folders
 // never substitute.
@@ -31,11 +31,11 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-overridden-as-such",
     |s| Box::pin ( async move {
-      s . reset ("subscribee_as_such_expansion_hides_and_substitutes", fixtures) ?;
-      subscribee_as_such_expansion_hides_and_substitutes (
+      s . reset ("subscribee_as_such_extension_hides_and_substitutes", fixtures) ?;
+      subscribee_as_such_extension_hides_and_substitutes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("overridden_as_such_expansion_is_raw_and_unhidden", fixtures) ?;
-      overridden_as_such_expansion_is_raw_and_unhidden (
+      s . reset ("overridden_as_such_extension_is_raw_and_unhidden", fixtures) ?;
+      overridden_as_such_extension_is_raw_and_unhidden (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("folder_members_never_substitute", fixtures) ?;
       folder_members_never_substitute (
@@ -98,7 +98,7 @@ async fn save_and_rerender (
 
 /// Request an editable view of the E copy under 'folder' (by editing
 /// the de novo view's text), save, and return the rerendered view.
-async fn expand_e_under (
+async fn extend_e_under (
   folder     : &str,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -127,14 +127,14 @@ async fn expand_e_under (
     "the {} copy of E was found and given a request", folder );
   save_and_rerender (&edited, config, tantivy) . await }
 
-async fn subscribee_as_such_expansion_hides_and_substitutes (
+async fn subscribee_as_such_extension_hides_and_substitutes (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
       let view : String =
-        expand_e_under ("subscribeeFolder", config, tantivy)
+        extend_e_under ("subscribeeFolder", config, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
         lines_by_enclosing_folder (&view);
@@ -147,7 +147,7 @@ async fn subscribee_as_such_expansion_hides_and_substitutes (
       assert! ( ! tagged . iter () . any ( |(c, l)|
                   *c == "subscribeeFolder"
                   && l . contains ("(id H)") ),
-        "R's hides apply to the subscribee-as-such expansion; H \
+        "R's hides apply to the subscribee-as-such extension; H \
          appears only under the hiddenInSubscribeeFolder:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "hiddenInSubscribeeFolder"
@@ -155,14 +155,14 @@ async fn subscribee_as_such_expansion_hides_and_substitutes (
         "H shows in the hiddenInSubscribeeFolder:\n{}", view );
       Ok (( )) }
 
-async fn overridden_as_such_expansion_is_raw_and_unhidden (
+async fn overridden_as_such_extension_is_raw_and_unhidden (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
       let view : String =
-        expand_e_under ("overriddenFolder", config, tantivy)
+        extend_e_under ("overriddenFolder", config, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
         lines_by_enclosing_folder (&view);
@@ -178,7 +178,7 @@ async fn overridden_as_such_expansion_is_raw_and_unhidden (
         "no hides apply: H draws below the overridden-as-such \
          (hides are scoped to subscriptions):\n{}", view );
       assert! ( ! view . contains ("(id X)"),
-        "X appears nowhere in this expansion:\n{}", view );
+        "X appears nowhere in this extension:\n{}", view );
       Ok (( )) }
 
 async fn folder_members_never_substitute (

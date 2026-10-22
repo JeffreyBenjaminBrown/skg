@@ -9,7 +9,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::to_org::expand::role_tree::{
+use skg::to_org::extend::role_tree::{
   RoleTreePartners, build_and_integrate_role_tree_with_skgrepo_set};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::git::{NodeSign, Sign};

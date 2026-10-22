@@ -51,7 +51,7 @@ pub struct NonmergeSavePlan {
 
 /// This is the whole non-nodeMerge half of save extraction, done via
 /// local fieldIntent collection. It returns the plan, plus the
-/// (acquirer, acquiree) pairs that nodeMerge expansion consumes.
+/// (acquirer, acquiree) pairs that the nodeMerge half consumes.
 #[allow(non_snake_case)]
 pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest             : &ViewForest,

@@ -66,7 +66,7 @@ fn context_bodies_are_folded_and_members_outside_u_are_leaves (
     "cy1, in U but not C, is context:\n{}", buffer );
   assert! ( buffer . contains (
     "** (skg (node (id keep) (repo main) writeProtected" ),
-    "keep, outside U, is an unexpanded write-protected member:\n{}", buffer );
+    "keep, outside U, is a write-protected member without its content:\n{}", buffer );
   Ok (( )) }
 
 #[test]

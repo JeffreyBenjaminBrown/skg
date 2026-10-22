@@ -1,5 +1,5 @@
 use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
-use crate::to_org::expand::editable::execute_view_requests;
+use crate::to_org::extend::editable::execute_view_requests;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
@@ -58,7 +58,7 @@ pub fn ensure_hiddenInFolder_under_editable_subscribee (
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles
-/// every Editable request at the node's own visit (the draw rule; see 'to_org/expand/editable.rs'), so
+/// every Editable request at the node's own visit (the draw rule; see 'to_org/extend/editable.rs'), so
 /// only Folder/Path requests should remain here; execute_view_requests
 /// errors loudly if a Editable one survives.
 fn extract_view_requests (
@@ -78,7 +78,7 @@ fn extract_view_requests (
   // build_and_integrate_containerward here would instead merge the ancestry into
   // existing content and panic on a cyclic root (one whose containerward cycles
   // back to the root). So leave view-root Containerward for the tail. A
-  // Containerward request a USER put on a non-root node still expands here.
+  // Containerward request a USER put on a non-root node still extends here.
   let is_view_root : bool =
     tree . get (node)
       . and_then ( |n| n . parent () )

@@ -309,7 +309,7 @@ fn check_export_target_conflicts (
 }
 
 /// The import record links to each document's file root rather than
-/// containing it, so viewing the record does not expand every document.
+/// containing it, so viewing the record does not show every document's content.
 fn import_record (
   skgid : ID,
   documents : &[(PathBuf, ID)],

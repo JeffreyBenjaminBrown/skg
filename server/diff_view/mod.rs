@@ -5,7 +5,7 @@
 //!   its stub roots;
 //! - 'completion.rs': drawing and rerendering a whole buffer;
 //! - 'visit.rs': where view completion reads the diff-view switch,
-//!   before a node's visit expands and after;
+//!   before a node's visit extends and after;
 //! - 'changes.rs': the per-visit step that view completion runs at
 //!   each unrestricted vognode and historical phantom;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;

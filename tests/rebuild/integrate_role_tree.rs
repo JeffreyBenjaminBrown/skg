@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- integrate_role_tree
 
 use indoc::indoc;
-use skg::to_org::expand::role_tree::{
+use skg::to_org::extend::role_tree::{
   integrate_path_that_might_branch_or_cycle,
   build_and_integrate_containerward_role_tree};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -34,9 +34,9 @@ fn all_tests
       s . reset ("test_path_with_branches_with_cycle", fixtures) ?;
       test_path_with_branches_with_cycle (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_fork_expansion_at_origin",
-                 "tests/rebuild/fixtures-fork-expansion") ?;
-      test_fork_expansion_at_origin (
+      s . reset ("test_fork_extension_at_origin",
+                 "tests/rebuild/fixtures-fork-extension") ?;
+      test_fork_extension_at_origin (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -262,13 +262,13 @@ async fn test_path_with_branches_with_cycle_impl(
   Ok(())
 }
 
-async fn test_fork_expansion_at_origin (
+async fn test_fork_extension_at_origin (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_fork_expansion_at_origin_impl(config) . await }
+      test_fork_extension_at_origin_impl(config) . await }
 
-async fn test_fork_expansion_at_origin_impl(
+async fn test_fork_extension_at_origin_impl(
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // a11 has containers {a1, a2} — immediate fork.
@@ -311,5 +311,5 @@ async fn test_fork_expansion_at_origin_impl(
     viewforest_to_string (&expected_trees, config)?;
   assert_metadata_eq!(
     actual_str, expected_str,
-    "Fork expansion at origin should expand immediate branches" );
+    "Fork extension at origin should extend immediate branches" );
   Ok(()) }

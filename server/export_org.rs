@@ -443,10 +443,10 @@ fn parse_target_filepath (
 /// event stream rendered (and used to build homes). Iterative (an
 /// explicit stack), so an arbitrarily deep outline cannot overflow
 /// the call stack. A monotonic per-file `rendered` set means each
-/// node is expanded at most ONCE per file: a node reached again
+/// node's content is exported at most ONCE per file: a node reached again
 /// (whether as a diamond's later branch or as a cycle back to an
-/// ancestor) becomes a LinkLeaf to its home rather than being
-/// re-expanded -- so a wide DAG cannot blow up and content is not
+/// ancestor) becomes a LinkLeaf to its home rather than having
+/// its content exported again -- so a wide DAG cannot blow up and content is not
 /// duplicated within a file.
 fn collect_events (
   root_pid     : &ID,

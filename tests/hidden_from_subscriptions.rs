@@ -140,7 +140,7 @@ fn insert_before_r1 (
     "** (skg (node (id r1)",
     &format! ("{}** (skg (node (id r1)", inserted)) }
 
-fn expanded_subscribee_edit_view (
+fn extended_subscribee_edit_view (
   initial_view : &str,
   edit_kind    : &str,
 ) -> String {
@@ -373,13 +373,13 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
       = single_root_view(
           &config, None,
           &ID ("r" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      expanded_subscribee_edit_view (&expanded, "delete");
+      extended_subscribee_edit_view (&extended, "delete");
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
         &edited, &config, tantivy, &graph, &mut views_state
@@ -404,13 +404,13 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       = single_root_view(
           &config, None,
           &ID ("r" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      expanded_subscribee_edit_view (&expanded, "delete");
+      extended_subscribee_edit_view (&extended, "delete");
     let mut stream : TcpStream = mk_test_tcp_stream ();
     let response = update_from_and_rerender_buffer (
       &mut stream, &edited, config, tantivy, &graph,
@@ -516,7 +516,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     views_state . open_views . register_view (
       &graph . load_full (), saved_view_id . clone(), viewforest, &pids);
 
-    let (expanded, collateral_views) =
+    let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
         &add_editable_view_request_to_subscribees (&initial_view),
         &saved_view_id, &config, tantivy, &graph,
@@ -526,17 +526,17 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "No collateral view should be registered yet: {:?}",
       collateral_views);
 
-    let expanded_viewforest =
+    let extended_viewforest =
       views_state . open_views . viewid_to_view (&saved_view_id)
       . expect ("saved view should be registered")
       . clone();
-    let expanded_pids : Vec<ID> =
+    let extended_pids : Vec<ID> =
       views_state . open_views . viewid_to_pids (&saved_view_id);
     views_state . open_views . register_view (
-      &graph . load_full (), collateral_view_id, expanded_viewforest, &expanded_pids);
+      &graph . load_full (), collateral_view_id, extended_viewforest, &extended_pids);
 
     let edited : String =
-      expanded_subscribee_edit_view (&expanded, "delete");
+      extended_subscribee_edit_view (&extended, "delete");
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
         &edited, &saved_view_id, &config, tantivy, &graph,
@@ -582,13 +582,13 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
       = single_root_view(
           &config, None,
           &ID ("r" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      expanded_subscribee_edit_view (&expanded, "move_to_r");
+      extended_subscribee_edit_view (&extended, "move_to_r");
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
         &edited, &config, tantivy, &graph, &mut views_state
@@ -623,13 +623,13 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
       = single_root_view(
           &config, None,
           &ID ("r" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      expanded_subscribee_edit_view (&expanded, "move_to_a");
+      extended_subscribee_edit_view (&extended, "move_to_a");
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
         &edited, &config, tantivy, &graph, &mut views_state
@@ -659,14 +659,14 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
       = single_root_view(
           &config, None,
           &ID ("r" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       insert_after_line_containing (
-        &remove_e1_and_e2_subtrees (&expanded),
+        &remove_e1_and_e2_subtrees (&extended),
         "(id e)",
         "**** (skg (node (id e2) (repo foreign) writeProtected)) e2\n\
          **** (skg (node (id a) (repo owned) writeProtected)) a\n\
@@ -748,7 +748,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
 ///
 /// Tests two views:
 /// - Initial view from R: subscribees are write-protected (bare leaves)
-/// - View from R with editable views expanded at each subscribee
+/// - View from R with editable views extended at each subscribee
 ///
 /// Also tests ordering rule: HiddenInSubscribeeFolder precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeFolder before E21.
@@ -776,7 +776,7 @@ async fn test_subscribee_and_filter_folders (
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: write-protected subscribees are bare leaves; only HiddenOutsideOfSubscribeeFolder shown");
 
-    let expanded = { // Request editable views, then save
+    let extended = { // Request editable views, then save
       let modified_view : String =
         add_editable_view_request_to_subscribees (&initial_view);
       println!("Modified view (with editable requests):\n{}", modified_view);
@@ -794,9 +794,9 @@ async fn test_subscribee_and_filter_folders (
           &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
-    println!("View from R after save with editable view requests:\n{}", expanded);
+    println!("View from R after save with editable view requests:\n{}", extended);
 
-    let expected_expanded = indoc! {
+    let expected_extended = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
@@ -811,8 +811,8 @@ async fn test_subscribee_and_filter_folders (
        **** (skg folded (node (id hidden-for-no-reason) (repo main) writeProtected (rels (hidesFromSubs (in 1 (ancestors 3))) (birth (hidesFromSubs in 3))))) hidden-for-no-reason
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
        "};
-    assert_metadata_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: HiddenInSubscribeeFolder shown before content; HiddenOutsideOfSubscribeeFolder at end");
+    assert_metadata_eq!(extended, expected_extended,
+      "View with extended subscribees: HiddenInSubscribeeFolder shown before content; HiddenOutsideOfSubscribeeFolder at end");
 
     Ok (( )) }
 
@@ -823,7 +823,7 @@ async fn test_subscribee_and_filter_folders (
 ///
 /// Tests two views:
 /// - Initial view from R: E1 is write-protected (bare leaf), H doesn't appear
-/// - View from R with editable views expanded at each subscribee: H appears in HiddenInSubscribeeFolder before E11 and E12
+/// - View from R with editable views extended at each subscribee: H appears in HiddenInSubscribeeFolder before E11 and E12
 ///
 /// No HiddenOutsideOfSubscribeeFolder in either state (H is in E1's content).
 async fn test_hidden_within_but_none_without (
@@ -845,7 +845,7 @@ async fn test_hidden_within_but_none_without (
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: write-protected subscribee is bare leaf; H doesn't appear");
 
-    let expanded = { // request editable views, then save
+    let extended = { // request editable views, then save
       let modified_view : String =
         add_editable_view_request_to_subscribees (&initial_view);
       println!("Modified view (with editable requests):\n{}", modified_view);
@@ -863,11 +863,11 @@ async fn test_hidden_within_but_none_without (
           &Err ( String::new () ), &mut views_state
         ) . await ?;
       response . saved_view };
-    println!("View from R after save with editable view requests:\n{}", expanded);
+    println!("View from R after save with editable view requests:\n{}", extended);
 
     // HiddenInSubscribeeFolder precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeFolder (with H) before E11 and E12.
-    let expected_expanded = indoc! {
+    let expected_extended = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
@@ -877,8 +877,8 @@ async fn test_hidden_within_but_none_without (
        **** (skg (node (id E12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) E12
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
        "};
-    assert_metadata_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: HiddenInSubscribeeFolder with H before E11 and E12");
+    assert_metadata_eq!(extended, expected_extended,
+      "View with extended subscribees: HiddenInSubscribeeFolder with H before E11 and E12");
 
     Ok (( )) }
 
@@ -898,14 +898,14 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
       = single_root_view(
           &config, None,
           &ID ("R" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       move_h_from_hiddenin_folder_to_visible_subscribee_content (
-        &expanded );
+        &extended );
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
         &edited, &config, tantivy, &graph, &mut views_state
@@ -955,7 +955,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     views_state . open_views . register_view (
       &graph . load_full (), saved_view_id . clone(), viewforest, &pids);
 
-    let (expanded, collateral_views) =
+    let (extended, collateral_views) =
       save_buffer_and_read_collateral_views (
         &add_editable_view_request_to_subscribees (&initial_view),
         &saved_view_id, &config, tantivy, &graph,
@@ -965,18 +965,18 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       "No collateral view should be registered yet: {:?}",
       collateral_views);
 
-    let expanded_viewforest =
+    let extended_viewforest =
       views_state . open_views . viewid_to_view (&saved_view_id)
       . expect ("saved view should be registered")
       . clone();
-    let expanded_pids : Vec<ID> =
+    let extended_pids : Vec<ID> =
       views_state . open_views . viewid_to_pids (&saved_view_id);
     views_state . open_views . register_view (
-      &graph . load_full (), collateral_view_id, expanded_viewforest, &expanded_pids);
+      &graph . load_full (), collateral_view_id, extended_viewforest, &extended_pids);
 
     let edited : String =
       move_h_from_hiddenin_folder_to_visible_subscribee_content (
-        &expanded );
+        &extended );
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
         &edited, &saved_view_id, &config, tantivy, &graph,
@@ -1014,13 +1014,13 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
       = single_root_view(
           &config, None,
           &ID ("R" . to_string()) )?;
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&initial_view),
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      remove_hiddenin_branch (&expanded);
+      remove_hiddenin_branch (&extended);
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
         &edited, &config, tantivy, &graph, &mut views_state
@@ -1048,7 +1048,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H in HiddenOutsideOfSubscribeeFolder
-/// - View from R with editable views expanded at each subscribee: E1 shows E11, E12 (E12 write-protected); E2 expanded but empty; H still in HiddenOutsideOfSubscribeeFolder
+/// - View from R with editable views extended at each subscribee: E1 shows E11, E12 (E12 write-protected); E2 extended but empty; H still in HiddenOutsideOfSubscribeeFolder
 ///
 /// No HiddenInSubscribeeFolder in either state (H is not in any subscribee's content).
 async fn test_hidden_without_but_none_within (
@@ -1071,7 +1071,7 @@ async fn test_hidden_without_but_none_within (
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: H in HiddenOutsideOfSubscribeeFolder; E1 and E2 are writeProtected bare leaves");
-    let with_subscribees_expanded = {
+    let with_subscribees_extended = {
       let modified_view : String =
         add_editable_view_request_to_subscribees (&initial_view);
       println!("Modified view (with editable requests):\n{}", modified_view);
@@ -1089,8 +1089,8 @@ async fn test_hidden_without_but_none_within (
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
     println!("View from R after save with editable view requests:\n{}",
-             with_subscribees_expanded);
-    let expected_expanded = indoc! {
+             with_subscribees_extended);
+    let expected_extended = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 2 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
@@ -1102,8 +1102,8 @@ async fn test_hidden_without_but_none_within (
        **** (skg folded (node (id H) (repo main) writeProtected (rels (hidesFromSubs (in 1 (ancestors 3))) (birth (hidesFromSubs in 3))))) H
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
        "};
-    assert_metadata_eq!(with_subscribees_expanded, expected_expanded,
-      "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeFolder (at end); E1 expanded with E11, E12; E2 expanded but empty");
+    assert_metadata_eq!(with_subscribees_extended, expected_extended,
+      "View with extended subscribees: H still in HiddenOutsideOfSubscribeeFolder (at end); E1 extended with E11, E12; E2 extended but empty");
 
     Ok (( )) }
 
@@ -1153,17 +1153,17 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         && warning . contains ("HiddenInSubscribeeFolder") ),
       "Expected the post-skgsave-commit moved-inside warning: {:?}",
       response . warnings );
-    let expanded : String =
+    let extended : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_editable_view_request_to_subscribees (&rerendered),
         &config, tantivy, &graph, &mut views_state
       ) . await ?;
     assert! (
-      expanded . contains ("hiddenInSubscribeeFolder")
-      && expanded . lines () . any ( |line| line . contains ("(id E11)") ),
+      extended . contains ("hiddenInSubscribeeFolder")
+      && extended . lines () . any ( |line| line . contains ("(id E11)") ),
       "The hidden child should appear in hiddenHere once its subscribee is \
-       editable:\n{}", expanded );
-    let without_h : String = expanded . lines ()
+       editable:\n{}", extended );
+    let without_h : String = extended . lines ()
       . filter (|line| ! line . contains ("(id H)"))
       . collect::<Vec<_>> () . join ("\n") + "\n";
     let _ : String = save_buffer_for_hidden_subscriptions_test (
@@ -1185,7 +1185,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H doesn't appear
-/// - View from R with editable views expanded at each subscribee: H appears in HiddenInSubscribeeFolder under BOTH E1 and E2
+/// - View from R with editable views extended at each subscribee: H appears in HiddenInSubscribeeFolder under BOTH E1 and E2
 ///
 /// No HiddenOutsideOfSubscribeeFolder in either state (H is in subscribees' content).
 async fn test_overlapping_hidden_within (
@@ -1206,7 +1206,7 @@ async fn test_overlapping_hidden_within (
        "};
     assert_metadata_eq!(initial_view, expected_initial,
       "Initial view from R: write-protected subscribees are bare leaves; H doesn't appear");
-    let expanded = {
+    let extended = {
       let modified_view : String =
         add_editable_view_request_to_subscribees (&initial_view);
       println!("Modified view (with editable requests):\n{}",
@@ -1224,8 +1224,8 @@ async fn test_overlapping_hidden_within (
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
-    println!("View from R after save with editable view requests:\n{}", expanded);
-    let expected_expanded = indoc! {
+    println!("View from R after save with editable view requests:\n{}", extended);
+    let expected_extended = indoc! {
       "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
@@ -1236,6 +1236,6 @@ async fn test_overlapping_hidden_within (
        ***** (skg folded (node (id H) (repo main) writeProtected (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4))) (birth (contains in 2) (hidesFromSubs in 4))))) H
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
        "};
-    assert_metadata_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: H appears in HiddenInSubscribeeFolder under both E1 and E2");
+    assert_metadata_eq!(extended, expected_extended,
+      "View with extended subscribees: H appears in HiddenInSubscribeeFolder under both E1 and E2");
     Ok (( )) }

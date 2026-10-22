@@ -92,9 +92,9 @@ pub fn reconcile_partnerFolder_children (
         // hide-derived reconciler, rather than a relation role.
         graph_members, }};
   // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
-  // vognode already spent its budget unit when it expanded, so drawing all the
+  // vognode already spent its budget unit when it extended, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
-  // budget bounds how many vognodes EXPAND, not how big one group is.)
+  // budget bounds how many vognodes EXTEND, not how big one group is.)
   let relRepos : HashMap<ID, SkgrepoName> = // of unknown members, for their heralds
     raw_outbound_members (graph_snap, &recorder_pid, member_role, skgrepo_restriction)
       . into_iter ()

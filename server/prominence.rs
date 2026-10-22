@@ -127,7 +127,7 @@ pub fn compute_and_store_prominence_sources (
 ///
 /// Like the previous save-time version this is best-effort for cycles:
 /// it does a containerward walk from each still-untyped saved node
-/// rather than the whole-graph cycle expansion, which stays at
+/// rather than the whole-graph cycle walk, which stays at
 /// init/rebuild ('compute_and_store_prominence_sources').
 pub fn prominence_sources_for_saved_from_inRustGraph (
   graph     : &InRustGraph,

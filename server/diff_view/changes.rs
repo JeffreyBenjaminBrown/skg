@@ -6,8 +6,8 @@
 //! On an editable occurrence: the content members (which the content
 //! reconciler drew from the after-graph) are tagged with the presence
 //! of their node and of their relationship, members outside U that
-//! were not editable already become unexpanded write-protected
-//! members, and the former members stand where
+//! were not editable already become write-protected members
+//! without their content, and the former members stand where
 //! 'phantom_insertion_plan' places them. A node in C also gets, ahead
 //! of its content, its old text, its home skgrepo move, its "it acquired"
 //! folder, the alias, ID and flags folders that changed, the partner
@@ -481,7 +481,8 @@ fn changed_partner_folders (
 
 /// Tag each content member, and each non-member child whose node is
 /// content, with the presence of its node and of its relationship,
-/// draw a member outside U as an unexpanded write-protected member unless it was
+/// draw a member outside U as a write-protected member without its
+/// content unless it was
 /// editable before completion ('u_and_editable', when given), and
 /// keep a relRepo move under exactly the members whose relationship
 /// moved. A member's view requests stay: one that

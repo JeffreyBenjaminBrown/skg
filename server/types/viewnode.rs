@@ -266,7 +266,7 @@ pub struct PhantomHistorical {
 /// already-drawn unrestricted descendants. A de-novo render under a
 /// restricted set NEVER creates one: restricted content members are
 /// omitted from goal lists ('omit_restricted_members') and their content
-/// is never expanded (completion does nothing at a restricted node's
+/// is never extended (completion does nothing at a restricted node's
 /// visit). So a public node reachable only through a private parent
 /// simply does not appear on a fresh restricted view.
 ///
@@ -1103,7 +1103,7 @@ pub fn mk_editable_viewnode (
 /// Build a PhantomUnknown wrapper. Use when a referenced ID resolves
 /// to nothing in in_rust_graph, on disk, or via any phantom/diff procedure
 /// -- the phantom lets the view render the line as a herald
-/// rather than aborting the whole BFS expansion.
+/// rather than aborting the whole BFS extension.
 pub fn mk_unknown_viewnode (
   skgid : ID,
 ) -> Viewnode {

@@ -1,6 +1,6 @@
-// cargo nextest run --test grouped_overrides -E 'test(expand_raw_overridden_children::)'
+// cargo nextest run --test grouped_overrides -E 'test(extend_raw_overridden_children::)'
 //
-// Production change (2), the second half of the expansion test
+// Production change (2), the second half of the extension test
 // (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org): substitution does not
 // apply to the immediate children of an overridden node drawn RAW.
 //
@@ -23,9 +23,9 @@ use skg::types::viewnode::Viewnode;
 fn raw_drawn_overridden_root_children_are_raw
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-expand-raw-overridden-children",
-    "tests/expand_partner_folder_member/fixtures",
-    "/tmp/tantivy-test-expand-raw-overridden-children",
+    "skg-test-extend-raw-overridden-children",
+    "tests/extend_partner_folder_member/fixtures",
+    "/tmp/tantivy-test-extend-raw-overridden-children",
     |config, tantivy| Box::pin ( async move {
       let (x_view, _pids, _tree)
         : (String, Vec<ID>, Tree<Viewnode>) =

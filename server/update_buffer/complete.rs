@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::expand::editable::{ apply_editable_draw_rule, apply_writeProtect_request, DrawOutcome};
+use crate::to_org::extend::editable::{ apply_editable_draw_rule, apply_writeProtect_request, DrawOutcome};
 use crate::to_org::util::EditableMap;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgrepoName};
@@ -19,7 +19,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::types::views_state::DiffViewBufferKind;
 use crate::diff_view::visit::{
   DiffViewVisit, NormalNodeUpdate, VisitSettings,
-  diffView_visit_after_expansion, diffView_visit_before_expansion};
+  diffView_visit_after_extension, diffView_visit_before_extension};
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest};
@@ -29,7 +29,7 @@ use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideS
 use super::reconcile::partner_folder::reconcile_partnerFolder_children;
 use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
 use super::reconcile::content::{
-  expand_true_content_at_unrestrictedVognode, mutate_unrestrictedVognode_to_deletednode};
+  extend_true_content_at_unrestrictedVognode, mutate_unrestrictedVognode_to_deletednode};
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -44,12 +44,12 @@ pub(crate) struct CompletionContext<'a> {
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
   pub(super) skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
-  /// The node budget (see the module comment of 'to_org/expand/editable.rs'): how
-  /// many more vognodes may expand their content. Initialized once per
+  /// The node budget (see the module comment of 'to_org/extend/editable.rs'): how
+  /// many more vognodes may extend their content. Initialized once per
   /// completion to `config.initial_node_limit` and decremented by one at
-  /// each expansion of an editable vognode (a folder fills for free, and
+  /// each extension of an editable vognode (a folder fills for free, and
   /// a content list is drawn whole); when it reaches 0 no later
-  /// vognode other than a root expands (and the cascade stops).
+  /// vognode other than a root extends (and the cascade stops).
   pub(super) node_budget                    : usize,
   /// True only for a DE-NOVO (initial) render driven through
   /// view completion. When set, each fresh editable node gets its default
@@ -73,8 +73,8 @@ pub(crate) struct CompletionContext<'a> {
   /// ('docs/diff-view.org', "Completion over the straddle"), and then
   /// with 'diffView_buffer_kind' Some too. 'straddle . is_some ()' is
   /// the switch. Read at two places, the calls of
-  /// 'diffView_visit_before_expansion' and
-  /// 'diffView_visit_after_expansion' ('server/diff_view/visit.rs',
+  /// 'diffView_visit_before_extension' and
+  /// 'diffView_visit_after_extension' ('server/diff_view/visit.rs',
   /// whose module comment says how the switch changes completion).
   pub(super) straddle : Option<&'a GraphStraddle>,
   /// Which buffer of the diff view is completed, whose pruned change view
@@ -236,10 +236,10 @@ pub(crate) fn complete_appended_roots (
 /// in which each node, when visited, may create viewdescendants
 /// (content children, subscribee/relation members) that are then visited later
 /// in the same traversal. A FIFO queue (not depth-first recursion) is what makes
-/// the node budget and the draw rule (see 'to_org/expand/editable.rs') order-correct: the first
+/// the node budget and the draw rule (see 'to_org/extend/editable.rs') order-correct: the first
 /// occurrence of a duplicate id reached in BFS order -- not in depth-first order
 /// -- is the one that wins, and the Finalizable draw rule makes that safe. A
-/// node's expansion depends only on its ancestors and the graph, never on
+/// node's extension depends only on its ancestors and the graph, never on
 /// siblings or descendants, so it can be processed the moment it is dequeued.
 fn complete_nodes_in_level_order (
   tree             : &mut Tree<Viewnode>,
@@ -281,7 +281,7 @@ fn dispatch_node_update (
     deaden_generalized_orphan_folder (tree, treeid) ?;
     return Ok (( )); }
   let settings : VisitSettings =
-    match diffView_visit_before_expansion (
+    match diffView_visit_before_extension (
       tree, treeid, &kind, context . straddle, context . diffView_buffer_kind ) ? {
       DiffViewVisit::Done => return Ok (( )),
       DiffViewVisit::Complete (settings) => settings, };
@@ -291,7 +291,7 @@ fn dispatch_node_update (
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
       if settings . subscribeeFolder_has_own_reconciler =>
       // A folder fills its members WHOLE and is budget-neutral (the node budget): the owning
-      // vognode already spent its 1 budget unit when it expanded, so drawing all
+      // vognode already spent its 1 budget unit when it extended, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribeeFolder_children (
         treeid, tree, context . runtime,
@@ -324,7 +324,7 @@ fn dispatch_node_update (
         context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
-    // In a diff view, 'diffView_visit_before_expansion' has finished
+    // In a diff view, 'diffView_visit_before_extension' has finished
     // a property folder's visit: the node's visit fills its alias, ID
     // and flags folders from the graph straddle.
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
@@ -369,7 +369,7 @@ fn visit_normal_node (
 ) -> Result<(), Box<dyn Error>> {
   let update : NormalNodeUpdate =
     update_normal_node (tree, treeid, context, settings) ?;
-  diffView_visit_after_expansion (
+  diffView_visit_after_extension (
     tree, treeid, update, context . straddle, context . diffView_buffer_kind,
     context . nodes_before_completion,
     context . editable_before_completion ) }
@@ -397,7 +397,7 @@ fn update_normal_node (
     return Ok (NormalNodeUpdate::DeletedBySave); }
   // A write-protect request is applied before anything else reads
   // the occurrence's editability, so that what follows -- the budget,
-  // the draw rule, the expansion -- sees it write-protected.
+  // the draw rule, the extension -- sees it write-protected.
   apply_writeProtect_request (
     tree, treeid, &context . runtime . graph,
     &context . runtime . config, context . editable_map ) ?;
@@ -407,23 +407,23 @@ fn update_normal_node (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           t . view_requests . contains (& ViewRequest::Editable),
         _ => false } ) ?;
-  let budgeted : bool = // whether this expansion is charged to the node budget
+  let budgeted : bool = // whether this extension is charged to the node budget
     settings . charges_node_budget (&pid, had_editableViewRequest);
   let mut settled : bool = false; // the draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand EVRs to children
-  // The node budget counts vognode *expansions* (each costs 1, charged in
-  // expand_true_content_at_unrestrictedVognode); once it hits 0 every later vognode is left
+  // The node budget counts vognode *extensions* (each costs 1, charged in
+  // extend_true_content_at_unrestrictedVognode); once it hits 0 every later vognode is left
   // write-protected -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already drawn keep all their members); we only stop
-  // STARTING new expansions. EXCEPTION: a view root (child of the BufferRoot) is
-  // the node the user explicitly opened, so it always expands -- never truncated.
+  // STARTING new extensions. EXCEPTION: a view root (child of the BufferRoot) is
+  // the node the user explicitly opened, so it always extends -- never truncated.
   // (The ancestor read is short-circuited to only run when the budget is spent.)
   if context . node_budget == 0
     && budgeted
     && ! read_at_ancestor_in_tree ( tree, treeid, 1,
            |vn : &Viewnode| matches! ( &vn . kind, ViewnodeKind::BufferRoot ) )
          . unwrap_or (false) {
-    // Budget spent and this is not a view root: draw it write-protected and expand
+    // Budget spent and this is not a view root: draw it write-protected and extend
     // nothing under it; strip any EVR so it is not treated as Final. The content
     // engine (settled) then clobbers+returns.
     write_at_unrestrictedVognode_in_tree (
@@ -441,8 +441,8 @@ fn update_normal_node (
         settled = true; }
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
-  settings . align_content_members_before_expansion (tree, treeid) ?;
-  expand_true_content_at_unrestrictedVognode (
+  settings . align_content_members_before_extension (tree, treeid) ?;
+  extend_true_content_at_unrestrictedVognode (
     treeid, tree, context . editable_map,
     &context . runtime . config, context . graph_snap,
     context . deleted_by_this_save_extra_ids,
@@ -459,7 +459,7 @@ fn update_normal_node (
   if ! still_normal { return Ok (NormalNodeUpdate::NoLongerUnrestricted); }
   // Create the default folders when this node is first presented as
   // editable: on a de-novo render, or when a editable-view request has
-  // just expanded an existing occurrence.  Folder members are included;
+  // just extended an existing occurrence.  Folder members are included;
   // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
   // the subscribee-specific HiddenIn folder is added by the pass below.
   // A diff view draws no default folders.

@@ -55,7 +55,7 @@ fn a_changed_multiply_contained_node_is_its_own_root (
   assert! ( sets . d . contains (&"mc" . into ()) );
   for container in [ "ma", "mb" ] {
     assert! ( ! sets . u . contains (&container . into ()),
-              "the walk stops at mc, so {} is not unfolded", container ); }
+              "the walk stops at mc, so {} is not extended", container ); }
   Ok (( )) }
 
 #[test]

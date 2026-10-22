@@ -1,6 +1,6 @@
 // cargo test --test rebuild -- mentionerward_role_tree
 //
-// Tests that mentionerward view expansion inserts containerward
+// Tests that mentionerward view extension inserts containerward
 // ancestry beneath each Birth::RoleGraft (RelationRole::MENTIONER) skgrepo node.
 //
 // Graph (see fixtures-mentionerward-role-tree/):
@@ -12,7 +12,7 @@
 //     but that's not possible when the link includes a title.)
 //   Containment:  bb > b,  ccc > cc,  cc > c,  d > cc
 //
-// After mentionerward expansion from "a", the expected tree is:
+// After mentionerward extension from "a", the expected tree is:
 //   a
 //   +-- b  (LinkTarget)         — links to a
 //   |   +-- bb (Content) — b's container
@@ -27,7 +27,7 @@
 // and child counts without depending on order.
 
 use indoc::indoc;
-use skg::to_org::expand::role_tree::build_and_integrate_mentionerward_role_tree;
+use skg::to_org::extend::role_tree::build_and_integrate_mentionerward_role_tree;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
@@ -93,7 +93,7 @@ async fn test_mentionerward_role_tree_impl (
   let node_a : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
-  // Request mentionerward expansion from "a".
+  // Request mentionerward extension from "a".
   build_and_integrate_mentionerward_role_tree (
     &mut viewforest, node_a,
     &graph_handle_from_config (config)? . load_full (), config

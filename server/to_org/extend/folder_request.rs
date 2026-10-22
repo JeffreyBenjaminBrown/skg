@@ -6,7 +6,7 @@
 /// folders are built only when populated (an empty write-protected
 /// folder is pruned by 'is_self_deletable_when_empty').
 ///
-/// 'aliases' is handled by the AliasFolder builder ('expand/aliases.rs'),
+/// 'aliases' is handled by the AliasFolder builder ('extend/aliases.rs'),
 /// not here -- the dispatch in 'execute_view_requests' routes it there.
 
 use crate::skgrepo_sets::SkgrepoRestriction;

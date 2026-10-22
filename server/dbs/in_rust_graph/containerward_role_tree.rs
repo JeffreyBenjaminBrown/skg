@@ -29,7 +29,7 @@ impl ContainerwardRoleTree {
 /// Internal: tracks what will happen to a child node
 /// during the BFS in 'full_containerward_role_tree'.
 enum NodeFate {
-  Open (usize), // will be expanded; usize is its position key
+  Open (usize), // will be extended; usize is its position key
   Repeated,
 }
 

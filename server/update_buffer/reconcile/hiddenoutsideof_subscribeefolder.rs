@@ -65,7 +65,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
   // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
-  // subscriber already spent its budget unit when it expanded, so drawing all
+  // subscriber already spent its budget unit when it extended, so drawing all
   // these hidden members here costs nothing and never truncates the group.
   let goal_items : Vec<FolderGoalItem> =
     FolderGoalItem::live_members (&goal_list);

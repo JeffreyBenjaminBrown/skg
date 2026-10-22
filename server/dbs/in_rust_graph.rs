@@ -34,7 +34,7 @@ use crate::types::save::{NodeInstruction, DeleteNode, SaveNode};
 ///
 /// Why "recorderward" rather than "inverse": so far every relationship
 /// is recorded by its first member, so the recorderward direction is
-/// also the relation's inverse. Expansions of the data model could let
+/// also the relation's inverse. Extensions of the data model could let
 /// the second member record a relationship; "recorderward" would still
 /// say which way the map points, and "inverse" would not.
 pub type RecorderwardRelmap = im::HashMap<ID, im::HashSet<ID>>;

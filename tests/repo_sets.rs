@@ -28,7 +28,7 @@ use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
-use skg::to_org::expand::role_tree::{
+use skg::to_org::extend::role_tree::{
   build_and_integrate_containerward_role_tree_with_skgrepo_set,
   integrate_path_that_might_branch_or_cycle_with_skgrepo_set};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
@@ -78,11 +78,11 @@ fn all_tests
       s . reset ("restricted_repo_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_skgrepo_search_and_save_work_together_end_to_end (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("containerward_expansion_truncates_before_restricted_container", fixtures) ?;
-      containerward_expansion_truncates_before_restricted_container (
+      s . reset ("containerward_extension_truncates_before_restricted_container", fixtures) ?;
+      containerward_extension_truncates_before_restricted_container (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
-      mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+      s . reset ("mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
+      mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("stale_restricted_placeholders_under_folders_save_without_error", fixtures) ?;
       stale_restricted_placeholders_under_folders_save_without_error (
@@ -630,7 +630,7 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
     "fully restricted forks should not render an empty fork folder" );
   Ok (( )) }
 
-async fn containerward_expansion_truncates_before_restricted_container (
+async fn containerward_extension_truncates_before_restricted_container (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -655,7 +655,7 @@ async fn containerward_expansion_truncates_before_restricted_container (
       assert_eq! (
         child_children,
         BTreeSet::from ([ID::from ("active-container")]),
-        "containerward expansion should keep the unrestricted prefix and \
+        "containerward extension should keep the unrestricted prefix and \
          truncate before the restricted container" );
       let rendered : String =
         viewforest_to_string (&viewforest, config)?;
@@ -670,7 +670,7 @@ async fn containerward_expansion_truncates_before_restricted_container (
         rendered );
       Ok (( )) }
 
-async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+async fn mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -700,7 +700,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
       assert_eq! (
         true_child_skgids (&viewforest, child_skgid),
         BTreeSet::from ([ID::from ("active-fork-branch")]),
-        "mentionerward fork expansion should retain unrestricted branches \
+        "mentionerward fork extension should retain unrestricted branches \
          independently and omit restricted branches" );
 
       let mut empty_fork_viewforest : Tree<Viewnode> =

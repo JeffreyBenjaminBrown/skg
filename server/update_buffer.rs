@@ -46,7 +46,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::write_graph_straddle_back;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
-use crate::to_org::expand::role_tree::{
+use crate::to_org::extend::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
 use crate::to_org::util::EditableMap;
 use crate::types::views_state::{DiffViewBufferKind, ViewId};
@@ -197,7 +197,7 @@ pub fn update_views_after_save (
       &mut saved_view_mut, &context . graph_snap ) ? };
   // Gate the forests' existing unrestricted nodes before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
-  // below covers nodes introduced by completion/expansion.
+  // below covers nodes introduced by completion.
   if let Some (restriction) = skgrepo_restriction {
     let mut input_candidates : Vec<ID> =
       unrestricted_skgids_in_viewforest (&saved_view_mut);
@@ -384,8 +384,8 @@ fn rerender_collateral_view (
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
 /// creates each fresh node's default PartnerFolders
-/// (create_partnerFolders_for_fresh_nodes = true), expands content, reconciles
-/// folders, and applies the node budget (see 'to_org/expand/editable.rs').
+/// (create_partnerFolders_for_fresh_nodes = true), extends content, reconciles
+/// folders, and applies the node budget (see 'to_org/extend/editable.rs').
 /// The caller (multi_root_view_via_env) then adds containerward role tree and
 /// stats.
 /// Returns the completed viewforest plus the warning strings the

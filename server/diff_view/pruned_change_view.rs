@@ -5,7 +5,7 @@
 //! origins reached from C by walking containerward through the union
 //! of the graph straddle; U is R, C and every node on those walks; D
 //! is R minus the content origins that another kept content origin
-//! reaches containerward inside U. The view unfolds contentward from
+//! reaches containerward inside U. The view extends contentward from
 //! each d in D: a node in U is drawn editable with its whole content
 //! list, a member outside U is a write-protected member drawn without
 //! its content. View completion extends the viewforest, its
@@ -76,8 +76,8 @@ impl Default for PrunedChangeViewCache {
 /// The sets of the pruned change view that a buffer of the diff view
 /// draws. The order-only buffer draws no pruned change view: its sets
 /// are empty, so each of its roots is drawn with its content as
-/// unexpanded write-protected members. Computed once per straddle
-/// ('PrunedChangeViewCache').
+/// write-protected members without their content. Computed once per
+/// straddle ('PrunedChangeViewCache').
 pub fn prunedChangeView_sets_of_buffer (
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,

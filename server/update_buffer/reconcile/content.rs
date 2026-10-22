@@ -60,17 +60,17 @@ struct ChildData {
 /// settles the node's
 /// Finalizable state *before* calling this (via 'apply_editable_draw_rule')
 /// and passes:
-/// - `settled`: the draw rule (see 'to_org/expand/editable.rs') already ran for this node (it carried a
+/// - `settled`: the draw rule (see 'to_org/extend/editable.rs') already ran for this node (it carried a
 ///   ViewRequest::Editable), so its map entry and write-protected/def are already
 ///   correct -- skip 'make_write-protected_if_repeat_then_extend_defmap', which would
 ///   otherwise write-protect a just-made-Final node against its own entry.
 /// - `cascade`: this node is Final (EVR-made); by the cascade it hands a
 ///   ViewRequest::Editable to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
-/// - `node_budget`: the remaining node budget (see 'to_org/expand/editable.rs'); this
-///   expansion costs one unit of it. None when this expansion is not
+/// - `node_budget`: the remaining node budget (see 'to_org/extend/editable.rs'); this
+///   extension costs one unit of it. None when this extension is not
 ///   charged (in a diff view, all but a request's).
-pub fn expand_true_content_at_unrestrictedVognode (
+pub fn extend_true_content_at_unrestrictedVognode (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
   editable_map                   : &mut EditableMap,
@@ -84,13 +84,13 @@ pub fn expand_true_content_at_unrestrictedVognode (
   substitution_enabled           : bool, // false in the diff view: it shows raw graph facts.
   substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
-  // Phantoms are diff placeholders; this pass mutates and expands
+  // Phantoms are diff placeholders; this pass mutates and extends
   // real content nodes.
   error_unless_node_satisfies(
     tree, node,
     |vn : &Viewnode| matches!( &vn . kind,
                                 ViewnodeKind::Vognode (Vognode::Unrestricted (_))),
-    "expand_true_content_at_unrestrictedVognode: expected Unrestricted vognode" ) ?;
+    "extend_true_content_at_unrestrictedVognode: expected Unrestricted vognode" ) ?;
   if ! settled {
     // A EVR node was already resolved by apply_editable_draw_rule; running
     // the dedup here would write-protect it against its own (just-inserted)
@@ -99,7 +99,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
       tree, node, editable_map ) ?; }
   let (pid, initial_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at( tree, node,
-                                  "expand_true_content_at_unrestrictedVognode" ) ?;
+                                  "extend_true_content_at_unrestrictedVognode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree( tree, node,
         |vn : &Viewnode| match &vn . kind {
@@ -109,8 +109,8 @@ pub fn expand_true_content_at_unrestrictedVognode (
     if is_writeProtected {
       clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
-  // The node budget: this vognode is editable and about to expand -- draw its whole
-  // content group, and (via the BFS) its folders. Each expansion costs ONE budget
+  // The node budget: this vognode is editable and about to extend -- draw its whole
+  // content group, and (via the BFS) its folders. Each extension costs ONE budget
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node write-protected if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
@@ -136,7 +136,7 @@ pub fn expand_true_content_at_unrestrictedVognode (
     tree, node ) ?;
   Ok(( )) }
 
-/// The cascade (see 'to_org/expand/editable.rs'): hand a ViewRequest::Editable to each affected,
+/// The cascade (see 'to_org/extend/editable.rs'): hand a ViewRequest::Editable to each affected,
 /// non-phantom Unrestricted content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through non-vognodes, so only
@@ -241,8 +241,8 @@ fn reconcile_content_children (
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
   // The content group is drawn WHOLE -- never truncated mid-group. The
-  // budget is spent once per expanding vognode (in expand_true_content_at_unrestrictedVognode),
-  // not per child, so a node either fully expands or is left write-protected; we
+  // budget is spent once per extending vognode (in extend_true_content_at_unrestrictedVognode),
+  // not per child, so a node either fully extends or is left write-protected; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
   // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder

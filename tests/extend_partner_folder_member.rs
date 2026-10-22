@@ -1,9 +1,9 @@
-// cargo nextest run --test grouped_overrides -E 'test(expand_partner_folder_member::)'
+// cargo nextest run --test grouped_overrides -E 'test(extend_partner_folder_member::)'
 //
 // Default folders on ordinary editable nodes and on editable
 // PartnerFolder members.  The initial presentation contains only a nonempty
 // subscribeeFolder.  The other relation folders require explicit requests;
-// after one of their members is expanded as editable, that member gets the
+// after one of their members is extended as editable, that member gets the
 // same default subscribeeFolder.  A subscribee-as-such additionally gets its
 // nonempty HiddenInSubscribeeFolder.
 
@@ -117,9 +117,9 @@ fn add_editable_view_requests_to_folder_members (
 fn initial_and_as_such_editable_nodes_get_only_the_default_folders
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-expand-partner-folder-member",
-    "tests/expand_partner_folder_member/fixtures",
-    "/tmp/tantivy-test-expand-partner-folder-member",
+    "skg-test-extend-partner-folder-member",
+    "tests/extend_partner_folder_member/fixtures",
+    "/tmp/tantivy-test-extend-partner-folder-member",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -157,10 +157,10 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         ("Overrider", "overriderFolder"),
         ("Hidden", "hiddenFolder"),
         ("Hider", "hiderFolder") ];
-      let expanded_request : String =
+      let extended_request : String =
         add_editable_view_requests_to_folder_members (&with_folders, &members);
       let saved : String =
-        save (&expanded_request, config, tantivy, &graph)
+        save (&extended_request, config, tantivy, &graph)
         . await ? . saved_view;
       for (skgid, folder) in members {
         let subtree : String =
@@ -183,7 +183,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         subtree_for_node_in_folder (&saved, "S", "subscriberFolder");
       assert! ( subscriber_subtree . contains ("(id C)")
                 && subscriber_subtree . contains ("content of S"),
-        "S's own content should appear on expansion:\n{}", saved );
+        "S's own content should appear on extension:\n{}", saved );
       assert! ( ! subscriber_subtree . contains ("hiddenInSubscribeeFolder")
                 && ! subscriber_subtree . contains (
                   "hiddenOutsideOfSubscribeeFolder"),
