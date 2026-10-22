@@ -442,8 +442,10 @@ end
 ---Prompt for and change the skgrepo of the node at point (S-arrows
 ---cycle owned skgrepos; typed names accepted). With RECURSIVE, also
 ---changes every true content descendant whose skgrepo matches. On
----a metadata-less headline, populates it minimally instead. Does NOT
----save.
+---a metadata-less headline, populates it minimally instead.
+---Write-protected occurrences are NOT changed -- the save would
+---refuse their skgrepo edits -- and produce a loud warning, with the
+---full ID list in :messages. Does NOT save.
 ---@param recursive boolean|nil
 function M.set_repo (recursive)
   if M.headline_metadata_empty_p() then
@@ -462,33 +464,94 @@ function M.set_repo (recursive)
   if new_skgrepo == current_skgrepo then
     vim.notify('Repo unchanged: ' .. current_skgrepo)
     return end
-  local changed_count
-  if recursive then
-    changed_count =
-      M.change_repo_recursive(current_skgrepo, new_skgrepo)
-  else
-    changed_count = M.change_repo_at_line(
-      M.current_line_number(), new_skgrepo) end
-  vim.notify(string.format(
-    'Repo changed from %s to %s on %d node%s. Save to apply.',
-    current_skgrepo, new_skgrepo, changed_count,
-    changed_count == 1 and '' or 's'))
+  M.change_repo_and_report(current_skgrepo, new_skgrepo, recursive)
 end
 
 function M.set_repo_recursive ()
   M.set_repo(true)
 end
 
+---The body of set_repo once a real move is requested: retarget the
+---skgrepos (skipping write-protected occurrences) and report --
+---loudly, when write-protected occurrences were skipped: one
+---message per skipped ID, then the summary.
+---@param old_skgrepo string
+---@param new_skgrepo string
+---@param recursive boolean|nil
+function M.change_repo_and_report (old_skgrepo, new_skgrepo, recursive)
+  local changed_count, writeProtected_skgids
+  if recursive then
+    changed_count, writeProtected_skgids =
+      M.change_repo_recursive(old_skgrepo, new_skgrepo)
+  else
+    changed_count, writeProtected_skgids =
+      M.change_repo_at_line_unless_write_protected(
+        M.current_line_number(), new_skgrepo) end
+  for _, skgid in ipairs(writeProtected_skgids) do
+    vim.notify(
+      'SkgSetRepo: write-protected occurrence NOT changed '
+        .. '(the save would refuse its edit): ' .. skgid,
+      vim.log.levels.WARN) end
+  local summary = string.format(
+    'Repo changed from %s to %s on %d node%s. Save to apply.',
+    old_skgrepo, new_skgrepo, changed_count,
+    changed_count == 1 and '' or 's')
+  if #writeProtected_skgids == 0 then
+    vim.notify(summary)
+  else
+    vim.notify(summary .. string.format(
+      '  WARNING: %d write-protected node%s NOT changed -- the save '
+        .. 'would refuse their edits. See :messages for the ID list.',
+      #writeProtected_skgids,
+      #writeProtected_skgids == 1 and '' or 's'),
+      vim.log.levels.WARN) end
+end
+
+---Set the skgrepo at LINE_NUMBER to NEW_REPO, unless the occurrence
+---is write-protected -- the save would refuse that edit.
+---@param line_number integer
+---@param new_skgrepo string
+---@return integer changed node count
+---@return string[] the skipped write-protected IDs
+function M.change_repo_at_line_unless_write_protected (line_number,
+                                                       new_skgrepo)
+  local metadata = M.metadata_sexp_at_line_or_nil(line_number)
+  if M.node_write_protected_p(metadata) then
+    return 0, { M.node_id(metadata) or '(no id)' } end
+  return M.change_repo_at_line(line_number, new_skgrepo), {}
+end
+
 ---Change OLD_REPO to NEW_REPO in this content subtree (root
 ---inclusive; only affectsParent=true descendants are traversed).
+---A write-protected occurrence is NOT edited -- the save would
+---refuse its skgrepo edit -- and its ID is returned instead, for the
+---caller to warn about, unless the walk also changed that ID's
+---editable occurrence: that one carries the move, and the rerender
+---after the save shows it everywhere. Its viewdescendants are still
+---traversed: they are self-writers, so their skgrepo edits take
+---effect even under a write-protected parent.
 ---@param old_skgrepo string
 ---@param new_skgrepo string
 ---@return integer changed node count
+---@return string[] the skipped write-protected IDs
 function M.change_repo_recursive (old_skgrepo, new_skgrepo)
+  local changed_count = 0
+  local changed_skgids = {}
+  local writeProtected_skgids = {}
+  local function change_or_skip (line)
+    local metadata = M.metadata_sexp_at_line_or_nil(line)
+    if M.node_write_protected_p(metadata) then
+      table.insert(writeProtected_skgids,
+                   M.node_id(metadata) or '(no id)')
+    else
+      local skgid = M.node_id(metadata)
+      if skgid then changed_skgids[skgid] = true end
+      changed_count = changed_count
+        + M.change_repo_at_line(line, new_skgrepo) end
+  end
   local start_line = M.current_line_number()
   local start_level = M.outline_level(start_line)
-  local changed_count =
-    M.change_repo_at_line(start_line, new_skgrepo)
+  change_or_skip(start_line)
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
@@ -497,11 +560,13 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
       line = M.next_headline_after_subtree(line)
     else
       if M.node_repo(metadata) == old_skgrepo then
-        changed_count = changed_count
-          + M.change_repo_at_line(line, new_skgrepo) end
+        change_or_skip(line) end
       line = M.next_headline_line(line) end
   end
-  return changed_count
+  return changed_count,
+         vim.tbl_filter(function (skgid)
+                          return not changed_skgids[skgid] end,
+                        writeProtected_skgids)
 end
 
 ---Set the skgrepo at LINE_NUMBER to NEW_REPO (and refresh the

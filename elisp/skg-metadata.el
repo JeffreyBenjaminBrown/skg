@@ -138,8 +138,8 @@ at their old, more private repos come back for review before anything
 is written (see `skg--strandeds-confirmation-handler'), and those it would
 leave more public than a node's new home are raised automatically.
 
-Write-protected occurrences are NOT changed -- the save would silently
-ignore their repo edits -- and produce a loud warning, with the
+Write-protected occurrences are NOT changed -- the save would refuse
+their repo edits -- and produce a loud warning, with the
 full ID list in *Messages*.
 
 Does NOT save; call `skg-request-save-buffer' afterward."
@@ -177,7 +177,7 @@ when write-protected occurrences were skipped."
          (changed-count (car change-result))
          (write-protected-skgids (cdr change-result)))
     (dolist (skgid write-protected-skgids)
-      (message "skg-set-repo: write-protected occurrence NOT changed (the save would ignore it): %s"
+      (message "skg-set-repo: write-protected occurrence NOT changed (the save would refuse its edit): %s"
                skgid))
     (message "%s"
              (concat
@@ -185,13 +185,13 @@ when write-protected occurrences were skipped."
                       old-skgrepo new-skgrepo changed-count
                       (if (= changed-count 1) "" "s"))
               (when write-protected-skgids
-                (format "  WARNING: %d write-protected node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
+                (format "  WARNING: %d write-protected node%s NOT changed -- the save would refuse their edits. See *Messages* for the ID list."
                         (length write-protected-skgids)
                         (if (= (length write-protected-skgids) 1) "" "s")))))))
 
 (defun skg--change-repo-at-point-unless-write-protected (new-skgrepo)
   "Set the repo at point to NEW-REPO, unless the occurrence is
-write-protected -- the save would silently ignore that edit. Returns
+write-protected -- the save would refuse that edit. Returns
 (CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-repo-recursive'."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (if (skg--node-write-protected-p meta)
@@ -732,8 +732,8 @@ Does NOT save; call `skg-request-save-buffer' afterward."
   "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
-A write-protected occurrence is NOT edited -- the save would silently
-ignore its repo edit -- and its ID is
+A write-protected occurrence is NOT edited -- the save would refuse
+its repo edit -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about,
 unless the walk also changed that ID's editable occurrence: that one
 carries the move, and the rerender after the save shows it everywhere.

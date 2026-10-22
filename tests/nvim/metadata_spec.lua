@@ -184,6 +184,81 @@ describe('skg.metadata commands', function ()
     end
   end)
 
+  ---Run set_repo (RECURSIVE) with the prompt answering NEW_SKGREPO,
+  ---and return every message it notified.
+  local function notices_of_set_repo (new_skgrepo, recursive)
+    local notices = {}
+    local original_prompt = picker.prompt_for_repo_change
+    local original_notify = vim.notify
+    picker.prompt_for_repo_change = function () return new_skgrepo end
+    vim.notify = function (text) table.insert(notices, text) end
+    local ok, err = pcall(metadata.set_repo, recursive)
+    picker.prompt_for_repo_change = original_prompt
+    vim.notify = original_notify
+    assert(ok, err)
+    return notices
+  end
+
+  local function some_notice_matches (notices, ...)
+    local patterns = { ... }
+    for _, notice in ipairs(notices) do
+      local all_match = true
+      for _, pattern in ipairs(patterns) do
+        if not notice:find(pattern, 1, true) then all_match = false end
+      end
+      if all_match then return true end
+    end
+    return false
+  end
+
+  it('set_repo_recursive warns about a write-protected occurrence', function ()
+    -- Mirrors test-set-repo-recursive-warns-about-write-protected.
+    buffer_with(table.concat({
+      '* (skg (node (id r) (repo private))) r',
+      '** (skg (node (id e) (repo private) writeProtected)) e',
+      '*** (skg (node (id f) (repo private))) f' }, '\n'))
+    local notices = notices_of_set_repo('public', true)
+    assert.is_true(some_notice_matches(notices, 'NOT changed', ': e',
+                                       'refuse'))
+    assert.is_true(some_notice_matches(notices, 'WARNING', ':messages',
+                                       'refuse'))
+    assert.is_true(subtree_p(metadata_sexp_by_id('e'),
+      '(skg (node (repo private)))'))
+    for _, skgid in ipairs({ 'r', 'f' }) do
+      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
+        '(skg (node (repo public)))'), skgid)
+    end
+  end)
+
+  it('set_repo_recursive lets a repeat follow its editable occurrence', function ()
+    -- Mirrors test-set-repo-recursive-repeat-follows-its-editable-occurrence.
+    buffer_with(table.concat({
+      '* (skg (node (id r) (repo private))) r',
+      '** (skg (node (id a) (repo private))) a',
+      '*** (skg (node (id x) (repo private))) x',
+      '** (skg (node (id b) (repo private))) b',
+      '*** (skg (node (id x) (repo private) writeProtected)) x again' },
+      '\n'))
+    local notices = notices_of_set_repo('trusted', true)
+    assert.is_false(some_notice_matches(notices, 'NOT changed'))
+    assert.is_false(some_notice_matches(notices, 'WARNING'))
+    assert.is_true(subtree_p(metadata.metadata_sexp_at_line_or_nil(3),
+      '(skg (node (id x) (repo trusted)))'))
+    assert.is_true(subtree_p(metadata.metadata_sexp_at_line_or_nil(5),
+      '(skg (node (id x) (repo private) writeProtected))'))
+  end)
+
+  it('set_repo on a write-protected occurrence warns and skips', function ()
+    -- Mirrors test-set-repo-single-write-protected-warns-and-skips.
+    buffer_with('* (skg (node (id x) (repo private) writeProtected)) x')
+    local notices = notices_of_set_repo('public', false)
+    assert.is_true(some_notice_matches(notices, 'WARNING'))
+    assert.is_true(subtree_p(first_metadata_sexp(),
+      '(skg (node (repo private)))'))
+    assert.is_false(subtree_p(first_metadata_sexp(),
+      '(skg (node (repo public)))'))
+  end)
+
   it('set_merge_request accepts a bare id', function ()
     buffer_with('* (skg (node (id acquirer) (repo public))) title')
     metadata.set_merge_request('acquiree')
