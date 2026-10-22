@@ -311,9 +311,12 @@ historical phantom, in the "it acquired" folder or under a removed
 member survives every rerender; when the removed member goes stale
 (a commit makes the removal part of HEAD, or the relationship
 returns), the note stands under a plain non-member occurrence of it.
-Below a phantom or in a folder there is no unrestricted parent to
-inherit a skgrepo from, so a new note there names its skgrepo
-('(repo NAME)'), and in a folder it is a non-member.
+A new note there that names no skgrepo ('(repo NAME)') inherits that
+of its nearest ancestor that is an unrestricted vognode, through the
+phantoms and folders between them
+('inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'), as
+a note directly under a vognode inherits its parent's; in a folder it
+is a non-member.
 ** Removed members and the LCS placement
 A removed member is a member of the before-graph's list that the
 after-graph's lacks. Membership is decided by set difference, so a
@@ -362,7 +365,10 @@ membership the save reads (an unknown phantom there would read back
 as a member); its leaf in content is under the content changeset
 marker. In a write-protected-set folder and in a historical phantom's
 old content, where nothing reads back, it is an unknown phantom with
-'(presence rel-)'. A former member is any viewnode standing for a
+'(presence rel-)'; the save's check of a write-protected occurrence's
+folder skips an unknown phantom with that sign, as it skips a removed
+member by its non-membership ('partnerFolder_members_in_view'). A
+former member is any viewnode standing for a
 before-only relationship, historical phantoms included.
 
 * Editability in the diff view

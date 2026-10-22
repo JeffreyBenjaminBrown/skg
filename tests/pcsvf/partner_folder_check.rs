@@ -45,6 +45,22 @@ fn a_member_drawn_by_an_extra_id_and_an_unknown_member_pass (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 
+/// A dangling removed member, as the diff view draws one in a
+/// write-protected folder (an unknown phantom with '(presence rel-)'),
+/// is not counted: beside the members recorder lists, the folder
+/// saves unchanged.
+#[test]
+fn a_dangling_removed_member_is_not_counted (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("partner_ids", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
+      &buffer, &[ "(skg (node (id x2) (repo main) writeProtected)) x",
+                  "(skg (unknown (id ghost)))",
+                  "(skg (unknown (id gone) (diff (presence rel-))))" ] )) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    Ok (( )) }) }
+
 /// An unknown phantom is compared by its raw ID: drawn with an ID
 /// recorder does not list, the folder is refused.
 #[test]

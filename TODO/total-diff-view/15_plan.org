@@ -1082,7 +1082,7 @@ removed member is its node's first occurrence; the slice-5-of-plan-13
 test under a historical phantom still passes without the restore
 block; the Rust suite and the integration suite.
 
-** TODO Slice 6: the save inherits a skgrepo through phantoms and folders, and ignores a dangling removed member
+** DONE Slice 6: the save inherits a skgrepo through phantoms and folders, and ignores a dangling removed member
 Make the changes under the heading of that name above. Tests: in
 'tests/new/buffer_to_viewnodes/add_missing_info.rs', a bare headline
 under a historical phantom under an editable node inherits the node's

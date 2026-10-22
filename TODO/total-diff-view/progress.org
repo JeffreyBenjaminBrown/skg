@@ -2559,3 +2559,56 @@ Over TCP, on an isolated server over 'removed_partners'
 member; the buffer saved unchanged reports no error and nothing
 unshown; x retitled there is written (five changed files, from four)
 and stays editable, marked 'node~' with its old title.
+** Slice 6: deviations
+*** the function took a name that says what it does
+'inherit_parent_skgrepo_if_possible' became
+'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible', as
+"parent" no longer describes it; the walk is its own function,
+'skgrepo_of_nearest_unrestricted_ancestor'. The stale
+'inherit_parent_repo_if_possible' in 'validate_tree.rs', in the
+comment of 'fill_skgrepo_from_graph_map' and in the test file, and
+'resolve_repos_for_repoless_ided_nodes' and 'repo_of_id' in
+'add_missing_info.rs', now name what exists.
+*** which kinds the walk passes, and which end it
+It passes phantoms of every kind, partner folders and property
+folders. The buffer root and a dead viewnode end it with no skgrepo,
+as the plan says, and so do a restricted vognode and a property,
+which the plan does not name: a restricted vognode's skgrepo is not
+one to reveal or write into, and nothing new stands under a property.
+*** tests
+In 'tests/new/buffer_to_viewnodes/add_missing_info.rs':
+'test_new_headline_inherits_through_phantoms_and_folders' (under a
+historical phantom; in a partner folder, as a non-member; in a
+partner folder under a write-protected occurrence whose shown
+skgrepo is stale, which gets the graph's, since the direct child of
+such an occurrence was already tested) and
+'test_new_headline_at_top_level_is_refused' (stays repoless, and
+'find_buffer_errors_for_saving' reports the config error). In
+'write_protected_edits.rs':
+'an_unknown_phantom_with_the_sign_minus_is_not_counted'. Beyond the
+plan, end to end: 'a_dangling_removed_member_is_not_counted' in
+'tests/pcsvf/partner_folder_check.rs', and the notes of
+'tests/pcsvf/users_notes.rs' name no skgrepo now, so the four tests
+there save notes that inherit through a phantom, a folder and a
+removed member.
+*** docs
+Besides the paragraph the plan names, 'docs/diff-view.org', "One
+encoding of a removed relationship", said a dangling removed member
+in a write-protected-set folder stands "where nothing reads back"; it
+now says the folder check skips it.
+*** seen, left
+'docs/COMMANDS.org' (C-c v e) says headline creation through Skg's
+commands "prompts for any skgrepo it cannot inherit"; whether the
+clients' notion of inheritance matches the server's was not checked.
+*** verification
+nextest 862 passed; Emacs 376; Neovim all specs passed. The
+integration suite is not among this slice's (the server writes
+nothing new into a buffer). Over TCP, on isolated servers
+('tests/results/15-slice6-verify/'): in the "all changes" buffer of
+'users_notes', a repoless note under the historical phantom h and one
+in a container folder saved without error and were written to main;
+a repoless top-level headline was refused ("UnrestrictedVognode must
+have a repo that exists in the config."). In that of 'partner_ids', a
+subscribee folder under the write-protected recorder holding an
+unknown phantom with '(presence rel-)' beside recorder's partners
+saved without error.
