@@ -76,7 +76,7 @@ pub fn full_containerward_role_tree_from_inRustGraph (
 
 /// The containers of a node, through the graph's 'contained_by'
 /// recorderward relmap, as the partners function of the containerward
-/// role tree. Ungated: the caller gates what it draws.
+/// role tree. Ungated: the caller gates what it shows.
 pub fn containers_in_inRustGraph (
   graph : &InRustGraph,
 ) -> impl Fn (&ID, RelationRole) -> HashSet<ID> + '_ {

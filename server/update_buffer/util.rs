@@ -138,9 +138,9 @@ impl<Orderkey> RepairSummary<Orderkey> {
 }
 
 /// The rule both reconcilers obey ('docs/diff-view.org', "What a
-/// reconciler keeps"): a reconciler detaches only what it drew, and
+/// reconciler keeps"): a reconciler detaches only what it created, and
 /// what the user added survives. A stale child (one the reconciler
-/// manages but would no longer draw) under which 'holds_the_users'
+/// manages but would no longer show) under which 'holds_the_users'
 /// finds something of the user's is kept: an unrestricted vognode as
 /// a plain non-member occurrence of its node, its diff facts cleared;
 /// any other kind (a restricted vognode, a phantom, a property or a
@@ -149,7 +149,7 @@ impl<Orderkey> RepairSummary<Orderkey> {
 /// the child; one it did not keep is the caller's to detach.
 /// 'complete_managed_children_in_viewforest' never looks below the
 /// children it manages, so for it any child of a stale child is the
-/// user's; the diff view's reconciler draws below the children it
+/// user's; the diff view's reconciler adds below the children it
 /// manages, and asks 'holds_the_users' in
 /// 'server/diff_view/shallow_model_subtree.rs'.
 pub fn keep_stale_child_holding_the_users (

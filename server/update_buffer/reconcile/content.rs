@@ -45,10 +45,10 @@ struct ChildData {
   kind         : ContentReality,
   /// The exact stored relRepo of an unresolved relationship member.
   /// Known children derive their display facts from their graphnode;
-  /// an Unknown has no home, so only this retained relationship fact can draw
+  /// an Unknown has no home, so only this retained relationship fact can show
   /// its optional relRepo herald.
   relRepo : Option<SkgrepoName>,
-  /// Some(R) = override substitution applies: draw R, marked
+  /// Some(R) = override substitution applies: show R, marked
   /// '(overridesHere goal-id)', in place of the goal member. The
   /// title/repo/body above are then R's. Only ContentReality::Real
   /// children substitute.
@@ -60,13 +60,13 @@ struct ChildData {
 /// settles the node's
 /// Finalizable state *before* calling this (via 'apply_editability_rule')
 /// and passes:
-/// - `settled`: the draw rule (see 'to_org/extend/editable.rs') already ran for this node (it carried a
+/// - `settled`: the editability rule (see 'to_org/extend/editable.rs') already ran for this node (it carried a
 ///   ViewRequest::Editable), so its map entry and write-protected/def are already
 ///   correct -- skip 'make_write-protected_if_repeat_then_extend_defmap', which would
 ///   otherwise write-protect a just-made-Final node against its own entry.
 /// - `cascade`: this node is Final (EVR-made); by the cascade it hands a
 ///   ViewRequest::Editable to each of its affected content children so the
-///   BFS draws each Final (clobbering competing Tentative occurrences).
+///   BFS makes each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the remaining node budget (see 'to_org/extend/editable.rs'); this
 ///   extension costs one unit of it. None when this extension is not
 ///   charged (in a diff view, all but a request's).
@@ -109,7 +109,7 @@ pub fn extend_true_content_at_unrestrictedVognode (
     if is_writeProtected {
       clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
-  // The node budget: this vognode is editable and about to extend -- draw its whole
+  // The node budget: this vognode is editable and about to extend -- extend its whole
   // content group, and (via the BFS) its folders. Each extension costs ONE budget
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node write-protected if the
@@ -138,7 +138,7 @@ pub fn extend_true_content_at_unrestrictedVognode (
 
 /// The cascade (see 'to_org/extend/editable.rs'): hand a ViewRequest::Editable to each affected,
 /// non-phantom Unrestricted content child of a Final node -- new and existing
-/// alike -- so the main BFS draws each Final (and it in turn cascades to its
+/// alike -- so the main BFS makes each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through non-vognodes, so only
 /// affectsParent=true content children receive it.
 fn pass_editableViewRequest_to_content_children (
@@ -215,7 +215,7 @@ fn reconcile_content_children (
     . map ( |m| m . member . id () . clone () )
     . collect ();
   let unresolved_relRepos : HashMap<ID, SkgrepoName> =
-    // The members the graph does not resolve are drawn as unknown
+    // The members the graph does not resolve are shown as unknown
     // phantoms, with their relationships' relRepos.
     content_members . iter ()
     . filter ( |m| m . member . is_unresolved () )
@@ -225,7 +225,7 @@ fn reconcile_content_children (
   // An editable subscribee-as-such (the glossary's "subscribee as such") regenerates its content as
   // contains-minus-hides, saved and collateral views alike. (View-update is
   // strictly post-extraction, so the hide edits are already in the graph and
-  // regenerating contains-minus-hides is correct. The cascade draws
+  // regenerating contains-minus-hides is correct. The cascade extends
   // subscribee content through this same path.)
   let apparent_content_skgids : Vec<ID> =
     content_goal_list( tree, node, &content_skgids, is_sub, config,
@@ -240,7 +240,7 @@ fn reconcile_content_children (
       |skgid : &ID| graph_snap . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
-  // The content group is drawn WHOLE -- never truncated mid-group. The
+  // The content group is extended WHOLE -- never truncated mid-group. The
   // budget is spent once per extending vognode (in extend_true_content_at_unrestrictedVognode),
   // not per child, so a node either fully extends or is left write-protected; we
   // never create a silent partial sibling set.
@@ -250,11 +250,11 @@ fn reconcile_content_children (
   // is preserved (made a non-member), and a now-childless PhantomDeleted is
   // removed by the prune sweep ('prune_self_deletable_when_empty').
   let substitution_for_children : bool =
-    // The raw-drawn-override rule (generalized 2026-06-12 from the
+    // The raw-shown-override rule (generalized 2026-06-12 from the
     // plan-11 overridden-as-such case): when this node is itself
-    // overridden but drawn RAW by its position -- a write-protected folder
+    // overridden but shown RAW by its position -- a write-protected folder
     // member, an overriddenFolder member, or a view root -- the user is
-    // looking at the ORIGINAL, so its immediate children draw raw too.
+    // looking at the ORIGINAL, so its immediate children are shown raw too.
     // Depth one level: a content child is not a raw position, so
     // substitution resumes there (matching the overridden-as-such
     // precedent).
@@ -281,7 +281,7 @@ fn reconcile_content_children (
 /// For each entry of the goal list with no member child, the first
 /// non-member child standing for the entry's node becomes the member,
 /// keeping its viewnode and fold state, so that the reconciler, which
-/// matches members only, does not draw a second one beside it. (Such
+/// matches members only, does not create a second one beside it. (Such
 /// a non-member is typically left from when the node was
 /// write-protected.) The reconciler then moves it into goal order.
 fn adopt_nonMember_children_that_are_content (
@@ -418,18 +418,18 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
         body, } ) ))); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
-/// Whether this node is overridden yet drawn RAW by its position, so
+/// Whether this node is overridden yet shown RAW by its position, so
 /// that substitution must be disabled for its immediate children (one
 /// level; a content child is a substituting position, so substitution
 /// resumes there). Generalizes the plan-11 overridden-as-such rule (an
-/// overriddenFolder member) to every raw-drawn position. Decided
+/// overriddenFolder member) to every raw-shown position. Decided
 /// 2026-06-12:
-/// - POSITION: a member of any PartnerFolder that draws raw -- every folder
+/// - POSITION: a member of any PartnerFolder that shows its members raw -- every folder
 ///   EXCEPT the editable subscribeeFolder, whose subscribees-as-such DO
 ///   substitute (the subscriber's view of them) -- or a view root.
 /// - OVERRIDDEN: ownership-gated, visibility-UNGATED ('unrestricted' = None),
 ///   so even a node whose only overrider is invisible counts as
-///   "overridden but drawn raw".
+///   "overridden but shown raw".
 /// - A node carrying an 'overridesHere' fact is a substitute, not a
 ///   raw original, so it is excluded (its children substitute as
 ///   usual).
@@ -605,14 +605,14 @@ fn complete_content_children (
         => true,
       // A RestrictedVognode is UNMANAGED: never matched against the goal
       // list, so it is preserved as-is (a retained placeholder hosting
-      // already-drawn unrestricted descendants) and needs no id. The goal
+      // already-extended unrestricted descendants) and needs no id. The goal
       // omits every restricted member (omit_restricted_members), so it is
       // never created here either.
       _ => false },
     |vn : &Viewnode| match &vn . kind {
       // Unrestricted and Unknown children participate. COLLECTED
       // ids (the overridesHere original when present), so goal lists
-      // stay in original IDs, an existing drawn substitute satisfies
+      // stay in original IDs, an existing shown substitute satisfies
       // its original goal member, and only genuinely missing members
       // are created -- which keeps post-save rerendering stable.
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
@@ -634,12 +634,12 @@ fn complete_content_children (
               mk_editable_viewnode(
                 skgid . clone(), d . home_skgrepo . clone(),
                 d . title . clone(), d . body . clone() ),
-            Some (drawn) => {
-              // Override substitution: draw the overrider, marked
+            Some (shown) => {
+              // Override substitution: show the overrider, marked
               // with the original it stands for.
               let mut vn : Viewnode =
                 mk_editable_viewnode(
-                  drawn . clone(), d . home_skgrepo . clone(),
+                  shown . clone(), d . home_skgrepo . clone(),
                   d . title . clone(), d . body . clone() );
               if let ViewnodeKind::Vognode (
                 Vognode::Unrestricted (ref mut t)) = vn . kind
@@ -723,7 +723,7 @@ fn mark_erroneous_content_children_as_indep (
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         t . affectsParent == AffectsParent::True
-        // collected_id: a drawn substitute is a member via its
+        // collected_id: a shown substitute is a member via its
         // original, and must not be made a non-member.
         && !content_id_set . contains( &t . collected_skgid () ),
       _ => false },
@@ -804,7 +804,7 @@ fn build_child_creation_data (
           // must still be pre-fetched here; otherwise the reconcile sends it to
           // the create closure and child_data.get(id).expect(..) panics.
           // Keys are COLLECTED ids, matching the reconcile's orderkey:
-          // an existing drawn substitute registers under its original.
+          // an existing shown substitute registers under its original.
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if t . affectsParent == AffectsParent::True
             => { m . insert( t . collected_skgid (),
@@ -848,7 +848,7 @@ fn build_child_creation_data (
     if skgrepo_restriction
       . is_some_and ( |restriction| !restriction . contains_skgrepo (&child_skgrepo) )
     {
-      // Omission precedes substitution: a restricted original draws
+      // Omission precedes substitution: a restricted original shows
       // nothing (this arm is the safety net; the goal list normally
       // omitted it already), so its overrider is not consulted.
       result . insert( skgid . clone(),
@@ -865,7 +865,7 @@ fn build_child_creation_data (
           resolve_override (
             config, graph_snap, skgrepo_restriction, skgid );
         // A chain of any length resolves to its end; substitution
-        // draws that effective overrider (the carrier collects the
+        // shows that effective overrider (the carrier collects the
         // original id, so the parent's contains round-trips to N).
         if resolution . effective != *skgid {
           Some ( resolution . effective )
@@ -874,14 +874,14 @@ fn build_child_creation_data (
     let fetch_skgid : &ID = shown_skgid . as_ref () . unwrap_or (skgid);
     let fetch_skgrepo : SkgrepoName = match &shown_skgid {
       None => child_skgrepo,
-      Some (drawn) =>
+      Some (shown) =>
         // The overrider is owned and unrestricted (the resolver's
         // gates), so the graph knows its skgrepo.
-        graph_snap . pid_and_skgrepo (drawn)
+        graph_snap . pid_and_skgrepo (shown)
         . map ( |(_pid, src)| src )
         . ok_or_else ( || format! (
           "build_child_creation_data: no repo for overrider {}",
-          drawn . 0 )) ? };
+          shown . 0 )) ? };
     let skg : Graphnode =
       graphnode_graphFirst_by_pid_and_skgrepo (
         graph_snap, config, fetch_skgid, &fetch_skgrepo ) ?;

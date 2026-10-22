@@ -83,7 +83,7 @@ fn build_and_integrate_folder (
         tree, treeid, PartnerFolder::Subscriber, config, graph,
         skgrepo_restriction, false ) ?; },
     FolderRelation::Containers =>
-      // The other side, its content, is drawn without a folder.
+      // The other side, its content, is shown without a folder.
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Container, config, graph,
         skgrepo_restriction, false ) ?,

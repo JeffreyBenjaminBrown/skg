@@ -1,8 +1,8 @@
 ;;; Integration test for the MOTIVATING override-chain case.
 ;;; Fork a foreign N into a public clone C (implicit fork), then run
-;;; skg-fork-node on the DRAWN SUBSTITUTE C and rotate its clone to a
+;;; skg-fork-node on the shown substitute C and rotate its clone to a
 ;;; PRIVATE skgrepo, forming the chain D overrides C overrides N. Viewing
-;;; N's container then draws the chain end D, marked (overridesHere N),
+;;; N's container then shows the chain end D, marked (overridesHere N),
 ;;; and the save accepts that chain-end carrier.
 
 (load-file "../../../elisp/skg-init.el")
@@ -69,21 +69,21 @@
       (skg-approve-fork)))
   (message "✓ foreign N forked into a public clone")
 
-  ;; 4. Reopen P: the public clone C is drawn in N's place.
+  ;; 4. Reopen P: the public clone C is shown in N's place.
   (let ((p-buf (chain-test--reopen-P)))
-    (let ((drawn (skg-test-wait-for
+    (let ((shown (skg-test-wait-for
                   (lambda ()
                     (with-current-buffer p-buf
                       (string-match-p "(overridesHere N)" (buffer-string))))
                   10)))
-      (unless drawn
-        (test-fail "the public clone was not drawn in N's place:\n%s"
+      (unless shown
+        (test-fail "the public clone was not shown in N's place:\n%s"
                    (with-current-buffer p-buf (buffer-string)))))
-    ;; 5. Explicitly fork the DRAWN SUBSTITUTE C.
+    ;; 5. Explicitly fork the shown substitute C.
     (with-current-buffer p-buf
       (goto-char (point-min))
       (unless (re-search-forward "(overridesHere N)" nil t)
-        (test-fail "could not find the drawn substitute:\n%s" (buffer-string)))
+        (test-fail "could not find the shown substitute:\n%s" (buffer-string)))
       (skg-fork-node)))
 
   ;; 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
@@ -101,9 +101,9 @@
   (message "✓ the public clone was forked into a private clone (repo rotated)")
 
   ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
-  ;;    node -- is now drawn in N's place, still marked (overridesHere N).
+  ;;    node -- is now shown in N's place, still marked (overridesHere N).
   (let ((p-buf (chain-test--reopen-P)))
-    (let ((end-drawn
+    (let ((end-shown
            (skg-test-wait-for
             (lambda ()
               (with-current-buffer p-buf
@@ -117,10 +117,10 @@
                           (throw 'found t))))
                     nil))))
             10)))
-      (unless end-drawn
-        (test-fail "the chain end D (a private node) was not drawn for N:\n%s"
+      (unless end-shown
+        (test-fail "the chain end D (a private node) was not shown for N:\n%s"
                    (with-current-buffer p-buf (buffer-string))))
-      (message "✓ the chain end D (private) is drawn in N's place (overridesHere N)")
+      (message "✓ the chain end D (private) is shown in N's place (overridesHere N)")
       ;; 8. Saving the chain-end view succeeds (tamper check accepts the
       ;;    chain-end carrier).
       (with-current-buffer p-buf

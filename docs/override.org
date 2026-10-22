@@ -137,9 +137,9 @@ the resolver walks toward owned nodes that override it.  For
 D overrides C overrides N
 #+end_example
 
-a full-repo content view draws =D= where =N= occurs.  If =D='s home
-skgrepo is restricted but =C='s is unrestricted, it draws =C=.  If no owned
-overrider is drawable, it draws =N=.  A monogamy violation makes the
+a full-repo content view shows =D= where =N= occurs.  If =D='s home
+skgrepo is restricted but =C='s is unrestricted, it shows =C=.  If no owned
+overrider can be shown, it shows =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
 
@@ -156,8 +156,8 @@ node rather than an automatic substitute:
 - PartnerFolder members and role grafts;
 - role-tree viewnodes and historical phantoms.
 
-When a node with an owned overrider is deliberately drawn raw, its
-immediate content children are also drawn raw.  Substitution resumes at
+When a node with an owned overrider is deliberately shown raw, its
+immediate content children are also shown raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
 children rather than its overrider's interpretation of them.
 
@@ -262,7 +262,7 @@ absent-reference cleanup can remove an exact dangling override partner
 from owned data.
 
 An unknown override target can otherwise remain visible as an unknown
-folder member.  It cannot substitute because there is no node to draw.
+folder member.  It cannot substitute because there is no node to show.
 
 ** Skgrepo-set behavior
 

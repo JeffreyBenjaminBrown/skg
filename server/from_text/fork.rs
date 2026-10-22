@@ -36,7 +36,7 @@ use std::collections::{HashMap, HashSet};
 /// sets it in the confirmation buffer). Inferring a distant owned node
 /// reached by skipping a foreign ancestor would be wrong -- a clone
 /// belongs in the skgrepo of the node that actually contains N here.
-/// A foreign node drawn at several positions can have different nearest
+/// A foreign node shown at several positions can have different nearest
 /// ancestors; the first OWNED one reached in preorder wins -- monogamy
 /// means at most one clone anyway, and the user can override the choice
 /// in the confirmation buffer.
@@ -123,7 +123,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
           { current = parent; }} }}
   map }
 
-/// Everything clone-repo resolution can draw on, in priority order
+/// Everything clone-repo resolution can use, in priority order
 /// (user_set > explicit_child > inferred_ancestor > default). The
 /// first two are user SPECIFICATIONS: a skgrepo resolved from them is
 /// 'repo_confirmed', and the confirmation buffer shows it as

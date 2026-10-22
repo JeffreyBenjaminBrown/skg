@@ -482,7 +482,7 @@ fn moved_linksto_relationship_broken_flipped () {
     "Moved linksToParent: C doesn't link to p_new — flip");
 }
 
-/// In a buffer of the diff view a role graft drawn from the
+/// In a buffer of the diff view a role graft taken from the
 /// before-graph keeps its birth: C contained P at HEAD only.
 #[test]
 fn a_containers_claim_held_only_at_head_keeps_its_birth_in_the_diff_view () {

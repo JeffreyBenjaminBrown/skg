@@ -239,7 +239,7 @@ fn facts_of_folder_holding (
     tree . get_mut (folder) . unwrap () . append (member . clone ()); }
   folder_change_facts ( tree . get (folder) . unwrap () ) }
 
-/// A folder is drawn as changed when some member's relationship to it
+/// A folder is shown as changed when some member's relationship to it
 /// carries a sign, and is ready when each such member is: a member
 /// whose '(leaves ...)' lists 'rel' when its '(ready ...)' names
 /// 'rel'; any other when it carries a '(ready ...)'. A relationship

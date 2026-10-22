@@ -132,7 +132,7 @@ async fn test_multi_root_view_logic (
                           * (skg (node (id 1) (repo main) (affectsParent na) writeProtected omittedBody)) 1
                           "};
                           // 'omittedBody': node 1 HAS a body, and this
-                          // (repeated, hence write-protected) draw of it
+                          // (repeated, hence write-protected) occurrence of it
                           // hides that body -- herald B (TODO/more.org).
   assert_metadata_eq!(result, expected,
              "Multi-root view should produce exact expected output");
@@ -227,9 +227,9 @@ async fn test_multi_root_view_with_node_limit (
       println!("Multi root view with limit=3 result:\n{}", result);
 
       // §5.5 node budget, limit=3: level-order creation spends the budget on the
-      // content children (2, and node 5 drawn in place of 3, under root 1; and
+      // content children (2, and node 5 shown in place of 3, under root 1; and
       // root 2's independent containerward node 1). Those nodes are created
-      // DEFINITIVELY (no write-protected placeholders), so the drawn 5 and root 2 extend
+      // DEFINITIVELY (no write-protected placeholders), so the shown 5 and root 2 extend
       // their bodies + default folders (folders are not budget-bound);
       // subscribee members are write-protected.
       let expected = indoc! {
@@ -265,7 +265,7 @@ async fn test_limit_with_multiple_sibling_groups (
       //      └─ 121 (gen 3)
       //
       // §5.5 node budget, limit=4 (cost 1 per vognode EXTENSION): extensions are
-      // 1, 11, 12, 111. Each parent draws its WHOLE child group (never a partial
+      // 1, 11, 12, 111. Each parent shows its WHOLE child group (never a partial
       // sibling set), and once the budget is spent the remaining children stay
       // write-protected: 11's group 111,112 is whole (111 extended, 112 write-protected), and
       // 12's group 121 is whole (write-protected). graphStats(contents N) flags the
@@ -293,6 +293,6 @@ async fn test_limit_with_multiple_sibling_groups (
                               *** (skg (node (id 121) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
                               "};
       assert_metadata_eq!(result, expected,
-                 "limit=4: whole groups drawn (111,112 and 121); extension stops at the budget");
+                 "limit=4: whole groups shown (111,112 and 121); extension stops at the budget");
 
       Ok (( )) }}

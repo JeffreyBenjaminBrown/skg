@@ -478,7 +478,7 @@ pub fn parse_metadata_to_viewnodemd (
                and (skg [focused] [folded] nonVognodeKind) for Non-vognodes.",
               first )); },
           folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
-            // '(KIND changed)': a folder the diff view drew
+            // '(KIND changed)': a folder the diff view shows
             // because of a change. A display fact, like its '(ready)'.
             if items . len () != 2
               || atom_to_string (&items[1]) ? != "changed" {

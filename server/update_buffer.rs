@@ -3,14 +3,14 @@
 //! 'update_buffer/complete.rs') and then the shared tail
 //! ('finish_viewforest': root role trees, affectsParent marking,
 //! stats, the skgrepo set, the text):
-//! - 'render_initial_view' draws a new content view from a stub of its
+//! - 'render_initial_view' renders a new content view from a stub of its
 //!   roots;
 //! - 'complete_viewforest_with_graph_straddle'
-//!   ('server/diff_view/completion.rs') draws a buffer of the diff
+//!   ('server/diff_view/completion.rs') renders a buffer of the diff
 //!   view the same way, over the graph straddle;
 //! - 'rerender_view' re-completes a view that already exists (after a
 //!   save, collaterally, after a commit, or at a skgrepo-set switch),
-//!   reconciling what it holds instead of redrawing it;
+//!   reconciling what it holds instead of rebuilding it;
 //! - 'update_views_after_save' rerenders the saved view and then the
 //!   collateral ones, streaming each to the client.
 
@@ -507,14 +507,14 @@ impl RerenderOptions {
 /// with a shallow model subtree from the straddle
 /// ('process_unrestrictedVognode_changes'), keeping every viewnode
 /// that stays and its fold state, and its readiness facts are then
-/// read from the store. Completion draws what it draws anew by the
+/// read from the store. Completion extends what it adds anew by the
 /// buffer's sets recomputed after the save, and nothing editable is
 /// write-protected again. Only when 'options . integrate_unshown_changes'
 /// is true (the "integrate unshown changes" request) does it make occurrences
 /// editable or append roots: before completion each node of the
 /// recomputed U is made editable at its first occurrence if it has no
 /// editable one, and after completion the content origins of the
-/// recomputed D that the buffer does not draw are appended as roots
+/// recomputed D that the buffer does not show are appended as roots
 /// and completed. Its standing roots stay. The diff view does its
 /// part before completion in 'prepare_diffView_rerender' and after it
 /// in 'finish_diffView_rerender'.
@@ -695,7 +695,7 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
         { *body = new_body; }} }}
   Ok (( )) }
 
-/// Remove every ID folder. A view draws one only in the diff
+/// Remove every ID folder. A view holds one only in the diff
 /// view, whose step at its node's visit
 /// ('process_unrestrictedVognode_changes') reconciles it instead.
 fn remove_id_folders (

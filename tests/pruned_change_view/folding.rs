@@ -212,7 +212,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
 
 /// The folds the 'buffers' buffer gets: mvp (a root), mvc (its
 /// member) and acq (top's member) folded, and mvs's body, which the
-/// server draws folded, unfolded.
+/// server renders folded, unfolded.
 fn fold_buffers_buffer (
   buffer : &str,
 ) -> String {

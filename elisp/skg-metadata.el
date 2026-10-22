@@ -385,7 +385,7 @@ next save will do with the relationship."
 
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
-     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The relationship belongs to the role graft's own contains list, wherever that list is drawn editable; it cannot be set from the role graft's position.")
+     "The node would CONTAIN its view-parent -- the shape of a containerward role graft. The relationship belongs to the role graft's own contains list, wherever that list is shown editable; it cannot be set from the role graft's position.")
     ("content" content
      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child relationship.")
     ("mentioner" nil

@@ -72,7 +72,7 @@ pub fn reconcile_subscribeeFolder_children (
   // subscribeeFolder-maybe-todo.org flagged (forks plan.org: "Collateral-rerender
   // staleness fix").
   { // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
-    // subscriber already spent its budget unit when it extended, so drawing all
+    // subscriber already spent its budget unit when it extended, so adding all
     // its subscribees here costs nothing and never truncates the group.
     let goal_items : Vec<FolderGoalItem> =
       FolderGoalItem::live_members (&goal_list);

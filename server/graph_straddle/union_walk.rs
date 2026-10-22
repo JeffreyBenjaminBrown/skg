@@ -77,7 +77,7 @@ impl GraphStraddle {
   /// in the order of the interleaved diff of the before-graph's list
   /// and the after-graph's ('interleaved_diff_without_reorders'): a
   /// kept or added one where the after-graph's list has it, one only
-  /// in the before-graph where the LCS puts it, as every drawing of
+  /// in the before-graph where the LCS puts it, as every rendering of
   /// the union places a removed entry. Recorders of the node come
   /// sorted by ID.
   pub fn partners (

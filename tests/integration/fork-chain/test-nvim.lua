@@ -1,9 +1,9 @@
 -- Integration test for the MOTIVATING override-chain case, nvim
 -- client. The Lua mirror of test-emacs.el in this directory: fork a
 -- foreign N into a public clone C (implicit fork), then run
--- skg.view_requests.fork_node on the DRAWN SUBSTITUTE C and rotate
+-- skg.view_requests.fork_node on the shown substitute C and rotate
 -- its clone to a PRIVATE skgrepo, forming the chain D overrides C
--- overrides N. Viewing N's container then draws the chain end D,
+-- overrides N. Viewing N's container then shows the chain end D,
 -- marked (overridesHere N), and the save accepts that chain-end
 -- carrier.
 
@@ -94,17 +94,17 @@ metadata.change_repo_at_line(clone_line_1, 'public')
 save.approve_fork()
 print('foreign N forked into a public clone')
 
--- 4. Reopen P: the public clone C is drawn in N's place.
+-- 4. Reopen P: the public clone C is shown in N's place.
 p_buf = reopen_P()
-local drawn = T.wait_for(function ()
+local shown = T.wait_for(function ()
   return T.buffer_text(p_buf):find('(overridesHere N)', 1, true)
 end, 10)
-T.check(drawn, "the public clone was not drawn in N's place")
+T.check(shown, "the public clone was not shown in N's place")
 
--- 5. Explicitly fork the DRAWN SUBSTITUTE C.
+-- 5. Explicitly fork the shown substitute C.
 vim.api.nvim_set_current_buf(p_buf)
 goto_line_containing('(overridesHere N)',
-  'could not find the drawn substitute')
+  'could not find the shown substitute')
 view_requests.fork_node()
 
 -- 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
@@ -119,7 +119,7 @@ save.approve_fork()
 print('the public clone was forked into a private clone (repo rotated)')
 
 -- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
---    node -- is now drawn in N's place, still marked (overridesHere N).
+--    node -- is now shown in N's place, still marked (overridesHere N).
 p_buf = reopen_P()
 local function chain_end_shown ()
   for _, line in ipairs(vim.api.nvim_buf_get_lines(p_buf, 0, -1, false)) do
@@ -131,8 +131,8 @@ local function chain_end_shown ()
   return false
 end
 local end_shown = T.wait_for(chain_end_shown, 10)
-T.check(end_shown, 'the chain end D (a private node) was not drawn for N')
-print("the chain end D (private) is drawn in N's place (overridesHere N)")
+T.check(end_shown, 'the chain end D (a private node) was not shown for N')
+print("the chain end D (private) is shown in N's place (overridesHere N)")
 
 -- 8. Saving the chain-end view succeeds (tamper check accepts the
 --    chain-end carrier).

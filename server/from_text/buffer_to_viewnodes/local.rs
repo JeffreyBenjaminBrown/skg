@@ -373,7 +373,7 @@ fn validate_relation_folder (
   errors }
 
 // The diff view's viewnodes are save-inert: these checks only
-// keep each where the diff view draws it.
+// keep each where the diff view shows it.
 
 fn validate_historical_phantom (
   tree    : &Tree<MpViewnode>,
@@ -696,7 +696,7 @@ pub fn nonignored_children_have_distinct_skgids (
   for child in node_ref . children() {
     let content_skgid : Option<ID> =
       // collected IDs, not own IDs: distinctness guards the
-      // collected contains list, and a drawn overrider can
+      // collected contains list, and a shown overrider can
       // legitimately appear twice when it stands for two distinct
       // originals.
       match &child . value() . kind {

@@ -4,7 +4,7 @@
 -- content is the owned M):
 --  - forking a DIRTY buffer is refused (no confirmation appears);
 --  - fork_node on M -> a fork-confirmation buffer; APPROVE -> the
---    clone is created (overrides M) and drawn in M's place on reopen;
+--    clone is created (overrides M) and shown in M's place on reopen;
 --  - on a second node M2, fork_node -> DECLINE strips the lingering
 --    (viewRequests fork) atom and commits nothing.
 
@@ -116,7 +116,7 @@ local clone_line = goto_line_starting_with('* (skg (node (repo ',
 metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
 
--- 5. Reopen Q fresh: override substitution now draws the clone in M's
+-- 5. Reopen Q fresh: override substitution now shows the clone in M's
 --    place, carrying (overridesHere M).
 do
   local live_q_buf = buffer_showing('Q')
@@ -128,8 +128,8 @@ local substituted = T.wait_for(function ()
   local buf = buffer_showing('Q')
   return buf and T.buffer_text(buf):find('(overridesHere M)', 1, true)
 end, 10)
-T.check(substituted, "the clone was not drawn in M's place on reopen")
-print("approve: the clone is drawn in M's place with (overridesHere M)")
+T.check(substituted, "the clone was not shown in M's place on reopen")
+print("approve: the clone is shown in M's place with (overridesHere M)")
 
 -- 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
 --    stripped and nothing is committed.

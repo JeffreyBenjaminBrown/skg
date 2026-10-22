@@ -2,7 +2,7 @@
 ;;; Open owned container Q (whose content is the owned M):
 ;;;  - forking a DIRTY buffer is refused (no confirmation appears);
 ;;;  - skg-fork-node on M -> a fork-confirmation buffer; APPROVE -> the
-;;;    clone is created (overrides M) and drawn in M's place on reopen;
+;;;    clone is created (overrides M) and shown in M's place on reopen;
 ;;;  - on a second node M2, skg-fork-node -> DECLINE strips the lingering
 ;;;    (viewRequests fork) atom and commits nothing.
 
@@ -82,7 +82,7 @@ Fails the test if it is not found."
       (skg--change-repo-at-point "owned")
       (skg-approve-fork)))
 
-  ;; 5. Reopen Q fresh: override substitution now draws the clone in M's
+  ;; 5. Reopen Q fresh: override substitution now shows the clone in M's
   ;;    place, carrying (overridesHere M).
   (let ((q-buf (fork-test--buffer-showing "Q")))
     (when (buffer-live-p q-buf) (kill-buffer q-buf)))
@@ -97,9 +97,9 @@ Fails the test if it is not found."
                       10)))
     (unless substituted
       (let ((q-buf (fork-test--buffer-showing "Q")))
-        (test-fail "the clone was not drawn in M's place on reopen:\n%s"
+        (test-fail "the clone was not shown in M's place on reopen:\n%s"
                    (if q-buf (with-current-buffer q-buf (buffer-string)) "<no Q buffer>"))))
-    (message "✓ approve: the clone is drawn in M's place with (overridesHere M)"))
+    (message "✓ approve: the clone is shown in M's place with (overridesHere M)"))
 
   ;; 6. DECLINE on a second node M2 (in Q2): the lingering fork atom is
   ;;    stripped and nothing is committed.

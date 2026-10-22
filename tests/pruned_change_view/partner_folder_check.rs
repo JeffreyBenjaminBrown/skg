@@ -3,7 +3,7 @@
 // ('skgid_a_folder_child_stands_for'). The 'partner_ids' fixture (one
 // skgrepo, main): c1 and c2, whose bodies changed, each contain
 // recorder, unchanged, which subscribes to x by its extra ID x2 and
-// to ghost, which no node has. So recorder is drawn write-protected
+// to ghost, which no node has. So recorder is shown write-protected
 // in the content of each.
 
 use crate::pruned_change_view::common::{open_all_changes_buffer, save, with_fixture};
@@ -25,13 +25,13 @@ fn with_subscribee_folder_under_recorder (
     . find ( |line| line . starts_with (
       "** (skg (node (id recorder) (repo main) writeProtected ") )
     . unwrap_or_else ( || panic! (
-      "recorder is drawn write-protected under c2:\n{}", buffer ));
+      "recorder is shown write-protected under c2:\n{}", buffer ));
   buffer . replacen ( recorder_under_c2, &format! (
     "{}\n*** (skg subscribeeFolder)\n{}", recorder_under_c2,
     members . iter () . map ( |member| format! ("**** {}", member) )
     . collect::<Vec<String>> () . join ("\n") ), 1 ) }
 
-/// x drawn by its extra ID x2, as recorder lists it, and ghost drawn
+/// x shown by its extra ID x2, as recorder lists it, and ghost shown
 /// as an unknown phantom with its raw ID: the folder says what the
 /// graph says, and the buffer saves.
 #[test]
@@ -45,7 +45,7 @@ fn a_member_shown_by_an_extra_id_and_an_unknown_member_pass (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 
-/// A dangling removed member, as the diff view draws one in a
+/// A dangling removed member, as the diff view shows one in a
 /// write-protected folder (an unknown phantom with '(presence rel-)'),
 /// is not counted: beside the members recorder lists, the folder
 /// saves unchanged.
@@ -61,7 +61,7 @@ fn a_dangling_removed_member_is_not_counted (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 
-/// An unknown phantom is compared by its raw ID: drawn with an ID
+/// An unknown phantom is compared by its raw ID: shown with an ID
 /// recorder does not list, the folder is refused.
 #[test]
 fn an_unknown_member_with_another_raw_id_is_refused (

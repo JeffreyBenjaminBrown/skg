@@ -229,7 +229,7 @@ fn diffView_property_rules (
           ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
       . collect () ) ] }
 
-/// The label of a folder the diff view drew because of a
+/// The label of a folder the diff view shows because of a
 /// change, '(KIND changed)', which takes the place of the folder's
 /// ordinary label: "its X changed (this file)" for a folder of the
 /// node's own lists, "(other files)" for one of its recorders. A

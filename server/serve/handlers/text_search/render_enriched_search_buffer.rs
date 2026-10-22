@@ -169,7 +169,7 @@ pub fn collect_overrideward_view_subtree_skgids (
 /// Append, under 'parent_treeid', one write-protected non-member child per
 /// override relative of 'pid' in direction 'dir', recursing into each
 /// relative not already on the path (cycle guard: a repeated id is
-/// still drawn, so the stats pass marks it 'cycle', but its branch
+/// still shown, so the stats pass marks it 'cycle', but its branch
 /// stops).
 fn graft_override_chain (
   pid           : &ID,

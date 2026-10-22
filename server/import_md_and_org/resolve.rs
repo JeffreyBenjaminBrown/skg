@@ -354,7 +354,7 @@ fn names_a_document (
 
 /// A link to anything but a Markdown or Org document (source code, an
 /// image, a folder) keeps pointing where it pointed, in Org syntax, and
-/// draws no warning, wherever it points. Under a host mapping, a target
+/// raises no warning, wherever it points. Under a host mapping, a target
 /// inside the input tree gets its host path, since its container path
 /// would not work on the host. A search suffix is left as written.
 fn link_to_a_non_document (

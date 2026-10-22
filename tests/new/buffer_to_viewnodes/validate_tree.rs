@@ -625,13 +625,13 @@ async fn test_editable_view_request_on_an_editable_node_with_content_is_allowed 
 ) -> Result<(), Box<dyn Error>> {
   // A request on an editable node with content children passes:
   // completion hands it to those children, extending them editable.
-  // So does a request on a write-protected node with drawn children.
+  // So does a request on a write-protected node with shown children.
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (repo main) (viewRequests editableView))) parent
                 ** (skg (node (id c) (repo main))) content child
                 * (skg (node (id other) (repo main) writeProtected (viewRequests editableView))) other
-                ** (skg (node (id d) (repo main) writeProtected)) drawn child
+                ** (skg (node (id d) (repo main) writeProtected)) shown child
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;

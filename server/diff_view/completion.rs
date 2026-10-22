@@ -1,5 +1,5 @@
-//! Drawing and rerendering a whole buffer of the diff view
-//! ('docs/diff-view.org', "Drawing a buffer"): the first drawing
+//! Rendering and rerendering a whole buffer of the diff view
+//! ('docs/diff-view.org', "Rendering a buffer"): the first rendering
 //! completes a stub viewforest over the graph straddle; a rerender
 //! ('rerender_view' in 'server/update_buffer.rs') brings the straddle
 //! up to date before view completion ('prepare_diffView_rerender') and
@@ -25,7 +25,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::sync::{Arc, MutexGuard};
 
-/// What a rerender of a buffer of the diff view draws over, from
+/// What a rerender of a buffer of the diff view renders over, from
 /// 'prepare_diffView_rerender' to 'finish_diffView_rerender'.
 pub struct DiffViewRerender {
   straddle                  : Arc<GraphStraddle>,
@@ -51,10 +51,10 @@ impl DiffViewRerender {
 /// Complete a stub viewforest of the diff view
 /// ('server/diff_view/pruned_change_view.rs'), the buffer of kind
 /// 'diffView_buffer_kind' over 'straddle': view completion with
-/// 'straddle' set, which draws the union of the straddle's content, the change
+/// 'straddle' set, which shows the union of the straddle's content, the change
 /// folders and markers, and the former members. It creates no
 /// default partner folders, spends no node budget (only an
-/// editable-view request spends it, and a first drawing carries
+/// editable-view request spends it, and a first rendering carries
 /// none), and never restricts by skgrepo (the diff view
 /// requires the set 'all').
 pub fn complete_viewforest_with_graph_straddle (
@@ -93,7 +93,7 @@ pub fn prepare_diffView_rerender (
     current_graph_straddle_in_slot (
       graph_straddle_slot, &runtime . config, runtime . graph . clone () )
     . map_err ( |e| format! (
-      "Cannot redraw the diff view buffer: {}", e )) ?;
+      "Cannot rerender the diff view buffer: {}", e )) ?;
   let rerender : DiffViewRerender = DiffViewRerender {
     straddle, diffView_buffer_kind, integrate_unshown_changes,
     standing_roots : root_skgids_of_buffer (viewforest), };
@@ -107,7 +107,7 @@ pub fn prepare_diffView_rerender (
 
 /// After view completion of a rerender that 'prepare_diffView_rerender'
 /// prepared ('rerender' Some): when integrating unshown changes, the
-/// content origins of the recomputed D that the buffer does not draw
+/// content origins of the recomputed D that the buffer does not show
 /// are appended as roots and completed, continuing
 /// 'completion_context'; then the readiness facts are read from the
 /// store.

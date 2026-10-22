@@ -25,7 +25,7 @@
 //! Each birth fact names a relation explaining why this occurrence is
 //! here, the side of this node it is on, and the ancestor generation
 //! it accounts for -- omitted when no ancestor does, as for a
-//! node drawn in place of a node it overrides.
+//! node shown in place of a node it overrides.
 //! See 'docs/heralds.org'.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -39,7 +39,7 @@ impl Side {
   pub fn wire_name (self) -> &'static str {
     match self { Side::In => "in", Side::Out => "out" } } }
 
-/// One reason an occurrence is drawn where it is: a relation, the side
+/// One reason an occurrence stands where it is: a relation, the side
 /// of this node it is on, and the ancestor generation it
 /// accounts for (None when it accounts for no ancestor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

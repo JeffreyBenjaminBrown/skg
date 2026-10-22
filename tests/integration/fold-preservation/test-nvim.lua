@@ -12,7 +12,7 @@ local buffer = require('skg.buffer')
 local folds = require('skg.folds')
 local save = require('skg.save')
 
----@return integer|nil the "all changes" buffer, once it draws dvroot
+---@return integer|nil the "all changes" buffer, once it shows dvroot
 local function diffView_all_changes_buffer ()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b)

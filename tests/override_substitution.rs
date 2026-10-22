@@ -2,7 +2,7 @@
 //
 // Override substitution (TODO/DONE/full-schema/DONE/11_override-rendering-and-navigation.org):
 // when completion would CREATE a viewnode for node N as recursive
-// content, and an owned, visible R overrides N, it draws R
+// content, and an owned, visible R overrides N, it shows R
 // instead, marked '(overridesHere N)' -- and saving such a view
 // round-trips to the ORIGINAL IDs, so a container's contains list is
 // never silently rewritten from N to R.
@@ -144,16 +144,16 @@ async fn de_novo_rendering_shows_the_overrider_marked (
           &[ ID::from ("P") ] ) ?;
       { let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
-          "exactly one drawn substitute for N:\n{}", view );
+          "exactly one shown substitute for N:\n{}", view );
         assert! ( marked [0] . contains ("(id R)"),
           "the substitute is R:\n{}", view ); }
       assert! ( view . lines () . any (
                   |l| l . contains ("(id W)") ),
-        "R's own content W is drawn beneath it:\n{}", view );
+        "R's own content W is shown beneath it:\n{}", view );
       assert! ( view . lines () . any (
                   |l| l . contains ("(id M)")
                       && ! l . contains ("overridesHere") ),
-        "M, not overridden, draws raw:\n{}", view );
+        "M, not overridden, is shown raw:\n{}", view );
       Ok (( )) }
 
 async fn save_roundtrips_to_original_and_is_idempotent (
@@ -179,7 +179,7 @@ async fn save_roundtrips_to_original_and_is_idempotent (
         assert! ( r_file . contains ("- W"),
           "R's own contains is untouched:\n{}", r_file ); }
       assert_eq! ( marked_lines (&saved, "N") . len (), 1,
-        "the rerendered saved view still draws marked R:\n{}",
+        "the rerendered saved view still shows marked R:\n{}",
         saved );
       let saved_again : String =
         save_and_rerender (&saved, config, tantivy)
@@ -210,7 +210,7 @@ async fn extraction_honors_overridesHere (
             "P" ) . is_none (),
           "P's contains is unchanged (N, M), so no instruction \
            touches P" ); }
-      { // Deleting the drawn child deletes the original member.
+      { // Deleting the shown child deletes the original member.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id M) (repo main) writeProtected)) M
@@ -220,7 +220,7 @@ async fn extraction_honors_overridesHere (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M") ] ); }
-      { // Reordering the drawn child positions the original.
+      { // Reordering the shown child positions the original.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id M) (repo main) writeProtected)) M
@@ -231,7 +231,7 @@ async fn extraction_honors_overridesHere (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M"), ID::from ("N") ] ); }
-      { // Moving the drawn child to another parent moves the original.
+      { // Moving the shown child to another parent moves the original.
         let buffer = indoc! {"
           * (skg (node (id Q) (repo main))) Q
           ** (skg (node (id P) (repo main))) P
@@ -247,7 +247,7 @@ async fn extraction_honors_overridesHere (
         assert_eq! (
           members_of ( & saved_node_by_skgid (&instructions, "P2") . contains ),
           vec![ ID::from ("N") ] ); }
-      { // Edits to the drawn R save to R; N is untouched.
+      { // Edits to the shown R save to R; N is untouched.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id R) (repo main) (viewStats (overridesHere N)))) R-edited
@@ -265,7 +265,7 @@ async fn extraction_honors_overridesHere (
         assert! (
           opt_saved_node_by_skgid (&instructions, "P") . is_none (),
           "P's contains is unchanged, so P noops" ); }
-      { // A legacy buffer drawing N raw still saves identically
+      { // A legacy buffer showing N raw still saves identically
         // (a noop, like the marked equivalent above).
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
@@ -276,7 +276,7 @@ async fn extraction_honors_overridesHere (
           opt_saved_node_by_skgid (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . is_none () ); }
-      { // Tamper: a fact the server would not have drawn aborts.
+      { // Tamper: a fact the server would not have rendered aborts.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id M) (repo main) (viewStats (overridesHere W)) writeProtected)) M
@@ -303,7 +303,7 @@ async fn extraction_honors_overridesHere (
           assert! (
             ! s_node . hidesFromSubs . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),
-            "S must not hide N: the drawn R stands for N" ); }}
+            "S must not hide N: the shown R stands for N" ); }}
       Ok (( )) }
 
 async fn ownership_and_visibility_gate_substitution (
@@ -317,7 +317,7 @@ async fn ownership_and_visibility_gate_substitution (
             config, None,
             &[ ID::from ("P1") ] ) ?;
         assert! ( marked_lines (&view, "N1") . is_empty (),
-          "FR is foreign; N1 draws raw:\n{}", view );
+          "FR is foreign; N1 is shown raw:\n{}", view );
         assert! ( view . contains ("(id N1)"), "{}", view ); }
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
@@ -328,7 +328,7 @@ async fn ownership_and_visibility_gate_substitution (
             config, None,
             &[ ID::from ("P2") ], &restriction ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
-          "R2's repo is restricted; N2 draws raw:\n{}", view );
+          "R2's repo is restricted; N2 is shown raw:\n{}", view );
         assert! ( view . contains ("(id N2)"), "{}", view ); }
       { // The same overrider substitutes when its skgrepo is unrestricted.
         let (view, _pids, _tree) =
@@ -339,7 +339,7 @@ async fn ownership_and_visibility_gate_substitution (
         assert_eq! ( marked . len (), 1, "{}", view );
         assert! ( marked [0] . contains ("(id R2)"), "{}", view ); }
       { // Omission beats substitution: restricted original, unrestricted
-        // overrider -> neither is drawn.
+        // overrider -> neither is shown.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
@@ -347,7 +347,7 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( ! view . contains ("(id N3)"),
           "the restricted original is omitted:\n{}", view );
         assert! ( ! view . contains ("(id R3)"),
-          "its overrider must not be drawn in its place (the \
+          "its overrider must not be shown in its place (the \
            fact would name a restricted node):\n{}", view ); }
       Ok (( )) }
 
@@ -393,7 +393,7 @@ async fn chain_half_visible_keeps_the_original (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      { // Under 'all', the chain end D is drawn in N's place.
+      { // Under 'all', the chain end D is shown in N's place.
         let (view, _p, _t) =
           multi_root_view (
             config, Some (tantivy),
@@ -402,13 +402,13 @@ async fn chain_half_visible_keeps_the_original (
         assert_eq! ( marked . len (), 1,
           "one substitute for N under all:\n{}", view );
         assert! ( marked [0] . contains ("(id D)"),
-          "the chain end D is drawn under all:\n{}", view ); }
+          "the chain end D is shown under all:\n{}", view ); }
       let main_set : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("main" . to_string ())) ?;
       let view_main : String = {
         // Under 'main', D's skgrepo 'other' is restricted, so the MIDDLE
-        // C is drawn instead.
+        // C is shown instead.
         let (view, _p, _t) =
           multi_root_view_with_skgrepo_set (
             config, Some (tantivy),
@@ -417,7 +417,7 @@ async fn chain_half_visible_keeps_the_original (
         assert_eq! ( marked . len (), 1,
           "one substitute for N under main:\n{}", view );
         assert! ( marked [0] . contains ("(id C)"),
-          "the chain middle C is drawn under main:\n{}", view );
+          "the chain middle C is shown under main:\n{}", view );
         view };
       { // Saving the half-visible view accepts the middle carrier and
         // keeps N (not C) in P's contains.
@@ -425,7 +425,7 @@ async fn chain_half_visible_keeps_the_original (
           save_under_set (&view_main, config, tantivy, &main_set)
           . await ?;
         assert_eq! ( marked_lines (&saved, "N") . len (), 1,
-          "the rerendered saved view still draws a marked substitute \
+          "the rerendered saved view still shows a marked substitute \
            for N:\n{}", saved );
         let p_file : String = {
           let main_path : &std::path::Path =

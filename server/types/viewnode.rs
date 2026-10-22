@@ -261,9 +261,9 @@ pub struct PhantomHistorical {
 /// the skgrepo restriction, so rendering any of it would leak.
 ///
 /// SCOPE: a RestrictedVognode arises ONLY from a skgrepo-set REDUCTION of an
-/// already-drawn buffer ('update_buffer/repo_switch.rs' converts
+/// already-rendered buffer ('update_buffer/repo_switch.rs' converts
 /// now-restricted Unrestricted nodes in place), where it is kept to host
-/// already-drawn unrestricted descendants. A de-novo render under a
+/// already-extended unrestricted descendants. A de-novo render under a
 /// restricted set NEVER creates one: restricted content members are
 /// omitted from goal lists ('omit_restricted_members') and their content
 /// is never extended (completion does nothing at a restricted node's
@@ -361,7 +361,7 @@ pub struct ViewnodeStats {
   /// client parses this and decides all presentation (letters, colors,
   /// order). See 'docs/heralds.org'.
   pub rel_heralds           : Option<String>,
-  /// Some(N) means this viewnode was drawn here in place of N,
+  /// Some(N) means this viewnode is shown here in place of N,
   /// which it (transitively) overrides. Herald pink "ĥ" after "O".
   /// LOAD-BEARING, unlike the other view stats: save extraction
   /// collects N (not this node's own ID) into the parent's lists
@@ -372,7 +372,7 @@ pub struct ViewnodeStats {
   /// (the carrier's ID must equal the visibility-ungated
   /// 'resolve_override (N).effective').
   pub overridesHere         : Option<ID>,
-  /// True iff the node is drawn write-protected here while its graph
+  /// True iff the node is shown write-protected here while its graph
   /// node has a body -- a body the rendering hides. Herald "B",
   /// hugging the ☮. Display-only, like the assembled
   /// herald strings; the parser accepts and discards it.
@@ -538,7 +538,7 @@ pub enum FolderRelation {
   HidesFromSubs,
   SubscribesTo,
   // These two build one write-protected folder each: their other
-  // side is the node's content, or its links, drawn without a folder.
+  // side is the node's content, or its links, shown without a folder.
   Containers,
   Mentioners,
 }
@@ -626,10 +626,10 @@ impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
 impl UnrestrictedVognode {
   /// The COLLECTED ID: what this viewnode contributes to its
   /// parent's collected lists -- the 'overridesHere' original when
-  /// the node was drawn in place of one, else its own ID. Save
+  /// the node is shown in place of one, else its own ID. Save
   /// extraction, the distinctness validators and the content
   /// reconciler's orderkey all read this, never the raw 'id', so a
-  /// drawn overrider round-trips to the original member instead of
+  /// shown overrider round-trips to the original member instead of
   /// rewriting its parent's contains.
   pub fn collected_skgid (&self) -> ID {
     self . viewStats . overridesHere . clone ()

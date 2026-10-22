@@ -1,5 +1,5 @@
-// A buffer of the diff view draws by its sets recomputed after
-// the save wherever a save draws something new, but only the "integrate
+// A buffer of the diff view is rendered from its sets recomputed after
+// the save wherever a save renders something new, but only the "integrate
 // unshown changes" request makes occurrences editable or appends roots
 // ('TODO/total-diff-view/08_plan_yet-more.org', "The view follows U
 // only on command"). The 'fresh' fixture (one skgrepo, main): r
@@ -32,7 +32,7 @@ use ego_tree::NodeId;
 use std::error::Error;
 use std::sync::Arc;
 
-/// Whether some line of 'buffer' draws 'node' editable.
+/// Whether some line of 'buffer' shows 'node' editable.
 fn shown_editable (
   buffer : &str,
   node   : &str,
@@ -68,11 +68,11 @@ fn subtree_starting<'a> (
                              || depth (line) > own_depth ))
     . collect () }
 
-/// w changes after the buffer opened, while the buffer draws it only
+/// w changes after the buffer opened, while the buffer shows it only
 /// as a write-protected member without its content. After the next save it is
 /// still one, and its change is counted as not editable. The command makes it editable,
-/// with its change drawn, and its members, outside U, write-protected.
-/// Its origin r is drawn already, so no root is added, and no change
+/// with its change shown, and its members, outside U, write-protected.
+/// Its origin r is shown already, so no root is added, and no change
 /// is counted as not editable.
 #[test]
 fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
@@ -91,7 +91,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert! ( shown_editable (&shown, "w"), "w must be editable:\n{}", shown );
     assert! ( shown . contains ("*** (skg (oldText title) (diff (leaves 1))) w"),
-              "w's old title must be drawn:\n{}", shown );
+              "w's old title must be shown:\n{}", shown );
     for member in [ "w1", "w2" ] {
       assert! ( ! node_lines (&shown, member) . is_empty ()
                 && ! shown_editable (&shown, member),
@@ -101,8 +101,8 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     Ok (( )) }) }
 
 /// w1a, two levels under the write-protected member w without its content,
-/// changes. The next save draws nothing of it and counts it as not editable. The command
-/// makes w, w1 and w1a editable and draws w1a's change under them;
+/// changes. The next save shows nothing of it and counts it as not editable. The command
+/// makes w, w1 and w1a editable and shows w1a's change under them;
 /// w2 stays write-protected.
 #[test]
 fn a_change_two_levels_under_a_write_protected_leaf_is_shown_by_the_command (
@@ -121,14 +121,14 @@ fn a_change_two_levels_under_a_write_protected_leaf_is_shown_by_the_command (
                 "{} must be editable:\n{}", node, shown ); }
     assert! ( ! shown_editable (&shown, "w2"), "{}", shown );
     assert! ( shown . contains ("***** (skg (oldText title) (diff (leaves 1))) w1a"),
-              "w1a's old title must be drawn under w1:\n{}", shown );
+              "w1a's old title must be shown under w1:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
 
-/// s1 changes, under s, an origin the buffer does not draw. The next
+/// s1 changes, under s, an origin the buffer does not show. The next
 /// save appends no root and counts the change as not editable. The command
-/// appends s as a root, after the standing ones, drawn as a first
-/// drawing draws a context root, with s1's change under it; a
+/// appends s as a root, after the standing ones, rendered as a first
+/// rendering renders a context root, with s1's change under it; a
 /// further save and a further command change nothing.
 #[test]
 fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
@@ -147,7 +147,7 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
                 line . starts_with ("** (skg (node (id s1) ")
                 && ! line . contains ("writeProtected") )
               && s_subtree . contains (&"*** (skg (oldText title) (diff (leaves 1))) s1"),
-              "s1's change must be drawn under s:\n{}", shown );
+              "s1's change must be shown under s:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
     assert_eq! ( again . saved_view, shown, "a further save adds nothing" );
@@ -184,7 +184,7 @@ fn a_changed_cycle_membership_appends_no_second_root (
     let saved : String = response . saved_view;
     assert! ( saved . lines () . any ( |line|
                 line . starts_with ("** (skg (node (id ") && line . ends_with (") z") ),
-              "z must be drawn under q:\n{}", saved );
+              "z must be shown under q:\n{}", saved );
     assert_eq! ( root_ids (&saved), vec! [ "q", "r" ], "{}", saved );
     let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
     assert_eq! ( root_ids (&shown), vec! [ "q", "r" ], "{}", shown );
@@ -193,7 +193,7 @@ fn a_changed_cycle_membership_appends_no_second_root (
 /// The user write-protects a, whose body changed, at its only
 /// occurrence. It stays write-protected through saves, its change
 /// counted as not editable, until the command makes it editable again, its
-/// change drawn.
+/// change shown.
 #[test]
 fn a_node_the_user_write_protected_stays_so_until_the_command (
 ) -> Result<(), Box<dyn Error>> {
@@ -214,7 +214,7 @@ fn a_node_the_user_write_protected_stays_so_until_the_command (
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert! ( shown_editable (&shown, "a")
               && shown . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
-              "a must be editable, its change drawn:\n{}", shown );
+              "a must be editable, its change shown:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
 
@@ -261,11 +261,11 @@ fn an_editable_view_request_cascades_within_the_node_budget (
 
 /// The 'shared' fixture (one skgrepo, main): x and y, whose bodies
 /// changed, each contain n, which contains a, whose body changed, and
-/// b, unchanged. So x and y are the buffer's roots, and n is drawn
+/// b, unchanged. So x and y are the buffer's roots, and n is shown
 /// editable under x and write-protected under y. An editable-view
 /// request on n under y makes that occurrence editable and the one
 /// under x write-protected, with its content; a, a node of U under
-/// it, is editable again under y, its change drawn there. A further
+/// it, is editable again under y, its change shown there. A further
 /// save changes nothing.
 #[test]
 fn an_editable_view_request_moves_editability_between_occurrences (
@@ -285,11 +285,11 @@ fn an_editable_view_request_moves_editability_between_occurrences (
         let atom : String = format! ("(node (id {}) ", node);
         let line : &str = subtree . iter ()
           . find ( |line| line . contains (&atom) )
-          . unwrap_or_else ( || panic! ( "{} must be drawn:\n{}", node, saved ));
+          . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
         assert_eq! ( ! line . contains ("writeProtected"), editable,
                      "{}:\n{}", node, saved ); }}
     assert! ( y_subtree . contains (&"**** (skg (oldText body) (diff (leaves 1)))"),
-              "a's change must be drawn under y:\n{}", saved );
+              "a's change must be shown under y:\n{}", saved );
     assert! ( ! saved . contains ("viewRequests"), "{}", saved );
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     assert_eq! ( again, saved, "the editability moved stays where it is" );
@@ -297,10 +297,10 @@ fn an_editable_view_request_moves_editability_between_occurrences (
 
 /// In the 'shared' fixture, once editability moved from n under x to
 /// n under y, a request on n under x moves it back. The children n
-/// kept drawn under x, which stopped being members when it was
-/// write-protected, are adopted, not redrawn: the same children, in
+/// kept under x, which stopped being members when it was
+/// write-protected, are adopted, not rerendered: the same children, in
 /// the same order, members again, and b, folded there, stays folded. a, a node of
-/// U, is editable under x again, its change drawn there, and n and a
+/// U, is editable under x again, its change shown there, and n and a
 /// are write-protected under y. A further save changes nothing.
 #[test]
 fn an_editable_view_request_moves_editability_back (
@@ -336,7 +336,7 @@ fn an_editable_view_request_moves_editability_back (
         let atom : String = format! ("(node (id {}) ", node);
         let line : &str = subtree . iter ()
           . find ( |line| line . contains (&atom) )
-          . unwrap_or_else ( || panic! ( "{} must be drawn:\n{}", node, saved ));
+          . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
         assert_eq! ( ! line . contains ("writeProtected"), editable,
                      "{}:\n{}", node, saved ); }}
     assert_eq! ( members_of_n_under_x (&saved)
@@ -351,7 +351,7 @@ fn an_editable_view_request_moves_editability_back (
                                && line . contains ("(node (id b) ") ),
               "b stays folded under x:\n{}", saved );
     assert! ( x_subtree . contains (&"**** (skg (oldText body) (diff (leaves 1)))"),
-              "a's change must be drawn under x:\n{}", saved );
+              "a's change must be shown under x:\n{}", saved );
     assert! ( ! saved . contains ("viewRequests"), "{}", saved );
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     assert_eq! ( again, saved, "the editability moved back stays where it is" );
@@ -387,7 +387,7 @@ fn an_editable_view_request_on_a_node_of_u_extends_its_members (
     Ok (( )) }) }
 
 /// U (a, p, q and r) exceeds the node budget, here 1; the buffer is
-/// drawn in full regardless, when opened and after a save.
+/// rendered in full regardless, when opened and after a save.
 #[test]
 fn a_buffer_whose_u_exceeds_the_node_budget_is_rendered_in_full (
 ) -> Result<(), Box<dyn Error>> {
@@ -395,16 +395,16 @@ fn a_buffer_whose_u_exceeds_the_node_budget_is_rendered_in_full (
     f . config . initial_node_limit = 1;
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;
-    for drawn in [ &buffer, &saved ] {
+    for rendered in [ &buffer, &saved ] {
       for node in [ "a", "p", "q", "r" ] {
-        assert! ( shown_editable (drawn, node),
-                  "{} must be editable:\n{}", node, drawn ); }
-      assert! ( drawn . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
-                "a's change must be drawn:\n{}", drawn ); }
+        assert! ( shown_editable (rendered, node),
+                  "{} must be editable:\n{}", node, rendered ); }
+      assert! ( rendered . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
+                "a's change must be shown:\n{}", rendered ); }
     assert_eq! ( saved, buffer );
     Ok (( )) }) }
 
-/// After a commit, U is empty, but the lingering nodes the buffer drew
+/// After a commit, U is empty, but the lingering nodes the buffer showed
 /// editable stay editable.
 #[test]
 fn after_a_commit_the_lingering_nodes_remain_editable (
@@ -425,11 +425,11 @@ fn after_a_commit_the_lingering_nodes_remain_editable (
 
 /// The 'folder_member' fixture (one skgrepo, main): m contains a,
 /// whose body changed; c1 and c2, unchanged, each contain m. So m is
-/// the buffer's one root, and c1 and c2 are drawn only as members of
+/// the buffer's one root, and c1 and c2 are shown only as members of
 /// its container folder. c1 changes after the buffer opened. After
 /// the next save it is still write-protected there, its change
 /// counted as not editable. The command makes it editable there, with its
-/// content list (m) drawn under it and its change shown; no root is
+/// content list (m) under it and its change shown; no root is
 /// appended, and a further save changes nothing.
 #[test]
 fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
@@ -449,7 +449,7 @@ fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
     assert! ( c1_subtree . contains (&"**** (skg (oldText title) (diff (leaves 1))) c1")
               && c1_subtree . iter () . any ( |line|
                    line . starts_with ("**** (skg (node (id m) ") ),
-              "c1's change and content must be drawn under it:\n{}", shown );
+              "c1's change and content must be shown under it:\n{}", shown );
     assert_eq! ( root_ids (&shown), vec! [ "m" ], "{}", shown );
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
@@ -478,7 +478,7 @@ fn an_editable_container_folder_member_outside_u_stays_editable (
 
 /// The 'historical_content' fixture (one skgrepo, main): at HEAD r
 /// contains h and k, and h contains m. Since then h was deleted and m
-/// retitled, so the buffer draws h as a historical phantom under r,
+/// retitled, so the buffer shows h as a historical phantom under r,
 /// holding its old content m, a node of U, as an editable removed
 /// member.
 /// Once m is write-protected there, the walk that finds the

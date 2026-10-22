@@ -164,7 +164,7 @@ local view = T.wait_for(function ()
   end
   return nil
 end)
-if not view then T.fail('Timeout waiting for a view of r drawing d as unknown') end
+if not view then T.fail('Timeout waiting for a view of r showing d as unknown') end
 vim.api.nvim_set_current_buf(view)
 for lnum, line in ipairs(vim.api.nvim_buf_get_lines(view, 0, -1, false)) do
   if line:find('(unknown (id d))', 1, true) then

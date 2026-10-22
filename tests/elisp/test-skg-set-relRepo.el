@@ -726,7 +726,7 @@ what a move strands, the save decides."
 
 (ert-deftest test-set-repo-recursive-repeat-follows-its-editable-occurrence ()
   "A write-protected repeat of a node whose editable occurrence the move
-changes is left as rendered (the save ignores it) and draws no warning:
+changes is left as rendered (the save ignores it) and raises no warning:
 the node does move."
   (test--with-skg-content-view
    (concat

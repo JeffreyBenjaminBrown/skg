@@ -1,9 +1,9 @@
-//! The diff view (C-c v d): up to four buffers, each drawn over the
+//! The diff view (C-c v d): up to four buffers, each rendered over the
 //! graph straddle ('server/graph_straddle/'). 'docs/diff-view.org'
 //! describes it; this module implements it:
 //! - 'pruned_change_view.rs': C, R, U and D, each buffer's sets, and
 //!   its stub roots;
-//! - 'completion.rs': drawing and rerendering a whole buffer;
+//! - 'completion.rs': rendering and rerendering a whole buffer;
 //! - 'visit.rs': where view completion reads the diff-view switch,
 //!   before a node's visit extends and after;
 //! - 'changes.rs': the per-visit step that view completion runs at
@@ -11,7 +11,7 @@
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
 //! - 'shallow_model_subtree.rs': reconciling what a viewnode holds with a
 //!   shallow model subtree of it;
-//! - 'partner_folders.rs': the partner folders drawn over the straddle;
+//! - 'partner_folders.rs': the partner folders over the straddle;
 //! - 'change_leaves.rs': the change-forest leaves and their readiness;
 //! - 'readiness_store.rs': the marks the user set;
 //! - 'readiness_requests.rs': where the store meets a viewforest.

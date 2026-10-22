@@ -1,4 +1,4 @@
-//! The override resolver: given an ID, which node should be DRAWN
+//! The override resolver: given an ID, which node should be SHOWN
 //! in its place? Follows owned 'overrides' relationships from
 //! overridden to overrider, transitively, with a seen-set cycle
 //! guard. Foreign override relationships never participate in substitution;
@@ -12,7 +12,7 @@
 //! - VISIBILITY: when an 'ShowSkgrepoRestriction' is supplied, a relationship is
 //!   followed only if both its relRepo and its overrider's home skgrepo
 //!   are unrestricted. A restricted relationship cannot affect visible topology,
-//!   and a restricted overrider cannot be drawn; either one stops the walk
+//!   and a restricted overrider cannot be shown; either one stops the walk
 //!   at the last visible node. Callers that ask "what fact would the
 //!   server have written, ever?" (the tamper check) pass None, i.e.
 //!   visibility-ungated.
@@ -20,7 +20,7 @@
 //! A path of any length is normal: an owned override chain
 //! (D overrides C overrides N, all owned) resolves to the end of the
 //! chain, and any node on the path is a node the server could
-//! legitimately draw (see 'carrier_on_owned_chain'). Only a
+//! legitimately show (see 'carrier_on_owned_chain'). Only a
 //! cycle is anomalous — forbidden upstream by the invariant validators
 //! (see [[./override_invariants.rs]]) at save and init/rebuild, and
 //! handled here as a backstop: the resolver still terminates and
@@ -37,7 +37,7 @@ use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OverrideResolution {
-  /// The PID to draw. Equal to the (resolved) input when no
+  /// The PID to show. Equal to the (resolved) input when no
   /// owned, visible overrider exists.
   pub effective      : ID,
   /// The chain of overriders traversed, in order. Empty = no
@@ -108,9 +108,9 @@ pub fn resolve_override (
     current = next; }}
 
 /// Whether 'carrier' is a node ON 'original''s owned override
-/// chain — i.e. a node the server could legitimately draw, marked
+/// chain — i.e. a node the server could legitimately show, marked
 /// '(overridesHere original)', wherever 'original' would appear as
-/// content. The tamper check at save uses this: with chains the drawn
+/// content. The tamper check at save uses this: with chains the shown
 /// node can be any link of the chain (a MIDDLE carrier, when a later
 /// link's skgrepo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) fact.
@@ -121,7 +121,7 @@ pub fn carrier_on_owned_chain (
   config   : &SkgConfig,
   graph    : &InRustGraph,
   original : &ID,   // the fact's N
-  carrier  : &ID,   // the drawn node's own id
+  carrier  : &ID,   // the shown node's own id
 ) -> bool {
   resolve_override (config, graph, None, original)
     . path . contains (carrier) }

@@ -119,7 +119,7 @@ pub fn viewnode_to_text (
   viewnode_to_text_with_folder_facts (level, viewnode, None, config) }
 
 /// The diff view's facts about a folder, derived from its
-/// members when the buffer is rendered: it is drawn because of a
+/// members when the buffer is rendered: it is shown because of a
 /// change when some member carries one, and ready when every such
 /// member's change is ready. Rendered '(KIND changed)' in place of
 /// the bare folder atom, then '(ready)'.
@@ -276,7 +276,7 @@ fn non_vognode_atom_metadata_to_string (
   parts . push (atom . to_string ());
   parts . join (" ") }
 
-/// A folder's atom, or, when it is drawn because of a change,
+/// A folder's atom, or, when it is shown because of a change,
 /// '(ATOM changed)' and '(ready)' if that change is ready.
 fn folder_atom_metadata_to_string (
   focused         : bool,

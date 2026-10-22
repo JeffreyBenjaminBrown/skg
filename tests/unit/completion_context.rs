@@ -113,7 +113,7 @@ fn for_diffView_gives_the_first_renderings_settings () {
 
 /// Outside the diff view a rerender takes the restriction and the two
 /// flags it is given; in a buffer of the diff view it takes the first
-/// drawing's instead. Either way it keeps what the save deleted, the
+/// rendering's instead. Either way it keeps what the save deleted, the
 /// sink, and what the view held before.
 #[test]
 fn for_rerender_gives_rerender_views_settings_in_and_out_of_the_diff_view () {

@@ -1127,7 +1127,7 @@ telescope senses of "unfold", the telescope's "aggregated", the fixture
 'fixtures/fresh/'). Tests: all three unit suites, with only the renamed
 identifiers and texts changed.
 
-** TODO Slice 10: "render", "extend" and the glossary
+** DONE Slice 10: "render", "extend" and the glossary
 Make the changes under "'Render', 'extend' and the glossary" above:
 the identifiers, then the prose sweep file by file, then the glossary.
 Grep for 'draw' under 'server/', 'elisp/', 'nvim/', 'tests/' and

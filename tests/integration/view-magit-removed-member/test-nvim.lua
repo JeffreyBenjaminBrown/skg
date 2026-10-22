@@ -53,7 +53,7 @@ local function find_all_changes_buffer (timeout_secs)
 end
 
 ---@param line string
----@return boolean does LINE draw b as a removed member?
+---@return boolean does LINE show b as a removed member?
 local function is_removed_member_line (line)
   return line:find('(id b)', 1, true) ~= nil
      and line:find('(diff (presence rel-)', 1, true) ~= nil

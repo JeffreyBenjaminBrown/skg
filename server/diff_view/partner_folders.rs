@@ -1,9 +1,9 @@
 //! The partner folders of the diff view: the straddle half of the
 //! partner-folder reconciler ('update_buffer/reconcile/partner_folder.rs'
 //! holds the live-graph half and dispatches here). A partner folder
-//! drawn over the graph straddle holds the union of its members in
+//! over the graph straddle holds the union of its members in
 //! both graphs, each tagged with its presence, and under each member
-//! its member role tree drawn over the union ('docs/diff-view.org',
+//! its member role tree, extended over the union ('docs/diff-view.org',
 //! "the in-folders and out-folders").
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -86,12 +86,12 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
       push_repair_warnings (sink, kind, recorder_pid, summary); }}
   Ok (( )) }
 
-/// The goal item of a partner of a straddle-drawn folder: a node only
+/// The goal item of a partner of a folder over the straddle: a node only
 /// in the before-graph is its historical phantom; a member whose
 /// relationship is only in the before-graph is removed (a non-member
 /// with '(presence rel-)', the one encoding of a removed relationship);
 /// any other is a member. In a folder whose membership the save reads
-/// (an EditableSet), a removed member that is dangling is not drawn at
+/// (an EditableSet), a removed member that is dangling is not shown at
 /// all, since an unknown phantom there would read back as a member.
 fn straddle_goal_item (
   straddle     : &GraphStraddle,
@@ -113,14 +113,14 @@ fn straddle_goal_item (
   Some ( FolderGoalItem {
     skgid : partner . id . clone (), presence : Some (presence), shape } ) }
 
-/// Under each member of a straddle-drawn folder, its member role tree,
-/// drawn by the role-tree engine over the union of the straddle: under
+/// Under each member of a folder over the straddle, its member role tree,
+/// extended by the role-tree engine over the union of the straddle: under
 /// a container, its full containerward tree; under any other member,
 /// the role tree of the folder's role, with a full containerward tree
 /// under each graft. In a folder of the folder viewparent's own
 /// relationships, only under the members whose relationship changed.
 /// A member whose relationship moved to another skgrepo gets that
-/// move. Each member role tree is drawn afresh in a scratch tree and
+/// move. Each member role tree is built afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
 /// its kind) at each level, so that a member role tree that stays
 /// keeps its viewnodes and their fold state, in the order of the walk;

@@ -115,8 +115,8 @@ A side's tier is shown by one part of the side, its carrier: its
 numeral, if it shows one, and otherwise all its ancestor flags. The
 carrier shows the greater of its floor and the side's tier; every other
 glyph shows just its floor. On the subscribesTo in-side, whose tier is
-high, =2aS= draws the 2 high and the 'a' low, while =aS= has no
-numeral, so its 'a' carries the tier and is drawn high.
+high, =2aS= shows the 2 high and the 'a' low, while =aS= has no
+numeral, so its 'a' carries the tier and is shown high.
 
 *** Fractions
 Two sides can show a subset with a tier of its own, as a fraction.
@@ -138,8 +138,8 @@ subscribee a different numerator.
 
 The numerator gets its own carrier, chosen the same way from its
 glyphs; the side's carrier is chosen from the denominator's. The slash
-shows the side's tier. =1/5aL= draws the 1 high, the 5 medium and the
-'a' low. =a/5L= draws the 'a' high, because it carries the subset's
+shows the side's tier. =1/5aL= shows the 1 high, the 5 medium and the
+'a' low. =a/5L= shows the 'a' high, because it carries the subset's
 tier, and the 5 medium. In =5/L= the denominator shows nothing, so only
 the slash shows the side's tier. An ancestor appears once: before the
 slash if it belongs to the numerator, otherwise after the denominator's
@@ -147,12 +147,12 @@ numeral. =a/bL= says both ancestors link here and only 'a' is
 substantive.
 
 *** Birth
-The letter of a relation that put this occurrence here is drawn low;
+The letter of a relation that put this occurrence here is shown low;
 its counts keep their own styles. An occurrence can have more than one
 birth relation. A side whose only members are ancestors that the birth
 relation already accounts for has tier low: =aC= (the parent is the sole
-container) draws the 'a' low. A subscribee's =bS= (its subscriber is the
-grandparent) draws the 'b' medium, because of b's floor.
+container) shows the 'a' low. A subscribee's =bS= (its subscriber is the
+grandparent) shows the 'b' medium, because of b's floor.
 
 Immediately after =O=, a crucial =ĥ= (precomposed h with circumflex)
 means this occurrence substitutes for a node it overrides. =2Oĥ3= is an
@@ -212,12 +212,12 @@ nothing. A changed folder's =✓= comes from its bare top-level
 =(ready)=. The rules match each part once per diff object, so a =✓=
 follows its own object whatever the raw order of the parts.
 
-A historical phantom (a node the worktree lacks, drawn with HEAD's
+A historical phantom (a node the worktree lacks, shown with HEAD's
 text) carries =☮=. The properties the view adds are labels: =old title
 and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
 +NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, and the
 changeset markers =its content changed=, =some content relationships
-changed skgrepo= and =order-only change=. A folder drawn because its
+changed skgrepo= and =order-only change=. A folder shown because its
 membership changed reads =its X changed (this file)= or =(other files)=;
 the nodeMerge folders read =it was acquired by= and =it acquired=.
 

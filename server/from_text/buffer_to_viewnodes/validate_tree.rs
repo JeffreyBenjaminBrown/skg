@@ -170,13 +170,13 @@ fn idFolder_membership_errors (
 /// Tamper validation for the '(overridesHere N)' fact (plan 11).
 /// The fact is load-bearing text: wherever it appears, save
 /// extraction collects N instead of the carrier's own ID. So a
-/// fact the server would not have drawn must abort the save --
+/// fact the server would not have rendered must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
 /// must be ON N's owned override chain
 /// ('carrier_on_owned_chain', VISIBILITY-UNGATED so ownership
 /// still gates but a fact honest when rendered does not start
-/// failing after a skgrepo-set switch). With chains the drawn node can
+/// failing after a skgrepo-set switch). With chains the shown node can
 /// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// fact. Facts on retained RestrictedVognodes are checked identically.
@@ -206,7 +206,7 @@ fn overridesHere_fact_errors (
       match &carrier {
         Some (c) =>
           carrier_on_owned_chain (config, graph, &original, c),
-        // An id-less carrier is never a node the server legitimately drew as
+        // An id-less carrier is never a node the server legitimately showed as
         // a substitute, so fail closed.
         _ => false };
     if ! chain_ok {

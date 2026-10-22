@@ -1,4 +1,4 @@
-/// Applying a repo-set switch to an already-drawn view
+/// Applying a repo-set switch to an already-rendered view
 /// (the API doc's "Restricted-skgrepo nodes").  Two passes:
 /// convert every Unrestricted viewnode from a now-restricted skgrepo into an
 /// RestrictedVognode, then prune (DFS postorder, so emptied parents prune

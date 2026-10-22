@@ -60,11 +60,11 @@ async fn test_bfs_limit_across_multiple_trees (
       //   33
       //
       // §5.5 node budget: the budget counts vognode EXTENSIONS (cost 1 each), in
-      // level order; a whole child group is always drawn (never truncated
+      // level order; a whole child group is always shown (never truncated
       // mid-group), and once the budget hits 0 every later vognode is left
       // write-protected (visible, collapsed -- graphStats(contents N) still shows it
       // has hidden content). View roots are never truncated. limit=7 extensions:
-      // 1,2,3,11,12,13,21. So 12 drew its whole gen-3 group 121..123 (all then
+      // 1,2,3,11,12,13,21. So 12 showed its whole gen-3 group 121..123 (all then
       // write-protected); 22,23,31,32,33 are reached after the budget is spent and
       // stay write-protected.
 
@@ -110,7 +110,7 @@ async fn test_bfs_limit_9_three_branches (
 ) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=9 (cost 1 per extension): extensions are
       // 1,2,3,11,12,13,21,22,23. So roots 1 and 2 fully extend (12 and 22 each
-      // draw their whole gen-3 group, write-protected); root 3 is reached after the
+      // show their whole gen-3 group, write-protected); root 3 is reached after the
       // budget is spent, so 31,32,33 stay write-protected. (Contrast limit=7, which
       // runs out one root sooner.)
 
@@ -159,7 +159,7 @@ async fn test_bfs_limit_8_two_branches (
 ) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=8, roots [1,2] (cost 1 per extension): extensions
       // are 1,2,11,12,13,21,22,23 -- both roots fully extend their gen-2. 12 and
-      // 22 each draw their whole gen-3 group (121..123, 221..223), all left
+      // 22 each show their whole gen-3 group (121..123, 221..223), all left
       // write-protected (budget spent by then). Whole groups, never a partial set.
 
       let mut test_config = config . clone();

@@ -2,11 +2,11 @@
 //
 // Production change (2), the second half of the extension test
 // (TODO/DONE/full-schema/DONE/13_test-rel-matrix.org): substitution does not
-// apply to the immediate children of an overridden node drawn RAW.
+// apply to the immediate children of an overridden node shown RAW.
 //
 // Fixture (the docs/forks.org shape): clone R overrides original X, and
-// R's child R1 overrides X's child X1. Opening X as a view root draws
-// X raw (roots draw raw); its immediate child X1 must therefore draw
+// R's child R1 overrides X's child X1. Opening X as a view root shows
+// X raw (roots are shown raw); its immediate child X1 must therefore be shown
 // RAW too -- NOT substituted by R1 -- because the user is looking at
 // the original. (Before this change, a raw title could sit over the
 // overrider's substituted children.)
@@ -32,18 +32,18 @@ fn raw_shown_overridden_root_children_are_raw
         multi_root_view (
           config, Some (tantivy), &[ID::from ("X")] )
  ?;
-      // X is drawn raw (a view root).
+      // X is shown raw (a view root).
       assert! ( x_view . lines () . any (
           |l| l . starts_with ("* (skg (node (id X)") ),
         "X should be the raw root:\n{}", x_view );
-      // X's immediate content child X1 is drawn RAW, as itself, under X.
+      // X's immediate content child X1 is shown RAW, as itself, under X.
       assert! ( x_view . lines () . any (
           |l| l . starts_with ("** (skg (node (id X1)") ),
         "X1 should appear raw as X's immediate child:\n{}", x_view );
       // Nothing is substituted in this view: no overrider stands in for
       // X1 (the bug this change removes).
       assert! ( ! x_view . contains ("overridesHere"),
-        "no immediate child of a raw-drawn overridden node may be \
+        "no immediate child of a raw-shown overridden node may be \
          substituted:\n{}", x_view );
       assert! ( ! x_view . lines () . any (
           |l| l . starts_with ("** (skg (node (id R1)") ),

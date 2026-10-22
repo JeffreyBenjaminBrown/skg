@@ -1,5 +1,5 @@
 // A buffer holding every one of the diff view's viewnodes,
-// drawn from the graph straddle of a git fixture, saves back unchanged:
+// rendered from the graph straddle of a git fixture, saves back unchanged:
 // no graph change, no validation error, and every one of them kept.
 // The buffer the save returns is a fixed point: saved again, it comes
 // back the same. (The first save's view completion adds the display
@@ -10,7 +10,7 @@
 // body edited; gone, which held gc, kept and the dangling ghost, is
 // deleted with gc, and p no longer contains it; acq acquired
 // 'acquired' by a nodeMerge. (One skgrepo cannot show a skgrepo move,
-// so the two move properties are drawn from made-up skgrepos.)
+// so the two move properties are taken from made-up skgrepos.)
 
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, save_view, skg_files, with_git_fixture};
@@ -91,7 +91,7 @@ fn append_historical_phantom (
   Some (phantom) }
 
 /// The view of p, with every one of the diff view's viewnodes
-/// added where the diff view draws it.
+/// added where the diff view shows it.
 fn buffer_with_every_new_viewnode (
   f : &Fixture,
 ) -> Result<String, Box<dyn Error>> {
@@ -208,7 +208,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     Ok (( )) }) }
 
 /// The new viewnodes are save-inert, but the validator keeps each
-/// where the diff view draws it.
+/// where the diff view shows it.
 #[test]
 fn the_new_viewnodes_are_refused_out_of_place (
 ) -> Result<(), Box<dyn Error>> {

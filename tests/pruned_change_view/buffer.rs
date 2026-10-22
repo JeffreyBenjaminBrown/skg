@@ -1,4 +1,4 @@
-// The "all changes" buffer, drawn from the graph straddle. The 'sets'
+// The "all changes" buffer, rendered from the graph straddle. The 'sets'
 // fixture is described in 'sets.rs'. In the 'kinds' fixture (owned
 // skgrepos public and private) each root shows one kind of change:
 // txt is retitled and its body edited; ali loses alias a1 and gains
@@ -258,7 +258,7 @@ fn removed_partners_buffer (
     Ok (( )) }) ?;
   Ok (buffer) }
 
-/// x's container folder draws b, the container it lost, between the
+/// x's container folder shows b, the container it lost, between the
 /// two it kept, as a removed member: a non-member with '(diff (presence rel-))'.
 #[test]
 fn a_removed_container_stands_between_the_kept_ones (
@@ -361,7 +361,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
     assert_eq! ( editable . len (), 1, "{}", saved );
     Ok (( )) }) }
 
-/// s's subscribee folder draws s2, the subscribee it lost, where it
+/// s's subscribee folder shows s2, the subscribee it lost, where it
 /// stood in s's list, not after the subscribees it kept.
 #[test]
 fn a_removed_subscribee_is_shown_where_it_stood (
@@ -380,7 +380,7 @@ fn the_removed_partners_buffer_saves_back_unchanged (
   saves_back_unchanged ("removed_partners", &["main"], DiffViewBufferKind::AllChanges) }
 
 /// In the 'historical_content' fixture h, which contained m, was
-/// deleted: h's historical phantom draws its old content m as a
+/// deleted: h's historical phantom holds its old content m as a
 /// removed member, a non-member with '(diff (presence rel-))', beside
 /// 'node~' since m was retitled. It is m's first occurrence, so it is
 /// editable, its old title beneath it. A buffer showing it saves back

@@ -6,7 +6,7 @@
 //   also overrides it;
 // - grandparentSubscribes ("gS"): an overriddenFolder member whose folder
 //   recorder also subscribes to it;
-// - overridesParent ("Op"): a node drawn under a vognode it overrides.
+// - overridesParent ("Op"): a node shown under a vognode it overrides.
 // One fixture serves all three: R subscribes to E and F and overrides
 // E (so E under R's subscribeeFolder carries gO and under R's
 // overriddenFolder carries gS, while F carries neither); R contains P,
@@ -51,7 +51,7 @@ fn lines_containing<'a> (
     . collect () }
 
 /// The folder (by its metadata atom) most recently opened above each
-/// E line. The fixture draws E only as a folder member, so this
+/// E line. The fixture shows E only as a folder member, so this
 /// attributes each E copy to its folder regardless of folder order.
 fn e_lines_by_enclosing_folder (
   buf : &str,
@@ -96,7 +96,7 @@ fn assert_sharing_stats_in_view_of_R (
           "{}: E-as-overridden also shows gS (R subscribes E, gen 2):\n{}",
           label, buf ); },
       other => panic! (
-        "{}: E drawn outside any folder ({:?}):\n{}", label, other, buf ),
+        "{}: E shown outside any folder ({:?}):\n{}", label, other, buf ),
     }}
   for f_line in lines_containing (buf, "(id F)") {
     // F is a subscribee R does NOT override, so it has no overrides
@@ -104,14 +104,14 @@ fn assert_sharing_stats_in_view_of_R (
     assert! ( ! f_line . contains ("(overrides"),
       "{}: F, a subscribee R does not override, shows no override \
        relation:\n{}", label, buf ); }
-  { // Since override substitution (plan 11), a fresh view of R draws
+  { // Since override substitution (plan 11), a fresh view of R shows
     // C in place of P (C overrides P), marked; the Op position (C
-    // under a drawn P) is asserted from a view of P instead, in
+    // under a shown P) is asserted from a view of P instead, in
     // assert_op_in_view_of_P.
     let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
     assert! ( c_lines . iter ()
               . any ( |l| l . contains ("(overridesHere P)") ),
-      "{}: C is drawn in place of P, marked:\n{}", label, buf ); }}
+      "{}: C is shown in place of P, marked:\n{}", label, buf ); }}
 
 fn assert_op_in_view_of_P (
   buf   : &str,
@@ -123,7 +123,7 @@ fn assert_op_in_view_of_P (
   assert! ( c_lines . iter ()
             . any ( |l| l . contains ("(overrides (out")
                         && l . contains ("(ancestors 1)") ),
-    "{}: C drawn as content of P (which it overrides) is born of an \
+    "{}: C shown as content of P (which it overrides) is born of an \
      overrides-out to P (gen 1):\n{}", label, buf ); }
 
 async fn save_and_rerender (
@@ -169,8 +169,8 @@ async fn sharing_view_stats_appear_and_roundtrip (
       let saved : String = // The save parses the buffer, so this also pins the parse arms.
         save_and_rerender (&de_novo, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&saved, "after save");
-      { // Op needs P drawn as a parent, which substitution prevents
-        // in a view of R; a view rooted at P draws P raw (roots
+      { // Op needs P shown as a parent, which substitution prevents
+        // in a view of R; a view rooted at P shows P raw (roots
         // never substitute) with C as its content.
         let (view_of_p, _pids, _tree)
           : (String, Vec<ID>, _) =

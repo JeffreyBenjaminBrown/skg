@@ -181,7 +181,7 @@
                            (not (string-match-p "diff-view: " (buffer-name b)))
                            (string-match-p "(unknown (id d))" (buffer-string)))))
                   (buffer-list))))))
-    (unless view (test-fail "Timeout waiting for a view of r drawing d as unknown"))
+    (unless view (test-fail "Timeout waiting for a view of r showing d as unknown"))
     (switch-to-buffer view)
     (goto-char (point-min))
     (re-search-forward "(unknown (id d))")

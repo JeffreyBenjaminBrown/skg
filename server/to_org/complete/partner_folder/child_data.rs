@@ -53,13 +53,13 @@ pub struct ChildData {
 pub struct FolderGoalItem {
   pub skgid    : ID,
   /// The presence of its node and of its relationship to the
-  /// folder's viewparent, when the folder draws the union of a graph
+  /// folder's viewparent, when the folder shows the union of a graph
   /// straddle; None from the live graph.
   pub presence : Option<DiffPresence>,
   pub shape    : FolderGoalShape,
 }
 
-/// How a goal item is drawn.
+/// How a goal item is shown.
 #[derive(Clone, Debug)]
 pub enum FolderGoalShape {
   /// A member: a write-protected vognode marked affectsParent=true,
@@ -138,7 +138,7 @@ pub fn build_child_data (
     m };
   let mut result : HashMap<ID, ChildData> = HashMap::new ();
   for item in goal_list {
-    // A historical phantom is drawn from the before-graph.
+    // A historical phantom is made from the before-graph.
     if let FolderGoalShape::Historical (_) = item . shape { continue; }
     let child_skgid : &ID = &item . skgid;
     if result . contains_key (child_skgid) { continue; }
@@ -190,7 +190,7 @@ pub fn build_child_data (
 /// managed/key/create closures. A member with an unknown ChildData
 /// entry produces an unknown phantom; any other, a write-protected
 /// viewnode marked AffectsParent::True. An item with another shape
-/// is drawn as its shape says, and matches an existing child of the
+/// is shown as its shape says, and matches an existing child of the
 /// same skgid whatever its shape, which then takes the item's
 /// ('apply_goal_shapes').
 pub fn reconcile_partnerFolder_children_against_goal_list (
@@ -248,14 +248,14 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     tree, folder_node, goal_list) ?;
   Ok (summary) }
 
-/// How a goal item is drawn when no child matches it. See
+/// The viewnode made for a goal item when no child matches it. See
 /// 'FolderGoalShape'.
 fn viewnode_of_goal_item (
   item       : &FolderGoalItem,
   child_data : &HashMap<ID, ChildData>,
   label      : &str,
 ) -> Result<Viewnode, String> {
-  let mut drawn : Viewnode = match &item . shape {
+  let mut viewnode : Viewnode = match &item . shape {
     FolderGoalShape::Historical (phantom) => phantom . clone (),
     shape => {
       let d : &ChildData =
@@ -274,8 +274,8 @@ fn viewnode_of_goal_item (
         match shape { FolderGoalShape::Removed => AffectsParent::False,
                       _ => AffectsParent::True, } ) } }, };
   if let Some (presence) = item . presence {
-    drawn . change_facts . presence = presence; }
-  Ok (drawn) }
+    viewnode . change_facts . presence = presence; }
+  Ok (viewnode) }
 
 /// Give each child that a goal item matched the item's shape, keeping
 /// the viewnode and its fold state, and the item's presence. A member
@@ -369,7 +369,7 @@ mod tests {
   fn skgid (text : &str) -> ID { ID::from (text) }
   fn skgrepo (text : &str) -> SkgrepoName { SkgrepoName::from (text) }
 
-  /// A member drawn by an extra ID of x stands for x, so the
+  /// A member shown by an extra ID of x stands for x, so the
   /// reconciler keeps it for the goal item x, as the save's
   /// write-protected-occurrence check counts it as x.
   #[test]

@@ -118,7 +118,7 @@ ACTUAL:
           (format "Scenario %s: BEFORE/AFTER differ" name))))))
 
 (defun bfp-diffView-all-changes-buffer ()
-  "The \"all changes\" buffer of the diff view, once it draws dvroot."
+  "The \"all changes\" buffer of the diff view, once it shows dvroot."
   (cl-find-if
    (lambda (b)
      (and (string-match-p "diff-view: all changes" (buffer-name b))

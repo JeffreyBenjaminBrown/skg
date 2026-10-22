@@ -2782,3 +2782,88 @@ aggregate" is slice 10's to rewrite, so it still says "An aggregate".
 - Comments that the longer names pushed past the margin were rewrapped.
 *** verification
 nextest 867 passed; Emacs 381; Neovim all 31 specs passed.
+** Slice 10: deviations
+*** the identifiers
+| old | new |
+|---+---|
+| 'DrawnDiffViewBuffer' | 'RenderedDiffViewBuffer' |
+| 'DrawOutcome', 'apply_editable_draw_rule' | 'EditabilityOutcome', 'apply_editability_rule' |
+| 'is_drawn_by_the_diff_view' | 'is_the_diffViews_viewnode' |
+| 'drawn_skgid' (the overrider shown in place of a goal member) | 'shown_skgid' |
+| 'is_overridden_drawn_raw', its local 'affects_parent_raw_drawing_folder' | 'is_overridden_shown_raw', 'affects_parent_raw_showing_folder' |
+| 'drawing_of_goal_item', its local 'drawn' | 'viewnode_of_goal_item', 'viewnode' |
+| 'drawn_above_itself' | 'standing_above_itself' |
+| the local 'drawn' in 'reconcile_removed_content_members' | 'removed_viewnode' |
+| the local 'drawn' in 'contentOrigins_missing_from_buffer' | 'editable' |
+| the locals 'drawn' in the content reconciler's child data | 'shown' |
+| the test helper 'drawn_editable' | 'shown_editable' |
+| the test locals 'drawn' ('recomputed_sets.rs', 'common.rs'), 'drawn', 'end-drawn', 'end_drawn', 'chain_end_drawn' (fork-chain) | 'rendered'; 'shown', 'end-shown', 'end_shown', 'chain_end_shown' |
+| 'only_links_to_documents_draw_path_warnings' | '..._raise_path_warnings' |
+| 'a_member_drawn_by_an_extra_id_*' (three tests) | 'a_member_shown_by_an_extra_id_*' |
+| 'parked_content_node_is_drawn_once', its test fn and temp paths | '..._is_shown_once' |
+| 'raw_drawn_overridden_root_children_are_raw' | 'raw_shown_...' |
+| 'de_novo_draws_the_overrider_marked' | 'de_novo_rendering_shows_the_overrider_marked' |
+| 'a_deleted_subtree_is_drawn_where_it_stood', 'a_removed_subscribee_is_drawn_where_it_stood' | '..._is_shown_where_it_stood' |
+| 'a_content_change_tags_the_members_and_draws_the_removed_one' | '..._and_shows_the_removed_one' |
+| 'home_and_relRepo_moves_are_drawn' | '..._are_shown' |
+| 'a_node_merge_draws_both_acquisition_folders' | 'a_node_merge_shows_...' |
+| 'a_deleted_subscriber_is_drawn_in_the_changed_subscriber_folder' | '..._is_shown_in_...' |
+| 'a_removed_container_is_drawn_between_the_kept_ones' | 'a_removed_container_stands_between_the_kept_ones' |
+| 'a_historical_phantoms_old_content_is_drawn_as_removed_members' | '..._is_shown_as_...' |
+| 'a_new_child_is_created_and_drawn_as_new' | '..._and_shown_as_new' |
+| 'the_skgrepo_changes_buffer_draws_the_recorder_of_a_relRepo_move', 'the_merges_buffer_draws_only_the_merge' | '..._shows_...' |
+| 'a_member_deleted_in_the_buffer_is_redrawn_as_removed', 'a_root_deleted_...' | '..._is_rerendered_as_removed' |
+| 'a_change_two_levels_under_a_write_protected_leaf_is_drawn_by_the_command' | '..._is_shown_by_the_command' |
+| 'a_buffer_whose_u_exceeds_the_node_budget_is_drawn_in_full' | '..._is_rendered_in_full' |
+| 'a_change_drawn_only_in_a_container_folder_becomes_editable_there' | 'a_change_shown_only_...' |
+| 'an_in_changed_only_change_is_drawn_under_its_new_container' | '..._is_shown_under_...' |
+| 'a_confirmed_resend_commits_and_redraws_the_open_buffers' | '..._and_rerenders_...' |
+| 'for_diffView_gives_the_first_drawings_settings' | '..._first_renderings_settings' |
+*** "drew" went too
+The plan names "draw", "draws", "drawn" and "drawing"; the past tense
+says the same, so its occurrences (server 13 lines, docs 10, tests 9)
+were reworded by the same rule: "a reconciler detaches only what it
+created", "what the diff view added", "what it made editable".
+*** "redraw": the clients keep it, the server, Rust tests and docs say "rerender"
+The plan keeps "redraw" in the clients, as the screen. So every
+"redraw" under 'elisp/', 'nvim/', 'tests/elisp/', 'tests/nvim/' and the
+client scripts of 'tests/integration/' stays, including the comments
+that mean the server's rerender of a buffer ("carrying the redrawn
+buffer") and the Emacs test 'test-stage-and-commit-redraws-an-emptied-view'.
+Under 'server/', the Rust tests and 'docs/', where "redraw" meant a
+buffer rendered again, it became "rerender" (the error "Cannot
+rerender the diff view buffer", the protocol comment, two test names),
+or "recreated" where it meant a viewnode made again ("moved, not
+recreated").
+*** the other senses of "draw"
+Senses that are not about a buffer went too, so that the closing grep
+finds only the drawer and "redraw": "draws no warning" became "raises
+no warning", "can draw on" became "can use", the herald legend's tier
+glyphs are "shown high" ('docs/heralds.org'), and
+'docs/it-will-be-fun.org' says "Connecting phrases with arrows".
+*** the glossary: the plan's terms, and the rest of its word list
+Beside the entries the plan lists (the long names of C, R, U and D
+with the corrected D and the rule for messages; "commit readiness
+aggregate"; "editable in the diff view, visible in the diff view";
+"reconciler", "managed child", "per-visit step", "shallow model
+subtree", "buffer kind", "match key", "the user's viewnode"), the plan's
+"Words this plan uses" says slice 10 adds the rest of that list. So
+the glossary also gained "editability rule, editable map" and "view
+completion, extend, render, rerender" (general terms, beside
+"editable, write-protected"), "startup warnings channel" (beside
+"collateral view"), "already-staged entry" and "change headline" (in
+the diff-view terms). The other words of the list were defined
+already. The glossary never described stage-and-commit, so "already
+staged" lives in its own entry.
+*** 'docs/api-and-formats.org' says "makes a node's changes editable" too
+Its readiness-summary passage defined "shows a node's changes" as the
+glossary did; it now uses the glossary's new phrase.
+*** seen, left
+- Capitalized words the rewording kept ("SHOWN", "shown RAW", "is
+  shown WRITE_PROTECTED") are slice 12's.
+- Citations of 'TODO/more.org' and plan 11 in the reworded comments
+  are slice 11's.
+*** verification
+nextest 867 passed; Emacs 381; Neovim all 31 specs passed. The
+changed integration scripts were checked for syntax only (the plan
+asks no integration run of this slice).

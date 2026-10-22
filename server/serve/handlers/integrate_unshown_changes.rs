@@ -1,11 +1,11 @@
 //! The "integrate unshown changes" request
-//! ('docs/diff-view.org', "Integrating unshown changes"): redraw one buffer of the diff view so
+//! ('docs/diff-view.org', "Integrating unshown changes"): rerender one buffer of the diff view so
 //! that every node of its recomputed U has an editable occurrence,
-//! and every content origin of its recomputed D that it draws nowhere
+//! and every content origin of its recomputed D that it shows nowhere
 //! is a root. A
 //! save never does that on its own.
 //!
-//! The answer carries the readiness summary of the redrawn buffer,
+//! The answer carries the readiness summary of the rerendered buffer,
 //! as a save's does, and is followed by a rerender stream: the one
 //! view, or nothing when the request was refused.
 

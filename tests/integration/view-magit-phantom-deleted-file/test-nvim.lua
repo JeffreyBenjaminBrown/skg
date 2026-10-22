@@ -6,7 +6,7 @@
 -- Worktree:   a no longer contains b; b.skg deleted from disk.
 --
 -- Phase 1: Open the diff view.
--- Phase 2: Its "all changes" buffer draws b as a historical phantom.
+-- Phase 2: Its "all changes" buffer shows b as a historical phantom.
 -- Phase 3: Resolve b's on-disk path and open its plain diff.
 -- Phase 4: Verify the resolved path is exactly skg-data/b.skg (NOT
 --          the outer skg project skgrepo, and NOT a double-prefixed

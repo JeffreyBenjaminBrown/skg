@@ -85,7 +85,7 @@ fn writeProtected_differences_from_graph (
 
 /// One change per partner folder under the occurrence whose members
 /// are not the node's partners in the folder's relation, as the folder
-/// reconciler would draw them, or of which a member carries a relRepo
+/// reconciler would show them, or of which a member carries a relRepo
 /// request. An absent folder, and a folder with no relation member
 /// role, says nothing.
 fn partnerFolder_differences_from_graph (
@@ -124,7 +124,7 @@ fn partnerFolder_differences_from_graph (
 /// counted. In particular a removed member, of either kind, is not:
 /// it stands for a relationship the before-graph had and the
 /// after-graph lacks, so counting it would refuse the folder the diff
-/// view drew. The diff view draws a removed member as a non-member
+/// view rendered. The diff view shows a removed member as a non-member
 /// unrestricted vognode with '(presence rel-)', or, when the partner
 /// is dangling, as an unknown phantom with that sign; the first is
 /// excluded by its non-membership, the second by its sign.
@@ -515,7 +515,7 @@ mod tests {
              "{}", errors [0]);
   }
 
-  /// As a buffer of the diff view draws the folder: each member
+  /// As a buffer of the diff view shows the folder: each member
   /// with its presence facts.
   #[test]
   fn a_subscribee_folder_with_an_extra_member_is_refused_in_a_diffView_buffer () {
@@ -567,28 +567,28 @@ mod tests {
   }
 
   /// recorder subscribes to x by its extra ID x2, and to ghost, which
-  /// no node has. A member drawn by the extra ID, or by x's pid, passes,
+  /// no node has. A member shown by the extra ID, or by x's pid, passes,
   /// because the check reads each member as the folder reconciler
   /// matches it ('skgid_a_folder_child_stands_for'): by the pid the
   /// graph resolves its ID to.
   #[test]
   fn a_member_shown_by_an_extra_id_passes_when_the_graph_lists_the_extra_id () {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
-    for drawn in ["x2", "x"] {
+    for shown in ["x2", "x"] {
       let text : String = format! (
         "* (skg (node (id recorder) (repo main) writeProtected)) recorder
 ** (skg subscribeeFolder)
 *** (skg (node (id {}) (repo main) writeProtected)) x
 *** (skg (unknown (id ghost)))
-", drawn );
+", shown );
       assert_eq! (
         errors_for_writeProtected_occurrences (
           &forest (&text), &graph, &config (), None ),
         vec! [], "{}", text ); }
   }
 
-  /// An unknown phantom member is compared by its raw ID: drawn with
-  /// the ID the recorder lists it passes, drawn with another it is
+  /// An unknown phantom member is compared by its raw ID: shown with
+  /// the ID the recorder lists it passes, shown with another it is
   /// refused.
   #[test]
   fn an_unknown_member_is_compared_by_raw_id () {
@@ -609,7 +609,7 @@ mod tests {
       vec! ["changed subscriptions" . to_string ()] );
   }
 
-  /// A dangling removed member, as the diff view draws one (an
+  /// A dangling removed member, as the diff view shows one (an
   /// unknown phantom with '(presence rel-)'), is not counted: the
   /// folder beside it says what the graph says, and passes. The same
   /// phantom without the sign is a member, compared by its raw ID as
@@ -654,7 +654,7 @@ mod tests {
         extra_ids : vec! [ID::from ("x2")],
         .. node ("x") } ]) }
 
-  /// A removed member, as the diff view draws one (a non-member with
+  /// A removed member, as the diff view shows one (a non-member with
   /// '(presence rel-)'), is not counted, nor is any other non-member.
   #[test]
   fn a_removed_member_is_not_counted () {
@@ -688,8 +688,8 @@ mod tests {
     "})), vec! ["changed containers" . to_string ()]);
   }
 
-  /// Under a skgrepo restriction the folder is drawn without the
-  /// members it hides, and so drawn it passes; drawn with them, it
+  /// Under a skgrepo restriction the folder is shown without the
+  /// members it hides, and so shown it passes; shown with them, it
   /// differs.
   #[test]
   fn under_a_skgrepo_restriction_a_folder_without_the_hidden_members_passes () {

@@ -24,7 +24,7 @@ use std::time;
 /// Whether an ID's editable occurrence is Final (claimed by a
 /// editable view request, EVR) or merely Tentative (an ordinary
 /// saved/completed editable). A EVR clobbers a Tentative occurrence
-/// but defers to a Final one: the draw rule, described with the editable
+/// but defers to a Final one: the editability rule, described with the editable
 /// map, the cascade and the node budget in the module comment of
 /// 'server/to_org/extend/editable.rs'. A user writes at most one EVR
 /// per ID (validation forbids two), so a second EVR reaching a Final
@@ -179,7 +179,7 @@ pub fn make_writeProtected_if_repeat_then_extend_editable_map (
              t . is_writeProtected () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   if !is_writeProtected {
-    // Ordinary completed/saved editable -> Tentative (the draw rule).
+    // Ordinary completed/saved editable -> Tentative (the editability rule).
     editableMap . insert ( pid, Finalizable::Tentative (treeid) ); }
   else { make_member_children_nonMembers ( tree, treeid ) ?; }
   Ok (( )) }
@@ -311,7 +311,7 @@ pub fn validate_affectsParent_relationships (
 /// 'validate_affectsParent_relationships', where in a buffer of the
 /// diff view ('before_graph' the straddle's before-graph) a role
 /// graft's claim also holds when its relationship is in the
-/// before-graph: the diff view draws member role trees over the
+/// before-graph: the diff view extends member role trees over the
 /// union of the straddle, and a graft keeps the birth that tells it
 /// from what the user added.
 pub fn validate_affectsParent_relationships_in_straddle (

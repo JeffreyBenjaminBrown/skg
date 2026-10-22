@@ -1,4 +1,4 @@
-// What the user adds under what the diff view drew survives every
+// What the user adds under what the diff view rendered survives every
 // rerender ('docs/diff-view.org', "What a reconciler keeps").
 //
 // The 'users_notes' fixture: a (retitled) contains x, which b no
@@ -29,8 +29,8 @@ fn note (
   format! ( "{} (skg (node (affectsParent false))) {}",
             "*" . repeat (stars), title ) }
 
-/// Save 'buffer', then save what the save drew: both without errors,
-/// and the second drawing the same as the first. Returns it.
+/// Save 'buffer', then save what the save rendered: both without errors,
+/// and the second rendering the same as the first. Returns it.
 fn saved_and_rerendered (
   f      : &mut Fixture,
   buffer : &str,
@@ -43,7 +43,7 @@ fn saved_and_rerendered (
             "the second save must succeed, got {:?}\n{}",
             second . errors, first . saved_view );
   assert_eq! ( second . saved_view, first . saved_view,
-               "a rerender keeps what the first drew" );
+               "a rerender keeps what the first rendered" );
   Ok (second . saved_view) }
 
 /// The headline of the parent of the one line whose title is 'title'.
@@ -68,7 +68,7 @@ const GRAFT_P  : &str =
   "***** (skg (node (id p) (repo main) (affectsParent false) (birth roleGraft container) writeProtected";
 
 /// A note under a member of a changed container folder survives, and
-/// the member's role tree is still drawn around it, once.
+/// the member's role tree is still shown around it, once.
 #[test]
 fn a_note_under_a_changed_folders_member_survives (
 ) -> Result<(), Box<dyn Error>> {

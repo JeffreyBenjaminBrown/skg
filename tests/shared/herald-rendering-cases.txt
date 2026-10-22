@@ -306,11 +306,11 @@
 (skg acquiredFolder)
 ---- text: ☮ it acquired
 ---- styles: crucial*1 -*1 message*11
-==== diff view: a folder of recorders drawn because of a change, ready
+==== diff view: a folder of recorders shown because of a change, ready
 (skg (containerFolder changed) (ready))
 ---- text: ☮ its containers changed (other files)✓
 ---- styles: crucial*1 -*1 message*36 go*1
-==== diff view: a folder of the node's own list drawn because of a change
+==== diff view: a folder of the node's own list shown because of a change
 (skg (aliasFolder changed))
 ---- text: its aliases changed (this file)
 ---- styles: message*31

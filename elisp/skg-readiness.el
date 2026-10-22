@@ -19,7 +19,7 @@
 ;;; request naming every listed object touches. A gesture names every
 ;;; object the headline lists, and toggles by the headline's own '(ready
 ;;; ...)': it is ready when that names every listed object. A folder
-;;; drawn because of a change names no leaf itself; a gesture on it acts
+;;; shown because of a change names no leaf itself; a gesture on it acts
 ;;; on its children.
 ;;;
 ;;; Below the headline a gesture acts on, it names no 'all': the leaves
@@ -147,7 +147,7 @@ the headline's only leaf or commit readiness aggregate."
                       objects))))
 
 (defun skg--readiness-changed-folder-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP is a folder drawn because of a change."
+  "Non-nil when METADATA-SEXP is a folder shown because of a change."
   (seq-some (lambda (element)
               (and (consp element)
                    (string-suffix-p "Folder" (symbol-name (car element)))

@@ -274,7 +274,7 @@ fn birth_facts (
   affectsParent    : AffectsParent,
   birth       : Birth,
   flags       : &AncestorFlags,
-  overridesHere : bool, // whether the node is drawn in place of a node it overrides
+  overridesHere : bool, // whether the node is shown in place of a node it overrides
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
     // A role graft's birth is its role's relation, regardless of
@@ -295,7 +295,7 @@ fn birth_facts (
   if overridesHere
     && ! facts . iter () . any ( |fact|
            fact . relation == NodeRelation::Overrides ) {
-    // A drawn overrider (drawn in place of a node it overrides) is
+    // A shown overrider (shown in place of a node it overrides) is
     // born of that override: it leads with the O herald, like every
     // other birth relation. The overridden node is not an ancestor.
     facts . insert ( 0, BirthFact::new (
@@ -343,7 +343,7 @@ fn birth_facts_for_folder (
               NodeRelation::HidesFromSubs, Side::In, Some (3) ) ], } }
 
 /// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
-/// is drawn WRITE_PROTECTED here while its graphnode has a body -- one
+/// is shown WRITE_PROTECTED here while its graphnode has a body -- one
 /// the rendering hides. Herald "B" on the ☮. False
 /// without a graph handle (some tests): better no B than a wrong one.
 fn set_omitted_body (

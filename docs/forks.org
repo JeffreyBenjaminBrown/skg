@@ -79,7 +79,7 @@ you own. =C=:
   cheap);
 - *subscribes to* =N=, so =N='s later additions surface to you as
   unintegrated content (below);
-- *overrides* =N=, so /override substitution/ draws =C= wherever =N=
+- *overrides* =N=, so /override substitution/ shows =C= wherever =N=
   would otherwise appear as content — you see and edit =C= in =N='s
   place from then on, without =N='s containers being rewritten to point
   at =C=;
@@ -128,10 +128,10 @@ Two differences from the implicit fork:
 The result is an *override chain*: =D overrides C overrides N=. Chains
 of any length are legal (only a /cycle/ is forbidden — see
 [[file:./sharing-model.org][the sharing model]]). When all skgrepos are unrestricted,
-viewing =N='s container draws the chain's end =D=; restrict the
-skgrepo-set to hide =D='s skgrepo and the same view draws the middle =C=
+viewing =N='s container shows the chain's end =D=; restrict the
+skgrepo-set to hide =D='s skgrepo and the same view shows the middle =C=
 instead — either way =N= stays in the container's contents. If you point
-=skg-fork-node= at a node that is /itself/ a drawn substitute (one
+=skg-fork-node= at a node that is /itself/ a shown substitute (one
 carrying an =overridesHere= fact), it forks the node on screen — the
 overrider — deepening the chain, never re-forking the node it stands for.
 
@@ -165,13 +165,13 @@ friend Egg Man (a skgrepo you do not own):
 You make =mystical= editable, edit it (say you rename it to
 =eggy mysticism=), and save. The confirmation buffer lists =mystical=;
 you approve. Now your graph has a clone of =mystical= that you can file
-under =mysticism=. Wherever =mystical= would be drawn, you see your clone
+under =mysticism=. Wherever =mystical= would be shown, you see your clone
 instead, marked as standing in for the original:
 
 #+begin_example
 ,* mysticism                         (yours)
 ,** common objects with mystical associations
-,*** eggy mysticism      «Oĥ» (drawn in place of Egg Man's "mystical")
+,*** eggy mysticism      «Oĥ» (shown in place of Egg Man's "mystical")
 ,**** Which came first, the chicken or the egg?
 ,*** subscribeeFolder
 ,**** mystical           (the subscribee-as-such; empty so far)

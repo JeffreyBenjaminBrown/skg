@@ -111,8 +111,8 @@ So far there are these endpoints:
   - If =NODE_ID= resolves to a restricted skgrepo, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to a restricted-skgrepo node behaves the same way.
-  - The requested node opens as itself, drawn raw. Because the raw root
-    is an overridden node drawn raw, its immediate children also draw
+  - The requested node opens as itself, shown raw. Because the raw root
+    is an overridden node shown raw, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
     "Override substitution" below. Override facts can be inspected in
     search results' overrideward view-subtrees and in explicitly requested
@@ -187,18 +187,18 @@ So far there are these endpoints:
        of the M changed files of the owned skgrepos (O of them changed only
        in order, and so ready), N are commit-ready; F files changed in
        foreign skgrepos; and K changes are not editable in the view: they
-       are recorded by nodes whose changes the buffer does not show. A
-       buffer shows a node's changes where it has an editable
+       are recorded by nodes whose changes the buffer does not make editable. A
+       buffer makes a node's changes editable where it has an editable
        occurrence of it, in content or in a partner folder, or a
        historical phantom of it in content position: under the buffer
        root or an unrestricted vognode, or in the old content of such a
        phantom. The buffer is reconciled over the graph straddle, not
-       rebuilt: its roots, and every headline it drew editable, stay as
+       rebuilt: its roots, and every headline it holds editable, stay as
        saved, and its change facts, change folders, markers and removed
-       members are redrawn. What it draws anew it draws by its pruned
+       members are recomputed. What it adds anew it adds by its pruned
        change view sets recomputed after the save: a new member in U is editable,
        with its content list, and any other new member is a
-       write-protected member drawn without its content. It
+       write-protected member shown without its content. It
        makes no occurrence editable and appends no root; the "integrate
        unshown changes" request below does. An editable-view request
        cascades as in any view, and only the extension of a node
@@ -222,7 +222,7 @@ So far there are these endpoints:
     partner folder's members are compared with the node's partners in
     its relation as a set of node IDs, under the save's skgrepo
     restriction, not counting a member the diff view shows as
-    removed; a member drawn by an extra ID counts as its node, and an
+    removed; a member shown by an extra ID counts as its node, and an
     unknown phantom by its raw ID, as the folder reconciler matches
     them; a member carrying a relRepo request differs. A present
     flags folder, under any node, must likewise equal the node's flags.
@@ -385,7 +385,7 @@ So far there are these endpoints:
       the skgrepo restriction is not =all=, when an owned skgrepo is
       not a gitrepo or has no HEAD commit, or for an unknown BUFFER. A
       refusal applies to every buffer, so the client stops.
-  - What each buffer draws: the "all changes" buffer is the pruned change view over
+  - What each buffer shows: the "all changes" buffer is the pruned change view over
     every change in the owned skgrepos since HEAD; the merges and
     skgrepo-changes buffers are pruned change views over the nodeMerges and over the
     home skgrepo and relRepo moves; the order-only buffer lists the
@@ -409,7 +409,7 @@ So far there are these endpoints:
     removed; the rest is created. The server sets a fold state only on
     a viewnode it creates: a context node's body starts folded. A
     root stays until the buffer is closed; a root whose node a commit
-    deleted is drawn as a deleted phantom.
+    deleted is shown as a deleted phantom.
   - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
     (=pruned_change_view.rs=, =changes.rs=).
 
@@ -437,7 +437,7 @@ So far there are these endpoints:
       neither list; one that failed is an error. When something was
       committed, the rerender stream rerenders each open buffer of
       the diff view over the rebuilt graph straddle, as any
-      rerender does: its roots and what it drew editable stay, and what
+      rerender does: its roots and what it holds editable stay, and what
       was committed loses its change facts. The marks of the changes committed are dropped
       from the readiness store.
     - =((errors ("REFUSAL")) (warnings ()))= when the skgrepo
@@ -465,8 +465,8 @@ So far there are these endpoints:
     occurrence becomes editable (its body from the live graph) at its
     first content occurrence in level order, or if it has none at its
     first partner folder occurrence. The buffer is then rerendered as
-    after a save, which draws the content list of each node made
-    editable. Last, each origin of D that the buffer draws nowhere is
+    after a save, which extends the content list of each node made
+    editable. Last, each origin of D that the buffer shows nowhere is
     appended as a root, at the end, in ID order, and completed; R is
     deduplicated with the buffer's roots pinned, so that a changed
     cycle that already has a root gains no second one.
@@ -824,7 +824,7 @@ node whose graphnode HAS a body — one the rendering hides. Herald
 "B", hugging the ☮. Display-only: the parser accepts and discards it;
 the view regenerates it.
 
-A role graft -- a node a role tree drew, playing a partner role toward
+A role graft -- a node a role tree added, playing a partner role toward
 its viewparent (e.g. =container= for a containerward role tree,
 =mentioner= for a node that links to it, also =mentioned=, =overrider=,
 =overridden=, =hider=, =hidden=, =subscriber=, =subscribee=) -- carries
@@ -863,14 +863,14 @@ node's heralds.
   write-protected folder is pruned. =containers= and =mentioners= each
   build one write-protected folder (=containerFolder=,
   =mentionerFolder=), pruned when empty: the other side of each is the
-  node's content, or its links, drawn without a folder.
+  node's content, or its links, shown without a folder.
   Emitted by the =C-c l= commands.
 - =(roleTree ROLENAME)= — build the role tree for one partner role, grafting
   the partners as inverted write-protected children, the role grafts. ROLENAME
   is one of the nine in =PARTNER_ROLE_VOCAB=. Emitted by the =C-c p= commands.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
-  keeping its drawn content, each member of which, there and below,
+  keeping its shown content, each member of which, there and below,
   becomes a non-member); on an editable node, extend its content
   editable, within =initial_node_limit= extensions. A buffer carries at
   most one per node.
@@ -936,7 +936,7 @@ occurrence's subscriber. Subset counts cannot exceed their side's total.
 =(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind this
 occurrence: for each, the side of this node it is on (=in= or =out=) and
 the ancestor generation it accounts for. =GEN= is omitted when no
-ancestor accounts for it, as for a node drawn in place of a node it
+ancestor accounts for it, as for a node shown in place of a node it
 overrides, which carries =(overrides out)=.
 
 | Birth                            | Facts                                                        |
@@ -950,7 +950,7 @@ overrides, which carries =(overrides out)=.
 | hider-folder member              | =(hidesFromSubs out 2)=                       |
 | hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
 | hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
-| drawn overrider (overrides-here) | =(overrides out)=                                    |
+| shown overrider (overrides-here) | =(overrides out)=                                    |
 | role graft                   | its role's relation, =out= for a first role and =in= for a second, =1= |
 Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
@@ -982,7 +982,7 @@ under different parents):
   vognode ancestor whose home moved moved the same way; LETTER names
   that ancestor as the relationship tokens do (a = the viewparent).
   Herald "Δ⌂=LETTER". A display fact, discarded at save;
-- =(relRepo NAME)= — ugly herald "~NAME", drawn immediately before
+- =(relRepo NAME)= — ugly herald "~NAME", shown immediately before
   the ⌂ skgrepo herald; the relRepo of the RELATIONSHIP this
   headline represents (the =contains= relationship to a content child, or
   the folder's relation for a PartnerFolder member), when its privacy was
@@ -1029,7 +1029,7 @@ remove graph context.
 
 When view completion would CREATE a viewnode for node N as
 recursive content, and an owned overrider R of N is visible
-under the skgrepo restriction, it draws R instead -- transitively (a
+under the skgrepo restriction, it shows R instead -- transitively (a
 owned chain D overrides C overrides N is legal and resolves to
 the last visible link), cycle-guarded, and never in the diff view.
 Ordinary completion does not rewrite an existing raw viewnode merely because
@@ -1047,29 +1047,29 @@ registered as rooted at K. Collateral rerenders do not perform these
 replacements; they retain their existing raw positions. A later independent
 single-root request for F still opens raw F.
 
-Moreover, the immediate children of ANY overridden node drawn raw -- a
+Moreover, the immediate children of ANY overridden node shown raw -- a
 PartnerFolder member, a view root, or the overridden-as-such (a member
-child of an overriddenFolder) -- also draw raw: the user is looking at the
+child of an overriddenFolder) -- are also shown raw: the user is looking at the
 original, so its children are the original's, not the overrider's. This is one
 level deep -- substitution resumes at the grandchildren -- and it is strict:
 a node whose only overrider is invisible under the skgrepo restriction is
-"overridden but drawn raw" too, so its children draw raw as well.
+"overridden but shown raw" too, so its children are shown raw as well.
 
 A substituted viewnode carries the keyed viewStats form
 =(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
 stands for. The fact is LOAD-BEARING at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
-instead of being rewritten to the overrider. Edits to the drawn
-node itself (title, body, folders) still save to the drawn node.
-A buffer whose fact the server would not have drawn (the carrier
+instead of being rewritten to the overrider. Edits to the shown
+node itself (title, body, folders) still save to the shown node.
+A buffer whose fact the server would not have rendered (the carrier
 is not on N's owned override chain -- the ownership-gated,
 visibility-UNGATED walk out of N) aborts the save with an
 explanation. With chains the honest carrier may be a MIDDLE link
-(drawn when a later link's mentioner is hidden), so the check accepts
+(shown when a later link's mentioner is hidden), so the check accepts
 any node on the chain and rejects only off-chain facts. A
 skgrepo-set switch that makes a
-drawn substitute's skgrepo restricted turns it into an anonymous
+shown substitute's skgrepo restricted turns it into an anonymous
 =restrictedNode= (the fact does not survive -- a restricted node is
 dataless); the original it stood for is preserved in its container's
 contains by disk supplementation.
@@ -1297,7 +1297,7 @@ or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
 ** Metadata of the diff view
 
-The buffers of the diff view (see "Diff view") draw
+The buffers of the diff view (see "Diff view") show
 changes with the forms below. All are display facts except the
 readiness requests, which the save consumes; saving a buffer reads
 none of the new viewnodes, which are save-inert. The glossary's "Terms
@@ -1370,7 +1370,7 @@ than =bodyDiff=.
   parks there.
 
 *** Changed folders
-A partner, alias, ID or flags folder drawn because some relationship of
+A partner, alias, ID or flags folder shown because some relationship of
 it changed is written =(FOLDER changed)=, e.g. =(containerFolder changed)=,
 in place of the bare atom, and is followed by a bare top-level
 =(ready)= when every changed member is ready. A folder carries no
@@ -1411,7 +1411,7 @@ for =overrides=. Edits to visible members, including
 deletions, are honored.
 
 The one place a restricted node still appears is retention: when a
-skgrepo-set switch is applied to an open view (an already-drawn
+skgrepo-set switch is applied to an open view (an already-rendered
 buffer), a restricted node with unrestricted viewchildren stays on screen
 as an anonymous restricted vognode, so its unrestricted descendants are not
 orphaned:

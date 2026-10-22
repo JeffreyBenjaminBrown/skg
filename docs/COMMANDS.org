@@ -288,7 +288,7 @@ appears in multiple sections.
 These four commands are described elsewhere in this document.
 *** C-c t r         : skg-investigate-unknown-node
 Says what an unknown node is: a reference that no node answers to,
-drawn as "Reference to unknown node.". On such a headline it takes
+shown as "Reference to unknown node.". On such a headline it takes
 that ID; anywhere else it asks for one. The answer opens read-only in
 "*skg unknown node*", as Org text. If the ID resolves to a node, it
 names that node, its ID and its home skgrepo. Otherwise it searches
@@ -337,7 +337,7 @@ optional view; doing so does not change any flag.
 *** C-c l c : skg-show-folderOf-containers
 The containerFolder -- the nodes that contain this one. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
-content, is drawn without a folder. On a node nothing contains, nothing
+content, is shown without a folder. On a node nothing contains, nothing
 appears.
 *** C-c l m : skg-show-folderOf-mentioners
 The mentionerFolder -- the nodes that link to this one. Write-protected
@@ -374,7 +374,7 @@ Typically the first place in the buffer that depicts a node
 is the editable view of it. So that other views of that node
 cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. One also has no content --
-the server draws none under it,
+the server extends none under it,
 in order to prevent the view from becoming redundant and huge --
 but it may keep children that do not affect it.
 
@@ -406,9 +406,9 @@ stop affecting it, since a write-protected occurrence has no content.
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view
-(if it exists) write-protected, keeping what it draws
+(if it exists) write-protected, keeping what it shows
 (though no longer as its content: each child that affected its parent
-stops affecting it), and then draw an editable view here.
+stops affecting it), and then make an editable view here.
 Moving editability back to that occurrence later
 makes those children its content again.
 Called on a node that is already editable,
@@ -643,8 +643,8 @@ two skgrepos. Works on write-protected headlines too.
 *** C-c r u : skg-diffView-integrate-unshown-changes
 Integrates every change not editable in the buffer of the diff view.
 Each changed node with no editable occurrence becomes editable where
-the buffer first draws it, in content or else in a partner folder,
-with its change and its content drawn under it; when a change is
+the buffer first shows it, in content or else in a partner folder,
+with its change and its content shown under it; when a change is
 under a root the buffer lacks, that root is appended at the end. The
 minibuffer then shows the readiness summary, as after a save. Refuses
 with "Save the buffer first." while the buffer has unsaved changes.
@@ -660,7 +660,7 @@ the commit then includes those entries, since a git-commit records
 everything staged. Every
 open view must be saved or reverted first. Afterward the open buffers
 of the diff view are rerendered: each keeps its roots, its
-folding and what it drew editable, and what was committed no longer
+folding and what it made editable, and what was committed no longer
 shows as a change. The
 commit lapses the marks of everything it committed.
 *** C-c r n c : skg-diffView-goto-next-change
@@ -779,14 +779,14 @@ when an owned skgrepo is not in a git repository or has no HEAD
 commit (the refusal names the skgrepo). A
 buffer keeps its roots until you close it, and saving it (or
 committing) keeps what you folded. A save (of it or of another view)
-draws what it draws anew by what changed: a new member that changed,
+decides what it adds anew by what changed: a new member that changed,
 or leads to a change, is editable with its content, and any other new
-member is a write-protected member drawn without its content. But a
-save makes nothing editable that the buffer already draws, and
+member is a write-protected member shown without its content. But a
+save makes nothing editable that the buffer already shows, and
 appends no root: the readiness summary counts a change since the
-buffer opened that it draws nowhere editable as not editable in this
+buffer opened that it holds nowhere editable as not editable in this
 view. C-c r u integrates such changes. Nothing the
-buffer draws editable is write-protected again by the server. An
+buffer holds editable is write-protected again by the server. An
 editable-view request (C-c s d) works as in any view, except that
 only the extension of a node outside U (the nodes the buffer extends
 anyway: those that changed and those leading to them) is charged to

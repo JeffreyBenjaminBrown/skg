@@ -14,7 +14,7 @@
 //!   other editable occurrence claims it as 'Finalizable::Tentative'.
 //!   Only an editable occurrence claims, so editability can move from
 //!   one rerender to the next.
-//! - The draw rule: an occurrence without a request is editable when
+//! - The editability rule: an occurrence without a request is editable when
 //!   its node is unclaimed, and write-protected when the BFS reached
 //!   another occurrence first
 //!   ('make_writeProtected_if_repeat_then_extend_editable_map'). An
@@ -29,13 +29,13 @@
 //!   each of its member content children
 //!   ('pass_editableViewRequest_to_content_children' in
 //!   'server/update_buffer/reconcile/content.rs'), each of which applies
-//!   the draw rule at its own visit and cascades in turn. So a request
+//!   the editability rule at its own visit and cascades in turn. So a request
 //!   on an editable occurrence means "extend this subtree editable".
 //! - The node budget ('CompletionContext::node_budget') starts at
 //!   'initial_node_limit' at each completion. Each extension of an
 //!   editable vognode's content costs one; a folder fills its members
-//!   for free, and a content list is drawn whole or not at all. Once the
-//!   budget is spent, every later occurrence other than a root is drawn
+//!   for free, and a content list is extended whole or not at all. Once the
+//!   budget is spent, every later occurrence other than a root is left
 //!   write-protected and loses its request, which is what bounds the
 //!   cascade. The diff view charges only some extensions; see
 //!   'docs/diff-view.org', "Editability in the diff view".
@@ -92,11 +92,11 @@ pub fn execute_view_requests (
       ViewRequest::Editable =>
         // View completion (dispatch_node_update) settles every Editable
         // request at the node's own visit (apply_editability_rule, the
-        // draw rule and the cascade), before this post-content view-request pass
+        // editability rule and the cascade), before this post-content view-request pass
         // runs, so none should reach here. Fail loudly if one does, rather than
         // silently dropping it.
         return Err ( "execute_view_requests: a ViewRequest::Editable survived \
-          to the view-request pass; it should have been consumed by the draw \
+          to the view-request pass; it should have been consumed by the editability \
           rule at the node's visit" . into () ),
       ViewRequest::WriteProtected | ViewRequest::WriteProtectedSubtree =>
         // Like an Editable request, consumed at the node's visit
@@ -113,7 +113,7 @@ pub fn execute_view_requests (
           save path and stripped before rendering" . into () ), }}
   Ok (( )) }
 
-/// The result of applying the Tentative/Final draw rule (see the module
+/// The result of applying the Tentative/Final editability rule (see the module
 /// comment) to a node that carries a 'ViewRequest::Editable' (a user
 /// EVR, or one the cascade passed down).
 pub enum EditabilityOutcome {
@@ -121,19 +121,19 @@ pub enum EditabilityOutcome {
   /// the node left write-protected. No content extension should follow.
   Deferred,
   /// The node was made Final (and any prior Tentative occurrence of its id
-  /// write-protectd). The caller draws its content next, and cascades.
+  /// write-protectd). The caller extends its content next, and cascades.
   MadeFinal,
 }
 
-/// Apply the draw rule (see the module comment) for a node carrying
+/// Apply the editability rule (see the module comment) for a node carrying
 /// 'ViewRequest::Editable', WITHOUT extending its content:
 /// - defer to an existing Final occurrence (drop the EVR, stay
 ///   write-protected) -> 'EditabilityOutcome::Deferred';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
 ///   and clear the request -> 'EditabilityOutcome::MadeFinal'.
-/// Content drawing is the caller's job (and so is the cascade), so the rule settles
-/// Final-ness before view completion (complete_nodes_in_level_order) draws
+/// Content extension is the caller's job (and so is the cascade), so the rule settles
+/// Final-ness before view completion (complete_nodes_in_level_order) extends
 /// (and cascades) content.
 pub fn apply_editability_rule (
   viewforest : &mut Tree<Viewnode>,
@@ -178,7 +178,7 @@ pub fn apply_editability_rule (
 /// 'ViewRequest::WriteProtectedSubtree' -- that the occurrence at
 /// 'treeid' carries, and consume it. Call at the occurrence's visit,
 /// before it extends, so that the extension takes the write-protected
-/// path and draws nothing under it.
+/// path and extends nothing under it.
 /// - The plain form write-protects the occurrence and makes each of its
 ///   direct unrestricted children a non-member; the children keep
 ///   their own editability and subtrees.
@@ -239,7 +239,7 @@ fn writeProtect_content_subtree (
 
 /// Write-protect one editable occurrence (resyncing it from the
 /// graph), and drop its entry from `visited` if the entry names it,
-/// so that an editable copy can be drawn elsewhere. An entry naming
+/// so that an editable copy can be made elsewhere. An entry naming
 /// another occurrence is that copy, and stays.
 fn writeProtect_occurrence (
   tree    : &mut Tree<Viewnode>,

@@ -1,4 +1,4 @@
-//! Reconciling what the diff view drew under a viewnode with a
+//! Reconciling what the diff view added under a viewnode with a
 //! shallow model subtree of it ('docs/diff-view.org',
 //! "The shallow model subtree, and what it keeps").
 //! The shallow model subtree is built in a scratch tree. Each existing
@@ -138,7 +138,7 @@ pub fn reconcile_children_with_shallowModelSubtree (
   Ok (result) }
 
 /// Below a stale viewnode kept for what the user added under it,
-/// detach what the diff view drew there that holds nothing of the
+/// detach what the diff view added there that holds nothing of the
 /// user's, as it would have been with the viewnode.
 fn detach_the_servers_below (
   tree : &mut Tree<Viewnode>,
@@ -159,7 +159,7 @@ fn detach_the_servers_below (
     else { detach_viewnode_transferring_focus (tree, child) ?; }}
   Ok (( )) }
 
-/// Whether a viewnode below what the diff view drew is the user's:
+/// Whether a viewnode below what the diff view added is the user's:
 /// an unrestricted vognode born 'Unremarkable' that carries no
 /// '(presence ...)' sign and is not a member of the folder it stands in
 /// ('parent_is_a_folder'). A role graft ('Birth::RoleGraft', which a
@@ -179,7 +179,7 @@ pub fn is_the_users_viewnode (
          && presence . rel . is_none ()
          && ! ( parent_is_a_folder && t . affectsParent == AffectsParent::True )) }
 
-/// What the diff view's reconciler manages below what it drew,
+/// What the diff view's reconciler manages below what it added,
 /// where it descends and under a member of a changed folder or a
 /// historical phantom: every viewnode with a match key except the
 /// user's, which stays where it stands. 'parent_is_a_folder' is
@@ -254,7 +254,7 @@ pub fn append_copy_of_subtree (
     append_copy_of_subtree (tree, copy, model, model_child) ?; }
   Ok (copy) }
 
-/// A removed member: a viewnode the diff view drew as a non-member
+/// A removed member: a viewnode the diff view made as a non-member
 /// with '(presence rel-)', because its relationship to its viewparent is
 /// only in the before-graph (or, while a visit reconciles, is about
 /// to be). That is the one encoding of a removed relationship, in

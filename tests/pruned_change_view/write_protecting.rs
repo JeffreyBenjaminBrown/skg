@@ -4,7 +4,7 @@
 // occurrence of a node of U. The 'shared' fixture (one skgrepo,
 // main): x and y, whose bodies changed, each contain n, which
 // contains a, whose body changed, and b, unchanged. So n, a node of
-// U, is drawn editable under x and write-protected under y.
+// U, is shown editable under x and write-protected under y.
 
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
@@ -30,7 +30,7 @@ use std::net::TcpStream;
 const N_UNDER_Y : &str = "** (skg (node (id n) (repo main) writeProtected ";
 
 /// 'buffer' with the first line at 'depth' (its leading stars) that
-/// draws 'node' editable made write-protected, without its body, and
+/// shows 'node' editable made write-protected, without its body, and
 /// its child vognodes made non-members, since a write-protected
 /// occurrence holds none.
 fn write_protecting_at (
@@ -103,7 +103,7 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
   with_fixture ("shared", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let b_under_x : usize = buffer . find ("*** (skg (node (id b) ")
-      . expect ("b is drawn under n under x");
+      . expect ("b is shown under n under x");
     let created : String = save ( f, &format! (
       "{}**** (skg (node (id c) (repo main))) c\n{}",
       &buffer [.. b_under_x], &buffer [b_under_x ..] )) ? . saved_view;
@@ -134,7 +134,7 @@ fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
     let registered : ViewForest = the_registered_viewforest (f);
     let n_under_y_line : &str = buffer . lines ()
       . find ( |line| line . starts_with (N_UNDER_Y) )
-      . expect ("n is drawn write-protected under y");
+      . expect ("n is shown write-protected under y");
     let typing = |child : &str| -> String {
       buffer . replacen ( n_under_y_line,
                           &format! ("{}\n{}", n_under_y_line, child), 1 ) };
@@ -158,7 +158,7 @@ fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
 
 /// Write-protecting n under x (its children becoming non-members)
 /// while requesting n under y moves editability there: n is editable
-/// under y and write-protected under x, and a is drawn once under each.
+/// under y and write-protected under x, and a is shown once under each.
 #[test]
 fn write_protecting_one_occurrence_and_requesting_another_moves_editability (
 ) -> Result<(), Box<dyn Error>> {
@@ -173,7 +173,7 @@ fn write_protecting_one_occurrence_and_requesting_another_moves_editability (
     assert! ( saved . find ("* (skg (node (id x) ")
               < saved . find ("* (skg (node (id y) ")
               && n_lines . len () == 2,
-              "n must be drawn under x, then under y:\n{}", saved );
+              "n must be shown under x, then under y:\n{}", saved );
     assert! ( n_lines [0] . contains ("writeProtected"), "{}", saved );
     assert! ( ! n_lines [1] . contains ("writeProtected"), "{}", saved );
     assert_eq! ( node_lines (&saved, "a") . len (), 2, "{}", saved );
@@ -241,7 +241,7 @@ fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
 
 /// c, typed under n under x and so created, carries presence facts. A
 /// write-protect request on n under x and an editable-view request
-/// on n under y, in one save, move editability: a, b and c are drawn
+/// on n under y, in one save, move editability: a, b and c are shown
 /// once under x, as non-members, c keeping its presence facts, and
 /// editable under y. An editable-view request on n under x moves it
 /// back: n under x adopts them as its members again.
@@ -251,12 +251,12 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
   with_fixture ("shared", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let b_under_x : usize = buffer . find ("*** (skg (node (id b) ")
-      . expect ("b is drawn under n under x");
+      . expect ("b is shown under n under x");
     let created : String = save ( f, &format! (
       "{}*** (skg (node (id c) (repo main))) c\n{}",
       &buffer [.. b_under_x], &buffer [b_under_x ..] )) ? . saved_view;
     assert! ( node_lines (&created, "c") [0] . contains ("(diff "), "{}", created );
-    // c, new, draws its containers, so n and its content recur deeper.
+    // c, new, shows its containers, so n and its content recur deeper.
     let at_depth = |buffer : &'_ str, stars : &str, node : &str| -> Vec<String> {
       node_lines (buffer, node) . into_iter ()
         . filter ( |line| line . starts_with (&format! ("{} (skg ", stars)) )
@@ -282,7 +282,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
                 && lines [0] . contains ("(affectsParent false)")
                 && lines [0] . contains ("writeProtected")
                 && ! lines [1] . contains ("affectsParent"),
-                "{} must be drawn once under each n:\n{}", child, moved ); }
+                "{} must be shown once under each n:\n{}", child, moved ); }
     assert! ( at_depth (&moved, "***", "c") [0] . contains ("(diff "),
               "c keeps its presence facts under x:\n{}", moved );
     let moved_back : String = save (
@@ -301,7 +301,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
     Ok (( )) }) }
 
 /// In the 'kinds' fixture the worktree removed sub's subscription to
-/// s1, so the buffer draws s1's subscriber folder holding sub as a
+/// s1, so the buffer shows s1's subscriber folder holding sub as a
 /// removed member, a non-member marked '(diff (presence rel-))'. Write-protected,
 /// s1 saves unchanged: the check of a write-protected occurrence's
 /// partner folders counts only members.
@@ -333,7 +333,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
               "{}", response . saved_view );
     Ok (( )) }) }
 
-/// The kinds buffer's line drawing ctx, unchanged and write-protected
+/// The kinds buffer's line showing ctx, unchanged and write-protected
 /// in ct's content, with 'replace' applied to it.
 fn editing_ctx (
   buffer  : &str,
@@ -342,11 +342,11 @@ fn editing_ctx (
   let ctx : &str = buffer . lines ()
     . find ( |line| line . starts_with (
       "** (skg (node (id ctx) (repo public) writeProtected ") )
-    . expect ("ctx is drawn write-protected in ct's content");
+    . expect ("ctx is shown write-protected in ct's content");
   buffer . replacen ( ctx, &replace (ctx), 1 ) }
 
-/// In the 'kinds' fixture ctx, unchanged, is drawn write-protected in
-/// ct's content. Drawn there with another home skgrepo, it is
+/// In the 'kinds' fixture ctx, unchanged, is shown write-protected in
+/// ct's content. Shown there with another home skgrepo, it is
 /// refused, naming the home skgrepo.
 #[test]
 fn a_writeProtected_occurrence_with_another_home_skgrepo_is_refused (
@@ -408,7 +408,7 @@ fn an_adopted_child_moves_into_content_order (
     let buffer : String = open_all_changes_buffer (f) ?;
     let n_under_y_line : &str = buffer . lines ()
       . find ( |line| line . starts_with (N_UNDER_Y) )
-      . expect ("n is drawn write-protected under y");
+      . expect ("n is shown write-protected under y");
     let typed : String = buffer . replacen ( n_under_y_line, &format! (
       "{}\n{}\n{}", n_under_y_line,
       "*** (skg folded (node (id b) (repo main) (affectsParent false) writeProtected)) b",

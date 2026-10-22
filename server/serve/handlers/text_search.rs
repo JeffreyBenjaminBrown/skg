@@ -602,7 +602,7 @@ pub fn group_matches_by_skgid (
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
 /// the node it overrides. Reachability follows relRepo-visible
-/// outbound overrides, matching what the role graft will actually draw.
+/// outbound overrides, matching what the role graft will actually show.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
 /// owned overrider that matched the query but ranks past the
 /// display limit could suppress its target without itself being shown

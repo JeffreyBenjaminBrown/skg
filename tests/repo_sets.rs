@@ -99,9 +99,9 @@ fn all_tests
       Ok (( )) } )) }
 
 /// PIN (the override-substitution-across-switch case discussed in
-/// TODO/strip-restricted-node-fields-progress.org): a drawn override
+/// TODO/strip-restricted-node-fields-progress.org): a shown override
 /// substitute whose skgrepo goes restricted on a skgrepo-set switch
-/// becomes an anonymous bare-atom 'restrictedNode'; the rerender draws the
+/// becomes an anonymous bare-atom 'restrictedNode'; the rerender shows the
 /// original directly (a restricted overrider does not substitute) with
 /// NO leak of the overrider's title or id, retaining the overrider's
 /// unrestricted descendant; and the container's contains still saves to the
@@ -126,7 +126,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       (
         skg::test_utils::graph_handle_from_config (config) ? );
 
-      // 1. Under "all", R is drawn in place of N (substitution).
+      // 1. Under "all", R is shown in place of N (substitution).
       let (view_all, _pids, tree_all)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
@@ -138,7 +138,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         view_all );
       assert! (
         view_all . contains ("private overrider title must not leak"),
-        "under 'all' the unrestricted overrider is drawn:\n{}", view_all );
+        "under 'all' the unrestricted overrider is shown:\n{}", view_all );
 
       // 2. Switch to "public": R goes restricted; the view re-renders.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
@@ -174,7 +174,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
             &env, &mut views_state, &mut restriction,
             &enrichment_slot, &search_cancelled); } ); } );
 
-      // 3. The re-rendered view: N drawn directly, R anonymized.
+      // 3. The re-rendered view: N shown directly, R anonymized.
       let view_public : String = {
         let forest = views_state . open_views
           . viewid_to_view (&view_id)
@@ -184,7 +184,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         "the overrider should become an anonymous restricted vognode:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-original"),
-        "the original N should be drawn directly:\n{}", view_public );
+        "the original N should be shown directly:\n{}", view_public );
       assert! (
         ! view_public . contains ("private overrider title must not leak"),
         "the restricted overrider's title must not leak:\n{}", view_public );

@@ -1,20 +1,20 @@
 //! The pruned change view: the viewforest the "all changes" buffer of
-//! the diff view draws ('docs/diff-view.org', "C, R, U and D").
+//! the diff view renders ('docs/diff-view.org', "C, R, U and D").
 //!
 //! C is the set of changed graphnodes. R is the set of content
 //! origins reached from C by walking containerward through the union
 //! of the graph straddle; U is R, C and every node on those walks; D
 //! is R minus the content origins that another kept content origin
 //! reaches containerward inside U. The view extends contentward from
-//! each d in D: a node in U is drawn editable with its whole content
-//! list, a member outside U is a write-protected member drawn without
+//! each d in D: a node in U is shown editable with its whole content
+//! list, a member outside U is a write-protected member shown without
 //! its content. View completion extends the viewforest, its
 //! 'straddle' set ('process_unrestrictedVognode_changes').
 //!
-//! The merges and skgrepo-changes buffers draw pruned change views over
+//! The merges and skgrepo-changes buffers render pruned change views over
 //! subsets of C ('prunedChangeView_sets_for_merges',
 //! 'prunedChangeView_sets_for_skgrepo_changes'). The order-only buffer
-//! draws no pruned change view: it is a flat list of the nodes whose
+//! renders no pruned change view: it is a flat list of the nodes whose
 //! only change is the order of a list.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -74,8 +74,8 @@ impl Default for PrunedChangeViewCache {
 }
 
 /// The sets of the pruned change view that a buffer of the diff view
-/// draws. The order-only buffer draws no pruned change view: its sets
-/// are empty, so each of its roots is drawn with its content as
+/// renders. The order-only buffer renders no pruned change view: its sets
+/// are empty, so each of its roots is shown with its content as
 /// write-protected members without their content. Computed once per
 /// straddle ('PrunedChangeViewCache').
 pub fn prunedChangeView_sets_of_buffer (
@@ -122,7 +122,7 @@ pub fn prunedChangeView_sets_over (
 /// involved in nodeMerges since HEAD: for each acquiree (a node of the
 /// before-graph only, which an after-graph node lists as an extra ID),
 /// the acquiree and its acquirer. The acquiree's text preserver is not
-/// in C; it is drawn as a new member of the acquirer's content.
+/// in C; it is shown as a new member of the acquirer's content.
 pub fn prunedChangeView_sets_for_merges (
   straddle : &GraphStraddle,
 ) -> PrunedChangeViewSets {
@@ -199,7 +199,7 @@ fn kept_content_origins (
       kept . remove (content_origin); }}
   kept . intersection (r) . cloned () . collect () }
 
-/// A buffer of the diff view, drawn: its text, the pids to register
+/// A buffer of the diff view, rendered: its text, the pids to register
 /// it under, and its viewforest.
 pub struct RenderedDiffViewBuffer {
   pub text       : String,
@@ -302,7 +302,7 @@ fn ancestor_letter (
 
 /// The nodes a buffer of the diff view makes editable: those it
 /// has an editable occurrence of, wherever it sits, and the deleted
-/// nodes it draws as historical phantoms in content position. A
+/// nodes it shows as historical phantoms in content position. A
 /// historical phantom in content position counts, since its old
 /// content is editable nowhere and shown there. The change-forest
 /// leaves these nodes record are the changes editable in the buffer.
@@ -321,7 +321,7 @@ pub fn nodes_editable_in_diffView (
     . collect () }
 
 /// The stub the pruned change view's view completion starts from: each
-/// root drawn as 'append_stub_root' draws one.
+/// root as 'append_stub_root' appends it.
 fn stub_viewforest_of_roots (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -337,11 +337,11 @@ fn stub_viewforest_of_roots (
   Ok (viewforest) }
 
 /// Append 'root' to the viewforest as an editable stub, or, when the
-/// after-graph lacks it, as a historical phantom, whose visit draws its
+/// after-graph lacks it, as a historical phantom, whose visit adds its
 /// old content. In a pruned change view, a multiply-contained root gets
 /// a folded container folder, which completion fills with its
 /// containers in either graph and their containerward forest. The
-/// order-only buffer, a flat list, draws none. Returns the root's
+/// order-only buffer, a flat list, gets none. Returns the root's
 /// treeid.
 fn append_stub_root (
   runtime              : &RuntimeGeneration,
@@ -372,7 +372,7 @@ fn append_stub_root (
   Ok (root_treeid) }
 
 /// The content origins in D, of the buffer's sets recomputed after
-/// the save, that no viewnode in it draws, in ID order. The recomputed
+/// the save, that it makes editable nowhere, in ID order. The recomputed
 /// R is deduplicated with the buffer's 'standing_roots' pinned as
 /// kept, so that a change to a rootlike cycle's membership never adds
 /// a second root for a cycle that already stands.
@@ -386,15 +386,15 @@ pub fn contentOrigins_missing_from_buffer (
     prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind);
   let containers_of = |skgid : &ID| -> Vec<ID> {
     union_containers (straddle, skgid) };
-  let drawn : HashSet<ID> = nodes_editable_in_diffView (viewforest);
+  let editable : HashSet<ID> = nodes_editable_in_diffView (viewforest);
   kept_content_origins (&sets . r, &sets . u, &containers_of, standing_roots)
     . into_iter ()
-    . filter ( |content_origin| ! drawn . contains (content_origin)
+    . filter ( |content_origin| ! editable . contains (content_origin)
                                 && ! standing_roots . contains (content_origin) )
     . collect () }
 
-/// Append 'content_origins' at the end of the buffer, each drawn as the first
-/// drawing draws a root ('append_stub_root'), for view completion to
+/// Append 'content_origins' at the end of the buffer, each stubbed as the first
+/// rendering stubs a root ('append_stub_root'), for view completion to
 /// complete. Returns their treeids.
 pub fn append_contentOrigins_to_buffer (
   runtime              : &RuntimeGeneration,
@@ -426,7 +426,7 @@ pub fn root_skgids_of_buffer (
 /// stands, at its BFS-first content occurrence (a root, a member of
 /// a vognode's content, or a removed member), or if it has none at its BFS-first
 /// folder occurrence, with its body from the live graph, as a freshly
-/// drawn editable viewnode has it. Completion then draws its content
+/// created editable viewnode has it. Completion then extends its content
 /// list. A node of U with no occurrence is reached through the node
 /// above it on its walk, once that one is editable.
 pub fn ensure_editableOccurrences_exist (

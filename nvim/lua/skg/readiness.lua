@@ -133,7 +133,7 @@ function M.objects_ready_p (metadata_sexp, objects)
 end
 
 ---@param metadata_sexp any
----@return boolean is it a folder drawn because of a change?
+---@return boolean is it a folder shown because of a change?
 function M.changed_folder_p (metadata_sexp)
   for i = 2, #metadata_sexp do
     local head = head_name(metadata_sexp[i])

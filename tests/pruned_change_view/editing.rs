@@ -1,5 +1,5 @@
 // Editing a buffer of the diff view like any view: what the
-// user may change, what the save refuses, and what is redrawn. The
+// user may change, what the save refuses, and what is rerendered. The
 // 'kinds' fixture is described in 'buffer.rs'. The 'overrides'
 // fixture: r overrides n, and p, which contains n, is retitled.
 
@@ -28,7 +28,7 @@ use std::io::BufReader;
 use std::net::TcpStream;
 
 /// Deleting the changed ID folders changes nothing: the save writes
-/// no file, and the reconciled buffer draws the folders again.
+/// no file, and the reconciled buffer shows the folders again.
 #[test]
 fn a_deleted_id_folder_respawns (
 ) -> Result<(), Box<dyn Error>> {
@@ -44,7 +44,7 @@ fn a_deleted_id_folder_respawns (
     assert_eq! ( skg_files (f) ?, files_before,
                  "deleting the ID folder must change no file" );
     assert_eq! ( response . saved_view, buffer,
-                 "the ID folder must be drawn again" );
+                 "the ID folder must be shown again" );
     Ok (( )) }) }
 
 /// Deleting an entry of the changed ID folder, while keeping the
@@ -69,7 +69,7 @@ fn editing_the_id_folder_aborts_the_save (
 
 /// A save does not restore a removed alias: ali's removed alias a1
 /// is not an alias, so ali keeps a2 and a3, and the reconciled buffer
-/// draws a1 as removed again.
+/// shows a1 as removed again.
 #[test]
 fn a_removed_alias_is_not_restored_by_a_save (
 ) -> Result<(), Box<dyn Error>> {
@@ -108,7 +108,7 @@ fn a_removed_id_does_not_abort_the_save (
 /// Deleting the save-inert images of removed things changes nothing:
 /// k1, removed from ct's content (an editable non-member, deleted
 /// with what it holds), and gone, a deleted subscriber of orph. Both
-/// are drawn again where they stood.
+/// are shown again where they stood.
 #[test]
 fn deleted_images_of_removed_members_respawn (
 ) -> Result<(), Box<dyn Error>> {
@@ -124,11 +124,11 @@ fn deleted_images_of_removed_members_respawn (
     assert_eq! ( skg_files (f) ?, files_before,
                  "deleting a save-inert image must change no file" );
     assert_eq! ( response . saved_view, buffer,
-                 "both removed members must be drawn again" );
+                 "both removed members must be shown again" );
     Ok (( )) }) }
 
 /// A child added under an editable node of the buffer is created on
-/// disk, and the reconciled buffer draws it as new, in a new
+/// disk, and the reconciled buffer shows it as new, in a new
 /// relationship.
 #[test]
 fn a_new_child_is_created_and_shown_as_new (
@@ -151,7 +151,7 @@ fn a_new_child_is_created_and_shown_as_new (
       line . starts_with ( &format! ("** (skg (node (id {})", new_child . 0) )
       && line . contains ("(diff (presence node+ rel+)")
       && line . ends_with ("a new child") ),
-      "the new child must be drawn as new:\n{}", response . saved_view );
+      "the new child must be shown as new:\n{}", response . saved_view );
     Ok (( )) }) }
 
 /// When another view's save changes what a buffer of the diff
@@ -188,7 +188,7 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
     assert! ( collateral . lines () . any ( |line|
       line . contains ("(diff (presence node+ rel+)")
       && line . ends_with ("a new child") ),
-      "the new child must be drawn as new:\n{}", collateral );
+      "the new child must be shown as new:\n{}", collateral );
     assert! ( collateral . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
               "txt's old text must stay:\n{}", collateral );
     assert! ( collateral . contains ("(diff (presence rel-) (leaves 1 rel)))) k1"),
@@ -208,7 +208,7 @@ fn register_content_view_of (
   Ok (text) }
 
 /// The diff view shows the graph as stored: a member that an
-/// overrider would replace in an ordinary view is drawn as itself.
+/// overrider would replace in an ordinary view is shown as itself.
 #[test]
 fn override_substitution_is_off (
 ) -> Result<(), Box<dyn Error>> {
@@ -216,12 +216,12 @@ fn override_substitution_is_off (
     let (ordinary_view, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("p") ] ) ?;
     assert! ( ordinary_view . contains ("(overridesHere n)"),
-              "precondition: an ordinary view of p draws r for n:\n{}",
+              "precondition: an ordinary view of p shows r for n:\n{}",
               ordinary_view );
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( buffer . lines () . any ( |line|
                 line . starts_with ("** (skg (node (id n)") ),
-              "n must be drawn as itself under p:\n{}", buffer );
+              "n must be shown as itself under p:\n{}", buffer );
     assert! ( ! buffer . contains ("overridesHere"),
-              "no member is drawn in place of another:\n{}", buffer );
+              "no member is shown in place of another:\n{}", buffer );
     Ok (( )) }) }

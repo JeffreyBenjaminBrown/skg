@@ -9,7 +9,7 @@ use crate::types::misc::ID;
 
 /// A *branching graphnode* has more than one partner in the direction
 /// walked: walking containerward, more than one container -- it is
-/// "containerward-branching". (Once drawn, it becomes a branching
+/// "containerward-branching". (Once rendered, it becomes a branching
 /// viewnode.) Most paths probably end without a branching graphnode or
 /// a cycle, but the same path can actually end in both: if it ends in a
 /// branching graphnode, any of its branches might be cycles.

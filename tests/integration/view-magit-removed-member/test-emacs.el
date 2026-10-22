@@ -28,7 +28,7 @@
   "Report test success."
   (apply #'message (concat "✓ PASS: " message) args))
 
-;;; The line of the diff view's "all changes" buffer that draws
+;;; The line of the diff view's "all changes" buffer that shows
 ;;; b as a removed member of a.
 (defconst test-removed-member-line-regexp
   "(id b).*(diff (presence rel-)")

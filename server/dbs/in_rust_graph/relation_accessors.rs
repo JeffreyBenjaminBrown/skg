@@ -311,7 +311,7 @@ impl InRustGraph {
   /// unresolved. A mention's relRepo is the recorder's home, because
   /// links live in the text. Members whose relRepo is outside the
   /// skgrepo restriction are left out; pass None for every member.
-  /// Drawing code reads the tag (an unresolved member is drawn as an
+  /// Rendering code reads the tag (an unresolved member is shown as an
   /// unknown phantom); comparisons take the ID from either variant.
   pub fn outbound_member_keys_for_relation_gated (
     &self,

@@ -200,7 +200,7 @@ pub(crate) fn stream_prepared_rerenders (
         &prepared . warnings) )); }
 
 /// Keep the graph straddle a rerender brought up to date as the
-/// connection's. A rerender that drew no buffer of the diff view
+/// connection's. A rerender that rendered no buffer of the diff view
 /// built none, and leaves the connection's as it was.
 pub(crate) fn write_graph_straddle_back (
   views_state    : &mut ViewsState,

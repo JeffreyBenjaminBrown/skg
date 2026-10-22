@@ -6,10 +6,10 @@
 // R hides H, E contains G and H. Extended with X overriding G, so
 // the no-cascade decision is observable:
 // - extending E under the subscribeeFolder applies R's hides (no H)
-//   and the GENERAL substitution rule (G draws as X, marked);
+//   and the GENERAL substitution rule (G is shown as X, marked);
 // - extending E under the overriddenFolder applies neither: full
 //   contains, raw G and raw H -- the user asked for the original.
-// The folder members themselves (each E copy) always draw raw: folders
+// The folder members themselves (each E copy) are always shown raw: folders
 // never substitute.
 
 use std::error::Error;
@@ -143,7 +143,7 @@ async fn subscribee_as_such_extension_hides_and_substitutes (
                   && l . contains ("(overridesHere G)")
                   && l . contains ("(id X)") ),
         "the general rule applies below a subscribee-as-such: \
-         G draws as X, marked:\n{}", view );
+         G is shown as X, marked:\n{}", view );
       assert! ( ! tagged . iter () . any ( |(c, l)|
                   *c == "subscribeeFolder"
                   && l . contains ("(id H)") ),
@@ -170,12 +170,12 @@ async fn overridden_as_such_extension_is_raw_and_unhidden (
                   *c == "overriddenFolder"
                   && l . contains ("(id G)")
                   && ! l . contains ("overridesHere") ),
-        "the bypass: G draws RAW (not as X) below an \
+        "the bypass: G is shown RAW (not as X) below an \
          overridden-as-such:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "overriddenFolder"
                   && l . contains ("(id H)") ),
-        "no hides apply: H draws below the overridden-as-such \
+        "no hides apply: H is shown below the overridden-as-such \
          (hides are scoped to subscriptions):\n{}", view );
       assert! ( ! view . contains ("(id X)"),
         "X appears nowhere in this extension:\n{}", view );
@@ -196,7 +196,7 @@ async fn folder_members_never_substitute (
         "(affectsParent na) (viewRequests (folder overrides))" );
       let view : String =
         save_and_rerender (&request, config, tantivy) . await ?;
-      // R overrides E, yet both folder copies of E draw raw: the
+      // R overrides E, yet both folder copies of E are shown raw: the
       // subscribeeFolder shows the graph fact "R subscribes to E" and
       // the overriddenFolder shows "R overrides E"; substituting
       // inside either would obscure the fact displayed.

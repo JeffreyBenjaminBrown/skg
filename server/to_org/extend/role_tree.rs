@@ -1,7 +1,7 @@
 /// PURPOSE: "Integrate" a role tree into a Viewnode tree (see "role
 /// tree" in docs/glossary.org). Its nodes other than the origin are
 /// role grafts.
-/// PITFALL: The tree is drawn as paths to their first nonlinearity
+/// PITFALL: The tree is extended as paths to their first nonlinearity
 /// (server/dbs/in_rust_graph/paths.rs): each follows single partners
 /// until it branches, then includes the first layer of branches (so the
 /// path's last viewnode is a branching viewnode: one with several
@@ -32,14 +32,14 @@ use std::error::Error;
 
 
 /// Where the role-tree engine finds a node's partners: in the live
-/// graph, or in the union of a graph straddle, so the same engine draws a
+/// graph, or in the union of a graph straddle, so the same engine extends a
 /// role tree over either. Viewnodes are built from the live graph
 /// either way.
 #[derive(Clone, Copy)]
 pub enum RoleTreePartners<'a> {
   /// The role tree's steps see only what the skgrepo restriction
   /// does; the containerward trees attached beneath are walked
-  /// ungated, and gated where they are drawn.
+  /// ungated, and gated where they are shown.
   LiveGraph,
   GraphStraddle (&'a GraphStraddle),
 }

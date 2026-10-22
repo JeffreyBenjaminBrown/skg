@@ -463,8 +463,8 @@ fn content_members (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
         if unrestricted_child_counts_as_content (t) {
           contents . push ((
-            // collected_id, not id: a drawn overrider stands for
-            // the original member it was drawn in place of.
+            // collected_id, not id: a shown overrider stands for
+            // the original member it is shown in place of.
             t . collected_skgid (),
             t . relRepo_request . clone() )); }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
@@ -490,7 +490,7 @@ fn visible_content_members (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if unrestricted_child_counts_as_visible_content (t) => {
         visible . push (
-          // collected_id: a drawn overrider presents the original,
+          // collected_id: a shown overrider presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_skgid ()); },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>

@@ -69,7 +69,7 @@ pub fn handle_diffView_request (
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }
 
-/// The named buffer, drawn from 'straddle'. The "all changes" buffer is
+/// The named buffer, rendered from 'straddle'. The "all changes" buffer is
 /// the pruned change view over all of C; the merges and skgrepo-changes
 /// buffers are pruned change views over subsets of it
 /// ('prunedChangeView_sets_of_buffer'). The order-only buffer lists the

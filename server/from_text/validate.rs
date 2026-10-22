@@ -35,7 +35,7 @@ pub fn validate_and_filter_foreign_instructions(
   instructions       : Vec<NodeInstruction>,
   nodeMerge_instructions : &[NodeMerge],
   graph              : &InRustGraph,
-  clone_skgrepo_inputs : &CloneSkgrepoInputs, // everything clone-repo resolution can draw on, in priority order
+  clone_skgrepo_inputs : &CloneSkgrepoInputs, // everything clone-repo resolution can use, in priority order
   adopt_clone_skgrepo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
   config             : &SkgConfig,
 ) -> Result<(Vec<NodeInstruction>, Vec<ForkSpec>),

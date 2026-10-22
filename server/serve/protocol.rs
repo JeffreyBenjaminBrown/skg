@@ -112,7 +112,7 @@ pub enum TcpToClient {
   DeleteReferencesResult,
   DiffView, // One buffer of the diff view, or '(empty . t)' when that buffer would show nothing.
   StageAndCommit, // The per-skgrepo git-commits, or the readiness summary with '(needs-confirmation . t)'. A rerender stream follows.
-  IntegrateUnshownChanges, // The readiness summary of the buffer of the diff view redrawn with every change editable, or a refusal. A rerender stream follows.
+  IntegrateUnshownChanges, // The readiness summary of the buffer of the diff view rerendered with every change editable, or a refusal. A rerender stream follows.
   InvestigateUnknownNode, // What git history says an unknown node used to be, or the node an ID resolves to, as Org text.
   ServerWarnings, // What the server warned about as it started, '(warnings ("..." ...))'. Each client asks once per connection.
   Error,

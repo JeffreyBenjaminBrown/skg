@@ -2,9 +2,9 @@
 
 # Integration test for the MOTIVATING override-chain case (the crux of
 # the override-chains arc): fork a FOREIGN node into a public clone, then
-# explicitly fork that clone (the drawn substitute) into a PRIVATE clone.
+# explicitly fork that clone (the shown substitute) into a PRIVATE clone.
 # The result is an owned chain D overrides C overrides N; viewing N's
-# container draws the chain end D, marked (overridesHere N), and the save
+# container shows the chain end D, marked (overridesHere N), and the save
 # accepts the chain-end carrier.
 #
 # Repos: public + private (owned) and foreign.

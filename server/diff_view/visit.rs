@@ -7,12 +7,12 @@
 //! - at an editable node's visit, its children are aligned with the
 //!   straddle before the content reconciler runs
 //!   ('align_content_members_with_straddle');
-//! - content is drawn without override substitution;
+//! - content is shown without override substitution;
 //! - the property folders are skipped at their own visits: the
 //!   per-visit step reconciles the alias, ID and flags folders from
 //!   the straddle;
 //! - a deleted phantom whose node the before-graph has becomes its
-//!   historical phantom, and each historical phantom's visit draws
+//!   historical phantom, and each historical phantom's visit adds
 //!   its old content ('process_historical_phantom_visit');
 //! - no default partner folders and no hidden-in-subscribee folder
 //!   are created;
@@ -20,7 +20,7 @@
 //!   request makes outside U ('VisitSettings::charges_node_budget');
 //! - each unrestricted vognode's visit ends with the per-visit step
 //!   ('process_unrestrictedVognode_changes');
-//! - the partner folders draw the union of the straddle (the
+//! - the partner folders show the union of the straddle (the
 //!   Subscribee folder too, through the generic folder reconciler).
 //! The caller then sets the readiness facts
 //! ('set_diffView_facts_in_viewforest').
@@ -57,7 +57,7 @@ pub struct VisitSettings<'a> {
   /// now an editable vognode: visit it as one.
   pub visit_as_unrestrictedVognode        : bool,
   /// Whether the Subscribee folder has its own reconciler. In the
-  /// diff view the generic partner-folder reconciler draws it.
+  /// diff view the generic partner-folder reconciler fills it.
   pub subscribeeFolder_has_own_reconciler : bool,
   pub partnerFolder_goal_source           : PartnerFolderGoalSource<'a>,
   /// False in the diff view: it shows raw graph facts.
@@ -65,7 +65,7 @@ pub struct VisitSettings<'a> {
   /// Whether default partner folders and the hidden-in-subscribee
   /// folder may be created. Not in the diff view.
   pub default_folders_allowed             : bool,
-  /// In the diff view, U of the buffer being drawn.
+  /// In the diff view, U of the buffer being rendered.
   diffView_u             : Option<&'a BTreeSet<ID>>,
   /// In the diff view, the straddle an editable node's members are
   /// aligned with before the content reconciler runs.
@@ -87,7 +87,7 @@ pub enum NormalNodeUpdate {
 /// The diff view's part of a visit, before the node extends: outside
 /// the diff view, nothing but the ordinary settings. In it, a
 /// property folder's visit is done (the per-visit step reconciles it);
-/// a historical phantom draws its old content, and is then visited as
+/// a historical phantom adds its old content, and is then visited as
 /// an editable vognode only if its node is back.
 pub fn diffView_visit_before_extension<'a> (
   tree                       : &mut Tree<Viewnode>,
@@ -109,7 +109,7 @@ pub fn diffView_visit_before_extension<'a> (
   let visit_as_unrestrictedVognode : bool = match kind {
     ViewnodeKind::PropertyFolder (_) =>
       return Ok (DiffViewVisit::Done),
-    // A historical phantom where content stands draws its old content.
+    // A historical phantom where content stands adds its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {
       if process_historical_phantom_visit (
            tree, treeid, straddle, diffView_buffer_kind ) ?
@@ -128,7 +128,7 @@ pub fn diffView_visit_before_extension<'a> (
     straddle_to_align_with              : Some (straddle), } )) }
 
 /// The diff view's part at the end of an unrestricted vognode's visit:
-/// a node this save deleted that HEAD has is drawn as history; one
+/// a node this save deleted that HEAD has is shown as history; one
 /// still unrestricted gets the per-visit step. Nothing outside the
 /// diff view.
 pub fn diffView_visit_after_extension (
@@ -150,7 +150,7 @@ pub fn diffView_visit_after_extension (
           tree, treeid, straddle, diffView_buffer_kind ) ?; },
     NormalNodeUpdate::NoLongerUnrestricted => {},
     NormalNodeUpdate::Updated =>
-      // Tag the content, draw what was removed, and add the change
+      // Tag the content, show what was removed, and add the change
       // folders, markers and properties.
       process_unrestrictedVognode_changes (
         tree, treeid, straddle, diffView_buffer_kind,
@@ -176,7 +176,7 @@ impl<'a> VisitSettings<'a> {
       Some (u) => had_editableViewRequest && ! u . contains (pid), } }
 
   /// In the diff view, align an editable node's members with the
-  /// straddle, after the draw rule settles its editability and before
+  /// straddle, after the editability rule settles its editability and before
   /// the content reconciler runs ('align_content_members_with_straddle').
   pub fn align_content_members_before_extension (
     &self,

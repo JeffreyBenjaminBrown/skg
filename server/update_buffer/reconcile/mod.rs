@@ -20,7 +20,7 @@ use crate::types::misc::{ID, SkgrepoName};
 /// member whose skgrepo cannot be resolved is omitted too: it might be
 /// private, and rendering must not leak; saving preserves it
 /// regardless (the weave / set-difference merge treat unresolvable as
-/// invisible).  A retained restricted vognode (one already drawn,
+/// invisible).  A retained restricted vognode (one already rendered,
 /// kept because it hosts unrestricted descendants after a skgrepo-set
 /// reduction) does NOT come back through the goal list: each
 /// reconciler treats it as an unmanaged child, preserved as-is.

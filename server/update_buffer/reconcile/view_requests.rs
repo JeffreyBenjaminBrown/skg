@@ -58,7 +58,7 @@ pub fn ensure_hiddenInFolder_under_editable_subscribee (
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles
-/// every Editable request at the node's own visit (the draw rule; see 'to_org/extend/editable.rs'), so
+/// every Editable request at the node's own visit (the editability rule; see 'to_org/extend/editable.rs'), so
 /// only Folder/Path requests should remain here; execute_view_requests
 /// errors loudly if a Editable one survives.
 fn extract_view_requests (

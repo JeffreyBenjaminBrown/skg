@@ -37,7 +37,7 @@ the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
 connection currently shows; the skgrepo-set =all= means no
 restriction. A skgrepo inside it is *unrestricted*, one outside it
-*restricted*, and so are their nodes: an unrestricted vognode is drawn
+*restricted*, and so are their nodes: an unrestricted vognode is shown
 in full, a restricted one only as an anonymous placeholder
 (=restrictedNode=).
 
@@ -129,7 +129,7 @@ the property "⌂ -OLD +NEW" under the node, a relRepo move as the
 property "relationship moved from OLD to NEW" under the member, keyed
 by the relationship, so the same move seen from either end is the
 same leaf. A relRepo move puts only the recorder in C. The
-skgrepo-changes buffer of the diff view draws the nodes whose home
+skgrepo-changes buffer of the diff view shows the nodes whose home
 skgrepo moved and the recorders of the relationships whose relRepo
 moved, each with all of its changes. Say "home skgrepo move", not
 "home move".
@@ -321,7 +321,7 @@ policies in different layers:
   =subscriberFolder=, =overriderFolder=, =hiderFolder= and
   =containerFolder= and =mentionerFolder= (the folders of =C-c l c= and
   =C-c l m=; the other side of each is the node's content, or its
-  links, drawn without a folder), the outbound =hiddenFolder=, and the
+  links, shown without a folder), the outbound =hiddenFolder=, and the
   diff view's =acquiredByFolder= and =acquiredFolder=, which are
   derived from the graph straddle and save-inert.
 - *WriteProtectedFilter* (=hiddenInSubscribeeFolder=): membership is
@@ -358,13 +358,13 @@ membership is generated and ordered, so a note you park inside a folder is
 kept but visibly separated from the live membership.
 
 *** role tree, role graft, and the -ward adjectives
-A *role tree* is drawn under a node, its origin, by following one
+A *role tree* is extended under a node, its origin, by following one
 relation role away from it: under the origin go the nodes playing that
 role toward it, under each of those the nodes playing the role toward
 them, and so on. A role, unlike a relation, is directed, so the tree
-goes one way. A role-tree request '(roleTree ROLE)' draws one (e.g.
-'skg-show-mentionerward-tree'); search enrichment draws containerward
-and override role trees under results. A role tree drawn on request
+goes one way. A role-tree request '(roleTree ROLE)' extends one (e.g.
+'skg-show-mentionerward-tree'); search enrichment extends containerward
+and override role trees under results. A role tree extended on request
 follows single partners until a node has several, then includes that
 first layer; a full containerward role tree ('ContainerwardRoleTree')
 goes as deep as 'max_roleTree_depth'.
@@ -401,11 +401,11 @@ not confuse it with a *branch*: any viewnode together with its
 descendants, which may be degenerate, its root having one viewchild
 or none.
 
-A role tree is drawn as paths that each end at their first
+A role tree is extended as paths that each end at their first
 "nonlinearity" ('PathToFirstNonlinearity'): a cycle, or a node with
-several partners in the direction walked, which the drawn path shows
+several partners in the direction walked, which the path shows
 as a branching viewnode. (The path code, which walks the graph before
-anything is drawn, calls that node a *branching graphnode*: one with
+anything is rendered, calls that node a *branching graphnode*: one with
 several partners in the direction walked, e.g. containerward-branching.) None of this is
 related to forking a node, below.
 
@@ -415,7 +415,7 @@ To *fork* a node N is to turn it into an editable *clone* C in a
 skgrepo you own. C copies N's title, body, and child-list (the child IDs
 only — shallow), =subscribesTo= N (so N's later additions surface to C
 as unintegrated subscribed content) and =overrides= N (so
-override substitution draws C wherever N would appear). Children of N
+override substitution shows C wherever N would appear). Children of N
 that the forking edit deleted become C's
 =hidesFromSubs=, and thereafter any child removed from
 an owned subscriber's contains that some subscribee still contains is
@@ -538,6 +538,14 @@ When a save changes nodes that other open views show, those views are
 other open view; the collateral views are the subset that needs a
 rerender.
 
+*** startup warnings channel
+
+How the server's startup warnings reach the user: 'load_config'
+returns warnings beside the config, 'main' records them once on the
+runtime ('record_startup_warnings' in 'server/types/env.rs'), the
+server serves them on request ("server warnings"), and each client
+shows them in its '*SKG Server Warnings*' buffer on connect.
+
 *** mk = make / create
 
 *** "merge" is always qualified: nodeMerge vs instructionMerge
@@ -584,7 +592,7 @@ someday let the second member record one; 'RecorderwardRelmap' in
 How far up the view an ancestor is: 1 is the viewparent, 2 the
 grandparent, counting folders. The '(rels ...)' form's '(ancestors GEN
 ...)' and a birth fact's GEN are ancestor generations, and heralds
-draw them as a, b, ... z, then {27}. A tree's plain "generation",
+show them as a, b, ... z, then {27}. A tree's plain "generation",
 counting down from its root, is the opposite direction.
 
 *** "commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit
@@ -612,22 +620,22 @@ but might not, is maybe-placed.
 *** override substitution, and the vocabulary around it
 
 When view completion would CREATE a viewnode for node N as
-recursive content, it draws the EFFECTIVE OVERRIDER of N instead:
+recursive content, it shows the EFFECTIVE OVERRIDER of N instead:
 the end of the chain of owned, currently-VISIBLE
 'overrides' relationships leading out of N. The chain is often one
 relationship, but may be longer (an owned chain D overrides C overrides
 N is legal; only a cycle is forbidden), and visibility gating can
 stop it at a MIDDLE node when a later link's mentioner is restricted --
-so the drawn node is the last visible link, not necessarily the
+so the shown node is the last visible link, not necessarily the
 chain's end. The resolver is 'resolve_override' in
 'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override
 relationships are display-only facts and never substitute.
 
-The drawn substitute carries the FACT '(overridesHere N)'
+The shown substitute carries the FACT '(overridesHere N)'
 (the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
 COLLECTED ID is what it contributes to its parent's saved lists:
 the fact's original if present, else its own ID -- so saving a
-view that draws R in place of N keeps N in the parent's contains.
+view that shows R in place of N keeps N in the parent's contains.
 
 An OVERRIDDEN-AS-SUCH is a member child of an overriddenFolder --
 the position that always shows the original; its editable
@@ -635,7 +643,7 @@ extension applies neither the recorder's hides nor substitution to
 its immediate children.
 
 An ordinary single-root visit always opens the requested node itself,
-drawn raw. In enriched search results, each result has an OVERRIDEWARD
+shown raw. In enriched search results, each result has an OVERRIDEWARD
 VIEW-SUBTREE containing its visible override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders and role trees.
@@ -723,7 +731,7 @@ write-protected occurrence shows no body and saves nothing of its own,
 so a save is refused if one differs from the graph (in its title,
 skgrepo, aliases, flags or partner folders) or has a child that
 affects its parent.
-The server leaves no such child under one it draws. A buffer may hold at most one editable occurrence of a node,
+The server adds no such child under one. A buffer may hold at most one editable occurrence of a node,
 so that two occurrences cannot contradict each other. Make one
 editable with =skg-set-editable= (=C-c s d=), which writes a
 =editableView= view request; make one write-protected with
@@ -731,9 +739,28 @@ editable with =skg-set-editable= (=C-c s d=), which writes a
 content subtree), which writes a =writeProtectedView= or
 =writeProtectedSubtreeView= view request.
 
+*** editability rule, editable map
+
+The *editability rule* decides, at each occurrence view completion
+reaches in level order, whether it is editable: an occurrence without
+a request is editable when its node is unclaimed in the *editable
+map* and write-protected when another occurrence claimed it first.
+The editable map is built empty at every completion, and only an
+editable occurrence claims. The module comment of
+'server/to_org/extend/editable.rs' states the whole rule, with the
+cascade and the node budget.
+
+*** view completion, extend, render, rerender
+
+*View completion* extends a viewforest: it adds viewnodes to one that
+stands ('complete_viewforest'). The server *renders* a viewforest when
+it produces its org text ('server/org_to_text.rs'); a *rerender* is the
+request that recompletes a view and sends its text. Org folding keeps
+the words "fold" and "unfold".
+
 *** birth
 
-Why a generated occurrence was drawn under its parent ('Birth' in
+Why a generated occurrence was created under its parent ('Birth' in
 'server/types/viewnode.rs'): either unremarkable, or a role graft naming
 its role. It is view history, used for display and stale-relation
 validation, never by save extraction. The =(rels ...)= form renders it as
@@ -755,7 +782,7 @@ resolves to nothing; see "unknown node"). Phantoms are save-inert.
 An *unknown node* is an ID that some node's contains, subscribesTo,
 hidesFromSubs or overrides list names but that no node of the graph
 answers to, as primary or extra ID; such an ID is *dangling*. A view
-draws it as an unknown phantom ("Reference to unknown node.").
+shows it as an unknown phantom ("Reference to unknown node.").
 The "investigate unknown node" request says what git history knows of
 it, and the delete-references-to-absent-node command removes the
 references.
@@ -783,13 +810,20 @@ changes", "merges", "skgrepo changes" and "order-only changes". Each is
 an ordinary editable view. Foreign skgrepos are excluded; the
 readiness summary only counts their changed files.
 
+*** buffer kind
+
+Which of the four buffers of the diff view a buffer is
+('DiffViewBufferKind'). A buffer of the diff view is rendered over the
+graph straddle; the straddle and the buffer kind are separate fields
+of the completion context.
+
 *** pruned change view
 
-The viewforest the "all changes" buffer draws
-('server/diff_view/pruned_change_view.rs', functions
-'prunedChangeView_...'). The merges and skgrepo-changes buffers draw
-pruned change views over subsets of the changes: the nodeMerges, and the home
-skgrepo and relRepo moves.
+The viewforest the "all changes" buffer renders, defined by the sets
+C, R, U and D (below; 'server/diff_view/pruned_change_view.rs',
+functions 'prunedChangeView_...'). The merges and skgrepo-changes
+buffers render pruned change views over subsets of the changes: the
+nodeMerges, and the home skgrepo and relRepo moves.
 
 *** graph straddle, before-graph, after-graph
 
@@ -830,21 +864,32 @@ an extra ID, a flag, or relRepo.
 
 *** C, R, U, D, content origin
 
-The sets the pruned change view is drawn from. *C* is the set of changed
+The sets the pruned change view is computed from: C, the changed
+nodes; R, the content origins; U, the nodes to extend contentward; D,
+the deduplicated content origins. *C*, the changed nodes, is the set of changed
 graphnodes, in two halves: a node is changed *out* when its own file
 records a change (it is new or deleted, or its text, aliases, extra
 IDs, flags, home skgrepo or own relationships changed), and *in* when
 its recorders' files do (its set of containers, mentioners,
 subscribers, overriders or hiders changed). A node can be both. A
 relRepo move puts only the recorder in C, and a change of order alone
-puts nothing in it. *R* is the set of content origins reached from C
-by walking containerward. A *content origin* is a node with no
+puts nothing in it. *R*, the content origins, is the set of content
+origins reached from C by walking containerward through the union of
+the straddle. A *content origin* is a node with no
 container, a multiply-contained node, or a member of a rootlike cycle
 (the stop rule of 'server/prominence.rs'). *U*, the nodes to
 extend contentward, is R, C and every node on a containerward path
-from a node of C to an origin. *D*, the roots of the "all changes"
-buffer, is R minus the origins that another kept origin reaches
-containerward inside U.
+from a node of C to an origin. *D*, the deduplicated content origins,
+the roots of the "all changes" buffer, is what remains of R when each
+origin, in ID order, is discarded if its own containerward walk within
+U reaches another origin still kept; of two origins on one cycle,
+exactly one is kept.
+
+A user-visible message that must name one of these sets says its long
+name, then the letter in parentheses, then where the algorithm is
+described: "the nodes to extend contentward (U; see
+'docs/diff-view.org', "C, R, U and D", and the module comment of
+'server/diff_view/pruned_change_view.rs')".
 
 *** change-forest, change-forest leaf, recorder of a leaf
 
@@ -868,14 +913,14 @@ the change it approved, and a mark whose fingerprint no longer
 matches the change counts as absent: editing a marked change unmarks
 it. A leaf's *readiness* is whether it is marked.
 
-*** derived commit-readiness aggregate
+*** commit readiness aggregate
 
-An aggregate -- a folder, a changeset marker, a node, a file, the
-whole changeset -- is ready iff every one of its leaves that can be
-ready is ready. That derived value is its *derived commit-readiness
-aggregate*, or "its readiness" where the context is clear. A view
-shows it as '(ready ...)' (in the '(diff ...)' form, or bare on a
-folder), which nothing reads at save.
+A *commit readiness aggregate* is a thing with change-forest leaves
+under it: a folder, a changeset marker, a node, a file, the whole
+changeset. It is ready iff every leaf under it that can be ready is
+ready; that derived value is *its readiness*. A view shows it as
+'(ready ...)' (in the '(diff ...)' form, or bare on a folder), which
+nothing reads at save.
 
 *** changeset marker
 
@@ -891,7 +936,7 @@ content relationships changed skgrepo") and the order-only marker
 A viewnode is in *content position* when its viewparent is the buffer
 root, an unrestricted vognode, or a historical phantom that is itself
 in content position ('in_content_position'). A historical phantom in
-content position draws its old content under it.
+content position holds its old content under it.
 
 *** removed member, former member
 
@@ -907,12 +952,58 @@ relationship, historical phantoms included.
 
 *** change viewnode
 
-A viewnode the diff view draws, at an editable node's visit, to show
+A viewnode the diff view adds, at an editable node's visit, to show
 a change of that node: its old text, its home skgrepo move, its
 changeset markers, its "it acquired" folder, its changed folders, its
 removed members, and, under a member, the relRepo move of the
 member's relationship. A rerender keeps a change viewnode the shallow
 model subtree still produces and detaches the rest.
+
+*** per-visit step
+
+What the diff view does at an editable occurrence's visit, after the
+content reconciler ('process_unrestrictedVognode_changes' in
+'server/diff_view/changes.rs'): it tags the members with their signs,
+adds the removed members, and for a node in C adds its change
+viewnodes.
+
+*** shallow model subtree
+
+The scratch tree a visit builds of what a viewnode should hold, which
+the diff view's reconciler matches the viewnode's children against.
+It is shallow: it includes other vognodes but not what their own
+visits add. A folder's goal list ('FolderGoalItem'), the input of the
+folder reconciler, is a flat list of what each member should be, not
+a tree.
+
+*** reconciler
+
+One of the two functions that bring an editable node's children in
+line with what they should be: the older one
+('complete_managed_children'), which reconciles the content list and
+each folder's members, and the diff view's
+('reconcile_children_with_shallowModelSubtree'), which reconciles the
+change viewnodes, the removed members and what stands below them with
+a shallow model subtree.
+
+*** managed child
+
+A child viewnode that a reconciler created and may detach. A
+reconciler detaches only its managed children, and keeps a stale one
+under which something of the user's stands.
+
+*** the user's viewnode
+
+A viewnode neither reconciler created ('is_the_users_viewnode'): an
+unrestricted vognode born 'Unremarkable', carrying no sign, and not a
+member of the folder it stands in. Its reconciler leaves it where it
+stands.
+
+*** match key
+
+What identifies a viewnode among its siblings for the diff view's
+reconciler ('MatchKey'): the ID it stands for, or, for one that
+stands for no graphnode, its kind.
 
 *** old text
 
@@ -925,7 +1016,7 @@ text.
 
 *** changed folder
 
-A partner, alias, ID or flags folder the diff view draws because its
+A partner, alias, ID or flags folder the diff view shows because its
 membership changed since HEAD. It is written '(FOLDER changed)' in
 place of the bare folder atom, holds the members of either graph
 tagged by presence, and reads "its X changed (this file)" or "(other
@@ -934,7 +1025,7 @@ every changed member is ready, and carries no '(diff ...)'.
 
 *** member role tree
 
-The role tree drawn under each member of a changed partner folder, so
+The role tree extended under each member of a changed partner folder, so
 that the user sees where the member sits: under a container, its
 containerward role tree; under a mentioner, subscriber, overrider or
 hider, the role tree of that role, with a containerward role tree
@@ -953,7 +1044,7 @@ viewparent; b, the grandparent; ...).
 *** removed alias, removed ID
 
 An alias or extra ID of a node that HEAD has and the worktree lacks.
-The diff view draws it in the node's alias or ID folder as its own kind
+The diff view shows it in the node's alias or ID folder as its own kind
 ('Property::RemovedAlias', 'Property::RemovedID'), where the LCS of
 the two lists puts it, with the '-' herald. It is save-inert by kind:
 the save reads no alias from it and does not count it among the
@@ -970,9 +1061,26 @@ marked; a file whose only change is order is ready without marks. The
 summary also counts the changed files of foreign skgrepos and the
 changes not editable in the view.
 
+*** already-staged entry
+
+An entry git's index already holds when stage-and-commit runs, staged
+by a hand or another tool. Stage-and-commit asks for confirmation
+before committing a gitrepo that has one, and the git-commit then
+includes it.
+
+*** editable in the diff view, visible in the diff view
+
+A buffer makes a node's changes *editable* when it holds an editable
+occurrence of the node, wherever it sits, or the node's historical
+phantom in content position ('nodes_editable_in_diffView'). A change
+is *visible* when the buffer shows it, which at a write-protected
+occurrence means the node's signs and what they name (its
+relationship, its existence, or its file as a whole), and nothing
+else of the node. A change can be neither.
+
 *** changes not editable in the view
 
-A buffer *shows a node's changes* when it holds an editable
+A buffer *makes a node's changes editable* when it holds an editable
 occurrence of the node, wherever that sits, or the node's historical
 phantom in content position. The change-forest leaves those nodes
 record are the changes editable in the buffer; the rest are the
@@ -988,6 +1096,13 @@ edits succeed, to set or clear the marks of a headline's leaves. A
 *readiness gesture* is a gesture (C-c r r, C-c r h and their
 recursive forms) that writes readiness requests on one or many
 headlines, then saves.
+
+*** change headline
+
+A headline whose metadata carries a '(leaves ...)' fact. It is ready
+when its '(ready ...)' names every object its '(leaves ...)' lists,
+and otherwise unready. The navigation commands (C-c r n c and its
+kin) move between change headlines.
 
 *** in, out, "(this file)", "(other files)"
 

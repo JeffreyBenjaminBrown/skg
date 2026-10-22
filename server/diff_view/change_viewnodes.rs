@@ -1,4 +1,4 @@
-//! The diff view's own viewnodes, drawn from the graph straddle
+//! The diff view's own viewnodes, made from the graph straddle
 //! ('docs/diff-view.org', "What each kind of change
 //! looks like"): the old text and its body diff, the home and relRepo
 //! moves, the changeset markers, the historical phantom of a node
@@ -124,7 +124,7 @@ pub fn mk_historical_viewnode (
 /// content stands, what it holds: if a nodeMerge acquired it, an "it
 /// was acquired by" folder, and then its old content as removed
 /// members: a deleted member as a historical phantom (whose own visit
-/// draws its old content), a surviving one as a removed member
+/// adds its old content), a surviving one as a removed member
 /// ('mk_removed_member_viewnode', editable when its node is in 'u'),
 /// and a dangling one as an unknown phantom.
 pub fn append_historical_phantom_content (

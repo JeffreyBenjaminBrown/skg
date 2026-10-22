@@ -4,7 +4,7 @@
 //! historical phantom's.
 //!
 //! On an editable occurrence: the content members (which the content
-//! reconciler drew from the after-graph) are tagged with the presence
+//! reconciler made from the after-graph) are tagged with the presence
 //! of their node and of their relationship, members outside U that
 //! were not editable already become write-protected members
 //! without their content, and the former members stand where
@@ -15,11 +15,11 @@
 //! straddle), and its changeset markers. A node in U but not in C is
 //! context: its body starts folded. A write-protected occurrence gets
 //! none of this; its viewparent tags it. U and C are those of the
-//! buffer being drawn ('prunedChangeView_sets_of_buffer'); in the
+//! buffer being rendered ('prunedChangeView_sets_of_buffer'); in the
 //! order-only buffer both are empty, and each node there gets an
 //! order-only marker.
 //!
-//! Nothing that exists is drawn again ('docs/diff-view.org',
+//! Nothing that exists is created again ('docs/diff-view.org',
 //! "The shallow model subtree, and what it keeps"):
 //! each step builds a shallow model subtree and reconciles what the node
 //! holds with it ('server/diff_view/shallow_model_subtree.rs'), so every
@@ -76,9 +76,9 @@ const OUT_FOLDERS : [PartnerFolder; 3] = [
   PartnerFolder::Hidden ];
 
 /// What the change leaves that mention a node say changed about it,
-/// grouped by aspect: what the per-visit step draws ahead of its
+/// grouped by aspect: what the per-visit step adds ahead of its
 /// content and as its changed partner folders. A new aspect of a leaf
-/// is added here once, and C, the drawing and readiness follow.
+/// is added here once, and C, the extension and readiness follow.
 #[derive(Debug, Default)]
 struct ChangedAspects {
   text         : bool,
@@ -137,7 +137,7 @@ impl ChangedAspects {
 /// members at the folder's own visit); then this step runs the diff
 /// view's, 'reconcile_children_with_shallowModelSubtree', over the change
 /// viewnodes, the removed members and what stands below them. They
-/// obey one rule: a reconciler detaches only what it drew, and what
+/// obey one rule: a reconciler detaches only what it created, and what
 /// the user added survives, under a stale child too
 /// ('keep_stale_child_holding_the_users').
 /// 'created_in_this_completion' is whether
@@ -163,7 +163,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   let content : Vec<Partner> =
     straddle . partners (&pid, RelationRole::CONTENT);
   if ! editable {
-    // What an earlier visit drew here while it was editable goes, and
+    // What an earlier visit added here while it was editable goes, and
     // the members it still holds are tagged as they stand now.
     detach_change_viewnodes (tree, treeid, straddle) ?;
     tag_content_members (tree, treeid, straddle, &content, None) ?;
@@ -222,11 +222,11 @@ fn sign_root (
 
 /// Before the content reconciler runs at an editable node's visit,
 /// align its members with the straddle, so that the reconciler keeps
-/// each viewnode instead of drawing another: a member, a removed
+/// each viewnode instead of creating another: a member, a removed
 /// member or a historical phantom whose relationship is in the
 /// after-graph is a member; a member whose relationship is only in
 /// the before-graph is set aside (affectsParent false), where the
-/// step after the reconciler finds it and draws it as removed.
+/// step after the reconciler finds it and shows it as removed.
 pub(crate) fn align_content_members_with_straddle (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -279,8 +279,8 @@ pub(crate) enum HistoricalPhantomVisit {
 
 /// The visit of a historical phantom in a diff view. Where
 /// content stands (under a vognode, or as a root), it holds what
-/// 'append_historical_phantom_content' draws, reconciled with what it
-/// holds already; a node drawn above itself holds nothing. In a
+/// 'append_historical_phantom_content' adds, reconciled with what it
+/// holds already; a node standing above itself holds nothing. In a
 /// folder it holds nothing new. A root whose node is back becomes an
 /// editable vognode, and one whose node is in neither graph (a
 /// deletion since committed) a deleted phantom. A removed member of
@@ -403,7 +403,7 @@ fn is_front_change_viewnode (
     | ViewnodeKind::PropertyFolder (_)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ) }
 
-/// Detach what this step draws under an editable node.
+/// Detach what this step adds under an editable node.
 fn detach_change_viewnodes (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -481,12 +481,12 @@ fn changed_partner_folders (
 
 /// Tag each content member, and each non-member child whose node is
 /// content, with the presence of its node and of its relationship,
-/// draw a member outside U as a write-protected member without its
+/// show a member outside U as a write-protected member without its
 /// content unless it was
 /// editable before completion ('u_and_editable', when given), and
 /// keep a relRepo move under exactly the members whose relationship
 /// moved. A member's view requests stay: one that
-/// carries an editable-view request is drawn as the request says at
+/// carries an editable-view request is extended as the request says at
 /// its own visit.
 fn tag_content_members (
   tree     : &mut Tree<Viewnode>,
@@ -509,7 +509,7 @@ fn tag_content_members (
           if t . affectsParent == AffectsParent::True
           || by_id . contains_key (&t . skgid) => {
           // A non-member whose node is content (as under a
-          // write-protected node) is tagged too, but never redrawn.
+          // write-protected node) is tagged too, but never recreated.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
           viewnode . change_facts . presence = DiffPresence {
             node : straddle . node_sign (&t . skgid),
@@ -540,13 +540,13 @@ fn tag_content_members (
 /// The members of the before-graph's content list that the
 /// after-graph's lacks, each where 'phantom_insertion_plan' places it
 /// (immediately before the next surviving member of the old order): a
-/// deleted node as its historical phantom (whose own visit draws its
+/// deleted node as its historical phantom (whose own visit adds its
 /// old content), a surviving one as a removed member
 /// ('mk_removed_member_viewnode'), created editable when its node is
 /// in 'u'. Each is matched by its skgid to what
-/// stands under the node already, and moved, not redrawn. Membership
+/// stands under the node already, and moved, not recreated. Membership
 /// is by set difference; the LCS only positions, so a reorder shows
-/// nothing. A removed dangling ID is not drawn: an unknown phantom
+/// nothing. A removed dangling ID is not shown: an unknown phantom
 /// here would be read back as a member. (Its change-forest leaf is
 /// under the content changeset marker.)
 fn reconcile_removed_content_members (
@@ -562,15 +562,15 @@ fn reconcile_removed_content_members (
   let mut model : Tree<Viewnode> = Tree::new (model_root ());
   let mut anchors : Vec<Option<ID>> = Vec::new ();
   for (removed, anchor) in plan {
-    let drawn : Option<Viewnode> = match straddle . node_presence (&removed) {
+    let removed_viewnode : Option<Viewnode> = match straddle . node_presence (&removed) {
       Some (Presence::OnlyBefore) =>
         mk_historical_viewnode (straddle, &removed, Some (Sign::Minus)),
       Some (_) => Some (
         mk_removed_member_viewnode (straddle, &removed, u)
         . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? ),
       None => None, };
-    if let Some (drawn) = drawn {
-      model . root_mut () . append (drawn);
+    if let Some (removed_viewnode) = removed_viewnode {
+      model . root_mut () . append (removed_viewnode);
       anchors . push (anchor); }}
   let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,

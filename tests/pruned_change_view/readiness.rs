@@ -109,11 +109,11 @@ fn editing_a_node_lapses_its_mark (
 
 /// The summary counts the changed files of the owned skgrepos and
 /// the ready ones, and the leaves owned by nodes the saved buffer does
-/// not draw. The "sets" fixture changes six files: cy2 and mc
+/// not show. The "sets" fixture changes six files: cy2 and mc
 /// (retitled), del and delc (deleted), ln (gains lo) and r (loses
 /// del); their seven leaves are the two text changes, the two
 /// deletions, and the relationships ln-lo, r-del and del-delc. Roots
-/// the user drops from the buffer are origins it no longer draws: the
+/// the user drops from the buffer are origins it no longer shows: the
 /// save leaves them out and counts their changes as not editable, and the
 /// "integrate unshown changes" request appends them again.
 #[test]
@@ -151,9 +151,9 @@ fn the_save_reports_the_readiness_summary (
 
 /// A save of the merges buffer of the 'buffers' fixture (described in
 /// 'other_buffers.rs') counts as not editable the eleven leaves of the nodes
-/// it does not draw editable: txt's text, the home and relRepo moves
+/// it does not show editable: txt's text, the home and relRepo moves
 /// of mvc, mvg, mvp, mvr and mvt, and the creation of pres, which it
-/// draws as a write-protected member of acq's content.
+/// shows as a write-protected member of acq's content.
 #[test]
 fn the_summary_counts_the_changes_the_saved_buffer_does_not_show (
 ) -> Result<(), Box<dyn Error>> {
@@ -225,7 +225,7 @@ fn save_deleting (
                "the reconciled buffer is a fixed point" );
   Ok (saved) }
 
-/// A node deleted in the buffer is drawn as the pruned change view draws a
+/// A node deleted in the buffer is shown as the pruned change view shows a
 /// deleted node: where it stood among its container's content, and
 /// in the changed container folder of what it contained. Where it
 /// stood, its viewnode stays, with its folded body.

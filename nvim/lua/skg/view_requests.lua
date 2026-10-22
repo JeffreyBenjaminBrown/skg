@@ -51,7 +51,7 @@ end
 ---Request an editable view for the headline at point. On a
 ---write-protected headline, the save makes it the node's editable
 ---occurrence and write-protects the one that was, which keeps what it
----draws. On an editable headline, the save extends its content
+---shows. On an editable headline, the save extends its content
 ---editable, up to the server's initial_node_limit extensions. A buffer
 ---may carry one such request per node. Does NOT auto-save.
 function M.set_editable ()

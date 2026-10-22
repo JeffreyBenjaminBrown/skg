@@ -111,7 +111,7 @@ fn a_rerender_all_writes_its_refreshed_straddle_back (
       f . views_state . graph_straddle . clone ()
       . expect ("the connection still holds a straddle");
     assert! ( Arc::ptr_eq (&held . after, &env . runtime_snapshot () . graph),
-              "the held straddle pairs HEAD with the live graph the rerender drew" );
+              "the held straddle pairs HEAD with the live graph the rerender used" );
     assert! ( Arc::ptr_eq (&held . before, &opened . before) );
     Ok (( )) }) }
 
@@ -208,7 +208,7 @@ fn a_request_is_refused_for_a_skgrepo_with_no_head_commit (
     Ok (( )) }) }
 
 /// HEAD is a merge commit, of the fixture's commit and a commit on
-/// its side, both with the same tree: the request draws the buffer as
+/// its side, both with the same tree: the request renders the buffer as
 /// for the fixture's commit.
 #[test]
 fn a_request_accepts_a_merge_commit_at_head (

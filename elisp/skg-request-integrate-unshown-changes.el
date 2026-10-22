@@ -17,7 +17,7 @@
 (defun skg-diffView-integrate-unshown-changes ()
   "In a buffer of the diff view, make every changed node that
 has no editable occurrence editable at its first occurrence, and
-append as roots the origins of changes the buffer draws nowhere.
+append as roots the origins of changes the buffer shows nowhere.
 Refuses while the buffer has unsaved changes."
   (interactive)
   (unless skg-view-id

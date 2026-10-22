@@ -269,7 +269,7 @@ async fn explicit_fork_on_unknown_node_errors (
   Ok (( )) }
 
 /// The explicit fork skgsave-commits a clone overriding the owned P (override
-/// substitution then draws it in P's place), and a SECOND explicit fork
+/// substitution then shows it in P's place), and a SECOND explicit fork
 /// of the now-overridden P is rejected with 'ForkAlreadyExists'.
 async fn explicit_fork_round_trip_and_monogamy (
   config : &SkgConfig,
@@ -772,7 +772,7 @@ async fn fork_fixture_files (
   assert_eq! ( node_from_disk (config, "N") ? . title, "N-original" );
   Ok (( )) }
 
-/// Round-trip: after the fork, reopening P draws the clone in N's
+/// Round-trip: after the fork, reopening P shows the clone in N's
 /// place, carrying (overridesHere N), with the default subscribeeFolder
 /// listing N but no unrequested overriddenFolder. The load-bearing property:
 /// P's stored
@@ -798,16 +798,16 @@ async fn fork_round_trip (
 
   let clone_skgid : ID = clone_on_disk (config) ? . pid;
 
-  // Reopen P de-novo. N is P's content; override substitution draws the
+  // Reopen P de-novo. N is P's content; override substitution shows the
   // clone in its place with (overridesHere N).
   let (p_view, _pids, _) =
     single_root_view (
       config, Some (tantivy), &ID::from ("P") ) ?;
   assert! ( p_view . contains ("(overridesHere N)"),
-    "the clone must be drawn in N's place with (overridesHere N):\n{}",
+    "the clone must be shown in N's place with (overridesHere N):\n{}",
     p_view );
   assert! ( p_view . contains (& format! ("(id {})", clone_skgid . 0)),
-    "the drawn substitute must be the clone {}:\n{}", clone_skgid . 0, p_view );
+    "the shown substitute must be the clone {}:\n{}", clone_skgid . 0, p_view );
   assert! ( p_view . contains ("subscribeeFolder"),
     "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
   assert! ( ! p_view . contains ("overriddenFolder"),

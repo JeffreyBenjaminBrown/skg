@@ -247,7 +247,7 @@ pub fn maybe_add_one_partnerFolder (
   if unique_non_vognode_child_of_viewnode (
       tree, treeid, &ViewnodeKind::PartnerFolder (kind)
     )? . is_some ()
-  { // There already is one. Don't draw a new one.
+  { // There already is one. Don't create a new one.
     return Ok (( )); }
   let recorder_pid : ID =
     read_at_node_in_tree (
@@ -274,7 +274,7 @@ pub fn maybe_add_one_partnerFolder (
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (skgid, config) ));
   if member_skgids . is_empty () && ! force_create_when_empty {
-    // It would be empty, so don't draw it.
+    // It would be empty, so don't create it.
     return Ok (( )); }
   let folder_treeid : NodeId =
     insert_non_vognode_as_child (

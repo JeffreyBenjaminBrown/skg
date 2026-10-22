@@ -80,7 +80,7 @@ pub fn all_changes_buffer_with_marks (
                    . expect ("a marked key is a leaf") ); }
   Ok ( diffView_buffer (
     &runtime, &straddle, &store, DiffViewBufferKind::AllChanges ) ?
-    . map ( |drawn| drawn . text ) ) }
+    . map ( |rendered| rendered . text ) ) }
 
 /// The view id under which 'open_buffer' registers a buffer: its
 /// client's name for it.
@@ -97,7 +97,7 @@ pub fn open_all_changes_buffer (
     . ok_or_else ( || "the all-changes buffer is empty" . into () ) }
 
 /// Open a buffer of the diff view as the "diff view"
-/// request does: drawn from the connection's graph straddle with the
+/// request does: rendered from the connection's graph straddle with the
 /// marks on disk, and registered as a view of the diff view.
 /// None when it would be empty.
 pub fn open_buffer (
@@ -209,7 +209,7 @@ pub fn send_integrate_unshown_changes_request (
   Ok (response) }
 
 /// The "all changes" buffer as the "integrate unshown changes" request
-/// redraws it, and the not-editable count of its readiness summary.
+/// rerenders it, and the not-editable count of its readiness summary.
 pub fn integrate_unshown_changes (
   f : &mut Fixture,
 ) -> Result<(String, usize), Box<dyn Error>> {
@@ -280,7 +280,7 @@ fn first_streamed_view_content (
         &message [ message . find ('(') . unwrap () .. ], "content" )
       . expect ("the streamed view has content") ) }
 
-/// The lines of 'buffer' that draw an unrestricted vognode of 'node'.
+/// The lines of 'buffer' that show an unrestricted vognode of 'node'.
 pub fn node_lines<'a> (
   buffer : &'a str,
   node   : &str,
@@ -289,7 +289,7 @@ pub fn node_lines<'a> (
   buffer . lines () . filter ( |line| line . contains (&atom) ) . collect () }
 
 /// 'buffer' with an editable-view request at the first occurrence of
-/// 'metadata', which must draw a write-protected node.
+/// 'metadata', which must show a write-protected node.
 pub fn requesting_editable_at (
   buffer   : &str,
   metadata : &str,

@@ -64,7 +64,7 @@ EOF
 # The diff view variant: the skgrepo is a gitrepo. At HEAD,
 # dvroot (with a body) contains dvchild (with a body); in the worktree
 # dvroot's body and dvchild's title are edited, so the "all changes"
-# buffer draws both, each with its old text.
+# buffer shows both, each with its old text.
 set_up_diffView_data() {
     local repo="$TEST_DIR/data/owned/skg-data"
     rm -rf "$repo/.git"

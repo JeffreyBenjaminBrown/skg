@@ -3,7 +3,7 @@
 -- open owned P (whose content is foreign N); make N editable and
 -- edit its title; save -> a fork-confirmation buffer appears and
 -- nothing commits; approve -> the clone is created (overriding N) and
--- immediately drawn in N's place when P re-renders.
+-- immediately shown in N's place when P re-renders.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)

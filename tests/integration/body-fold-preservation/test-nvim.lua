@@ -135,7 +135,7 @@ local function bfp_run_scenario (name, expected_snapshot_before,
   return string.format('Scenario %s: BEFORE/AFTER differ', name)
 end
 
----@return integer|nil the "all changes" buffer, once it draws dvroot
+---@return integer|nil the "all changes" buffer, once it shows dvroot
 local function diffView_all_changes_buffer ()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b)
