@@ -130,9 +130,10 @@ container folder, which completion fills with its containers in
 either graph and their containerward forest.
 ** Completion over the straddle
 The stub is completed by the one view completion every view uses
-(the level-order BFS of 'complete_viewforest'), with 'diffView_source'
-set to the straddle and the buffer kind. That switch changes
-completion so:
+(the level-order BFS of 'complete_viewforest'), with the completion
+context's 'straddle' set to the straddle and its
+'diffView_buffer_kind' to the buffer kind. 'straddle' is the switch,
+and it changes completion so:
 - at an editable node's visit, before the content reconciler runs,
   its children are aligned with the straddle, so that the reconciler
   keeps each viewnode instead of drawing another;

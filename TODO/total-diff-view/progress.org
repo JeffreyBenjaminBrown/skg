@@ -2347,3 +2347,36 @@ nextest 849 passed; Emacs 374; Neovim all 31 specs passed. Over TCP,
 on a scratch copy of the 'kinds' fixture, the four diff-view buffers,
 a save carrying a readiness request and the rerendered "all changes"
 buffer were byte-identical between this slice and its parent commit.
+** Slice 2: deviations
+*** the visit functions take the two fields as options
+'diffView_visit_before_expansion' and 'diffView_visit_after_expansion'
+took 'Option<DiffViewSource>', so they take 'straddle :
+Option<&GraphStraddle>' and 'diffView_buffer_kind :
+Option<DiffViewBufferKind>', straight from the completion context, and
+act as the diff view only when both are Some. 'for_rerender' likewise
+takes the two options and uses 'for_diffView' when both are Some.
+*** 'DiffViewRerender' has two accessors
+Its 'source ()' went with 'DiffViewSource'; 'straddle ()' and
+'diffView_buffer_kind ()' take its place. 'rerender_view' reads them
+once, passes them to 'for_rerender', and passes the straddle's
+before-graph to 'finish_viewforest', which had read it through
+'source ()'.
+*** five readers of 'sets ()'
+The plan counts three; there were five (the handler, 'visit.rs',
+'changes.rs' and two in 'pcsvf.rs'). Each calls
+'pcsvf_sets_of_buffer (straddle, kind)'.
+*** tests
+'tests/unit/completion_context.rs' compares the context's straddle by
+address ('*const GraphStraddle') beside the buffer kind;
+'tests/pcsvf/recomputed_sets.rs' passes the two values to
+'ensure_editableOccurrences_exist'.
+*** docs
+'docs/diff-view.org', "Completion over the straddle", names the two
+fields of the completion context.
+*** verification
+nextest 849 passed; Emacs 374; Neovim all specs passed. Over TCP,
+on a scratch copy of the 'kinds' fixture, the four diff-view buffers,
+a save carrying a readiness request and the rerendered "all changes"
+buffer were byte-identical between this slice and its parent commit,
+except the order of the save-lock's 'lock-views', which varies from
+run to run under either binary.

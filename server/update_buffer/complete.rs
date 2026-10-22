@@ -15,7 +15,8 @@ use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_bra
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::diff_view::pcsvf::DiffViewSource;
+use crate::graph_straddle::types::GraphStraddle;
+use crate::types::views_state::DiffViewBufferKind;
 use crate::diff_view::visit::{
   DiffViewVisit, NormalNodeUpdate, VisitSettings,
   diffView_visit_after_expansion, diffView_visit_before_expansion};
@@ -69,11 +70,16 @@ pub(crate) struct CompletionContext<'a> {
   /// repairs do not correspond to edits the user just made.
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
   /// Some only when completing a buffer of the diff view
-  /// ('docs/diff-view.org', "Completion over the straddle"). Read at
-  /// two places, the calls of 'diffView_visit_before_expansion' and
+  /// ('docs/diff-view.org', "Completion over the straddle"), and then
+  /// with 'diffView_buffer_kind' Some too. 'straddle . is_some ()' is
+  /// the switch. Read at two places, the calls of
+  /// 'diffView_visit_before_expansion' and
   /// 'diffView_visit_after_expansion' ('server/diff_view/visit.rs',
   /// whose module comment says how the switch changes completion).
-  pub(super) diffView_source : Option<DiffViewSource<'a>>,
+  pub(super) straddle : Option<&'a GraphStraddle>,
+  /// Which buffer of the diff view is completed, whose PCSVF sets the
+  /// visits read. Some exactly when 'straddle' is.
+  pub(super) diffView_buffer_kind : Option<DiffViewBufferKind>,
   /// The viewnodes the viewforest held before this completion began.
   /// In a diff view, a fold state is set only on a viewnode
   /// not among them.
@@ -112,12 +118,14 @@ impl<'a> CompletionContext<'a> {
       create_partnerFolders_for_fresh_nodes : true,
       substitute_existing_content_overrides : false,
       warning_sink                   : Some (warning_sink),
-      diffView_source                : None,
+      straddle                       : None,
+      diffView_buffer_kind           : None,
       nodes_before_completion        : &NO_NODES,
       editable_before_completion     : &NO_NODES, } }
 
   /// The first drawing of a buffer of the diff view
-  /// ('complete_viewforest_with_graph_straddle'), over 'drawing'. It
+  /// ('complete_viewforest_with_graph_straddle'), the buffer of kind
+  /// 'diffView_buffer_kind' over 'straddle'. It
   /// is never restricted by skgrepo (the diff view requires the set
   /// 'all'), creates no default partner folders, substitutes no
   /// overrider, and reports no repair. Every viewnode of a first
@@ -127,7 +135,8 @@ impl<'a> CompletionContext<'a> {
     graph_snap   : &'a Arc<InRustGraph>,
     editable_map : &'a mut EditableMap,
     errors       : &'a mut Vec<String>,
-    drawing      : DiffViewSource<'a>,
+    straddle     : &'a GraphStraddle,
+    diffView_buffer_kind : DiffViewBufferKind,
   ) -> CompletionContext<'a> {
     CompletionContext {
       editable_map, runtime, graph_snap, errors,
@@ -138,14 +147,16 @@ impl<'a> CompletionContext<'a> {
       create_partnerFolders_for_fresh_nodes : false,
       substitute_existing_content_overrides : false,
       warning_sink                   : None,
-      diffView_source                : Some (drawing),
+      straddle                       : Some (straddle),
+      diffView_buffer_kind           : Some (diffView_buffer_kind),
       nodes_before_completion        : &NO_NODES,
       editable_before_completion     : &NO_NODES, } }
 
   /// A rerender of an open view ('rerender_view'): after a save, for
   /// rerender-all, or after a skgrepo-set switch. It carries what the
   /// save deleted, the repairs' sink, and what the view held before.
-  /// With 'diffView_source' it completes a buffer of the diff view,
+  /// With 'straddle' and 'diffView_buffer_kind' Some it completes
+  /// that buffer of the diff view,
   /// with the settings of 'for_diffView' whatever
   /// 'skgrepo_restriction', 'create_partnerFolders_for_fresh_nodes'
   /// and 'substitute_existing_content_overrides' say.
@@ -160,14 +171,15 @@ impl<'a> CompletionContext<'a> {
     create_partnerFolders_for_fresh_nodes : bool,
     substitute_existing_content_overrides : bool,
     warning_sink                   : Option<&'a mut Vec<CompletionWarning>>,
-    diffView_source                : Option<DiffViewSource<'a>>,
+    straddle                       : Option<&'a GraphStraddle>,
+    diffView_buffer_kind           : Option<DiffViewBufferKind>,
     nodes_before_completion        : &'a HashSet<NodeId>,
     editable_before_completion     : &'a HashSet<NodeId>,
   ) -> CompletionContext<'a> {
-    let settings : CompletionContext<'a> = match diffView_source {
-      Some (drawing) => CompletionContext::for_diffView (
-        runtime, graph_snap, editable_map, errors, drawing ),
-      None => CompletionContext {
+    let settings : CompletionContext<'a> = match (straddle, diffView_buffer_kind) {
+      (Some (straddle), Some (diffView_buffer_kind)) => CompletionContext::for_diffView (
+        runtime, graph_snap, editable_map, errors, straddle, diffView_buffer_kind ),
+      _ => CompletionContext {
         editable_map, runtime, graph_snap, errors,
         deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
         deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
@@ -176,7 +188,8 @@ impl<'a> CompletionContext<'a> {
         create_partnerFolders_for_fresh_nodes,
         substitute_existing_content_overrides,
         warning_sink                   : None,
-        diffView_source                : None,
+        straddle                       : None,
+        diffView_buffer_kind           : None,
         nodes_before_completion        : &NO_NODES,
         editable_before_completion     : &NO_NODES, }, };
     CompletionContext {
@@ -269,7 +282,7 @@ fn dispatch_node_update (
     return Ok (( )); }
   let settings : VisitSettings =
     match diffView_visit_before_expansion (
-      tree, treeid, &kind, context . diffView_source,
+      tree, treeid, &kind, context . straddle, context . diffView_buffer_kind,
       context . editable_before_completion ) ? {
       DiffViewVisit::Done => return Ok (( )),
       DiffViewVisit::Complete (settings) => settings, };
@@ -358,7 +371,7 @@ fn visit_normal_node (
   let update : NormalNodeUpdate =
     update_normal_node (tree, treeid, context, settings) ?;
   diffView_visit_after_expansion (
-    tree, treeid, update, context . diffView_source,
+    tree, treeid, update, context . straddle, context . diffView_buffer_kind,
     context . nodes_before_completion,
     context . editable_before_completion ) }
 

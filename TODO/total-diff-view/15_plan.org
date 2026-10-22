@@ -1027,7 +1027,7 @@ asserts (the wire does not change); a unit test that
 member with 'rel' ready, a member with 'rel' unready, an unknown
 phantom with a bare '(ready)' and an entry without one.
 
-** TODO Slice 2: the straddle and the buffer kind are two fields
+** DONE Slice 2: the straddle and the buffer kind are two fields
 Make the changes under "The straddle and the buffer kind are two
 fields" above. Tests: the Rust suite; 'tests/unit/completion_context.rs'
 asserts the two fields of the diff-view constructor and 'None' of the

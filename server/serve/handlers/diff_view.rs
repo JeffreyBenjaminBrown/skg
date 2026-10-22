@@ -6,7 +6,8 @@
 use crate::diff_view::change_leaves::readiness_response_sexp;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pcsvf::{DiffViewSource, DrawnDiffViewBuffer, diffView_buffer_viewforest};
+use crate::diff_view::pcsvf::{
+  DrawnDiffViewBuffer, diffView_buffer_viewforest, pcsvf_sets_of_buffer};
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
@@ -78,10 +79,11 @@ pub fn diffView_buffer (
   store                : &ReadinessStore,
   diffView_buffer_kind : DiffViewBufferKind,
 ) -> Result<Option<DrawnDiffViewBuffer>, Box<dyn std::error::Error>> {
-  let drawing : DiffViewSource = DiffViewSource { straddle, diffView_buffer_kind };
   let roots : Vec<ID> = match diffView_buffer_kind {
     DiffViewBufferKind::OrderOnlyChanges =>
       straddle . order_only_pids () . iter () . cloned () . collect (),
-    _ => drawing . sets () . d . iter () . cloned () . collect (), };
+    _ => pcsvf_sets_of_buffer (straddle, diffView_buffer_kind)
+      . d . iter () . cloned () . collect (), };
   if roots . is_empty () { return Ok (None); }
-  Ok ( Some ( diffView_buffer_viewforest (runtime, drawing, store, &roots) ? )) }
+  Ok ( Some ( diffView_buffer_viewforest (
+    runtime, straddle, diffView_buffer_kind, store, &roots ) ? )) }

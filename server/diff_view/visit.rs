@@ -1,5 +1,5 @@
 //! Where view completion reads the diff-view switch
-//! ('CompletionContext::diffView_source'): once before a node's
+//! ('CompletionContext::straddle'): once before a node's
 //! visit expands anything ('diffView_visit_before_expansion') and once
 //! after an unrestricted vognode's visit ('diffView_visit_after_expansion').
 //! ('docs/diff-view.org', "Completion over the straddle".) In a buffer
@@ -29,10 +29,11 @@ use crate::diff_view::changes::{
   HistoricalPhantomVisit, align_content_members_with_straddle,
   deleted_phantom_becomes_historical, process_historical_phantom_visit,
   process_unrestrictedVognode_changes};
-use crate::diff_view::pcsvf::DiffViewSource;
+use crate::diff_view::pcsvf::pcsvf_sets_of_buffer;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::misc::ID;
 use crate::types::viewnode::{Phantom, Viewnode, ViewnodeKind, Vognode};
+use crate::types::views_state::DiffViewBufferKind;
 use crate::update_buffer::reconcile::partner_folder::PartnerFolderGoalSource;
 
 use ego_tree::{NodeId, Tree};
@@ -92,10 +93,12 @@ pub fn diffView_visit_before_expansion<'a> (
   tree                       : &mut Tree<Viewnode>,
   treeid                     : NodeId,
   kind                       : &ViewnodeKind,
-  diffView_source            : Option<DiffViewSource<'a>>,
+  straddle                   : Option<&'a GraphStraddle>,
+  diffView_buffer_kind       : Option<DiffViewBufferKind>,
   editable_before_completion : &HashSet<NodeId>,
 ) -> Result<DiffViewVisit<'a>, Box<dyn Error>> {
-  let Some (drawing) = diffView_source else {
+  let (Some (straddle), Some (diffView_buffer_kind)) =
+    (straddle, diffView_buffer_kind) else {
     return Ok ( DiffViewVisit::Complete ( VisitSettings {
       visit_as_unrestrictedVognode        : false,
       subscribeeFolder_has_own_reconciler : true,
@@ -110,7 +113,7 @@ pub fn diffView_visit_before_expansion<'a> (
     // A historical phantom where content stands draws its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {
       if process_historical_phantom_visit (
-           tree, treeid, drawing . straddle, editable_before_completion ) ?
+           tree, treeid, straddle, editable_before_completion ) ?
         == HistoricalPhantomVisit::Done {
         return Ok (DiffViewVisit::Done); }
       true },
@@ -118,11 +121,12 @@ pub fn diffView_visit_before_expansion<'a> (
   Ok ( DiffViewVisit::Complete ( VisitSettings {
     visit_as_unrestrictedVognode,
     subscribeeFolder_has_own_reconciler : false,
-    partnerFolder_goal_source           : PartnerFolderGoalSource::GraphStraddle (drawing . straddle),
+    partnerFolder_goal_source           : PartnerFolderGoalSource::GraphStraddle (straddle),
     substitution_enabled                : false,
     default_folders_allowed             : false,
-    diffView_u                          : Some (& drawing . sets () . u),
-    straddle_to_align_with              : Some (drawing . straddle), } )) }
+    diffView_u                          :
+      Some (& pcsvf_sets_of_buffer (straddle, diffView_buffer_kind) . u),
+    straddle_to_align_with              : Some (straddle), } )) }
 
 /// The diff view's part at the end of an unrestricted vognode's visit:
 /// a node this save deleted that HEAD has is drawn as history; one
@@ -132,23 +136,25 @@ pub fn diffView_visit_after_expansion (
   tree                       : &mut Tree<Viewnode>,
   treeid                     : NodeId,
   update                     : NormalNodeUpdate,
-  diffView_source            : Option<DiffViewSource>,
+  straddle                   : Option<&GraphStraddle>,
+  diffView_buffer_kind       : Option<DiffViewBufferKind>,
   nodes_before_completion    : &HashSet<NodeId>,
   editable_before_completion : &HashSet<NodeId>,
 ) -> Result<(), Box<dyn Error>> {
-  let Some (drawing) = diffView_source
+  let (Some (straddle), Some (diffView_buffer_kind)) =
+    (straddle, diffView_buffer_kind)
     else { return Ok (( )); };
   match update {
     NormalNodeUpdate::DeletedBySave =>
-      if deleted_phantom_becomes_historical (tree, treeid, drawing . straddle) ? {
+      if deleted_phantom_becomes_historical (tree, treeid, straddle) ? {
         process_historical_phantom_visit (
-          tree, treeid, drawing . straddle, editable_before_completion ) ?; },
+          tree, treeid, straddle, editable_before_completion ) ?; },
     NormalNodeUpdate::NoLongerUnrestricted => {},
     NormalNodeUpdate::Updated =>
       // Tag the content, draw what was removed, and add the change
       // folders, markers and properties.
       process_unrestrictedVognode_changes (
-        tree, treeid, drawing,
+        tree, treeid, straddle, diffView_buffer_kind,
         ! nodes_before_completion . contains (&treeid),
         editable_before_completion ) ?, }
   Ok (( )) }

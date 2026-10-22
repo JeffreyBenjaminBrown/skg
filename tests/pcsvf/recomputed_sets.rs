@@ -16,7 +16,7 @@ use crate::pcsvf::common::{
   retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::pcsvf::{DiffViewSource, ensure_editableOccurrences_exist};
+use skg::diff_view::pcsvf::ensure_editableOccurrences_exist;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -489,9 +489,6 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    let drawing : DiffViewSource = DiffViewSource {
-      straddle : &straddle,
-      diffView_buffer_kind : DiffViewBufferKind::AllChanges };
     let mut viewforest : ViewForest = diffView_buffer (
       &runtime, &straddle, &ReadinessStore::default (),
       DiffViewBufferKind::AllChanges ) ?
@@ -509,7 +506,8 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
     assert_eq! ( m_under_h (&viewforest), Some (false),
                  "m is drawn write-protected under h" );
     ensure_editableOccurrences_exist (
-      drawing, &mut viewforest, &runtime . graph, &runtime . config ) ?;
+      &straddle, DiffViewBufferKind::AllChanges,
+      &mut viewforest, &runtime . graph, &runtime . config ) ?;
     assert_eq! ( m_under_h (&viewforest), Some (true) );
     Ok (( )) } ) }
 

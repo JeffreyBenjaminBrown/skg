@@ -15,7 +15,7 @@
 //! straddle), and its changeset markers. A node in U but not in C is
 //! context: its body starts folded. A write-protected occurrence gets
 //! none of this; its viewparent tags it. U and C are those of the
-//! buffer being drawn ('DiffViewSource::sets'); in the order-only buffer
+//! buffer being drawn ('pcsvf_sets_of_buffer'); in the order-only buffer
 //! both are empty, and each node there gets an order-only marker.
 //!
 //! Nothing that exists is drawn again ('docs/diff-view.org',
@@ -32,7 +32,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
-use crate::diff_view::pcsvf::{PcsvfSets, DiffViewSource};
+use crate::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_of_buffer};
 use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
@@ -143,13 +143,13 @@ impl ChangedAspects {
 /// its body's fold state come from C. 'editable_before_completion'
 /// holds the viewnodes that were editable when completion began.
 pub(crate) fn process_unrestrictedVognode_changes (
-  tree    : &mut Tree<Viewnode>,
-  treeid  : NodeId,
-  drawing : DiffViewSource,
+  tree                       : &mut Tree<Viewnode>,
+  treeid                     : NodeId,
+  straddle                   : &GraphStraddle,
+  diffView_buffer_kind       : DiffViewBufferKind,
   created_in_this_completion : bool,
   editable_before_completion : &HashSet<NodeId>,
 ) -> Result<(), Box<dyn Error>> {
-  let straddle : &GraphStraddle = drawing . straddle;
   let (pid, editable) : (ID, bool) =
     match &tree . get (treeid)
       . ok_or ("process_unrestrictedVognode_changes: node not found") ?
@@ -165,7 +165,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     detach_change_viewnodes (tree, treeid, straddle) ?;
     tag_content_members (tree, treeid, straddle, &content, None) ?;
     return Ok (( )); }
-  let sets : &PcsvfSets = drawing . sets ();
+  let sets : &PcsvfSets = pcsvf_sets_of_buffer (straddle, diffView_buffer_kind);
   let in_c : bool = sets . c . contains (&pid);
   if created_in_this_completion {
     tree . get_mut (treeid) . unwrap () . value () . org_body_folded = ! in_c; }
@@ -178,7 +178,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     else { ChangedAspects::default () };
   let fresh : Tree<Viewnode> = fresh_front_change_viewnodes (
     straddle, &pid, &aspects, in_c,
-    drawing . diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
+    diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
   let fronts : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (), &straddle . after,

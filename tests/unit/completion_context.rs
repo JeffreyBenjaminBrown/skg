@@ -39,6 +39,7 @@ struct Settings {
   create_partnerFolders_for_fresh_nodes : bool,
   substitute_existing_content_overrides : bool,
   has_warning_sink               : bool,
+  straddle                       : Option<*const GraphStraddle>,
   diffView_buffer_kind           : Option<DiffViewBufferKind>,
   nodes_before_completion        : HashSet<NodeId>,
   editable_before_completion     : HashSet<NodeId>,
@@ -57,8 +58,9 @@ fn settings_of (
     substitute_existing_content_overrides :
       context . substitute_existing_content_overrides,
     has_warning_sink               : context . warning_sink . is_some (),
-    diffView_buffer_kind           : context . diffView_source
-      . map ( |drawing| drawing . diffView_buffer_kind ),
+    straddle                       : context . straddle
+      . map ( |straddle| straddle as *const GraphStraddle ),
+    diffView_buffer_kind           : context . diffView_buffer_kind,
     nodes_before_completion        : context . nodes_before_completion . clone (),
     editable_before_completion     : context . editable_before_completion . clone (), } }
 
@@ -81,6 +83,7 @@ fn for_content_view_gives_render_initial_views_settings () {
     create_partnerFolders_for_fresh_nodes : true,
     substitute_existing_content_overrides : false,
     has_warning_sink               : true,
+    straddle                       : None,
     diffView_buffer_kind           : None,
     nodes_before_completion        : HashSet::new (),
     editable_before_completion     : HashSet::new (), } ); }
@@ -94,8 +97,7 @@ fn for_diffView_gives_the_first_drawings_settings () {
   let mut errors : Vec<String> = Vec::new ();
   let context : CompletionContext = CompletionContext::for_diffView (
     &runtime, &graph_snap, &mut editable_map, &mut errors,
-    DiffViewSource { straddle : &straddle,
-                     diffView_buffer_kind : DiffViewBufferKind::Merges } );
+    &straddle, DiffViewBufferKind::Merges );
   assert_eq! ( settings_of (&context), Settings {
     deleted_by_this_save_pids      : HashSet::new (),
     deleted_by_this_save_extra_ids : HashMap::new (),
@@ -104,6 +106,7 @@ fn for_diffView_gives_the_first_drawings_settings () {
     create_partnerFolders_for_fresh_nodes : false,
     substitute_existing_content_overrides : false,
     has_warning_sink               : false,
+    straddle                       : Some (&straddle as *const GraphStraddle),
     diffView_buffer_kind           : Some (DiffViewBufferKind::Merges),
     nodes_before_completion        : HashSet::new (),
     editable_before_completion     : HashSet::new (), } ); }
@@ -130,13 +133,14 @@ fn for_rerender_gives_rerender_views_settings_in_and_out_of_the_diff_view () {
     let mut editable_map : EditableMap = EditableMap::new ();
     let mut errors : Vec<String> = Vec::new ();
     let mut sink : Vec<CompletionWarning> = Vec::new ();
-    let drawing : Option<DiffViewSource> = in_diffView . then ( ||
-      DiffViewSource { straddle : &straddle,
-                       diffView_buffer_kind : DiffViewBufferKind::AllChanges } );
+    let diffView_straddle : Option<&GraphStraddle> =
+      in_diffView . then_some (&straddle);
+    let diffView_buffer_kind : Option<DiffViewBufferKind> =
+      in_diffView . then_some (DiffViewBufferKind::AllChanges);
     let context : CompletionContext = CompletionContext::for_rerender (
       &runtime, &graph_snap, &mut editable_map, &mut errors,
       &deleted_pids, &deleted_extra_ids, Some (&restriction),
-      true, true, Some (&mut sink), drawing,
+      true, true, Some (&mut sink), diffView_straddle, diffView_buffer_kind,
       &nodes_before, &nodes_before );
     assert_eq! ( settings_of (&context), Settings {
       deleted_by_this_save_pids      : deleted_pids . clone (),
@@ -147,6 +151,8 @@ fn for_rerender_gives_rerender_views_settings_in_and_out_of_the_diff_view () {
       create_partnerFolders_for_fresh_nodes : ! in_diffView,
       substitute_existing_content_overrides : ! in_diffView,
       has_warning_sink               : true,
+      straddle                       : diffView_straddle
+        . map ( |straddle| straddle as *const GraphStraddle ),
       diffView_buffer_kind           :
         in_diffView . then_some (DiffViewBufferKind::AllChanges),
       nodes_before_completion        : nodes_before . clone (),

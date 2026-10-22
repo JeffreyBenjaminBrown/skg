@@ -35,7 +35,6 @@ use crate::diff_view::completion::{
   DiffViewRerender, finish_diffView_rerender, prepare_diffView_rerender};
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pcsvf::DiffViewSource;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
@@ -535,8 +534,10 @@ pub fn rerender_view (
       &mut context . graph_straddle, &context . runtime,
       options . diffView_buffer, options . integrate_unshown_changes,
       viewforest ) ?;
-  let diffView_source : Option<DiffViewSource> =
-    diffView_rerender . as_ref () . map ( |rerender| rerender . source () );
+  let straddle : Option<&GraphStraddle> =
+    diffView_rerender . as_ref () . map ( |rerender| rerender . straddle () );
+  let diffView_buffer_kind : Option<DiffViewBufferKind> =
+    diffView_rerender . as_ref () . map ( |rerender| rerender . diffView_buffer_kind () );
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let nodes_before_completion : HashSet<NodeId> =
       viewforest . nodes () . map ( |node| node . id () ) . collect ();
@@ -559,7 +560,8 @@ pub fn rerender_view (
       options . create_partnerFolders,
       options . substitute_existing_content_overrides,
       warning_sink,
-      diffView_source,
+      straddle,
+      diffView_buffer_kind,
       &nodes_before_completion,
       &editable_before_completion );
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -577,8 +579,7 @@ pub fn rerender_view (
         &context . runtime . graph,
         &context . runtime . config,
         context . skgrepo_restriction,
-        diffView_rerender . as_ref ()
-          . map ( |rerender| &*rerender . source () . straddle . before )) } ?;
+        straddle . map ( |straddle| &*straddle . before )) } ?;
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }

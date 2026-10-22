@@ -6,7 +6,7 @@
 //! sets the readiness facts after it ('finish_diffView_rerender').
 
 use crate::diff_view::pcsvf::{
-  DiffViewSource, append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
+  append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
   ensure_editableOccurrences_exist, root_skgids_of_buffer, set_diffView_facts_in_viewforest};
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -35,32 +35,40 @@ pub struct DiffViewRerender {
 }
 
 impl DiffViewRerender {
-  /// What view completion draws the buffer from.
-  pub fn source (
+  /// The straddle view completion reads the buffer from.
+  pub fn straddle (
     &self,
-  ) -> DiffViewSource<'_> {
-    DiffViewSource { straddle             : &self . straddle,
-                     diffView_buffer_kind : self . diffView_buffer_kind } }
+  ) -> &GraphStraddle {
+    &self . straddle }
+
+  /// Which buffer of the diff view is rerendered.
+  pub fn diffView_buffer_kind (
+    &self,
+  ) -> DiffViewBufferKind {
+    self . diffView_buffer_kind }
 }
 
 /// Complete a stub viewforest of the diff view
-/// ('server/diff_view/pcsvf.rs') as 'drawing' says: view completion with
-/// 'diffView_source' set, which draws the union of the straddle's content, the change
+/// ('server/diff_view/pcsvf.rs'), the buffer of kind
+/// 'diffView_buffer_kind' over 'straddle': view completion with
+/// 'straddle' set, which draws the union of the straddle's content, the change
 /// folders and markers, and the former members. It creates no
 /// default partner folders, spends no node budget (only an
 /// editable-view request spends it, and a first drawing carries
 /// none), and never restricts by skgrepo (the diff view
 /// requires the set 'all').
 pub fn complete_viewforest_with_graph_straddle (
-  runtime    : &RuntimeGeneration,
-  drawing    : DiffViewSource,
-  viewforest : &mut ViewForest,
+  runtime              : &RuntimeGeneration,
+  straddle             : &GraphStraddle,
+  diffView_buffer_kind : DiffViewBufferKind,
+  viewforest           : &mut ViewForest,
 ) -> Result<(), Box<dyn Error>> {
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let mut editable_map : EditableMap = EditableMap::new ();
   let mut errors : Vec<String> = Vec::new ();
   let mut context : CompletionContext = CompletionContext::for_diffView (
-    runtime, &graph_snap, &mut editable_map, &mut errors, drawing );
+    runtime, &graph_snap, &mut editable_map, &mut errors,
+    straddle, diffView_buffer_kind );
   complete_viewforest ( viewforest, &mut context ) ?;
   if ! errors . is_empty () {
     return Err ( errors . join ("\n") . into () ); }
@@ -93,7 +101,7 @@ pub fn prepare_diffView_rerender (
     // Before any visit, so that a node of U is editable before its
     // parent's visit can see it.
     ensure_editableOccurrences_exist (
-      rerender . source (), viewforest,
+      rerender . straddle (), rerender . diffView_buffer_kind (), viewforest,
       &runtime . graph, &runtime . config ) ?; }
   Ok (Some (rerender)) }
 
@@ -112,17 +120,18 @@ pub(crate) fn finish_diffView_rerender (
 ) -> Result<(), Box<dyn Error>> {
   let Some (rerender) = rerender
     else { return Ok (( )); };
-  let drawing : DiffViewSource = rerender . source ();
+  let straddle : &GraphStraddle = rerender . straddle ();
+  let diffView_buffer_kind : DiffViewBufferKind = rerender . diffView_buffer_kind ();
   if rerender . integrate_unshown_changes {
     let new_roots : Vec<ID> =
       contentOrigins_missing_from_buffer (
-        drawing, viewforest, &rerender . standing_roots );
+        straddle, diffView_buffer_kind, viewforest, &rerender . standing_roots );
     let appended : Vec<NodeId> = append_contentOrigins_to_buffer (
-      runtime, drawing, viewforest, &new_roots ) ?;
+      runtime, straddle, diffView_buffer_kind, viewforest, &new_roots ) ?;
     complete_appended_roots (
       viewforest, &appended, completion_context ) ?; }
   let store : MutexGuard<ReadinessStore> =
     env . runtime . lock_readiness_store ();
   set_diffView_facts_in_viewforest (
-    viewforest, drawing, &store, &runtime . graph );
+    viewforest, straddle, diffView_buffer_kind, &store, &runtime . graph );
   Ok (( )) }
