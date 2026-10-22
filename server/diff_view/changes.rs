@@ -20,9 +20,9 @@
 //! order-only marker.
 //!
 //! Nothing that exists is drawn again ('docs/diff-view.org',
-//! "The fresh drawing, and what it keeps"):
-//! each step builds a fresh drawing and reconciles what the node
-//! holds with it ('server/diff_view/fresh_drawing.rs'), so every
+//! "The shallow model subtree, and what it keeps"):
+//! each step builds a shallow model subtree and reconciles what the node
+//! holds with it ('server/diff_view/shallow_model_subtree.rs'), so every
 //! viewnode that stays keeps its fold state, and is moved, not
 //! recreated, to where it belongs. The server sets a fold state only
 //! on a viewnode it creates.
@@ -39,9 +39,9 @@ use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_homeSkgrepoMove_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
-use crate::diff_view::fresh_drawing::{
-  adopt_fresh_facts, is_drawn_by_the_diff_view,
-  is_unrestricted_removed_member, reconcile_children_with_fresh_drawing};
+use crate::diff_view::shallow_model_subtree::{
+  adopt_model_facts, is_drawn_by_the_diff_view,
+  is_unrestricted_removed_member, reconcile_children_with_shallowModelSubtree};
 use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
@@ -135,7 +135,7 @@ impl ChangedAspects {
 /// 'complete_managed_children' ('update_buffer/util.rs'), reconciles
 /// the content list first, as in every view (and each folder's
 /// members at the folder's own visit); then this step runs the diff
-/// view's, 'reconcile_children_with_fresh_drawing', over the change
+/// view's, 'reconcile_children_with_shallowModelSubtree', over the change
 /// viewnodes, the removed members and what stands below them. They
 /// obey one rule: a reconciler detaches only what it drew, and what
 /// the user added survives, under a stale child too
@@ -180,12 +180,12 @@ pub(crate) fn process_unrestrictedVognode_changes (
   let aspects : ChangedAspects = // read only for a node in C
     if in_c { ChangedAspects::of_node (straddle . change_leaves (), &pid) }
     else { ChangedAspects::default () };
-  let fresh : Tree<Viewnode> = fresh_front_change_viewnodes (
+  let model : Tree<Viewnode> = model_of_front_change_viewnodes (
     straddle, &pid, &aspects, in_c,
     diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
-  let fronts : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-    tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
+  let fronts : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+    tree, treeid, &model, model . root () . id (), &straddle . after,
     &is_front_change_viewnode,
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   let partner_folders : Vec<NodeId> =
@@ -286,7 +286,7 @@ pub(crate) enum HistoricalPhantomVisit {
 /// deletion since committed) a deleted phantom. A removed member of
 /// its old content is created editable when its node is in U of the
 /// buffer being completed ('prunedChangeView_sets_of_buffer'); one that
-/// stands already keeps its editability ('adopt_fresh_facts').
+/// stands already keeps its editability ('adopt_model_facts').
 pub(crate) fn process_historical_phantom_visit (
   tree                 : &mut Tree<Viewnode>,
   treeid               : NodeId,
@@ -310,7 +310,7 @@ pub(crate) fn process_historical_phantom_visit (
           skgid . clone (), node . home_skgrepo . clone (),
           node . title . clone (), node . body . clone () ) . kind );
       return Ok (HistoricalPhantomVisit::RootIsLive); }}
-  let Some (fresh_phantom) : Option<Viewnode> =
+  let Some (model_phantom) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, None) else {
       // In neither graph.
       let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid) . unwrap ();
@@ -323,29 +323,29 @@ pub(crate) fn process_historical_phantom_visit (
             title             : h . title . clone (),
             body              : h . body . clone () } )));
         node_mut . value () . replace_kind (deleted); }
-      let empty : Tree<Viewnode> = Tree::new (fresh_root ());
-      reconcile_children_with_fresh_drawing (
+      let empty : Tree<Viewnode> = Tree::new (model_root ());
+      reconcile_children_with_shallowModelSubtree (
         tree, treeid, &empty, empty . root () . id (), &straddle . after,
         &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
         &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
-    adopt_fresh_facts (
-      tree . get_mut (treeid) . unwrap () . value (), &fresh_phantom ); }
+    adopt_model_facts (
+      tree . get_mut (treeid) . unwrap () . value (), &model_phantom ); }
   if ! in_content_position { return Ok (HistoricalPhantomVisit::Done); }
   let drawn_above_itself : bool =
     tree . get (treeid) . unwrap () . ancestors ()
     . any ( |ancestor| matches! ( &ancestor . value () . kind,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
         if h . skgid == skgid ));
-  let mut fresh : Tree<Viewnode> = Tree::new (fresh_root ());
+  let mut model : Tree<Viewnode> = Tree::new (model_root ());
   if ! drawn_above_itself {
-    let root : NodeId = fresh . root () . id ();
+    let root : NodeId = model . root () . id ();
     append_historical_phantom_content (
-      &mut fresh, root, straddle, &skgid,
+      &mut model, root, straddle, &skgid,
       & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
-  let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-    tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
+  let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+    tree, treeid, &model, model . root () . id (), &straddle . after,
     &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   arrange_last_children (tree, treeid, &kept) ?;
@@ -384,8 +384,8 @@ pub(crate) fn deleted_phantom_becomes_historical (
   viewnode . change_facts = historical . change_facts;
   Ok (true) }
 
-/// The root of a scratch tree that holds a fresh drawing.
-fn fresh_root (
+/// The root of a scratch tree that holds a shallow model subtree.
+fn model_root (
 ) -> Viewnode {
   viewforest_root_viewnode () }
 
@@ -409,8 +409,8 @@ fn detach_change_viewnodes (
   treeid   : NodeId,
   straddle : &GraphStraddle,
 ) -> Result<(), Box<dyn Error>> {
-  let empty : Tree<Viewnode> = Tree::new (fresh_root ());
-  reconcile_children_with_fresh_drawing (
+  let empty : Tree<Viewnode> = Tree::new (model_root ());
+  reconcile_children_with_shallowModelSubtree (
     tree, treeid, &empty, empty . root () . id (), &straddle . after,
     &|viewnode| is_front_change_viewnode (viewnode)
       || is_unrestricted_removed_member (viewnode)
@@ -419,41 +419,41 @@ fn detach_change_viewnodes (
     &|_| false ) ?;
   Ok (( )) }
 
-/// The fresh drawing of what an editable node holds ahead of its
+/// The shallow model subtree of what an editable node holds ahead of its
 /// content, in order, partner folders aside: for a node in C, its old
 /// text, its home skgrepo move, its "it acquired" folder, its alias, ID and
 /// flags folders that changed, and its content and relRepo markers,
 /// each as 'aspects' says; then, in the order-only buffer, its
 /// order-only marker.
-fn fresh_front_change_viewnodes (
+fn model_of_front_change_viewnodes (
   straddle   : &GraphStraddle,
   pid        : &ID,
   aspects    : &ChangedAspects,
   in_c       : bool,
   order_only : bool,
 ) -> Tree<Viewnode> {
-  let mut fresh : Tree<Viewnode> = Tree::new (fresh_root ());
-  let root : NodeId = fresh . root () . id ();
+  let mut model : Tree<Viewnode> = Tree::new (model_root ());
+  let root : NodeId = model . root () . id ();
   if in_c {
     if aspects . text {
-      append_old_text (&mut fresh, root, straddle, pid); }
+      append_old_text (&mut model, root, straddle, pid); }
     if aspects . home_skgrepo {
       if let Some (homeSkgrepoMove) = mk_homeSkgrepoMove_viewnode (straddle, pid) {
-        append (&mut fresh, root, homeSkgrepoMove); }}
-    append_acquired_folder (&mut fresh, root, straddle, pid);
-    append_changed_property_folders (&mut fresh, root, straddle, pid, aspects);
+        append (&mut model, root, homeSkgrepoMove); }}
+    append_acquired_folder (&mut model, root, straddle, pid);
+    append_changed_property_folders (&mut model, root, straddle, pid, aspects);
     if aspects . recorded_changed (
       NodeRelation::Contains, RelationshipAspect::Existence ) {
-      append ( &mut fresh, root,
+      append ( &mut model, root,
         mk_changeset_marker_viewnode (ChangesetMarkerKind::Content) ); }
     if aspects . recorded_changed (
       NodeRelation::Contains, RelationshipAspect::RelRepo ) {
-      append ( &mut fresh, root,
+      append ( &mut model, root,
         mk_changeset_marker_viewnode (ChangesetMarkerKind::RelRepo) ); }}
   if order_only {
-    append ( &mut fresh, root,
+    append ( &mut model, root,
       mk_changeset_marker_viewnode (ChangesetMarkerKind::OrderOnly) ); }
-  fresh }
+  model }
 
 /// The node's partner folders whose membership changed, each found
 /// or created: the folders of its recorders (changed when one was
@@ -525,11 +525,11 @@ fn tag_content_members (
             by_id . get (&unknown . skgid)
             . and_then ( |p| p . presence . diff_sign () ); },
         _ => continue, }}
-    let mut fresh : Tree<Viewnode> = Tree::new (fresh_root ());
+    let mut model : Tree<Viewnode> = Tree::new (model_root ());
     if let Some (moved) = moved {
-      fresh . root_mut () . append (moved); }
-    let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-      tree, member, &fresh, fresh . root () . id (), &straddle . after,
+      model . root_mut () . append (moved); }
+    let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+      tree, member, &model, model . root () . id (), &straddle . after,
       &|viewnode| matches! ( &viewnode . kind,
         ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
       &|_| false ) ?;
@@ -559,7 +559,7 @@ fn reconcile_removed_content_members (
   let plan : Vec<(ID, Option<ID>)> = removal_plan (straddle, pid);
   let removed : HashSet<ID> =
     plan . iter () . map ( |(removed, _)| removed . clone () ) . collect ();
-  let mut fresh : Tree<Viewnode> = Tree::new (fresh_root ());
+  let mut model : Tree<Viewnode> = Tree::new (model_root ());
   let mut anchors : Vec<Option<ID>> = Vec::new ();
   for (removed, anchor) in plan {
     let drawn : Option<Viewnode> = match straddle . node_presence (&removed) {
@@ -570,10 +570,10 @@ fn reconcile_removed_content_members (
         . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? ),
       None => None, };
     if let Some (drawn) = drawn {
-      fresh . root_mut () . append (drawn);
+      model . root_mut () . append (drawn);
       anchors . push (anchor); }}
-  let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-    tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
+  let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+    tree, treeid, &model, model . root () . id (), &straddle . after,
     &|viewnode| match &viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>

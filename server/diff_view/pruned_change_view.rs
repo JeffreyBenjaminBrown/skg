@@ -25,7 +25,7 @@ use crate::prominence::climb_containerward_to_content_origins_via;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
-use crate::diff_view::fresh_drawing::is_unrestricted_removed_member;
+use crate::diff_view::shallow_model_subtree::is_unrestricted_removed_member;
 use crate::to_org::util::{
   EditableMap, append_plain_stub_root, graphnode_and_viewnode_from_skgid};
 use crate::types::env::RuntimeGeneration;

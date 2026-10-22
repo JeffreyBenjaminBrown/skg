@@ -1,7 +1,7 @@
 //! Reconciling what the diff view drew under a viewnode with a
-//! fresh drawing of it ('docs/diff-view.org',
-//! "The fresh drawing, and what it keeps").
-//! The fresh drawing is built in a scratch tree. Each existing
+//! shallow model subtree of it ('docs/diff-view.org',
+//! "The shallow model subtree, and what it keeps").
+//! The shallow model subtree is built in a scratch tree. Each existing
 //! viewnode it also produces is kept, with its fold state, and its
 //! kind and facts are updated in place; each it does not is
 //! detached, unless something the user added stands below it
@@ -78,58 +78,58 @@ fn property_kind (
       format! ("changesetMarker {:?}", kind), }}
 
 /// Under 'parent', make the children that 'managed' selects match
-/// the children of 'fresh_parent' in 'fresh'. A kept child whose
-/// fresh twin 'descend' selects has its own children reconciled the
+/// the children of 'model_parent' in 'model'. A kept child whose
+/// model twin 'descend' selects has its own children reconciled the
 /// same way, every keyed child but the user's managed
-/// ('is_drawn_by_the_diff_view'), and ordered as the fresh drawing
+/// ('is_drawn_by_the_diff_view'), and ordered as the shallow model subtree
 /// orders them. Returns the kept and created children, in
-/// the fresh drawing's order; where they stand among the others is
+/// the shallow model subtree's order; where they stand among the others is
 /// the caller's to decide. 'graph' is the live graph ('match_key').
-pub fn reconcile_children_with_fresh_drawing (
+pub fn reconcile_children_with_shallowModelSubtree (
   tree         : &mut Tree<Viewnode>,
   parent       : NodeId,
-  fresh        : &Tree<Viewnode>,
-  fresh_parent : NodeId,
+  model        : &Tree<Viewnode>,
+  model_parent : NodeId,
   graph        : &InRustGraph,
   managed      : &dyn Fn (&Viewnode) -> bool,
   descend      : &dyn Fn (&Viewnode) -> bool,
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
   let mut unmatched : Vec<(NodeId, MatchKey)> =
     tree . get (parent)
-    . ok_or ("reconcile_children_with_fresh_drawing: parent not found") ?
+    . ok_or ("reconcile_children_with_shallowModelSubtree: parent not found") ?
     . children ()
     . filter ( |child| managed ( child . value () ))
     . filter_map ( |child| match_key ( child . value (), graph )
                    . map ( |key| (child . id (), key) ))
     . collect ();
-  let fresh_children : Vec<NodeId> =
-    fresh . get (fresh_parent)
-    . ok_or ("reconcile_children_with_fresh_drawing: fresh parent not found") ?
+  let model_children : Vec<NodeId> =
+    model . get (model_parent)
+    . ok_or ("reconcile_children_with_shallowModelSubtree: model parent not found") ?
     . children () . map ( |child| child . id () ) . collect ();
   let mut result : Vec<NodeId> = Vec::new ();
-  for fresh_child in fresh_children {
-    let fresh_viewnode : &Viewnode =
-      fresh . get (fresh_child) . unwrap () . value ();
-    let key : MatchKey = match_key (fresh_viewnode, graph)
-      . ok_or ("reconcile_children_with_fresh_drawing: a fresh viewnode has no match key") ?;
+  for model_child in model_children {
+    let model_viewnode : &Viewnode =
+      model . get (model_child) . unwrap () . value ();
+    let key : MatchKey = match_key (model_viewnode, graph)
+      . ok_or ("reconcile_children_with_shallowModelSubtree: a model viewnode has no match key") ?;
     let matched : Option<usize> =
       unmatched . iter () . position ( |(_, existing)| *existing == key );
     match matched {
       Some (index) => {
         let (existing, _) : (NodeId, MatchKey) = unmatched . remove (index);
-        adopt_fresh_facts (
-          tree . get_mut (existing) . unwrap () . value (), fresh_viewnode );
-        if descend (fresh_viewnode) {
+        adopt_model_facts (
+          tree . get_mut (existing) . unwrap () . value (), model_viewnode );
+        if descend (model_viewnode) {
           let parent_is_a_folder : bool =
             is_folder ( tree . get (existing) . unwrap () . value () );
-          let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-            tree, existing, fresh, fresh_child, graph,
+          let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+            tree, existing, model, model_child, graph,
             &|viewnode| is_drawn_by_the_diff_view (viewnode, parent_is_a_folder, graph),
             descend ) ?;
           arrange_last_children (tree, existing, &kept) ?; }
         result . push (existing); },
       None => result . push (
-        append_copy_of_subtree (tree, parent, fresh, fresh_child) ?), }}
+        append_copy_of_subtree (tree, parent, model, model_child) ?), }}
   for (stale, _) in unmatched {
     if keep_stale_child_holding_the_users (tree, stale, &holds_the_users) ? {
       detach_the_servers_below (tree, stale) ?;
@@ -208,21 +208,21 @@ fn is_folder (
   matches! ( viewnode . kind,
     ViewnodeKind::PartnerFolder (_) | ViewnodeKind::PropertyFolder (_) ) }
 
-/// Give 'existing' the kind and facts of 'fresh', keeping its fold
+/// Give 'existing' the kind and facts of 'model', keeping its fold
 /// state and focus. Of the facts, it takes the presence, and its
 /// '(ready ...)' and '(leaves ...)' are cleared, for the pass after
 /// completion to set. An unrestricted vognode keeps what the view
 /// decides about it (its view requests, its stats, its readiness
-/// request), and becomes write-protected when the fresh one is.
-pub fn adopt_fresh_facts (
+/// request), and becomes write-protected when the model one is.
+pub fn adopt_model_facts (
   existing : &mut Viewnode,
-  fresh    : &Viewnode,
+  model    : &Viewnode,
 ) {
   existing . change_facts = ChangeFacts {
-    presence : fresh . change_facts . presence,
+    presence : model . change_facts . presence,
     ready    : None,
     leaves   : None };
-  match ( &mut existing . kind, &fresh . kind ) {
+  match ( &mut existing . kind, &model . kind ) {
     ( ViewnodeKind::Vognode (Vognode::Unrestricted (e)),
       ViewnodeKind::Vognode (Vognode::Unrestricted (f)) ) => {
       e . title         = f . title . clone ();
@@ -231,27 +231,27 @@ pub fn adopt_fresh_facts (
       e . birth         = f . birth; // a buffer does not carry it back
       if f . is_writeProtected () {
         e . write_protect (); }},
-    (kind, fresh_kind) => {
-      *kind = fresh_kind . clone ();
-      existing . readiness_request = fresh . readiness_request . clone (); }, }}
+    (kind, model_kind) => {
+      *kind = model_kind . clone ();
+      existing . readiness_request = model . readiness_request . clone (); }, }}
 
-/// Append under 'parent' a copy of the subtree of 'fresh' at
-/// 'fresh_node'.
+/// Append under 'parent' a copy of the subtree of 'model' at
+/// 'model_node'.
 pub fn append_copy_of_subtree (
   tree       : &mut Tree<Viewnode>,
   parent     : NodeId,
-  fresh      : &Tree<Viewnode>,
-  fresh_node : NodeId,
+  model      : &Tree<Viewnode>,
+  model_node : NodeId,
 ) -> Result<NodeId, Box<dyn Error>> {
-  let fresh_ref : NodeRef<Viewnode> = fresh . get (fresh_node)
-    . ok_or ("append_copy_of_subtree: fresh node not found") ?;
+  let model_ref : NodeRef<Viewnode> = model . get (model_node)
+    . ok_or ("append_copy_of_subtree: model node not found") ?;
   let copy : NodeId =
     tree . get_mut (parent) . ok_or ("append_copy_of_subtree: parent not found") ?
-    . append ( fresh_ref . value () . clone () ) . id ();
-  let fresh_children : Vec<NodeId> =
-    fresh_ref . children () . map ( |child| child . id () ) . collect ();
-  for fresh_child in fresh_children {
-    append_copy_of_subtree (tree, copy, fresh, fresh_child) ?; }
+    . append ( model_ref . value () . clone () ) . id ();
+  let model_children : Vec<NodeId> =
+    model_ref . children () . map ( |child| child . id () ) . collect ();
+  for model_child in model_children {
+    append_copy_of_subtree (tree, copy, model, model_child) ?; }
   Ok (copy) }
 
 /// A removed member: a viewnode the diff view drew as a non-member

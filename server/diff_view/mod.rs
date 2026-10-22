@@ -9,8 +9,8 @@
 //! - 'changes.rs': the per-visit step that view completion runs at
 //!   each unrestricted vognode and historical phantom;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
-//! - 'fresh_drawing.rs': reconciling what a viewnode holds with a
-//!   fresh drawing of it;
+//! - 'shallow_model_subtree.rs': reconciling what a viewnode holds with a
+//!   shallow model subtree of it;
 //! - 'partner_folders.rs': the partner folders drawn over the straddle;
 //! - 'change_leaves.rs': the change-forest leaves and their readiness;
 //! - 'readiness_store.rs': the marks the user set;
@@ -20,7 +20,7 @@ pub mod change_leaves;
 pub mod change_viewnodes;
 pub mod changes;
 pub mod completion;
-pub mod fresh_drawing;
+pub mod shallow_model_subtree;
 pub mod partner_folders;
 pub mod pruned_change_view;
 pub mod readiness_requests;

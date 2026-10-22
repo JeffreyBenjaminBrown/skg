@@ -9,9 +9,9 @@
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
-use crate::diff_view::fresh_drawing::{
+use crate::diff_view::shallow_model_subtree::{
   is_drawn_by_the_diff_view,
-  reconcile_children_with_fresh_drawing};
+  reconcile_children_with_shallowModelSubtree};
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
@@ -147,22 +147,22 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
       _ => None, } )
     . collect ();
   for (member, partner) in members {
-    let mut fresh : Tree<Viewnode> = // its root stands in for the member
+    let mut model : Tree<Viewnode> = // its root stands in for the member
       Tree::new ( tree . get (member) . unwrap () . value () . clone () );
-    let fresh_member : NodeId = fresh . root () . id ();
+    let model_member : NodeId = model . root () . id ();
     if ! outbound || partner . changed () {
       if let Some (moved) = mk_relRepo_move_viewnode (partner) {
-        fresh . root_mut () . prepend (moved); }
+        model . root_mut () . prepend (moved); }
       if kind == PartnerFolder::Container {
         attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-          &mut fresh, &[fresh_member], &runtime . graph, &runtime . config, None,
+          &mut model, &[model_member], &runtime . graph, &runtime . config, None,
           RoleTreePartners::GraphStraddle (straddle) ) ?;
       } else {
         build_and_integrate_role_tree_with_skgrepo_set (
-          &mut fresh, fresh_member, &runtime . graph, member_role,
+          &mut model, model_member, &runtime . graph, member_role,
           &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
-    let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
-      tree, member, &fresh, fresh_member, &straddle . after,
+    let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+      tree, member, &model, model_member, &straddle . after,
       &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),
       &|_| true ) ?;
     arrange_last_children (tree, member, &kept) ?; }

@@ -84,12 +84,12 @@ pub fn handle_stage_and_commit_request (
         stream, env, views_state, skgrepo_restriction ),
     _ => stream_empty_rerender (stream), }}
 
-/// After a git-commit: rerender each open buffer of the diff
-/// view as any rerender does, over the graph straddle the commit
-/// rebuilt. Its roots stay ('docs/diff-view.org',
-/// "The fresh drawing, and what it keeps"), and what the commit made unchanged loses its
-/// decorations. The commit requires the skgrepo-set all, so no text
-/// is withheld and no release is asked for.
+/// After a git-commit: rerender each open buffer of the diff view as
+/// any rerender does, over the graph straddle the commit rebuilt. Its
+/// roots stay ('docs/diff-view.org', "The shallow model subtree, and
+/// what it keeps"), and what the commit made unchanged loses its
+/// decorations. The commit requires the skgrepo-set all, so no text is
+/// withheld and no release is asked for.
 fn stream_rerender_diffView_views (
   stream              : &mut TcpStream,
   env                 : &SkgEnv,

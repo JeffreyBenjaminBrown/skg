@@ -24,8 +24,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::diff_view::fresh_drawing::{
-  adopt_fresh_facts, is_unrestricted_removed_member};
+use crate::diff_view::shallow_model_subtree::{
+  adopt_model_facts, is_unrestricted_removed_member};
 use crate::types::viewnode::{DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
@@ -312,7 +312,7 @@ fn apply_goal_shapes (
         if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
           t . affectsParent = AffectsParent::False;
           t . write_protect (); }},
-      _ => adopt_fresh_facts (
+      _ => adopt_model_facts (
         viewnode, &drawing_of_goal_item (item, child_data, label) ? ), }
     if let Some (presence) = item . presence {
       viewnode . change_facts . presence = presence; }}

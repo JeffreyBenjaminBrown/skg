@@ -151,7 +151,7 @@ impl<Orderkey> RepairSummary<Orderkey> {
 /// children it manages, so for it any child of a stale child is the
 /// user's; the diff view's reconciler draws below the children it
 /// manages, and asks 'holds_the_users' in
-/// 'server/diff_view/fresh_drawing.rs'.
+/// 'server/diff_view/shallow_model_subtree.rs'.
 pub fn keep_stale_child_holding_the_users (
   tree            : &mut Tree<Viewnode>,
   stale           : NodeId,

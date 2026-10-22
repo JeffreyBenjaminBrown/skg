@@ -504,7 +504,7 @@ impl RerenderOptions {
 /// 'context': view
 /// completion reconciles each editable node's change facts, change
 /// folders, markers and former members, its ID folder among them,
-/// with a fresh drawing from the straddle
+/// with a shallow model subtree from the straddle
 /// ('process_unrestrictedVognode_changes'), keeping every viewnode
 /// that stays and its fold state, and its readiness facts are then
 /// read from the store. Completion draws what it draws anew by the
