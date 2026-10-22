@@ -7,7 +7,7 @@
 // U, is drawn editable under x and write-protected under y.
 
 use crate::git_fixture::{Fixture, skg_files};
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   node_lines, open_all_changes_buffer, requesting_editable_at, save,
   view_id_of, with_fixture};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;

@@ -4,7 +4,7 @@
 // among them.
 
 use crate::git_fixture::{Fixture, graph_straddle};
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   all_changes_buffer, open_all_changes_buffer, rerendered_view_content,
   send_stage_and_commit_request, view_id_of, with_fixture};
 

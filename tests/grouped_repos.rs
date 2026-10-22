@@ -29,8 +29,8 @@ mod readiness_requests;
 #[path = "repo_sets.rs"]
 mod skgrepo_sets;
 
-#[path = "pcsvf.rs"]
-mod pcsvf;
+#[path = "pruned_change_view.rs"]
+mod pruned_change_view;
 
 #[path = "diff_view.rs"]
 mod diff_view;

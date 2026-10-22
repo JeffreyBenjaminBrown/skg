@@ -24,7 +24,7 @@
 
 use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
-use crate::diff_view::pcsvf::nodes_editable_in_diffView;
+use crate::diff_view::pruned_change_view::nodes_editable_in_diffView;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole, RelationshipKey};

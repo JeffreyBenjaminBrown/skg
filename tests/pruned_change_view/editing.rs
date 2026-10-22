@@ -4,7 +4,7 @@
 // fixture: r overrides n, and p, which contains n, is retitled.
 
 use crate::git_fixture::{Fixture, skg_files};
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   insert_after_line_starting, open_all_changes_buffer, save, view_id_of,
   with_fixture, without_subtree_starting};
 use crate::git_fixture_helpers::{

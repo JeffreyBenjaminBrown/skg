@@ -77,8 +77,8 @@ pub(crate) struct CompletionContext<'a> {
   /// 'diffView_visit_after_expansion' ('server/diff_view/visit.rs',
   /// whose module comment says how the switch changes completion).
   pub(super) straddle : Option<&'a GraphStraddle>,
-  /// Which buffer of the diff view is completed, whose PCSVF sets the
-  /// visits read. Some exactly when 'straddle' is.
+  /// Which buffer of the diff view is completed, whose pruned change view
+  /// sets the visits read. Some exactly when 'straddle' is.
   pub(super) diffView_buffer_kind : Option<DiffViewBufferKind>,
   /// The viewnodes the viewforest held before this completion began.
   /// In a diff view, a fold state is set only on a viewnode

@@ -1,5 +1,5 @@
-// Helpers for the PCSVF tests, over the git fixtures
-// ('tests/shared/git_fixture.rs') of the cases in 'tests/pcsvf/fixtures/',
+// Helpers for the pruned change view tests, over the git fixtures
+// ('tests/shared/git_fixture.rs') of the cases in 'tests/pruned_change_view/fixtures/',
 // each of whose owned skgrepos is a folder of the case.
 
 use crate::git_fixture::{
@@ -14,7 +14,7 @@ use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use skg::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
-use skg::diff_view::pcsvf::DrawnDiffViewBuffer;
+use skg::diff_view::pruned_change_view::DrawnDiffViewBuffer;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::{
@@ -36,7 +36,7 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::sync::{Arc, MutexGuard};
 
-const FIXTURES : &str = "tests/pcsvf/fixtures";
+const FIXTURES : &str = "tests/pruned_change_view/fixtures";
 
 /// Run 'body' on the case's fixture, its owned skgrepos 'skgrepos' in
 /// privacy order; see 'with_git_fixture'.

@@ -6,7 +6,7 @@
 
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use crate::git_fixture::{Fixture, everything_written};
-use crate::pcsvf::common::{open_all_changes_buffer, with_fixture};
+use crate::pruned_change_view::common::{open_all_changes_buffer, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
 use skg::serve::handlers::close_view::handle_close_view_request;

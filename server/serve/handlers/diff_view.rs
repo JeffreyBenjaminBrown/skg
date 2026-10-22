@@ -6,8 +6,9 @@
 use crate::diff_view::change_leaves::readiness_response_sexp;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::diff_view::pcsvf::{
-  DrawnDiffViewBuffer, diffView_buffer_viewforest, pcsvf_sets_of_buffer};
+use crate::diff_view::pruned_change_view::{
+  DrawnDiffViewBuffer, diffView_buffer_viewforest,
+  prunedChangeView_sets_of_buffer};
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
@@ -69,10 +70,11 @@ pub fn handle_diffView_request (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }
 
 /// The named buffer, drawn from 'straddle'. The "all changes" buffer is
-/// the PCSVF over all of C; the merges and skgrepo-changes buffers
-/// are PCSVFs over subsets of it ('pcsvf_sets_of_buffer').
-/// The order-only buffer lists the nodes whose only change is the
-/// order of a list, in ID order. None when the buffer would be empty.
+/// the pruned change view over all of C; the merges and skgrepo-changes
+/// buffers are pruned change views over subsets of it
+/// ('prunedChangeView_sets_of_buffer'). The order-only buffer lists the
+/// nodes whose only change is the order of a list, in ID order. None
+/// when the buffer would be empty.
 pub fn diffView_buffer (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -82,7 +84,7 @@ pub fn diffView_buffer (
   let roots : Vec<ID> = match diffView_buffer_kind {
     DiffViewBufferKind::OrderOnlyChanges =>
       straddle . order_only_pids () . iter () . cloned () . collect (),
-    _ => pcsvf_sets_of_buffer (straddle, diffView_buffer_kind)
+    _ => prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind)
       . d . iter () . cloned () . collect (), };
   if roots . is_empty () { return Ok (None); }
   Ok ( Some ( diffView_buffer_viewforest (

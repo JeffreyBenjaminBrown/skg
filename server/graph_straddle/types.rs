@@ -1,14 +1,14 @@
 //! The types of the graph straddle ('server/graph_straddle/mod.rs'):
 //! the straddle itself, with the sets it computes once per straddle
 //! (C, the change-forest leaves) and the diff view's cache of each
-//! buffer's PCSVF sets ('PcsvfCache'), which it keeps but does not
-//! read; the
-//! presence of a node or relationship in its two graphs; a node's own
-//! changes ('NodeChanges'); a partner over the union of the two graphs
-//! ('Partner'); and the two halves of C ('ChangedPids').
+//! buffer's pruned change view sets ('PrunedChangeViewCache'), which it
+//! keeps but does not read; the presence of a node or relationship in
+//! its two graphs; a node's own changes ('NodeChanges'); a partner over
+//! the union of the two graphs ('Partner'); and the two halves of C
+//! ('ChangedPids').
 
 use crate::diff_view::change_leaves::ChangeLeaves;
-use crate::diff_view::pcsvf::PcsvfCache;
+use crate::diff_view::pruned_change_view::PrunedChangeViewCache;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
@@ -35,9 +35,9 @@ pub struct GraphStraddle {
   pub(super) changed_pids : OnceLock<ChangedPids>,
   /// Computed on first use; see 'GraphStraddle::change_leaves'.
   pub(super) change_leaves : OnceLock<ChangeLeaves>,
-  /// The diff view's per-buffer sets; see 'pcsvf_sets_of_buffer'.
+  /// The diff view's per-buffer sets; see 'prunedChangeView_sets_of_buffer'.
   /// Kept here so that they persist with the straddle across requests.
-  pub(crate) pcsvf_cache : PcsvfCache,
+  pub(crate) prunedChangeView_cache : PrunedChangeViewCache,
 }
 
 /// Which graphs of the straddle hold a node or a relationship.
@@ -95,7 +95,7 @@ impl GraphStraddle {
     GraphStraddle { before, after, head_identity, foreign_changed_files,
                 changed_pids  : OnceLock::new (),
                 change_leaves : OnceLock::new (),
-                pcsvf_cache   : PcsvfCache::default () } }
+                prunedChangeView_cache   : PrunedChangeViewCache::default () } }
 
   /// The change-forest of this straddle. Computed once per straddle.
   pub fn change_leaves (

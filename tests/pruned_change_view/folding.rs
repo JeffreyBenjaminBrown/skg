@@ -6,7 +6,7 @@
 // 'other_buffers.rs' ('buffers').
 
 use crate::git_fixture::{edit_line, save_cleanly};
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   all_changes_view, open_all_changes_buffer, rerendered_view_content,
   retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
 

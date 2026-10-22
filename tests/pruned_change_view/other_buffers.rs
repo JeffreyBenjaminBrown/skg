@@ -11,12 +11,14 @@
 // move (rr's containment of rm) and a text-only change (txt).
 
 use crate::git_fixture::{Fixture, graph_straddle};
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   assert_lines_in_order, ids, open_buffer, saves_back_unchanged,
   with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_for_skgrepo_changes, pcsvf_sets_for_merges};
+use skg::diff_view::pruned_change_view::{
+  PrunedChangeViewSets, prunedChangeView_sets_for_skgrepo_changes,
+  prunedChangeView_sets_for_merges};
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::error::Error;
@@ -87,7 +89,7 @@ fn the_merges_sets_hold_the_acquiree_and_the_acquirer (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    let sets : PcsvfSets = pcsvf_sets_for_merges (&straddle);
+    let sets : PrunedChangeViewSets = prunedChangeView_sets_for_merges (&straddle);
     assert_eq! ( sets . c, ids (&[ "acq", "acqd" ]) );
     assert_eq! ( sets . d, ids (&[ "acqd", "top" ]) );
     Ok (( )) }) }
@@ -97,7 +99,7 @@ fn the_skgrepo_changes_sets_hold_the_moved_nodes (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("buffers", &SKGREPOS, |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    let sets : PcsvfSets = pcsvf_sets_for_skgrepo_changes (&straddle);
+    let sets : PrunedChangeViewSets = prunedChangeView_sets_for_skgrepo_changes (&straddle);
     assert_eq! ( sets . c, ids (&[ "mvc", "mvg", "mvp", "mvr", "mvt" ]) );
     assert_eq! ( sets . d, ids (&[ "mvp" ]) );
     assert! ( sets . u . contains (&"mvs" . into ()),
@@ -109,7 +111,7 @@ fn the_skgrepo_changes_sets_hold_the_recorder_of_a_relRepo_move (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &SKGREPOS, |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    let sets : PcsvfSets = pcsvf_sets_for_skgrepo_changes (&straddle);
+    let sets : PrunedChangeViewSets = prunedChangeView_sets_for_skgrepo_changes (&straddle);
     assert_eq! ( sets . c, ids (&[ "mv", "rr" ]) );
     Ok (( )) }) }
 

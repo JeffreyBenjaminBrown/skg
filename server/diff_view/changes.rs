@@ -15,8 +15,9 @@
 //! straddle), and its changeset markers. A node in U but not in C is
 //! context: its body starts folded. A write-protected occurrence gets
 //! none of this; its viewparent tags it. U and C are those of the
-//! buffer being drawn ('pcsvf_sets_of_buffer'); in the order-only buffer
-//! both are empty, and each node there gets an order-only marker.
+//! buffer being drawn ('prunedChangeView_sets_of_buffer'); in the
+//! order-only buffer both are empty, and each node there gets an
+//! order-only marker.
 //!
 //! Nothing that exists is drawn again ('docs/diff-view.org',
 //! "The fresh drawing, and what it keeps"):
@@ -32,7 +33,8 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
-use crate::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_of_buffer};
+use crate::diff_view::pruned_change_view::{
+  PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
 use crate::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_home_move_viewnode,
@@ -166,7 +168,8 @@ pub(crate) fn process_unrestrictedVognode_changes (
     detach_change_viewnodes (tree, treeid, straddle) ?;
     tag_content_members (tree, treeid, straddle, &content, None) ?;
     return Ok (( )); }
-  let sets : &PcsvfSets = pcsvf_sets_of_buffer (straddle, diffView_buffer_kind);
+  let sets : &PrunedChangeViewSets =
+    prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind);
   let in_c : bool = sets . c . contains (&pid);
   if created_in_this_completion {
     tree . get_mut (treeid) . unwrap () . value () . org_body_folded = ! in_c; }
@@ -282,8 +285,8 @@ pub(crate) enum HistoricalPhantomVisit {
 /// editable vognode, and one whose node is in neither graph (a
 /// deletion since committed) a deleted phantom. A removed member of
 /// its old content is created editable when its node is in U of the
-/// buffer being completed ('pcsvf_sets_of_buffer'); one that stands
-/// already keeps its editability ('adopt_fresh_facts').
+/// buffer being completed ('prunedChangeView_sets_of_buffer'); one that
+/// stands already keeps its editability ('adopt_fresh_facts').
 pub(crate) fn process_historical_phantom_visit (
   tree                 : &mut Tree<Viewnode>,
   treeid               : NodeId,
@@ -340,7 +343,7 @@ pub(crate) fn process_historical_phantom_visit (
     let root : NodeId = fresh . root () . id ();
     append_historical_phantom_content (
       &mut fresh, root, straddle, &skgid,
-      & pcsvf_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
+      & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
   let kept : Vec<NodeId> = reconcile_children_with_fresh_drawing (
     tree, treeid, &fresh, fresh . root () . id (), &straddle . after,
     &|viewnode| is_drawn_by_the_diff_view (viewnode, false, &straddle . after),

@@ -1,0 +1,32 @@
+// The pruned change view and the "all changes" buffer of the diff view
+// ('TODO/total-diff-view/02_plan.org', its section on the pruned change view),
+// over git fixtures in 'tests/pruned_change_view/fixtures/'.
+//
+// cargo nextest run --test grouped_repos -E 'test(pruned_change_view::)'
+
+#[path = "pruned_change_view/common.rs"]
+mod common;
+#[path = "pruned_change_view/sets.rs"]
+mod sets;
+#[path = "pruned_change_view/buffer.rs"]
+mod buffer;
+#[path = "pruned_change_view/request.rs"]
+mod request;
+#[path = "pruned_change_view/readiness.rs"]
+mod readiness;
+#[path = "pruned_change_view/other_buffers.rs"]
+mod other_buffers;
+#[path = "pruned_change_view/stage_and_commit.rs"]
+mod stage_and_commit;
+#[path = "pruned_change_view/editing.rs"]
+mod editing;
+#[path = "pruned_change_view/folding.rs"]
+mod folding;
+#[path = "pruned_change_view/recomputed_sets.rs"]
+mod recomputed_sets;
+#[path = "pruned_change_view/write_protecting.rs"]
+mod write_protecting;
+#[path = "pruned_change_view/partner_folder_check.rs"]
+mod partner_folder_check;
+#[path = "pruned_change_view/users_notes.rs"]
+mod users_notes;

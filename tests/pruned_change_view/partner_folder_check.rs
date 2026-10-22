@@ -6,7 +6,7 @@
 // to ghost, which no node has. So recorder is drawn write-protected
 // in the content of each.
 
-use crate::pcsvf::common::{open_all_changes_buffer, save, with_fixture};
+use crate::pruned_change_view::common::{open_all_changes_buffer, save, with_fixture};
 
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{BufferValidationError, SaveError};

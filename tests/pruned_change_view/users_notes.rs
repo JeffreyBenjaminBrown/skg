@@ -8,7 +8,7 @@
 // member; r held h, which is deleted, with m in its old content; acq
 // acquired acqd.
 
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   assert_lines_in_order, insert_after_line_starting, open_all_changes_buffer,
   rerendered_view_content, save, send_stage_and_commit_request, with_fixture};
 use crate::git_fixture::Fixture;

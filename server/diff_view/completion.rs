@@ -5,7 +5,7 @@
 //! up to date before view completion ('prepare_diffView_rerender') and
 //! sets the readiness facts after it ('finish_diffView_rerender').
 
-use crate::diff_view::pcsvf::{
+use crate::diff_view::pruned_change_view::{
   append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
   ensure_editableOccurrences_exist, root_skgids_of_buffer, set_diffView_facts_in_viewforest};
 use crate::diff_view::readiness_store::ReadinessStore;
@@ -49,7 +49,7 @@ impl DiffViewRerender {
 }
 
 /// Complete a stub viewforest of the diff view
-/// ('server/diff_view/pcsvf.rs'), the buffer of kind
+/// ('server/diff_view/pruned_change_view.rs'), the buffer of kind
 /// 'diffView_buffer_kind' over 'straddle': view completion with
 /// 'straddle' set, which draws the union of the straddle's content, the change
 /// folders and markers, and the former members. It creates no

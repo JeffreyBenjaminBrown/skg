@@ -1,27 +1,28 @@
-// The PCSVF's sets on the 'sets' fixture: a rootlike cycle (cy1 and
+// The pruned change view's sets on the 'sets' fixture: a rootlike cycle (cy1 and
 // cy2 contain each other; cy2 is retitled), a multiply-contained
 // node (mc, in ma and mb; retitled), a deleted subtree (r no longer
 // contains del, which is deleted with its content delc), and a
 // in-changed-only change (ln now contains lo, which lp contains too).
 
 use crate::git_fixture::graph_straddle;
-use crate::pcsvf::common::{ids, with_fixture, with_fixture_and_foreign};
+use crate::pruned_change_view::common::{ids, with_fixture, with_fixture_and_foreign};
 
 use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey, RelationshipAspect};
 use skg::graph_straddle::types::GraphStraddle;
 use skg::types::misc::ID;
-use skg::diff_view::pcsvf::{PcsvfSets, pcsvf_sets_of_buffer};
+use skg::diff_view::pruned_change_view::{
+  PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
 use skg::types::views_state::DiffViewBufferKind;
 
 use std::collections::BTreeSet;
 use std::error::Error;
 
 fn sets_fixture_sets (
-) -> Result<PcsvfSets, Box<dyn Error>> {
-  let mut sets : Option<PcsvfSets> = None;
+) -> Result<PrunedChangeViewSets, Box<dyn Error>> {
+  let mut sets : Option<PrunedChangeViewSets> = None;
   with_fixture ("sets", &["main"], |f| {
     let straddle : GraphStraddle = graph_straddle (f) ?;
-    sets = Some ( pcsvf_sets_of_buffer (
+    sets = Some ( prunedChangeView_sets_of_buffer (
       &straddle, DiffViewBufferKind::AllChanges ) . clone () );
     Ok (( )) }) ?;
   Ok ( sets . unwrap () ) }
@@ -29,7 +30,7 @@ fn sets_fixture_sets (
 #[test]
 fn c_holds_the_out_changed_and_the_in_changed_halves (
 ) -> Result<(), Box<dyn Error>> {
-  let sets : PcsvfSets = sets_fixture_sets () ?;
+  let sets : PrunedChangeViewSets = sets_fixture_sets () ?;
   assert_eq! ( sets . c,
                ids (&[ "cy2", "del", "delc", "ln", "lo", "mc", "r" ]) );
   Ok (( )) }
@@ -37,7 +38,7 @@ fn c_holds_the_out_changed_and_the_in_changed_halves (
 #[test]
 fn both_members_of_a_rootlike_cycle_are_origins_and_one_is_kept (
 ) -> Result<(), Box<dyn Error>> {
-  let sets : PcsvfSets = sets_fixture_sets () ?;
+  let sets : PrunedChangeViewSets = sets_fixture_sets () ?;
   assert! ( sets . r . is_superset (&ids (&[ "cy1", "cy2" ])) );
   assert! ( sets . u . is_superset (&ids (&[ "cy1", "cy2" ])) );
   // cy1 reaches cy2, still kept, so cy1 goes; cy2 then reaches only
@@ -49,7 +50,7 @@ fn both_members_of_a_rootlike_cycle_are_origins_and_one_is_kept (
 #[test]
 fn a_changed_multiply_contained_node_is_its_own_root (
 ) -> Result<(), Box<dyn Error>> {
-  let sets : PcsvfSets = sets_fixture_sets () ?;
+  let sets : PrunedChangeViewSets = sets_fixture_sets () ?;
   assert! ( sets . r . contains (&"mc" . into ()) );
   assert! ( sets . d . contains (&"mc" . into ()) );
   for container in [ "ma", "mb" ] {
@@ -60,7 +61,7 @@ fn a_changed_multiply_contained_node_is_its_own_root (
 #[test]
 fn a_deleted_subtree_is_reached_through_its_former_containers (
 ) -> Result<(), Box<dyn Error>> {
-  let sets : PcsvfSets = sets_fixture_sets () ?;
+  let sets : PrunedChangeViewSets = sets_fixture_sets () ?;
   assert! ( sets . u . is_superset (&ids (&[ "r", "del", "delc" ])) );
   assert! ( sets . d . contains (&"r" . into ()) );
   assert! ( ! sets . u . contains (&"keep" . into ()) );
@@ -69,7 +70,7 @@ fn a_deleted_subtree_is_reached_through_its_former_containers (
 #[test]
 fn an_in_changed_only_change_is_drawn_under_its_new_container (
 ) -> Result<(), Box<dyn Error>> {
-  let sets : PcsvfSets = sets_fixture_sets () ?;
+  let sets : PrunedChangeViewSets = sets_fixture_sets () ?;
   // lo has two containers in the union, so it is an origin; ln, a
   // kept origin, reaches it within U.
   assert! ( sets . r . is_superset (&ids (&[ "ln", "lo" ])) );
@@ -78,7 +79,7 @@ fn an_in_changed_only_change_is_drawn_under_its_new_container (
   assert_eq! ( sets . d, ids (&[ "cy2", "ln", "mc", "r" ]) );
   Ok (( )) }
 
-/// On every fixture of 'tests/pcsvf/': C is the recorders of the change
+/// On every fixture of 'tests/pruned_change_view/': C is the recorders of the change
 /// leaves, and the members of the relationship leaves whose
 /// relationship exists in one graph only (each a node of some graph).
 /// No fixture changes a mention, the in-half's other source.

@@ -10,7 +10,7 @@
 
 use crate::git_fixture::{Fixture, save_cleanly, skg_files};
 use crate::git_fixture_helpers::read_graphnode;
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   all_changes_buffer, all_changes_buffer_with_marks, all_changes_view,
   assert_lines_in_order, node_lines, open_all_changes_buffer,
   saves_back_unchanged, with_fixture};

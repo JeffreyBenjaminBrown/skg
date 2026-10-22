@@ -1,7 +1,8 @@
 //! The diff view (C-c v d): up to four buffers, each drawn over the
 //! graph straddle ('server/graph_straddle/'). 'docs/diff-view.org'
 //! describes it; this module implements it:
-//! - 'pcsvf.rs': C, R, U and D, each buffer's sets, and its stub roots;
+//! - 'pruned_change_view.rs': C, R, U and D, each buffer's sets, and
+//!   its stub roots;
 //! - 'completion.rs': drawing and rerendering a whole buffer;
 //! - 'visit.rs': where view completion reads the diff-view switch,
 //!   before a node's visit expands and after;
@@ -21,7 +22,7 @@ pub mod changes;
 pub mod completion;
 pub mod fresh_drawing;
 pub mod partner_folders;
-pub mod pcsvf;
+pub mod pruned_change_view;
 pub mod readiness_requests;
 pub mod readiness_store;
 pub mod visit;

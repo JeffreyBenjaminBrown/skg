@@ -1,6 +1,5 @@
-//! The PCSVF ("pruned change-spanning viewforest"): the viewforest
-//! the "all changes" buffer of the diff view draws
-//! ('docs/diff-view.org', "C, R, U and D").
+//! The pruned change view: the viewforest the "all changes" buffer of
+//! the diff view draws ('docs/diff-view.org', "C, R, U and D").
 //!
 //! C is the set of changed graphnodes. R is the set of content
 //! origins reached from C by walking containerward through the union
@@ -12,10 +11,11 @@
 //! its content. View completion extends the viewforest, its
 //! 'straddle' set ('process_unrestrictedVognode_changes').
 //!
-//! The merges and skgrepo-changes buffers draw PCSVFs over subsets of
-//! C ('pcsvf_sets_for_merges', 'pcsvf_sets_for_skgrepo_changes'). The
-//! order-only buffer draws no PCSVF: it is a flat list of the nodes
-//! whose only change is the order of a list.
+//! The merges and skgrepo-changes buffers draw pruned change views over
+//! subsets of C ('prunedChangeView_sets_for_merges',
+//! 'prunedChangeView_sets_for_skgrepo_changes'). The order-only buffer
+//! draws no pruned change view: it is a flat list of the nodes whose
+//! only change is the order of a list.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::GraphStraddle;
@@ -45,59 +45,65 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::sync::OnceLock;
 
-/// The sets that define a PCSVF. See the module comment.
+/// The sets that define a pruned change view. See the module comment.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct PcsvfSets {
+pub struct PrunedChangeViewSets {
   pub c : BTreeSet<ID>,
   pub r : BTreeSet<ID>,
   pub u : BTreeSet<ID>,
   pub d : BTreeSet<ID>,
 }
 
-/// The PCSVF sets of each buffer kind, each computed on first use.
-/// The graph straddle holds one ('GraphStraddle::pcsvf_cache'), so
-/// the sets are computed once per straddle and persist with it across
-/// requests.
-pub struct PcsvfCache {
-  sets_by_buffer_kind : HashMap<DiffViewBufferKind, OnceLock<PcsvfSets>>,
+/// The pruned change view sets of each buffer kind, each computed on
+/// first use. The graph straddle holds one
+/// ('GraphStraddle::prunedChangeView_cache'), so the sets are computed
+/// once per straddle and persist with it across requests.
+pub struct PrunedChangeViewCache {
+  sets_by_buffer_kind :
+    HashMap<DiffViewBufferKind, OnceLock<PrunedChangeViewSets>>,
 }
 
-impl Default for PcsvfCache {
+impl Default for PrunedChangeViewCache {
   fn default (
-  ) -> PcsvfCache {
-    PcsvfCache {
+  ) -> PrunedChangeViewCache {
+    PrunedChangeViewCache {
       sets_by_buffer_kind :
         DiffViewBufferKind::ALL . into_iter ()
         . map ( |diffView_buffer_kind| (diffView_buffer_kind, OnceLock::new ()) )
         . collect () } }
 }
 
-/// The sets of the PCSVF that a buffer of the diff view draws. The
-/// order-only buffer draws no PCSVF: its sets are empty, so each of
-/// its roots is drawn with its content as unexpanded write-protected
-/// members. Computed once per straddle ('PcsvfCache').
-pub fn pcsvf_sets_of_buffer (
+/// The sets of the pruned change view that a buffer of the diff view
+/// draws. The order-only buffer draws no pruned change view: its sets
+/// are empty, so each of its roots is drawn with its content as
+/// unexpanded write-protected members. Computed once per straddle
+/// ('PrunedChangeViewCache').
+pub fn prunedChangeView_sets_of_buffer (
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
-) -> &PcsvfSets {
-  straddle . pcsvf_cache . sets_by_buffer_kind [&diffView_buffer_kind]
+) -> &PrunedChangeViewSets {
+  straddle . prunedChangeView_cache . sets_by_buffer_kind [&diffView_buffer_kind]
     . get_or_init ( || match diffView_buffer_kind {
-      DiffViewBufferKind::AllChanges       => pcsvf_sets (straddle),
-      DiffViewBufferKind::Merges           => pcsvf_sets_for_merges (straddle),
-      DiffViewBufferKind::SkgrepoChanges   => pcsvf_sets_for_skgrepo_changes (straddle),
-      DiffViewBufferKind::OrderOnlyChanges => PcsvfSets::default (), } ) }
+      DiffViewBufferKind::AllChanges =>
+        prunedChangeView_sets (straddle),
+      DiffViewBufferKind::Merges =>
+        prunedChangeView_sets_for_merges (straddle),
+      DiffViewBufferKind::SkgrepoChanges =>
+        prunedChangeView_sets_for_skgrepo_changes (straddle),
+      DiffViewBufferKind::OrderOnlyChanges =>
+        PrunedChangeViewSets::default (), } ) }
 
-/// The sets of the PCSVF over all of C.
-pub fn pcsvf_sets (
+/// The sets of the pruned change view over all of C.
+pub fn prunedChangeView_sets (
   straddle : &GraphStraddle,
-) -> PcsvfSets {
-  pcsvf_sets_over ( straddle, straddle . changed_pids () . all () ) }
+) -> PrunedChangeViewSets {
+  prunedChangeView_sets_over ( straddle, straddle . changed_pids () . all () ) }
 
-/// The sets of a PCSVF over the changed nodes 'c'.
-pub fn pcsvf_sets_over (
+/// The sets of a pruned change view over the changed nodes 'c'.
+pub fn prunedChangeView_sets_over (
   straddle : &GraphStraddle,
   c        : BTreeSet<ID>,
-) -> PcsvfSets {
+) -> PrunedChangeViewSets {
   let containers_of = |skgid : &ID| -> Vec<ID> {
     union_containers (straddle, skgid) };
   let mut r : BTreeSet<ID> = BTreeSet::new ();
@@ -110,31 +116,31 @@ pub fn pcsvf_sets_over (
   u . extend ( r . iter () . cloned () );
   let d : BTreeSet<ID> =
     kept_content_origins (&r, &u, &containers_of, &BTreeSet::new ());
-  PcsvfSets { c, r, u, d } }
+  PrunedChangeViewSets { c, r, u, d } }
 
-/// The sets of the merges buffer's PCSVF, over the nodes involved in
-/// nodeMerges since HEAD: for each acquiree (a node of the
-/// before-graph only, which an after-graph node lists as an extra
-/// ID), the acquiree and its acquirer. The acquiree's text preserver
-/// is not in C; it is drawn as a new member of the acquirer's content.
-pub fn pcsvf_sets_for_merges (
+/// The sets of the merges buffer's pruned change view, over the nodes
+/// involved in nodeMerges since HEAD: for each acquiree (a node of the
+/// before-graph only, which an after-graph node lists as an extra ID),
+/// the acquiree and its acquirer. The acquiree's text preserver is not
+/// in C; it is drawn as a new member of the acquirer's content.
+pub fn prunedChangeView_sets_for_merges (
   straddle : &GraphStraddle,
-) -> PcsvfSets {
+) -> PrunedChangeViewSets {
   let mut c : BTreeSet<ID> = BTreeSet::new ();
   for acquiree in &straddle . changed_pids () . out_changed {
     let Some (acquirer) : Option<ID> = straddle . acquirer_of (acquiree)
       else { continue; };
     c . insert ( acquiree . clone () );
     c . insert (acquirer); }
-  pcsvf_sets_over (straddle, c) }
+  prunedChangeView_sets_over (straddle, c) }
 
-/// The sets of the skgrepo-changes buffer's PCSVF, over the recorders
-/// of the change leaves whose aspect is the home skgrepo or the
-/// relRepo: the nodes whose home skgrepo moved, and the recorders of
-/// the relationships whose relRepo moved.
-pub fn pcsvf_sets_for_skgrepo_changes (
+/// The sets of the skgrepo-changes buffer's pruned change view, over
+/// the recorders of the change leaves whose aspect is the home skgrepo
+/// or the relRepo: the nodes whose home skgrepo moved, and the
+/// recorders of the relationships whose relRepo moved.
+pub fn prunedChangeView_sets_for_skgrepo_changes (
   straddle : &GraphStraddle,
-) -> PcsvfSets {
+) -> PrunedChangeViewSets {
   let leaves : &ChangeLeaves = straddle . change_leaves ();
   let c : BTreeSet<ID> =
     leaves . recorders ()
@@ -143,7 +149,7 @@ pub fn pcsvf_sets_for_skgrepo_changes (
       . any ( |leaf| leaf_is_a_skgrepo_change (&leaf . key) ) )
     . cloned ()
     . collect ();
-  pcsvf_sets_over (straddle, c) }
+  prunedChangeView_sets_over (straddle, c) }
 
 /// A home skgrepo move or a relRepo move.
 fn leaf_is_a_skgrepo_change (
@@ -202,8 +208,8 @@ pub struct DrawnDiffViewBuffer {
 }
 
 /// The buffer of kind 'diffView_buffer_kind' over 'straddle', with
-/// roots 'roots' (for a PCSVF, its D in order), and readiness from
-/// 'store'.
+/// roots 'roots' (for a pruned change view, its D in order), and
+/// readiness from 'store'.
 pub fn diffView_buffer_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -313,8 +319,8 @@ pub fn nodes_editable_in_diffView (
     . chain (historical_in_content_position)
     . collect () }
 
-/// The stub the PCSVF's view completion starts from: each root drawn
-/// as 'append_stub_root' draws one.
+/// The stub the pruned change view's view completion starts from: each
+/// root drawn as 'append_stub_root' draws one.
 fn stub_viewforest_of_roots (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -330,9 +336,9 @@ fn stub_viewforest_of_roots (
   Ok (viewforest) }
 
 /// Append 'root' to the viewforest as an editable stub, or, when the
-/// after-graph lacks it, as a historical phantom, whose visit draws
-/// its old content. In a PCSVF, a multiply-contained root gets a
-/// folded container folder, which completion fills with its
+/// after-graph lacks it, as a historical phantom, whose visit draws its
+/// old content. In a pruned change view, a multiply-contained root gets
+/// a folded container folder, which completion fills with its
 /// containers in either graph and their containerward forest. The
 /// order-only buffer, a flat list, draws none. Returns the root's
 /// treeid.
@@ -375,7 +381,8 @@ pub fn contentOrigins_missing_from_buffer (
   viewforest           : &ViewForest,
   standing_roots       : &BTreeSet<ID>,
 ) -> Vec<ID> {
-  let sets : &PcsvfSets = pcsvf_sets_of_buffer (straddle, diffView_buffer_kind);
+  let sets : &PrunedChangeViewSets =
+    prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind);
   let containers_of = |skgid : &ID| -> Vec<ID> {
     union_containers (straddle, skgid) };
   let drawn : HashSet<ID> = nodes_editable_in_diffView (viewforest);
@@ -429,7 +436,7 @@ pub fn ensure_editableOccurrences_exist (
   config               : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let u : &BTreeSet<ID> =
-    & pcsvf_sets_of_buffer (straddle, diffView_buffer_kind) . u;
+    & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u;
   let mut editable : HashSet<ID> = editable_occurrences (viewforest);
   let occurrences : Vec<NodeId> =
     content_occurrences_in_level_order (viewforest) . into_iter ()

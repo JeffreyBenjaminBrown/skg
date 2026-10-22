@@ -10,13 +10,13 @@
 // member.
 
 use crate::git_fixture::{graph_straddle, save_cleanly};
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   all_changes_view, integrate_unshown_changes, node_lines,
   open_all_changes_buffer, requesting_editable_at, rerendered_view_content,
   retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
 
 use skg::graph_straddle::types::GraphStraddle;
-use skg::diff_view::pcsvf::ensure_editableOccurrences_exist;
+use skg::diff_view::pruned_change_view::ensure_editableOccurrences_exist;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::serve::handlers::save_buffer::SaveResponse;

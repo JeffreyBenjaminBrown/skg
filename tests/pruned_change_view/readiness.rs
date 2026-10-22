@@ -6,7 +6,7 @@
 
 use crate::git_fixture::{Fixture, edit_line, save_cleanly};
 use crate::git_fixture_helpers::without_lines_containing;
-use crate::pcsvf::common::{
+use crate::pruned_change_view::common::{
   all_changes_view, insert_after_line_starting, integrate_unshown_changes,
   open_all_changes_buffer, open_buffer, save_buffer, with_fixture,
   with_fixture_and_foreign};
@@ -225,7 +225,7 @@ fn save_deleting (
                "the reconciled buffer is a fixed point" );
   Ok (saved) }
 
-/// A node deleted in the buffer is drawn as the PCSVF draws a
+/// A node deleted in the buffer is drawn as the pruned change view draws a
 /// deleted node: where it stood among its container's content, and
 /// in the changed container folder of what it contained. Where it
 /// stood, its viewnode stays, with its folded body.

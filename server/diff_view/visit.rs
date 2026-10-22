@@ -29,7 +29,7 @@ use crate::diff_view::changes::{
   HistoricalPhantomVisit, align_content_members_with_straddle,
   deleted_phantom_becomes_historical, process_historical_phantom_visit,
   process_unrestrictedVognode_changes};
-use crate::diff_view::pcsvf::pcsvf_sets_of_buffer;
+use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::misc::ID;
 use crate::types::viewnode::{Phantom, Viewnode, ViewnodeKind, Vognode};
@@ -124,7 +124,7 @@ pub fn diffView_visit_before_expansion<'a> (
     substitution_enabled                : false,
     default_folders_allowed             : false,
     diffView_u                          :
-      Some (& pcsvf_sets_of_buffer (straddle, diffView_buffer_kind) . u),
+      Some (& prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u),
     straddle_to_align_with              : Some (straddle), } )) }
 
 /// The diff view's part at the end of an unrestricted vognode's visit:
@@ -159,12 +159,12 @@ pub fn diffView_visit_after_expansion (
   Ok (( )) }
 
 impl<'a> VisitSettings<'a> {
-  /// Whether this expansion of 'pid' is charged to the node budget
-  /// (see the module comment of 'to_org/expand/editable.rs'). In an
-  /// ordinary view, every expansion is. The diff view deviates
-  /// ('docs/diff-view.org', "Editability in the diff view"): a node of
-  /// U is never charged, whether the PCSVF's rule or a request made it
-  /// editable, so the budget bounds only the expansions that an
+  /// Whether this expansion of 'pid' is charged to the node budget (see
+  /// the module comment of 'to_org/expand/editable.rs'). In an ordinary
+  /// view, every expansion is. The diff view deviates
+  /// ('docs/diff-view.org', "Editability in the diff view"): a node of U
+  /// is never charged, whether the pruned change view's rule or a request
+  /// made it editable, so the budget bounds only the expansions that an
   /// editable-view request makes outside U.
   pub fn charges_node_budget (
     &self,
