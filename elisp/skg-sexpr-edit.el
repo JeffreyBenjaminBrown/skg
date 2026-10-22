@@ -278,7 +278,7 @@ Kill the buffer to cancel without saving."
                (title (caddr split))
                (org-text (let ((sexp-as-org (sexp-to-org sexp)))
                            (if is-unrestrictedNode
-                               (skg-unrestrictedNode-expand-defaults-in-org
+                               (skg-unrestrictedNode-fillIn-defaults-in-org
                                 sexp-as-org nil title)
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer

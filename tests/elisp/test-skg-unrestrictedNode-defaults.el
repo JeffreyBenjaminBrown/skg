@@ -32,15 +32,15 @@
                    "* skg\n** node\n*** id\n**** abc"))))
 
 ;;
-;; Expand: minimal sexp (id + repo only) -> all defaults appear
+;; Fill in: minimal sexp (id + repo only) -> all defaults appear
 ;;
 
-(ert-deftest test-expand-minimal-sexp ()
-  "Expanding a minimal UnrestrictedVognode inserts all default fields."
+(ert-deftest test-fillIn-minimal-sexp ()
+  "Filling in a minimal UnrestrictedVognode inserts all default fields."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, repo : jeff,
     ;; write-protected : false (default), affectsParent : true (default),
@@ -58,15 +58,15 @@
                      :key #'cdr :test #'string=))))
 
 ;;
-;; Expand: sexp with 'writeProtected' present -> shows 'true' child
+;; Fill in: sexp with 'writeProtected' present -> shows 'true' child
 ;;
 
-(ert-deftest test-expand-with-write-protected ()
-  "Expanding a sexp with bare writeProtected shows 'true' child."
+(ert-deftest test-fillIn-with-write-protected ()
+  "Filling in a sexp with bare writeProtected shows 'true' child."
   (let* ((sexp '(skg (node (id abc) (repo jeff) writeProtected)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (write-protected-idx (cl-position "writeProtected" headlines
                                  :key #'cdr :test #'string=)))
@@ -75,15 +75,15 @@
     (should (string= (cdr (nth (1+ write-protected-idx) headlines)) "true"))))
 
 ;;
-;; Expand: sexp without affectsParent -> inserts 'true (default)' child
+;; Fill in: sexp without affectsParent -> inserts 'true (default)' child
 ;;
 
-(ert-deftest test-expand-affectsParent-default-inserted ()
-  "Expanding a sexp without affectsParent inserts 'true (default)'."
+(ert-deftest test-fillIn-affectsParent-default-inserted ()
+  "Filling in a sexp without affectsParent inserts 'true (default)'."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (affectsParent-idx (cl-position "affectsParent" headlines
                                  :key #'cdr :test #'string=)))
@@ -92,15 +92,15 @@
                       "true (default)"))))
 
 ;;
-;; Strip: unmodified expanded org -> returns original sexp
+;; Strip: unmodified filled-in org -> returns original sexp
 ;;
 
 (ert-deftest test-strip-unmodified-returns-original ()
-  "Stripping an unmodified expanded org returns the original sexp."
+  "Stripping an unmodified filled-in org returns the original sexp."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -157,42 +157,42 @@
     (should (equal result '(skg (node (id abc) (repo jeff)))))))
 
 ;;
-;; Round-trip: expand then strip with no edits = identity
+;; Round-trip: fill in then strip with no edits = identity
 ;;
 
 (ert-deftest test-round-trip-minimal ()
-  "Round-trip: expand then strip on minimal sexp is identity."
+  "Round-trip: fill in then strip on minimal sexp is identity."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
 (ert-deftest test-round-trip-with-write-protected ()
-  "Round-trip: expand then strip preserves bare writeProtected."
+  "Round-trip: fill in then strip preserves bare writeProtected."
   (let* ((sexp '(skg (node (id abc) (repo jeff) writeProtected)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
 (ert-deftest test-round-trip-with-editrequest-delete ()
-  "Round-trip: expand then strip preserves (editRequest delete)."
+  "Round-trip: fill in then strip preserves (editRequest delete)."
   (let* ((sexp '(skg (node (id abc) (repo jeff) (editRequest delete))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
 (ert-deftest test-round-trip-with-editrequest-merge ()
-  "Round-trip: expand then strip preserves (editRequest (merge XYZ))."
+  "Round-trip: fill in then strip preserves (editRequest (merge XYZ))."
   (let* ((sexp '(skg (node (id abc) (repo jeff) (editRequest (merge XYZ)))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
@@ -201,11 +201,11 @@
 ;;
 
 (ert-deftest test-canonical-ordering ()
-  "Fields appear in canonical order after expansion."
+  "Fields appear in canonical order after filling in."
   (let* ((sexp '(skg (node (repo jeff) (graphStats 42) (id abc) writeProtected)))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
          (level-3 (mapcar #'cdr
                           (cl-remove-if-not
@@ -316,33 +316,33 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
 ;; Repo defaults
 ;;
 
-(ert-deftest test-expand-with-default-repo-marks-matching ()
-  "Expanding with default-repo marks matching repo value."
+(ert-deftest test-fillIn-with-default-repo-marks-matching ()
+  "Filling in with default-repo marks matching repo value."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text "jeff"))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "jeff (default)" headlines
                      :key #'cdr :test #'string=))))
 
-(ert-deftest test-expand-with-default-repo-leaves-nonmatching ()
-  "Expanding with default-repo leaves non-matching repo value bare."
+(ert-deftest test-fillIn-with-default-repo-leaves-nonmatching ()
+  "Filling in with default-repo leaves non-matching repo value bare."
   (let* ((sexp '(skg (node (id abc) (repo bob))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text "jeff"))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "bob" headlines :key #'cdr :test #'string=))
     (should-not (cl-find "bob (default)" headlines
                          :key #'cdr :test #'string=))))
 
-(ert-deftest test-expand-inserts-default-repo-when-missing ()
-  "Expanding a node with no repo inserts default repo."
+(ert-deftest test-fillIn-inserts-default-repo-when-missing ()
+  "Filling in a node with no repo inserts default repo."
   (let* ((sexp '(skg (node (id abc))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text "jeff"))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (cl-find "repo" headlines :key #'cdr :test #'string=))
     (should (cl-find "jeff (default)" headlines
@@ -373,35 +373,35 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
     (should (equal result '(skg (node (id abc) (repo bob)))))))
 
 (ert-deftest test-round-trip-with-default-repo ()
-  "Round-trip with default-repo: expand then strip is identity."
+  "Round-trip with default-repo: fill in then strip is identity."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text "jeff"))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
 (ert-deftest test-round-trip-new-node-no-repo ()
-  "Round-trip for new node: expand with default, strip keeps repo."
+  "Round-trip for new node: fill in with default, strip keeps repo."
   (let* ((org-text "* skg\n** node")
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text "jeff"))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text "jeff"))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg (node (repo jeff)))))))
 
 ;;
 ;; Bug: skg-view-metadata was passing hardcoded "* skg\n** node"
 ;; instead of the actual sexp-to-org output, discarding all fields.
-;; These tests verify expand works correctly on real metadata sexps.
+;; These tests verify filling in works correctly on real metadata sexps.
 ;;
 
-(ert-deftest test-expand-preserves-existing-repo ()
-  "Expanding a sexp that already has repo preserves it."
+(ert-deftest test-fillIn-preserves-existing-repo ()
+  "Filling in a sexp that already has repo preserves it."
   (let* ((sexp '(skg (node (id abc) (repo public)
                            (rels "C5"))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Repo field must be present
     (should (cl-find "repo" headlines :key #'cdr :test #'string=))
@@ -413,27 +413,27 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
     ;; the rels herald must be preserved (as non-canonical, appended at end)
     (should (cl-find "rels" headlines :key #'cdr :test #'string=))))
 
-(ert-deftest test-expand-preserves-repo-round-trip ()
-  "Expanding then stripping a sexp with id + repo is identity. (The
+(ert-deftest test-fillIn-preserves-repo-round-trip ()
+  "Filling in then stripping a sexp with id + repo is identity. (The
 sexp<->org bijection is symbol-based, so the display-only herald strings
 -- which are stripped before this path anyway -- are not round-tripped
 here; see test-round-trip-with-links-in-herald's removal.)"
   (let* ((sexp '(skg (node (id abc) (repo public))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
-(ert-deftest test-expand-real-world-metadata ()
-  "Expanding a real-world metadata sexp (like from next.org bug report)
+(ert-deftest test-fillIn-real-world-metadata ()
+  "Filling in a real-world metadata sexp (like from next.org bug report)
 preserves repo and all fields."
   (let* ((sexp '(skg (node (id 6972d099)
                            (repo public)
                            (rels "C5 4(1,1)L"))))
          (org-text (sexp-to-org sexp))
-         (expanded (skg-unrestrictedNode-expand-defaults-in-org org-text))
-         (lines (split-string expanded "\n"))
+         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Repo must be present
     (should (cl-find "repo" headlines :key #'cdr :test #'string=))
@@ -457,14 +457,14 @@ preserves repo and all fields."
 ;; Display-only title group
 ;;
 
-(ert-deftest test-expand-prepends-display-title ()
-  "Expanding with a display title prepends the title group."
+(ert-deftest test-fillIn-prepends-display-title ()
+  "Filling in with a display title prepends the title group."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded
-          (skg-unrestrictedNode-expand-defaults-in-org
+         (filledIn
+          (skg-unrestrictedNode-fillIn-defaults-in-org
            org-text nil "actual title"))
-         (lines (split-string expanded "\n"))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (equal (cl-subseq headlines 0 4)
                    '((1 . "title")
@@ -472,13 +472,13 @@ preserves repo and all fields."
                      (1 . "skg")
                      (2 . "node"))))))
 
-(ert-deftest test-expand-with-empty-display-title-does-not-prepend ()
-  "Expanding with an empty display title leaves metadata first."
+(ert-deftest test-fillIn-with-empty-display-title-does-not-prepend ()
+  "Filling in with an empty display title leaves metadata first."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded
-          (skg-unrestrictedNode-expand-defaults-in-org org-text nil ""))
-         (lines (split-string expanded "\n"))
+         (filledIn
+          (skg-unrestrictedNode-fillIn-defaults-in-org org-text nil ""))
+         (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (equal (car headlines) '(1 . "skg")))))
 
@@ -486,10 +486,10 @@ preserves repo and all fields."
   "Stripping removes the display-only title group before conversion."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
-         (expanded
-          (skg-unrestrictedNode-expand-defaults-in-org
+         (filledIn
+          (skg-unrestrictedNode-fillIn-defaults-in-org
            org-text nil "actual title"))
-         (stripped (skg-unrestrictedNode-strip-defaults-from-org expanded))
+         (stripped (skg-unrestrictedNode-strip-defaults-from-org filledIn))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 

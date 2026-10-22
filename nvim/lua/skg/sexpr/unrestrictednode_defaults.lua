@@ -1,9 +1,9 @@
--- PURPOSE: Expand/strip default fields for UnrestrictedVognode metadata
--- editing. After sexp_to_org, expand inserts missing editable fields
+-- PURPOSE: Fill in/strip default fields for UnrestrictedVognode metadata
+-- editing. After sexp_to_org, filling in inserts missing editable fields
 -- with defaults; before org_to_sexp, strip removes default-valued
 -- fields. The Lua port of elisp/skg-sexpr/skg-unrestrictedNode-defaults.el.
 --
--- ENTRY POINTS: unrestrictedNode_sexp_p, expand_defaults_in_org,
+-- ENTRY POINTS: unrestrictedNode_sexp_p, fillIn_defaults_in_org,
 -- strip_defaults_from_org, headlines_to_org.
 --
 -- Headlines here are the {level, text} tables produced by
@@ -59,12 +59,12 @@ function M.headlines_to_org (headlines)
   return table.concat(lines, '\n')
 end
 
--- ── Expand ─────────────────────────────────────────────────────────
+-- ── Fill in ────────────────────────────────────────────────────────
 
----Expand default fields in ORG_TEXT for UnrestrictedVognode metadata editing:
+---Fill in default fields in ORG_TEXT for UnrestrictedVognode metadata editing:
 ---reorder the '** node' section's fields to canonical order, insert
----missing editable fields with defaults, and expand bare boolean
----atoms to have a value child. If DEFAULT_REPO is given, insert it
+---missing editable fields with defaults, and fill in a value child
+---for each bare boolean atom. If DEFAULT_REPO is given, insert it
 ---as the skgrepo default and mark a matching existing skgrepo value
 ---with '(default)'. If DISPLAY_TITLE is given and non-empty, prepend
 ---a display-only title group.
@@ -72,11 +72,11 @@ end
 ---@param default_repo string|nil
 ---@param display_title string|nil
 ---@return string
-function M.expand_defaults_in_org (org_text, default_skgrepo,
+function M.fillIn_defaults_in_org (org_text, default_skgrepo,
                                    display_title)
   local headlines = bijection.extract_headlines(org_text)
-  local expanded = M.expand_headlines(headlines, default_skgrepo)
-  local with_title = M.maybe_prepend_title(expanded, display_title)
+  local filledIn = M.fillIn_headlines(headlines, default_skgrepo)
+  local with_title = M.maybe_prepend_title(filledIn, display_title)
   return M.headlines_to_org(with_title)
 end
 
@@ -97,16 +97,16 @@ end
 ---@param headlines table[]
 ---@param default_skgrepo string|nil
 ---@return table[]
-function M.expand_headlines (headlines, default_skgrepo)
+function M.fillIn_headlines (headlines, default_skgrepo)
   local node_index = M.find_node_headline(headlines)
   local child_level = headlines[node_index].level + 1
   local before_node = vim.list_slice(headlines, 1, node_index)
   local after_node = vim.list_slice(headlines, node_index + 1)
   local children, remainder =
     M.group_children(after_node, child_level)
-  local expanded_children =
-    M.expand_and_reorder(children, child_level, default_skgrepo)
-  return M.concatenated(before_node, expanded_children, remainder)
+  local filledIn_children =
+    M.fillIn_and_reorder(children, child_level, default_skgrepo)
+  return M.concatenated(before_node, filledIn_children, remainder)
 end
 
 ---The index of the 'node' headline in HEADLINES; errors if na.
@@ -154,7 +154,7 @@ end
 ---@param child_level integer
 ---@param default_skgrepo string|nil
 ---@return table[]
-function M.expand_and_reorder (children, child_level, default_skgrepo)
+function M.fillIn_and_reorder (children, child_level, default_skgrepo)
   local field_map = {}
   for _, group in ipairs(children) do
     table.insert(field_map, { name = group[1].text, group = group })
@@ -172,7 +172,7 @@ function M.expand_and_reorder (children, child_level, default_skgrepo)
     if existing then
       seen[field_name] = true
       for _, headline in ipairs(
-          M.maybe_expand_field(existing.group, child_level,
+          M.maybe_fillIn_field(existing.group, child_level,
                                field_name, default_skgrepo)) do
         table.insert(ordered, headline) end
     elseif M.editable_default_for(field_name) then
@@ -197,14 +197,14 @@ function M.expand_and_reorder (children, child_level, default_skgrepo)
   return ordered
 end
 
----Expand GROUP for display: a bare 'writeProtected' boolean gains a 'true'
+---Fill in GROUP for display: a bare 'writeProtected' boolean gains a 'true'
 ---child; a skgrepo value matching DEFAULT_REPO gains ' (default)'.
 ---@param group table[]
 ---@param child_level integer
 ---@param field_name string
 ---@param default_repo string|nil
 ---@return table[]
-function M.maybe_expand_field (group, child_level, field_name,
+function M.maybe_fillIn_field (group, child_level, field_name,
                                default_skgrepo)
   if #group == 1 and field_name == 'writeProtected' then
     return { group[1], { level = child_level + 1, text = 'true' } } end

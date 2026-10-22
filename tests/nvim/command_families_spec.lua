@@ -255,7 +255,7 @@ describe('skg.metadata_edit', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('opens the expanded view and applies an edit back', function ()
+  it('opens the filled-in view and applies an edit back', function ()
     local source_buf = buffer_with(
       '* (skg (node (id abc) (repo public))) my title')
     metadata_edit.edit_metadata()

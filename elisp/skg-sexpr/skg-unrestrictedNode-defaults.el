@@ -1,12 +1,12 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Expand/strip default fields for UnrestrictedVognode metadata editing.
-;;; After sexp-to-org, expand inserts missing editable fields with defaults.
+;;; PURPOSE: Fill in/strip default fields for UnrestrictedVognode metadata editing.
+;;; After sexp-to-org, filling in inserts missing editable fields with defaults.
 ;;; Before org-to-sexp, strip removes default-valued fields.
 ;;;
 ;;; ENTRY POINTS:
 ;;;   skg-unrestrictedNode-sexp-p
-;;;   skg-unrestrictedNode-expand-defaults-in-org
+;;;   skg-unrestrictedNode-fillIn-defaults-in-org
 ;;;   skg-unrestrictedNode-strip-defaults-from-org
 ;;;   skg-headlines-to-org
 
@@ -52,27 +52,27 @@
    "\n"))
 
 ;;
-;; Expand
+;; Fill in
 ;;
 
-(defun skg-unrestrictedNode-expand-defaults-in-org
+(defun skg-unrestrictedNode-fillIn-defaults-in-org
     (org-text &optional default-skgrepo display-title)
-  "Expand default fields in ORG-TEXT for UnrestrictedVognode metadata editing.
+  "Fill in default fields in ORG-TEXT for UnrestrictedVognode metadata editing.
 Parses org text to headlines, finds the ** node section,
 reorders fields to canonical order, inserts missing editable
-fields with defaults, and expands bare boolean atoms to have
-a value child.
+fields with defaults, and fills in a value child for each bare
+boolean atom.
 If DEFAULT-REPO is non-nil, insert it as the repo default
 and mark existing repo values that match it with '(default)'.
 If DISPLAY-TITLE is non-nil and non-empty, prepend a read-only
 title display group."
   (let* ((lines (split-string org-text "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (expanded (skg-unrestrictedNode--expand-headlines
+         (filledIn (skg-unrestrictedNode--fillIn-headlines
                     headlines default-skgrepo))
          (with-title
           (skg-unrestrictedNode--maybe-prepend-title
-           expanded display-title)))
+           filledIn display-title)))
     (skg-headlines-to-org with-title)))
 
 (defun skg-unrestrictedNode--maybe-prepend-title (headlines display-title)
@@ -84,8 +84,8 @@ title display group."
               headlines)
     headlines))
 
-(defun skg-unrestrictedNode--expand-headlines (headlines &optional default-skgrepo)
-  "Expand HEADLINES by reordering fields and inserting defaults.
+(defun skg-unrestrictedNode--fillIn-headlines (headlines &optional default-skgrepo)
+  "Fill in HEADLINES by reordering fields and inserting defaults.
 DEFAULT-REPO, if non-nil, is used for repo field defaults.
 Returns a new headline list."
   (let* ((node-idx (skg-unrestrictedNode--find-node-headline headlines))
@@ -96,10 +96,10 @@ Returns a new headline list."
          (groups (skg-unrestrictedNode--group-children after-node child-level))
          (children (car groups))
          (remainder (cdr groups))
-         (expanded-children
-          (skg-unrestrictedNode--expand-and-reorder
+         (filledIn-children
+          (skg-unrestrictedNode--fillIn-and-reorder
            children child-level default-skgrepo)))
-    (append before-node expanded-children remainder)))
+    (append before-node filledIn-children remainder)))
 
 (defun skg-unrestrictedNode--find-node-headline (headlines)
   "Return the index of the '** node' headline in HEADLINES."
@@ -143,7 +143,7 @@ headline groups, each being a list of headlines."
       (push (nreverse current-group) children))
     (cons (nreverse children) rest)))
 
-(defun skg-unrestrictedNode--expand-and-reorder (children child-level
+(defun skg-unrestrictedNode--fillIn-and-reorder (children child-level
                                         &optional default-skgrepo)
   "Reorder CHILDREN to canonical order and insert missing defaults.
 CHILDREN is a list of headline groups. CHILD-LEVEL is the level
@@ -163,7 +163,7 @@ repo field defaults. Returns a flat list of headlines."
               (let ((group (cdr existing)))
                 (setq ordered
                       (append ordered
-                              (skg-unrestrictedNode--maybe-expand-field
+                              (skg-unrestrictedNode--maybe-fillIn-field
                                group child-level field-name
                                default-skgrepo)))))
           ;; Insert default if it's an editable field
@@ -200,12 +200,12 @@ repo field defaults. Returns a flat list of headlines."
      (cons (cdr (car group)) group))
    children))
 
-(defun skg-unrestrictedNode--maybe-expand-field (group child-level field-name
+(defun skg-unrestrictedNode--maybe-fillIn-field (group child-level field-name
                                         default-skgrepo)
-  "Expand GROUP for display. Handles booleans and repo defaults.
+  "Fill in GROUP for display. Handles booleans and repo defaults.
 Returns the group, possibly with a value child added or modified."
   (cond
-   ;; Bare boolean atom: expand to have 'true' child
+   ;; Bare boolean atom: fill in a 'true' child
    ((and (= (length group) 1)
          (string= field-name "writeProtected"))
     (list (car group)

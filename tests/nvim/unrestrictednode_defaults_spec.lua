@@ -12,20 +12,20 @@ local function find_text (headlines, text)
   return nil
 end
 
-local function expanded_headlines (sexp_text, default_skgrepo,
+local function filledIn_headlines (sexp_text, default_skgrepo,
                                    display_title)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
-  local expanded = defaults.expand_defaults_in_org(
+  local filledIn = defaults.fillIn_defaults_in_org(
     org_text, default_skgrepo, display_title)
-  return bijection.extract_headlines(expanded)
+  return bijection.extract_headlines(filledIn)
 end
 
----Expand then strip then re-read, as the edit-buffer apply path does.
+---Fill in then strip then re-read, as the edit-buffer apply path does.
 local function round_trip (sexp_text, default_skgrepo)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
-  local expanded = defaults.expand_defaults_in_org(
+  local filledIn = defaults.fillIn_defaults_in_org(
     org_text, default_skgrepo)
-  local stripped = defaults.strip_defaults_from_org(expanded)
+  local stripped = defaults.strip_defaults_from_org(filledIn)
   return bijection.org_to_sexp(stripped)
 end
 
@@ -60,10 +60,10 @@ describe('skg.sexpr.unrestrictednode_defaults.headlines_to_org', function ()
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults expansion', function ()
+describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
   it('inserts all default fields into a minimal UnrestrictedVognode', function ()
     local headlines =
-      expanded_headlines('(skg (node (id abc) (repo jeff)))')
+      filledIn_headlines('(skg (node (id abc) (repo jeff)))')
     -- skg, node, id/abc, skgrepo/jeff, write-protected/false, affectsParent/true,
     -- birth/unremarkable, editRequest/none, viewRequests/none:
     -- each key AND each value is a separate headline.
@@ -76,7 +76,7 @@ describe('skg.sexpr.unrestrictednode_defaults expansion', function ()
 
   it('shows a true child for a bare writeProtected', function ()
     local headlines =
-      expanded_headlines('(skg (node (id abc) (repo jeff) writeProtected))')
+      filledIn_headlines('(skg (node (id abc) (repo jeff) writeProtected))')
     local write_protected_index = find_text(headlines, 'writeProtected')
     assert.is_not_nil(write_protected_index)
     assert.are.equal('true', headlines[write_protected_index + 1].text)
@@ -84,7 +84,7 @@ describe('skg.sexpr.unrestrictednode_defaults expansion', function ()
 
   it('inserts true (default) when affectsParent is missing', function ()
     local headlines =
-      expanded_headlines('(skg (node (id abc) (repo jeff)))')
+      filledIn_headlines('(skg (node (id abc) (repo jeff)))')
     local affectsParent_index = find_text(headlines, 'affectsParent')
     assert.is_not_nil(affectsParent_index)
     assert.are.equal('true (default)',
@@ -92,7 +92,7 @@ describe('skg.sexpr.unrestrictednode_defaults expansion', function ()
   end)
 
   it('orders fields canonically', function ()
-    local headlines = expanded_headlines(
+    local headlines = filledIn_headlines(
       '(skg (node (repo jeff) (graphStats 42) (id abc) writeProtected))')
     local level_3 = {}
     for _, headline in ipairs(headlines) do
@@ -107,7 +107,7 @@ describe('skg.sexpr.unrestrictednode_defaults expansion', function ()
 end)
 
 describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
-  it('is identity on an unmodified expansion', function ()
+  it('is identity on unmodified filled-in text', function ()
     assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
       round_trip('(skg (node (id abc) (repo jeff)))'))
   end)
@@ -211,13 +211,13 @@ end)
 
 describe('skg.sexpr.unrestrictednode_defaults repo defaults', function ()
   it('marks a matching repo value with (default)', function ()
-    local headlines = expanded_headlines(
+    local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo jeff)))', 'jeff')
     assert.is_not_nil(find_text(headlines, 'jeff (default)'))
   end)
 
   it('leaves a non-matching repo value bare', function ()
-    local headlines = expanded_headlines(
+    local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo bob)))', 'jeff')
     assert.is_not_nil(find_text(headlines, 'bob'))
     assert.is_nil(find_text(headlines, 'bob (default)'))
@@ -225,7 +225,7 @@ describe('skg.sexpr.unrestrictednode_defaults repo defaults', function ()
 
   it('inserts the default repo when missing', function ()
     local headlines =
-      expanded_headlines('(skg (node (id abc)))', 'jeff')
+      filledIn_headlines('(skg (node (id abc)))', 'jeff')
     assert.is_not_nil(find_text(headlines, 'repo'))
     assert.is_not_nil(find_text(headlines, 'jeff (default)'))
   end)
@@ -250,9 +250,9 @@ describe('skg.sexpr.unrestrictednode_defaults repo defaults', function ()
   end)
 
   it('round-trips a new node with no repo', function ()
-    local expanded = defaults.expand_defaults_in_org(
+    local filledIn = defaults.fillIn_defaults_in_org(
       '* skg\n** node', 'jeff')
-    local stripped = defaults.strip_defaults_from_org(expanded)
+    local stripped = defaults.strip_defaults_from_org(filledIn)
     assert.are.same(sexpr.read('(skg (node (repo jeff)))'),
       bijection.org_to_sexp(stripped))
   end)
@@ -261,7 +261,7 @@ end)
 describe('skg.sexpr.unrestrictednode_defaults real-world metadata', function ()
   it('preserves an existing repo and appends non-canonical fields',
      function ()
-    local headlines = expanded_headlines(
+    local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo public) (rels "C5")))')
     assert.is_not_nil(find_text(headlines, 'repo'))
     assert.is_not_nil(find_text(headlines, 'public'))
@@ -276,8 +276,8 @@ describe('skg.sexpr.unrestrictednode_defaults real-world metadata', function ()
       round_trip('(skg (node (id abc) (repo public)))'))
   end)
 
-  it('expands real-world metadata with a herald field', function ()
-    local headlines = expanded_headlines(
+  it('fills in real-world metadata with a herald field', function ()
+    local headlines = filledIn_headlines(
       '(skg (node (id 6972d099) (repo public)'
       .. ' (rels "C5 4(1,1)L")))')
     assert.is_not_nil(find_text(headlines, 'repo'))
@@ -291,7 +291,7 @@ end)
 
 describe('skg.sexpr.unrestrictednode_defaults display title', function ()
   it('prepends the title group', function ()
-    local headlines = expanded_headlines(
+    local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo jeff)))', nil, 'actual title')
     assert.are.same(
       { { level = 1, text = 'title' },
@@ -302,7 +302,7 @@ describe('skg.sexpr.unrestrictednode_defaults display title', function ()
   end)
 
   it('does not prepend an empty title', function ()
-    local headlines = expanded_headlines(
+    local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo jeff)))', nil, '')
     assert.are.same({ level = 1, text = 'skg' }, headlines[1])
   end)
@@ -310,9 +310,9 @@ describe('skg.sexpr.unrestrictednode_defaults display title', function ()
   it('is removed again by stripping', function ()
     local org_text = bijection.sexp_to_org(
       sexpr.read('(skg (node (id abc) (repo jeff)))'))
-    local expanded = defaults.expand_defaults_in_org(
+    local filledIn = defaults.fillIn_defaults_in_org(
       org_text, nil, 'actual title')
-    local stripped = defaults.strip_defaults_from_org(expanded)
+    local stripped = defaults.strip_defaults_from_org(filledIn)
     assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
       bijection.org_to_sexp(stripped))
   end)

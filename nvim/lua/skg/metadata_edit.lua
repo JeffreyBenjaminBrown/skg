@@ -46,7 +46,7 @@ function M.edit_metadata ()
   local is_unrestrictedNode = defaults.unrestrictedNode_sexp_p(sexp)
   local org_text = bijection.sexp_to_org(sexp)
   if is_unrestrictedNode then
-    org_text = defaults.expand_defaults_in_org(
+    org_text = defaults.fillIn_defaults_in_org(
       org_text, nil, split.title) end
   M.open_edit_buffer(org_text, source_buf, line_number,
                      #split.stars, #split.metadata, is_unrestrictedNode)
