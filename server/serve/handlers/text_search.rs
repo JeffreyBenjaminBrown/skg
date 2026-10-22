@@ -563,7 +563,7 @@ pub fn group_matches_by_skgid (
           // alias document carries the ALIAS's relRepo as
           // its skgrepo, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
-          // nor shift ranking (dbs-and-search, 5_plan.org). The
+          // nor shift ranking ('docs/api-and-formats.org', "Text search"). The
           // group-level filter below survives as a backstop.
           if ! a . is_all ()
           && ! a . contains_skgrepo (&skgrepo) {

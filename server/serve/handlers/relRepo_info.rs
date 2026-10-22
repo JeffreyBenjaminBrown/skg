@@ -1,4 +1,4 @@
-//! `relRepo info` (BUG-and-fix_make-edge-more-public.org): given
+//! `relRepo info` ('docs/api-and-formats.org', "relRepo info"): given
 //! one relationship -- recorder id, member id, and the relation
 //! between them -- reply with the relationship's default relRepo and its
 //! current relRepo (when the graph records the relationship). The client's

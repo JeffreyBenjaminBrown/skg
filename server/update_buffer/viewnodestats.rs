@@ -366,8 +366,8 @@ fn set_omitted_body (
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . omitted_body = omitted_body; }}
 
-/// Sets relRepo on the unrestricted vognode at treeid (render-and-gating,
-/// 5_plan.org; see 'ViewnodeStats::relRepo' for the full contract).
+/// Sets relRepo on the unrestricted vognode at treeid (see
+/// 'ViewnodeStats::relRepo' for the full contract).
 /// Computes the (recorder, relation, target) triple that identifies the
 /// binding relationship this position represents -- contains for an ordinary
 /// Vognode-parent content child; the folder's relation for a simple

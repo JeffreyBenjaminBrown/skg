@@ -86,7 +86,7 @@ pub fn fetch_all_graphnodestats_with_skgrepo_set (
 /// In-Rust-graph implementation. Every field is computed from GraphnodeInRust
 /// and the recorderward relmaps, without I/O.
 ///
-/// relRepo gating (render-and-gating, 5_plan.org): counts and the
+/// relRepo gating ('docs/telescopes.org', "What lives where"): counts and the
 /// container/content maps use the gated accessors
 /// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
 /// not the raw GraphnodeInRust lists / recorderward relmaps -- a membership

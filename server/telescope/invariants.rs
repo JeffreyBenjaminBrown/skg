@@ -4,8 +4,8 @@
 //! -- because two divergent validators once nearly let bad data
 //! through.
 //!
-//! ENFORCEMENT STRENGTH (decided, 4_discussion "Migration and the
-//! fate of today's validations"): cross-file violations are
+//! ENFORCEMENT STRENGTH ('docs/telescopes.org', "What leaks, and what
+//! repair fixes"): cross-file violations are
 //! WARNINGS with repair guidance, never load refusals -- they can
 //! arise from two perfectly correct saves on different machines, so
 //! a pull must never brick a skgrepo. Only single-file malformations

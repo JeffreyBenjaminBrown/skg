@@ -63,8 +63,8 @@ pub struct DefiningFolderRecorder {
 /// "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
 /// validates the explicit skgrepos against each relationship's DEFAULT floor
-/// at save time (render-and-gating, 5_plan.org;
-/// BUG-and-fix_make-edge-more-public.org).
+/// at save time ('docs/telescopes.org', "Setting a relationship's
+/// skgrepo").
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum FieldIntent {

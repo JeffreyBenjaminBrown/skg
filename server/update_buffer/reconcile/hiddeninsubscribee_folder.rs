@@ -102,7 +102,7 @@ fn read_hiddenin_context (
   let (subscriber_pid, subscriber_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor(
       tree, node, 2, kind . caller_label () ) ?;
-  // relRepo gating (render-and-gating, 5_plan.org): these are the
+  // relRepo gating ('docs/telescopes.org', "What lives where"): these are the
   // subscribee's and subscriber's own outbound lists (contains,
   // hidesFromSubs), read here to compute a DERIVED
   // membership for a third node (the HiddenInSubscribeeFolder) -- like

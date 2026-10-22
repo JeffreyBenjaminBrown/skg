@@ -18,7 +18,7 @@ pub struct GraphnodeInTantivy {
   // Aliases keep their PRIVACY LEVELS: each alias document's
   // repo field is the alias's relRepo, not the node's home, so a
   // restricted search cannot match a private alias of a public
-  // node (dbs-and-search, 5_plan.org).
+  // node ('docs/api-and-formats.org', "Text search").
   pub aliases : MSV<RelPartner<String>>,
   pub body    : Option<String>,
   pub flags   : Vec<Flag>,

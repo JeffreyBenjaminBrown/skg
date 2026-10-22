@@ -14,7 +14,7 @@ use std::error::Error;
 /// Reconciles an AliasFolder's children against
 ///   the aliases on disk (via the map) for its parent UnrestrictedVognode.
 ///
-/// Per the spec in buffer-update.org:
+/// In order:
 /// - Verify this node is an AliasFolder
 /// - Verify its parent is an UnrestrictedVognode
 /// - Fetch the corresponding Graphnode from the map

@@ -532,7 +532,7 @@ pub fn prepend_writeProtected_indep_child_with_skgrepo_set (
         . or_else (|| crate::types::phantom::home_from_disk (child_skgid, config))
       { if ! restriction . contains_skgrepo (&skgrepo)
         { return Ok (None); }} }
-    // relRepo gating (render-and-gating, 5_plan.org): the partner
+    // relRepo gating ('docs/telescopes.org', "What lives where"): the partner
     // NODE's skgrepo (above) is not enough -- the RELATIONSHIP grafting it
     // here can be recorded in a more private skgrepo than either
     // endpoint's home (a private reading-list membership between two

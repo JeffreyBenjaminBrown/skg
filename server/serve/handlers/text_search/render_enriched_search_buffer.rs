@@ -60,7 +60,7 @@ fn insert_full_containerward_role_tree(
   restriction   : &SkgrepoRestriction,
 ) {
   if ! restriction . is_all () {
-    // relRepo gating (render-and-gating, 5_plan.org): a private
+    // relRepo gating ('docs/telescopes.org', "What lives where"): a private
     // MEMBERSHIP must not surface through enrichment role tree even
     // when both nodes are public. The relationship's recorder is the
     // container (this role-tree step).

@@ -104,7 +104,7 @@ fn read_hiddenoutside_context (
     graphnode_graphFirst_by_pid_and_skgrepo (
       &runtime . graph, &runtime . config,
       &subscriber_pid, &subscriber_skgrepo ) ?;
-  // relRepo gating (render-and-gating, 5_plan.org): both are the
+  // relRepo gating ('docs/telescopes.org', "What lives where"): both are the
   // subscriber's own outbound lists (hidesFromSubs,
   // subscribesTo); a membership recorded in a restricted skgrepo must
   // not feed this derived folder.

@@ -1,6 +1,7 @@
 -- PURPOSE: All skg keybindings and the Ex-command surface.
 -- The Lua port of elisp/skg-keymaps-and-aliases.el, translated per
--- the settled keybinding scheme (plan.org Q4):
+-- the keybinding scheme of 'docs/nvim-client-deviations.org',
+-- "Input model":
 --   ':w' saves (BufWriteCmd, wired in skg.buffer); '<localleader>'
 --   plays the C-c prefix with the same mnemonic letters; where Emacs
 --   ended a chord with RET the letter doubles (C-c g RET ->

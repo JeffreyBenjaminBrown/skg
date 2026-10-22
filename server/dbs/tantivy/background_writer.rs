@@ -1,7 +1,7 @@
 //! Background Tantivy index writer.
 //!
 //! Each save's Tantivy update — the ~60% of the save spent in
-//! 'writer.commit()' (see profiling-save.org) — used to block the
+//! 'writer.commit()' — used to block the
 //! response, even though the save's re-rendered result is built from
 //! the in-Rust graph and never reads the search index. The save now
 //! ENQUEUES its search-index update here and returns; the tantivy-commit happens off

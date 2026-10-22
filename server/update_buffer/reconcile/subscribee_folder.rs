@@ -68,9 +68,8 @@ pub fn reconcile_subscribeeFolder_children (
   // strictly AFTER extraction and the graph update, so the graph already holds
   // the user's just-saved subscriptions and reconciling reproduces them rather
   // than clobbering them. This also refreshes a EDITABLE subscriber's
-  // subscribeeFolder during a collateral rerender -- the latent staleness
-  // subscribeeFolder-maybe-todo.org flagged (forks plan.org: "Collateral-rerender
-  // staleness fix").
+  // subscribeeFolder during a collateral rerender, which would otherwise
+  // go stale.
   { // The node budget: a folder fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it extended, so adding all
     // its subscribees here costs nothing and never truncates the group.
@@ -111,7 +110,7 @@ fn read_subscribeeFolder_context (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribeeFolder_children: parent is not an UnrestrictedVognode") ?;
   let worktree_members : Vec<RelPartner<ID>> =
-    // relRepo gating (render-and-gating, 5_plan.org): this is the
+    // relRepo gating ('docs/telescopes.org', "What lives where"): this is the
     // RECORDER's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
     // restricted level must not appear here even though the

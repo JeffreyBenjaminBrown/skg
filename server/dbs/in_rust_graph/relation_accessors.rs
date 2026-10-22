@@ -361,7 +361,7 @@ impl InRustGraph {
   /// skgrepo restriction iff relRepo(P, R, X) is unrestricted -- private
   /// memberships must not surface through ancestry, role trees, or
   /// inbound folders when the content direction hides them
-  /// (render-and-gating, 5_plan.org).
+  /// ('docs/telescopes.org', "What lives where").
   pub fn relRepo (
     &self,
     recorder : &ID,

@@ -108,7 +108,7 @@ fn create_documents_from_node (
     // Each entry with the REPO its document will carry: the home
     // for the title, the alias's own privacy LEVEL for an alias --
     // so restricted search filtering excludes private aliases of
-    // public nodes (dbs-and-search, 5_plan.org).
+    // public nodes ('docs/api-and-formats.org', "Text search").
     vec![ ( node . title . clone(),
             node . home_skgrepo . clone() ) ];
   titles_and_aliases . extend (

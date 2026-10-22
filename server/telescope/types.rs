@@ -216,8 +216,8 @@ impl Telescope {
 
 /// One entry of an ordered relation's stored sequence.
 ///
-/// SERIALIZATION (the diff-readable requirement from 4_discussion's
-/// stage-moves thread): the sequence is one YAML list, one entry per
+/// SERIALIZATION ('docs/api-and-formats.org', "The .skg file format"):
+/// the sequence is one YAML list, one entry per
 /// line -- a member is a bare ID line ("- ID"), an anchor a one-key
 /// map line ("- anchor: ID"). Members therefore render identically
 /// in every section, so a membership moving between sections diffs
@@ -295,7 +295,7 @@ pub struct SectionSlices {
 /// Nonfatal compose trouble. The compose is TOTAL: junk degrades to one of
 /// these, never to an error or a panic, because a dangling anchor
 /// can arise from two perfectly correct saves on different machines
-/// (see the plan's "Dangling anchors" section).
+/// ('docs/api-and-formats.org', "The .skg file format").
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompositionWarning {
   /// An anchor named no member of the strictly-more-public compose.

@@ -11,7 +11,8 @@
 //! caller's 'resolve' (extra-ids: 'pid_of'; identity in tests).
 //! Runs sharing an anchor concatenate in file order. A dangling run
 //! attaches after the run that precedes it in the file, or joins the
-//! prepend if it is first (Jeff's fallback, 4_discussion.org).
+//! prepend if it is first ('docs/api-and-formats.org', "The .skg file
+//! format").
 //!
 //! Unordered relations (hides, overrides) and aliases: union in
 //! Skgrepo order; a member repeated across skgrepos keeps its most

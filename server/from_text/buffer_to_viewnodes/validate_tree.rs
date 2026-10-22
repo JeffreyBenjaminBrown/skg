@@ -107,9 +107,8 @@ pub fn find_buffer_errors_for_saving (
   find_buffer_errors_for_saving_in_graph (
     viewforest, &graph, config ) }
 
-/// Edits to an idFolder's membership abort the save (decision from
-/// vision.org, via metaplan_2.org; see the glossary's "write-protected
-/// set"): for each present
+/// Edits to an idFolder's membership abort the save (see the
+/// glossary's "write-protected set"): for each present
 /// idFolder whose parent is an UnrestrictedVognode with an ID, the multiset of ID
 /// non-vognodes beneath it must equal the recorder's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
@@ -167,7 +166,8 @@ fn idFolder_membership_errors (
             recorder, buffer_skgids, real )); }}, }}
   Ok (( )) }
 
-/// Tamper validation for the '(overridesHere N)' fact (plan 11).
+/// Tamper validation for the '(overridesHere N)' fact
+/// ('docs/override.org', "The overridesHere fact").
 /// The fact is load-bearing text: wherever it appears, save
 /// extraction collects N instead of the carrier's own ID. So a
 /// fact the server would not have rendered must abort the save --

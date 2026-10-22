@@ -79,8 +79,9 @@ pub fn reconcile_partnerFolder_children (
         graph_members,
       FolderPolicy::WriteProtectedSet =>
         // The user may have reordered this generated folder; the
-        // order is view-local and respected (metaplan_2.org,
-        // "preserve user-visible order in write-protected sets").
+        // order is view-local and respected ('docs/sharing-model.org',
+        // "The write-protected folders: who subscribes to, overrides, or
+        // hides this node").
         view_order_preserving_goal_list (
           tree, node, &graph_members, graph_snap ) ?,
       FolderPolicy::WriteProtectedFilter =>

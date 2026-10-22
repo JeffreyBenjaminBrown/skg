@@ -129,13 +129,12 @@ fn three_nodeMerged_graphnodes(
       acquiree_from_disk . extra_ids . clone() );
     updated_acquirer . extra_ids =
       dedup_vector (combined_extra_ids); }
-  // Combining lists of relation partners (5_plan.org, work item interactions;
-  // "compose both, concatenate acquiree-after-acquirer, dedup,
-  // decompose"): relRepos are PRESERVED, so a merge cannot silently
-  // de-privatize a relationship. On a member both sides carry, the more
-  // PRIVATE skgrepo wins (the safe tie-break); every skgrepo clamps at
-  // the acquirer's home, since no section may be more public than
-  // its home.
+  // Combining lists of relation partners (compose both, concatenate
+  // acquiree-after-acquirer, dedup, decompose): relRepos are PRESERVED, so
+  // a merge cannot silently de-privatize a relationship. On a member both
+  // sides carry, the more PRIVATE skgrepo wins (the safe tie-break); every
+  // skgrepo clamps at the acquirer's home, since no section may be more
+  // public than its home.
   let combine_rel_partners =
     |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
       let home    : &SkgrepoName = & updated_acquirer . home_skgrepo;

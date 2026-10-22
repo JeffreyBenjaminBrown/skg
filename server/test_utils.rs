@@ -482,7 +482,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
 /// test that reassigns a node's skgrepo must go through this, or the
 /// telescope write would emit sections at the old skgrepo. The real
 /// repo-move rule (which member relRepos follow a home skgrepo move) is
-/// owned by work item save-leveling.
+/// the save's ('docs/glossary.org', "stranded relationship, strandeds").
 pub fn set_skgrepo_retagging_relRepos (
   node    : &mut Graphnode,
   skgrepo : &SkgrepoName,

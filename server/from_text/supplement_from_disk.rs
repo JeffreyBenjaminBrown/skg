@@ -285,27 +285,26 @@ pub fn refuse_delete_with_restricted_sections (
           pid )); }} }
   Ok (( )) }
 
-/// THE STICKY-ELSE-DEFAULT RULE (5_plan.org, work item
-/// save-leveling), extended by an EXPLICIT third path (work item
-/// render-and-gating). The lowering stages tag every relationship with the
+/// THE STICKY-ELSE-DEFAULT RULE ('docs/telescopes.org', "Where new
+/// relationships land: the sticky-else-default rule"), with its
+/// EXPLICIT third path. The lowering stages tag every relationship with the
 /// node's own skgrepo (a placeholder); this pass resolves the real
 /// relRepos:
 /// - EXPLICIT: a member named in 'explicit' (the buffer headline's
 ///   '(relRepo NAME)' atom, threaded in as a side-channel because
 ///   Graphnode's 'RelPartner::skgrepo' carries no "was this
 ///   explicit" flag) wins outright, PROVIDED it is at least as
-///   private as the DEFAULT floor -- normally the more private of
-///   the two endpoints' homes, NOT the disk relRepo. An explicit atom
-///   is therefore the one path that can make an existing relationship more
-///   public, down to but never more public than its default
-///   (BUG-and-fix_make-edge-more-public.org). One exception keeps
-///   the render->save round-trip lossless: when the DISK relRepo
-///   already sits more public than the default (a legacy or
-///   hand-authored shape), the explicit floor relaxes to that disk
-///   skgrepo -- such a relationship can be held or made more private, never
-///   moved still more public. A choice more public than its floor
-///   fails with a validation error naming the member, offered skgrepo,
-///   and floor.
+///   private as the DEFAULT floor -- normally the more private of the two
+///   endpoints' homes, NOT the disk relRepo. An explicit atom is therefore
+///   the one path that can make an existing relationship more public, down
+///   to but never more public than its default ('docs/telescopes.org',
+///   "Setting a relationship's skgrepo"). One exception keeps the
+///   render->save round-trip lossless: when the DISK relRepo already sits
+///   more public than the default (a legacy or hand-authored shape), the
+///   explicit floor relaxes to that disk skgrepo -- such a relationship can
+///   be held or made more private, never moved still more public. A choice
+///   more public than its floor fails with a validation error naming the
+///   member, offered skgrepo, and floor.
 /// - STICKY: absent an explicit skgrepo, a relationship that already exists
 ///   on disk (same relation, same endpoints, through 'pid_of')
 ///   keeps its DISK relRepo. Renormalization never lowers a relationship's
@@ -386,16 +385,16 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
       . find (|disk| member_key (&disk . member) == key)
       . map (|disk| disk . member . clone ())
       . unwrap_or_else (|| member . clone ()) };
-  // EXPLICIT wins when at least as private as its floor: the more PUBLIC of the
-  // DEFAULT floor and the sticky skgrepo. Flooring at the default
-  // (not at sticky) is what lets an atom LOWER a stuck relationship's
-  // privacy back down to the default
-  // (BUG-and-fix_make-edge-more-public.org); admitting the sticky
-  // skgrepo when IT sits more public than the default covers legacy
-  // or hand-authored data. Render emits the '(relRepo ...)' atom
-  // for every off-default relationship, and that atom must round-trip through
-  // save unchanged. Net: a normal relationship never moves more public than
-  // the default, and a preexisting more-public relationship can only be held
+  // EXPLICIT wins when at least as private as its floor: the more PUBLIC of
+  // the DEFAULT floor and the sticky skgrepo. Flooring at the default (not
+  // at sticky) is what lets an atom LOWER a stuck relationship's privacy
+  // back down to the default ('docs/telescopes.org', "Setting a
+  // relationship's skgrepo"); admitting the sticky skgrepo when IT sits
+  // more public than the default covers legacy or hand-authored data.
+  // Render emits the '(relRepo ...)' atom for every off-default
+  // relationship, and that atom must round-trip through save unchanged.
+  // Net: a normal relationship never moves more public than the default,
+  // and a preexisting more-public relationship can only be held
   // or made more private. Absent an atom, sticky-else-default.
   let resolve_skgrepo = |disk_list      : &[RelPartner<ID>],
                         member         : &ID,

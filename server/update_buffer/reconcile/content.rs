@@ -204,7 +204,7 @@ fn reconcile_content_children (
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_repo_from_id'; this makes the rerender consistent.)
   let content_members : Vec<RelPartner<RelationshipMemberKey>> =
-    // relRepo gating (render-and-gating, 5_plan.org): a
+    // relRepo gating ('docs/telescopes.org', "What lives where"): a
     // membership whose REPO is restricted is invisible here even
     // when the member node itself is unrestricted -- the private
     // reading-list case. Node-repo omission still happens
@@ -251,7 +251,7 @@ fn reconcile_content_children (
   // removed by the prune sweep ('prune_self_deletable_when_empty').
   let substitution_for_children : bool =
     // The raw-shown-override rule (generalized 2026-06-12 from the
-    // plan-11 overridden-as-such case): when this node is itself
+    // overridden-as-such case): when this node is itself
     // overridden but shown RAW by its position -- a write-protected folder
     // member, an overriddenFolder member, or a view root -- the user is
     // looking at the ORIGINAL, so its immediate children are shown raw too.
@@ -421,8 +421,9 @@ pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
 /// Whether this node is overridden yet shown RAW by its position, so
 /// that substitution must be disabled for its immediate children (one
 /// level; a content child is a substituting position, so substitution
-/// resumes there). Generalizes the plan-11 overridden-as-such rule (an
-/// overriddenFolder member) to every raw-shown position. Decided
+/// resumes there). Generalizes the overridden-as-such rule (an
+/// overriddenFolder member; 'docs/override.org', "overriddenFolder: what
+/// this node overrides") to every raw-shown position. Decided
 /// 2026-06-12:
 /// - POSITION: a member of any PartnerFolder that shows its members raw -- every folder
 ///   EXCEPT the editable subscribeeFolder, whose subscribees-as-such DO
@@ -498,7 +499,8 @@ fn is_subscribee (
 /// the implicit one (a node moved into the subscriber is not also hidden --
 /// "hiding your own content is silly", resolve_visibility -- so without the
 /// contains subtraction it would double-show, once as integrated content and
-/// once as unintegrated; forks plan.org Prerequisite / discussion.org Option B).
+/// once as unintegrated; 'docs/forks.org', "Unintegrated content: the
+/// subscribeeFolder").
 fn content_goal_list (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
@@ -523,7 +525,7 @@ fn content_goal_list (
     // (its contains holds the pre-merge acquiree alias, while the
     // subscribee's contains holds the acquirer's primary) would not
     // cancel, and would double-show as unintegrated subscribed content.
-    // relRepo gating (render-and-gating, 5_plan.org): a member
+    // relRepo gating ('docs/telescopes.org', "What lives where"): a member
     // the grandparent-subscriber HIDES or CONTAINS only in a skgrepo
     // outside the skgrepo restriction must not subtract the subscribee's
     // content here -- else a privately-contained/-hidden member

@@ -1,9 +1,8 @@
 //! OTHER_SKGREPO_DEPENDENCIES.toml: the publisher-side fix for the one structural
 //! regression the telescope carries relative to the retired chain
 //! design -- a foreign telescope's composition ORDER lives in the
-//! receiver's config, not in the data (5_plan.org, work item
-//! dependencies-manifest; decided in 4_discussion, "lets Skg
-//! automatically generate a OTHER_SKGREPO_DEPENDENCIES.toml").
+//! receiver's config, not in the data ('docs/api-and-formats.org',
+//! "OTHER_SKGREPO_DEPENDENCIES.toml").
 //!
 //! PUBLISHER half: at init, every OWNED skgrepo directory gets a
 //! OTHER_SKGREPO_DEPENDENCIES.toml whose `dependencies` is a list of pairs, one per

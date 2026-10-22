@@ -4,7 +4,7 @@
 
 local M = {}
 
----The nvim version floor, per the plan's settled decisions.
+---The nvim version floor, which 'nvim/README.org' states.
 local minimum_nvim_version = { major = 0, minor = 11 }
 
 ---Error unless the running nvim meets the version floor.

@@ -3,7 +3,7 @@
 ;;; PURPOSE: `skg-set-relRepo' -- request the relRepo
 ;;; of one relationship, informed by the server's
 ;;; 'relRepo info' endpoint
-;;; (BUG-and-fix_make-edge-more-public.org). The buffer-local
+;;; ('docs/api-and-formats.org', "relRepo info"). The buffer-local
 ;;; helpers it drives live in skg-metadata.el.
 
 (require 'skg-length-prefix)
