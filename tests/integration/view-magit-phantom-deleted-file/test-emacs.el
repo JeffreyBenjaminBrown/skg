@@ -8,7 +8,7 @@
 ;;; Phase 2: In its "all changes" buffer, b appears as a historical
 ;;;          phantom.
 ;;; Phase 3: Call skg-goto-in-magit on the phantom b.
-;;; Phase 4: Verify magit opened on the skg-data skgrepo (NOT the outer
+;;; Phase 4: Verify magit opened on the skg-data skgrepo (not the outer
 ;;;          skg project skgrepo), and that point is on b.skg.
 
 (load-file "../../../elisp/skg-init.el")

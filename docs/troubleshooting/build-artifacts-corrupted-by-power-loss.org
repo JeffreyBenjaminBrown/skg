@@ -23,7 +23,7 @@ python3 docs/troubleshooting/check-rlibs.py
 Fix -- pass every package the script names:
 
 #+begin_src bash
-cargo clean -p skg -p tantivy   # e.g.; use YOUR script output
+cargo clean -p skg -p tantivy   # e.g.; use your script output
 cargo build --bin skg
 ./bash/start-servers.sh
 #+end_src
@@ -148,7 +148,7 @@ and check the configured Skg API port is listening (1730 here):
 (exec 3<>/dev/tcp/127.0.0.1/1730) && echo "skg up"
 #+end_src
 
-* What was NOT damaged (so don't go breaking it)
+* What was not damaged (so don't go breaking it)
 
 In the 2026-07-14 incident the power loss damaged *only* build
 artifacts. Specifically intact were:

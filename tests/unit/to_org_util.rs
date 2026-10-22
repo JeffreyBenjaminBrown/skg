@@ -68,7 +68,7 @@ fn birth_if_normal (
 #[test]
 fn linksto_false_claim_flipped_to_independent () {
   // Parent P, child C with birth=LinksToParent, but C's linksTo
-  // does NOT include P. The claim is false → flip.
+  // does not include P. The claim is false → flip.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &[]),   // linksTo: empty
@@ -92,7 +92,7 @@ fn linksto_false_claim_flipped_to_independent () {
 #[test]
 fn linksto_true_claim_preserved () {
   // Parent P, child C with birth=LinksToParent and C's linksTo
-  // DOES include P. The claim is true → preserve.
+  // does include P. The claim is true → preserve.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &["P"]), // C links to P
@@ -116,7 +116,7 @@ fn linksto_true_claim_preserved () {
 #[test]
 fn containerof_false_claim_flipped () {
   // Parent P, child C with birth=ContainsParent, but C's contains
-  // does NOT include P.
+  // does not include P.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[],    &[]),
     mk_node ("C", &[], &["X"], &[]),  // C contains some other pid
@@ -140,7 +140,7 @@ fn containerof_false_claim_flipped () {
 fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
   // §A (Jeff's invariant): a member Unrestricted node under a non-container
   // parent (Deleted phantom / DeadViewnode) is made a non-member; a legitimate
-  // folder MEMBER (member Unrestricted under a PartnerFolder) is left untouched.
+  // folder member (member Unrestricted under a PartnerFolder) is left untouched.
   use crate::types::viewnode::{ PartnerFolder, Phantom, PhantomDeleted };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
@@ -231,7 +231,7 @@ fn containerof_view_affects_parent_acquiree_preserved () {
 
 #[test]
 fn contentof_writeProtected_parent_false_claim_flipped () {
-  // Parent is write-protected; its contains list does NOT include C.
+  // Parent is write-protected; its contains list does not include C.
   // So C's Container claim is false.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),   // P.contains empty
@@ -253,7 +253,7 @@ fn contentof_writeProtected_parent_false_claim_flipped () {
 
 #[test]
 fn contentof_editable_parent_skipped () {
-  // Parent is EDITABLE; the check is skipped regardless of whether
+  // Parent is editable; the check is skipped regardless of whether
   // the graph agrees (save just redefined P's contains to match
   // the buffer, so asking the graph would be circular). Claim preserved.
   let graph : InRustGraph = graph_with (vec! [
@@ -317,7 +317,7 @@ fn absent_under_visible_parent_becomes_container () {
 }
 
 // ===== 3x2 matrix: moving a {content, container, linksToParent}
-// child of a NEW parent where the relationship to the new
+// child of a new parent where the relationship to the new
 // parent does / doesn't hold. =====================================
 //
 // Each test sets up:
@@ -334,7 +334,7 @@ fn absent_under_visible_parent_becomes_container () {
 fn moved_containerof_relationship_holds_preserved () {
   // Child C once had birth=containsParent under p_old (C.contains had
   // p_old). User moved C under p_new. Test case: C's contains
-  // ALSO includes p_new → the content claim still holds for
+  // also includes p_new → the content claim still holds for
   // the new parent.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("p_old", &[], &[],                   &[]),
@@ -387,7 +387,7 @@ fn moved_containerof_relationship_broken_flipped () {
 #[test]
 fn moved_contentof_writeProtected_parent_relationship_holds_preserved () {
   // Child C was content of a write-protected p_old. Moved under
-  // write-protected p_new. Test case: p_new.contains ALSO includes C.
+  // write-protected p_new. Test case: p_new.contains also includes C.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("p_old", &[], &["C"], &[]),
     mk_node ("p_new", &[], &["C"], &[]), // p_new really contains C
@@ -410,7 +410,7 @@ fn moved_contentof_writeProtected_parent_relationship_holds_preserved () {
 
 #[test]
 fn moved_contentof_writeProtected_parent_relationship_broken_flipped () {
-  // Same setup but p_new.contains does NOT include C.
+  // Same setup but p_new.contains does not include C.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("p_old", &[], &["C"], &[]),
     mk_node ("p_new", &[], &[],    &[]), // p_new doesn't contain C

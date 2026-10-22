@@ -13,7 +13,7 @@
 -- saved buffer introduced a brand-new node, because
 -- build_child_creation_data can't find a skgrepo for the new UUID. So
 -- buffer A picks up the title change and the new child c anyway (per
--- the elisp test's phase 5 -- the collateral update DOES succeed
+-- the elisp test's phase 5 -- the collateral update does succeed
 -- here).
 
 local T = dofile('../test-nvim-lib.lua')
@@ -37,8 +37,8 @@ local function child_named (list, name)
   return nil
 end
 
----A role graft's ROLENAME from its SEMANTIC relationship facts
----(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates OUTBOUND
+---A role graft's ROLENAME from its semantic relationship facts
+---(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates outbound
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
 ---side, mapped to its role. Port of headline--role-of-role-graft-from-rels.
 local function role_of_role_graft_from_rels (rels_body)

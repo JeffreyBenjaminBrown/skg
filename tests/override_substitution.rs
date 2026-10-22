@@ -2,10 +2,10 @@
 //
 // Override substitution ('docs/override.org', "Automatic override
 // substitution"):
-// when completion would CREATE a viewnode for node N as recursive
+// when completion would create a viewnode for node N as recursive
 // content, and an owned, visible R overrides N, it shows R
 // instead, marked '(overridesHere N)' -- and saving such a view
-// round-trips to the ORIGINAL IDs, so a container's contains list is
+// round-trips to the original IDs, so a container's contains list is
 // never silently rewritten from N to R.
 //
 // Fixture (tests/override_substitution/fixtures, single skgrepo
@@ -385,7 +385,7 @@ async fn save_under_set (
 
 /// A half-visible owned chain: D overrides C overrides N, with the
 /// end D in skgrepo 'other'. Under 'all' the END D substitutes for N;
-/// under 'main' (hiding 'other') the MIDDLE C substitutes. Saving the
+/// under 'main' (hiding 'other') the middle C substitutes. Saving the
 /// half-visible view accepts the middle carrier (it is on N's chain)
 /// and keeps N in P's contains; an off-chain fact is rejected.
 async fn chain_half_visible_keeps_the_original (
@@ -408,7 +408,7 @@ async fn chain_half_visible_keeps_the_original (
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("main" . to_string ())) ?;
       let view_main : String = {
-        // Under 'main', D's skgrepo 'other' is restricted, so the MIDDLE
+        // Under 'main', D's skgrepo 'other' is restricted, so the middle
         // C is shown instead.
         let (view, _p, _t) =
           multi_root_view_with_skgrepo_set (
@@ -439,7 +439,7 @@ async fn chain_half_visible_keeps_the_original (
         assert! ( ! p_file . contains ("- C"),
           "P must NOT be rewritten to contain the carrier C:\n{}",
           p_file ); }
-      { // A fact on a node NOT on N's chain is rejected.
+      { // A fact on a node not on N's chain is rejected.
         let buffer = indoc! {"
           * (skg (node (id P) (repo main))) P
           ** (skg (node (id D) (repo other) (viewStats (overridesHere P)) writeProtected)) D

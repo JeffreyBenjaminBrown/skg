@@ -1,4 +1,4 @@
--- Integration test for the fork-confirmation buffer's EDITABLE clone
+-- Integration test for the fork-confirmation buffer's editable clone
 -- skgrepo, nvim client. The Lua mirror of test-emacs.el in this
 -- directory: open owned P (whose content is foreign N); make N
 -- editable and edit its title; save -> a fork-confirmation buffer.
@@ -25,7 +25,7 @@ local function buffer_showing (skgid)
   return nil
 end
 
----Move the cursor in the CURRENT buffer onto the first line containing
+---Move the cursor in the current buffer onto the first line containing
 ---SNIPPET anywhere. Fails the test if no line does.
 local function goto_line_containing (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -38,8 +38,8 @@ local function goto_line_containing (snippet, description)
   T.fail(description or ('could not find a line containing: ' .. snippet))
 end
 
----Move the cursor in the CURRENT buffer onto the first line that
----STARTS WITH SNIPPET (the analog of an elisp "^..."-anchored search).
+---Move the cursor in the current buffer onto the first line that
+---starts with SNIPPET (the analog of an elisp "^..."-anchored search).
 ---Fails the test if no line does.
 local function goto_line_starting_with (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -90,7 +90,7 @@ local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
 -- The server always pre-fills the PICK-A-REPO placeholder and only
--- SUGGESTS the inferred skgrepo in a comment line (fork.rs; documented
+-- suggests the inferred skgrepo in a comment line (fork.rs; documented
 -- in COMMANDS.org and glossary.org), as the elisp original asserts too.
 local confirmation_text = T.buffer_text(confirm_buf)
 T.check(confirmation_text:find('(repo PICK-A-REPO)', 1, true),
@@ -110,7 +110,7 @@ print("rotated the clone's repo to owned2")
 -- 5. Approve: re-save the source buffer with the chosen skgrepo.
 save.approve_fork()
 
--- 6. The clone must land in owned2 (rotated), NOT owned (inferred).
+-- 6. The clone must land in owned2 (rotated), not owned (inferred).
 local committed = T.wait_for(function ()
   return #skg_files_in('data/owned/owned2') == 1
 end, 10)

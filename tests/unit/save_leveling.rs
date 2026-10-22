@@ -178,9 +178,9 @@ fn hide_floor_is_the_most_public_explaining_subscription (
   let recorder : Graphnode = node_at ("recorder", "public");
   let graph : InRustGraph = graph_from ( & [
     recorder . clone (), hidden, container_a, container_b ] );
-  { // Only a PRIVATE subscription explains the hide: the hide must
+  { // Only a private subscription explains the hide: the hide must
     // be private, else it leaks the inference that the private
-    // subscription exists. The privatized subscription is a DISK
+    // subscription exists. The privatized subscription is a disk
     // fact (sticky preserves it); raising its privacy from the
     // buffer would come through the (relRepo ...) atom (see the
     // explicit_repo_* tests below), landed with render-and-gating.
@@ -201,7 +201,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     assert_eq! (
       resolved . hidesFromSubs . or_default (),
       & [ pm ("private", "victim") ] ); }
-  { // A PUBLIC explanation exists too: the inference is innocent,
+  { // A public explanation exists too: the inference is innocent,
     // so the hide may stay public.
     let mut disk : Graphnode = recorder . clone ();
     disk . subscribesTo = MSV::Specified ( vec! [
@@ -252,8 +252,8 @@ fn explicit_skgrepo_at_or_more_private_than_floor_is_honored (
 fn explicit_skgrepo_more_public_than_floor_is_rejected (
 ) {
   // More-public-than-floor rejection ('docs/telescopes.org', "Setting a
-  // relationship's skgrepo"): an explicit skgrepo more PUBLIC than the
-  // DEFAULT floor is a save error naming the member, the offered skgrepo,
+  // relationship's skgrepo"): an explicit skgrepo more public than the
+  // default floor is a save error naming the member, the offered skgrepo,
   // and the floor.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -279,7 +279,7 @@ fn explicit_skgrepo_more_public_than_floor_is_rejected (
 fn explicit_relRepo_moves_a_sticky_relationship_to_its_default (
 ) {
   // ('docs/telescopes.org', "Setting a relationship's skgrepo"): an
-  // explicit relRepo validates against the DEFAULT floor, not the disk
+  // explicit relRepo validates against the default floor, not the disk
   // relRepo, so it can lower a stuck relationship's privacy back to the
   // default.
   let config : SkgConfig =
@@ -329,7 +329,7 @@ fn explicit_skgrepo_between_default_and_sticky_is_accepted (
 #[test]
 fn explicit_more_public_than_default_is_rejected_and_names_the_default (
 ) {
-  // With the floors split, the error's floor is the DEFAULT, not
+  // With the floors split, the error's floor is the default, not
   // the (more private) sticky disk relRepo.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -456,7 +456,7 @@ fn explicit_lowering_moves_the_relationship_between_section_files (
 fn same_save_child_homeSkgrepoMove_allows_publicizing_its_parent_relationship (
 ) {
   // A skgrepo move and its parent's explicit relRepo request occur in one
-  // save. The parent must calculate the relationship default from the child's NEW
+  // save. The parent must calculate the relationship default from the child's new
   // home, not the pre-save graph's old home.
   let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
   let mut parent : Graphnode = node_at ("parent", "public");

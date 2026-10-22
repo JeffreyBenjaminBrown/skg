@@ -1,4 +1,4 @@
-;;; Integration test for the fork-confirmation buffer's EDITABLE clone
+;;; Integration test for the fork-confirmation buffer's editable clone
 ;;; skgrepo. Open owned P (whose content is foreign N); make N editable
 ;;; and edit its title; save -> a fork-confirmation buffer. The clone's
 ;;; skgrepo is inferred as "owned"; rotate it to "owned2" in the
@@ -63,7 +63,7 @@ the clone landed in the rotated repo."
     (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
     (with-current-buffer confirm-buf
       ;; The server pre-fills the PICK-A-REPO placeholder and only
-      ;; SUGGESTS the inferred skgrepo in a comment line (fork.rs;
+      ;; suggests the inferred skgrepo in a comment line (fork.rs;
       ;; documented in docs/COMMANDS.org and glossary.org).
       (unless (string-match-p "(repo PICK-A-REPO)" (buffer-string))
         (test-fail "clone-to-be should carry the PICK-A-REPO placeholder:\n%s"
@@ -86,7 +86,7 @@ the clone landed in the rotated repo."
       ;; 5. Approve: re-save the source buffer with the chosen skgrepo.
       (skg-approve-fork)))
 
-  ;; 6. The clone must land in owned2 (rotated), NOT owned (inferred).
+  ;; 6. The clone must land in owned2 (rotated), not owned (inferred).
   (let ((committed (skg-test-wait-for
                     (lambda ()
                       (let ((clones (fork-repo-test--skg-files "data/owned/owned2")))

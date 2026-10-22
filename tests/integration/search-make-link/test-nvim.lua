@@ -128,7 +128,7 @@ end
 
 ---Verify that REPO_BUF has a [[id:target][...]] link followed by
 ---its own newline, with the child's `** child node' headline still
----intact on the next line -- i.e. the link did NOT eat the blank
+---intact on the next line -- i.e. the link did not eat the blank
 ---line's trailing newline.
 ---@param source_buf integer
 local function verify_link_on_its_own_line (source_buf)

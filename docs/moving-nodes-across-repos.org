@@ -92,7 +92,7 @@ Both =public= and =private= must be skgrepos defined in your
 (see Pitfalls below).
 
 Under privacy telescopes (see =telescopes.org=), what moves is the
-node's HOME: its title, body and extra ids relocate to the new
+node's home: its title, body and extra ids relocate to the new
 skgrepo's section. Sections of the node at other privacy levels stay
 where they are, and each relationship keeps its relRepo
 (relationships are clamped to be at least as private as the new home).

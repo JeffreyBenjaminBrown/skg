@@ -1,6 +1,6 @@
-;;; Integration test for the EXPLICIT fork gesture (skg-fork-node).
+;;; Integration test for the explicit fork gesture (skg-fork-node).
 ;;; Open owned container Q (whose content is the owned M):
-;;;  - forking a DIRTY buffer is refused (no confirmation appears);
+;;;  - forking a dirty buffer is refused (no confirmation appears);
 ;;;  - skg-fork-node on M -> a fork-confirmation buffer; APPROVE -> the
 ;;;    clone is created (overrides M) and shown in M's place on reopen;
 ;;;  - on a second node M2, skg-fork-node -> DECLINE strips the lingering
@@ -48,7 +48,7 @@ Fails the test if it is not found."
       (unless (string-match-p "(id M)" (buffer-string))
         (test-fail "Q's view does not show its content M:\n%s" (buffer-string)))
 
-      ;; 2. Forking a DIRTY buffer is refused: no confirmation appears.
+      ;; 2. Forking a dirty buffer is refused: no confirmation appears.
       (set-buffer-modified-p t)
       (fork-test--goto-headline "M")
       (skg-fork-node)
@@ -136,7 +136,7 @@ Fails the test if it is not found."
                    (buffer-string))))
     (message "✓ decline committed nothing (no clone overrides M2)"))
 
-  ;; 7. KILLING the confirmation buffer directly (not via C-c C-k) must
+  ;; 7. Killing the confirmation buffer directly (not via C-c C-k) must
   ;;    also strip the lingering fork atom from the source buffer.
   (skg-request-single-root-content-view-from-id "Q3")
   (let ((q3-buf (skg-test-wait-for (lambda () (fork-test--buffer-showing "Q3")) 10)))

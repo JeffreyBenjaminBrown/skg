@@ -160,7 +160,7 @@ fn receiver_warns_on_contradicted_order_and_not_on_agreement (
     & [ ("mine",       "owned/mine",       true),
         ("her-work",   "colleague/work",   false),
         ("her-extra",  "colleague/extra",  false) ] );
-  { // The colleague's manifest says extra is MORE PUBLIC than work;
+  { // The colleague's manifest says extra is more public than work;
     // this config orders them the other way.
     std::fs::write (
       tmp . path () . join ("colleague/work/OTHER_SKGREPO_DEPENDENCIES.toml"),

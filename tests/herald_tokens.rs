@@ -1,6 +1,6 @@
 // cargo nextest run -E 'test(herald_tokens::)'
 //
-// The server now emits SEMANTIC relationship facts; presentation lives
+// The server now emits semantic relationship facts; presentation lives
 // in the clients. These pin the wire the emitter produces.
 
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -98,7 +98,7 @@ fn overrider_as_such_out_side () {
 
 #[test]
 fn filter_folder_two_births_in_fixed_order () {
-  // HiddenInSubscribee: born of BOTH hides (gen 4) and contains (gen 2).
+  // HiddenInSubscribee: born of both hides (gen 4) and contains (gen 2).
   // Relations emitted contains-first; birth lists in the given order.
   let c = RelationCounts { hiders : 1, containers : 1, .. counts () };
   let mut f = AncestorFlags::default ();

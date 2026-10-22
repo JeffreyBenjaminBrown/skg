@@ -16,7 +16,7 @@
 // or-extra lookup), so opening a afresh shows a -> d correctly.
 //
 // The rerender path (rerender_view -> complete_viewtree ->
-// reconcile_content_children -> content_goal_list) does NOT
+// reconcile_content_children -> content_goal_list) does not
 // resolve extra_ids. It walks a.contains = [b] verbatim, matches
 // the existing pid=b child in a's viewforest, and lets the
 // deleted_by_this_save_pids check mutate it into a PhantomDeleted.

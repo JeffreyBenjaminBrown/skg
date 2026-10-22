@@ -3,7 +3,7 @@
 // The init/rebuild refusal wiring ('docs/data-model_technical.org', "Hard
 // validation constraints"): override invariants are
 // validated not only at their own seam (tests/dbs/in_rust_graph/
-// override_invariants.rs) but actually BLOCK initialization. This
+// override_invariants.rs) but actually block initialization. This
 // drives the graph validator shared by server start and rebuild.
 
 use std::error::Error;

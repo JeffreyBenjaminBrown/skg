@@ -93,7 +93,7 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
               (setq result (skg-first-sexpr-on-line))
             (error (setq errored t)))
           ;; Either it errors, or returns nil (no sexp found) - both are acceptable
-          ;; What's NOT acceptable is returning a sexp
+          ;; What's not acceptable is returning a sexp
           (when (and (not errored) result)
             (ert-fail (format "Should have errored or returned nil at position %d, got: %S"
                               pos result))))))))

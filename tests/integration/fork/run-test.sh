@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Integration test for the fork gesture and its confirmation stage.
-# - Starts an independent skg server with an OWNED + a FOREIGN skgrepo.
+# - Starts an independent skg server with an owned + a foreign skgrepo.
 # - Emacs opens foreign F as a root and structurally edits its content;
 #   Neovim exercises the simpler foreign-child-under-owned-P gesture.
 # - The save returns a fork-confirmation buffer (nothing committed).

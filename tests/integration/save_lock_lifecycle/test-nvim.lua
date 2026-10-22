@@ -2,17 +2,17 @@
 -- 20.2a), nvim client. The Lua mirror of test-emacs.el in this
 -- directory.
 --
--- Opens THREE overlapping views, edits and saves one, and asserts
+-- Opens three overlapping views, edits and saves one, and asserts
 -- that the truly-non-collateral view becomes editable once the save
 -- stream settles -- i.e. the lock the save took out over every open
 -- view was actually released.
 --
 -- Graph: a contains b; solo is standalone.
---   skg://a    -- the SAVED view.
---   skg://b    -- COLLATERAL to saving a (b's view shows a as
+--   skg://a    -- the saved view.
+--   skg://b    -- collateral to saving a (b's view shows a as
 --                 containerward, so its pid set contains a; saving a
 --                 re-renders it).
---   skg://solo -- truly NON-COLLATERAL to saving a (its pid set is
+--   skg://solo -- truly non-collateral to saving a (its pid set is
 --                 {solo}).
 --
 -- Wrapping the response handlers observes both intermediate boundaries

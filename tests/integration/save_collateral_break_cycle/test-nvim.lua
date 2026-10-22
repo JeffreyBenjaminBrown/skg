@@ -7,7 +7,7 @@
 -- underneath 'b', because complete_managed_children discards
 -- children not in the parent's goal_list.
 --
--- This test does NOT exercise DeletedNode -- no nodes are deleted
+-- This test does not exercise DeletedNode -- no nodes are deleted
 -- from disk, only a containment relationship is modified.
 
 local T = dofile('../test-nvim-lib.lua')
@@ -30,8 +30,8 @@ local function child_named (list, name)
   return nil
 end
 
----A role graft's ROLENAME from its SEMANTIC relationship facts
----(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates OUTBOUND
+---A role graft's ROLENAME from its semantic relationship facts
+---(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates outbound
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
 ---side, mapped to its role. Port of headline--role-of-role-graft-from-rels.
 local function role_of_role_graft_from_rels (rels_body)

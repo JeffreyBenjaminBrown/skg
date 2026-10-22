@@ -13,7 +13,7 @@
 --          and that b's removal is present in it.
 --
 -- DEVIATION: the nvim client has no magit; goto_in_git_parent opens a
--- PLAIN DIFF buffer instead of a magit-status buffer landing point on
+-- plain diff buffer instead of a magit-status buffer landing point on
 -- a section. That plain buffer's own name already identifies the file
 -- (skg://git-diff/a.skg), which is the part of the elisp assertion
 -- ("magit opened on a.skg's diff") this test can still make directly.

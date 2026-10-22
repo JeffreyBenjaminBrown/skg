@@ -2,14 +2,14 @@
 //
 // The batched relationship-matrix target
 // ('docs/sharing-model.org', "The write-protected folders: who
-// subscribes to, overrides, or hides this node"). ONE test function builds
-// ONE database of mutually independent subgraphs (IDs prefixed by
+// subscribes to, overrides, or hides this node"). One test function builds
+// one database of mutually independent subgraphs (IDs prefixed by
 // scenario), then runs the matrix scenarios serially against it: de
 // novo omission of unrequested write-protected folders, and -- after explicit
 // folder requests, per folder -- save after
 // reorder, insertion of a non-member, deletion of a member, plus the
 // editable folders' membership edits and the restricted-set omission.
-// Scenario failures ACCUMULATE: every mismatch is collected and the
+// Scenario failures accumulate: every mismatch is collected and the
 // test fails once at the end, so one broken folder does not mask the
 // rest.
 //
@@ -396,14 +396,14 @@ async fn path_request_scenarios (
   // Each row: (scenario, recorder, role, partner-id, birth-span-fragment).
   // Since uniform-heralds, the grafted partner no longer carries the
   // old (birth roleGraft ROLE) fact nor a parent-relative viewStat;
-  // instead its relationship TO its viewparent (the origin) shows as the
+  // instead its relationship to its viewparent (the origin) shows as the
   // birth (black-on-white) token inside its (rels ...) spans.
-  // E.g. the 'overridden' partner is overridden BY the origin -> its
+  // E.g. the 'overridden' partner is overridden by the origin -> its
   // parent (a) overrides it -> token "aO", rendered as the ancestor
   // letter 'a' (yellow) then the birth 'O' (white). The 'overrider'
   // partner overrides its parent among others -> "O2a". The birth token's
   // spans appear consecutively inside (rels ...) on the partner's line.
-  // Each row's 5th field is the SEMANTIC relationship the grafted
+  // Each row's 5th field is the semantic relationship the grafted
   // partner has to the origin (its viewparent, generation 1), which is
   // its birth. The direction (in vs out) distinguishes e.g.
   // overridden (the origin overrides it) from overrider (it overrides
@@ -434,7 +434,7 @@ async fn path_request_scenarios (
           partner, birth_rel, line )); },
       None => {}, // already recorded by want_contains above
     } }
-  { // (roleTree mentioned) on a node whose TITLE carries [[id:pathLink-dst]]:
+  { // (roleTree mentioned) on a node whose title carries [[id:pathLink-dst]]:
     // the dest node is grafted. (mentioner is the existing mentionerward
     // golden; this is its mirror.)
     let s : &str = "path/mentioned";
@@ -448,8 +448,8 @@ async fn path_request_scenarios (
     // origin), no outbound.
     fails . want_contains (
       s, &resp . saved_view, "(linksTo (in 1 (ancestors 1) (substantive 0)))" ); }
-  { // Self-referential fixture: a node that links to ITSELF. A
-    // non-container path role is cycle-guarded and needs NO view-root
+  { // Self-referential fixture: a node that links to itself. A
+    // non-container path role is cycle-guarded and needs no view-root
     // special-case (unlike containerward) -- the build must not panic,
     // and the node reappears as its own grafted dest.
     let s : &str = "path/self-referential-no-special-case";
@@ -462,7 +462,7 @@ async fn path_request_scenarios (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// The Folder view-request, '(viewRequests (folder RELNAME))': build BOTH
+// The Folder view-request, '(viewRequests (folder RELNAME))': build both
 // folders of the relation, the writable one even when empty (decision A).
 // Save a minimal editable buffer carrying just the request and assert
 // on the rerendered view. An absent editable folder means "no opinion"
@@ -480,7 +480,7 @@ async fn folder_request_scenarios (
       "* (skg (node (id {}) (repo public) (viewRequests (folder {})))) {}\n",
       recorder, rel, recorder ) };
   { // (folder overrides) on wSub-owner, which overrides nothing and is
-    // overridden by nothing: the EDITABLE overriddenFolder appears EMPTY
+    // overridden by nothing: the editable overriddenFolder appears empty
     // (the "add an override here" surface); the write-protected overriderFolder
     // does not appear (empty write-protected folders are pruned).
     let s : &str = "folder-request/overrides-empty";
@@ -492,7 +492,7 @@ async fn folder_request_scenarios (
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_absent  (s, &resp . saved_view, "overriderFolder"); }
   { // (folder overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
-    // the overriddenFolder appears POPULATED with both.
+    // the overriddenFolder appears populated with both.
     let s : &str = "folder-request/overrides-populated";
     let resp : SaveResponse = save (
       &request_buf ("wOvr-owner", "overrides"),
@@ -502,7 +502,7 @@ async fn folder_request_scenarios (
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-a)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-b)"); }
-  { // (folder subscribesTo) on wSub-owner: subscribeeFolder POPULATED (a,b,c).
+  { // (folder subscribesTo) on wSub-owner: subscribeeFolder populated (a,b,c).
     let s : &str = "folder-request/subscribes-populated";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "subscribesTo"),
@@ -512,7 +512,7 @@ async fn folder_request_scenarios (
     fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
   { // (folder hidesFromSubs) on wSub-owner, which neither hides nor is hidden:
-    // both sides write-protected and empty, so NOTHING appears.
+    // both sides write-protected and empty, so nothing appears.
     let s : &str = "folder-request/hides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "hidesFromSubs"),
@@ -708,7 +708,7 @@ async fn omission_scenarios (
         config, None, &[ID::from ("omWsub-owner")], &restriction ) ?;
     fails . want_contains (s, &buf, "(id omWsub-active)");
     fails . want_absent (s, &buf, "omWsub-inactive");
-    // Delete the only VISIBLE subscribee and save under the restricted
+    // Delete the only visible subscribee and save under the restricted
     // set: the weave must still preserve the invisible omWsub-inactive
     // (a restricted save cannot delete what it cannot see), while the
     // deleted unrestricted member is removed. So subscribesTo = [restricted].
@@ -734,7 +734,7 @@ async fn omission_scenarios (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Function 2 (its own database, since it must observe a REJECTED
+// Function 2 (its own database, since it must observe a rejected
 // save): the buffer-level half of "two owned overriders rejected
 // at save". A save adds a second owned overrider for an
 // already-overridden target via an overriddenFolder; the save is

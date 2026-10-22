@@ -143,7 +143,7 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
        fetched for it: {}", line ); }
   Ok (( )) }
 
-/// Only nodes recursively overridden by an OWNED result are
+/// Only nodes recursively overridden by an owned result are
 /// suppressed. A foreign overrider suppresses nothing.
 fn suppression_anchors_at_owned (
   graph  : &InRustGraph,

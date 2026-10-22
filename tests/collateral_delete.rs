@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_delete::)'
 //
-// Deleting a node whose viewnode is still present in ANOTHER
+// Deleting a node whose viewnode is still present in another
 // open view must not make the save response complain about that
 // collateral view. Fixture mirrors the reported shape: P contains the
 // linking node L (whose title is one big link to X); a view of P
@@ -59,9 +59,9 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       views_state . open_views . register_view (
         &graph . load_full (), p_view_id . clone (), p_vf, &p_pids );
 
-      { // A SECOND content view rooted at L, and a search view whose
+      { // A second content view rooted at L, and a search view whose
         // result list holds L, both stay open too -- the deleted node
-        // as a collateral view's ROOT, which is how the user usually
+        // as a collateral view's root, which is how the user usually
         // reached it (a search, or a goto-id view).
         let (_v, pids2, vf2) =
           single_root_view (

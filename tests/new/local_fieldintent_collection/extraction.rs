@@ -271,7 +271,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 fn restricted_placeholders_emit_neither_savenode_nor_contains () {
   // Raw extraction (no skgrepo set / weave): a restricted vognode
   // emits no save intention at all. It produces no SaveNode, and it
-  // does NOT appear in its container's extracted contains -- the
+  // does not appear in its container's extracted contains -- the
   // container's membership of an invisible node is owned by the disk
   // merge (weave), exercised under a restricted skgrepo set in
   // tests/repo_sets.rs. Position in the buffer is irrelevant here.

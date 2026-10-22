@@ -1,14 +1,14 @@
 ;;; Integration test for the save-lock lifecycle (plan_v2 §20.2a).
 ;;;
-;;; Opens THREE overlapping views, edits and saves one, and asserts that the
+;;; Opens three overlapping views, edits and saves one, and asserts that the
 ;;; truly-non-collateral view becomes editable once the save stream settles --
 ;;; i.e. the lock the save took out over every open view was actually released.
 ;;;
 ;;; Graph: a contains b; solo is standalone.
-;;;   *a*    -- the SAVED view.
-;;;   *b*    -- COLLATERAL to saving a (b's view shows a as containerward, so its
+;;;   *a*    -- the saved view.
+;;;   *b*    -- collateral to saving a (b's view shows a as containerward, so its
 ;;;             pid set contains a; saving a re-renders it).
-;;;   *solo* -- truly NON-COLLATERAL to saving a (its pid set is {solo}).
+;;;   *solo* -- truly non-collateral to saving a (its pid set is {solo}).
 ;;;
 ;;; Response-handler advice observes both intermediate protocol boundaries
 ;;; synchronously, before the next framed message can be dispatched.

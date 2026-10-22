@@ -357,7 +357,7 @@ async fn test_move_and_merge_simultaneously_rejected (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-    // Move b to private AND merge b into stay.
+    // Move b to private and merge b into stay.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (repo public))) a
       ** (skg (node (id b) (repo private) (editRequest (merge stay)))) b

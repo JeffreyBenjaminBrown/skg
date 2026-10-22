@@ -74,7 +74,7 @@ changed.
 
 When you save, each relationship keeps the relRepo it already had
 on disk (*sticky*), unless an =(editRequest (relRepo ...))= request explicitly
-names another skgrepo at least as private as the relationship's default. A NEW
+names another skgrepo at least as private as the relationship's default. A new
 relationship between owned nodes defaults to the more-private endpoint home —
 the most public skgrepo that leaks neither endpoint. A new relationship from
 an owned recorder to a foreign member instead defaults to the recorder's

@@ -1,8 +1,8 @@
--- Integration test for the EXPLICIT fork gesture
+-- Integration test for the explicit fork gesture
 -- (skg.view_requests.fork_node), nvim client. The Lua mirror of
 -- test-emacs.el in this directory: open owned container Q (whose
 -- content is the owned M):
---  - forking a DIRTY buffer is refused (no confirmation appears);
+--  - forking a dirty buffer is refused (no confirmation appears);
 --  - fork_node on M -> a fork-confirmation buffer; APPROVE -> the
 --    clone is created (overrides M) and shown in M's place on reopen;
 --  - on a second node M2, fork_node -> DECLINE strips the lingering
@@ -29,7 +29,7 @@ local function buffer_showing (skgid)
 end
 
 ---The live buffer named NAME, or nil. No polling -- for asserting the
----ABSENCE of a buffer that should never appear.
+---absence of a buffer that should never appear.
 local function find_buffer_named (name)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf)
@@ -40,7 +40,7 @@ local function find_buffer_named (name)
   return nil
 end
 
----Move the cursor in the CURRENT buffer onto the first line containing
+---Move the cursor in the current buffer onto the first line containing
 ---SNIPPET anywhere. Fails the test if no line does.
 local function goto_line_containing (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -61,8 +61,8 @@ local function goto_owned_headline (skgid)
     string.format("could not find %s's headline", skgid))
 end
 
----Move the cursor in the CURRENT buffer onto the first line that
----STARTS WITH SNIPPET (the analog of an elisp "^..."-anchored search).
+---Move the cursor in the current buffer onto the first line that
+---starts with SNIPPET (the analog of an elisp "^..."-anchored search).
 ---Fails the test if no line does.
 local function goto_line_starting_with (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -85,7 +85,7 @@ vim.api.nvim_set_current_buf(q_buf)
 T.check(T.buffer_text(q_buf):find('(id M)', 1, true),
         "Q's view does not show its content M")
 
--- 2. Forking a DIRTY buffer is refused: no confirmation appears.
+-- 2. Forking a dirty buffer is refused: no confirmation appears.
 vim.bo[q_buf].modified = true
 goto_owned_headline('M')
 view_requests.fork_node()
@@ -163,7 +163,7 @@ T.check(not T.buffer_text(q2_buf):find('(overridesHere M2)', 1, true),
         'decline must not commit a clone overriding M2')
 print('decline committed nothing (no clone overrides M2)')
 
--- 7. KILLING the confirmation buffer directly (not via approve/decline)
+-- 7. Killing the confirmation buffer directly (not via approve/decline)
 --    must also strip the lingering fork atom from the source buffer.
 content_view.request_single_root_content_view_from_id('Q3')
 local q3_buf = T.wait_for(function () return buffer_showing('Q3') end, 10)

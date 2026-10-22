@@ -41,7 +41,7 @@ T.check(vim.fn.filereadable(skg_file) == 1,
 local disk_contents = table.concat(vim.fn.readfile(skg_file), '\n')
 print(disk_contents)
 
--- Elisp's "^body:" matches at the start of ANY line in the string
+-- Elisp's "^body:" matches at the start of any line in the string
 -- (Emacs regex ^ matches after each newline); mirror that by scanning
 -- lines rather than anchoring to the whole string.
 local function any_line_starts_with (text, prefix)

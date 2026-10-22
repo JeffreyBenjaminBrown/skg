@@ -153,7 +153,7 @@ fn budget_aliasfolder_is_neutral (
 
 // ===================================================
 // Test: Editable view with an ample budget -> everything extends.
-// §5.5 budget counts vognode EXTENSIONS (cost 1 each); the full subtree here is
+// §5.5 budget counts vognode extensions (cost 1 each); the full subtree here is
 // 12 extensions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
 // 20 is ample and nothing is left write-protected.
 // ===================================================
@@ -276,14 +276,14 @@ async fn test_editable_view_limit_5_or_6 (
       println!("Result with limit=5:\n{}", result_5);
       println!("Result with limit=6:\n{}", result_6);
 
-      // §5.5: the budget counts vognode EXTENSIONS (cost 1 each), in BFS order.
+      // §5.5: the budget counts vognode extensions (cost 1 each), in BFS order.
       // The extension order here is 1, 2, 11, 12, 13, 121, 122, ... A folder fills
-      // WHOLE for free, so a node's whole content group is always shown -- the
-      // budget only governs how many of those children then EXTEND in turn; the
+      // whole for free, so a node's whole content group is always shown -- the
+      // budget only governs how many of those children then extend in turn; the
       // rest stay write-protected (visible, collapsed). Never a partial group.
       //
       // limit=5: extensions 1,2,11,12,13 spend the budget. 12 (the 4th) extended
-      // and showed its WHOLE group 121..124, but the budget hit 0 at 13, so when
+      // and showed its whole group 121..124, but the budget hit 0 at 13, so when
       // 121..124 are visited they stay write-protected (none extends -> no gen-3).
       let expected_5 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
@@ -379,12 +379,12 @@ async fn test_editable_view_limit_1_to_4 (
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
 
-      // §5.5: the budget counts vognode EXTENSIONS (cost 1 each), in BFS order:
-      // 1, 2, 11, 12, 13, then 12's content 121..124, ... A view ROOT is never
+      // §5.5: the budget counts vognode extensions (cost 1 each), in BFS order:
+      // 1, 2, 11, 12, 13, then 12's content 121..124, ... A view root is never
       // truncated (the user opened it), so roots 1 and 2 always extend; other
       // vognodes reached after the budget is spent are left write-protected.
       //
-      // limit=1: root 1 extends (budget 1->0) and shows its WHOLE group 11,12,13;
+      // limit=1: root 1 extends (budget 1->0) and shows its whole group 11,12,13;
       // all three are then write-protected (budget spent), so 12 never extends and
       // none of 121.. is created. Root 2 still extends (root exemption).
       let expected_1 = indoc! {"
@@ -395,7 +395,7 @@ async fn test_editable_view_limit_1_to_4 (
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
       // omittedBody marks only 12: the saved buffer showed 11 and 13
-      // editable with no body text, WIPING their bodies, while
+      // editable with no body text, wiping their bodies, while
       // write-protected 12 kept its body -- which this render hides.
       // limit=4: extensions 1, 2, 11, 12 spend the budget. 12 (the 4th) showed its
       // whole group 121..124, all write-protected (budget spent); 13 is reached
@@ -622,7 +622,7 @@ async fn test_editable_view_request_cleared (
       println!("Result:\n{}", result);
 
       // The viewRequests should be cleared after processing
-      // So the output should NOT contain "viewRequests"
+      // So the output should not contain "viewRequests"
       assert!(!result . contains ("viewRequests"),
         "viewRequests should be cleared after processing");
 
@@ -819,19 +819,19 @@ async fn test_editable_view_request_moves_editability_back (
       Ok (( )) }
 
 // ===================================================
-// Test: an AliasFolder fills WHOLE and is budget-NEUTRAL (§5.5).
+// Test: an AliasFolder fills whole and is budget-neutral (§5.5).
 // ===================================================
 // Companion to initial_view_bfs::test_budget_content_beats_subscribers (which
 // pins the same neutrality for the auto-rendered SubscribeeFolder). An AliasFolder,
-// unlike a SubscribeeFolder, is NOT auto-rendered de-novo -- it appears only on an
+// unlike a SubscribeeFolder, is not auto-rendered de-novo -- it appears only on an
 // explicit `aliases` view request -- so this exercises the request path through
 // the rerender (build_and_integrate_aliases / reconcile_aliasFolder_children),
 // neither of which takes node_budget.
 //
 // Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
-// counts vognode EXTENSIONS (cost 1), so the whole content here is exactly 3
+// counts vognode extensions (cost 1), so the whole content here is exactly 3
 // extensions: r, c1, c2. With limit=3 the chain fully extends (c2 editable)
-// AND the AliasFolder shows BOTH aliases. The alias members are non-vognodes, so they
+// and the AliasFolder shows both aliases. The alias members are non-vognodes, so they
 // cost nothing: were they charged, the 3 units could not also cover c2, which
 // would then be left write-protected (verified: at limit=2 c2 *is* write-protected
 // while the AliasFolder stays whole). That c2 is editable here is the guarantee

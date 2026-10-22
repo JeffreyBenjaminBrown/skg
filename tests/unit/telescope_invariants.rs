@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 /// public < private, per repo_order (dummy configs otherwise fall
-/// back to ALPHABETICAL order, where "private" < "public" would
+/// back to alphabetical order, where "private" < "public" would
 /// invert the ladder).
 fn two_skgrepo_config () -> SkgConfig {
   let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
@@ -76,7 +76,7 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
 
 #[test]
 fn private_membership_of_a_public_member_is_fine (
-) { // the private-reading-list shape: MORE private than the target
+) { // the private-reading-list shape: more private than the target
   let config        : SkgConfig = two_skgrepo_config ();
   let mut container : Graphnode = node_at ("container", "private");
   let public_child  : Graphnode = node_at ("open", "public");
@@ -92,7 +92,7 @@ fn private_membership_of_a_public_member_is_fine (
 
 #[test]
 fn leak_check_resolves_extra_ids (
-) { // a relationship naming a merged-away extra id judges the RECORDER's home
+) { // a relationship naming a merged-away extra id judges the recorder's home
   let config : SkgConfig = two_skgrepo_config ();
   let mut container : Graphnode = node_at ("container", "public");
   let mut private_child : Graphnode = node_at ("secret", "private");

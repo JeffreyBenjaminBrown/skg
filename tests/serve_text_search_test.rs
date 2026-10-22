@@ -352,7 +352,7 @@ fn private_alias_documents_are_filtered_before_grouping (
 ) -> Result < (), Box < dyn std::error::Error >> {
   // A node's home is "main" but one alias lives at level
   // "private". A search restricted to "main" must drop the
-  // alias DOCUMENT itself (per-document skgrepo filtering, before
+  // alias document itself (per-document skgrepo filtering, before
   // group_matches_by_id groups by ID) -- not merely drop whole
   // ID-groups whose home is restricted.
   let index_dir : &str =

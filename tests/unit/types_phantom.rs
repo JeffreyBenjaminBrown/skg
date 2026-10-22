@@ -6,8 +6,8 @@ fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
 fn skgid        (s: &str) -> ID         { ID ( s . to_string () ) }
 
 /// A node with sections in several skgrepos has exactly one home: the
-/// most public RETAINED section. The privacy order here is declaration
-/// order (foreign, zed, alpha), deliberately NOT alphabetical. The
+/// most public retained section. The privacy order here is declaration
+/// order (foreign, zed, alpha), deliberately not alphabetical. The
 /// foreign section is discarded by the owned-pid collision rule, so
 /// "zed" wins over the retained "alpha" section. Rebuilding the config
 /// for every assertion also gives its HashMap a fresh randomized state,

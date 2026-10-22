@@ -79,7 +79,7 @@ local function bfp_build_buffer (name)
     'root body line one',
     'root body line two',
     '** (skg (node (repo main))) child',
-    -- Two body lines: vim cannot close a SINGLE-line fold (the
+    -- Two body lines: vim cannot close a single-line fold (the
     -- documented one-line-body deviation in skg/folds.lua), so a
     -- one-line child body could never reach scenario B's folded
     -- BEFORE state in this client.
@@ -175,7 +175,7 @@ local diff_b = bfp_run_scenario(
   .. '[V] root body line one\n'
   .. '[V] root body line two\n'
   .. '[V] ** child\n'
-  -- A closed vim fold DISPLAYS its first line as the fold
+  -- A closed vim fold displays its first line as the fold
   -- placeholder (the documented deviation from org, which hid the
   -- whole entry), so the body's first line reads visible here.
   .. '[V] child body line one\n'

@@ -206,19 +206,19 @@ fn verify_tantivy_after_merge_2_into_1(
   nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
 
-  // Search for node 2 - should NOT find it (it was merged and deleted)
+  // Search for node 2 - should not find it (it was merged and deleted)
   let found_node_2: bool =
     tantivy_contains_skgid(tantivy_index, "2", "2")?;
   assert!(!found_node_2,
           "Node 2 should NOT be in Tantivy index after being merged");
 
-  // Search for node 1 - SHOULD find it (it's the acquirer)
+  // Search for node 1 - should find it (it's the acquirer)
   let found_node_1: bool =
     tantivy_contains_skgid(tantivy_index, "1", "1")?;
   assert!(found_node_1,
           "Node 1 SHOULD be in Tantivy index after merge");
 
-  // Search for acquiree_text_preserver - SHOULD find it
+  // Search for acquiree_text_preserver - should find it
   let acquiree_text_preserver_skgid: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let found_acquiree_text_preserver: bool =
@@ -334,7 +334,7 @@ fn verify_filesystem_after_merge_1_into_2(
              "Node 2 should subscribe to 1-subscribes-to");
 
   // Verify hidesFromSubs: should have node 1's hides,
-  // but NOT "hidden-from-subscriptions-of-1-but-in-content-of-2"
+  // but not "hidden-from-subscriptions-of-1-but-in-content-of-2"
   // (because it's in node 2's contents)
   assert_eq!(node_2 . hidesFromSubs . or_default() . len(),
              1,
@@ -386,19 +386,19 @@ fn verify_tantivy_after_merge_1_into_2(
   nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
 
-  // Search for node 1 - should NOT find it (it was merged and deleted)
+  // Search for node 1 - should not find it (it was merged and deleted)
   let found_node_1: bool = tantivy_contains_skgid(
     tantivy_index, "1", "1" )?;
   assert!(!found_node_1,
           "Node 1 should NOT be in Tantivy index after being merged");
 
-  // Search for node 2 - SHOULD find it (it's the acquirer)
+  // Search for node 2 - should find it (it's the acquirer)
   let found_node_2: bool = tantivy_contains_skgid(
     tantivy_index, "2", "2")?;
   assert!(found_node_2,
           "Node 2 SHOULD be in Tantivy index after merge");
 
-  // Search for acquiree_text_preserver - SHOULD find it
+  // Search for acquiree_text_preserver - should find it
   let acquiree_text_preserver_skgid: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let found_acquiree_text_preserver: bool = tantivy_contains_skgid(

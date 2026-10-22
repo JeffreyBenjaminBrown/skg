@@ -112,9 +112,9 @@
           (message "Expected to contain: 'cycle' and 'writeProtected'")
           (message "Got: %s" updated-content)
           (kill-emacs 1)))))
-  ;; §20.2(c): an invalid save must NOT leak lock/stream state that wedges the
-  ;; NEXT save (save-relax-lock is registered non-one-shot for exactly this).
-  ;; Reaching here already proves the second save's wait RETURNED -- a wedged
+  ;; §20.2(c): an invalid save must not leak lock/stream state that wedges the
+  ;; next save (save-relax-lock is registered non-one-shot for exactly this).
+  ;; Reaching here already proves the second save's wait returned -- a wedged
   ;; pending-count would have hung until the outer timeout fired. Assert
   ;; explicitly that no stream guard or lock overlay lingers after the
   ;; invalid-then-valid sequence.

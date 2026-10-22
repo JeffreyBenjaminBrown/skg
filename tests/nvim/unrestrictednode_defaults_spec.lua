@@ -66,7 +66,7 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
       filledIn_headlines('(skg (node (id abc) (repo jeff)))')
     -- skg, node, id/abc, skgrepo/jeff, write-protected/false, affectsParent/true,
     -- birth/unremarkable, editRequest/none, viewRequests/none:
-    -- each key AND each value is a separate headline.
+    -- each key and each value is a separate headline.
     assert.are.equal(16, #headlines)
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
     assert.is_not_nil(find_text(headlines, 'false (default)'))

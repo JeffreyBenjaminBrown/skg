@@ -39,7 +39,7 @@ fn test_birth_and_write_protected(
         // Node 1 contains node 2 (which has affectsParent=false and write-protected)
         // Node 2 contains node 3 (already); node 4 (new) sits under it
         // without affecting it, as a write-protected node holds no member.
-        // Node 2 should NOT affect node 1 because affectsParent=false
+        // Node 2 should not affect node 1 because affectsParent=false
         let org_text = indoc! {"
           * (skg (node (id 1) (repo main))) 1
           ** (skg (node (id 2) (repo main) (affectsParent false) writeProtected)) 2

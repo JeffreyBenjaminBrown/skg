@@ -67,7 +67,7 @@ local function open_plain_diff_for_node_at_point ()
   print('Resolved path: ' .. resolved_path)
   local before = vim.api.nvim_list_bufs()
   goto_git.open_plain_diff_at(resolved_path, nil)
-  -- open_plain_diff_at only switches to a NEW buffer when the file has
+  -- open_plain_diff_at only switches to a new buffer when the file has
   -- changes; otherwise it just notifies. Report whichever happened.
   local current = vim.api.nvim_get_current_buf()
   for _, buf in ipairs(before) do

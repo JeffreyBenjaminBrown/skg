@@ -58,8 +58,8 @@ One node can be recorded at several privacy levels at once: same-ID
 files is the node's *privacy telescope*; each file is one
 *telescope section* ("section" for short in code), holding the
 slice of the node recorded at its skgrepo's privacy level. The *home* is
-the MOST PUBLIC RETAINED section; it alone holds title, body, and extra
-ids. That the home carries the title is an INVARIANT, not a
+the most public retained section; it alone holds title, body, and extra
+ids. That the home carries the title is an invariant, not a
 search rule: a node's text always lives in its most public
 section, so a titleless section above the title is a violation
 the composition reports (=CompositionWarning::TitleBelowHome=), not a shape to
@@ -173,7 +173,7 @@ clamped to be no more public than the recorder's home. Hides
 floor higher (at least the most public subscription explaining them). A
 =(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
 overrides sticky with any skgrepo at least as private as the relationship's
-DEFAULT — raising privacy, or moving a stuck skgrepo back to the
+default — raising privacy, or moving a stuck skgrepo back to the
 default; a more-public choice is a save error. A legacy or
 hand-authored relationship whose disk relRepo already sits more public than
 its default may be held or made more private, never made still more
@@ -619,32 +619,32 @@ but might not, is maybe-placed.
 
 *** override substitution, and the vocabulary around it
 
-When view completion would CREATE a viewnode for node N as
-recursive content, it shows the EFFECTIVE OVERRIDER of N instead:
-the end of the chain of owned, currently-VISIBLE
+When view completion would create a viewnode for node N as
+recursive content, it shows the effective overrider of N instead:
+the end of the chain of owned, currently-visible
 'overrides' relationships leading out of N. The chain is often one
 relationship, but may be longer (an owned chain D overrides C overrides
 N is legal; only a cycle is forbidden), and visibility gating can
-stop it at a MIDDLE node when a later link's mentioner is restricted --
+stop it at a middle node when a later link's mentioner is restricted --
 so the shown node is the last visible link, not necessarily the
 chain's end. The resolver is 'resolve_override' in
 'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override
 relationships are display-only facts and never substitute.
 
-The shown substitute carries the FACT '(overridesHere N)'
+The shown substitute carries the fact '(overridesHere N)'
 (the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
-COLLECTED ID is what it contributes to its parent's saved lists:
+collected ID is what it contributes to its parent's saved lists:
 the fact's original if present, else its own ID -- so saving a
 view that shows R in place of N keeps N in the parent's contains.
 
-An OVERRIDDEN-AS-SUCH is a member child of an overriddenFolder --
+An overridden-as-such is a member child of an overriddenFolder --
 the position that always shows the original; its editable
 extension applies neither the recorder's hides nor substitution to
 its immediate children.
 
 An ordinary single-root visit always opens the requested node itself,
-shown raw. In enriched search results, each result has an OVERRIDEWARD
-VIEW-SUBTREE containing its visible override relatives in both
+shown raw. In enriched search results, each result has an overrideward
+view-subtree containing its visible override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders and role trees.
 
@@ -1055,7 +1055,7 @@ node's IDs. Marking it marks the leaf of the lost alias or ID.
 The line a client shows after every save of a diff-view buffer, after the
 "integrate unshown changes" command (C-c r u), and before a
 stage-and-commit that would leave changes behind: "12 of 14 changed
-files are ready", or "COMMIT READY. All 14 of 14 changed files are
+files are ready", or "Commit ready. All 14 of 14 changed files are
 ready." A changed file is ready when every change it records is
 marked; a file whose only change is order is ready without marks. The
 summary also counts the changed files of foreign skgrepos and the

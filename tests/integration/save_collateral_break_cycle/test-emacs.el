@@ -5,7 +5,7 @@
 ;;; lose the now-stale write-protected 'a' underneath 'b', because
 ;;; complete_managed_children discards children not in the parent's goal_list.
 ;;;
-;;; This test does NOT exercise DeletedNode — no nodes are deleted from disk,
+;;; This test does not exercise DeletedNode — no nodes are deleted from disk,
 ;;; only a containment relationship is modified.
 
 ;; Load the project elisp configuration

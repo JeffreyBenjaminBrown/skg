@@ -150,12 +150,12 @@ repo to a later fork's child (parent-repo resets on every level 1)."
     (insert "* plain headline, no metadata\n")
     (insert "** (skg (node (id N2) (repo foreign) writeProtected)) N2-original\n")
     (org-mode)
-    ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no skgrepo).
+    ;; N1 -> ownedA; N2 must not inherit ownedA (its parent has no skgrepo).
     (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N1" . "ownedA"))))))
 
 (ert-deftest test-show-fork-confirmation-builds-editable-navigable-buffer ()
-  "skg--show-fork-confirmation inserts the content into an EDITABLE
+  "skg--show-fork-confirmation inserts the content into an editable
 content-view buffer (so the user can rotate each clone's repo), records
 the source buffer, leaves skg-view-id nil, and binds approve/decline plus an
 ordinary-save refusal on C-x C-s."

@@ -20,7 +20,7 @@
 ;; to cover the entire hidden subtree. The root line (and its
 ;; children's text) is clobbered, and only the reformatted line is
 ;; re-inserted at point. The test that has `focused' on the root
-;; FAILS; the test without `focused' PASSES — confirming the trigger
+;; fails; the test without `focused' passes — confirming the trigger
 ;; is the focus-removal step operating on a folded headline.
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
@@ -37,7 +37,7 @@
 (ert-deftest test-save-response-with-folded-children-preserves-root ()
   "After a folded single-root save, the server's response carries the
 root with `focused' metadata and each child with `folded' metadata.
-`skg-replace-buffer-with-new-content' must NOT drop the root line."
+`skg-replace-buffer-with-new-content' must not drop the root line."
   (let* ((from-rust
           (concat
            "* (skg focused (node (id root))) root\n"

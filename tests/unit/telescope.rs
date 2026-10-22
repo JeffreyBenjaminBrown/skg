@@ -56,7 +56,7 @@ fn identity_resolve (
 ) -> ID {
   skgid . clone () }
 
-/// An arbitrary list of relation partners with UNIQUE members: up to N
+/// An arbitrary list of relation partners with unique members: up to N
 /// members, each at a random skgrepo in the universe. Uniqueness matters
 /// because the composition dedups (with warnings), which round-trip inputs
 /// must not trigger.
@@ -185,7 +185,7 @@ proptest! {
     { // Unordered relations have no order to preserve: sections
       // cannot express cross-repo interleavings without anchors,
       // which unordered relations deliberately lack, so the composition's
-      // output order is CANONICAL (repo-major). The law is
+      // output order is canonical (repo-major). The law is
       // set-equality with skgrepos intact.
       let sort = |v : Option<&Vec<RelPartner<ID>>>|
       -> Vec<RelPartner<ID>> {
@@ -257,7 +257,7 @@ proptest! {
 fn dangling_anchor_attaches_after_preceding_run_with_warning (
 ) {
   // S1's section: prepend [p], run (a,[x]), then a run whose anchor
-  // is unknown -- its members must follow the PRECEDING run, warned.
+  // is unknown -- its members must follow the preceding run, warned.
   let sections : Vec<(SkgrepoName, SectionSlices)> = vec! [
     ( SkgrepoName::from ("S0"),
       SectionSlices {
@@ -374,7 +374,7 @@ fn anchors_resolve_through_the_resolver ( // extra-id safety
 #[test]
 fn the_home_is_the_most_public_section_titled_or_not (
 ) { // Jeff's rule: a node's text always lives in its most public
-    // section. So the home is the most public SECTION, not the most
+    // section. So the home is the most public section, not the most
     // public section bearing a title; a titleless one above the
     // title is a violation to report, not a shape to search past.
   let titleless_public : (SkgrepoName, SectionSlices) =

@@ -8,8 +8,8 @@
 -- Phase 1: Open the diff view.
 -- Phase 2: Its "all changes" buffer shows b as a historical phantom.
 -- Phase 3: Resolve b's on-disk path and open its plain diff.
--- Phase 4: Verify the resolved path is exactly skg-data/b.skg (NOT
---          the outer skg project skgrepo, and NOT a double-prefixed
+-- Phase 4: Verify the resolved path is exactly skg-data/b.skg (not
+--          the outer skg project skgrepo, and not a double-prefixed
 --          nonexistent directory), and that point is on the buffer
 --          for b.skg.
 --
@@ -29,7 +29,7 @@
 -- exercises the request_file_path -> open_plain_diff_at chain
 -- goto_in_git itself falls back to when neogit is unavailable,
 -- calling it directly. This lets the test assert the resolved path
--- ITSELF, which is strictly more precise for this regression than
+-- itself, which is strictly more precise for this regression than
 -- inspecting magit's toplevel afterward: a wrong/double-prefixed path
 -- fails the comparison directly at its skgrepo, rather than via
 -- magit's directory walk landing somewhere unexpected. b's own id is

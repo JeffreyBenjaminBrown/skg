@@ -41,7 +41,7 @@ So far there are these endpoints:
     - =regex=, =body=, =operators= are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
-      - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, the query is parsed as a boolean expression over the per-token regexes: AND / OR / NOT / +foo / -bar, conventional precedence (NOT > AND > OR, bare adjacency = OR), and grouping via parens that stand ALONE between whitespace (a paren attached to a pattern is regex syntax within that piece). Malformed operator syntax is an error; phrase syntax does not apply. Detailed in docs/COMMANDS.org.
+      - "operators=true": preserve Tantivy phrase and operator syntax (AND / OR / phrase / +foo / -bar / grouping / field:). Intra-word operator chars still get escaped heuristically so C++ etc. remain findable. In regex mode, the query is parsed as a boolean expression over the per-token regexes: AND / OR / NOT / +foo / -bar, conventional precedence (NOT > AND > OR, bare adjacency = OR), and grouping via parens that stand alone between whitespace (a paren attached to a pattern is regex syntax within that piece). Malformed operator syntax is an error; phrase syntax does not apply. Detailed in docs/COMMANDS.org.
     - The skgrepo restriction is applied before grouping, ranking,
       alias/title selection, and display truncation. Restricted-skgrepo
       documents do not influence result order or which title/alias is
@@ -250,11 +250,11 @@ So far there are these endpoints:
     =((response-type strandeds-confirmation) (strandeds (((relation
     "contains") (recorder "R") (member "M") (relRepo "REPO") (default
     "REPO")) ...)) (prompt "..."))=, with IDs but no titles. The
-    client re-issues the SAME save with =(strandeds-reviewed . "true")=
+    client re-issues the same save with =(strandeds-reviewed . "true")=
     and the chosen =(reset-strandeds ...)=; the server resets those
     to their new defaults, saving each recorder (outside the view or
     not), so the views that show them rerender as collateral.
-  - The first ALTERNATIVE terminal message: after validation, a save
+  - The first alternative terminal message: after validation, a save
     rereads every telescope it will write. If any currently selects a
     title or body below home and lacks exact approval, nothing is
     skgsave-committed and the server replies, in place of save-result,
@@ -264,14 +264,14 @@ So far there are these endpoints:
     Hoist moves the selected title/body text to home and removes lower
     title/body copies while retaining lower relationships and aliases;
     Abort writes nothing and requires manual =.skg= repair. Hoist
-    re-issues the SAME save with =(approved-hoist-pids "P" ...)=.
+    re-issues the same save with =(approved-hoist-pids "P" ...)=.
     The server rereads and reclassifies on that retry, so newly dirty
     PIDs produce another batch confirmation. Each attempt still sends
     =save-lock= first, and the confirmation is terminal for that
     attempt: neither =save-relax-lock=, =collateral-view=, nor
     =save-result= follows it.
-  - The second ALTERNATIVE terminal message: a save that detects forks
-    (edited foreign nodes, or explicit fork requests) and does NOT
+  - The second alternative terminal message: a save that detects forks
+    (edited foreign nodes, or explicit fork requests) and does not
     carry =(approved-forks . "true")= skgsave-commits nothing and replies, in
     place of save-result,
     =((response-type fork-confirmation) (content "...") (to-minibuffer "..."))=,
@@ -280,11 +280,11 @@ So far there are these endpoints:
     forks; an unspecified clone skgrepo renders as the PICK-A-REPO
     placeholder under a =# Suggested repo ...= comment). The client
     shows it, collects a skgrepo per placeholder, and on approval
-    re-issues the SAME save with =(approved-forks . "true")= and
+    re-issues the same save with =(approved-forks . "true")= and
     =(fork-repos ...)=. Hoist is decided first: when a save needs
     both decisions, its approved Hoist retry then returns the fork
     confirmation, and neither attempt writes.
-  - The third ALTERNATIVE terminal message protects the saved and
+  - The third alternative terminal message protects the saved and
     collateral rerenders. After a valid save has updated disk and the
     session-lifetime stores, the server renders the saved view and every collateral view in memory.
     Under a restricted skgrepo-set, if the staged forests contain overPrivateText
@@ -293,7 +293,7 @@ So far there are these endpoints:
     =((response-type overPrivateText-telescope-confirmation)
     (operation save-rerender) (pids ("P" ...)) (prompt "..."))=.
     The save itself has succeeded; only its updated text is withheld.
-    The client may retry the SAME save with
+    The client may retry the same save with
     =(approved-overPrivateText-pids "P" ...)=. Under skgrepo-set =all=, or on an
     approved retry, the ordinary save-result carries the shared overPrivateText-
     telescope warning. Declining leaves current client buffers and the
@@ -545,7 +545,7 @@ So far there are these endpoints:
     a per-repo breakdown, or "Body whitespace strip failed: ...".
   - Behavior: Strips trailing whitespace from every line of every
     body, and trailing blank lines from each body's tail, in every
-    OWNED skgrepo in the config. Foreign skgrepos are never written, so they are
+    owned skgrepo in the config. Foreign skgrepos are never written, so they are
     left untouched (stripping them would make them diverge from
     their upstreams). Rewrites exactly the .skg files whose bodies
     changed (a clean file stays byte-identical); a body that strips
@@ -692,7 +692,7 @@ one automatically.
     Under a restricted set, overPrivateText content without exact approval returns
     LP =overPrivateText-telescope-confirmation= with
     =(operation rerender-all-views)= and
-    the exact PIDs, followed by an EMPTY rerender stream
+    the exact PIDs, followed by an empty rerender stream
     (=rerender-lock= with no view IDs, then clean =rerender-done=). No view
     text is sent and no open-view registry entry changes. A retry adds
     =approved-overPrivateText-pids=; =all= instead adds the shared warning to
@@ -733,14 +733,14 @@ one automatically.
     connection, and cancels any in-flight search enrichment.
   - Refusal: the endpoint's error paths (missing or unknown set
     name) answer in the normal skgrepo-restriction response-type,
-    carrying the explanatory text as =content= and the UNCHANGED set
-    as =restriction=, followed by an EMPTY rerender stream (a
+    carrying the explanatory text as =content= and the unchanged set
+    as =restriction=, followed by an empty rerender stream (a
     rerender-lock naming no views, then rerender-done), so the
     client's preemptive buffer locks and stream guard unwind.
   - Rerender authorization precedes both the set change and release of
     view text. If the proposed set would render an overPrivateText telescope, the
     first reply is LP =overPrivateText-telescope-confirmation= with
-    =(operation repo-set-switch-rerender)= and exact PIDs, followed by an EMPTY
+    =(operation repo-set-switch-rerender)= and exact PIDs, followed by an empty
     rerender stream. A retry adds =approved-overPrivateText-pids=; declining
     leaves the skgrepo restriction and open-view registry unchanged.
 
@@ -820,7 +820,7 @@ node participates in the membership represented by its viewparent:
 - =(affectsParent na)= is rendered for view roots.
 
 The bare atom =omittedBody= accompanies =writeProtected= on a write-protected
-node whose graphnode HAS a body — one the rendering hides. Herald
+node whose graphnode has a body — one the rendering hides. Herald
 "B", hugging the ☮. Display-only: the parser accepts and discards it;
 the view regenerates it.
 
@@ -841,7 +841,7 @@ reads =Oa=, an =overridden= role graft =aO=.
 
 ** View requests: (viewRequests ...)
 
-=(viewRequests ...)= carries client→server REQUESTS for viewbranches
+=(viewRequests ...)= carries client→server requests for viewbranches
 (unlike =(rels ...)= and the stats below, which are server→client). On save
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Request forms:
@@ -855,7 +855,7 @@ is part of the subscriber's =subscribeeFolder=. Use a folder request for the
 other relation folders; their potential contents remain advertised by the
 node's heralds.
 
-- =(folder RELNAME)= — build BOTH folders of the relation, populated from the
+- =(folder RELNAME)= — build both folders of the relation, populated from the
   graph. RELNAME is =aliases=, =overrides=,
   =hidesFromSubs=, =subscribesTo=, =containers= or =mentioners=.
   The editable folder (=overriddenFolder= / =subscribeeFolder= / =aliasFolder=)
@@ -968,7 +968,7 @@ ancestor-lettered tokens now. (The bare =omittedBody= atom documented
 above still rides a write-protected node whose graphnode has an omitted
 body.)
 
-=(viewStats ...)= still carries the position facts that are NOT
+=(viewStats ...)= still carries the position facts that are not
 relationship tokens (the same graphnode can warrant different ones
 under different parents):
 
@@ -983,7 +983,7 @@ under different parents):
   that ancestor as the relationship tokens do (a = the viewparent).
   Herald "Δ⌂=LETTER". A display fact, discarded at save;
 - =(relRepo NAME)= — ugly herald "~NAME", shown immediately before
-  the ⌂ skgrepo herald; the relRepo of the RELATIONSHIP this
+  the ⌂ skgrepo herald; the relRepo of the relationship this
   headline represents (the =contains= relationship to a content child, or
   the folder's relation for a PartnerFolder member), when its privacy was
   deliberately raised above the relationship's default. This is an observed,
@@ -994,7 +994,7 @@ under different parents):
   the server enforces the floor (an offered skgrepo more
   public than the relationship's default is a save error; a skgrepo at the
   default or more private is honored, which is how a stuck relationship's
-  privacy is lowered; a legacy or hand-authored relationship whose DISK
+  privacy is lowered; a legacy or hand-authored relationship whose disk
   skgrepo already sits more public than the default may be held or
   made more private, never made still more public). Absent means the
   relationship sits at its default relRepo. The relationship belongs to the
@@ -1027,7 +1027,7 @@ remove graph context.
 
 ** Override substitution and the overridesHere fact
 
-When view completion would CREATE a viewnode for node N as
+When view completion would create a viewnode for node N as
 recursive content, and an owned overrider R of N is visible
 under the skgrepo restriction, it shows R instead -- transitively (a
 owned chain D overrides C overrides N is legal and resolves to
@@ -1047,7 +1047,7 @@ registered as rooted at K. Collateral rerenders do not perform these
 replacements; they retain their existing raw positions. A later independent
 single-root request for F still opens raw F.
 
-Moreover, the immediate children of ANY overridden node shown raw -- a
+Moreover, the immediate children of any overridden node shown raw -- a
 PartnerFolder member, a view root, or the overridden-as-such (a member
 child of an overriddenFolder) -- are also shown raw: the user is looking at the
 original, so its children are the original's, not the overrider's. This is one
@@ -1057,15 +1057,15 @@ a node whose only overrider is invisible under the skgrepo restriction is
 
 A substituted viewnode carries the keyed viewStats form
 =(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
-stands for. The fact is LOAD-BEARING at save: wherever it
+stands for. The fact is load-bearing at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
 instead of being rewritten to the overrider. Edits to the shown
 node itself (title, body, folders) still save to the shown node.
 A buffer whose fact the server would not have rendered (the carrier
 is not on N's owned override chain -- the ownership-gated,
-visibility-UNGATED walk out of N) aborts the save with an
-explanation. With chains the honest carrier may be a MIDDLE link
+visibility-ungated walk out of N) aborts the save with an
+explanation. With chains the honest carrier may be a middle link
 (shown when a later link's mentioner is hidden), so the check accepts
 any node on the chain and rejects only off-chain facts. A
 skgrepo-set switch that makes a
@@ -1162,7 +1162,7 @@ Fred}.
 ** OTHER_SKGREPO_DEPENDENCIES.toml
 
 At every server start the server writes an =OTHER_SKGREPO_DEPENDENCIES.toml=
-manifest into each OWNED skgrepo directory. Its =dependencies= is a
+manifest into each owned skgrepo directory. Its =dependencies= is a
 list of pairs, one per skgrepo that skgrepo may reference — itself and
 everything more public, in privacy order, the skgrepo itself last.
 Each pair has a =path= (data-root-relative directory) and, unless the
@@ -1181,7 +1181,7 @@ dependencies = [
 
 It is generated output — hand edits are clobbered — and lets someone
 who receives one of your skgrepos see what it depends on and where to get
-it. When a FOREIGN skgrepo's manifest orders two skgrepos differently
+it. When a foreign skgrepo's manifest orders two skgrepos differently
 than this config does, the server warns at init, in its log and in
 the startup warnings each client shows on connect (see "Server
 warnings", above). (The receiver also
@@ -1226,7 +1226,7 @@ Each file is one *telescope section*: the slice of one node
 recorded at one privacy level (see =docs/telescopes.org=). One node =
 one ID = same-ID =.skg= files across skgrepos, at most one per
 skgrepo; the filename is the node's primary ID followed by =.skg= in
-every skgrepo. The node's *home* is its MOST PUBLIC section, and
+every skgrepo. The node's *home* is its most public section, and
 that section carries the =title= — an invariant, not a search rule.
 A titleless section more public than the title still loads (the
 composition reports it) but cannot be rewritten by a save. A field a
@@ -1244,14 +1244,14 @@ Fields:
 - =body=: An optional string, perhaps with newlines. Home only.
 - =aliases=: Optional list of strings. Each section may contribute
   aliases; an alias's relRepo is its section's skgrepo.
-- =contains=, =subscribesTo=: Ordered relations. ONE flat YAML
+- =contains=, =subscribesTo=: Ordered relations. One flat YAML
   sequence per relation, one entry per line:
   - =- ID= — a member recorded at this section's skgrepo. Identical
     syntax in every section, so a membership moving between skgrepos
     diffs as a clean one-line delete/add pair.
   - =- anchor: ID= — a placement anchor: the members after it (until
     the next anchor) insert immediately after the anchored ID, which
-    lives in a MORE PUBLIC section. Members before the first anchor
+    lives in a more public section. Members before the first anchor
     prepend to the front of the more public list. Anchors are derived
     on save from the in-memory order; hand-written anchors are
     honored on load (a dangling anchor's run falls back with a
@@ -1261,8 +1261,8 @@ Fields:
   across sections; each entry's relRepo is its section's
   skgrepo.
 
-The COMPOSITION of all same-pid sections (most public first) yields the
-node; saving DECOMPOSES the node back into sections, byte-stably, so
+The composition of all same-pid sections (most public first) yields the
+node; saving decomposes the node back into sections, byte-stably, so
 untouched sections do not change on disk. An owned section emptied
 by a save is deleted; foreign sections are never touched.
 

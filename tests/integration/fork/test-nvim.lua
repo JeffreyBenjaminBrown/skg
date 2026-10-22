@@ -24,7 +24,7 @@ local function buffer_showing (skgid)
   return nil
 end
 
----Move the cursor in the CURRENT buffer onto the first line containing
+---Move the cursor in the current buffer onto the first line containing
 ---SNIPPET anywhere. Fails the test if no line does.
 local function goto_line_containing (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -37,8 +37,8 @@ local function goto_line_containing (snippet, description)
   T.fail(description or ('could not find a line containing: ' .. snippet))
 end
 
----Move the cursor in the CURRENT buffer onto the first line that
----STARTS WITH SNIPPET (the analog of an elisp "^..."-anchored search).
+---Move the cursor in the current buffer onto the first line that
+---starts with SNIPPET (the analog of an elisp "^..."-anchored search).
 ---Fails the test if no line does.
 local function goto_line_starting_with (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)

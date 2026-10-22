@@ -131,7 +131,7 @@ async fn test_multi_root_view_logic (
                           * (skg (node (id 2) (repo main) (affectsParent na))) 2
                           * (skg (node (id 1) (repo main) (affectsParent na) writeProtected omittedBody)) 1
                           "};
-                          // 'omittedBody': node 1 HAS a body, and this
+                          // 'omittedBody': node 1 has a body, and this
                           // (repeated, hence write-protected) occurrence of it
                           // hides that body -- herald B ('docs/heralds.org',
                           // "Other heralds").
@@ -230,7 +230,7 @@ async fn test_multi_root_view_with_node_limit (
       // §5.5 node budget, limit=3: level-order creation spends the budget on the
       // content children (2, and node 5 shown in place of 3, under root 1; and
       // root 2's independent containerward node 1). Those nodes are created
-      // DEFINITIVELY (no write-protected placeholders), so the shown 5 and root 2 extend
+      // definitively (no write-protected placeholders), so the shown 5 and root 2 extend
       // their bodies + default folders (folders are not budget-bound);
       // subscribee members are write-protected.
       let expected = indoc! {
@@ -265,8 +265,8 @@ async fn test_limit_with_multiple_sibling_groups (
       //   └─ 12 (gen 2)
       //      └─ 121 (gen 3)
       //
-      // §5.5 node budget, limit=4 (cost 1 per vognode EXTENSION): extensions are
-      // 1, 11, 12, 111. Each parent shows its WHOLE child group (never a partial
+      // §5.5 node budget, limit=4 (cost 1 per vognode extension): extensions are
+      // 1, 11, 12, 111. Each parent shows its whole child group (never a partial
       // sibling set), and once the budget is spent the remaining children stay
       // write-protected: 11's group 111,112 is whole (111 extended, 112 write-protected), and
       // 12's group 121 is whole (write-protected). graphStats(contents N) flags the

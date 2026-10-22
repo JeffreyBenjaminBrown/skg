@@ -59,7 +59,7 @@ async fn test_bfs_limit_across_multiple_trees (
       //     323
       //   33
       //
-      // §5.5 node budget: the budget counts vognode EXTENSIONS (cost 1 each), in
+      // §5.5 node budget: the budget counts vognode extensions (cost 1 each), in
       // level order; a whole child group is always shown (never truncated
       // mid-group), and once the budget hits 0 every later vognode is left
       // write-protected (visible, collapsed -- graphStats(contents N) still shows it
@@ -197,10 +197,10 @@ async fn test_bfs_limit_8_two_branches (
 
       Ok (( )) }
 
-// §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills WHOLE
-// and is budget-NEUTRAL. Fixture: root r -> content chain c1 -> c2, and r also
+// §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills whole
+// and is budget-neutral. Fixture: root r -> content chain c1 -> c2, and r also
 // subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
-// the chain fully extends (c2 is editable, body and all), AND both subscribers
+// the chain fully extends (c2 is editable, body and all), and both subscribers
 // are shown (the folder is whole), write-protected. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
 // write-protected -- it is not, which is the guarantee this test pins. Subscribers

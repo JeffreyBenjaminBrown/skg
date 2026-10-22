@@ -429,9 +429,9 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
 
 /// The contains-removal rule ('docs/forks.org', "Editing the clone:
 /// deletions become hides"): owned f contains [c, x] and subscribes to o,
-/// whose contains include c (but not x). Saving f WITHOUT its children must
+/// whose contains include c (but not x). Saving f without its children must
 /// hide c (it would otherwise reappear under f as unintegrated subscribed
-/// content), and must NOT hide x (no subscribee contains it -- deleting it
+/// content), and must not hide x (no subscribee contains it -- deleting it
 /// is an ordinary contains edit).
 async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
   config : &SkgConfig,
@@ -462,7 +462,7 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
     Ok (( )) }
 
 /// The inverse of the contains-removal rule: owned g hides c and
-/// subscribes to o (which contains c). Saving g WITH c as content
+/// subscribes to o (which contains c). Saving g with c as content
 /// must drop the now-stale hide -- c is integrated, so g should no
 /// longer appear among c's hiders.
 async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
@@ -547,8 +547,8 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
-    // in-view subtree (e11) is a user branch, so §6.0 MAKES the visible
-    // occurrence A NON-MEMBER (affectsParent=false) rather than deleting it -- chaos-
+    // in-view subtree (e11) is a user branch, so §6.0 makes the visible
+    // occurrence A non-member (affectsParent=false) rather than deleting it -- chaos-
     // monkey safety: the user may have deliberately placed content there, and
     // we must not lose it. So e1 shows twice: once hidden (write-protected), once as a
     // preserved non-member branch.
@@ -602,7 +602,7 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
       rerendered );
     // Regression ('docs/forks.org', "Unintegrated content: the
     // subscribeeFolder"): e1, now contained by the
-    // subscriber r, must NOT also re-appear as unintegrated subscribee-as-such
+    // subscriber r, must not also re-appear as unintegrated subscribee-as-such
     // content. Before the contains-subtraction fix it showed twice -- once as
     // r's integrated content (above) and once under the subscribee-as-such.
     assert_e1_removed_from_visible_subscribee_branch (&rerendered);
@@ -1043,7 +1043,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
 /// Hidden without but none hidden within:
 /// - R subscribes to E1, E2
 /// - R hides H
-/// - H is NOT in any subscribee's content
+/// - H is not in any subscribee's content
 /// - E1 contains [E11, E12], E12 contains [E121]
 /// - E2 has no content
 ///
@@ -1186,7 +1186,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are write-protected (bare leaves), H doesn't appear
-/// - View from R with editable views extended at each subscribee: H appears in HiddenInSubscribeeFolder under BOTH E1 and E2
+/// - View from R with editable views extended at each subscribee: H appears in HiddenInSubscribeeFolder under both E1 and E2
 ///
 /// No HiddenOutsideOfSubscribeeFolder in either state (H is in subscribees' content).
 async fn test_overlapping_hidden_within (

@@ -72,9 +72,9 @@ async fn test_unmodified_foreign_node_allowed (
 async fn test_modified_foreign_node_forks_with_default_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-      // Editing a foreign node FORKS it. The foreign node is a ROOT with
+      // Editing a foreign node forks it. The foreign node is a root with
       // no owned ancestor to infer a clone skgrepo from, so the clone's
-      // skgrepo DEFAULTS to the user's first owned skgrepo ("main"). The
+      // skgrepo defaults to the user's first owned skgrepo ("main"). The
       // fork rides in the plan's fork_specs (skgsave-committed only on
       // confirmation); the foreign node itself is not written.
       let org_text: &str = indoc! {"

@@ -1,8 +1,8 @@
--- Integration test for the MOTIVATING override-chain case, nvim
+-- Integration test for the motivating override-chain case, nvim
 -- client. The Lua mirror of test-emacs.el in this directory: fork a
 -- foreign N into a public clone C (implicit fork), then run
 -- skg.view_requests.fork_node on the shown substitute C and rotate
--- its clone to a PRIVATE skgrepo, forming the chain D overrides C
+-- its clone to a private skgrepo, forming the chain D overrides C
 -- overrides N. Viewing N's container then shows the chain end D,
 -- marked (overridesHere N), and the save accepts that chain-end
 -- carrier.
@@ -27,7 +27,7 @@ local function buffer_showing (skgid)
   return nil
 end
 
----Move the cursor in the CURRENT buffer onto the first line containing
+---Move the cursor in the current buffer onto the first line containing
 ---SNIPPET anywhere. Fails the test if no line does.
 local function goto_line_containing (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -40,8 +40,8 @@ local function goto_line_containing (snippet, description)
   T.fail(description or ('could not find a line containing: ' .. snippet))
 end
 
----Move the cursor in the CURRENT buffer onto the first line that
----STARTS WITH SNIPPET (the analog of an elisp "^..."-anchored search).
+---Move the cursor in the current buffer onto the first line that
+---starts with SNIPPET (the analog of an elisp "^..."-anchored search).
 ---Fails the test if no line does.
 local function goto_line_starting_with (snippet, description)
   local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -108,7 +108,7 @@ goto_line_containing('(overridesHere N)',
 view_requests.fork_node()
 
 -- 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
---    PRIVATE, then approve -> private D overrides C.
+--    private, then approve -> private D overrides C.
 local confirm_buf_2 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_2, 'no fork-confirmation for the clone appeared')
 vim.api.nvim_set_current_buf(confirm_buf_2)
@@ -118,7 +118,7 @@ metadata.change_repo_at_line(clone_line_2, 'private')
 save.approve_fork()
 print('the public clone was forked into a private clone (repo rotated)')
 
--- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
+-- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
 --    node -- is now shown in N's place, still marked (overridesHere N).
 p_buf = reopen_P()
 local function chain_end_shown ()

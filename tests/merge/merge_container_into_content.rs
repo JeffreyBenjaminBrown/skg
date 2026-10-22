@@ -153,13 +153,13 @@ async fn merge_container_into_content_impl (
 
   let view : &str = &response . saved_view;
 
-  // editRequest should NOT persist in the rendered buffer.
+  // editRequest should not persist in the rendered buffer.
   if view . contains ("editRequest") {
     failures . push (
       "editRequest persists after merge execution"
       . to_string() ); }
 
-  // a should NOT appear as a PhantomDeleted: the preprocessing pass
+  // a should not appear as a PhantomDeleted: the preprocessing pass
   // 'rewriteInPlace_viewnodes_whose_id_is_newly_extra' rewrites viewnodes whose pid
   // became an extra-id (here, a is an extra-id of aa after the
   // merge) to carry the acquirer's pid instead. The acquiree line

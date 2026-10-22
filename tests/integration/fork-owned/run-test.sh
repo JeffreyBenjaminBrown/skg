@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Integration test for the EXPLICIT fork gesture (skg-fork-node).
-# - Starts an independent skg server with a single OWNED skgrepo.
+# Integration test for the explicit fork gesture (skg-fork-node).
+# - Starts an independent skg server with a single owned skgrepo.
 # - Emacs opens the owned container Q (whose content is the owned M),
 #   runs skg-fork-node on M, and approves: a clone is created (overrides
 #   M) and shown in M's place when Q re-renders.
-# - Also checks that forking a DIRTY buffer is refused, and that
-#   DECLINING a fork strips the lingering (viewRequests fork) atom and
+# - Also checks that forking a dirty buffer is refused, and that
+#   declining a fork strips the lingering (viewRequests fork) atom and
 #   commits nothing.
 
 set -e

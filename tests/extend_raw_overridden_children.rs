@@ -1,13 +1,13 @@
 // cargo nextest run --test grouped_overrides -E 'test(extend_raw_overridden_children::)'
 //
 // Substitution does not apply to the immediate children of an
-// overridden node shown RAW ('docs/override.org', "Automatic override
+// overridden node shown raw ('docs/override.org', "Automatic override
 // substitution").
 //
 // Fixture (the docs/forks.org shape): clone R overrides original X, and
 // R's child R1 overrides X's child X1. Opening X as a view root shows
 // X raw (roots are shown raw); its immediate child X1 must therefore be shown
-// RAW too -- NOT substituted by R1 -- because the user is looking at
+// raw too -- not substituted by R1 -- because the user is looking at
 // the original. (Before this change, a raw title could sit over the
 // overrider's substituted children.)
 
@@ -36,7 +36,7 @@ fn raw_shown_overridden_root_children_are_raw
       assert! ( x_view . lines () . any (
           |l| l . starts_with ("* (skg (node (id X)") ),
         "X should be the raw root:\n{}", x_view );
-      // X's immediate content child X1 is shown RAW, as itself, under X.
+      // X's immediate content child X1 is shown raw, as itself, under X.
       assert! ( x_view . lines () . any (
           |l| l . starts_with ("** (skg (node (id X1)") ),
         "X1 should appear raw as X's immediate child:\n{}", x_view );

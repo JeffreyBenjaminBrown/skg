@@ -76,10 +76,10 @@ fn assert_sharing_stats_in_view_of_R (
   assert_eq! ( e_lines . len (), 2,
     "{}: E should appear under both the subscribeeFolder and the \
      overriddenFolder:\n{}", label, buf );
-  // In the SEMANTIC wire the parent-relative stats are relationships to
+  // In the semantic wire the parent-relative stats are relationships to
   // E's grandparent R (generation 2): R both subscribes to and overrides
-  // E. Under a folder, the FOLDER relation is E's birth; the
-  // OTHER (the old gO/gS sharing stat) shows as an ordinary relation.
+  // E. Under a folder, the folder relation is E's birth; the
+  // other (the old gO/gS sharing stat) shows as an ordinary relation.
   // Both carry (ancestors 2). The folders differ by which relation is birth.
   for (folder, line) in &e_lines {
     match *folder {
@@ -101,7 +101,7 @@ fn assert_sharing_stats_in_view_of_R (
         "{}: E shown outside any folder ({:?}):\n{}", label, other, buf ),
     }}
   for f_line in lines_containing (buf, "(id F)") {
-    // F is a subscribee R does NOT override, so it has no overrides
+    // F is a subscribee R does not override, so it has no overrides
     // relation at all -- only its folder subscribe (its birth).
     assert! ( ! f_line . contains ("(overrides"),
       "{}: F, a subscribee R does not override, shows no override \
@@ -121,7 +121,7 @@ fn assert_op_in_view_of_P (
 ) {
   let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
   // Op ("overridesParent"): C overrides its viewparent (a = P), so
-  // it is born of an overrides-OUT relation to generation 1.
+  // it is born of an overrides-out relation to generation 1.
   assert! ( c_lines . iter ()
             . any ( |l| l . contains ("(overrides (out")
                         && l . contains ("(ancestors 1)") ),

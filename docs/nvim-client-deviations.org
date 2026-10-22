@@ -49,7 +49,7 @@
 
 * Read-only text regions (necessary: nvim has no per-range read-only)
 - The metadata edit buffer's display-only title group is editable
-  while typing; edits to it are DISCARDED at commit (the strip step
+  while typing; edits to it are discarded at commit (the strip step
   drops the title group whatever it holds). Emacs rejected the edits
   at type time.
 - The fork-confirmation buffer similarly relies on commit-time
@@ -59,7 +59,7 @@
 * Folding (necessary: vim folds are line ranges on windows)
 - A closed fold always displays vim's one-line fold placeholder; org
   hid the text entirely.
-- A ONE-LINE body cannot be body-folded (vim cannot close a
+- A one-line body cannot be body-folded (vim cannot close a
   single-line fold). A 'bodyFolded' marker on such a body degrades
   gracefully: the body stays visible and the marker is simply not
   re-recorded at the next save. Multi-line bodies body-fold normally.
@@ -108,7 +108,7 @@
 - The Lua sexp printer renders the empty list as '()' where elisp
   prints 'nil'; the server's parser accepts both, and the reader maps
   both to the same value.
-- ':SkgReload' (the dev-convenience module reload) CLOSES the TCP
+- ':SkgReload' (the dev-convenience module reload) closes the TCP
   connection before discarding the module holding it, where Emacs
   left the old process object dangling in its process list. Marked as
   a deliberate improvement, not a fidelity gap. The client reconnects
@@ -118,5 +118,5 @@
 - 'search-interactive''s 'h' option opens docs/COMMANDS-nvim.org
   (falling back to COMMANDS.org).
 - The 'M-x' cosmetic machinery (alias names, completion-predicate
-  hiding of internal names) has no analog; the ':Skg*' commands ARE
+  hiding of internal names) has no analog; the ':Skg*' commands are
   the public names.

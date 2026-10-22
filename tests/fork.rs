@@ -35,7 +35,7 @@ use skg::types::save::{NodeInstruction, ForkSpec, SaveNode};
 use skg::types::views_state::{OpenViews, ViewId};
 
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
-/// an OWNED container P. The buffer makes N editable and edits its
+/// an owned container P. The buffer makes N editable and edits its
 /// title to "N-edited" -- a real change, so saving forks N. (N's
 /// children stay write-protected foreign content.)
 const FORK_BUFFER : &str = indoc! {"
@@ -45,7 +45,7 @@ const FORK_BUFFER : &str = indoc! {"
   *** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
-/// A foreign node N opened as a bare ROOT -- no owned ancestor to infer
+/// A foreign node N opened as a bare root -- no owned ancestor to infer
 /// a clone skgrepo from. Editing its title forks it; the clone's skgrepo
 /// must then default to the user's first owned skgrepo.
 const FORK_ROOT_BUFFER : &str = indoc! {"
@@ -54,10 +54,10 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
   ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
-/// ('docs/forks.org', "Adding new content under a foreign node"): a BARE
+/// ('docs/forks.org', "Adding new content under a foreign node"): a bare
 /// new headline (no metadata at all) appended under a foreign root.
 /// Enrichment mints it an id and inherits the foreign skgrepo; that must
-/// NOT be a foreign-creation error -- appending it edits N's contains,
+/// not be a foreign-creation error -- appending it edits N's contains,
 /// which forks N, and the new node rides that fork, adopting the clone's
 /// skgrepo.
 const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
@@ -77,7 +77,7 @@ const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
   ** (skg (node (id N2) (repo foreign) writeProtected)) N2
   "};
 
-/// Same shape, but the new node EXPLICITLY claims the foreign skgrepo:
+/// Same shape, but the new node explicitly claims the foreign skgrepo:
 /// a deliberate attempt to create a node in a write-protected skgrepo, which
 /// must stay rejected.
 const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
@@ -87,7 +87,7 @@ const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
   ** (skg (node (repo foreign))) Can I add to this?
   "};
 
-/// The explicit 'skg-fork-node' gesture: an OWNED node (P) carries
+/// The explicit 'skg-fork-node' gesture: an owned node (P) carries
 /// (viewRequests fork). Unlike the implicit foreign fork, P keeps its
 /// own save; saving adds a clone C that overrides P, built from P's disk
 /// snapshot.
@@ -222,8 +222,8 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// The explicit fork of an OWNED node P: the SavePlan carries one
-/// ForkSpec whose clone copies P's DISK snapshot (title/contains),
+/// The explicit fork of an owned node P: the SavePlan carries one
+/// ForkSpec whose clone copies P's disk snapshot (title/contains),
 /// subscribesTo=[P], overrides=[P], in the config-first owned
 /// skgrepo. P itself keeps its own (owned) save -- it is not dropped like
 /// a foreign fork's original.
@@ -270,7 +270,7 @@ async fn explicit_fork_on_unknown_node_errors (
   Ok (( )) }
 
 /// The explicit fork skgsave-commits a clone overriding the owned P (override
-/// substitution then shows it in P's place), and a SECOND explicit fork
+/// substitution then shows it in P's place), and a second explicit fork
 /// of the now-overridden P is rejected with 'ForkAlreadyExists'.
 async fn explicit_fork_round_trip_and_monogamy (
   config : &SkgConfig,
@@ -313,8 +313,8 @@ async fn explicit_fork_round_trip_and_monogamy (
       other ), }
   Ok (( )) }
 
-/// Under a restricted skgrepo-set, the clone-repo DEFAULT must prefer an
-/// owned skgrepo that is UNRESTRICTED. Here "owned" (alphabetically first owned)
+/// Under a restricted skgrepo-set, the clone-repo default must prefer an
+/// owned skgrepo that is unrestricted. Here "owned" (alphabetically first owned)
 /// is restricted and "owned2" is the only unrestricted owned skgrepo; a foreign
 /// node with no owned ancestor must default to "owned2" and reach the
 /// confirmation stage, not dead-end on ForkRepoRestricted.
@@ -335,7 +335,7 @@ async fn fork_default_prefers_unrestricted_owned_skgrepo (
     save_plan . fork_specs[0] . clone . 0 . home_skgrepo );
   Ok (( )) }
 
-/// A user-set clone skgrepo that the user does NOT own (a configured but
+/// A user-set clone skgrepo that the user does not own (a configured but
 /// foreign skgrepo, which the C-c s s prompt would let one type) is
 /// rejected with ForkRepoNotOwned.
 async fn fork_user_set_skgrepo_not_owned_rejected (
@@ -357,7 +357,7 @@ async fn fork_user_set_skgrepo_not_owned_rejected (
       other ), }
   Ok (( )) }
 
-/// A foreign node with NO owned ancestor still forks: with no user-set
+/// A foreign node with no owned ancestor still forks: with no user-set
 /// skgrepo and nothing to infer, the clone's skgrepo defaults to the
 /// user's first owned skgrepo (alphabetically "owned", here). No more
 /// 'ForkRepoUnresolved' hard-fail.
@@ -419,8 +419,8 @@ async fn fork_user_set_skgrepo_overrides (
   Ok (( )) }
 
 /// ('docs/forks.org', "Adding new content under a foreign node"): appending
-/// a new child that EXPLICITLY names an owned skgrepo specifies the clone's
-/// skgrepo. The spec must resolve to that skgrepo, CONFIRMED, and the
+/// a new child that explicitly names an owned skgrepo specifies the clone's
+/// skgrepo. The spec must resolve to that skgrepo, confirmed, and the
 /// confirmation buffer must show it as settled -- no PICK-A-REPO, no
 /// suggestion comment.
 async fn explicit_new_child_skgrepo_confirms_clone_skgrepo (
@@ -447,14 +447,14 @@ async fn explicit_new_child_skgrepo_confirms_clone_skgrepo (
     "the buffer must show the specified repo as settled:\n{}",
     confirmation );
   assert! ( ! confirmation . contains ("(repo PICK-A-REPO)"),
-    // (The instructions body may MENTION the placeholder; only the
+    // (The instructions body may mention the placeholder; only the
     // metadata form matters.)
     "no placeholder repo when the repo was specified:\n{}",
     confirmation );
   Ok (( )) }
 
-/// New children naming DIFFERENT owned skgrepos are ambiguous: the
-/// clone's skgrepo falls back to inference/default, UNCONFIRMED, so
+/// New children naming different owned skgrepos are ambiguous: the
+/// clone's skgrepo falls back to inference/default, unconfirmed, so
 /// the flow asks.
 async fn disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
   config : &SkgConfig,
@@ -496,8 +496,8 @@ async fn clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
     "the clone's inferred repo must be P's after-save repo" );
   Ok (( )) }
 
-/// The confirmation stage: a save that finds forks but is NOT approved
-/// returns a fork-confirmation buffer and skgsave-commits NOTHING; re-issuing
+/// The confirmation stage: a save that finds forks but is not approved
+/// returns a fork-confirmation buffer and skgsave-commits nothing; re-issuing
 /// the save approved then skgsave-commits.
 async fn fork_confirmation_gates_skgsave_commit (
   config : &SkgConfig,
@@ -542,7 +542,7 @@ async fn fork_confirmation_gates_skgsave_commit (
 /// foreign root forks the root rather than dying with "Cannot create node
 /// in foreign repo". The SavePlan must hold one ForkSpec for N, whose
 /// clone's contains end with the new node's minted id, and a kept Save
-/// nodeInstruction for the new node REWRITTEN into the clone's skgrepo.
+/// nodeInstruction for the new node rewritten into the clone's skgrepo.
 async fn fork_from_bare_new_child_plan (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -596,7 +596,7 @@ async fn fork_new_parent_adopts_relationship_skgrepos (
   Ok (( )) }
 
 /// ('docs/forks.org', "Adding new content under a foreign node"),
-/// committed: the approved save creates the clone AND the new node, both in
+/// committed: the approved save creates the clone and the new node, both in
 /// the owned skgrepo; N's foreign .skg is untouched.
 async fn fork_from_bare_new_child_skgsave_commits (
   config : &SkgConfig,
@@ -631,7 +631,7 @@ async fn fork_from_bare_new_child_skgsave_commits (
     "N's own contains must be untouched" );
   Ok (( )) }
 
-/// An EXPLICITLY foreign-repo new node stays a rejection: only an
+/// An explicitly foreign-repo new node stays a rejection: only an
 /// inherited (guessed) foreign skgrepo rides the fork.
 async fn explicitly_foreign_new_child_still_rejected (
   config : &SkgConfig,
@@ -706,9 +706,9 @@ async fn fork_skgrepo_restricted (
   Ok (( )) }
 
 /// The SavePlan a foreign edit produces carries one ForkSpec whose
-/// clone copies N's title/body/contains (SHALLOW -- the child IDs only,
+/// clone copies N's title/body/contains (shallow -- the child IDs only,
 /// no descendants), subscribesTo=[N], overrides=[N], and no
-/// hides; in an OWNED skgrepo inferred from the owned ancestor P.
+/// hides; in an owned skgrepo inferred from the owned ancestor P.
 async fn fork_save_instruction (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -737,7 +737,7 @@ async fn fork_save_instruction (
     "clone has a fresh pid, not N's" );
   Ok (( )) }
 
-/// After saving the fork: a clone .skg appears in the OWNED skgrepo with
+/// After saving the fork: a clone .skg appears in the owned skgrepo with
 /// the four fields, and N's foreign .skg is byte-unchanged.
 async fn fork_fixture_files (
   config : &SkgConfig,
@@ -778,7 +778,7 @@ async fn fork_fixture_files (
 /// place, carrying (overridesHere N), with the default subscribeeFolder
 /// listing N but no unrequested overriddenFolder. The load-bearing property:
 /// P's stored
-/// 'contains' is NOT rewritten to the clone -- it still lists N, so the
+/// 'contains' is not rewritten to the clone -- it still lists N, so the
 /// fact round-trips and a save never silently re-points containers at
 /// the clone. (That the clone's subscribee-as-such view of N starts
 /// empty and fills as N gains children is the prerequisite rule,
@@ -816,7 +816,7 @@ async fn fork_round_trip (
     "the clone's overriddenFolder should require an explicit request:\n{}",
     p_view );
 
-  // The load-bearing round-trip: P's stored contains was NOT rewritten
+  // The load-bearing round-trip: P's stored contains was not rewritten
   // to the clone; it still lists N (the fact collected N, not C).
   let p_disk : Graphnode = node_from_disk (config, "P") ?;
   assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],

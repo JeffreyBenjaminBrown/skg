@@ -2,16 +2,16 @@
 ;;; Load with (load-file "path/to/test-helpers.el").
 
 (defun headline--role-of-role-graft-from-rels (rels-body)
-  "Classify a role graft from its SEMANTIC relationship facts, or nil.
+  "Classify a role graft from its semantic relationship facts, or nil.
 RELS-BODY is the cdr of the (rels ...) form -- a list of relation
 sub-forms like (contains (in ...) (out ...)) and (birth ...). A role
-graft relates OUTBOUND to a tracked ancestor: it has a relation with an
+graft relates outbound to a tracked ancestor: it has a relation with an
 (out ... (ancestors ...)) side. That relation names the role: contains
 -> container, linksTo -> mentioner, subscribesTo -> subscribee,
 overrides -> overrider, hidesFromSubs -> hider. Only
 meaningful for a node
 already known to be a role graft (affectsParent false); an ordinary content
-child can carry the same outbound ancestor (e.g. a cycle) yet is NOT a
+child can carry the same outbound ancestor (e.g. a cycle) yet is not a
 role graft."
   (cl-loop for (rel . role) in '((contains    . container)
                                  (linksTo . mentioner)

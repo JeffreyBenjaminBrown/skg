@@ -147,7 +147,7 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( ! line_containing (&saved, "subscriberFolder")
               . contains ("HELLO"),
     "the folder headline edit must not survive the rerender:\n{}", saved );
-  { // A BODY on a non-vognode still aborts the save (Body_of_NonVognode).
+  { // A body on a non-vognode still aborts the save (Body_of_NonVognode).
     let folder_line : String =
       line_containing (&saved, "subscriberFolder") . to_string ();
     let with_body : String =
@@ -164,7 +164,7 @@ async fn failed_save_carries_warnings_with_errors (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Decided 2026-06-12 (option b): a failed save's response carries
-  // its warnings alongside its errors. The buffer below produces BOTH
+  // its warnings alongside its errors. The buffer below produces both
   // a parse-time warning (leftover text on a subscriberFolder headline)
   // and a validation error (an idFolder claiming an id node n lacks).
       let graph : InRustGraphHandle =

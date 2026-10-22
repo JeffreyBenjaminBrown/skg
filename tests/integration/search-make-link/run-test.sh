@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Integration test for skg-search-make-link.
-# Verifies that, from a content view buffer (which is NOT visiting a
+# Verifies that, from a content view buffer (which is not visiting a
 # file), the user can:
 #   1. Position point somewhere inside the buffer.
 #   2. Run skg-search-make-link with some search terms.

@@ -4,7 +4,7 @@
 (require 'skg-reload)
 
 (ert-deftest test-skg-reload-preserves-herald-rules-on-load-error ()
-  "A load error mid-reload must NOT strip the herald rule table.
+  "A load error mid-reload must not strip the herald rule table.
 
 Regression guard for a volatile-session-state bug: the herald rule
 table is fetched once per connect (`skg-request-herald-rules') and has
@@ -20,7 +20,7 @@ The fix wraps the re-install in `unwind-protect'.  Here we stub the
 destructive `skg--reload-modules' so the real reload machinery never
 runs (no feature is actually unloaded); the stub mimics the failure by
 wiping the table and signalling.  `skg-reload' must still surface the
-error AND leave the captured table installed."
+error and leave the captured table installed."
   (let ((heralds--transform-rules '(skg test-sentinel)))
     (cl-letf (((symbol-function 'skg--reload-modules)
                (lambda (&rest _)

@@ -1,4 +1,4 @@
-;;; Request a view for a LEAF node (no children) to measure
+;;; Request a view for a leaf node (no children) to measure
 ;;; single-node query overhead.
 
 (load-file "../elisp/skg-init.el")

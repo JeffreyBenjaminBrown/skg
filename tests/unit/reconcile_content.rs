@@ -114,9 +114,9 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 // complete_content_children counts only affectsParent=true Unrestricted children as
 // "already present", so a non-member same-id child is sent to the create
 // closure; if build_child_creation_data skipped pre-fetching it (because it
-// collected the skip-set from ALL Unrestricted children, non-member included), the
+// collected the skip-set from all Unrestricted children, non-member included), the
 // closure's child_data.get(id).expect(..) panics. The skip-set must match the
-// present-set: a non-member same-id child must NOT be skipped.
+// present-set: a non-member same-id child must not be skipped.
 #[test]
 fn independent_same_skgid_child_is_prefetched () {
   use crate::types::viewnode::{ mk_editable_viewnode, AffectsParent };

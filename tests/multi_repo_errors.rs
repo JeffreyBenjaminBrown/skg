@@ -141,10 +141,10 @@ fn test_foreign_node_modification_errors(
           println!("\nCreatedForeignNode errors: {}",
                    created_foreign_errors . len());
 
-          // Editing a foreign node now FORKS it rather than erroring,
+          // Editing a foreign node now forks it rather than erroring,
           // so the four content/field edits (ext-1..ext-4) are fork
           // candidates, not ModifiedForeignNode errors. Only the two
-          // DELETES of foreign nodes still error as ModifiedForeignNode
+          // deletes of foreign nodes still error as ModifiedForeignNode
           // (deleting a foreign node is not a fork). The delete/create
           // rejections return before the forks are even built, so the
           // edits surface no error here at all.

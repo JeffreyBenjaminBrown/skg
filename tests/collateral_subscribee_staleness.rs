@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_subscribee_staleness::)'
 //
-// Regression for a collateral-rerender staleness. A EDITABLE subscriber
+// Regression for a collateral-rerender staleness. A editable subscriber
 // open in two views: changing its subscriptions in one view and saving must
-// refresh the OTHER (collateral) view's subscribeeFolder from the graph,
+// refresh the other (collateral) view's subscribeeFolder from the graph,
 // not leave it showing the old subscription. Before the fix,
 // reconcile_subscribeeFolder_children skipped an editable subscriber, so
 // the collateral subscribeeFolder kept stale members.
@@ -116,8 +116,8 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
           &mut views_state ) . await ?;
 
       // The collateral view B must refresh from the just-saved graph:
-      // its subscribeeFolder now shows M but NOT N, even though S is
-      // EDITABLE there (the root). Before the
+      // its subscribeeFolder now shows M but not N, even though S is
+      // editable there (the root). Before the
       // fix, B kept N stale.
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );

@@ -1,7 +1,7 @@
-;;; Integration test for the MOTIVATING override-chain case.
+;;; Integration test for the motivating override-chain case.
 ;;; Fork a foreign N into a public clone C (implicit fork), then run
 ;;; skg-fork-node on the shown substitute C and rotate its clone to a
-;;; PRIVATE skgrepo, forming the chain D overrides C overrides N. Viewing
+;;; private skgrepo, forming the chain D overrides C overrides N. Viewing
 ;;; N's container then shows the chain end D, marked (overridesHere N),
 ;;; and the save accepts that chain-end carrier.
 
@@ -87,7 +87,7 @@
       (skg-fork-node)))
 
   ;; 6. In the confirmation buffer, rotate the clone-to-be's skgrepo to
-  ;;    PRIVATE, then approve -> private D overrides C.
+  ;;    private, then approve -> private D overrides C.
   (let ((confirm-buf (skg-test-wait-for
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation for the clone appeared"))
@@ -100,7 +100,7 @@
       (skg-approve-fork)))
   (message "✓ the public clone was forked into a private clone (repo rotated)")
 
-  ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a PRIVATE-repo
+  ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
   ;;    node -- is now shown in N's place, still marked (overridesHere N).
   (let ((p-buf (chain-test--reopen-P)))
     (let ((end-shown

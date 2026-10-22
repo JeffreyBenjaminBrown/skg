@@ -89,7 +89,7 @@
        (null heralds-overlays)))))
 
 (ert-deftest test-heralds-minor-mode-visual-check ()
-  "The relationship heralds render from SEMANTIC facts with per-token
+  "The relationship heralds render from semantic facts with per-token
 faces, the ⊥/⟳/delete heralds appear, the sentinel placeholder never
 leaks, and the overlay clears on disable. The injected node's rels
 payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as

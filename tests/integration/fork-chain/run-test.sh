@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Integration test for the MOTIVATING override-chain case (the crux of
-# the override-chains arc): fork a FOREIGN node into a public clone, then
-# explicitly fork that clone (the shown substitute) into a PRIVATE clone.
+# Integration test for the motivating override-chain case (the crux of
+# the override-chains arc): fork a foreign node into a public clone, then
+# explicitly fork that clone (the shown substitute) into a private clone.
 # The result is an owned chain D overrides C overrides N; viewing N's
 # container shows the chain end D, marked (overridesHere N), and the save
 # accepts the chain-end carrier.
@@ -61,7 +61,7 @@ start_skg_server
 run_client_test
 
 # Disk verification (step 5): the public clone C overrides the foreign N
-# and names NO private id; the private clone D overrides C.
+# and names no private id; the private clone D overrides C.
 echo "Verifying clone .skg files on disk..."
 PUB_CLONE=$(find "$TEST_DIR/data/owned/public" -name '*.skg' ! -name 'P.skg' | head -1)
 PRIV_CLONE=$(find "$TEST_DIR/data/owned/private" -name '*.skg' | head -1)

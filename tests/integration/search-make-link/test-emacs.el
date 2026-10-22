@@ -101,7 +101,7 @@ park point on that blank line. Return the point position."
 (defun verify-link-on-its-own-line (source-buf)
   "Verify that REPO-BUF has a [[id:target][...]] link followed by
 its own newline, with the child's `** child node' headline still
-intact on the next line — i.e. the link did NOT eat the blank
+intact on the next line — i.e. the link did not eat the blank
 line's trailing newline."
   (message "=== PHASE 4: Verifying link landed on the blank line ===")
   (unless (buffer-live-p source-buf)

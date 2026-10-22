@@ -101,7 +101,7 @@ fn all_tests
 /// retention, and save preservation"): a shown override substitute whose
 /// skgrepo goes restricted on a skgrepo-set switch becomes an anonymous
 /// bare-atom 'restrictedNode'; the rerender shows the original directly (a
-/// restricted overrider does not substitute) with NO leak of the
+/// restricted overrider does not substitute) with no leak of the
 /// overrider's title or id, retaining the overrider's unrestricted
 /// descendant; and the container's contains still saves to the original,
 /// never to the overrider.
@@ -321,7 +321,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // ('docs/api-and-formats.org', "skgrepo-sets"): a switch RE-RENDERS
+  // ('docs/api-and-formats.org', "skgrepo-sets"): a switch re-renders
   // open views in place instead of closing them.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
@@ -390,7 +390,7 @@ async fn content_view_omits_restricted_contained_nodes (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
-  // retention, and save preservation") rendering OMITS restricted children
+  // retention, and save preservation") rendering omits restricted children
   // (no placeholders); the weave preserves their memberships at save.
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
@@ -455,7 +455,7 @@ async fn restricted_placeholder_in_buffer_does_not_drive_contains (
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("public" . to_string ())) ?;
       { // The user drags the placeholder to the end. The save keeps
-        // private-a at its DISK position (after active-a), not the
+        // private-a at its disk position (after active-a), not the
         // buffer position, and writes no SaveNode for it.
         let reordered = indoc! {"
           * (skg (node (id root) (repo public))) root
@@ -478,7 +478,7 @@ async fn restricted_placeholder_in_buffer_does_not_drive_contains (
         assert! (
           ! save_skgids (&instructions) . contains (&ID::from ("private-a")),
           "a restricted vognode must not produce a SaveNode" ); }
-      { // A stale placeholder for a node NOT in root's disk contains
+      { // A stale placeholder for a node not in root's disk contains
         // (private-removed) must not be resurrected into contains; the
         // real invisible member (private-a) is still preserved.
         let stale = indoc! {"

@@ -55,7 +55,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("public" . to_string ())) ?;
-      { // An EDITED now-restricted editable node: write suppressed,
+      { // An edited now-restricted editable node: write suppressed,
         // warning attached, containment preserved.
         let buffer = indoc! {"
           * (skg (node (id root) (repo public))) root
@@ -77,7 +77,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
           members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
           vec![ ID::from ("active-b"), ID::from ("private-a") ],
           "the unrestricted parent keeps containing the restricted child" ); }
-      { // The same stale node UNTOUCHED: the noop filter drops its
+      { // The same stale node untouched: the noop filter drops its
         // nodeInstruction before suppression looks, so no warning.
         let buffer = indoc! {"
           * (skg (node (id root) (repo public))) root

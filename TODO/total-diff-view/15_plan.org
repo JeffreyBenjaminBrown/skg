@@ -1143,7 +1143,7 @@ and 'docs/' before finishing; what remains is 'docs/README.org:55' and
 the corrected citation of the problems list. Tests: the three unit
 suites (comments only).
 
-** TODO Slice 12: all-caps
+** DONE Slice 12: all-caps
 Make the changes under "All-caps" above, by the procedure there, and
 write the rule into 'coding-advice/formatting.org'. Record the counts
 before and after in 'progress.org'. Tests: all three unit suites and

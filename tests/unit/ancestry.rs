@@ -71,7 +71,7 @@ fn relation_folder_under_deadviewnode_is_orphan () {
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
 // Multi-level: the immediate parent (subscribee) is a live Unrestricted, but the
-// FAR ancestor (subscriber, depth 3) is dead -- the generalized (not just
+// far ancestor (subscriber, depth 3) is dead -- the generalized (not just
 // immediate-parent) check must catch it.
 fn build_subscribee_chain (
   subscriber : Viewnode,
@@ -113,7 +113,7 @@ fn required_ancestor_walks_the_chain () {
 
 #[test]
 fn required_ancestor_reads_without_revalidating_kind () {
-  // §20.4: required_ancestor no longer re-validates each ancestor's KIND -- the
+  // §20.4: required_ancestor no longer re-validates each ancestor's kind -- the
   // orphan pre-check (folder_is_generalized_orphan) does that before any reconcile
   // runs. So on a broken chain (dead subscriber) it still returns the
   // table-indexed ancestor; detecting the break is the orphan check's job (see

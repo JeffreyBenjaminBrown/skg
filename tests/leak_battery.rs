@@ -3,8 +3,8 @@
 // THE LEAK BATTERY ('docs/telescopes.org', "What lives where"): a
 // membership's relRepo, not just the member node's own skgrepo, gates
 // whether it renders. Fixtures pin the shape the sweep exists to close: a
-// PUBLIC node (N) whose PRIVATE section privately contains/subscribesTo
-// another PUBLIC node (C) -- a private reading-list entry between two nodes
+// public node (N) whose private section privately contains/subscribesTo
+// another public node (C) -- a private reading-list entry between two nodes
 // that are each individually visible at every skgrepo. Without relRepo
 // gating this leaks by omission (a public session would still show the
 // private membership) or by appearance (inbound surfaces would reveal N/S
@@ -267,9 +267,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
       // Buffer: C with child S. S subscribes to C, but that relationship is
-      // recorded only in S's PRIVATE section, so the ancestor-flag
+      // recorded only in S's private section, so the ancestor-flag
       // pass must not tint S's herald with the 'S' token at public.
-      // (Both nodes are individually public; the RELATIONSHIP is what gates.)
+      // (Both nodes are individually public; the relationship is what gates.)
       let herald_of_S = | restriction : &SkgrepoRestriction |
       -> Result<Option<String>, Box<dyn Error>> {
         let mut viewforest : Tree<Viewnode> =
@@ -319,7 +319,7 @@ fn a_lowered_relationship_is_governed_by_its_new_level (
 ) {
   // ('docs/telescopes.org', "Setting a relationship's skgrepo"): after the
   // explicit gesture lowers a relationship's privacy to its default, the
-  // gated surfaces follow the NEW skgrepo -- the relationship appears under
+  // gated surfaces follow the new skgrepo -- the relationship appears under
   // sets that include that skgrepo, while a sibling relationship still more
   // private than its default stays hidden. Lowering to the default cannot
   // leak: by definition both endpoints' homes are at least as public as it.

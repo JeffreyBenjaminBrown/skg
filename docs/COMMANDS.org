@@ -157,14 +157,14 @@ also search body fields.
 
 The regex *flavor is Rust's* (the =regex= crate), not Emacs's.
 The inversion that bites Emacs users: bare parens =(...)= group
-and bare pipe =|= alternates, while =\(= and =\)= are LITERAL
+and bare pipe =|= alternates, while =\(= and =\)= are literal
 parens. =(cat|dog).*= is one valid piece; the Emacs-style
 =\(cat\|dog\).*= would match only tokens containing literal
-parens and pipes. A pattern must match the WHOLE token
+parens and pipes. A pattern must match the whole token
 (anchored), and tokens are lowercase.
 
 The *=*= gotcha*: in regex =*= means "zero or more of the
-previous character", NOT "any characters" (that's =.*=). So
+previous character", not "any characters" (that's =.*=). So
 =sci*= matches the tokens =sc=, =sci=, =scii=, … — not
 "anything starting with sci". Use =sci.*= for that.
 
@@ -180,21 +180,21 @@ over the pieces:
   then =OR=. So =poli.* AND sci.* OR fish.*= means
   "(poli.* AND sci.*) OR fish.*".
 - *Grouping*: a paren is an operator-grouping token if and only
-  if it stands ALONE between whitespace. =( poli.* AND sci.* )
+  if it stands alone between whitespace. =( poli.* AND sci.* )
   OR fish.*= groups; =poli.* AND ( sci.* OR fish.* )= overrides
-  precedence. A paren ATTACHED to a pattern is regex syntax
+  precedence. A paren attached to a pattern is regex syntax
   inside that piece, so =(cat|dog).*= still works. Groups nest.
 - =NOT piece= (or the prefix =-piece=) excludes its piece
   within the enclosing group; =+piece= requires it even in an
-  OR group. A group holding ONLY exclusions matches nothing
+  OR group. A group holding only exclusions matches nothing
   (there is no positive clause to anchor it).
 - Malformed operator syntax — a lone unbalanced paren, a
   dangling =AND= / =OR=, an empty query — is rejected with an
   explanatory error rather than silently reinterpreted.
 Examples:
 - =poli.* AND sci.*= — documents whose tokens include one
-  matching =poli.*= AND one matching =sci.*=.
-- =poli.* NOT bio.*= — documents matching =poli.*= and NOT
+  matching =poli.*= and one matching =sci.*=.
+- =poli.* NOT bio.*= — documents matching =poli.*= and not
   any token matching =bio.*=.
 - =+poli.* -bio.*= — same as above, without the keywords.
 - =( poli.* AND sci.* ) OR fish.*= — the grouped conjunction,
@@ -303,8 +303,8 @@ same buffer, as "* investigation failed" with the reason under it.
 ** C-c l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
-render the relation's folder viewnodes into the view, POPULATED from
-the graph. Each builds BOTH folders of its relation (but containers and
+render the relation's folder viewnodes into the view, populated from
+the graph. Each builds both folders of its relation (but containers and
 mentioners build one). The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its nonempty
@@ -315,15 +315,15 @@ The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
 *** C-c l o : skg-show-folderOf-overrides
-The overriddenFolder (the nodes this node overrides -- EDITABLE, shown
+The overriddenFolder (the nodes this node overrides -- editable, shown
 even when empty as an "add an override here" surface) and the
 overriderFolder (the nodes that override this one -- write-protected, ☮).
 *** C-c l h : skg-show-folderOf-hidesFromSubs
-The hiderFolder and hiddenFolder -- BOTH write-protected (☮). Hiding is edited from
+The hiderFolder and hiddenFolder -- both write-protected (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
 *** C-c l s : skg-show-folderOf-subscribesTo
-The subscribeeFolder (the nodes this node subscribes to -- EDITABLE, shown
+The subscribeeFolder (the nodes this node subscribes to -- editable, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- write-protected, ☮).
 *** C-c l p : skg-show-folderOf-flags
@@ -447,7 +447,7 @@ with that skgrepo's path as the headline body.
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the move.
 
-A write-protected occurrence is NOT changed -- the save would
+A write-protected occurrence is not changed -- the save would
 refuse its skgrepo edit -- and produces a loud WARNING,
 with the full ID list written to =*Messages*=.
 
@@ -527,7 +527,7 @@ immediately before the ⌂ skgrepo herald; once saved at its default,
 request and display herald disappear.
 
 The no-override choice removes the request, which means "no opinion":
-a saved relationship keeps its saved skgrepo (sticky). It does NOT reset the
+a saved relationship keeps its saved skgrepo (sticky). It does not reset the
 relationship to its default -- to reach the default, choose it.
 
 Refuses with an error when point is on a member of a write-protected folder
@@ -557,7 +557,7 @@ included). Also reachable as =C-u C-c s r=.
 It first presents an org-menu asking what kinds of relations to
 the viewparent should qualify: the schema's five node-node
 relations are the level-1 headlines, and each level-2 headline is a
-role the view-CHILD would play in that relation toward its
+role the view-child would play in that relation toward its
 viewparent. Only three roles are settable from the child's
 position -- =contained= (ordinary content), =subscribee= (a
 subscribeeFolder member) and =overridden= (an overriddenFolder member);
@@ -567,7 +567,7 @@ independent skgrepo; hide skgrepos are derived at save). RET picks a
 role; q aborts.
 
 It then prompts for a skgrepo over the whole ladder, plus the
-no-override choice, which instead REMOVES existing skgrepo requests
+no-override choice, which instead removes existing skgrepo requests
 throughout the subtree. Unlike the single-relationship command, no
 per-relationship default is fetched -- the subtree's relationships have different
 defaults -- so every skgrepo is offered and the save's floor check
@@ -603,7 +603,7 @@ and M✓ once every change its file records is marked.
 
 After every save of one of the diff view's buffers, the
 minibuffer shows the readiness summary: "12 of 14 changed files are
-ready", or "COMMIT READY. All 14 of 14 changed files are ready.". A
+ready", or "Commit ready. All 14 of 14 changed files are ready.". A
 changed file counts as ready when every change it records is marked;
 a file whose only change is the order of a list counts as ready
 without marks. The summary
@@ -705,7 +705,7 @@ editable, so saving records the dest as content of the
 parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** C-c m f : skg-fork-node
-Fork the node at point that you ALREADY own: create a private
+Fork the node at point that you already own: create a private
 clone that overrides it. This is the explicit counterpart to the
 implicit fork (which is triggered by editing a /foreign/ node);
 use it to deepen an override chain, e.g. to layer a private =D=
@@ -714,7 +714,7 @@ over a public clone =C= that already overrides a foreign =N=.
 Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's saved state matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
-the usual fork-confirmation buffer. There you MUST set the clone's
+the usual fork-confirmation buffer. There you must set the clone's
 skgrepo with =C-c s s= (it starts as the placeholder PICK-A-REPO,
 with your config-first owned skgrepo suggested above it), then
 approve with =C-c C-c=; or decline with =C-c C-k= (which also

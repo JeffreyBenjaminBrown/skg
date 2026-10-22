@@ -2,11 +2,11 @@
 //
 // The overridden-as-such exception
 // ('docs/override.org', "overriddenFolder: what this node overrides"),
-// on the R/E/G/H example: R subscribes to AND overrides E,
+// on the R/E/G/H example: R subscribes to and overrides E,
 // R hides H, E contains G and H. Extended with X overriding G, so
 // the no-cascade decision is observable:
 // - extending E under the subscribeeFolder applies R's hides (no H)
-//   and the GENERAL substitution rule (G is shown as X, marked);
+//   and the general substitution rule (G is shown as X, marked);
 // - extending E under the overriddenFolder applies neither: full
 //   contains, raw G and raw H -- the user asked for the original.
 // The folder members themselves (each E copy) are always shown raw: folders
@@ -42,7 +42,7 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// The lines of 'buf', each tagged with its nearest ENCLOSING folder
+/// The lines of 'buf', each tagged with its nearest enclosing folder
 /// (by metadata atom; "" outside any folder). Depth-aware: a folder stops
 /// enclosing once a line at its own depth or shallower appears, so
 /// a sibling following a nested folder is attributed to the outer folder,

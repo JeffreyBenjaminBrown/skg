@@ -119,7 +119,7 @@ plain parens. Fields producing no herald get none."
              (let ((ov (seq-find
                         (lambda (o)
                           (overlay-get o 'skg-sexp-edit-herald))
-                        ;; 1+: an EMPTY overlay sitting exactly at
+                        ;; 1+: an empty overlay sitting exactly at
                         ;; line-end is excluded by overlays-in when
                         ;; the range stops there.
                         (overlays-in (line-beginning-position)
@@ -131,7 +131,7 @@ plain parens. Fields producing no herald get none."
       (should (equal (funcall hint-on-line "**** false") " (\u22a5)"))
       (should-not (funcall hint-on-line "**** main"))
       (should-not (funcall hint-on-line "*** repo"))
-      ;; The buffer TEXT is untouched: applying must not see hints.
+      ;; The buffer text is untouched: applying must not see hints.
       (should-not (string-match-p "(\u262e)" (buffer-string))))))
 
 (provide 'test-skg-metadata-editing)

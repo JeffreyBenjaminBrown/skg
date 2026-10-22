@@ -2919,3 +2919,95 @@ paths are operands, not citations.
 *** verification
 nextest 867 passed; Emacs 381; Neovim all specs passed. The changed
 integration scripts were checked for syntax only.
+** Slice 12: deviations
+*** the procedure
+A Sonnet subagent wrote the counter,
+'tests/results/allcaps/list_allcaps_candidates.py' (ignored, so not
+committed). It lists every all-caps word of two or more letters in the
+comments and string literals under 'server/', 'elisp/', 'nvim/',
+'tests/' and 'bash/', and in the prose of 'docs/'. It leaves out an
+acronym list (HEAD, UUID, ID, PID, SKG, JSON, TCP, ...), the wire
+placeholders the plan names, the section labels the plan names, org
+headline keywords, TODO markers, and the capitalized argument names of
+Emacs docstrings. I read every remaining hit in place and lowercased
+the ones the rule does not keep, capitalizing a sentence's first word.
+*** counts
+| dir     | before | after |
+|---------+--------+-------|
+| server  |    975 |   507 |
+| tests   |   1491 |  1137 |
+| nvim    |    455 |   407 |
+| elisp   |    685 |   602 |
+| bash    |    140 |   127 |
+| docs    |    453 |   352 |
+|---------+--------+-------|
+| total   |   4199 |  3132 |
+1067 words went. The counter counts string literals too, which the
+plan's rough count did not: test data, wire forms and test-runner
+output make up most of what remains in 'tests/' and 'elisp/'. Every
+remaining hit is in a kept category below.
+*** what the rule kept, beyond the plan's lists
+- Metavariables. Emacs docstrings name arguments and the parts of
+  return values in capitals, and the Lua doc comments and some Rust
+  doc comments do the same ("Move NODE to REPO", "TEXT as a chunk in
+  the highlight group of STYLE"). So do the grammars in comments
+  (COUNT, GEN, SIGN, OBJECT, KIND, STYLE, LABEL, OLD, NEW, LETTER,
+  TERMS, START). They were treated as wire placeholders.
+- DSL words: the lens directives ANY, IT, ABUT and INTERC, the style
+  names STOP, GO, NORMAL, MEDIUM and HIGH, the edit DSL's DELETE,
+  REPLACE and ENSURE, Tantivy's AND, OR, NOT, MUST, SHOULD, STRING,
+  STORED and TEXT.
+- Role names as the role vocabulary spells them (CONTAINER, MENTIONER,
+  CONTENT, OVERRIDDEN, OVERRIDER, SUBSCRIBEE).
+- Labels. The plan's list reads as examples, so any capitalized label
+  that opens a comment and ends in a colon stayed (GLOSSARY:, DANGER:,
+  ASSUMES:, ERRORS:, LOAD-BEARING:, WHAT IT DOES:, CAVEAT:, ...), and
+  so did a capitalized heading that opens a comment section without a
+  colon ("FOREIGN HOME.", "VOCABULARY (shared by both functions):",
+  "INPUT REQUIREMENTS"). A label in mixed case ("PUBLISHER half:") was
+  lowercased; a sentence that only started in capitals ("SHARES
+  RESPONSIBILITY for error detection") too.
+- Key names (RET, TAB, CR, 'GG'), log levels, signal names, further
+  acronyms (DB, FS, LP, MSV, EVR, CS, NUL, UTC, WYSIWYG, IDF, RGB),
+  file names (COMMANDS.org, README).
+- Data: string literals that are data or wire forms (':PROPERTIES:',
+  the herald label "DELETED", the title prefix "MERGED: ",
+  "PICK-A-REPO"). Test fixtures, test-runner status words (PASS, FAIL,
+  PHASE, TIMEOUT) and assertion messages are neither comments, nor
+  docstrings, nor messages of the clients or the server, so they
+  stayed.
+- Warnings: the export header "# DON'T EDIT THIS FILE", "MUST stay in
+  sync" ('render_enriched_search_buffer.rs'), "We MUST unfold"
+  ('skg-request-save.el'), the save error buffer's headline "NOTHING
+  WAS SAVED", and "MOST PUBLIC FIRST" in the dependencies manifest's
+  own comment. That comment is written into every owned skgrepo, and
+  the fixtures commit it.
+- Labels inside messages: "WARNING:", "ERROR:", and "APPROVE" and
+  "DECLINE" in the fork confirmation's instructions.
+*** messages that changed, and what follows them
+- "COMMIT READY." is "Commit ready." in both clients; the client tests,
+  the diff-view integration test and four docs follow.
+- set-repo's "NOT changed" is "not changed" in both clients; the
+  client tests and both COMMANDS files follow.
+- The server's id-conflict report says "across repos", the repo-set
+  migration error "prefixes", and the telescope warnings report "These
+  are warnings, not errors". 'tests/multi_repo_loading.rs' follows the
+  first; the integration run regenerated the three tracked
+  'telescope-warnings.org' fixtures with the third.
+- Smaller ones: the Emacs herald-table message "came back empty", and
+  start-servers' "Servers not started".
+*** rewordings
+- "the ONE view completion path" (four comments) became "the single
+  view completion path".
+- "THE PRIMITIVE both gates call" became "The one primitive both gates
+  call".
+- "nearest means NEAREST:" became "nearest means literally nearest:".
+*** seen, left
+- 'server/consts.rs:31' heads its section "READONING:", a typo for
+  "REASONING:". The label stays as it is.
+- 'server/import_org_roam.rs:74' cites "RelPartner's interim note",
+  which no longer exists.
+*** verification
+nextest 867 passed; Emacs 381; Neovim all specs passed. Integration:
+every test passed but 'import-md-and-org', which fails at baseline too
+(this slice's baseline run showed the same).

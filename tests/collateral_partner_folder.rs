@@ -2,18 +2,18 @@
 //
 // Two cells of the relationship matrix ('docs/sharing-model.org', "The
 // write-protected folders: who subscribes to, overrides, or hides this
-// node") that need an open COLLATERAL view and the collateral rerender
+// node") that need an open collateral view and the collateral rerender
 // stream:
 //
 // 1. collateral folder-membership update: a view of N shows a
-//    subscriberFolder with member S; a save of a SECOND view that drops
+//    subscriberFolder with member S; a save of a second view that drops
 //    S's subscription to N must re-render N's view (collaterally) with
 //    S gone from its subscriberFolder. This exercises the
 //    reconcile_partnerFolder_children path shared by all eight folders.
 //
 // 2. saved-view-only warning scoping: a repair that happens in the
-//    COLLATERAL view (a stale intruder under its subscriberFolder) while
-//    the saved buffer is clean must NOT add a repair warning to the
+//    collateral view (a stale intruder under its subscriberFolder) while
+//    the saved buffer is clean must not add a repair warning to the
 //    save response -- collateral rerenders pass no warning sink,
 //    so warnings stay scoped to the saved view.
 
@@ -153,7 +153,7 @@ fn collateral_partner_folder_update_and_warning_scoping
       // the saver -- the save response carries no folder-repair warning.
       // (Collateral rerenders get no warning sink; this pins the observable
       // consequence. The stronger form -- a collateral view holding an
-      // UNREPAIRED stale member -- is not reachable through register_view,
+      // unrepaired stale member -- is not reachable through register_view,
       // whose viewforests are always post-reconciliation; that form stays
       // enforced by construction.)
       assert! (

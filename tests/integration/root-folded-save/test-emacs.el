@@ -33,7 +33,7 @@
 
 (defun test-root-folded-save ()
   (message "=== PHASE 1: request single-root view from server ===")
-  ;; Mirror what skg-open-org-buffer-from-text does, but WITHOUT going
+  ;; Mirror what skg-open-org-buffer-from-text does, but without going
   ;; through the async dispatcher — we want the flow deterministic.
   ;; The text we insert is the text the server would return for the
   ;; initial view; we then activate skg-content-view-mode so that

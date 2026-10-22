@@ -127,7 +127,7 @@
         (message "✓ Saved result buffer state to result.log")
         (message "Result content:\n%s" result-content)
 
-        ;; Verify the atoms are REMOVED (not present in buffer)
+        ;; Verify the atoms are removed (not present in buffer)
         (let ((has-focused-metadata (string-match-p "\\<focused\\>" result-content))
               (has-folded-metadata (string-match-p "\\<folded\\>" result-content))
               (current-line (buffer-substring-no-properties (line-beginning-position) (line-end-position)))

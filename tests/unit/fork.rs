@@ -2,9 +2,9 @@
 // build from server/from_text/fork.rs via #[path].
 //
 // The rule under test ('owned_ancestor_repos_for_foreign_vognodes'):
-// a foreign node's clone inherits the skgrepo of its NEAREST vognode
+// a foreign node's clone inherits the skgrepo of its nearest vognode
 // ancestor, recorded only if that ancestor is an owned Unrestricted vognode.
-// The walk skips non-vognodes (folders) but STOPS at the first vognode -- it
+// The walk skips non-vognodes (folders) but stops at the first vognode -- it
 // never passes a foreign or restricted ancestor to reach a distant owned
 // one.
 
@@ -41,7 +41,7 @@ fn subscribee_folder () -> Viewnode {
   viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) }
 
 /// Build a forest exercising the three shapes:
-/// - owned2 P -> foreign F -> foreign N   (must infer NOTHING for N)
+/// - owned2 P -> foreign F -> foreign N   (must infer nothing for N)
 /// - owned2 Q -> foreign M                (must infer owned2 for M)
 /// - owned1 R -> subscribeeFolder -> foreign S  (folder skipped: owned1 for S)
 fn build_forest () -> ViewForest {
@@ -63,7 +63,7 @@ fn build_forest () -> ViewForest {
 
 #[test]
 fn owned_foreign_N_infers_nothing () {
-  // The bug: walking PAST the foreign ancestor F to the owned P. The
+  // The bug: walking past the foreign ancestor F to the owned P. The
   // corrected rule stops at F (foreign) and infers nothing for N.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
@@ -85,7 +85,7 @@ fn owned_N_still_infers_the_owned_skgrepo () {
 #[test]
 fn non_vognode_ancestor_is_skipped () {
   // owned1 R -> subscribeeFolder -> foreign S: the folder is a non-vognode, so
-  // S's nearest VOGNODE ancestor is the owned R.
+  // S's nearest vognode ancestor is the owned R.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_skgrepos_for_foreign_vognodes (
     & build_forest (), & HashMap::new (), & config );
@@ -160,8 +160,8 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   assert! ( lines . first () . map_or ( false, |l|
       l . starts_with ("* Fork confirmation") ),
     "the buffer must open with the instructions headline:\n{}", buf );
-  // The clone-to-be parent: a LEVEL-1 headline ("* "), edited title, and
-  // the PICK-A-REPO placeholder skgrepo the user must replace (NO id).
+  // The clone-to-be parent: a level-1 headline ("* "), edited title, and
+  // the PICK-A-REPO placeholder skgrepo the user must replace (no id).
   // (starts_with pins the level marker so a "* " -> "** " drift is caught
   // -- the elisp walk keys off the level.)
   assert! ( lines . iter () . any ( |l|
@@ -169,8 +169,8 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
         & format! ("* (skg (node (repo {})", FORK_SKGREPO_PLACEHOLDER) )
       && l . ends_with ("N-edited") ),
     "clone-to-be parent (level-1, edited title, placeholder repo) missing:\n{}", buf );
-  // The computed skgrepo is shown only as a SUGGESTION comment,
-  // DIRECTLY above the clone-to-be (the client parses that adjacency
+  // The computed skgrepo is shown only as a suggestion comment,
+  // directly above the clone-to-be (the client parses that adjacency
   // for the prompt's default).
   assert! ( lines . windows (2) . any ( |w|
       w[0] . starts_with ("# Suggested repo")
@@ -179,7 +179,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
     "the clone's suggested repo must sit directly above it:\n{}", buf );
   assert! ( ! buf . contains ("(id N) (repo owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
-  // The original child: a LEVEL-2 headline ("** "), real id, foreign
+  // The original child: a level-2 headline ("** "), real id, foreign
   // skgrepo, write-protected, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
       l . starts_with ("** (skg (node (id N) (repo foreign)")
@@ -193,7 +193,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
 fn confirmation_buffer_shows_a_confirmed_skgrepo_as_settled () {
   // When the user already specified the clone's skgrepo (explicitly in
   // the saved metadata, or in a prior confirmation round), the buffer
-  // shows THAT skgrepo -- no placeholder, no suggestion comment.
+  // shows that skgrepo -- no placeholder, no suggestion comment.
   let buf : String =
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited (true) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
@@ -203,7 +203,7 @@ fn confirmation_buffer_shows_a_confirmed_skgrepo_as_settled () {
     "a confirmed clone must show its real repo:\n{}", buf );
   assert! ( ! buf . contains (
       & format! ("(repo {})", FORK_SKGREPO_PLACEHOLDER) ),
-    // (The instructions body may MENTION the placeholder; only the
+    // (The instructions body may mention the placeholder; only the
     // metadata form matters.)
     "no placeholder repo when every repo is confirmed:\n{}", buf );
   assert! ( ! buf . contains ("# Suggested repo"),

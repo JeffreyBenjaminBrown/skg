@@ -137,7 +137,7 @@ fn export_writes_expected_files_and_links () {
   assert! (a . contains ("[[*Root A][rootlink]]"), "a.org:\n{}", a);
   assert! (a . contains ("*** Cee"), "a.org:\n{}", a);
   assert! (a . contains ("** [[./sub/n.org][Enn]]"), "a.org:\n{}", a);
-  // The nested root's subtree is NOT inlined.
+  // The nested root's subtree is not inlined.
   assert! (! a . contains ("Cee\n* "), "nested inlined? a.org:\n{}", a);
 
   let n : String =
@@ -241,7 +241,7 @@ fn diamond_node_rendered_once_then_linked () {
   // the second occurrence is a link to the first.
   assert! (a . contains ("[[*Shared][Shared]]"),
            "second container should link to shared:\n{}", a);
-  // Not a repeated title (it is the SAME node, once), so no CUSTOM_ID.
+  // Not a repeated title (it is the same node, once), so no CUSTOM_ID.
   assert! (! a . contains (":CUSTOM_ID:"), "a.org:\n{}", a);
 }
 
@@ -278,7 +278,7 @@ fn links_to_a_repeated_title_use_custom_id () {
 #[test]
 fn title_link_to_instruction_without_target_is_content () {
   // A node whose title links to the instruction node but has no
-  // target_filepath is ordinary content, not a marker: it must NOT
+  // target_filepath is ordinary content, not a marker: it must not
   // be excluded from the export.
   let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A", None, &["ma","doc"]),
@@ -314,7 +314,7 @@ fn marker_child_is_excluded_from_content () {
 #[test]
 fn private_skgrepo_relationship_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the relationship to "priv"
-  // is RECORDED in skgrepo "private". A main-only export renders the
+  // is recorded in skgrepo "private". A main-only export renders the
   // visible composition: "pub" appears, "priv" does not -- even though
   // priv's home is unrestricted.
   let mut root : Graphnode =

@@ -50,7 +50,7 @@
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")
-  "Config text with [[repos]] interleaved among other array\ntables. The [[repo_sets]] tables are RETIRED config the server\nwould reject; they remain here to pin that the elisp readers skip\ntables they do not care about.")
+  "Config text with [[repos]] interleaved among other array\ntables. The [[repo_sets]] tables are retired config the server\nwould reject; they remain here to pin that the elisp readers skip\ntables they do not care about.")
 
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
@@ -71,7 +71,7 @@ skg-config-dir is set and skg--owned-repos works."
       (delete-directory config-dir))))
 
 ;; Test 1: C-return inserts metadata with chosen skgrepo via minibuffer,
-;;         does NOT open a sexp-edit buffer.
+;;         does not open a sexp-edit buffer.
 
 (ert-deftest test-insert-heading-prompts-for-repo ()
   "C-return on a root headline should prompt for repo in minibuffer,
@@ -128,7 +128,7 @@ without prompting."
      (lambda ()
        (should (org-at-heading-p))
 
-       ;; completing-read should NOT be called.
+       ;; completing-read should not be called.
        (let ((cr-called nil))
          (cl-letf (((symbol-function 'completing-read)
                     (lambda (&rest _)

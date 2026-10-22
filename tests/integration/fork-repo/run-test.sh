@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Integration test for the fork-confirmation buffer's editable clone
-# skgrepo. Two OWNED skgrepos (owned, owned2) plus a FOREIGN one.
+# skgrepo. Two owned skgrepos (owned, owned2) plus a foreign one.
 # - Emacs opens owned P (whose content is foreign N), makes N editable,
 #   edits its title, and saves -> a fork-confirmation buffer.
 # - The clone's skgrepo is inferred as "owned"; the test rotates it to

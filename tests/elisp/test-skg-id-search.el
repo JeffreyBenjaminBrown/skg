@@ -99,7 +99,7 @@
           (skg-id-push)
           (should (equal (length skg-linkstack) (1+ len-before)))
           (should (equal (car skg-linkstack) '("6" "just a title"))) ))
-      (let (( len-before (length skg-linkstack) )) ;; Line 3: fake metadata — should NOT push
+      (let (( len-before (length skg-linkstack) )) ;; Line 3: fake metadata — should not push
         (dotimes (_ 3)
           (goto-char (+ line3-start
                         (random (- line3-end line3-start))))

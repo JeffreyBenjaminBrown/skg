@@ -64,3 +64,11 @@ but if you are an AI, it's pretty much costless, so please do.
   document can freeze Emacs's org-mode via pathological regex
   backtracking in the emphasis parser. Single-apostrophe wrapping is
   safe and is the project convention.
+* Capital letters do not carry stress.
+  In comments, docstrings, docs and user-visible messages, write a word
+  in lowercase unless it is an acronym or a proper name in letters
+  (HEAD, UUID, TOML, ID, SKG), a placeholder in a wire grammar (GITREPO,
+  PATH), a label that heads a comment section ('PURPOSE:', 'PITFALL:',
+  'NOTE:'), an org keyword, or a word whose sentence warns of something
+  whose neglect breaks the program or the data. Where caps would carry
+  a sentence's stress, reword the sentence to carry it.

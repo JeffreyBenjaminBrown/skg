@@ -57,7 +57,7 @@ describe('skg.id_search navigation', function ()
   it('finds the nearest id from anywhere on the line', function ()
     buffer_with(navigation_text)
     -- From title text before the link: the probe order (point, then
-    -- next-on-line, then previous) finds the LINK first, exactly as
+    -- next-on-line, then previous) finds the link first, exactly as
     -- the elisp skg-nearest-id would.
     vim.api.nvim_win_set_cursor(0, { 2, 25 })
     local hit = id_search.nearest_id()

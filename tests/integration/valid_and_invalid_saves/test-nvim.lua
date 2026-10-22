@@ -108,9 +108,9 @@ local function test_valid_save (content_buf)
     T.fail('Expected cycle and writeProtected atoms not found')
   end
 
-  -- §20.2(c): an invalid save must NOT leak lock/stream state that
-  -- wedges the NEXT save. Reaching here already proves the second
-  -- save's wait RETURNED -- a wedged pending-count would have hung
+  -- §20.2(c): an invalid save must not leak lock/stream state that
+  -- wedges the next save. Reaching here already proves the second
+  -- save's wait returned -- a wedged pending-count would have hung
   -- until the outer timeout fired. Assert explicitly that no stream
   -- guard or lock overlay lingers after the invalid-then-valid
   -- sequence.

@@ -395,12 +395,12 @@ fn test_search_body_axis (
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes, Path::new ("/tmp/tantivy-test-body-axis") ) ?;
-  { // body=false: body content is NOT findable
+  { // body=false: body content is not findable
     let (matches, _searcher) =
       search_index (&ti, "paprika", &SearchOptions::default ()) ?;
     assert! ( matches . is_empty (),
               "body word should NOT match when body=false" ); }
-  { // body=true: body content IS findable
+  { // body=true: body content is findable
     let opts = SearchOptions { body: true, ..SearchOptions::default () };
     let (matches, searcher) =
       search_index (&ti, "paprika", &opts) ?;
@@ -692,9 +692,9 @@ fn test_search_regex_with_operators (
   Ok (( )) }
 
 /// Regex + operators, grouping ('docs/api-and-formats.org', "Text search"):
-/// parens that stand ALONE between whitespace group operator expressions;
+/// parens that stand alone between whitespace group operator expressions;
 /// precedence is conventional (NOT > AND > OR, adjacency = OR); a paren
-/// ATTACHED to a pattern stays regex syntax; a lone unbalanced paren is a
+/// attached to a pattern stays regex syntax; a lone unbalanced paren is a
 /// loud error.
 #[test]
 fn test_search_regex_operator_grouping (
