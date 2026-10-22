@@ -270,8 +270,9 @@ fn the_removed_partners_buffer_saves_back_unchanged (
 
 /// In the 'historical_content' fixture h, which contained m, was
 /// deleted: h's historical phantom draws its old content m as a
-/// removed member, a non-member with '(diff (presence rel-))'. A buffer showing
-/// it saves back unchanged.
+/// removed member, a non-member with '(diff (presence rel-))', beside
+/// 'node~' since m was retitled. A buffer showing it saves back
+/// unchanged.
 #[test]
 fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
 ) -> Result<(), Box<dyn Error>> {
@@ -281,5 +282,5 @@ fn a_historical_phantoms_old_content_is_drawn_as_removed_members (
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg (historical (id h) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) h",
-    "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel)))) m, retitled" ] );
+    "*** (skg (node (id m) (repo main) (affectsParent false) writeProtected (diff (presence node~ rel-) (leaves 2 rel all)))) m, retitled" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

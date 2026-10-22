@@ -17,6 +17,14 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sign { Plus, Minus }
 
+/// The sign of a node, as the diff view shows it: a 'Sign' of its
+/// existence, or '~' (Modified), "modified": the node exists in both
+/// graphs of the straddle and records at least one change-forest leaf
+/// ('GraphStraddle::node_sign'). Relationships and folder entries take
+/// a 'Sign', never '~'.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeSign { Plus, Minus, Modified }
+
 /// Represents the per-stage diff for an entire skgrepo directory.
 /// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
 /// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
@@ -68,6 +76,14 @@ pub enum GitDiffStatus {
 //
 // Implementations
 //
+
+impl From<Sign> for NodeSign {
+  fn from (
+    sign : Sign,
+  ) -> NodeSign {
+    match sign {
+      Sign::Plus  => NodeSign::Plus,
+      Sign::Minus => NodeSign::Minus, } } }
 
 impl SkgrepoDiff {
   pub fn new_not_gitrepo () -> Self {

@@ -14,6 +14,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::diff_view::change_leaves::ChangeLeaves;
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
+use crate::types::git::NodeSign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -40,6 +41,23 @@ impl GraphStraddle {
     Presence::from_membership (
       self . before . nodes . contains_key (pid),
       self . after  . nodes . contains_key (pid) ) }
+
+  /// The node's sign as the diff view shows it: '+' when only the
+  /// after-graph has it, '-' when only the before-graph does, '~'
+  /// (modified) when both do and it records at least one
+  /// change-forest leaf ('ChangeLeaves::leaves_under'), else none.
+  /// Every site that signs an unrestricted vognode in content
+  /// position, or a root, asks this.
+  pub fn node_sign (
+    &self,
+    pid : &ID,
+  ) -> Option<NodeSign> {
+    match self . node_presence (pid) ? {
+      Presence::OnlyAfter  => Some (NodeSign::Plus),
+      Presence::OnlyBefore => Some (NodeSign::Minus),
+      Presence::Both =>
+        ( ! self . change_leaves () . leaves_under (pid) . is_empty () )
+        . then_some (NodeSign::Modified), } }
 
   /// Empty unless the node is in both graphs: a created or deleted
   /// node's change is its existence ('node_presence').

@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::git::Sign;
+use skg::types::git::{NodeSign, Sign};
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
@@ -133,7 +133,7 @@ fn a_historical_phantom_round_trips () {
           skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : Some ("its body\n" . into ()) } ))),
       ChangeFacts {
-        presence : DiffPresence { node : Some (Sign::Minus),
+        presence : DiffPresence { node : Some (NodeSign::Minus),
                                   rel  : Some (Sign::Minus) },
         ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
         leaves   : None },

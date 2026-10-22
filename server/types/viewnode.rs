@@ -6,7 +6,7 @@
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
-use super::git::Sign;
+use super::git::{NodeSign, Sign};
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -67,8 +67,9 @@ pub struct ChangeFacts {
 /// '(leaves N OBJECT...)': the change-forest leaves a readiness
 /// request on a viewnode may name ('docs/diff-view.org', "Facts on
 /// the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
-/// historical phantom, each worth one leaf; 'all' on an aggregate;
-/// none where a bare request names them all.
+/// historical phantom, each worth one leaf; 'all' on a modified node
+/// (beside 'rel' when that names a leaf) and on an aggregate; none
+/// where a bare request names them all.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LeavesFact {
   /// How many leaves a request naming every one of 'objects' touches.
@@ -76,19 +77,21 @@ pub struct LeavesFact {
   pub objects : BTreeSet<DiffObject>,
 }
 
-/// The '(presence ATOMS)' of a viewnode, from 'node+ node- rel+ rel-'.
-/// None on an object means the node (or relationship) is in both
-/// graphs of the straddle, or that the object does not apply.
+/// The '(presence ATOMS)' of a viewnode, from 'node+ node- node~
+/// rel+ rel-'. None on the node means it is in both graphs of the
+/// straddle and records no leaf, or that the object does not apply;
+/// None on the relationship, that it is in both graphs, or does not
+/// apply.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DiffPresence {
-  pub node : Option<Sign>,
+  pub node : Option<NodeSign>,
   pub rel  : Option<Sign>,
 }
 
 /// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
-/// own existence), 'rel' (its relationship to its viewparent), and,
-/// in a request only, 'all' (every leaf of an aggregate, one level
-/// down).
+/// own existence), 'rel' (its relationship to its viewparent), and
+/// 'all' (every leaf the node records, or every leaf of an aggregate,
+/// one level down).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DiffObject {
   Node,
@@ -831,14 +834,15 @@ impl DiffPresence {
     &self,
   ) -> Vec<&'static str> {
     let node : Option<&'static str> = self . node . map ( |sign| match sign {
-      Sign::Plus => "node+", Sign::Minus => "node-" } );
+      NodeSign::Plus => "node+", NodeSign::Minus => "node-",
+      NodeSign::Modified => "node~" } );
     let rel : Option<&'static str> = self . rel . map ( |sign| match sign {
       Sign::Plus => "rel+", Sign::Minus => "rel-" } );
     node . into_iter () . chain (rel) . collect () }
 
   /// The atoms the serializer can emit, for the herald conformance test.
-  pub const EMITTABLE_ATOMS : [&'static str; 4] =
-    [ "node+", "node-", "rel+", "rel-" ];
+  pub const EMITTABLE_ATOMS : [&'static str; 5] =
+    [ "node+", "node-", "node~", "rel+", "rel-" ];
 }
 
 impl DiffObject {

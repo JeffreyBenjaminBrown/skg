@@ -32,6 +32,7 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
+use crate::types::git::NodeSign;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -39,7 +40,7 @@ use crate::types::viewnode::{
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::sync::{Arc, MutexGuard};
 
 /// After a save's graph edits succeeded: apply the saved buffer's
@@ -217,7 +218,9 @@ fn keys_in_forest (
 /// viewnode that carries them. An object is ready when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'); the order-only marker is always ready. The
-/// '(leaves ...)' fact is 'leaves_fact_at'.
+/// '(leaves ...)' fact is 'leaves_fact_at'. On an unrestricted vognode
+/// whose leaves fact lists 'all', '(ready ...)' names 'all' when every
+/// leaf its node records is marked.
 pub fn set_ready_facts_in_viewforest (
   viewforest : &mut ViewForest,
   forest     : &ChangeLeaves,
@@ -232,14 +235,22 @@ pub fn set_ready_facts_in_viewforest (
   let facts : Vec<(NodeId, Option<BTreeSet<DiffObject>>, Option<LeavesFact>)> =
     viewforest . root () . descendants ()
     . filter_map ( |node| {
+      let leaves : Option<LeavesFact> = leaves_fact_at (node, forest, &pid_of);
       let ready : Option<BTreeSet<DiffObject>> =
         match &node . value () . kind {
           ViewnodeKind::Vognode (
-            Vognode::Unrestricted (_)
-            | Vognode::Phantom (Phantom::Historical (_)) ) => {
+            vognode @ ( Vognode::Unrestricted (_)
+                        | Vognode::Phantom (Phantom::Historical (_)) )) => {
+            let all_is_listed : bool =
+              matches! ( vognode, Vognode::Unrestricted (_) )
+              && leaves . as_ref () . is_some_and ( |leaves|
+                leaves . objects . contains (&DiffObject::All) );
             let objects : BTreeSet<DiffObject> =
               [ DiffObject::Node, DiffObject::Rel ] . into_iter ()
               . filter ( |object| object_is_ready (node, &[ *object ]) )
+              . chain ( ( all_is_listed
+                          && object_is_ready (node, &[ DiffObject::All ]) )
+                        . then_some (DiffObject::All) )
               . collect ();
             ( ! objects . is_empty () ) . then_some (objects) },
           ViewnodeKind::Vognode (
@@ -252,7 +263,7 @@ pub fn set_ready_facts_in_viewforest (
             if ! matches! (property, Property::BodyDiff { .. }) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           _ => return None, };
-      Some (( node . id (), ready, leaves_fact_at (node, forest, &pid_of) )) } )
+      Some (( node . id (), ready, leaves )) } )
     . collect ();
   for (treeid, ready, leaves) in facts {
     let mut node_mut : NodeMut<Viewnode> = viewforest . get_mut (treeid) . unwrap ();
@@ -261,11 +272,13 @@ pub fn set_ready_facts_in_viewforest (
     change_facts . leaves = leaves; }}
 
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
-/// on an unrestricted vognode or a historical phantom, each of 'node'
-/// and 'rel' that names a leaf of 'forest', or else 'all' if its node
-/// records any leaf; on anything else, 'all' when a bare request
-/// names an aggregate (a changeset marker), else no object. N is how
-/// many leaves of 'forest' a request naming those objects names.
+/// on an unrestricted vognode whose node's sign is '~' (modified),
+/// 'all', beside 'rel' when that names a leaf of 'forest'; on any
+/// other unrestricted vognode or a historical phantom, each of 'node'
+/// and 'rel' that names a leaf, or else 'all' if its node records any
+/// leaf; on anything else, 'all' when a bare request names an
+/// aggregate (a changeset marker), else no object. N is how many
+/// distinct leaves of 'forest' a request naming those objects names.
 /// None when that is none.
 fn leaves_fact_at (
   node   : NodeRef<Viewnode>,
@@ -275,6 +288,13 @@ fn leaves_fact_at (
   let names_some_leaf = |objects : &[DiffObject]| -> bool {
     ! keys_named_at (node, objects, forest, pid_of) . is_empty () };
   let objects : BTreeSet<DiffObject> = match &node . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (_))
+      if node . value () . change_facts . presence . node
+         == Some (NodeSign::Modified) =>
+      [ DiffObject::Rel ] . into_iter ()
+      . filter ( |object| names_some_leaf (&[ *object ]) )
+      . chain ([ DiffObject::All ])
+      . collect (),
     ViewnodeKind::Vognode (
       Vognode::Unrestricted (_)
       | Vognode::Phantom (Phantom::Historical (_)) ) => {
@@ -293,11 +313,12 @@ fn leaves_fact_at (
       else { BTreeSet::from ([ DiffObject::All ]) } }, };
   let count : usize = keys_named_at (
     node, &objects . iter () . copied () . collect::<Vec<_>> (),
-    forest, pid_of ) . len ();
+    forest, pid_of ) . into_iter () . collect::<HashSet<LeafKey>> () . len ();
   ( count > 0 ) . then_some ( LeavesFact { count, objects } ) }
 
 /// The leaves of 'forest' that a request naming 'objects' at 'node'
-/// names.
+/// names. Several objects can name one leaf twice ('node' and 'all'
+/// both name the existence leaf).
 fn keys_named_at (
   node    : NodeRef<Viewnode>,
   objects : &[DiffObject],

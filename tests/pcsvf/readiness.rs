@@ -7,8 +7,9 @@
 use crate::git_fixture::{Fixture, edit_line, save_cleanly};
 use crate::git_fixture_helpers::without_lines_containing;
 use crate::pcsvf::common::{
-  all_changes_view, integrate_unshown_changes, open_all_changes_buffer,
-  open_buffer, save_buffer, with_fixture, with_fixture_and_foreign};
+  all_changes_view, insert_after_line_starting, integrate_unshown_changes,
+  open_all_changes_buffer, open_buffer, save_buffer, with_fixture,
+  with_fixture_and_foreign};
 
 use skg::diff_view::change_leaves::{BufferReadinessSummary, ReadinessSummary};
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -255,4 +256,84 @@ fn a_root_deleted_in_the_buffer_is_redrawn_as_removed (
       "* (skg (historical (id flg) (repo public) (diff (presence node-) (leaves 1 node)))) flg" ),
       "{}", saved );
     assert! ( ! saved . contains ("(deleted (id flg)"), "{}", saved );
+    Ok (( )) }) }
+
+/// A node in both graphs that records a leaf is modified: its sign is
+/// '~' (herald 'M'), and its leaves fact lists 'all', every leaf it
+/// records. cy2, retitled, stands as a root and, write-protected, in
+/// cy1's content, an unchanged relationship. One request naming
+/// 'all' on the write-protected image marks its file: both images
+/// then show '(ready all)', and its old text shows ready.
+#[test]
+fn a_modified_node_lists_all_and_one_mark_readies_its_file (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("sets", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let modified : &str = "(diff (presence node~) (leaves 1 all)))) cy2, retitled";
+    assert! ( buffer . lines () . any ( |line|
+      line . starts_with ("*** (skg (node (id cy2) (repo main) writeProtected")
+      && line . ends_with (modified) ),
+      "cy2 is modified in cy1's content:\n{}", buffer );
+    let marked : String = edit_line (
+      &buffer, "*** (skg (node (id cy2)",
+      |line| line . replace ( "(leaves 1 all))))",
+                              "(leaves 1 all) (readyRequest all))))" ));
+    let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
+    let ready : &str =
+      "(diff (presence node~) (leaves 1 all) (ready all)))) cy2, retitled";
+    for prefix in [ "* (skg (node (id cy2)", "*** (skg (node (id cy2)" ] {
+      assert! ( saved . lines () . any ( |line|
+        line . starts_with (prefix) && line . ends_with (ready) ),
+        "{:?} is ready:\n{}", prefix, saved ); }
+    assert! ( saved . contains ("** (skg (oldText title) (diff (leaves 1) (ready))) cy2"),
+              "cy2's old text is ready:\n{}", saved );
+    Ok (( )) }) }
+
+/// A modified node in a new relationship lists 'rel' beside 'all',
+/// and N counts the distinct leaves the two name: lo, new in ln's
+/// content, once retitled records its text, so N is 2.
+#[test]
+fn a_modified_node_in_a_new_relationship_lists_rel_and_all (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("sets", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( buffer . contains ("(diff (presence rel+) (leaves 1 rel)))) lo\n"),
+              "lo, unmodified, is new in ln's content:\n{}", buffer );
+    let retitled : String = edit_line (
+      &buffer, "** (skg (node (id lo)",
+      |line| format! ( "{}, retitled", line ));
+    let saved : String = save_cleanly (f, &all_changes_view (), &retitled) ? . saved_view;
+    assert! ( saved . lines () . any ( |line|
+      line . starts_with ("** (skg (node (id lo)")
+      && line . ends_with ("(diff (presence node~ rel+) (leaves 2 rel all)))) lo, retitled") ),
+      "lo is modified, in a new relationship:\n{}", saved );
+    Ok (( )) }) }
+
+/// A new node is signed and counted as before: its existence and its
+/// relationship, one leaf each.
+#[test]
+fn a_new_node_lists_node_and_rel (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let edited : String = insert_after_line_starting (
+      &buffer, "* (skg (node (id ct)", "** a new child" );
+    let saved : String = save_cleanly (f, &all_changes_view (), &edited) ? . saved_view;
+    assert! ( saved . lines () . any ( |line|
+      line . starts_with ("** (skg (node (id ")
+      && line . ends_with ("(diff (presence node+ rel+) (leaves 2 node rel)))) a new child") ),
+      "the new child is new, in a new relationship:\n{}", saved );
+    Ok (( )) }) }
+
+/// A root is signed at its own visit, as a member is at its
+/// viewparent's: txt, retitled, is a modified root.
+#[test]
+fn a_modified_root_carries_its_sign (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    assert! ( buffer . lines () . any ( |line|
+      line . starts_with ("* (skg (node (id txt)")
+      && line . ends_with ("(diff (presence node~) (leaves 1 all)))) txt, retitled") ),
+      "txt is a modified root:\n{}", buffer );
     Ok (( )) }) }

@@ -268,9 +268,10 @@ fn changed_folder_rules (
              "the nodes it hides changed (this file)") ] }
 
 /// The diff view's '(diff ...)' form on a vognode: its '(presence
-/// ...)' as ∃+ ∃- (the node itself) and ~+ ~- (its relationship to
-/// its viewparent), each followed by a ✓ when '(ready ...)' names
-/// that diff object, then the readiness request. '(leaves ...)' is
+/// ...)' as ∃+ ∃- M (the node itself: new, deleted or modified) and
+/// ~+ ~- (its relationship to its viewparent), each followed by a ✓
+/// when '(ready ...)' names that diff object ('all' for M), then the
+/// readiness request. '(leaves ...)' is
 /// for the clients' gestures and shows nothing. The same part is
 /// matched once per object, so each ✓ lands after its own object
 /// whatever the raw order.
@@ -280,8 +281,10 @@ fn change_fact_rules_for_two_objects (
     rule ("diff", vec! [
       rule ("presence", vec! [
         leaf_styled_as ("presence", "node+", "∃+"),
-        leaf_styled_as ("presence", "node-", "∃-") ]),
-      rule ("ready", vec! [ leaf_abut_styled_as ("ready", "node", "✓") ]),
+        leaf_styled_as ("presence", "node-", "∃-"),
+        leaf_styled_as ("presence", "node~", "M") ]),
+      rule ("ready", vec! [ leaf_abut_styled_as ("ready", "node", "✓"),
+                            leaf_abut_styled_as ("ready", "all",  "✓") ]),
       rule ("presence", vec! [
         leaf_styled_as ("presence", "rel+", "~+"),
         leaf_styled_as ("presence", "rel-", "~-") ]),

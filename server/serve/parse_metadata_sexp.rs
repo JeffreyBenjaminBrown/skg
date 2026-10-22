@@ -19,8 +19,8 @@
 ///                                [(leaves N OBJECT...)]
 ///                                [(ready OBJECT...)]
 ///                                [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]))
-///   where SIGN is node+, node-, rel+ or rel-, and OBJECT is node,
-///   rel or (in a request only) all. The '(diff ...)' form may also
+///   where SIGN is node+, node-, node~, rel+ or rel-, and OBJECT is
+///   node, rel or all. The '(diff ...)' form may also
 ///   appear in (deleted ...), (unknown ...) and (historical ...), and
 ///   at top level on an alias, id or flag property and on the
 ///   diff view's properties other than bodyDiff. A changed folder
@@ -38,9 +38,9 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
-use crate::types::git::Sign;
+use crate::types::git::{NodeSign, Sign};
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, ReadinessRequest,
+  ChangeFacts, DiffObject, DiffPresence, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
@@ -990,25 +990,26 @@ fn parse_change_fact_part (
     "presence" => {
       if metadata . change_facts . presence != Default::default () {
         return Err ( "presence may appear only once" . to_string () ); }
+      let presence : &mut DiffPresence = &mut metadata . change_facts . presence;
       for atom in &atoms {
-        let slot : &mut Option<Sign> = match atom . as_str () {
-          "node+" | "node-" => &mut metadata . change_facts . presence . node,
-          "rel+"  | "rel-"  => &mut metadata . change_facts . presence . rel,
+        let names_twice : bool = match atom . as_str () {
+          "node+" | "node-" | "node~" => presence . node . replace (
+            match atom . as_str () {
+              "node+" => NodeSign::Plus,
+              "node-" => NodeSign::Minus,
+              _       => NodeSign::Modified, } ) . is_some (),
+          "rel+" | "rel-" => presence . rel . replace (
+            if atom . ends_with ('+') { Sign::Plus }
+            else { Sign::Minus } ) . is_some (),
           other => return Err ( format! (
             "Unknown presence atom: {}", other )), };
-        if slot . is_some () {
-          return Err ( format! ( "presence names an object twice: {}", atom )); }
-        *slot = Some ( if atom . ends_with ('+') { Sign::Plus }
-                       else { Sign::Minus } ); }},
+        if names_twice {
+          return Err ( format! ( "presence names an object twice: {}", atom )); }}},
     "ready" => {
       if metadata . change_facts . ready . is_some () {
         return Err ( "ready may appear only once" . to_string () ); }
-      let objects : BTreeSet<DiffObject> =
-        readiness_objects_from_atoms (&atoms) ?;
-      if objects . contains (&DiffObject::All) {
-        return Err ( "ready cannot name the object all; only a request can"
-                     . to_string () ); }
-      metadata . change_facts . ready = Some (objects); },
+      metadata . change_facts . ready =
+        Some ( readiness_objects_from_atoms (&atoms) ? ); },
     "leaves" => {},
     "readyRequest" | "unreadyRequest" => {
       if metadata . readiness_request . is_some () {

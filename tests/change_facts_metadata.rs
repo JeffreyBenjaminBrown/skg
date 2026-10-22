@@ -9,7 +9,7 @@
 use skg::org_to_text::{FolderChangeFacts, folder_change_facts, viewnode_to_string};
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::git::Sign;
+use skg::types::git::{NodeSign, Sign};
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
@@ -28,7 +28,7 @@ fn objects (
   objects . iter () . copied () . collect () }
 
 fn facts (
-  node  : Option<Sign>,
+  node  : Option<NodeSign>,
   rel   : Option<Sign>,
   ready : Option<&[DiffObject]>,
 ) -> ChangeFacts {
@@ -75,7 +75,7 @@ fn a_vognode_round_trips_its_presence_readiness_and_request () {
     with_facts (
       mk_editable_viewnode (
         ID::from ("a"), SkgrepoName::from ("main"), "A" . into (), None ),
-      facts ( Some (Sign::Plus), Some (Sign::Minus),
+      facts ( Some (NodeSign::Plus), Some (Sign::Minus),
               Some (&[DiffObject::Node, DiffObject::Rel]) ),
       request (true, &[DiffObject::All]) ),
     "(node (id a) (repo main) (diff (presence node+ rel-) (ready node rel) (readyRequest all)))" );
@@ -87,7 +87,18 @@ fn a_vognode_round_trips_its_presence_readiness_and_request () {
         AffectsParent::True ),
       facts ( None, Some (Sign::Plus), Some (&[]) ),
       request (false, &[DiffObject::Rel]) ),
-    "(node (id b) (repo main) writeProtected (diff (presence rel+) (ready) (unreadyRequest rel)))" ); }
+    "(node (id b) (repo main) writeProtected (diff (presence rel+) (ready) (unreadyRequest rel)))" );
+  // A modified node: its sign is '~', and '(ready all)' says every
+  // leaf it records is marked.
+  assert_round_trip (
+    with_facts (
+      mk_writeProtected_viewnode (
+        ID::from ("m"), SkgrepoName::from ("main"), "M" . into (),
+        AffectsParent::True ),
+      facts ( Some (NodeSign::Modified), Some (Sign::Plus),
+              Some (&[DiffObject::Rel, DiffObject::All]) ),
+      request (false, &[DiffObject::Rel, DiffObject::All]) ),
+    "(node (id m) (repo main) writeProtected (diff (presence node~ rel+) (ready rel all) (unreadyRequest rel all)))" ); }
 
 #[test]
 fn phantoms_round_trip_their_change_facts () {
@@ -97,7 +108,7 @@ fn phantoms_round_trip_their_change_facts () {
         Phantom::Deleted ( PhantomDeleted {
           skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
           title : "D" . into (), body : None, } )))),
-      facts ( Some (Sign::Minus), None, Some (&[]) ),
+      facts ( Some (NodeSign::Minus), None, Some (&[]) ),
       request (false, &[]) ),
     "(deleted (id d) (repo main) (diff (presence node-) (ready) (unreadyRequest)))" );
   assert_round_trip (
@@ -162,7 +173,7 @@ fn the_leaves_fact_renders_and_parses_back_to_nothing () {
 fn each_part_of_the_diff_form_round_trips_together_and_alone () {
   let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let mut change_facts : ChangeFacts =
-    facts ( Some (Sign::Plus), Some (Sign::Plus), Some (&[DiffObject::Node]) );
+    facts ( Some (NodeSign::Plus), Some (Sign::Plus), Some (&[DiffObject::Node]) );
   change_facts . leaves = Some ( LeavesFact {
     count : 2, objects : objects (&[DiffObject::Node, DiffObject::Rel]) } );
   let node : Viewnode = with_facts (
@@ -175,7 +186,7 @@ fn each_part_of_the_diff_form_round_trips_together_and_alone () {
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) ) . unwrap ();
   assert_eq! ( metadata . change_facts,
-               facts ( Some (Sign::Plus), Some (Sign::Plus),
+               facts ( Some (NodeSign::Plus), Some (Sign::Plus),
                        Some (&[DiffObject::Node]) ));
   assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Rel]) );
   let alias = || viewnode_of ( ViewnodeKind::Property ( Property::Alias {
@@ -203,8 +214,8 @@ fn malformed_change_facts_are_refused () {
     "(skg aliasFolder (diff (presence rel+)))",                  // a folder's only fact is '(ready)'
     "(skg aliasFolder (diff (leaves 1)))",
     "(skg (aliasFolder sideways))",                   // a folder's form is '(KIND changed)'
-    "(skg (node (id a) (diff (ready all))))",         // 'all' only in a request
     "(skg (node (id a) (diff (presence node+ node-))))",         // an object twice
+    "(skg (node (id a) (diff (presence node~ node+))))",
     "(skg (node (id a) (diff (readyRequest) (unreadyRequest node))))", // two requests
     "(skg (node (id a) (diff (readyRequest sideways))))",
     "(skg alias (ready))",                            // a property's ready is in '(diff ...)'
@@ -258,7 +269,7 @@ fn a_folder_is_ready_when_each_changed_member_is () {
     facts ( None, Some (Sign::Minus), None ),
     None );
   let unchanged : Viewnode = with_facts (
-    member ("unchanged"), facts ( Some (Sign::Plus), None, Some (&[DiffObject::Node]) ),
+    member ("unchanged"), facts ( Some (NodeSign::Plus), None, Some (&[DiffObject::Node]) ),
     None );
   let ready   : Option<FolderChangeFacts> = Some ( FolderChangeFacts { ready : true } );
   let unready : Option<FolderChangeFacts> = Some ( FolderChangeFacts { ready : false } );

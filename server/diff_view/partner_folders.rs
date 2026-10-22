@@ -24,6 +24,7 @@ use crate::to_org::expand::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set,
   build_and_integrate_role_tree_with_skgrepo_set};
 use crate::types::env::RuntimeGeneration;
+use crate::types::git::NodeSign;
 use crate::types::misc::ID;
 use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{DiffPresence, FolderPolicy, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
@@ -99,7 +100,8 @@ fn straddle_goal_item (
 ) -> Option<FolderGoalItem> {
   let node_presence : Option<Presence> = straddle . node_presence (&partner . id);
   let presence : DiffPresence = DiffPresence {
-    node : node_presence . and_then ( |presence| presence . diff_sign () ),
+    node : node_presence . and_then ( |presence| presence . diff_sign () )
+           . map (NodeSign::from), // a folder member is never '~'
     rel  : partner . presence . diff_sign (), };
   let shape : FolderGoalShape = match node_presence {
     Some (Presence::OnlyBefore) => FolderGoalShape::Historical (

@@ -157,6 +157,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         ( t . skgid . clone (), ! t . is_writeProtected () ),
       _ => return Ok (( )), };
+  sign_root (tree, treeid, straddle, &pid) ?;
   let content : Vec<Partner> =
     straddle . partners (&pid, RelationRole::CONTENT);
   if ! editable {
@@ -196,6 +197,24 @@ pub(crate) fn process_unrestrictedVognode_changes (
     . chain ( fronts . iter () . filter ( |front| is_marker (front) ) . copied () )
     . collect ();
   arrange_first_children (tree, treeid, &order) ?;
+  Ok (( )) }
+
+/// A root is signed at its own visit, as a member is at its
+/// viewparent's ('tag_content_members'): '∃+' when new, 'M' when
+/// modified ('GraphStraddle::node_sign'). Nothing for a non-root.
+fn sign_root (
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
+) -> Result<(), Box<dyn Error>> {
+  let is_root : bool =
+    tree . get (treeid) . ok_or ("sign_root: node not found") ?
+    . parent () . is_some_and ( |parent|
+      matches! ( parent . value () . kind, ViewnodeKind::BufferRoot ));
+  if is_root {
+    tree . get_mut (treeid) . unwrap () . value ()
+      . change_facts . presence . node = straddle . node_sign (pid); }
   Ok (( )) }
 
 /// Before the content reconciler runs at an editable node's visit,
@@ -502,8 +521,7 @@ fn tag_content_members (
           // write-protected node) is tagged too, but never redrawn.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
           viewnode . change_facts . presence = DiffPresence {
-            node : straddle . node_presence (&t . skgid)
-                   . and_then ( |presence| presence . diff_sign () ),
+            node : straddle . node_sign (&t . skgid),
             rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
           if t . affectsParent == AffectsParent::True
              && u_and_editable . is_some_and ( |(u, writable)|

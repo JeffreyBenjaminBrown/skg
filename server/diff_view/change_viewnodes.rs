@@ -8,7 +8,7 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
-use crate::types::git::Sign;
+use crate::types::git::{NodeSign, Sign};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
@@ -109,7 +109,7 @@ pub fn mk_historical_viewnode (
   let before : &GraphnodeInRust = straddle . before . get (pid) ?;
   Some ( Viewnode {
     change_facts : ChangeFacts {
-      presence : DiffPresence { node : Some (Sign::Minus), rel },
+      presence : DiffPresence { node : Some (NodeSign::Minus), rel },
       ready    : None,
       leaves   : None },
     .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
@@ -184,8 +184,7 @@ pub fn mk_removed_member_viewnode (
     pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
     AffectsParent::False );
   member . change_facts . presence = DiffPresence {
-    node : straddle . node_presence (pid)
-           . and_then ( |presence| presence . diff_sign () ),
+    node : straddle . node_sign (pid),
     rel  : Some (Sign::Minus) };
   Some (member) }
 

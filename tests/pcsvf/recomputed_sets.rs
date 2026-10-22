@@ -518,7 +518,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg (node (id m) (repo main) (affectsParent false) (diff (presence rel-) (leaves 1 rel)))) m, retitled";
+    let m_line : &str = "*** (skg (node (id m) (repo main) (affectsParent false) (diff (presence node~ rel-) (leaves 2 rel all)))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( ! buffer . contains (m_line), "{}", buffer );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;

@@ -13,7 +13,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
-use crate::types::git::Sign;
+use crate::types::git::{NodeSign, Sign};
 use crate::types::misc::ID;
 use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{
@@ -161,18 +161,22 @@ fn detach_the_servers_below (
 
 /// Whether a viewnode below what the diff view drew is the user's:
 /// an unrestricted vognode born 'Unremarkable' that carries no
-/// '(presence ...)' fact and is not a member of the folder it stands in
+/// '(presence ...)' sign and is not a member of the folder it stands in
 /// ('parent_is_a_folder'). A role graft ('Birth::RoleGraft', which a
 /// buffer carries back), a removed member and a folder's member are
-/// the server's, as is every viewnode of another kind.
+/// the server's, as is every viewnode of another kind. The sign '~'
+/// does not count: it says the node is modified, wherever it stands,
+/// and nothing about who put it there.
 pub fn is_the_users_viewnode (
   viewnode           : &Viewnode,
   parent_is_a_folder : bool,
 ) -> bool {
+  let presence : DiffPresence = viewnode . change_facts . presence;
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . birth == Birth::Unremarkable
-         && viewnode . change_facts . presence == DiffPresence::default ()
+         && matches! ( presence . node, None | Some (NodeSign::Modified) )
+         && presence . rel . is_none ()
          && ! ( parent_is_a_folder && t . affectsParent == AffectsParent::True )) }
 
 /// What the diff view's reconciler manages below what it drew,

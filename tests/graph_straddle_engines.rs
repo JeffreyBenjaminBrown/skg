@@ -12,7 +12,7 @@ use skg::graph_straddle::types::GraphStraddle;
 use skg::to_org::expand::role_tree::{
   RoleTreePartners, build_and_integrate_role_tree_with_skgrepo_set};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
-use skg::types::git::Sign;
+use skg::types::git::{NodeSign, Sign};
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::viewnode::{
@@ -100,9 +100,9 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
   let both : DiffPresence = DiffPresence::default ();
   assert_eq! ( children_with_presence (tree . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),
-    ( "c2" . to_string (), DiffPresence { node : Some (Sign::Minus),
+    ( "c2" . to_string (), DiffPresence { node : Some (NodeSign::Minus),
                                           rel  : Some (Sign::Minus) } ),
-    ( "c3" . to_string (), DiffPresence { node : Some (Sign::Plus),
+    ( "c3" . to_string (), DiffPresence { node : Some (NodeSign::Plus),
                                           rel  : Some (Sign::Plus) } ) ] );
   Ok (( )) }
 

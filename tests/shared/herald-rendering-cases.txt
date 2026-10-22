@@ -234,6 +234,14 @@
 (skg (node (id x) (diff (presence node+ rel+) (ready node))))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
+==== diff view: a modified node
+(skg (node (id x) (diff (presence node~) (leaves 2 all))))
+---- text: M
+---- styles: nonstandard*1
+==== diff view: a modified node in a new relationship, every leaf it records ready
+(skg (node (id x) (diff (presence node~ rel+) (leaves 3 rel all) (ready all))))
+---- text: M✓ ~+
+---- styles: nonstandard*1 go*1 -*1 nonstandard*2
 ==== diff view: each ✓ follows its own object, whatever the raw order of the parts
 (skg (node (id x) (diff (ready rel node) (presence rel- node+))))
 ---- text: ∃+✓ ~-✓
