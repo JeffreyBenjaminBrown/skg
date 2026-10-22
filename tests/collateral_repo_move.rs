@@ -1,5 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_repo_move::)'
 
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use futures::executor::block_on;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
@@ -25,7 +26,7 @@ use skg::types::viewnode::Viewnode;
 use ego_tree::Tree;
 use std::error::Error;
 use std::io::BufReader;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -200,18 +201,6 @@ async fn setup_test_stores (
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
   Ok ((config, tantivy_index, nodes)) }
-
-fn mk_test_tcp_stream_pair (
-) -> (TcpStream, TcpStream) {
-  let listener : TcpListener =
-    TcpListener::bind ("127.0.0.1:0") . unwrap();
-  let addr =
-    listener . local_addr() . unwrap();
-  let write_end : TcpStream =
-    TcpStream::connect (addr) . unwrap();
-  let (read_end, _) =
-    listener . accept() . unwrap();
-  (write_end, read_end) }
 
 fn buffer_has_skgrepo_for_title (
   buffer  : &str,

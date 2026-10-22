@@ -1,5 +1,8 @@
 // Git and stream helpers for the tests over git fixtures (the graph
-// straddle and the diff view). Declared once, in 'tests/grouped_repos.rs'.
+// straddle and the diff view) and for other tests that need a gitrepo
+// or a stream pair. Declared once per test target that uses it, in
+// 'tests/grouped_repos.rs', 'tests/grouped_unit.rs',
+// 'tests/grouped_views.rs' and 'tests/grouped_overrides.rs'.
 
 use git2::Repository;
 use std::error::Error;

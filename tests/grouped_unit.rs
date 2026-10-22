@@ -4,6 +4,10 @@
 // Cargo.toml sets autotests = false and declares a few [[test]]
 // targets; this one gathers the db-free unit-style files.
 
+#[path = "shared/git_fixture_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod git_fixture_helpers;
+
 #[path = "body_yaml_format.rs"]
 mod body_yaml_format;
 

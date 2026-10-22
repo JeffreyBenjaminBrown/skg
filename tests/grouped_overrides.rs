@@ -4,6 +4,10 @@
 // Store-using tests across this binary are serialized by the fixture mutex in
 // server/test_utils.rs when plain `cargo test` runs them in one process.
 
+#[path = "shared/git_fixture_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod git_fixture_helpers;
+
 #[path = "collateral_partner_folder.rs"]
 mod collateral_partner_folder;
 

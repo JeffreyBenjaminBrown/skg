@@ -1,3 +1,4 @@
+use crate::git_fixture_helpers::{commit_all, configure_git_user};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::titles_by_skgids::{
   add_deleted_node_titles_by_skgids,
@@ -182,11 +183,11 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
     temp_dir . path ();
   let gitrepo : git2::Repository =
     git2::Repository::init (skgrepo_dir)?;
-  configure_git_user (&gitrepo)?;
+  configure_git_user (&gitrepo);
   fs::write (
     skgrepo_dir . join (format! ("{}.skg", skgid . 0)),
     format! ("title: Deleted From Git\npid: {}\n", skgid . 0))?;
-  commit_all (&gitrepo, "initial commit")?;
+  commit_all (&gitrepo, "initial commit");
   fs::remove_file (
     skgrepo_dir . join (format! ("{}.skg", skgid . 0)))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
@@ -243,9 +244,9 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
     temp_dir . path ();
   let gitrepo : git2::Repository =
     git2::Repository::init (skgrepo_dir)?;
-  configure_git_user (&gitrepo)?;
+  configure_git_user (&gitrepo);
   fs::write (skgrepo_dir . join ("README.md"), "initial\n")?;
-  commit_all (&gitrepo, "initial commit")?;
+  commit_all (&gitrepo, "initial commit");
   fs::write (
     skgrepo_dir . join (format! ("{}.skg", skgid . 0)),
     format! ("title: Untracked Title\npid: {}\n", skgid . 0))?;
@@ -288,41 +289,4 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
     response . contains ("Untracked Title"),
     "untracked file title should be returned: {}",
     response );
-  Ok (( )) }
-
-fn configure_git_user (
-  gitrepo : &git2::Repository,
-) -> Result<(), Box<dyn Error>> {
-  let mut config : git2::Config =
-    gitrepo . config ()?;
-  config . set_str ("user.email", "test@test.com")?;
-  config . set_str ("user.name", "Test")?;
-  Ok (( )) }
-
-fn commit_all (
-  gitrepo    : &git2::Repository,
-  message : &str,
-) -> Result<(), Box<dyn Error>> {
-  let mut index : git2::Index =
-    gitrepo . index ()?;
-  index . add_all (["*.skg"], git2::IndexAddOption::DEFAULT, None)?;
-  index . write ()?;
-  let tree_id : git2::Oid =
-    index . write_tree ()?;
-  let tree : git2::Tree =
-    gitrepo . find_tree (tree_id)?;
-  let sig : git2::Signature =
-    gitrepo . signature ()?;
-  let parents : Vec<git2::Commit> =
-    match gitrepo . head () {
-      Ok (head) => vec! [head . peel_to_commit ()?],
-      Err (_)   => Vec::new () };
-  let parent_refs : Vec<&git2::Commit> =
-    parents . iter () . collect ();
-  gitrepo . commit (
-    Some ("HEAD"),
-    &sig, &sig,
-    message,
-    &tree,
-    &parent_refs)?;
   Ok (( )) }

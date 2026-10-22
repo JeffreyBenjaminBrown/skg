@@ -2,6 +2,10 @@
 // subscription-visibility tests. See tests/grouped_unit.rs for why
 // test files are grouped into a few [[test]] targets.
 
+#[path = "shared/git_fixture_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod git_fixture_helpers;
+
 #[path = "content_view.rs"]
 mod content_view;
 

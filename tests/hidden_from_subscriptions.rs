@@ -5,6 +5,7 @@
 // 1. Initial view shows subscribees as write-protected with HiddenOutsideOfSubscribeeFolder
 // 2. After saving with editable view requests, HiddenInSubscribeeFolder is shown
 
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::assert_metadata_eq;
@@ -37,18 +38,6 @@ fn mk_test_tcp_stream ()
   let write_end : TcpStream =
     TcpStream::connect (addr) . unwrap ();
   write_end }
-
-fn mk_test_tcp_stream_pair ()
-  -> (TcpStream, TcpStream)
-{ let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let addr : std::net::SocketAddr =
-    listener . local_addr () . unwrap ();
-  let write_end : TcpStream =
-    TcpStream::connect (addr) . unwrap ();
-  let (read_end, _) =
-    listener . accept () . unwrap ();
-  (write_end, read_end) }
 
 /// Add (viewRequests editableView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request an editable view.

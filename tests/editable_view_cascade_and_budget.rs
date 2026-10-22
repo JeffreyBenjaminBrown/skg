@@ -4,6 +4,7 @@
 // These tests verify that when a node has a "Editable" view request,
 // its content children are expanded from disk using BFS with truncation.
 
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
@@ -26,14 +27,6 @@ use skg::types::viewnode::Viewnode;
 use ego_tree::Tree;
 
 
-
-fn mk_test_tcp_stream ()
-  -> TcpStream
-{ let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let addr : std::net::SocketAddr =
-    listener . local_addr () . unwrap ();
-  TcpStream::connect (addr) . unwrap () }
 
 const FIXTURES : &str =
   "tests/editable_view_cascade_and_budget/fixtures";
@@ -185,7 +178,8 @@ async fn test_editable_view_ample_budget (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config, tantivy, &graph,
@@ -253,7 +247,8 @@ async fn test_editable_view_limit_5_or_6 (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response_5 = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config5, tantivy, &graph,
@@ -269,7 +264,8 @@ async fn test_editable_view_limit_5_or_6 (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response_6 = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config6, tantivy, &graph,
@@ -356,7 +352,8 @@ async fn test_editable_view_limit_1_to_4 (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response_1 = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config1, tantivy, &graph,
@@ -371,7 +368,8 @@ async fn test_editable_view_limit_1_to_4 (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response_4 = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config4, tantivy, &graph,
@@ -452,7 +450,8 @@ async fn test_editable_view_conflicting (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config, tantivy, &graph,
@@ -506,7 +505,8 @@ async fn test_editable_view_with_cycle (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config, tantivy, &graph,
@@ -553,7 +553,8 @@ async fn test_editable_view_with_repeat (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config, tantivy, &graph,
@@ -610,7 +611,8 @@ async fn test_editable_view_request_cleared (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config, tantivy, &graph,
@@ -717,7 +719,8 @@ async fn test_editable_view_request_on_an_editable_node (
       let result : String = {
         let mut config : SkgConfig = config . clone ();
         config . initial_node_limit = 3;
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response : SaveResponse = update_from_and_rerender_buffer (
           &mut stream, &requested, &config, tantivy, &graph,
           &Ok (view_id), &mut views_state ) . await ?;
@@ -768,7 +771,8 @@ async fn test_editable_view_request_moves_editability_back (
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
       let mut save = async | buffer : &str | -> Result<String, Box<dyn Error>> {
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response : SaveResponse = update_from_and_rerender_buffer (
           &mut stream, buffer, &config, tantivy, &graph,
           &Ok (view_id . clone ()), &mut views_state ) . await ?;
@@ -850,7 +854,8 @@ async fn test_budget_aliasfolder_is_neutral (
         let mut views_state : ViewsState = ViewsState {
           open_views            : OpenViews::new (),
           graph_straddle        : None,};
-        let mut stream : TcpStream = mk_test_tcp_stream ();
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
           input_org_text, &config, tantivy, &graph,
@@ -881,7 +886,8 @@ async fn save_view (
   view_id     : &ViewId,
   views_state : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let mut stream : TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response : SaveResponse = update_from_and_rerender_buffer (
     &mut stream, buffer, config, tantivy, graph,
     &Ok (view_id . clone ()), views_state ) . await ?;
