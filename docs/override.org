@@ -316,7 +316,7 @@ not perform interactive override substitution.
 - [[file:../server/update_buffer.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
 - [[file:../server/types/viewnode.rs][folder policies and =overridesHere= collection]]
-- [[file:../server/to_org/expand/folder_request.rs][on-demand folder construction]]
+- [[file:../server/to_org/extend/folder_request.rs][on-demand folder construction]]
 - [[file:../server/serve/handlers/text_search.rs][search suppression]]
 - [[file:../server/serve/handlers/text_search/render_enriched_search_buffer.rs][overrideward view-subtrees]]
 - [[file:../server/from_text/fork.rs][implicit and explicit fork construction]]

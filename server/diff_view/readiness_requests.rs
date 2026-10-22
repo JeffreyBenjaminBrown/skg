@@ -276,8 +276,8 @@ pub fn set_ready_facts_in_viewforest (
 /// 'all', beside 'rel' when that names a leaf of 'forest'; on any
 /// other unrestricted vognode or a historical phantom, each of 'node'
 /// and 'rel' that names a leaf, or else 'all' if its node records any
-/// leaf; on anything else, 'all' when a bare request names an
-/// aggregate (a changeset marker), else no object. N is how many
+/// leaf; on anything else, 'all' when a bare request names a commit
+/// readiness aggregate (a changeset marker), else no object. N is how many
 /// distinct leaves of 'forest' a request naming those objects names.
 /// None when that is none.
 fn leaves_fact_at (

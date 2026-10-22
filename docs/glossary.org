@@ -346,7 +346,7 @@ graph members are restored.
 nonempty =subscribeeFolder= automatically. The other top-level relation
 folders require an explicit folder request, even when their herald counts say
 they would be nonempty. The same rule applies when a member of any
-PartnerFolder is expanded as editable. A subscribee-as-such also gets its
+PartnerFolder is extended as editable. A subscribee-as-such also gets its
 nonempty =hiddenInSubscribeeFolder=; this is the filter specific to how that
 subscriber sees the subscribee.
 
@@ -631,7 +631,7 @@ view that draws R in place of N keeps N in the parent's contains.
 
 An OVERRIDDEN-AS-SUCH is a member child of an overriddenFolder --
 the position that always shows the original; its editable
-expansion applies neither the recorder's hides nor substitution to
+extension applies neither the recorder's hides nor substitution to
 its immediate children.
 
 An ordinary single-root visit always opens the requested node itself,
@@ -783,11 +783,12 @@ changes", "merges", "skgrepo changes" and "order-only changes". Each is
 an ordinary editable view. Foreign skgrepos are excluded; the
 readiness summary only counts their changed files.
 
-*** PCSVF = pruned change-spanning viewforest
+*** pruned change view
 
-The viewforest the "all changes" buffer draws ('server/diff_view/pcsvf.rs',
-functions 'pcsvf_...'). The merges and skgrepo-changes buffers draw
-PCSVFs over subsets of the changes: the nodeMerges, and the home
+The viewforest the "all changes" buffer draws
+('server/diff_view/pruned_change_view.rs', functions
+'prunedChangeView_...'). The merges and skgrepo-changes buffers draw
+pruned change views over subsets of the changes: the nodeMerges, and the home
 skgrepo and relRepo moves.
 
 *** graph straddle, before-graph, after-graph
@@ -822,14 +823,14 @@ A change-forest leaf about a relationship has the relationship as its
 object, never the member. A request, a '(leaves ...)' fact and a
 '(ready ...)' fact may also say 'all', which names every leaf a
 modified node records (so one gesture on it marks its file), or every
-leaf of an aggregate one level down; 'all' is shorthand, not a third
+leaf of a commit readiness aggregate one level down; 'all' is shorthand, not a third
 object. A *diff aspect* is what a
 change-forest leaf is about: existence, text, home skgrepo, an alias,
 an extra ID, a flag, or relRepo.
 
 *** C, R, U, D, content origin
 
-The sets the PCSVF is drawn from. *C* is the set of changed
+The sets the pruned change view is drawn from. *C* is the set of changed
 graphnodes, in two halves: a node is changed *out* when its own file
 records a change (it is new or deleted, or its text, aliases, extra
 IDs, flags, home skgrepo or own relationships changed), and *in* when
@@ -840,7 +841,7 @@ puts nothing in it. *R* is the set of content origins reached from C
 by walking containerward. A *content origin* is a node with no
 container, a multiply-contained node, or a member of a rootlike cycle
 (the stop rule of 'server/prominence.rs'). *U*, the nodes to
-viewforest-unfold, is R, C and every node on a containerward path
+extend contentward, is R, C and every node on a containerward path
 from a node of C to an origin. *D*, the roots of the "all changes"
 buffer, is R minus the origins that another kept origin reaches
 containerward inside U.
@@ -910,8 +911,8 @@ A viewnode the diff view draws, at an editable node's visit, to show
 a change of that node: its old text, its home skgrepo move, its
 changeset markers, its "it acquired" folder, its changed folders, its
 removed members, and, under a member, the relRepo move of the
-member's relationship. A rerender keeps a change viewnode the fresh
-drawing still produces and detaches the rest.
+member's relationship. A rerender keeps a change viewnode the shallow
+model subtree still produces and detaches the rest.
 
 *** old text
 

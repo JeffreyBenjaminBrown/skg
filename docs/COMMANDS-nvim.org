@@ -405,8 +405,8 @@ stops affecting it), and then draw an editable view here.
 Moving editability back to that occurrence later
 makes those children its content again.
 Called on a node that is already editable,
-it unfolds the node's content editable,
-up to 'initial_node_limit' expansions.
+it extends the node's content editable,
+up to 'initial_node_limit' extensions.
 A buffer may carry only one such request per node.
 It does not save; the request takes effect at the next save.
 *** <localleader>sw : :SkgRequestWriteProtected
@@ -490,8 +490,8 @@ In a buffer of the diff view (<localleader>vd), each change can
 be marked commit-ready. A mark approves the change as it is now:
 editing the changed thing again makes the mark lapse. Marks live on
 the server, in '<data_root>/readiness-marks.json'. A headline whose
-change is ready shows ✓ after it; an aggregate (a folder of changes,
-a changeset marker) shows ✓ when all of its changes are. A node that
+change is ready shows ✓ after it; a commit readiness aggregate (a
+folder of changes, a changeset marker) shows ✓ when all of its changes are. A node that
 existed at HEAD and whose file records a change shows M ("modified"),
 and M✓ once every change its file records is marked.
 
@@ -664,7 +664,7 @@ view. <localleader>ru integrates such changes.
 Nothing the buffer draws editable is write-protected again by the
 server. An editable-view
 request (<localleader>sd) works as in any view, except that only the
-expansion of a node outside U (the nodes the buffer unfolds anyway:
+extension of a node outside U (the nodes the buffer extends anyway:
 those that changed and those leading to them) is charged to
 'initial_node_limit'; nothing else in the buffer is bounded by that
 limit.

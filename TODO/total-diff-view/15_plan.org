@@ -1115,7 +1115,7 @@ headlines, one ready, where each of the six commands lands where it
 should and the ends report "No further change" and "No earlier
 change"; the key lookups; the Emacs and Neovim suites.
 
-** TODO Slice 9: names
+** DONE Slice 9: names
 Apply every table under "Names" above, with 'git mv' for the files and
 directories, in the server, both clients, the tests and the docs. Grep
 for 'pcsvf', 'PCSVF', 'home_move', 'home-move', 'home move', 'expand',

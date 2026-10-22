@@ -115,7 +115,7 @@ without the form gets one."
                   1 #'skg-cycle-commit-ready)
                  '("* (skg (node (id m) (repo r) (diff (presence node~ rel+) (leaves 2 rel all) (ready rel) (readyRequest rel all)))) m"))))
 
-(ert-deftest test-skg-cycle-commit-ready-on-an-aggregate-writes-one-level-down ()
+(ert-deftest test-skg-cycle-commit-ready-on-a-commit-readiness-aggregate-writes-one-level-down ()
   ;; A changed folder: a request on each leaf just below it.
   (should (equal (test-skg-readiness--run
                   '("* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali"
@@ -159,7 +159,7 @@ without the form gets one."
                    "** (skg (node (id m) (repo r) writeProtected (diff (presence node~ rel+) (leaves 2 rel all) (readyRequest rel)))) m"
                    "* (skg (node (id other) (repo r) (diff (leaves 1 all)))) other"
                    "** (skg (oldText title) (diff (leaves 1))) other")))
-  ;; At point, a changeset marker names its aggregate.
+  ;; At point, a changeset marker names its commit readiness aggregate.
   (should (equal (test-skg-readiness--run
                   '("** (skg (changesetMarker content) (diff (leaves 2 all)))")
                   1 #'skg-cycle-commit-ready '(4))

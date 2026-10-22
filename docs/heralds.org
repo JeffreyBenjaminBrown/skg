@@ -198,8 +198,8 @@ flag entry, which has one diff object, the same facts read =+= and
 phantom's =~+= or =~-=. A =✓= after a diff object's facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
-change of whose file is marked. An aggregate (a folder or changeset
-marker) shows a =✓= when everything under it is ready. =request:ready= and
+change of whose file is marked. A commit readiness aggregate (a
+folder or changeset marker) shows a =✓= when everything under it is ready. =request:ready= and
 =request:unready=, with =:node=, =:rel= or =:all=, are pending readiness
 requests, consumed by the next save.
 
@@ -215,7 +215,7 @@ follows its own object whatever the raw order of the parts.
 A historical phantom (a node the worktree lacks, drawn with HEAD's
 text) carries =☮=. The properties the view adds are labels: =old title
 and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
-+NEW= for a home move, =relationship moved from OLD to NEW=, and the
++NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, and the
 changeset markers =its content changed=, =some content relationships
 changed skgrepo= and =order-only change=. A folder drawn because its
 membership changed reads =its X changed (this file)= or =(other files)=;

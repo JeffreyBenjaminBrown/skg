@@ -116,7 +116,7 @@ end
 ---@param objects string[]
 ---@return boolean is every one of OBJECTS ready? One is when the
 ---headline's '(ready ...)' names it, or is a bare '(ready)', which
----names the headline's only leaf or aggregate.
+---names the headline's only leaf or commit readiness aggregate.
 function M.objects_ready_p (metadata_sexp, objects)
   local ready = M.form(metadata_sexp, 'ready')
   if not ready then return false end

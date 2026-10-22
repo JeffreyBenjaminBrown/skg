@@ -2716,3 +2716,69 @@ a streaming command.
 *** verification
 nextest 867 passed; Emacs 381; Neovim all 31 specs passed. No server
 code changed, so the integration suite was not run.
+** Slice 9: deviations
+*** "expand" and "unfold" retired in the tests too
+The plan's table names the server's comments, its files and the docs;
+its closing grep covers 'tests/' as well. So the tests' viewforest
+senses went too: comments and assertion texts ("extends", "extension",
+"a write-protected member without its content"), the helpers
+'extend_e_under' and 'extended_subscribee_edit_view', the locals, the
+temp paths of the two renamed override tests, and the test names
+'subscribee_as_such_extension_hides_and_substitutes',
+'overridden_as_such_extension_is_raw_and_unhidden',
+'test_fork_extension_at_origin',
+'containerward_extension_truncates_before_restricted_container',
+'mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks'
+and 'an_editable_view_request_on_a_node_of_u_extends_its_members'. The
+clients' "initial_node_limit expansions" became "extensions".
+*** no "expand" left in the server
+The closing grep of the plan lists 'expand' in the server among the
+retired names, so its other senses were reworded as well: "extensions
+of the data model" ('in_rust_graph.rs'), "the branching
+representation" ('paths.rs'), a node's content "exported at most once
+per file" ('export_org.rs'), "the nodeMerge half" (the fieldIntent
+collection), "does not show every document's content" (the import
+record), "the whole-graph cycle walk" ('prominence.rs'), and
+"completion/expansion" became "completion" ('update_buffer.rs').
+*** what keeps "expand" outside the server
+Emacs's and org-fold's own sense ('elisp/PITFALLs.org:13',
+'skg-request-save.el:1033, :1037',
+'test-skg-save-response-folded-root.el:20', magit's sections in
+'skg-request-file-path.el:281'), a path's expansion (the integration
+test 'view-magit-phantom-deleted-file'), the herald test helper that
+expands style runs, "the expanded metadata" of 'docs/heralds.org:9'
+(the display without heralds), and plain English in
+'docs/telescopes.org:11' and 'docs/private-writing.org:5'.
+*** "home moved" stays, including one banner the plan lists
+The banner at 'tests/shared/herald-rendering-cases.txt:321' reads
+"whose home moved", the verb the plan keeps; only the banner "a home
+skgrepo move, ready" changed. The glossary's "Say 'home skgrepo move',
+not 'home move'" stays. "home-move gesture" became "home skgrepo move
+gesture"; the capitalized "HOME MOVE" in 'supplement_from_disk.rs'
+became "HOME SKGREPO MOVE", its case left for slice 12.
+*** the shallow model subtree: three more locals
+Beside the table's names, 'fresh_viewnode' and 'fresh_kind'
+('shallow_model_subtree.rs') and 'fresh_phantom' ('changes.rs') became
+'model_viewnode', 'model_kind' and 'model_phantom'. 'fresh_root' was
+a function, now 'model_root'. 'create_partnerFolders_for_fresh_nodes'
+and the other "fresh" of new nodes and views are another sense and
+stay.
+*** commit readiness aggregate
+Each passage names the full term once. The verb ("the content
+changeset marker aggregates the ... leaves") became "gathers" in
+'docs/diff-view.org' and one test comment; the test name
+'readiness_aggregates_over_the_leaves_that_exist' keeps it, as the
+plan says. The Emacs test
+'test-skg-cycle-commit-ready-on-an-aggregate-writes-one-level-down'
+became '...-on-a-commit-readiness-aggregate-...', and its Neovim twin's
+title likewise. The glossary entry "derived commit-readiness
+aggregate" is slice 10's to rewrite, so it still says "An aggregate".
+*** smaller choices
+- The "fill in" sense reached one more title: Neovim's
+  'command_families_spec.lua' "opens the filled-in view".
+- 'tests/pruned_change_view.rs' cited 02_plan.org's section "The
+  PCSVF"; it now says "its section on the pruned change view", the
+  citation itself left for slice 11.
+- Comments that the longer names pushed past the margin were rewrapped.
+*** verification
+nextest 867 passed; Emacs 381; Neovim all 31 specs passed.

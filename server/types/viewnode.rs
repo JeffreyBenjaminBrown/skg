@@ -68,8 +68,8 @@ pub struct ChangeFacts {
 /// request on a viewnode may name ('docs/diff-view.org', "Facts on
 /// the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
 /// historical phantom, each worth one leaf; 'all' on a modified node
-/// (beside 'rel' when that names a leaf) and on an aggregate; none
-/// where a bare request names them all.
+/// (beside 'rel' when that names a leaf) and on a commit readiness
+/// aggregate; none where a bare request names them all.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LeavesFact {
   /// How many leaves a request naming every one of 'objects' touches.
@@ -90,8 +90,8 @@ pub struct DiffPresence {
 
 /// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
 /// own existence), 'rel' (its relationship to its viewparent), and
-/// 'all' (every leaf the node records, or every leaf of an aggregate,
-/// one level down).
+/// 'all' (every leaf the node records, or every leaf of a commit
+/// readiness aggregate, one level down).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DiffObject {
   Node,
@@ -433,7 +433,7 @@ pub enum Property {
   // The diff view's properties, below, are display-only and
   // save-inert: the validator ignores them, and the diff view's
   // reconciler owns them. Each but BodyDiff is a change-forest leaf or
-  // aggregate, so its viewnode carries '(ready ...)' and a
+  // commit readiness aggregate, so its viewnode carries '(ready ...)' and a
   // readiness request.
   /// In an alias folder: an alias the worktree lost since HEAD. The
   /// alias reader never reads it. Its change-forest leaf is that alias.

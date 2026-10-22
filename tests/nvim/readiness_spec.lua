@@ -130,7 +130,7 @@ describe('skg.readiness', function ()
           1, readiness.cycle_commit_ready))
   end)
 
-  it('writes one level down on an aggregate', function ()
+  it('writes one level down on a commit readiness aggregate', function ()
     assert.are.same({
       '* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali',
       '** (skg (aliasFolder changed))',
@@ -173,7 +173,7 @@ describe('skg.readiness', function ()
             '* (skg (node (id other) (repo r) (diff (leaves 1 all)))) other',
             '** (skg (oldText title) (diff (leaves 1))) other' },
           1, readiness.cycle_commit_ready_recursive))
-    -- At point, a changeset marker names its aggregate.
+    -- At point, a changeset marker names its commit readiness aggregate.
     assert.are.same(
       { '** (skg (changesetMarker content) (diff (leaves 2 all) (readyRequest all))) ' },
       run({ '** (skg (changesetMarker content) (diff (leaves 2 all)))' },

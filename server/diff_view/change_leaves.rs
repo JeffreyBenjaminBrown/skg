@@ -5,8 +5,8 @@
 //! changed aspects; its leaves are the individual changes a user
 //! marks. A relationship's leaves live under its recorder.
 //!
-//! The readiness of an aggregate (a set of leaves, a file, the whole
-//! changeset) is derived here from a 'ReadinessStore'.
+//! The readiness of a commit readiness aggregate (a set of leaves, a
+//! file, the whole changeset) is derived here from a 'ReadinessStore'.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{

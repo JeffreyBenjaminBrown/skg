@@ -14,17 +14,17 @@
 ;;; existence) and/or 'rel' (~, its relationship to its viewparent) on
 ;;; a vognode or phantom, each worth one leaf; 'all' on a modified node
 ;;; (M, every leaf its file records, beside 'rel' when that names a
-;;; leaf) and on an aggregate (a changeset marker); none on a headline
-;;; that names one leaf. N is how many distinct leaves a request naming
-;;; every listed object touches. A gesture names every object the
-;;; headline lists, and toggles by the headline's own '(ready ...)':
-;;; it is ready when that names every listed object. A folder drawn
-;;; because of a change names no leaf itself; a gesture on it acts on
-;;; its children.
+;;; leaf) and on a commit readiness aggregate (a changeset marker); none
+;;; on a headline that names one leaf. N is how many distinct leaves a
+;;; request naming every listed object touches. A gesture names every
+;;; object the headline lists, and toggles by the headline's own '(ready
+;;; ...)': it is ready when that names every listed object. A folder
+;;; drawn because of a change names no leaf itself; a gesture on it acts
+;;; on its children.
 ;;;
 ;;; Below the headline a gesture acts on, it names no 'all': the leaves
-;;; of a modified node or an aggregate there are named by the headlines
-;;; under it, or are not shown there.
+;;; of a modified node or a commit readiness aggregate there are named
+;;; by the headlines under it, or are not shown there.
 ;;;
 ;;; It also formats the readiness summary, which the save, stage-and-
 ;;; commit and integrate-unshown-changes show.
@@ -139,7 +139,7 @@ as (N . OBJECTS), or nil when it names no leaf."
 (defun skg--readiness-objects-ready-p (metadata-sexp objects)
   "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline:
 when its '(ready ...)' names it, or is a bare '(ready)', which names
-the headline's only leaf or aggregate."
+the headline's only leaf or commit readiness aggregate."
   (let ((ready (skg--readiness-form metadata-sexp 'ready)))
     (and ready
          (seq-every-p (lambda (object)

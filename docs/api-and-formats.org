@@ -195,13 +195,13 @@ So far there are these endpoints:
        phantom. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots, and every headline it drew editable, stay as
        saved, and its change facts, change folders, markers and removed
-       members are redrawn. What it draws anew it draws by its PCSVF
-       sets recomputed after the save: a new member in U is editable,
+       members are redrawn. What it draws anew it draws by its pruned
+       change view sets recomputed after the save: a new member in U is editable,
        with its content list, and any other new member is a
        write-protected member drawn without its content. It
        makes no occurrence editable and appends no root; the "integrate
        unshown changes" request below does. An editable-view request
-       cascades as in any view, and only the expansion of a node
+       cascades as in any view, and only the extension of a node
        outside U spends =initial_node_limit=; nothing else in the
        buffer spends that budget.
   - Readiness requests (=(readyRequest OBJECTS)= and
@@ -236,7 +236,7 @@ So far there are these endpoints:
     =save-result= with nil content and actionable errors naming view IDs and
     IDs, and performs no filesystem, graph, search index, registry, or collateral
     update. There is no save-anyway path.
-  - Moving a node between skgrepos: for each home move the server
+  - Moving a node between skgrepos: for each home skgrepo move the server
     finds every relationship touching the moved node, in either
     direction and whether or not a view shows it, that sat at its
     default relRepo and that the sticky-else-default rule would leave
@@ -385,9 +385,9 @@ So far there are these endpoints:
       the skgrepo restriction is not =all=, when an owned skgrepo is
       not a gitrepo or has no HEAD commit, or for an unknown BUFFER. A
       refusal applies to every buffer, so the client stops.
-  - What each buffer draws: the "all changes" buffer is the PCSVF over
+  - What each buffer draws: the "all changes" buffer is the pruned change view over
     every change in the owned skgrepos since HEAD; the merges and
-    skgrepo-changes buffers are PCSVFs over the nodeMerges and over the
+    skgrepo-changes buffers are pruned change views over the nodeMerges and over the
     home skgrepo and relRepo moves; the order-only buffer lists the
     nodes whose only change is the order of a list. Foreign skgrepos
     are excluded. See the glossary's "Terms of the diff view", and
@@ -400,8 +400,9 @@ So far there are these endpoints:
     both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
     buffer"), and its response carries the readiness summary.
   - A rerender of such a buffer (after a save, collateral, or after a
-    commit) reconciles what it holds with a fresh drawing from the
-    straddle: a viewnode the fresh drawing also produces is kept, with
+    commit) reconciles what it holds with a shallow model subtree from
+    the straddle: a viewnode the shallow model subtree also produces
+    is kept, with
     its =folded= and =bodyFolded=, its kind and facts updated in place
     (a member that loses its relationship becomes a removed member, a
     deleted node a historical phantom, and back); one it does not is
@@ -410,7 +411,7 @@ So far there are these endpoints:
     root stays until the buffer is closed; a root whose node a commit
     deleted is drawn as a deleted phantom.
   - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
-    (=pcsvf.rs=, =changes.rs=).
+    (=pruned_change_view.rs=, =changes.rs=).
 
 ** Stage and commit
   - Request: =((request . "stage and commit") (message . "MESSAGE"))=,
@@ -460,7 +461,7 @@ So far there are these endpoints:
       restriction is not =all=, VIEW_ID is not a buffer of the
       diff view, or the rerender fails. The rerender stream is empty.
   - Logic: the graph straddle is brought up to date, and the buffer's
-    fresh PCSVF sets computed. Each node of U without an editable
+    pruned change view sets recomputed. Each node of U without an editable
     occurrence becomes editable (its body from the live graph) at its
     first content occurrence in level order, or if it has none at its
     first partner folder occurrence. The buffer is then rerendered as
@@ -469,7 +470,7 @@ So far there are these endpoints:
     appended as a root, at the end, in ID order, and completed; R is
     deduplicated with the buffer's roots pinned, so that a changed
     cycle that already has a root gains no second one.
-    =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pcsvf.rs=
+    =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pruned_change_view.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in
     =server/update_buffer.rs=.
@@ -847,7 +848,7 @@ the atom, so a request is transient. Request forms:
 
 An editable node's default presentation includes its nonempty
 =subscribeeFolder=, but no other top-level relation folder. This applies both
-to ordinary positions and to nodes expanded as members of relation folders.
+to ordinary positions and to nodes extended as members of relation folders.
 An editable subscribee-as-such additionally includes its nonempty
 =hiddenInSubscribeeFolder=; =hiddenOutsideOfSubscribeeFolder=, when nonempty,
 is part of the subscriber's =subscribeeFolder=. Use a folder request for the
@@ -870,8 +871,8 @@ node's heralds.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
   keeping its drawn content, each member of which, there and below,
-  becomes a non-member); on an editable node, unfold its content
-  editable, within =initial_node_limit= expansions. A buffer carries at
+  becomes a non-member); on an editable node, extend its content
+  editable, within =initial_node_limit= extensions. A buffer carries at
   most one per node.
 - =writeProtectedView= — make the occurrence write-protected (its title
   resynced from the graph) and each of its direct child vognodes a
@@ -1340,8 +1341,8 @@ than =bodyDiff=.
   Absent when nothing is ready.
 - =(readyRequest OBJECT...)= and =(unreadyRequest OBJECT...)= -- ask
   the save to set or clear the marks of those leaves; the object =all=
-  names every leaf a vognode's node records, or every leaf of an
-  aggregate, one level down. At most one, and
+  names every leaf a vognode's node records, or every leaf of a
+  commit readiness aggregate, one level down. At most one, and
   absent when no request is pending.
 
 *** The diff view's viewnodes
@@ -1428,7 +1429,7 @@ supplementation, not the buffer), it is not a collateral re-render target, and
 editing its (empty) title/body is a buffer validation error. Its
 unrestricted children remain fully editable. A de-novo render under a
 restricted set never produces one -- restricted members are omitted and
-their content is never expanded.
+their content is never extended.
 
 Edits to restricted nodes themselves are /suppressed/ at save, not
 fatal: any nodeInstruction that would write a restricted skgrepo is
