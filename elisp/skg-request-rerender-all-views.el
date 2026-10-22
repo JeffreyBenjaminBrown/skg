@@ -23,47 +23,75 @@
   "Ask the server to re-render every open view.
 Locks all skg buffers, then registers handlers for the
 streaming protocol: rerender-lock, rerender-view*, rerender-done."
-  (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg--begin-stream "rerender")
-    (skg--lock-all-skg-buffers)
-    (skg--register-rerender-stream-handlers)
-    (skg--register-rerender-overPrivateText-confirmation
-     (lambda (pids) (skg-request-rerender-all-views pids)))
-    (skg-lp-reset)
-    (process-send-string
-     tcp-proc
-     (concat (prin1-to-string
-              (append
-               '((request . "rerender all views"))
-               (when approved-pids
-                 `((approved-overPrivateText-pids ,@approved-pids)))))
-             "\n"))))
+  (skg--send-streaming-request
+   "rerender" nil
+   (append '((request . "rerender all views"))
+           (when approved-pids
+             `((approved-overPrivateText-pids ,@approved-pids))))
+   nil nil nil
+   (lambda (pids) (skg-request-rerender-all-views pids))))
 
 (defun skg--send-streaming-request
     (label response-type request handler
-           &optional other-handlers retry-after-empty-stream)
+           &optional other-handlers retry-after-empty-stream
+           overPrivateText-retry)
   "Send REQUEST, an alist, for a command whose answer a rerender
 stream follows. First begin the stream (LABEL names it in the error
 when another is in flight), lock every skg buffer, register the
 rerender stream's handlers and, one-shot, HANDLER for RESPONSE-TYPE,
 then reset the receiver.
+RESPONSE-TYPE and HANDLER may be nil, for a command whose only
+answer is the rerender stream.
 OTHER-HANDLERS, an alist of (TYPE . HANDLER), are the command's other
 possible answers, also one-shot. With RETRY-AFTER-EMPTY-STREAM, a
 handler may set `skg--rerender-after-empty-stream' to resend once
 the empty stream that follows a confirmation is done.
-Each handler is called as (HANDLER TCP-PROC PAYLOAD)."
+OVERPRIVATETEXT-RETRY, a function of the approved PIDs, resends the
+request when the server challenges it over private text; a challenge
+cancels the one-shot handler for RESPONSE-TYPE, which the challenged
+request no longer answers.
+Each handler is called as (HANDLER TCP-PROC PAYLOAD).
+If any step after the stream begins fails, the handlers registered
+here are removed, the stream ends and the buffers unlock."
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
     (skg--begin-stream label)
-    (skg--lock-all-skg-buffers)
-    (skg--register-rerender-stream-handlers)
-    (when retry-after-empty-stream
-      (skg--wrap-rerender-done-with-after-empty-stream))
-    (skg-register-response-handler response-type handler t)
-    (dolist (other other-handlers)
-      (skg-register-response-handler (car other) (cdr other) t))
-    (skg-lp-reset)
-    (process-send-string tcp-proc
-                         (concat (prin1-to-string request) "\n"))))
+    (condition-case err
+        (progn
+          (skg--lock-all-skg-buffers)
+          (skg--register-rerender-stream-handlers)
+          (when retry-after-empty-stream
+            (skg--wrap-rerender-done-with-after-empty-stream))
+          (when response-type
+            (skg-register-response-handler response-type handler t))
+          (dolist (other other-handlers)
+            (skg-register-response-handler (car other) (cdr other) t))
+          (when overPrivateText-retry
+            (skg--register-rerender-overPrivateText-confirmation
+             overPrivateText-retry response-type))
+          (skg-lp-reset)
+          (process-send-string tcp-proc
+                               (concat (prin1-to-string request) "\n")))
+      (error
+       (skg--unregister-response-handlers
+        (append '(rerender-lock rerender-view rerender-done
+                  overPrivateText-telescope-confirmation)
+                (when response-type (list response-type))
+                (mapcar #'car other-handlers)))
+       (skg--end-stream)
+       (skg--unlock-all-save-locked)
+       (signal (car err) (cdr err))))))
+
+(defun skg--unregister-response-handlers (response-types)
+  "Remove the handler of each of RESPONSE-TYPES, balancing the pending
+count for each one-shot handler removed."
+  (dolist (type response-types)
+    (let ((entry (assoc type skg-response-handler-map)))
+      (when entry
+        (when (cddr entry)
+          (setq skg-lp--pending-count
+                (max 0 (1- skg-lp--pending-count))))
+        (setq skg-response-handler-map
+              (assoc-delete-all type skg-response-handler-map))))))
 
 (defun skg--response-errors-line (response)
   "The errors of RESPONSE, an alist with an (errors (...)) entry,

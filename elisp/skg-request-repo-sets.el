@@ -4,7 +4,7 @@
 (require 'skg-config)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
-(require 'skg-request-rerender-all-views) ; for skg--register-rerender-stream-handlers
+(require 'skg-request-rerender-all-views) ; for skg--send-streaming-request
 (require 'skg-state)
 
 (defun skg-list-repo-sets ()
@@ -60,32 +60,20 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
   (interactive (list (skg--prompt-for-repo-set)))
   (when (or approved-pids
             (yes-or-no-p "Switch repo-set and re-render all SKG buffers? "))
-    (let ((tcp-proc (skg-tcp-connect-to-rust)))
-      (skg-register-response-handler
-       'skgrepo-restriction
-       (lambda (_tcp-proc payload)
-         (condition-case err
-             (let* ((response (read payload))
-                    (content (cadr (assoc 'content response))))
-               (message "%s" content))
-           (error
-            (message "skg-restrict-repo-set: %S" err))))
-       t)
-      (skg--begin-stream "rerender")
-      (skg--lock-all-skg-buffers)
-      (skg--register-rerender-stream-handlers)
-      (skg--register-rerender-overPrivateText-confirmation
-       (lambda (pids) (skg-restrict-repo-set name pids))
-       'skgrepo-restriction)
-      (skg-lp-reset)
-      (process-send-string
-       tcp-proc
-       (concat (prin1-to-string
-                (append
-                 `((request . "set skgrepo restriction")
-                   (name . ,name))
-                 (when approved-pids
-                   `((approved-overPrivateText-pids ,@approved-pids)))))
-               "\n")))))
+    (skg--send-streaming-request
+     "rerender" 'skgrepo-restriction
+     (append `((request . "set skgrepo restriction")
+               (name . ,name))
+             (when approved-pids
+               `((approved-overPrivateText-pids ,@approved-pids))))
+     (lambda (_tcp-proc payload)
+       (condition-case err
+           (let* ((response (read payload))
+                  (content (cadr (assoc 'content response))))
+             (message "%s" content))
+         (error
+          (message "skg-restrict-repo-set: %S" err))))
+     nil nil
+     (lambda (pids) (skg-restrict-repo-set name pids)))))
 
 (provide 'skg-request-repo-sets)

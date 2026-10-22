@@ -3,7 +3,6 @@
 -- port of elisp/skg-request-repo-sets.el.
 
 local client = require('skg.client')
-local lock = require('skg.lock')
 local payload = require('skg.payload')
 local picker = require('skg.picker')
 local rerender = require('skg.rerender')
@@ -49,17 +48,6 @@ function M.restrict_repo_set (name, approved_pids)
        'Switch repo-set and re-render all SKG buffers?',
        '&Yes\n&No', 2) ~= 1 then
     return end
-  state.register_response_handler('skgrepo-restriction',
-    function (_payload_text, response)
-      vim.notify(payload.field_text(response, 'content') or '?')
-    end, true)
-  lock.begin_stream('rerender')
-  lock.lock_all_skg_buffers()
-  rerender.register_rerender_stream_handlers()
-  rerender.register_overPrivateText_confirmation(function (pids)
-    M.restrict_repo_set(name, pids)
-  end, 'skgrepo-restriction')
-  state.lp_reset()
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'set skgrepo restriction'),
     sexpr.pair(sexpr.symbol('name'), name) }
@@ -67,7 +55,12 @@ function M.restrict_repo_set (name, approved_pids)
     local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+  rerender.send_streaming_request('rerender', 'skgrepo-restriction',
+    request,
+    function (_payload_text, response)
+      vim.notify(payload.field_text(response, 'content') or '?')
+    end, nil,
+    function (pids) M.restrict_repo_set(name, pids) end)
 end
 
 return M

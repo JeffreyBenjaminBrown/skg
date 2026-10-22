@@ -38,13 +38,6 @@ end
 
 function M.request_rerender_all_views_with_approval (approved_pids,
                                                      excluded_view_ids)
-  lock.begin_stream('rerender')
-  lock.lock_all_skg_buffers()
-  M.register_rerender_stream_handlers()
-  M.register_overPrivateText_confirmation(function (pids)
-    M.request_rerender_all_views_with_approval(pids, excluded_view_ids)
-  end)
-  state.lp_reset()
   local request = {
     sexpr.pair(
       sexpr.symbol('request'),
@@ -59,46 +52,76 @@ function M.request_rerender_all_views_with_approval (approved_pids,
     local approval = { sexpr.symbol('approved-overPrivateText-pids') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
-  local ok, err = pcall(client.send_string, sexpr.to_string(request) .. '\n')
-  if not ok then
-    for _, kind in ipairs({ 'rerender-lock', 'rerender-view',
-                            'rerender-done',
-                            'overPrivateText-telescope-confirmation' }) do
-      local entry = state.response_handler_map[kind]
-      if entry and entry.one_shot then
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-      end
-      state.response_handler_map[kind] = nil
-    end
-    lock.end_stream()
-    lock.unlock_all_save_locked()
-    error(err)
-  end
+  M.send_streaming_request('rerender', nil, request, nil, nil,
+    function (pids)
+      M.request_rerender_all_views_with_approval(pids, excluded_view_ids)
+    end)
 end
 
 ---Send REQUEST, a list of sexpr pairs, for a command whose answer a
 ---rerender stream follows. First begin the stream (LABEL names it in
 ---the error when another is in flight), lock every skg buffer,
 ---register the rerender stream's handlers and, one-shot, HANDLER for
----RESPONSE_TYPE, then reset the receiver. OTHER_HANDLERS, a table from
----response type to handler, are the command's other possible answers,
----also one-shot. Each handler is called as HANDLER(payload_text,
----response).
+---RESPONSE_TYPE, then reset the receiver. RESPONSE_TYPE and HANDLER
+---may be nil, for a command whose only answer is the rerender stream.
+---OTHER_HANDLERS, a table from response type to handler, are the
+---command's other possible answers, also one-shot.
+---OVERPRIVATETEXT_RETRY, a function of the approved PIDs, resends the
+---request when the server challenges it over private text; a
+---challenge cancels the one-shot handler for RESPONSE_TYPE, which the
+---challenged request no longer answers. Each handler is called as
+---HANDLER(payload_text, response). If any step after the stream
+---begins fails, the handlers registered here are removed, the stream
+---ends, the buffers unlock and the error propagates.
 ---@param label string
----@param response_type string
+---@param response_type string|nil
 ---@param request table
----@param handler function
+---@param handler function|nil
 ---@param other_handlers table<string, function>|nil
+---@param overPrivateText_retry function|nil
 function M.send_streaming_request (label, response_type, request,
-                                   handler, other_handlers)
+                                   handler, other_handlers,
+                                   overPrivateText_retry)
   lock.begin_stream(label)
-  lock.lock_all_skg_buffers()
-  M.register_rerender_stream_handlers()
-  state.register_response_handler(response_type, handler, true)
-  for other_type, other_handler in pairs(other_handlers or {}) do
-    state.register_response_handler(other_type, other_handler, true) end
-  state.lp_reset()
-  client.send_string(sexpr.to_string(request) .. '\n')
+  local ok, err = pcall(function ()
+    lock.lock_all_skg_buffers()
+    M.register_rerender_stream_handlers()
+    if response_type then
+      state.register_response_handler(response_type, handler, true) end
+    for other_type, other_handler in pairs(other_handlers or {}) do
+      state.register_response_handler(other_type, other_handler, true) end
+    if overPrivateText_retry then
+      M.register_overPrivateText_confirmation(overPrivateText_retry,
+                                              response_type) end
+    state.lp_reset()
+    client.send_string(sexpr.to_string(request) .. '\n')
+  end)
+  if not ok then
+    local registered_types = { 'rerender-lock', 'rerender-view',
+                               'rerender-done',
+                               'overPrivateText-telescope-confirmation' }
+    if response_type then
+      table.insert(registered_types, response_type) end
+    for other_type in pairs(other_handlers or {}) do
+      table.insert(registered_types, other_type) end
+    M.unregister_response_handlers(registered_types)
+    lock.end_stream()
+    lock.unlock_all_save_locked()
+    error(err, 0)
+  end
+end
+
+---Remove the handler of each of RESPONSE_TYPES, balancing the pending
+---count for each one-shot handler removed.
+---@param response_types string[]
+function M.unregister_response_handlers (response_types)
+  for _, response_type in ipairs(response_types) do
+    local entry = state.response_handler_map[response_type]
+    if entry and entry.one_shot then
+      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+    end
+    state.response_handler_map[response_type] = nil
+  end
 end
 
 ---The errors of RESPONSE joined into one line, or nil when it has

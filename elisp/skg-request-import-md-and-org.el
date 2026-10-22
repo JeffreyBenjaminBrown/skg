@@ -111,37 +111,15 @@ privacy for every imported node.  No input file is changed."
                    for view-id = (with-current-buffer buf
                                (and (boundp 'skg-view-id) skg-view-id))
                    when (and view-id (buffer-modified-p buf))
-                   collect view-id))
-         (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg--begin-stream "import rerender")
-    (skg--lock-all-skg-buffers)
-    (skg--register-rerender-stream-handlers)
-    (skg--register-rerender-overPrivateText-confirmation
-     (lambda (pids) (skg--import-rerender-clean-views pids)))
-    (skg-lp-reset)
-    (condition-case err
-        (process-send-string
-         tcp-proc
-         (concat
-          (prin1-to-string
-           (append
-            `((request . "rerender all views")
-              (exclude-view-ids ,@dirty-view-ids))
-            (when approved-pids
-              `((approved-overPrivateText-pids ,@approved-pids)))))
-          "\n"))
-      (error
-       (dolist (type '(rerender-lock rerender-view rerender-done
-                       overPrivateText-telescope-confirmation))
-         (let ((entry (assoc type skg-response-handler-map)))
-           (when entry
-             (when (cddr entry)
-               (setq skg-lp--pending-count
-                     (max 0 (1- skg-lp--pending-count))))
-             (setq skg-response-handler-map
-                   (assoc-delete-all type skg-response-handler-map)))))
-       (skg--end-stream)
-       (skg--unlock-all-save-locked)
-       (signal (car err) (cdr err))))))
+                   collect view-id)))
+    (skg--send-streaming-request
+     "import rerender" nil
+     (append
+      `((request . "rerender all views")
+        (exclude-view-ids ,@dirty-view-ids))
+      (when approved-pids
+        `((approved-overPrivateText-pids ,@approved-pids))))
+     nil nil nil
+     (lambda (pids) (skg--import-rerender-clean-views pids)))))
 
 (provide 'skg-request-import-md-and-org)

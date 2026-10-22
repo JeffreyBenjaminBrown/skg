@@ -11,6 +11,7 @@ local helpers = dofile(
 local buffer = require('skg.buffer')
 local client = require('skg.client')
 local investigate_unknown_node = require('skg.investigate_unknown_node')
+local length_prefix = require('skg.length_prefix')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
 local repo_sets = require('skg.repo_sets')
@@ -79,6 +80,90 @@ describe('skg stream consumers', function ()
                       'reset',
                       'send ((request . "a request"))\n' },
                     calls)
+  end)
+
+  it('registers an over-private-text retry after the answer handlers',
+     function ()
+    -- Mirrors the last case of
+    -- test-skg-send-streaming-request-sends-after-the-prologue.
+    local calls = {}
+    local stubs = {
+      { lock, 'begin_stream', function () end },
+      { lock, 'lock_all_skg_buffers', function () end },
+      { rerender, 'register_rerender_stream_handlers', function () end },
+      { state, 'register_response_handler',
+        function (response_type) table.insert(calls,
+                                              'handler ' .. response_type) end },
+      { rerender, 'register_overPrivateText_confirmation',
+        function (_retry, unfired_response_type)
+          table.insert(calls, 'confirmation ' .. unfired_response_type) end },
+      { state, 'lp_reset', function () table.insert(calls, 'reset') end },
+      { client, 'send_string', function () table.insert(calls, 'send') end } }
+    local originals = {}
+    for i, stub in ipairs(stubs) do
+      originals[i] = stub[1][stub[2]]
+      stub[1][stub[2]] = stub[3] end
+    local ok, err = pcall(rerender.send_streaming_request,
+      'the label', 'the-answer',
+      { sexpr.pair(sexpr.symbol('request'), 'a request') },
+      function () end, nil, function () end)
+    for i, stub in ipairs(stubs) do stub[1][stub[2]] = originals[i] end
+    assert(ok, err)
+    assert.are.same({ 'handler the-answer', 'confirmation the-answer',
+                      'reset', 'send' },
+                    calls)
+  end)
+
+  it('unwinds a streaming request whose send fails', function ()
+    -- Mirrors test-skg-send-streaming-request-unwinds-a-failed-send.
+    local original_send = client.send_string
+    client.send_string = function () error('connection lost') end
+    local ok = pcall(rerender.send_streaming_request,
+      'the label', 'the-answer',
+      { sexpr.pair(sexpr.symbol('request'), 'a request') },
+      function () end, { ['other-answer'] = function () end },
+      function () end)
+    client.send_string = original_send
+    assert.is_false(ok)
+    assert.are.same({}, state.response_handler_map)
+    assert.are.equal(0, state.lp_pending_count)
+    assert.is_nil(lock.stream_in_progress)
+  end)
+
+  it("cancels the repo-set switch's answer on a confirmation and"
+     .. ' retries with the approved PIDs', function ()
+    -- Mirrors
+    -- test-skg-restrict-repo-set-confirmation-cancels-its-answer-and-retries.
+    local sent = {}
+    local original_send, original_confirm =
+      client.send_string, vim.fn.confirm
+    client.send_string = function (text) table.insert(sent, text) end
+    vim.fn.confirm = function () return 1 end
+    local ok, err = pcall(function ()
+      repo_sets.restrict_repo_set('public')
+      assert.are.equal(1, #sent)
+      assert.is_falsy(sent[1]:find('approved-overPrivateText-pids', 1, true))
+      assert.is_truthy(state.response_handler_map['skgrepo-restriction'])
+      assert.are.equal(3, state.lp_pending_count) -- lock, done, the answer
+      length_prefix.dispatch_by_type(
+        '((response-type overPrivateText-telescope-confirmation)'
+        .. ' (operation rerender) (pids (p1 p2)) (prompt "Include?"))')
+      assert.is_nil(state.response_handler_map['skgrepo-restriction'])
+      assert.are.equal(2, state.lp_pending_count)
+      length_prefix.dispatch_by_type(
+        '((response-type rerender-lock) (lock-views ()))')
+      length_prefix.dispatch_by_type(
+        '((response-type rerender-done) (errors ()) (warnings ()))')
+      vim.wait(2000, function () return #sent == 2 end, 10)
+      assert.are.equal(2, #sent)
+      assert.are.equal(
+        '((request . "set skgrepo restriction") (name . "public")'
+        .. ' (approved-overPrivateText-pids "p1" "p2"))\n',
+        sent[2])
+      assert.is_truthy(state.response_handler_map['skgrepo-restriction'])
+    end)
+    client.send_string, vim.fn.confirm = original_send, original_confirm
+    assert(ok, err)
   end)
 
   it("joins a response's errors into one line", function ()
