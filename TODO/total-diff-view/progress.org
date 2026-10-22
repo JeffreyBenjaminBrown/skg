@@ -2380,3 +2380,50 @@ a save carrying a readiness request and the rerendered "all changes"
 buffer were byte-identical between this slice and its parent commit,
 except the order of the save-lock's 'lock-views', which varies from
 run to run under either binary.
+** Slice 3: deviations
+*** the signs' style key is 'presence'
+'shared/herald-styles.json' styled the four signs under the key
+'diff'. The signs now sit in the '(presence ...)' part, so the key is
+'presence', with the same style.
+*** what the parser accepts
+A top-level '(ready)' is accepted only on a folder; a property's
+facts must sit in '(diff ...)'. The parser does not enforce the order
+of the parts (the printer writes them in order, and a herald case
+keeps a reversed order to show the rules do not depend on it). An
+empty '(diff)' is accepted and ignored; it is never written.
+*** a headline without the form gets one
+Both clients' edit DSLs append a missing list whole, so a '(DELETE
+...)' inside a '(diff ...)' the headline lacks would land in the
+buffer literally. The writer sends the DELETE only when the headline
+has the form, and otherwise sends '(diff REQUEST)'. Each client has a
+test of the three cases (a node's nested form replacing a request, a
+property's top-level form, a headline without the form).
+*** a folder's readiness in the clients
+'skg--readiness-form' and 'M.form' now read parts of '(diff ...)', so
+the changed-folder branch of 'skg--readiness-ready-p' and 'M.ready_p'
+reads the folder's bare top-level '(ready)' directly.
+*** the diff-view integration scripts
+Their substrings '(ready' and '(diff ' still mean what they did (the
+second is now stricter: no fact of any kind after the commit), so
+they stay as they are. The removed-member scripts match
+'(diff (presence rel-)' without its closing paren, as the form
+continues with '(leaves ...)'.
+*** tests
+The old literals were rewritten by a script
+('tests/results/nest_diff_facts.py'); substring checks whose old
+fragment ended at a sign lost their closing paren by hand, and a
+test that inserted a request after '(repo main)' inserts it into the
+diff form. The new round trip is
+'each_part_of_the_diff_form_round_trips_together_and_alone'.
+*** verification
+nextest 850, all passed but
+'save::extra_id_revocation::rejected_revocation_does_not_mutate_any_store'
+in the full run, which passed alone (unrelated to this slice). Emacs
+375; Neovim all specs passed. 'bash/integration-tests.sh': only the
+baseline 'import-md-and-org' fails. Over TCP, on a scratch copy of the
+'kinds' fixture, the "all changes" buffer carried the nested forms; a
+save carrying two nested requests stored both marks, and a fresh
+open showed them as '(ready ...)' parts. The save's own rerendered
+view, sent on a second connection under a hand-made view id, carried
+no '(leaves ...)' or '(ready ...)'; the pcsvf tests, which save
+through the registered view, see both, so this was not pursued.

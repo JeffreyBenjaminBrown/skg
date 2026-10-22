@@ -47,14 +47,14 @@ end
 describe('skg.readiness', function ()
   it('toggles a leaf', function ()
     assert.are.same(
-      { '** (skg removedAlias (diff rel-) (leaves 1) (readyRequest)) a1' },
-      run({ '** (skg removedAlias (diff rel-) (leaves 1)) a1' }, 1,
+      { '** (skg removedAlias (diff (presence rel-) (leaves 1) (readyRequest))) a1' },
+      run({ '** (skg removedAlias (diff (presence rel-) (leaves 1))) a1' }, 1,
           readiness.cycle_commit_ready))
     assert.are.same(
-      { '** (skg (oldText title) (ready) (leaves 1) (unreadyRequest)) txt' },
-      run({ '** (skg (oldText title) (ready) (leaves 1)) txt' }, 1,
+      { '** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) txt' },
+      run({ '** (skg (oldText title) (diff (leaves 1) (ready))) txt' }, 1,
           readiness.cycle_commit_ready))
-    -- Without the server's '(leaves ...)' fact, nothing is named.
+    -- Without the server's '(diff (leaves ...))' fact, nothing is named.
     assert.are.same({}, (function ()
       local buf = vim.api.nvim_create_buf(true, false)
       vim.api.nvim_buf_set_lines(buf, 0, -1, false,
@@ -66,35 +66,59 @@ describe('skg.readiness', function ()
     end)())
   end)
 
+  it('writes the request as the last part of the diff form', function ()
+    -- Two levels under 'skg' on a node; a headline without the form
+    -- gets one.
+    local function write (line, ready, objects)
+      local buf = vim.api.nvim_create_buf(true, false)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { line })
+      vim.api.nvim_set_current_buf(buf)
+      readiness.write_request(1, ready, objects)
+      local result = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
+      vim.api.nvim_buf_delete(buf, { force = true })
+      return result
+    end
+    assert.are.equal(
+      '* (skg (node (id k) (repo r) (diff (presence rel+) (leaves 1 rel) (unreadyRequest rel)))) k',
+      write('* (skg (node (id k) (repo r) (diff (presence rel+) (leaves 1 rel) (readyRequest rel)))) k',
+            false, { 'rel' }))
+    assert.are.equal(
+      '** (skg alias (diff (presence rel+) (leaves 1) (readyRequest))) a',
+      write('** (skg alias (diff (presence rel+) (leaves 1))) a', true, {}))
+    assert.are.equal(
+      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (readyRequest))) ',
+      write('** (skg (homeSkgrepoMove (old x) (new b))) ', true, {}))
+  end)
+
   it('asks which object of a member, unless only one applies', function ()
     assert.are.same(
-      { '* (skg (node (id k) (repo r) (diff node+ rel+) (ready rel) (leaves 2 node rel) (unreadyRequest rel))) k' },
-      run({ '* (skg (node (id k) (repo r) (diff node+ rel+) (ready rel) (leaves 2 node rel))) k' },
+      { '* (skg (node (id k) (repo r) (diff (presence node+ rel+) (leaves 2 node rel) (ready rel) (unreadyRequest rel)))) k' },
+      run({ '* (skg (node (id k) (repo r) (diff (presence node+ rel+) (leaves 2 node rel) (ready rel)))) k' },
           1, readiness.cycle_commit_ready, 'rel'))
     assert.are.same(
-      { '* (skg (historical (id d) (repo r) (diff node-) (leaves 1 node) (readyRequest node))) d' },
-      run({ '* (skg (historical (id d) (repo r) (diff node-) (leaves 1 node))) d' },
+      { '* (skg (historical (id d) (repo r) (diff (presence node-) (leaves 1 node) (readyRequest node)))) d' },
+      run({ '* (skg (historical (id d) (repo r) (diff (presence node-) (leaves 1 node)))) d' },
           1, readiness.cycle_commit_ready))
   end)
 
   it('writes one level down on an aggregate', function ()
     assert.are.same({
-      '* (skg (node (id ali) (repo r) (leaves 2 all))) ali',
+      '* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali',
       '** (skg (aliasFolder changed))',
-      '*** (skg removedAlias (diff rel-) (ready) (leaves 1) (readyRequest)) a1',
+      '*** (skg removedAlias (diff (presence rel-) (leaves 1) (ready) (readyRequest))) a1',
       '*** (skg alias) a2',
-      '*** (skg alias (diff rel+) (leaves 1) (readyRequest)) a3' },
-      run({ '* (skg (node (id ali) (repo r) (leaves 2 all))) ali',
+      '*** (skg alias (diff (presence rel+) (leaves 1) (readyRequest))) a3' },
+      run({ '* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali',
             '** (skg (aliasFolder changed))',
-            '*** (skg removedAlias (diff rel-) (ready) (leaves 1)) a1',
+            '*** (skg removedAlias (diff (presence rel-) (leaves 1) (ready))) a1',
             '*** (skg alias) a2',
-            '*** (skg alias (diff rel+) (leaves 1)) a3' },
+            '*** (skg alias (diff (presence rel+) (leaves 1))) a3' },
           2, readiness.cycle_commit_ready))
     assert.are.same({
-      '* (skg (node (id txt) (repo r) (leaves 1 all) (readyRequest all))) txt',
-      '** (skg (oldText title) (leaves 1)) txt' },
-      run({ '* (skg (node (id txt) (repo r) (leaves 1 all))) txt',
-            '** (skg (oldText title) (leaves 1)) txt' },
+      '* (skg (node (id txt) (repo r) (diff (leaves 1 all) (readyRequest all)))) txt',
+      '** (skg (oldText title) (diff (leaves 1))) txt' },
+      run({ '* (skg (node (id txt) (repo r) (diff (leaves 1 all)))) txt',
+            '** (skg (oldText title) (diff (leaves 1))) txt' },
           1, readiness.cycle_commit_ready))
   end)
 
@@ -102,51 +126,51 @@ describe('skg.readiness', function ()
     -- Below the headline at point, no 'all': the changeset marker's
     -- leaves are its siblings', and so are untouched there.
     assert.are.same({
-      '* (skg (node (id r) (repo r) (leaves 3 all) (readyRequest all))) r',
-      '** (skg (changesetMarker content) (leaves 2 all))',
-      '** (skg (historical (id d) (repo r) (diff node- rel-) (leaves 2 node rel) (readyRequest node rel))) d',
+      '* (skg (node (id r) (repo r) (diff (leaves 3 all) (readyRequest all)))) r',
+      '** (skg (changesetMarker content) (diff (leaves 2 all)))',
+      '** (skg (historical (id d) (repo r) (diff (presence node- rel-) (leaves 2 node rel) (readyRequest node rel)))) d',
       '*** (skg (node (id k) (repo r) writeProtected)) k',
-      '** (skg (node (id c) (repo r) writeProtected (diff rel+) (leaves 1 rel) (readyRequest rel))) c',
-      '* (skg (node (id other) (repo r) (leaves 1 all))) other',
-      '** (skg (oldText title) (leaves 1)) other' },
-      run({ '* (skg (node (id r) (repo r) (leaves 3 all))) r',
-            '** (skg (changesetMarker content) (leaves 2 all))',
-            '** (skg (historical (id d) (repo r) (diff node- rel-) (leaves 2 node rel))) d',
+      '** (skg (node (id c) (repo r) writeProtected (diff (presence rel+) (leaves 1 rel) (readyRequest rel)))) c',
+      '* (skg (node (id other) (repo r) (diff (leaves 1 all)))) other',
+      '** (skg (oldText title) (diff (leaves 1))) other' },
+      run({ '* (skg (node (id r) (repo r) (diff (leaves 3 all)))) r',
+            '** (skg (changesetMarker content) (diff (leaves 2 all)))',
+            '** (skg (historical (id d) (repo r) (diff (presence node- rel-) (leaves 2 node rel)))) d',
             '*** (skg (node (id k) (repo r) writeProtected)) k',
-            '** (skg (node (id c) (repo r) writeProtected (diff rel+) (leaves 1 rel))) c',
-            '* (skg (node (id other) (repo r) (leaves 1 all))) other',
-            '** (skg (oldText title) (leaves 1)) other' },
+            '** (skg (node (id c) (repo r) writeProtected (diff (presence rel+) (leaves 1 rel)))) c',
+            '* (skg (node (id other) (repo r) (diff (leaves 1 all)))) other',
+            '** (skg (oldText title) (diff (leaves 1))) other' },
           1, readiness.cycle_commit_ready_recursive))
     -- At point, a changeset marker names its aggregate.
     assert.are.same(
-      { '** (skg (changesetMarker content) (leaves 2 all) (readyRequest all)) ' },
-      run({ '** (skg (changesetMarker content) (leaves 2 all))' },
+      { '** (skg (changesetMarker content) (diff (leaves 2 all) (readyRequest all))) ' },
+      run({ '** (skg (changesetMarker content) (diff (leaves 2 all)))' },
           1, readiness.cycle_commit_ready_recursive))
   end)
 
   it('marks home moves, recursively only those like the first', function ()
     local lines = {
-      '* (skg (node (id a) (repo b) (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (leaves 1))',
-      '** (skg (node (id c) (repo b) writeProtected (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (leaves 1))',
-      '** (skg (node (id e) (repo b) (leaves 1 all))) e',
-      '*** (skg (homeSkgrepoMove (old y) (new b)) (leaves 1))' }
+      '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
+      '** (skg (node (id c) (repo b) writeProtected (diff (leaves 1 all)))) c',
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
+      '** (skg (node (id e) (repo b) (diff (leaves 1 all)))) e',
+      '*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))' }
     assert.are.same({
-      '* (skg (node (id a) (repo b) (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (leaves 1) (readyRequest)) ',
-      '** (skg (node (id c) (repo b) writeProtected (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (leaves 1))',
-      '** (skg (node (id e) (repo b) (leaves 1 all))) e',
-      '*** (skg (homeSkgrepoMove (old y) (new b)) (leaves 1))' },
+      '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (readyRequest))) ',
+      '** (skg (node (id c) (repo b) writeProtected (diff (leaves 1 all)))) c',
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))',
+      '** (skg (node (id e) (repo b) (diff (leaves 1 all)))) e',
+      '*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))' },
       run(lines, 1, readiness.toggle_homeSkgrepo_move_commitReady))
     assert.are.same({
-      '* (skg (node (id a) (repo b) (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (leaves 1) (readyRequest)) ',
-      '** (skg (node (id c) (repo b) writeProtected (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (leaves 1) (readyRequest)) ',
-      '** (skg (node (id e) (repo b) (leaves 1 all))) e',
-      '*** (skg (homeSkgrepoMove (old y) (new b)) (leaves 1))' },
+      '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (readyRequest))) ',
+      '** (skg (node (id c) (repo b) writeProtected (diff (leaves 1 all)))) c',
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (readyRequest))) ',
+      '** (skg (node (id e) (repo b) (diff (leaves 1 all)))) e',
+      '*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))' },
       run(lines, 1,
           readiness.toggle_homeSkgrepo_move_commitReady_recursive))
   end)
@@ -154,73 +178,73 @@ describe('skg.readiness', function ()
   it('asks nothing before a single-leaf unmark', function ()
     assert.are.same({
       '** (skg (aliasFolder changed) (ready))',
-      '*** (skg removedAlias (diff rel-) (ready) (leaves 1) (unreadyRequest)) a1',
+      '*** (skg removedAlias (diff (presence rel-) (leaves 1) (ready) (unreadyRequest))) a1',
       '*** (skg alias) a2' },
       run({ '** (skg (aliasFolder changed) (ready))',
-            '*** (skg removedAlias (diff rel-) (ready) (leaves 1)) a1',
+            '*** (skg removedAlias (diff (presence rel-) (leaves 1) (ready))) a1',
             '*** (skg alias) a2' },
           1, readiness.cycle_commit_ready))
     -- A changed node whose only leaf is ready: one leaf, as the server
     -- counts, so nothing is asked.
     assert.are.same({
-      '* (skg (node (id txt) (repo r) (leaves 1 all) (unreadyRequest all))) txt',
-      '** (skg (oldText title) (ready) (leaves 1)) txt' },
-      run({ '* (skg (node (id txt) (repo r) (leaves 1 all))) txt',
-            '** (skg (oldText title) (ready) (leaves 1)) txt' },
+      '* (skg (node (id txt) (repo r) (diff (leaves 1 all) (unreadyRequest all)))) txt',
+      '** (skg (oldText title) (diff (leaves 1) (ready))) txt' },
+      run({ '* (skg (node (id txt) (repo r) (diff (leaves 1 all)))) txt',
+            '** (skg (oldText title) (diff (leaves 1) (ready))) txt' },
           1, readiness.cycle_commit_ready))
   end)
 
   it('asks before a wide unmark, and writes nothing on refusal', function ()
     local lines = {
-      '* (skg (historical (id d) (repo r) (diff node- rel-) (ready node rel) (leaves 2 node rel))) d',
-      '** (skg (oldText title) (ready) (leaves 1)) d' }
+      '* (skg (historical (id d) (repo r) (diff (presence node- rel-) (leaves 2 node rel) (ready node rel)))) d',
+      '** (skg (oldText title) (diff (leaves 1) (ready))) d' }
     assert.are.same(lines,
       run(lines, 1, readiness.cycle_commit_ready_recursive, nil, 'no'))
     assert.are.same({
-      '* (skg (historical (id d) (repo r) (diff node- rel-) (ready node rel) (leaves 2 node rel) (unreadyRequest node rel))) d',
-      '** (skg (oldText title) (ready) (leaves 1) (unreadyRequest)) d' },
+      '* (skg (historical (id d) (repo r) (diff (presence node- rel-) (leaves 2 node rel) (ready node rel) (unreadyRequest node rel)))) d',
+      '** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) d' },
       run(lines, 1, readiness.cycle_commit_ready_recursive, nil, 'yes'))
     -- Unmarking a changed node unmarks every leaf it records: two here.
     local node_lines = {
-      '* (skg (node (id txt) (repo r) (leaves 2 all))) txt',
-      '** (skg (oldText title) (ready) (leaves 1)) txt',
-      '** (skg (homeSkgrepoMove (old x) (new r)) (ready) (leaves 1))' }
+      '* (skg (node (id txt) (repo r) (diff (leaves 2 all)))) txt',
+      '** (skg (oldText title) (diff (leaves 1) (ready))) txt',
+      '** (skg (homeSkgrepoMove (old x) (new r)) (diff (leaves 1) (ready)))' }
     assert.are.same(node_lines,
       run(node_lines, 1, readiness.cycle_commit_ready, nil, 'no'))
   end)
 
   it("warns before a wide unmark by the server's count", function ()
     -- A ready changeset marker over three leaves: asked first.
-    local lines = { '** (skg (changesetMarker content) (ready) (leaves 3 all))' }
+    local lines = { '** (skg (changesetMarker content) (diff (leaves 3 all) (ready)))' }
     assert.are.same(lines,
       run(lines, 1, readiness.cycle_commit_ready, nil, 'no'))
     -- A ready single-leaf headline: nothing is asked.
     assert.are.same(
-      { '** (skg (oldText title) (ready) (leaves 1) (unreadyRequest)) txt' },
-      run({ '** (skg (oldText title) (ready) (leaves 1)) txt' }, 1,
+      { '** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) txt' },
+      run({ '** (skg (oldText title) (diff (leaves 1) (ready))) txt' }, 1,
           readiness.cycle_commit_ready))
   end)
 
   it('unmarks a ready home move, asking only for several', function ()
     local lines = {
-      '* (skg (node (id a) (repo b) (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (ready) (leaves 1))',
-      '** (skg (node (id c) (repo b) writeProtected (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (ready) (leaves 1))' }
+      '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready)))',
+      '** (skg (node (id c) (repo b) writeProtected (diff (leaves 1 all)))) c',
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready)))' }
     for _, line_number in ipairs({ 1, 2 }) do
       assert.are.same({
-        '* (skg (node (id a) (repo b) (leaves 1 all))) a',
-        '** (skg (homeSkgrepoMove (old x) (new b)) (ready) (leaves 1) (unreadyRequest)) ',
-        '** (skg (node (id c) (repo b) writeProtected (leaves 1 all))) c',
-        '*** (skg (homeSkgrepoMove (old x) (new b)) (ready) (leaves 1))' },
+        '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
+        '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready) (unreadyRequest))) ',
+        '** (skg (node (id c) (repo b) writeProtected (diff (leaves 1 all)))) c',
+        '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready)))' },
         run(lines, line_number,
             readiness.toggle_homeSkgrepo_move_commitReady))
     end
     assert.are.same({
-      '* (skg (node (id a) (repo b) (leaves 1 all))) a',
-      '** (skg (homeSkgrepoMove (old x) (new b)) (ready) (leaves 1) (unreadyRequest)) ',
-      '** (skg (node (id c) (repo b) writeProtected (leaves 1 all))) c',
-      '*** (skg (homeSkgrepoMove (old x) (new b)) (ready) (leaves 1) (unreadyRequest)) ' },
+      '* (skg (node (id a) (repo b) (diff (leaves 1 all)))) a',
+      '** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready) (unreadyRequest))) ',
+      '** (skg (node (id c) (repo b) writeProtected (diff (leaves 1 all)))) c',
+      '*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready) (unreadyRequest))) ' },
       run(lines, 1,
           readiness.toggle_homeSkgrepo_move_commitReady_recursive,
           nil, 'yes'))

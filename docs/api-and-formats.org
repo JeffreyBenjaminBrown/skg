@@ -205,7 +205,8 @@ So far there are these endpoints:
        outside U spends =initial_node_limit=; nothing else in the
        buffer spends that budget.
   - Readiness requests (=(readyRequest OBJECTS)= and
-    =(unreadyRequest OBJECTS)=; see "Metadata of the diff view") are
+    =(unreadyRequest OBJECTS)=, the last part of a headline's
+    =(diff ...)=; see "Metadata of the diff view") are
     consumed by a save of any buffer, not only one of the diff view's,
     after its graph edits succeed: each sets or clears the marks of the
     change-forest leaves its headline names, at their current
@@ -1296,37 +1297,47 @@ readiness requests, which the save consumes; saving a buffer reads
 none of the new viewnodes, which are save-inert. The glossary's "Terms
 of the diff view" defines the vocabulary.
 
-*** Presence: =(diff ATOMS)=
-ATOMS are drawn from =node+ node- rel+ rel-=: the node HEAD lacks (=node+=)
-or the worktree lacks (=node-=); the relationship to the viewparent
-that HEAD lacks (=rel+=) or the worktree lacks (=rel-=). It sits inside
-=(node ...)=, =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and
-at top level on alias, id and flag leaves, whose single diff object
-is written =rel+= or =rel-=. A lost alias or ID is a =removedAlias= or
-=removedID= leaf (below), whose =rel-= is display only.
-
-*** Readiness: =(ready OBJECTS)=, =(leaves N OBJECTS)=, =(readyRequest OBJECTS)=, =(unreadyRequest OBJECTS)=
-=(ready OBJECTS)= lists the diff objects (=node=, =rel=) whose
-change-forest leaves are all marked commit-ready; a bare =(ready)=
-marks a single-object leaf, or an aggregate (a folder or changeset
-marker) that is ready. It is absent when nothing is ready.
-=(leaves N OBJECTS)= follows it on every viewnode that names leaves:
-the OBJECTS a request there may name (=node= and/or =rel= on a vognode
-or historical phantom, each worth one leaf; =all= on a changed node
-without a =(diff ...)= fact or on a changeset marker; none where a bare
-request names them), and N, how many leaves a request naming all of
-them touches. The clients read it to build their requests and to
-count the leaves an unmark touches; the server's parser accepts and
-ignores it.
-=(readyRequest OBJECTS)= and =(unreadyRequest OBJECTS)= ask the save
-to set or clear the marks of those leaves; the object =all= names
-every leaf of an aggregate, one level down. These sit where =(diff ...)= sits, and also at top level on the
-properties below other than =bodyDiff=.
+*** Facts and requests: =(diff ...)=
+A headline's facts of the diff view and its readiness request form
+one list:
+#+begin_example
+(diff (presence SIGN...) (leaves N OBJECT...) (ready OBJECT...) (readyRequest OBJECT...))
+#+end_example
+the last part being =(unreadyRequest OBJECT...)= for an unmark. The
+parts come in that order, and a part is absent when it has nothing to
+say; a headline with nothing to say carries no =(diff ...)=, and
+=(diff)= is never written. The form sits inside =(node ...)=,
+=(deleted ...)=, =(unknown ...)= and =(historical ...)=, and at top
+level on alias, id and flag leaves and on the properties below other
+than =bodyDiff=.
+- =(presence SIGN...)= -- SIGNs are taken from =node+ node- rel+ rel-=:
+  the node HEAD lacks (=node+=) or the worktree lacks (=node-=); the
+  relationship to the viewparent that HEAD lacks (=rel+=) or the
+  worktree lacks (=rel-=). On an alias, id or flag leaf, the single
+  diff object is written =rel+= or =rel-=. A lost alias or ID is a
+  =removedAlias= or =removedID= leaf (below), whose =rel-= is display
+  only. Absent when both signs are none.
+- =(leaves N OBJECT...)= -- on every viewnode that names leaves: the
+  OBJECTs a request there may name (=node= and/or =rel= on a vognode
+  or historical phantom, each worth one leaf; =all= on a changed node
+  without a =(presence ...)= part or on a changeset marker; none where
+  a bare request names them), and N, how many leaves a request naming
+  all of them touches. The clients read it to build their requests and
+  to count the leaves an unmark touches; the server's parser accepts
+  and ignores it.
+- =(ready OBJECT...)= -- the diff objects (=node=, =rel=) whose
+  change-forest leaves are all marked commit-ready; a bare =(ready)=
+  marks a single-object leaf, or a changeset marker, that is ready.
+  Absent when nothing is ready.
+- =(readyRequest OBJECT...)= and =(unreadyRequest OBJECT...)= -- ask
+  the save to set or clear the marks of those leaves; the object =all=
+  names every leaf of an aggregate, one level down. At most one, and
+  absent when no request is pending.
 
 *** The diff view's viewnodes
 - =removedAlias=, =removedID= -- in an alias or ID folder: an alias or
   extra ID that HEAD has and the worktree lacks, its headline the alias
-  or the ID, carrying =(diff rel-)=. Saving reads no alias from it and
+  or the ID, carrying =(diff (presence rel-) ...)=. Saving reads no alias from it and
   does not count it among the node's IDs.
 - =(historical (id ID) (repo REPO) ...)= -- a historical phantom: a node
   HEAD has and the worktree lacks, with HEAD's title and body; the
@@ -1350,8 +1361,9 @@ properties below other than =bodyDiff=.
 *** Changed folders
 A partner, alias, ID or flags folder drawn because some relationship of
 it changed is written =(FOLDER changed)=, e.g. =(containerFolder changed)=,
-in place of the bare atom, and is followed by =(ready)= when every
-changed member is ready. Its herald reads "its X changed (this file)"
+in place of the bare atom, and is followed by a bare top-level
+=(ready)= when every changed member is ready. A folder carries no
+=(diff ...)=. Its herald reads "its X changed (this file)"
 or "(other files)" (see the glossary's "in, out").
 
 *** In view stats
@@ -1361,13 +1373,13 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 
 Examples:
 #+begin_example
-(skg (node (id 7) (repo main) (diff node+ rel+) (ready node) (leaves 2 node rel)))
-(skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff rel-) (leaves 1 rel)))
-(skg alias (diff rel+) (leaves 1) (readyRequest))
-(skg removedAlias (diff rel-) (ready) (leaves 1))
-(skg (historical (id 4) (repo main) (diff node- rel-) (leaves 2 node rel)))
-(skg (oldText title) (ready) (leaves 1))
-(skg (changesetMarker content) (leaves 3 all) (readyRequest all))
+(skg (node (id 7) (repo main) (diff (presence node+ rel+) (leaves 2 node rel) (ready node))))
+(skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff (presence rel-) (leaves 1 rel))))
+(skg alias (diff (presence rel+) (leaves 1) (readyRequest)))
+(skg removedAlias (diff (presence rel-) (leaves 1) (ready)))
+(skg (historical (id 4) (repo main) (diff (presence node- rel-) (leaves 2 node rel))))
+(skg (oldText title) (diff (leaves 1) (ready)))
+(skg (changesetMarker content) (diff (leaves 3 all) (readyRequest all)))
 (skg (subscriberFolder changed) (ready))
 #+end_example
 

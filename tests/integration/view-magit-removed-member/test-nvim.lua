@@ -7,7 +7,7 @@
 --
 -- Phase 1: Open the diff view.
 -- Phase 2: In its "all changes" buffer, b appears under a as a
---          removed member: write-protected, tagged (diff rel-).
+--          removed member: write-protected, tagged (diff (presence rel-)).
 -- Phase 3: Call goto_git.goto_in_git_parent on b.
 -- Phase 4: Verify a plain-diff buffer opened on a.skg (the parent)
 --          and that b's removal is present in it.
@@ -56,7 +56,7 @@ end
 ---@return boolean does LINE draw b as a removed member?
 local function is_removed_member_line (line)
   return line:find('(id b)', 1, true) ~= nil
-     and line:find('(diff rel-)', 1, true) ~= nil
+     and line:find('(diff (presence rel-)', 1, true) ~= nil
 end
 
 print('=== SKG View-Magit-Removed-Member Integration Test ===')

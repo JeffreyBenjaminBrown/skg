@@ -93,7 +93,7 @@ describe('skg.id_search navigation', function ()
 
   it('reads the id and repo of a historical phantom', function ()
     local sexp = require('skg.sexpr.parse').read(
-      '(skg (historical (id gone) (repo main) (diff node- rel-)))')
+      '(skg (historical (id gone) (repo main) (diff (presence node- rel-))))')
     assert.are.equal('gone', id_search.extract_id_from_metadata_sexp(sexp))
     assert.are.equal('main', id_search.extract_repo_from_metadata_sexp(sexp))
   end)

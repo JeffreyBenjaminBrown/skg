@@ -158,7 +158,7 @@ At each editable occurrence's visit, after the content reconciler,
 'process_unrestrictedVognode_changes' draws the node's change
 viewnodes:
 - it tags each content member with the presence of its node and of
-  its relationship ('(diff node+ ...)', '(diff rel- ...)'), and draws a
+  its relationship ('(presence node+ ...)', '(presence rel- ...)'), and draws a
   new member outside U as a write-protected member drawn without its
   content (one that was editable when the rerender began stays
   editable);
@@ -272,7 +272,7 @@ what the user added survives.
 Below what the diff view drew -- where its reconciler descends, under
 a member of a changed folder (around the member role tree) and under a
 historical phantom -- an unrestricted vognode born 'Unremarkable' that
-carries no '(diff ...)' fact and is not the member of the folder it
+carries no '(presence ...)' fact and is not the member of the folder it
 stands in is the user's ('is_the_users_viewnode' in
 'server/diff_view/fresh_drawing.rs'). Its reconciler leaves it where
 it stands, ahead of what it draws there. A role graft is the server's:
@@ -325,7 +325,7 @@ list orders, come sorted by ID. So every drawing of the union of the
 two graphs places a removed entry by the LCS.
 ** One encoding of a removed relationship
 A removed member whose node survives is an unrestricted vognode drawn
-as a non-member, write-protected, with the fact '(diff rel-)': its
+as a non-member, write-protected, with the fact '(presence rel-)': its
 relationship to its viewparent exists in the before-graph only. That
 is the one encoding of a removed relationship, wherever it stands: in
 content, in a partner folder, and in a historical phantom's old
@@ -339,7 +339,7 @@ membership the save reads (an unknown phantom there would read back
 as a member); its leaf in content is under the content changeset
 marker. In a write-protected-set folder and in a historical phantom's
 old content, where nothing reads back, it is an unknown phantom with
-'(diff rel-)'. A former member is any viewnode standing for a
+'(presence rel-)'. A former member is any viewnode standing for a
 before-only relationship, historical phantoms included.
 
 * Editability in the diff view
@@ -434,14 +434,23 @@ content relationship leaves of its node; a member's existence leaf
 belongs to the member's own file. A file whose only change is order
 has no leaf and is ready.
 ** Facts on the wire
-'(ready OBJECTS)' is a display fact the server writes after
+A headline's facts and its readiness request form one form, '(diff
+(presence SIGN...) (leaves N OBJECT...) (ready OBJECT...) REQUEST)',
+each part present only when it has something to say
+('change_fact_forms' in 'server/org_to_text.rs'; the grammar is in
+'docs/api-and-formats.org', "Facts and requests"). It sits inside the
+node's or phantom's form, or at top level on a property. A changed
+folder carries no '(diff ...)': its readiness is a bare top-level
+'(ready)'.
+
+The part '(ready OBJECT...)' is a display fact the server writes after
 completion ('set_ready_facts_in_viewforest'): the diff objects
 ('node', 'rel') whose leaves are all marked; a bare '(ready)' on a
 headline that names one leaf, or on a ready aggregate. Nothing reads
 it at save.
 
-Beside it, a headline that names leaves
-carries '(leaves N OBJECT...)': N is the number of leaves a request
+Before it, a headline that names leaves
+carries the part '(leaves N OBJECT...)': N is the number of leaves a request
 naming every listed object would touch, and the OBJECTs are those a
 request on this headline may name ('node' and/or 'rel' on a vognode or
 phantom, each worth one leaf; 'all' on an aggregate, worth N; none on
@@ -451,7 +460,8 @@ display-only, and the clients read it instead of keeping tables of
 headline kinds.
 ** Readiness requests and gestures
 A gesture writes readiness requests, '(readyRequest OBJECTS)' or
-'(unreadyRequest OBJECTS)', into headline metadata and saves; the save
+'(unreadyRequest OBJECTS)', as the last part of a headline's '(diff
+...)' (creating the form if the headline lacks one) and saves; the save
 consumes them after its graph edits succeed (not when it stops for a
 confirmation), in any buffer, marking or unmarking the leaves each
 headline names at their current fingerprints. A request naming no

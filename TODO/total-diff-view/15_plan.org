@@ -1033,7 +1033,7 @@ fields" above. Tests: the Rust suite; 'tests/unit/completion_context.rs'
 asserts the two fields of the diff-view constructor and 'None' of the
 others.
 
-** TODO Slice 3: the diff view's facts nest under '(diff ...)'
+** DONE Slice 3: the diff view's facts nest under '(diff ...)'
 Make the changes under "The diff view's facts nest under '(diff ...)'"
 above, server first (printer, parser, heralds, rendering cases), then
 both clients, then the docs. Tests: a round trip in

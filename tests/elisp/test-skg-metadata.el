@@ -129,7 +129,7 @@ and leave the headline's own metadata alone."
      (concat
       "* (skg (node (id 1) (repo public))) root\n"
       "body line\n"
-      "** (skg alias (diff rel+)) alias title\n"
+      "** (skg alias (diff (presence rel+))) alias title\n"
       "** plain child\n"))
     (concat
      "* root\n"

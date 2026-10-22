@@ -199,6 +199,14 @@ shows a =✓= when everything under it is ready. =request:ready= and
 =request:unready=, with =:node=, =:rel= or =:all=, are pending readiness
 requests, consumed by the next save.
 
+These heralds render the headline's one =(diff ...)= form (see
+'docs/api-and-formats.org', "Facts and requests"): the signs come
+from its =(presence ...)= part, each =✓= from its =(ready ...)= part,
+and the request from its last part; its =(leaves ...)= part shows
+nothing. A changed folder's =✓= comes from its bare top-level
+=(ready)=. The rules match each part once per diff object, so a =✓=
+follows its own object whatever the raw order of the parts.
+
 A historical phantom (a node the worktree lacks, drawn with HEAD's
 text) carries =☮=. The properties the view adds are labels: =old title
 and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD

@@ -8,11 +8,12 @@
 ;;; redrawn and the readiness summary.
 ;;;
 ;;; The server says which leaves (single changes) a headline names:
-;;; it writes '(leaves N OBJECT...)' beside '(ready ...)'. The OBJECTs
+;;; it writes '(leaves N OBJECT...)' in the headline's '(diff ...)'
+;;; form, beside '(ready ...)'. The OBJECTs
 ;;; are those a request on the headline may name: 'node' (∃, its
 ;;; existence) and/or 'rel' (~, its relationship to its viewparent) on
 ;;; a vognode or phantom, each worth one leaf; 'all' on an aggregate (a
-;;; changed node without a '(diff ...)' fact, a changeset marker); none
+;;; changed node without a '(presence ...)' fact, a changeset marker); none
 ;;; on a headline that names one leaf. N is how many leaves a request
 ;;; naming every listed object touches. A folder drawn because of a
 ;;; change names no leaf itself; a gesture on it acts on its children.
@@ -97,15 +98,18 @@ its move. Works on write-protected occurrences too."
 ;;; Reading a headline's change facts
 
 (defun skg--readiness-host (metadata-sexp)
-  "The list in METADATA-SEXP that holds its change facts: the form
-among its elements that holds its '(leaves ...)' fact, if one does,
-else the whole sexp."
+  "The list in METADATA-SEXP that holds its '(diff ...)' form: the
+form among its elements that holds one, as a vognode's or a
+phantom's does, if one does, else the whole sexp, as a property's."
   (or (seq-find (lambda (element)
                   (and (consp element)
-                       (seq-find (lambda (fact) (eq (car-safe fact) 'leaves))
-                                 (cdr element))))
+                       (assq 'diff (cdr element))))
                 (cdr metadata-sexp))
       metadata-sexp))
+
+(defun skg--readiness-diff-form (metadata-sexp)
+  "The '(diff ...)' form of METADATA-SEXP, or nil."
+  (assq 'diff (cdr (skg--readiness-host metadata-sexp))))
 
 (defun skg--readiness-vognode-p (metadata-sexp)
   "Non-nil when METADATA-SEXP holds its change facts in a nested form,
@@ -113,9 +117,8 @@ as a vognode or a phantom does."
   (not (eq (skg--readiness-host metadata-sexp) metadata-sexp)))
 
 (defun skg--readiness-form (metadata-sexp key)
-  "The (KEY ...) form among METADATA-SEXP's change facts, or nil."
-  (seq-find (lambda (element) (eq (car-safe element) key))
-            (cdr (skg--readiness-host metadata-sexp))))
+  "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
+  (assq key (cdr (skg--readiness-diff-form metadata-sexp))))
 
 (defun skg--readiness-leaves (metadata-sexp)
   "The '(leaves N OBJECT...)' fact of the headline with METADATA-SEXP,
@@ -161,7 +164,8 @@ drawn."
     (cond ((skg--readiness-aggregate-node-p metadata-sexp) nil)
           (leaves (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
           ((skg--readiness-changed-folder-p metadata-sexp)
-           (skg--readiness-form metadata-sexp 'ready)))))
+           ;; A folder's bare '(ready)' stands outside any '(diff ...)'.
+           (assq 'ready (cdr metadata-sexp))))))
 
 (defun skg--readiness-home-move (metadata-sexp)
   "The (OLD NEW) skgrepos of METADATA-SEXP when it is a home move."
@@ -319,15 +323,22 @@ leaf, or is a changed folder, is ready, and at least one does."
 
 (defun skg--write-readiness-request (ready objects)
   "Replace the readiness request of the headline at point with one
-that marks (READY non-nil) or unmarks the leaves on OBJECTS."
+that marks (READY non-nil) or unmarks the leaves on OBJECTS. The
+request is the last part of the headline's '(diff ...)' form, which
+lies under '(node ...)' or another phantom's form, or at top level
+on a property. A headline without the form gets one."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
          (host (skg--readiness-host metadata-sexp))
          (request (cons (if ready 'readyRequest 'unreadyRequest) objects))
-         (edits `((DELETE (readyRequest) (unreadyRequest)) ,request)))
+         (diff-edit
+          (if (skg--readiness-diff-form metadata-sexp)
+              `(diff (DELETE (readyRequest) (unreadyRequest)) ,request)
+            ;; A missing form is appended whole, so it holds no DELETE.
+            `(diff ,request))))
     (skg-edit-metadata-at-point
      (if (eq host metadata-sexp)
-         `(skg ,@edits)
-       `(skg (,(car host) ,@edits))))))
+         `(skg ,diff-edit)
+       `(skg (,(car host) ,diff-edit))))))
 
 ;;; The readiness summary
 

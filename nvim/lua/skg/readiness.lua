@@ -5,8 +5,8 @@
 -- them, setting or clearing the marks, and answers with the buffer
 -- redrawn and the readiness summary.
 -- The Lua port of elisp/skg-readiness.el, which describes how the
--- server's '(leaves N OBJECT...)' fact says which leaves a headline
--- names. Neovim has no prefix argument, so each recursive form is its
+-- '(leaves N OBJECT...)' part of the server's '(diff ...)' form says
+-- which leaves a headline names. Neovim has no prefix argument, so each recursive form is its
 -- own command.
 -- It also formats the readiness summary, which the save,
 -- stage-and-commit and integrate-unshown-changes show.
@@ -31,21 +31,36 @@ local function head_name (value)
   return nil
 end
 
----The list in METADATA_SEXP that holds its change facts: the form
----among its elements that holds its '(leaves ...)' fact, if one does,
----else the whole sexp.
+---The element of LIST, after its head, whose head is KEY, or nil.
+---@param list any
+---@param key string
+---@return any|nil
+local function child_with_head (list, key)
+  for i = 2, #list do
+    if head_name(list[i]) == key then return list[i] end
+  end
+  return nil
+end
+
+---The list in METADATA_SEXP that holds its '(diff ...)' form: the
+---form among its elements that holds one, as a vognode's or a
+---phantom's does, if one does, else the whole sexp, as a property's.
 ---@param metadata_sexp any
 ---@return any
 function M.host (metadata_sexp)
   for i = 2, #metadata_sexp do
     local element = metadata_sexp[i]
-    if sexpr.is_list(element) then
-      for j = 2, #element do
-        if head_name(element[j]) == 'leaves' then return element end
-      end
-    end
+    if sexpr.is_list(element) and child_with_head(element, 'diff') then
+      return element end
   end
   return metadata_sexp
+end
+
+---The '(diff ...)' form of METADATA_SEXP, or nil.
+---@param metadata_sexp any
+---@return any|nil
+function M.diff_form (metadata_sexp)
+  return child_with_head(M.host(metadata_sexp), 'diff')
 end
 
 ---@param metadata_sexp any
@@ -55,16 +70,14 @@ function M.vognode_p (metadata_sexp)
   return M.host(metadata_sexp) ~= metadata_sexp
 end
 
----The (KEY ...) form among METADATA_SEXP's change facts, or nil.
+---The (KEY ...) part of METADATA_SEXP's '(diff ...)' form, or nil.
 ---@param metadata_sexp any
 ---@param key string
 ---@return any|nil
 function M.form (metadata_sexp, key)
-  local host = M.host(metadata_sexp)
-  for i = 2, #host do
-    if head_name(host[i]) == key then return host[i] end
-  end
-  return nil
+  local diff = M.diff_form(metadata_sexp)
+  if not diff then return nil end
+  return child_with_head(diff, key)
 end
 
 ---The atoms after the head of FORM, as strings.
@@ -148,8 +161,9 @@ function M.ready_p (metadata_sexp)
   if M.aggregate_node_p(metadata_sexp) then return false end
   local leaves = M.leaves(metadata_sexp)
   if leaves then return M.objects_ready_p(metadata_sexp, leaves.objects) end
+  -- A folder's bare '(ready)' stands outside any '(diff ...)'.
   return M.changed_folder_p(metadata_sexp)
-         and M.form(metadata_sexp, 'ready') ~= nil
+         and child_with_head(metadata_sexp, 'ready') ~= nil
 end
 
 ---The {old, new} skgrepos of METADATA_SEXP when it is a home move.
@@ -195,7 +209,10 @@ end
 -- ── the gestures ───────────────────────────────────────────────────
 
 ---Replace the readiness request of the headline at LINE_NUMBER with
----one that marks (READY true) or unmarks the leaves on OBJECTS.
+---one that marks (READY true) or unmarks the leaves on OBJECTS. The
+---request is the last part of the headline's '(diff ...)' form, which
+---lies under '(node ...)' or another phantom's form, or at top level
+---on a property. A headline without the form gets one.
 ---@param line_number integer
 ---@param ready boolean
 ---@param objects string[]
@@ -207,16 +224,18 @@ function M.write_request (line_number, ready, objects)
   for _, object in ipairs(objects) do
     table.insert(request, sexpr.symbol(object))
   end
-  local edits = { { sexpr.symbol('DELETE'),
-                    { sexpr.symbol('readyRequest') },
-                    { sexpr.symbol('unreadyRequest') } },
-                  request }
+  local diff_edit = { sexpr.symbol('diff') }
+  if M.diff_form(metadata_sexp) then
+    table.insert(diff_edit, { sexpr.symbol('DELETE'),
+                              { sexpr.symbol('readyRequest') },
+                              { sexpr.symbol('unreadyRequest') } })
+  end -- else a missing form is appended whole, so it holds no DELETE
+  table.insert(diff_edit, request)
   local instruction = { sexpr.symbol('skg') }
   if host == metadata_sexp then
-    vim.list_extend(instruction, edits)
+    table.insert(instruction, diff_edit)
   else
-    table.insert(instruction,
-                 vim.list_extend({ host[1] }, edits)) end
+    table.insert(instruction, { host[1], diff_edit }) end
   metadata.edit_metadata_at_line(line_number, instruction)
 end
 

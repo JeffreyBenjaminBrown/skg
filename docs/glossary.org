@@ -804,13 +804,14 @@ live graph.
 The *union walk* is the API over the graph straddle that answers
 questions about the union of its two graphs. Each node and each
 relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
-'OnlyAfter'. A view shows a presence as '(diff ...)' atoms: 'node+' and
-'node-' on the node itself, 'rel+' and 'rel-' on its relationship to
-its viewparent.
+'OnlyAfter'. A view shows a presence as the atoms of the '(presence
+...)' part of a headline's '(diff ...)' form: 'node+' and 'node-' on
+the node itself, 'rel+' and 'rel-' on its relationship to its
+viewparent.
 
 *** diff object, diff aspect
 
-A *diff object* is what a '(diff ...)' fact or a readiness request
+A *diff object* is what a part of a '(diff ...)' form or a readiness request
 names on a headline: the node itself ('node'), or the node's
 relationship to its viewparent ('rel'). There are exactly these two.
 A change-forest leaf about a relationship has the relationship as its
@@ -866,7 +867,8 @@ An aggregate -- a folder, a changeset marker, a node, a file, the
 whole changeset -- is ready iff every one of its leaves that can be
 ready is ready. That derived value is its *derived commit-readiness
 aggregate*, or "its readiness" where the context is clear. A view
-shows it as '(ready ...)', which nothing reads at save.
+shows it as '(ready ...)' (in the '(diff ...)' form, or bare on a
+folder), which nothing reads at save.
 
 *** changeset marker
 
@@ -887,7 +889,7 @@ content position draws its old content under it.
 *** removed member, former member
 
 A *removed member* is an unrestricted vognode drawn as a non-member,
-write-protected, with the fact '(diff rel-)': its node survives, but
+write-protected, with the fact '(presence rel-)': its node survives, but
 its relationship to its viewparent exists in the before-graph only.
 It is drawn so in content, in a partner folder and in a historical
 phantom's old content alike. A
@@ -918,8 +920,8 @@ A partner, alias, ID or flags folder the diff view draws because its
 membership changed since HEAD. It is written '(FOLDER changed)' in
 place of the bare folder atom, holds the members of either graph
 tagged by presence, and reads "its X changed (this file)" or "(other
-files)" (see "in, out"). It shows '(ready)' when every changed member
-is ready.
+files)" (see "in, out"). It shows a bare top-level '(ready)' when
+every changed member is ready, and carries no '(diff ...)'.
 
 *** member role tree
 
@@ -971,7 +973,8 @@ counts. A save never makes them editable; C-c r u integrates them.
 *** readiness request, readiness gesture
 
 A *readiness request* is a metadata form, '(readyRequest OBJECTS)' or
-'(unreadyRequest OBJECTS)', that the save consumes, after its graph
+'(unreadyRequest OBJECTS)', the last part of a headline's '(diff ...)'
+form, that the save consumes, after its graph
 edits succeed, to set or clear the marks of a headline's leaves. A
 *readiness gesture* is a gesture (C-c r r, C-c r h and their
 recursive forms) that writes readiness requests on one or many
