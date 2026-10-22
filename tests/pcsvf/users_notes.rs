@@ -20,13 +20,13 @@ use skg::types::env::SkgEnv;
 use std::error::Error;
 
 /// A new headline of the user's that affects no parent, 'stars' deep.
-/// It names its skgrepo: below a phantom or a folder there is no
-/// unrestricted parent to inherit one from.
+/// It names no skgrepo: it inherits that of its nearest unrestricted
+/// ancestor, through a phantom or a folder.
 fn note (
   stars : usize,
   title : &str,
 ) -> String {
-  format! ( "{} (skg (node (repo main) (affectsParent false))) {}",
+  format! ( "{} (skg (node (affectsParent false))) {}",
             "*" . repeat (stars), title ) }
 
 /// Save 'buffer', then save what the save drew: both without errors,

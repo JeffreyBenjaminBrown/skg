@@ -21,11 +21,12 @@ use uuid::Uuid;
 
 /// Which nodes enrichment INVENTED data for, as opposed to reading it
 /// from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
-/// 'inherited_repo_nodes' had no skgrepo (so they inherited their
-/// parent's). Downstream policy needs the distinction the enriched
-/// tree itself has erased -- e.g. a NEW node whose INHERITED skgrepo is
-/// foreign is not a foreign-creation error but a rider on its
-/// parent's fork, whereas an explicitly foreign new node is the error.
+/// 'inherited_skgrepo_nodes' had no skgrepo (so they inherited that of
+/// their nearest unrestricted ancestor). Downstream policy needs the
+/// distinction the enriched tree itself has erased -- e.g. a NEW node
+/// whose INHERITED skgrepo is foreign is not a foreign-creation error
+/// but a rider on its ancestor's fork, whereas an explicitly foreign
+/// new node is the error.
 /// It also needs a fact the tree does not show:
 /// 'writeProtected_skgrepos_after_save' (see
 /// 'skgrepos_after_save_of_writeProtected_occurrences').
@@ -115,7 +116,7 @@ fn finish_missing_info_enrichment(
       make_alias_if_appropriate (&mut node)?;
       fill_skgrepo_from_graph_map (&mut node, skgrepo_of_skgid);
       let skgrepo_inherited : bool =
-        inherit_parent_skgrepo_if_possible (
+        inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible (
           &mut node, &writeProtected_skgrepos_after_save )?;
       let id_assigned : bool =
         assign_new_skgid_if_absent (&mut node)?; // Do this *after* PID replacement, so fresh UUIDs do not trigger a pointless graph lookup.
@@ -184,13 +185,21 @@ fn make_alias_if_appropriate(
                       relRepo_request: t . relRepo_request . clone () } ); }}
   Ok (( )) }
 
-/// Inherit parent's skgrepo if both:
+/// Inherit a skgrepo if both:
 /// - this is a repoless UnrestrictedVognode
-/// - its parent is an UnrestrictedVognode with a skgrepo
-/// A write-protected parent's skgrepo is the one its ID will have after
-/// this save (WRITEPROTECTED_SKGREPOS_AFTER_SAVE), not the one it shows.
+/// - its nearest ancestor that is an UnrestrictedVognode has a skgrepo.
+/// The walk rootward passes through phantoms and folders, which carry
+/// no home skgrepo of their own (and never show the home herald), so a
+/// new headline below a historical phantom or in a partner folder
+/// inherits from the vognode above them. Any other kind ends the walk
+/// and supplies none: the buffer root (so a bare headline at top level
+/// is refused at validation), a dead viewnode, a restricted vognode, a
+/// property.
+/// A write-protected ancestor's skgrepo is the one its ID will have
+/// after this save (WRITEPROTECTED_SKGREPOS_AFTER_SAVE), not the one it
+/// shows.
 /// Returns whether it inherited one.
-fn inherit_parent_skgrepo_if_possible(
+fn inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible (
   node                               : &mut NodeMut<MpViewnode>,
   writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,
 ) -> Result<bool, String> {
@@ -200,23 +209,42 @@ fn inherit_parent_skgrepo_if_possible(
         => t . home_skgrepo . is_none(),
       _ => false, };
   if needs_skgrepo {
-    let parent_skgrepo : Option<SkgrepoName> =
-      node . parent() . and_then(|mut p| {
-        match &p . value() . kind {
-          MpViewnodeKind::Vognode (MpVognode::Unrestricted (pt))
-            => if pt . is_writeProtected () {
-                 pt . skgid . as_ref ()
-                 . and_then ( |skgid| writeProtected_skgrepos_after_save
-                                      . get (skgid) . cloned () )
-                 . or_else ( || pt . home_skgrepo . clone () )
-               } else { pt . home_skgrepo . clone () },
-          _ => None, }} );
-    if let Some (skgrepo) = parent_skgrepo {
+    let treeid : NodeId = node . id ();
+    let ancestor_skgrepo : Option<SkgrepoName> =
+      skgrepo_of_nearest_unrestricted_ancestor (
+        node . tree () . get (treeid) . unwrap (),
+        writeProtected_skgrepos_after_save );
+    if let Some (skgrepo) = ancestor_skgrepo {
       if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         = &mut node . value() . kind
       { t . home_skgrepo = Some (skgrepo);
         return Ok (true); }}}
   Ok (false) }
+
+/// The skgrepo 'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'
+/// gives a repoless node: that of its nearest UnrestrictedVognode
+/// ancestor, walking through phantoms and folders, or None.
+fn skgrepo_of_nearest_unrestricted_ancestor (
+  node                               : NodeRef<MpViewnode>,
+  writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,
+) -> Option<SkgrepoName> {
+  for ancestor in node . ancestors () {
+    match &ancestor . value () . kind {
+      MpViewnodeKind::Vognode (MpVognode::Unrestricted (at)) =>
+        return if at . is_writeProtected () {
+          at . skgid . as_ref ()
+          . and_then ( |skgid| writeProtected_skgrepos_after_save
+                               . get (skgid) . cloned () )
+          . or_else ( || at . home_skgrepo . clone () )
+        } else { at . home_skgrepo . clone () },
+      MpViewnodeKind::Vognode (MpVognode::Phantom (_))
+        | MpViewnodeKind::PartnerFolder (_)
+        | MpViewnodeKind::PropertyFolder (_) => continue,
+      MpViewnodeKind::Vognode (MpVognode::Restricted (_))
+        | MpViewnodeKind::Property (_)
+        | MpViewnodeKind::BufferRoot
+        | MpViewnodeKind::DeadViewnode => return None, }}
+  None }
 
 /// Look up, from the graph, the skgrepo of every repoless,
 /// write-protected UnrestrictedVognode that already carries an id (ids are pids
@@ -237,7 +265,7 @@ fn skgrepos_for_repoless_ided_nodes_from_graph (
 
 /// Collect the ids of repoless, WRITE_PROTECTED UnrestrictedVognodes that
 /// already carry an id. Editable nodes are excluded on purpose (see
-/// 'resolve_repos_for_repoless_ided_nodes').
+/// 'fill_skgrepo_from_graph_map').
 fn collect_repoless_unrestricted_skgids (
   node_ref : NodeRef<MpViewnode>,
   skgids      : &mut HashSet<ID>,
@@ -252,11 +280,11 @@ fn collect_repoless_unrestricted_skgids (
     collect_repoless_unrestricted_skgids ( child, skgids ); }}
 
 /// If the node is a repoless, WRITE_PROTECTED UnrestrictedVognode whose id the
-/// graph resolved, set its skgrepo from 'repo_of_id' (built before the
-/// DFS). This is how a bare folder-member reference acquires the skgrepo of
-/// the existing node it names -- something
-/// 'inherit_parent_repo_if_possible' cannot do, since the viewparent
-/// is a non-vognode rather than an UnrestrictedVognode with a skgrepo. The
+/// graph resolved, set its skgrepo from 'skgrepo_of_skgid' (built before
+/// the DFS). This is how a bare folder-member reference acquires the
+/// skgrepo of the existing node it names, rather than the one
+/// 'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'
+/// would give it from the vognode above its folder. The
 /// write-protected gate matches the folder above, so an editable node
 /// sharing an id with a write-protected one is never filled.
 fn fill_skgrepo_from_graph_map (

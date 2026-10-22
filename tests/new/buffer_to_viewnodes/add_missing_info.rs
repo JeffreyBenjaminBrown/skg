@@ -7,6 +7,8 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   na_affectsParent_under_visible_parent_becomes_isContainer};
+use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
+use skg::types::errors::BufferValidationError;
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
@@ -42,7 +44,88 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
         &s . config ) . await ?;
+      s . reset ("test_new_headline_inherits_through_phantoms_and_folders",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
+      test_new_headline_inherits_through_phantoms_and_folders (
+        &s . config ) . await ?;
+      s . reset ("test_new_headline_at_top_level_is_refused",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
+      test_new_headline_at_top_level_is_refused (
+        &s . config ) . await ?;
       Ok (( )) } )) }
+
+/// The 'new note' headline of 'viewforest': its skgrepo and its
+/// 'affectsParent'.
+fn new_note_skgrepo_and_affectsParent (
+  viewforest : &MpViewForest,
+) -> (Option<SkgrepoName>, AffectsParent) {
+  viewforest . nodes ()
+    . find_map ( |node_ref| match &node_ref . value () . kind {
+        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+          if t . title == "new note"
+          => Some (( t . home_skgrepo . clone (), t . affectsParent )),
+        _ => None } )
+    . expect ("the new note should be in the forest") }
+
+/// A headline without '(repo NAME)' inherits the skgrepo of its
+/// nearest ancestor that is an unrestricted vognode, through a
+/// historical phantom or a partner folder. A non-member note in a
+/// folder stays a non-member. Below a write-protected occurrence the
+/// skgrepo is the one its ID will have after the save, as for a
+/// child. (Fixture node 'root-pid' lives in 'main'; 'alt' is a skgrepo
+/// no fixture node has, so only inheritance can supply it.)
+async fn test_new_headline_inherits_through_phantoms_and_folders (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  for (input, expected_skgrepo, expected_affectsParent) in [
+    ( // Under a historical phantom under an editable node.
+      indoc! {"
+        * (skg (node (id editable) (repo alt))) editable
+        ** (skg (historical (id gone) (repo main) (diff (presence node- rel-)))) gone
+        *** new note
+      "}, "alt", AffectsParent::True ),
+    ( // In a partner folder of an editable node, as a non-member.
+      indoc! {"
+        * (skg (node (id editable) (repo alt))) editable
+        ** (skg containerFolder)
+        *** (skg (node (affectsParent false))) new note
+      "}, "alt", AffectsParent::False ),
+    ( // In a partner folder under a write-protected occurrence whose
+      // shown skgrepo is stale: the graph says 'main'.
+      indoc! {"
+        * (skg (node (id other) (repo alt))) other
+        ** (skg (node (id root) (repo stale) writeProtected)) root again
+        *** (skg containerFolder)
+        **** (skg (node (affectsParent false))) new note
+      "}, "main", AffectsParent::False ), ] {
+    let mut viewforest : MpViewForest =
+      org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+    add_missing_info_to_viewforest (
+      &mut viewforest, &config) ?;
+    assert_eq! ( new_note_skgrepo_and_affectsParent (&viewforest),
+                 ( Some (SkgrepoName::from (expected_skgrepo)),
+                   expected_affectsParent ),
+                 "new note, in:\n{}", input ); }
+  Ok (( )) }
+
+/// The buffer root supplies no skgrepo: a headline without '(repo
+/// NAME)' at top level stays repoless, and validation refuses it.
+async fn test_new_headline_at_top_level_is_refused (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let mut viewforest : MpViewForest =
+    org_to_uninterpreted_viewforest ("* new note\n") . unwrap() . 0;
+  add_missing_info_to_viewforest (
+    &mut viewforest, &config) ?;
+  assert_eq! ( new_note_skgrepo_and_affectsParent (&viewforest) . 0,
+               None );
+  let errors : Vec<BufferValidationError> =
+    find_buffer_errors_for_saving (&viewforest, config) ?;
+  assert! ( errors . iter () . any ( |error| matches! (
+              error, BufferValidationError::LocalStructureViolation (message, _)
+              if message == "UnrestrictedVognode must have a repo that exists in the config." )),
+            "{:?}", errors );
+  Ok (( )) }
 
 /// A new child of a write-protected occurrence inherits the skgrepo its
 /// parent's ID will have after the save, not the (stale) one that
@@ -85,9 +168,10 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a
-/// 'subscribeeFolder' non-vognode, with no skgrepo. Its viewparent is a
-/// non-vognode, so 'inherit_parent_repo_if_possible' cannot supply a
-/// skgrepo; enrichment must resolve it from the graph by id instead.
+/// 'subscribeeFolder' non-vognode, with no skgrepo.
+/// 'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'
+/// would give it the recorder's skgrepo; enrichment must resolve the
+/// node's own from the graph by id instead.
 /// Before the fix this node stayed repoless and the save was refused
 /// with "UnrestrictedVognode must have a repo that exists in the config".
 async fn test_repoless_folder_member_gets_graph_skgrepo (

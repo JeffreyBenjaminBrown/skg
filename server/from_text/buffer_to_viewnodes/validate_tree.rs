@@ -32,7 +32,8 @@ use std::collections::HashSet;
 /// - IDs have been replaced with PIDs, per
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
-/// - All nodes have skgrepos, per 'inherit_parent_repo_if_possible'.
+/// - All nodes have skgrepos, per
+///   'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'.
 ///
 /// This is the maybePlaced tree validation stage: metadata is complete,
 /// but role classification, save-intent extraction, and disk
