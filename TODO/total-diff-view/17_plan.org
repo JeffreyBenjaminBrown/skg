@@ -1002,7 +1002,7 @@ suite and the integration suite.
 ** DONE Slice 3: kept children keep their order
 The reconcilers, the sorted walk, the sorted lock list, the
 tests, the problem entry moved. Run all four suites.
-** TODO Slice 4: convert, then prune
+** DONE Slice 4: convert, then prune
 'convert_unwarranted_child', the older reconciler and the
 folders, duplicates, the validators, folder adoption, the switch
 prepass, hidden content, orphaned folders, the one rule in the

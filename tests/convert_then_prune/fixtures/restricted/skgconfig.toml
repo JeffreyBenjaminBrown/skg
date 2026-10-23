@@ -1,0 +1,10 @@
+tantivy_folder = "/tmp/placeholder"
+default_repo_set = "public"
+
+[[repos]]
+name = "public"
+path = "owned/public"
+
+[[repos]]
+name = "private"
+path = "owned/private"

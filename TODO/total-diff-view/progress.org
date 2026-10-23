@@ -3301,3 +3301,92 @@ fails at baseline. Over TCP on a scratch instance: n's
 subscriberFolder, its members swapped to t, r and a non-member note
 typed after them, saves back in that order with the note last, and
 the result saves back byte-identical.
+** Slice 4: deviations
+*** the generic reconciler takes a preferred copy and a converter
+'complete_managed_children' ('server/update_buffer/util.rs') takes
+'preferred_copy' (which of several copies of one key to keep) and
+'convert_unwarranted' (what to do with a stale or duplicate child) in
+place of the focus and keep closures, and detaches nothing; the
+viewnode version passes "editable" and 'convert_unwarranted_child',
+the leaf test being "has no children". 'convert_unwarranted_child'
+returns a 'Conversion' ('DeadLeaf' or 'Parked'), so 'RepairSummary'
+keeps its categories: a dead leaf counts as removed (stale or
+duplicate), anything parked as made a non-member, and the repair
+warnings read as before. With 'KeptChildOrder::FollowsGoal' every
+child that is not a kept member (the unmanaged and the converted, in
+their order) goes before the members.
+*** a phantom or restricted vognode with a subtree becomes dead
+The plan says a vognode with a subtree becomes a write-protected
+non-member. Only an unrestricted vognode can be one, so a stale
+unknown or historical phantom, or a restricted vognode, holding a
+subtree becomes a dead viewnode, as the keep path made it.
+*** the conversion write-protects and empties the parked vognode
+Besides 'writeProtected' and 'affectsParent' false, the parked vognode
+loses its change facts and readiness request, and its member children
+become non-members ('make_member_children_nonMembers'), since the save
+refuses a member under a write-protected occurrence.
+*** the diff view's reconciler converts what it keeps
+'keep_stale_child_holding_the_users' is gone; the diff view's
+reconciler calls 'convert_unwarranted_child' where it used it (a stale
+child holding something of the user's), and still detaches the rest;
+slice 5 removes that. So a removed member kept for a note is now
+write-protected and keeps its birth. No diff-view test changed.
+*** folder adoption, and a member that was a removed member
+'mark_goal_children_as_folder_members' now runs before the reconciler
+and adopts, per goal item no managed child stands for (a historical
+one aside), the unrestricted non-member standing for its node (by the
+live graph's resolution), the editable one else the first. Its old
+second job, marking a removed member that is a member again, moved to
+'apply_goal_shapes' (the 'Member' arm sets 'affectsParent' true).
+*** the role graft's birth
+The problem entry also saw the root's role graft b lose its birth.
+That is the birth check ('validate_affectsParent_relationships_in_straddle'),
+which resets a role graft's birth when its relationship is gone; it
+is right, and stays. The test asserts nothing about it.
+*** the switch: an unknown phantom without a relRepo
+An unknown phantom carries no relRepo when its relationship is
+recorded in its recorder's home, so the prepass reads that home from
+the viewparent (or the folder's viewparent) before converting the
+vognodes. A view root that becomes a dead viewnode holding something
+stays one; the switch prunes a childless one, as it already pruned a
+childless restricted root.
+*** the hidden content stats: generations where it stands
+The plan's parenthetical gives the hidden folder member's generations
+(2 and 4). The parked member stands one level higher, under the
+subscribee, so its stats say what is true there: '(contains (in 1
+(ancestors 1)))' and '(hidesFromSubs (in 1 (ancestors 3)))'. The
+viewparent's containment was flagged already; 'set_herald_strings_in_viewnode'
+now also flags the subscriber's hide for a non-member under a
+subscribee-as-such ('subscriber_above_subscribee_viewparent'). It
+carries no birth facts: a non-member has none.
+*** the validators
+Each folder validator's child checks wrap their predicate in 'dead_or'
+('local.rs'), the acquisition folders' too.
+*** the prune is public
+'prune_self_deletable_when_empty' is 'pub', so that
+'tests/rebuild/complete_aliasfolder.rs', which calls the alias folder
+reconciler alone, can prune after it; it was the one Rust test whose
+outcome rested on the detachment itself.
+*** the tests
+'tests/convert_then_prune.rs' (fixtures 'main' and 'restricted'):
+a stale content leaf and branch, the parked folder member adopted back
+(the save accepts), duplicates in a stored view rerendered by "rerender
+all views", a stale alias, and the deleted phantoms after a switch to
+'public' (a stored view, through 'handle_skgrepo_set_request'). The
+hidden content stats are asserted in the existing collateral test of
+'tests/hidden_from_subscriptions.rs'. Unit tests:
+'an_unwarranted_child_is_converted_never_detached',
+'of_duplicates_the_preferred_copy_is_kept', the adapted ordering and
+orphan-disposal tests. The new file's save helper is close to
+'save_view_and_read_collateral' in 'tests/partner_folder_order.rs'
+(quasi-duplicate; the shared helper module is declared without
+'dead_code' allowance in one target, so it was not moved there).
+*** verification
+nextest 891 passed; Emacs 382; Neovim 359 specs in 31 files, none
+failed. Integration: every test passed but 'import-md-and-org', which
+fails at baseline. Over TCP on a scratch instance
+('tests/results/17-slice4/verify/'): k losing l and m from a view of
+its container leaves l gone and m parked write-protected with mc a
+non-member, and that buffer saves; x's containerFolder parks b with
+the note when b drops x, readopts the same viewnode (same vid) when b
+contains x again, with one b in the folder, and the buffer saves.

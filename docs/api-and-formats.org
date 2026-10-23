@@ -735,7 +735,10 @@ one automatically.
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set: nodes whose skgrepo
        became restricted are converted and pruned (a restricted node
-       with unrestricted viewchildren is retained, write-protected), and
+       with unrestricted viewchildren is retained, write-protected), a
+       deleted phantom whose home skgrepo became restricted, or an
+       unknown phantom whose relRepo (else its recorder's home) did,
+       becomes a dead viewnode, pruned unless it holds something, and
        PartnerFolders regenerate per the new set, so widening the set
        reveals members and folders.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
@@ -945,6 +948,12 @@ adds =(unintegrated COUNT (ancestors GEN...))=, including when both counts
 are zero; absence of that subform means the role does not apply. The
 numerator counts members not already directly contained or hidden by that
 occurrence's subscriber. Subset counts cannot exceed their side's total.
+The ancestors counted are the viewparent, or, for a folder member, the
+vognodes of the folder's required ancestry. A non-member under a
+subscribee-as-such -- content its subscriber hides, which the
+reconciler parks there when it holds a subtree -- also counts the
+subscriber, three generations up, on its =hidesFromSubs= incoming side,
+as a =hiddenInSubscribeeFolder= member does.
 =(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind this
 occurrence: for each, the side of this node it is on (=in= or =out=) and
 the ancestor generation it accounts for. =GEN= is omitted when no

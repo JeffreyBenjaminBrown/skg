@@ -335,12 +335,10 @@ folder cannot be changed from here" — the same sense ☮
 (=server/heralds.rs=), with no wire atom of its own: which folders are
 write-protected is already known from the folder atom.
 
-The stale-member rule is uniform across all policies (decided
-2026-06-10: a stale branch is made a non-member, not discarded): a
-stale ~affectsParent=true~ member that is a leaf is deleted; one with
-children is made a non-member (~affectsParent=false~) so the user
-keeps any subtree they built under it; duplicates are deleted; missing
-graph members are restored.
+Every policy's reconciler obeys [[*the one rule: convert, then prune][the one rule]]: a stale member or
+an extra copy of a member is converted, not detached, and missing
+graph members are restored.  A non-member standing for a node the
+folder's goal lists again is adopted back as its member.
 
 *Default presentation is intentionally narrow.* An editable node gets a
 nonempty =subscribeeFolder= automatically. The other top-level relation
@@ -1005,9 +1003,62 @@ a shallow model subtree.
 
 *** managed child
 
-A child viewnode that a reconciler created and may detach. A
-reconciler detaches only its managed children, and keeps a stale one
+A child viewnode that a reconciler matches against what it should
+show, and so may convert ([[*the one rule: convert, then prune][the one rule]]); the older reconciler's
+predicates say which ('complete_managed_children'), and its
+[[*owner][owner]] is that reconciler. The diff view's reconciler detaches a
+managed child with nothing of the user's below it, and converts one
 under which something of the user's stands.
+
+*** the one rule: convert, then prune
+
+A reconciler never detaches a child. A child it manages that the
+graph no longer warrants -- a stale child, whose key the reconciler's
+model lacks, or an extra copy of a key a sibling has -- is converted
+('convert_unwarranted_child' in 'server/update_buffer/util.rs'): an
+unrestricted vognode with a subtree becomes a write-protected
+non-member, which keeps its title, ID and birth, loses its change
+facts, holds no member (its members become non-members) and no
+editable claim, and can be adopted back when its membership returns;
+a leaf, and any viewnode of another kind (a phantom, a restricted
+vognode, a property, a folder), becomes a [[*dead viewnode][dead viewnode]]. Of several
+copies of one key, the one kept as the member is the editable one,
+else the first. After every completion the postorder prune
+('prune_self_deletable_when_empty' in
+'server/update_buffer/complete.rs') removes the childless dead
+viewnodes (and childless deleted phantoms and empty write-protected
+folders), never a view root. A viewnode nobody owns -- one the user
+typed or pasted -- is never converted, so it holds its ancestors
+alive: whatever stands below a converted child survives under it.
+
+A converted copy is the one duplicate shape the save accepts: under
+an editable parent two editable copies of a node are refused, and so
+are two members, in a content list or a folder.
+
+The orphaned folder ('deaden_generalized_orphan_folder') and the
+skgrepo-set switch ('convert_and_prune_for_skgrepo_switch') convert by
+the same rule: a member of a folder whose viewparent died, and a
+deleted or unknown phantom that a now restricted skgrepo records.
+
+*** dead viewnode
+
+A viewnode ('ViewnodeKind::DeadViewnode', '(skg deadViewnode)') with
+no title, ID, facts or match key, which only holds what stands below
+it. It is what the one rule makes of an unwarranted leaf or
+non-vognode. The prune removes it once it is childless; the parser
+discards text typed on its line; its member children become
+non-members ('mark_orphans_under_dead_parents_false'); every folder
+accepts one among its children.
+
+*** owner
+
+The reconciler that created a viewnode, or nobody (the user) when
+the user typed or pasted it ('Owner' in 'server/types/viewnode.rs').
+A member of a content list is owned by the content reconciler and a
+member of a folder by that folder's reconciler, whoever typed it,
+since membership is a fact of the graph that its reconciler
+maintains. The owner is recorded per [[*view id, vid][view id]] in the view's state
+('ViewIdRecord'), never inferred from a viewnode's shape.
 
 *** the user's viewnode
 

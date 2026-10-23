@@ -540,22 +540,30 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
-    // in-view subtree (e11) is a user branch, so §6.0 makes the visible
-    // occurrence A non-member (affectsParent=false) rather than deleting it -- chaos-
-    // monkey safety: the user may have deliberately placed content there, and
-    // we must not lose it. So e1 shows twice: once hidden (write-protected), once as a
-    // preserved non-member branch.
+    // in-view subtree (e11) is a user branch, so the one rule
+    // ('docs/glossary.org') makes the visible occurrence a write-protected
+    // non-member rather than deleting it -- chaos-monkey safety: the user may
+    // have deliberately placed content there, and we must not lose it. So e1
+    // shows twice: once hidden (write-protected), once as a preserved
+    // non-member branch, whose stats say, as the hidden folder's member's
+    // do, that its viewparent (the subscribee) contains it and the
+    // subscriber, three generations up, hides it.
     let collateral : &str = &collateral_views[0];
     assert! (
       without_vids (collateral) . contains (
         "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
       "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
-    assert! (
-      collateral . lines() . any ( |line|
-        line . starts_with ("**** (skg (node (id e1)")
-        && line . contains ("(affectsParent false)") ),
-      "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
-      collateral );
+    let parked_e1 : &str = collateral . lines ()
+      . find ( |line| line . starts_with ("**** (skg (node (id e1)")
+                      && line . contains ("(affectsParent false)") )
+      . unwrap_or_else ( || panic! (
+        "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
+        collateral ));
+    assert! ( parked_e1 . contains ("writeProtected"),
+      "the parked e1 is write-protected:\n{}", collateral );
+    assert! ( parked_e1 . contains ("(contains (in 1 (ancestors 1))")
+              && parked_e1 . contains ("(hidesFromSubs (in 1 (ancestors 3)))"),
+      "the parked e1 says who contains and who hides it:\n{}", collateral );
 
     Ok (( )) }
 

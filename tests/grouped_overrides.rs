@@ -20,6 +20,9 @@ mod collateral_delete;
 #[path = "fork.rs"]
 mod fork;
 
+#[path = "convert_then_prune.rs"]
+mod convert_then_prune;
+
 #[path = "collateral_repo_move.rs"]
 mod collateral_skgrepo_move;
 
