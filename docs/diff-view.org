@@ -303,8 +303,8 @@ changes under it. A commit is an ordinary rerender: the roots stand
 as plain context with their change viewnodes gone, and a root whose
 node the commit deleted is shown as a deleted phantom. A removed
 member that held content, or any change viewnode that held
-something of the user's, stays as a write-protected non-member or
-a dead viewnode holding it.
+something of the user's, stays as a non-member, keeping its
+editability, or a dead viewnode holding it.
 ** What a reconciler keeps
 Two reconcilers run at an editable node's visit. The older one,
 'complete_managed_children' ('server/update_buffer/util.rs'),
@@ -315,8 +315,8 @@ viewnodes, the removed members and what the diff view adds below
 them. What the user added survives both. Both obey the one rule
 ('docs/glossary.org', "the one rule: convert, then prune"): neither
 detaches, and each converts a child the graph no longer warrants into
-a write-protected non-member or a dead viewnode, which the prune
-removes once childless.
+a non-member retained with its editability or a dead viewnode, which
+the prune removes once childless.
 
 Neither moves a child it keeps. A child it creates goes right after
 the kept or created child that precedes it in its model, or first
@@ -376,8 +376,8 @@ So a note the user adds under a member of a changed folder, under a
 historical phantom, in the "it acquired" folder or under a removed
 member survives every rerender; when the removed member goes stale
 (a commit makes the removal part of HEAD, or the relationship
-returns), the note stands under a write-protected non-member
-occurrence of it.
+returns), the note stands under a non-member occurrence of it,
+which keeps the editability the removed member had.
 A new note there that names no skgrepo ('(repo NAME)') inherits that
 of its nearest ancestor that is an unrestricted vognode, through the
 phantoms and folders between them
@@ -455,6 +455,9 @@ member in content position counts as an occurrence here: a node
 whose first occurrence is a removed member (one its only container
 dropped, say, or one first reached through a container that dropped
 it) is editable there ("One encoding of a removed relationship").
+Where the editability walk prefers a member to a non-member, a
+removed member counts as a member: it keeps the claim from a member
+met later, and takes it from a plain non-member met earlier.
 ** The budget bounds only requests outside U
 An editable-view request (C-c s d) behaves as in any view: it makes
 its occurrence the editable one, write-protecting the other with its

@@ -3876,3 +3876,66 @@ partner folder that 'changed_partner_folders' creates empty during
 the saved view's completion is filled at its own visit, and
 'push_repair_warnings' reports the members it creates as restored.
 It is outside this slice; the graft test checks the save after.
+** Slice 3: deviations
+*** the convert function is told why
+'convert_unwarranted_child' takes an 'Unwarranted { Stale,
+Duplicate }', and so does the convert closure of
+'complete_managed_children', which calls it once per duplicate
+and once per stale child. The diff view's 'convert_duplicate'
+says 'Duplicate'; 'convert_unwarranted_subtree', the orphaned
+folder and the property-folder unmarking say 'Stale'.
+*** where the member preference lives
+The plan names 'apply_editability_rule', but that function runs
+only for an occurrence carrying a request. The walk without a
+request is 'make_writeProtected_if_repeat_then_extend_editable_map'
+('server/to_org/util.rs'), which now first calls
+'take_claim_from_tentative_nonMember' ('editable.rs'), and so
+takes the graph and the config.
+**** only an editable member takes the claim
+A write-protected member stays write-protected, as every
+write-protected occurrence does without a request: only an
+editable occurrence claims. So a member the reconciler creates
+(editable) takes the claim, while one the buffer already showed
+write-protected leaves it with the retained copy. After a commit
+in 'commit_leftovers', the retained x under e keeps the claim and
+c's member x under d stays write-protected
+('tests/pruned_change_view/after_a_commit.rs').
+**** a removed member counts as a member
+'docs/diff-view.org' gives a removed member a member's
+editability, and eight diff-view tests pin that the first
+occurrence in level order, often a removed member, is the
+editable one. Read literally, the preference would move the claim
+from such a removed member to a later member of its node. The
+walk therefore counts a removed member
+('is_unrestricted_removed_member') as a member: it keeps the
+claim from a later member, and takes it from a plain non-member
+met earlier. The diff-view doc says so. Slice 7, which replaces
+the birth that predicate reads, carries it along.
+**** how the non-member yields, and one guard
+The non-member is write-protected with its content subtree
+('writeProtect_content_subtree'), as a Tentative occurrence is
+when a request makes another occurrence Final. A non-member that
+is an ancestor of the member does not yield, since doing so would
+make the member itself a non-member.
+*** tests
+In 'tests/convert_then_prune.rs': the stale branch m stays
+editable with mc its content; a pasted write-protected copy of m
+stays write-protected beside the retained member; an editable
+extra copy of a duplicate is retained write-protected, its ec a
+non-member; the retained m under k yields the claim to l's new
+member m. The duplicate tests share 'rerendered_stored_view'.
+'tests/editable_view_cascade_and_budget.rs' has P2 as
+'a_request_claimed_elsewhere_leaves_no_member';
+'tests/unit/update_buffer_util.rs' covers both branches.
+**** the pasted copy is never converted
+The save refuses two members of one node under one parent, so the
+copy can only be pasted as a non-member. The content reconciler
+does not manage non-members, so the copy is never converted and
+its test passes before this slice too; it pins that the copy is
+untouched beside the retained editable member. The yield test was
+checked to fail with the preference disabled.
+**** adapted tests
+'hidden_from_subscriptions' (the retained e1 keeps its
+editability, e11 its content) and two tests of 'after_a_commit'
+(the retained x under e stays editable, xc its member). The Rust
+count is 915.

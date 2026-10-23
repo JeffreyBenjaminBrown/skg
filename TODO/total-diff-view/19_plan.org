@@ -916,7 +916,7 @@ The candidate filter, the alignment of content members, the
 duplicate clause in the diff view and the attach, property
 folders by kind and refreshed and kept, the five tests. Run all
 four suites.
-** TODO Slice 3: a retained copy keeps its editability
+** DONE Slice 3: a retained copy keeps its editability
 The convert function's two branches, the editability walk's
 preference and 'ClaimedElsewhere' with its fix, the tests. Run
 all four suites.

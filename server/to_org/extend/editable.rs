@@ -17,7 +17,15 @@
 //! - The editability rule: an occurrence without a request is editable when
 //!   its node is unclaimed, and write-protected when the BFS reached
 //!   another occurrence first
-//!   ('make_writeProtected_if_repeat_then_extend_editable_map'). An
+//!   ('make_writeProtected_if_repeat_then_extend_editable_map'), with
+//!   one exception: the walk prefers a member to a non-member. An
+//!   editable member whose node a Tentative non-member occurrence
+//!   claimed (one not its ancestor) takes the claim, and the
+//!   non-member yields, write-protected with its whole content subtree
+//!   ('take_claim_from_tentative_nonMember'); so a copy retained as
+//!   non-member never keeps the claim from its node's member. A
+//!   removed member of the diff view counts as a member here, since
+//!   its editability is a member's ('docs/diff-view.org'). An
 //!   occurrence carrying an editable-view request ('ViewRequest::Editable',
 //!   C-c s d) yields to a Final occurrence elsewhere, becoming
 //!   write-protected and losing the request; otherwise it becomes
@@ -51,10 +59,12 @@ use crate::to_org::extend::folder_request::build_and_integrate_folder_then_drop_
 use crate::to_org::extend::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, make_member_children_nonMembers, unrestrictedVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
-use crate::types::viewnode::{ Viewnode, ViewRequest, FolderRelation, Editability };
+use crate::types::tree::generic::read_at_node_in_tree;
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, Membership, ViewRequest, FolderRelation, Editability };
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::diff_view::shallow_model_subtree::is_unrestricted_removed_member;
 use crate::types::tree::viewnode_graphnode::{write_at_unrestrictedVognode_in_tree, pid_and_skgrepo_from_viewnode_at};
 
 use ego_tree::{Tree, NodeId};
@@ -179,6 +189,54 @@ pub fn apply_editability_rule (
     // A EVR target is Final: later EVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (treeid) ); }
   Ok ( EditabilityOutcome::MadeFinal ) }
+
+/// The editability walk's preference of a member to a non-member (see
+/// the module comment), for an occurrence without a request, before it
+/// claims or yields its node. When the occurrence at 'treeid' is an
+/// editable member, and a Tentative non-member occurrence that is not
+/// its ancestor holds its node's claim, that occurrence yields: it is
+/// write-protected with its content subtree
+/// ('writeProtect_content_subtree'), which drops its claim, so that
+/// the member claims the node next and its content is extended. A
+/// removed member counts as a member ('counts_as_member_for_the_claim').
+pub fn take_claim_from_tentative_nonMember (
+  tree    : &mut Tree<Viewnode>,
+  treeid  : NodeId,
+  visited : &mut EditableMap,
+  graph   : &InRustGraph,
+  config  : &SkgConfig,
+) -> Result < (), Box<dyn Error> > {
+  let is_editable_member : bool =
+    read_at_node_in_tree ( tree, treeid,
+      |vn : &Viewnode| counts_as_member_for_the_claim (vn)
+                       && matches! ( &vn . kind,
+                            ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+                            if ! t . is_writeProtected () )) ?;
+  if ! is_editable_member { return Ok (( )); }
+  let node_pid : ID = get_skgid_from_viewnode_at ( tree, treeid ) ?;
+  let Some ( &Finalizable::Tentative (prior) ) = visited . get (&node_pid)
+    else { return Ok (( )); };
+  if prior == treeid { return Ok (( )); }
+  let prior_is_nonMember : bool =
+    read_at_node_in_tree ( tree, prior,
+      |vn : &Viewnode| ! counts_as_member_for_the_claim (vn) ) ?;
+  let prior_is_ancestor : bool =
+    tree . get (treeid) . ok_or ("take_claim_from_tentative_nonMember: node not found") ?
+    . ancestors () . any ( |ancestor| ancestor . id () == prior );
+  if prior_is_nonMember && ! prior_is_ancestor {
+    writeProtect_content_subtree ( tree, prior, visited, graph, config ) ?; }
+  Ok (( )) }
+
+/// Whether the editability walk counts an unrestricted vognode as a
+/// member when it prefers a member to a non-member: a member, or a
+/// removed member of the diff view.
+fn counts_as_member_for_the_claim (
+  viewnode : &Viewnode,
+) -> bool {
+  matches! ( &viewnode . kind,
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if t . membership == Membership::Member )
+  || is_unrestricted_removed_member (viewnode) }
 
 /// Apply a write-protect request -- 'ViewRequest::WriteProtected' or
 /// 'ViewRequest::WriteProtectedSubtree' -- that the occurrence at

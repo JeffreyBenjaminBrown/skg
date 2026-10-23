@@ -2,6 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
+use crate::to_org::extend::editable::take_claim_from_tentative_nonMember;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
@@ -145,7 +146,7 @@ pub fn complete_branch_minus_content (
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, treeid ) ?;
   make_writeProtected_if_repeat_then_extend_editable_map (
-    tree, treeid, visited ) ?;
+    tree, treeid, visited, graph, config ) ?;
   if unrestrictedVognode_in_tree_is_writeProtected ( tree, treeid )?
   { clobberWriteProtectedViewnode (
       tree, treeid, graph, config ) ?; }
@@ -158,6 +159,10 @@ pub fn complete_branch_minus_content (
 /// Does only what it says, and makes the members of a write-protected
 /// node non-members -- in particular,
 /// does not clobber the node after making it write-protected.
+/// A repeat is an occurrence whose node another occurrence claimed,
+/// unless that one is a Tentative non-member and this an editable
+/// member, which takes the claim
+/// ('take_claim_from_tentative_nonMember').
 ///
 /// The two jobs in the name cannot be unbundled --
 /// we have to interleave extending the editable_map
@@ -167,9 +172,13 @@ pub fn make_writeProtected_if_repeat_then_extend_editable_map (
   tree    : &mut Tree<Viewnode>,
   treeid : NodeId,
   editableMap  : &mut EditableMap,
+  graph   : &InRustGraph,
+  config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Non-vognode.
     get_skgid_from_viewnode_at ( tree, treeid ) ?;
+  take_claim_from_tentative_nonMember (
+    tree, treeid, editableMap, graph, config ) ?;
   let is_writeProtected : bool =
     write_at_unrestrictedVognode_in_tree (
       tree, treeid,

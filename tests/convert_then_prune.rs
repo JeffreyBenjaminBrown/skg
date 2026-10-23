@@ -7,8 +7,9 @@
 // vognode with a subtree is retained as non-member, keeping its
 // editability if stale, write-protected if an extra copy of a
 // duplicate -- and a folder adopts such a non-member back when its
-// membership returns. Each test rerenders a view over a fixture and
-// saves the result.
+// membership returns. The editability walk prefers a member to a
+// non-member. Each test rerenders a view over a fixture and saves the
+// result.
 //
 // Fixture 'main': k contains l and m, m contains mc; a, b and c contain
 // x, x contains xc, p contains b; al has the aliases one and two; d
@@ -56,6 +57,9 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected", main) ?;
       a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_retained_editable_copy_yields_the_claim_to_a_member_met_later", main) ?;
+      a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_parked_folder_member_is_adopted_when_its_membership_returns", main) ?;
       a_parked_folder_member_is_adopted_when_its_membership_returns (
@@ -238,6 +242,47 @@ async fn a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected
   assert! ( the_line_after (first_view, "** ", "nonMember writeProtected")
               . contains ("a note under the copy"),
     "the note stands under the copy:\n{}", first_view );
+  save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
+              &mut views_state ) . await ?;
+  Ok (( )) }
+
+/// A second view of k moves m, with mc, from k into l. The first
+/// view's rerender retains its m under k as non-member, editable, and
+/// the walk then meets l's new member m, which takes the claim: m
+/// under l is editable with mc its content, and the retained m yields,
+/// write-protected with its subtree. That buffer saves.
+async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = empty_views_state ();
+  let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-1" . into ());
+  let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-2" . into ());
+  let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
+  save_view ( &k_view, &first_viewforest_id, config, tantivy, &graph,
+              &mut views_state ) . await ?;
+  let m_under_l : String = // m directly follows l, so one level deeper it is l's
+    k_view . lines ()
+    . map ( |line| if line . contains ("(id m)") || line . contains ("(id mc)")
+                   { format! ("*{}", line) } else { line . to_string () } )
+    . collect::<Vec<String>> () . join ("\n") + "\n";
+  let (second_view, collateral_views) : (String, Vec<String>) = save_view (
+    &m_under_l, &second_viewforest_id, config, tantivy, &graph,
+    &mut views_state ) . await ?;
+  the_line (&second_view, "*** ", "(id m)"); // the second view moved m under l
+  assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
+  let first_view : &str = &collateral_views [0];
+  assert! ( is_parked ( &the_line (first_view, "** ", "(id m)") ),
+    "the retained m yields the claim:\n{}", first_view );
+  assert! ( is_parked ( &the_line (first_view, "*** ", "(id mc)") ),
+    "with its subtree:\n{}", first_view );
+  let member_m : String = the_line (first_view, "*** ", "(id m)");
+  assert! ( ! member_m . contains ("nonMember") && ! member_m . contains ("writeProtected"),
+    "l's member m takes the claim:\n{}", first_view );
+  let member_mc : String = the_line (first_view, "**** ", "(id mc)");
+  assert! ( ! member_mc . contains ("nonMember") && ! member_mc . contains ("writeProtected"),
+    "and its content is extended:\n{}", first_view );
   save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }

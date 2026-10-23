@@ -787,9 +787,12 @@ stale vognode with a subtree.
 The *editability rule* decides, at each occurrence view completion
 reaches in level order, whether it is editable: an occurrence without
 a request is editable when its node is unclaimed in the *editable
-map* and write-protected when another occurrence claimed it first.
-The editable map is built empty at every completion, and only an
-editable occurrence claims. The module comment of
+map* and write-protected when another occurrence claimed it first,
+except that the walk prefers a member to a non-member: an editable
+member takes the claim from a non-member that holds it without a
+request, and the non-member is write-protected with its content
+subtree. The editable map is built empty at every completion, and
+only an editable occurrence claims. The module comment of
 'server/to_org/extend/editable.rs' states the whole rule, with the
 cascade and the node budget.
 
@@ -872,14 +875,22 @@ graph no longer warrants -- a stale child, whose key the
 reconciler's model lacks, or an extra copy of a key a sibling has
 -- is *converted* ('convert_unwarranted_child' in
 'server/update_buffer/util.rs'): an unrestricted vognode with a
-subtree becomes a write-protected [[*non-member][non-member]],
-which keeps its title, ID and birth, loses its change facts,
-holds no member (its members become non-members) and no editable
-claim, and can be adopted back when its membership returns; a
-leaf, and any viewnode of another kind (a phantom, a restricted
-vognode, a property, a folder), becomes a
+subtree is retained as [[*non-member][non-member]]: it keeps its
+title, ID and birth, loses its change facts, and can be adopted
+back when its membership returns. A stale one keeps its
+editability: an editable one keeps its members as they are, and a
+write-protected one's members become non-members, since a
+write-protected occurrence holds no member. Since the editability
+walk prefers a member to a non-member
+([[*editability rule, editable map][editability rule]]), a
+retained copy never keeps the editability claim from its node's
+member. A leaf, and any viewnode of another kind (a phantom, a
+restricted vognode, a property, a folder), becomes a
 [[*dead viewnode][dead viewnode]]. Of several copies of one key,
-the one kept as the member is the editable one, else the first.
+the one kept as the member is the editable one, else the first;
+each other copy with a subtree is retained write-protected, its
+members made non-members, whatever its editability was, since the
+save refuses two editable occurrences of one node.
 After every completion the postorder *prune*
 ('prune_self_deletable_when_empty' in
 'server/update_buffer/complete.rs') removes the childless dead

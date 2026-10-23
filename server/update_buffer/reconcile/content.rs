@@ -95,9 +95,10 @@ pub fn extend_true_content_at_unrestrictedVognode (
   if ! settled {
     // A EVR node was already resolved by apply_editability_rule; running
     // the dedup here would write-protect it against its own (just-inserted)
-    // map entry. Ordinary nodes still dedup first-wins (Tentative).
+    // map entry. Ordinary nodes still dedup first-wins (Tentative),
+    // but that a member takes the claim from a non-member.
     make_writeProtected_if_repeat_then_extend_editable_map(
-      tree, node, editable_map ) ?; }
+      tree, node, editable_map, graph_snap, config ) ?; }
   let (pid, initial_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at( tree, node,
                                   "extend_true_content_at_unrestrictedVognode" ) ?;
