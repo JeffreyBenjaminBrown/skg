@@ -23,9 +23,10 @@
 //! "The shallow model subtree, and what it keeps"):
 //! each step builds a shallow model subtree and reconciles what the node
 //! holds with it ('server/diff_view/shallow_model_subtree.rs'), so every
-//! viewnode that stays keeps its fold state, and is moved, not
-//! recreated, to where it belongs. The server sets a fold state only
-//! on a viewnode it creates.
+//! viewnode that stays keeps its fold state and where it stands; only
+//! a former member is moved to where it belongs
+//! ('reconcile_removed_content_members'). The server sets a fold
+//! state only on a viewnode it creates.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
@@ -49,8 +50,8 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::nodes::complete::Flag;
 use crate::types::tree::forest::in_content_position;
 use crate::types::tree::moves::{
-  arrange_first_children, arrange_last_children, move_before,
-  move_to_first_child, move_to_last_child};
+  move_before, move_to_last_child,
+  place_created_children_after_their_model_predecessors};
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
@@ -139,7 +140,10 @@ impl ChangedAspects {
 /// viewnodes, the removed members and what stands below them. They
 /// obey one rule: a reconciler detaches only what it created, and what
 /// the user added survives, under a stale child too
-/// ('keep_stale_child_holding_the_users').
+/// ('keep_stale_child_holding_the_users'). What this step keeps
+/// stays where it stands; what it creates goes after what precedes
+/// it here: the change viewnodes ahead of the markers, then the
+/// changed partner folders, then the markers.
 /// 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
 /// its body's fold state come from C. 'editable_before_completion'
@@ -184,6 +188,9 @@ pub(crate) fn process_unrestrictedVognode_changes (
     straddle, &pid, &aspects, in_c,
     diffView_buffer_kind == DiffViewBufferKind::OrderOnlyChanges
       && straddle . order_only_pids () . contains (&pid) );
+  let children_before : HashSet<NodeId> =
+    tree . get (treeid) . unwrap () . children ()
+    . map ( |child| child . id () ) . collect ();
   let fronts : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
     &is_front_change_viewnode,
@@ -199,7 +206,10 @@ pub(crate) fn process_unrestrictedVognode_changes (
     . chain (partner_folders)
     . chain ( fronts . iter () . filter ( |front| is_marker (front) ) . copied () )
     . collect ();
-  arrange_first_children (tree, treeid, &order) ?;
+  let created : HashSet<NodeId> = order . iter ()
+    . filter ( |front| ! children_before . contains (front) ) . copied () . collect ();
+  place_created_children_after_their_model_predecessors (
+    tree, treeid, &order, &created ) ?;
   Ok (( )) }
 
 /// A root is signed at its own visit, as a member is at its
@@ -344,11 +354,10 @@ pub(crate) fn process_historical_phantom_visit (
     append_historical_phantom_content (
       &mut model, root, straddle, &skgid,
       & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
-  let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+  reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
     &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
-  arrange_last_children (tree, treeid, &kept) ?;
   Ok (HistoricalPhantomVisit::Done) }
 
 /// When a save deleted the node of the deleted phantom at 'treeid'
@@ -528,13 +537,11 @@ fn tag_content_members (
     let mut model : Tree<Viewnode> = Tree::new (model_root ());
     if let Some (moved) = moved {
       model . root_mut () . append (moved); }
-    let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+    reconcile_children_with_shallowModelSubtree ( // a new move goes first
       tree, member, &model, model . root () . id (), &straddle . after,
       &|viewnode| matches! ( &viewnode . kind,
         ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
-      &|_| false ) ?;
-    if let Some (move_viewnode) = kept . first () {
-      move_to_first_child (tree, member, *move_viewnode) ?; }}
+      &|_| false ) ?; }
   Ok (( )) }
 
 /// The members of the before-graph's content list that the

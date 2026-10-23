@@ -6,7 +6,7 @@ use crate::types::viewnode::{FolderKind, Owner, Viewnode, ViewnodeKind, AffectsP
 use crate::types::viewnode::{Vognode, PropertyFolder, Property, viewnode_of};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
-use crate::update_buffer::util::{complete_managed_children_in_viewforest, treat_certain_children};
+use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, treat_certain_children};
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
 use std::error::Error;
@@ -78,6 +78,7 @@ pub fn reconcile_aliasFolder_children (
     tree,
     aliasfolder_treeid,
     Owner::FolderReconciler (FolderKind::Alias),
+    KeptChildOrder::FollowsGoal, // the save writes the aliases' order
     is_alias,
     view_alias_text,
     &goal_list,

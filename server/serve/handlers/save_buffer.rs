@@ -985,6 +985,7 @@ pub fn compute_diff_for_every_skgrepo (
 /// Over-approximates true collateral (which requires parsing the buffer
 /// to know which PIDs actually changed). This is intentional: locking
 /// too many buffers briefly is harmless; missing one could lose edits.
+/// Sorted, as the relax-lock list is.
 fn view_ids_of_views_to_lock (
   viewid_from_request_result : &Result<ViewId, String>,
   views_state                  : &ViewsState,
@@ -999,4 +1000,7 @@ fn view_ids_of_views_to_lock (
     for view_id in views_state . open_views . views_containing (pid) {
       if &view_id != saved_view_id
       { collateral_views . insert (view_id); } } }
-  collateral_views . into_iter () . collect () }
+  let mut lock_view_ids : Vec<ViewId> =
+    collateral_views . into_iter () . collect ();
+  lock_view_ids . sort_by_key (ViewId::repr_in_client);
+  lock_view_ids }

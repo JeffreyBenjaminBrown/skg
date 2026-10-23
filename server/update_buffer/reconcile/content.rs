@@ -23,6 +23,7 @@ use crate::types::tree::viewnode_graphnode::{
     write_at_unrestrictedVognode_in_tree};
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::{
+    KeptChildOrder,
     complete_managed_children_in_viewforest,
     partition_children,
     treat_certain_children};
@@ -596,7 +597,7 @@ fn complete_content_children (
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
   complete_managed_children_in_viewforest(
-    tree, node, Owner::ContentReconciler,
+    tree, node, Owner::ContentReconciler, KeptChildOrder::FollowsGoal,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,

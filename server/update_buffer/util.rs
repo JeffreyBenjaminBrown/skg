@@ -1,7 +1,8 @@
 use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
-use crate::types::tree::moves::move_to_last_child;
+use crate::types::tree::moves::{
+  move_to_last_child, place_created_children_after_their_model_predecessors};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -137,6 +138,25 @@ impl<Orderkey> RepairSummary<Orderkey> {
       deleted_duplicates : Vec::new (), }}
 }
 
+/// Whether 'complete_managed_children' moves the children it keeps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeptChildOrder {
+  /// The rule both reconcilers obey ('docs/diff-view.org', "What a
+  /// reconciler keeps"): every child it keeps stays where it stands,
+  /// and so does every child it does not manage; a child it creates
+  /// goes after the managed child that precedes it in the goal list,
+  /// or first when none does.
+  Unmoved,
+  /// For a list whose order is a graph fact the save writes: the
+  /// content of a node and the folders whose membership the save
+  /// reads (the alias folder, and the partner folders of the editable
+  /// 'FolderPolicy's). The unmanaged children go first, then the
+  /// managed ones in the goal list's order, so that a view other than
+  /// the one saved follows a reorder saved elsewhere. In the view just
+  /// saved the two orders agree, since the save wrote the buffer's.
+  FollowsGoal,
+}
+
 /// The rule both reconcilers obey ('docs/diff-view.org', "What a
 /// reconciler keeps"): a reconciler detaches only what it created, and
 /// what the user added survives. A stale child (one the reconciler
@@ -185,6 +205,7 @@ pub fn complete_managed_children_in_viewforest
   tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,
   owner               : Owner,
+  kept_child_order    : KeptChildOrder,
   managed             : Managed,
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
@@ -196,7 +217,7 @@ where Managed  : Fn (&Viewnode) -> bool,
 {
   let summary : RepairSummary<Orderkey> =
     complete_managed_children_in_viewforest_ignoring_owners (
-      tree, treeid, &managed, &view_child_orderkey, goal_list,
+      tree, treeid, kept_child_order, &managed, &view_child_orderkey, goal_list,
       |orderkey : &Orderkey| create_child (orderkey)
         . map ( |viewnode : Viewnode| Viewnode { owner, .. viewnode } ) ) ?;
   let goal_set : HashSet<&Orderkey> = goal_list . iter () . collect ();
@@ -218,6 +239,7 @@ fn complete_managed_children_in_viewforest_ignoring_owners
 <Orderkey, Managed, View> (
   tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,
+  kept_child_order    : KeptChildOrder,
   managed             : Managed,
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
@@ -244,6 +266,7 @@ where Managed  : Fn (&Viewnode) -> bool,
   complete_managed_children(
     tree,
     treeid,
+    kept_child_order,
     managed,
     view_child_orderkey,
     goal_list,
@@ -268,20 +291,19 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///     otherwise it is detached.
 ///   Runs problem_discard on each node that is actually detached; if any returns
 ///   true, runs problem_discard_response on the parent afterward.
-/// - Reorders remaining children: unmanaged first, then managed in goal_list order.
-///   Creates new children for any orderkeys missing from the original children.
-///   User-facing consequence for PartnerFolders: a non-member
-///   child a user parks inside a folder is "unmanaged" here, so it is moved
-///   above the generated members on save. This is deliberate -- the
-///   membership is generated and ordered, so a parked note stays but is
-///   visibly separated from the live membership. Documented in docs/glossary.org
-///   ("PartnerFolder") and docs/sharing-model.org.
+/// - Creates new children for any orderkeys missing from the original
+///   children, placed as 'kept_child_order' says: with
+///   'KeptChildOrder::Unmoved', each after the managed child that precedes
+///   it in goal_list (or first), every other child staying where it
+///   stands; with 'KeptChildOrder::FollowsGoal', the children are
+///   reordered, unmanaged first, then managed in goal_list order.
 /// - Returns a RepairSummary: which children it created, which it made
 ///   non-members, and which it detached.
 pub fn complete_managed_children
 <Node, Orderkey, Managed, View, ProblemDiscard, ProblemResponse, MakeStaleANonMember> (
   tree                     : &mut Tree<Node>,
   parent_skgid             : NodeId,
+  kept_child_order         : KeptChildOrder,
   managed                  : Managed,
   view_child_orderkey      : View,
   goal_list                : &[Orderkey],
@@ -356,22 +378,27 @@ where
         tree, parent_skgid,
         |mut n| { problem_discard_response( n . value() ); }
       ) . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
-  for &child_skgid in &unmanaged_skgids {
-    // Move unmanaged children to end. (They will precede the managed ones.)
-    move_to_last_child( tree, parent_skgid, child_skgid )?; }
-  for orderkey in goal_list {
-    // Move/create managed children in desired order
+  let mut in_goal_order : Vec<NodeId> = Vec::new ();
+  let mut created : HashSet<NodeId> = HashSet::new ();
+  for orderkey in goal_list { // create the missing children, at the end
     match orderkey_to_treeid . get (orderkey) {
-      Some (&child_skgid) => {
-        move_to_last_child( tree, parent_skgid, child_skgid )?; },
+      Some (&child_skgid) => in_goal_order . push (child_skgid),
       None => {
         let node : Node = create_child (orderkey) ?;
-        with_node_mut(
-            tree, parent_skgid,
-            |mut p| { p . append (node); }
-          ) . map_err( |e| -> Box<dyn Error>
-                      { e . into() } )?;
+        let child_skgid : NodeId = tree . get_mut (parent_skgid)
+          . ok_or ("complete_managed_children: node not found") ?
+          . append (node) . id ();
+        created . insert (child_skgid);
+        in_goal_order . push (child_skgid);
         summary . created . push( orderkey . clone() ); }, }}
+  match kept_child_order {
+    KeptChildOrder::Unmoved =>
+      place_created_children_after_their_model_predecessors (
+        tree, parent_skgid, &in_goal_order, &created ) ?,
+    KeptChildOrder::FollowsGoal => {
+      for &child_skgid in unmanaged_skgids . iter () . chain (&in_goal_order) {
+        // The unmanaged children, then the managed ones in goal order.
+        move_to_last_child( tree, parent_skgid, child_skgid )?; }}, }
   Ok (summary) }
 
 #[cfg(test)]

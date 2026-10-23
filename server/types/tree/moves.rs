@@ -7,6 +7,7 @@
 //! place.
 
 use ego_tree::{NodeId, NodeRef, Tree};
+use std::collections::HashSet;
 
 /// Make 'node' the first child of 'parent'.
 pub fn move_to_first_child<T> (
@@ -70,32 +71,26 @@ pub fn move_after<T> (
     . insert_id_after (node);
   Ok (( )) }
 
-/// Make 'ordered' the first children of 'parent', in that order.
-pub fn arrange_first_children<T> (
-  tree    : &mut Tree<T>,
-  parent  : NodeId,
-  ordered : &[NodeId],
+/// Place each of 'created' that 'in_model_order' lists right after
+/// the child listed before it, or first among the children of
+/// 'parent' when it is listed first; every other child stays where
+/// it stands. This is how a reconciler places what it creates without
+/// moving what it keeps ('docs/diff-view.org', "What a reconciler
+/// keeps"): 'in_model_order' is its kept and created children in the
+/// order of its model.
+pub fn place_created_children_after_their_model_predecessors<T> (
+  tree           : &mut Tree<T>,
+  parent         : NodeId,
+  in_model_order : &[NodeId],
+  created        : &HashSet<NodeId>,
 ) -> Result<(), String> {
   let mut previous : Option<NodeId> = None;
-  for node in ordered {
-    match previous {
-      None => move_to_first_child (tree, parent, *node) ?,
-      Some (previous) => move_after (tree, previous, *node) ?, }
+  for node in in_model_order {
+    if created . contains (node) {
+      match previous {
+        None => move_to_first_child (tree, parent, *node) ?,
+        Some (previous) => move_after (tree, previous, *node) ?, }}
     previous = Some (*node); }
-  Ok (( )) }
-
-/// Make 'ordered' the last children of 'parent', in that order.
-pub fn arrange_last_children<T> (
-  tree    : &mut Tree<T>,
-  parent  : NodeId,
-  ordered : &[NodeId],
-) -> Result<(), String> {
-  let mut next : Option<NodeId> = None;
-  for node in ordered . iter () . rev () {
-    match next {
-      None => move_to_last_child (tree, parent, *node) ?,
-      Some (next) => move_before (tree, next, *node) ?, }
-    next = Some (*node); }
   Ok (( )) }
 
 fn node_ref<'a, T> (

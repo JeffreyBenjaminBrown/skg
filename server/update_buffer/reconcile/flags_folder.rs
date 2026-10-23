@@ -6,7 +6,7 @@ use crate::types::nodes::complete::{
 use crate::types::viewnode::{FolderKind, Owner, Property, Viewnode, ViewnodeKind, viewnode_of};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{
-  complete_managed_children_in_viewforest, treat_certain_children};
+  KeptChildOrder, complete_managed_children_in_viewforest, treat_certain_children};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -28,6 +28,7 @@ pub fn reconcile_flags_folder_children (
     . collect ();
   complete_managed_children_in_viewforest (
     tree, folder_skgid, Owner::FolderReconciler (FolderKind::Flags),
+    KeptChildOrder::Unmoved,
     |viewnode| matches! (&viewnode . kind,
       ViewnodeKind::Property (Property::Flag { .. })),
     |viewnode| match &viewnode . kind {

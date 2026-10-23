@@ -2,11 +2,12 @@
 //! shallow model subtree of it ('docs/diff-view.org',
 //! "The shallow model subtree, and what it keeps").
 //! The shallow model subtree is built in a scratch tree. Each existing
-//! viewnode it also produces is kept, with its fold state, and its
-//! kind and facts are updated in place; each it does not is
-//! detached, unless something the user added stands below it
+//! viewnode it also produces is kept where it stands, with its fold
+//! state, and its kind and facts are updated in place; each it does
+//! not is detached, unless something the user added stands below it
 //! ('keep_stale_child_holding_the_users', the rule both reconcilers
-//! obey); what only it has is copied in. A viewnode that stands
+//! obey); what only it has is copied in, after the child that
+//! precedes it in the shallow model subtree. A viewnode that stands
 //! for a graphnode is matched by the ID it stands for, any other by
 //! its kind (and a folder entry by the entry): within one parent each
 //! key appears at most once.
@@ -15,7 +16,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
 use crate::types::git::{NodeSign, Sign};
 use crate::types::misc::ID;
-use crate::types::tree::moves::arrange_last_children;
+use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, DiffPresence, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
@@ -23,6 +24,7 @@ use crate::update_buffer::util::{
   detach_viewnode_transferring_focus, keep_stale_child_holding_the_users};
 
 use ego_tree::{NodeId, NodeRef, Tree};
+use std::collections::HashSet;
 use std::error::Error;
 
 /// What identifies a viewnode among its siblings.
@@ -78,13 +80,15 @@ fn property_kind (
       format! ("changesetMarker {:?}", kind), }}
 
 /// Under 'parent', make the children that 'managed' selects match
-/// the children of 'model_parent' in 'model'. A kept child whose
-/// model twin 'descend' selects has its own children reconciled the
-/// same way, every keyed child but the user's managed
-/// ('is_the_diffViews_viewnode'), and ordered as the shallow model subtree
-/// orders them. Returns the kept and created children, in
-/// the shallow model subtree's order; where they stand among the others is
-/// the caller's to decide. 'graph' is the live graph ('match_key').
+/// the children of 'model_parent' in 'model'. A kept child stays
+/// where it stands; a created one goes after the kept or created
+/// child that precedes it in the shallow model subtree, or first when
+/// none does ('place_created_children_after_their_model_predecessors').
+/// A kept child whose model twin 'descend' selects has its own
+/// children reconciled the same way, every keyed child but the user's
+/// managed ('is_the_diffViews_viewnode'). Returns the kept and created
+/// children, in the shallow model subtree's order. 'graph' is the
+/// live graph ('match_key').
 pub fn reconcile_children_with_shallowModelSubtree (
   tree         : &mut Tree<Viewnode>,
   parent       : NodeId,
@@ -107,6 +111,7 @@ pub fn reconcile_children_with_shallowModelSubtree (
     . ok_or ("reconcile_children_with_shallowModelSubtree: model parent not found") ?
     . children () . map ( |child| child . id () ) . collect ();
   let mut result : Vec<NodeId> = Vec::new ();
+  let mut created : HashSet<NodeId> = HashSet::new ();
   for model_child in model_children {
     let model_viewnode : &Viewnode =
       model . get (model_child) . unwrap () . value ();
@@ -122,19 +127,23 @@ pub fn reconcile_children_with_shallowModelSubtree (
         if descend (model_viewnode) {
           let parent_is_a_folder : bool =
             is_folder ( tree . get (existing) . unwrap () . value () );
-          let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+          reconcile_children_with_shallowModelSubtree (
             tree, existing, model, model_child, graph,
             &|viewnode| is_the_diffViews_viewnode (viewnode, parent_is_a_folder, graph),
-            descend ) ?;
-          arrange_last_children (tree, existing, &kept) ?; }
+            descend ) ?; }
         result . push (existing); },
-      None => result . push (
-        append_copy_of_subtree (tree, parent, model, model_child) ?), }}
+      None => {
+        let copy : NodeId =
+          append_copy_of_subtree (tree, parent, model, model_child) ?;
+        created . insert (copy);
+        result . push (copy); }, }}
   for (stale, _) in unmatched {
     if keep_stale_child_holding_the_users (tree, stale, &holds_the_users) ? {
       detach_the_servers_below (tree, stale) ?;
     } else {
       detach_viewnode_transferring_focus (tree, stale) ?; }}
+  place_created_children_after_their_model_predecessors (
+    tree, parent, &result, &created ) ?;
   Ok (result) }
 
 /// Below a stale viewnode kept for what the user added under it,

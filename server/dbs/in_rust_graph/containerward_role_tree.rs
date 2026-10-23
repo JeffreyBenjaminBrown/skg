@@ -119,8 +119,12 @@ pub fn full_containerward_role_tree (
     let mut next_frontier : Vec<(usize, ID)> =
       Vec::new ();
     for (parent_key, current_skgid) in & frontier {
-      let containers : HashSet<ID> =
-        partners_of (current_skgid, RelationRole::CONTAINER);
+      let containers : Vec<ID> = { // sorted, so that a walk is deterministic
+        let mut containers : Vec<ID> =
+          partners_of (current_skgid, RelationRole::CONTAINER)
+          . into_iter () . collect ();
+        containers . sort ();
+        containers };
       if containers . is_empty () {
         children_of . insert ( *parent_key, vec![] );
       } else {

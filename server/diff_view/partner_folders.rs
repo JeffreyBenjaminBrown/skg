@@ -26,7 +26,6 @@ use crate::to_org::extend::role_tree::{
 use crate::types::env::RuntimeGeneration;
 use crate::types::git::NodeSign;
 use crate::types::misc::ID;
-use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{DiffPresence, FolderPolicy, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_vid_of, push_repair_warnings, view_order_preserving_goal_list};
@@ -125,9 +124,8 @@ fn straddle_goal_item (
 /// move. Each member role tree is built afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
 /// its kind) at each level, so that a member role tree that stays
-/// keeps its viewnodes and their fold state, in the order of the walk;
-/// what the user added under the member stays where it stands, ahead
-/// of the member role tree.
+/// keeps its viewnodes, where they stand, and their fold state; what
+/// the user added under the member stays where it stands.
 fn attach_memberRoleTrees_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -163,9 +161,8 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
         build_and_integrate_role_tree_with_skgrepo_set (
           &mut model, model_member, &runtime . graph, member_role,
           &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
-    let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
+    reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
       &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
-      &|_| true ) ?;
-    arrange_last_children (tree, member, &kept) ?; }
+      &|_| true ) ?; }
   Ok (( )) }

@@ -111,8 +111,8 @@ pub fn find_buffer_errors_for_saving (
 /// glossary's "write-protected set"): for each present
 /// idFolder whose parent is an UnrestrictedVognode with an ID, the multiset of ID
 /// non-vognodes beneath it must equal the recorder's real ID list (pid
-/// plus extra_ids). Reordering passes (the rerender re-sorts
-/// anyway); adding, deleting or text-editing an ID property fails,
+/// plus extra_ids). Reordering passes (the order is view-local:
+/// the rerender keeps it); adding, deleting or text-editing an ID property fails,
 /// with a message naming the escape hatch (edit the .skg file
 /// directly). In the diff view, an ID entry tagged '(presence rel-)'
 /// is a lost ID, not a membership claim, and is excluded before

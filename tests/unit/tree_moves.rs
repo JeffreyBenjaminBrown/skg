@@ -64,10 +64,16 @@ fn each_move_places_the_node () {
   move_after (&mut tree, c, b) . unwrap ();
   assert_eq! ( values (&tree, root), vec! [1, 3, 2] ); }
 
+/// Created children go after their predecessors in the model, or
+/// first; the kept ones stay where they stand, whatever the model's
+/// order.
 #[test]
-fn arranging_orders_the_ends () {
-  let (mut tree, root, [a, b, c]) = three_children ();
-  arrange_first_children (&mut tree, root, &[c, b]) . unwrap ();
-  assert_eq! ( values (&tree, root), vec! [3, 2, 1] );
-  arrange_last_children (&mut tree, root, &[c, a]) . unwrap ();
-  assert_eq! ( values (&tree, root), vec! [2, 3, 1] ); }
+fn placing_created_children_moves_no_kept_one () {
+  let (mut tree, root, [a, _b, c]) = three_children ();
+  let d : NodeId = tree . root_mut () . append (4) . id ();
+  let e : NodeId = tree . root_mut () . append (5) . id ();
+  // The model orders them e, c, a, d; b is not the reconciler's.
+  place_created_children_after_their_model_predecessors (
+    &mut tree, root, &[e, c, a, d], &HashSet::from ([d, e]) ) . unwrap ();
+  assert_eq! ( values (&tree, root), vec! [5, 1, 4, 2, 3] );
+  assert_every_traversal_is_finite (&tree, root); }
