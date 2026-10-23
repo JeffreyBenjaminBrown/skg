@@ -9,7 +9,7 @@ use crate::types::viewnode::{
   Birth, GraphnodeStats, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 
 /// The five graph relations whose flags the H/S/O/L checks consult via
@@ -131,6 +131,17 @@ fn set_herald_strings_in_viewnode (
       &mut flags, graph, restriction,
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
+  if affectsParent != AffectsParent::True {
+    // A non-member under a subscribee-as-such: the content the
+    // subscriber hides, parked there with its subtree, says so, as the
+    // hiddenInSubscribeeFolder's members do.
+    if let (Some (graph), Some (subscriber_pid)) =
+      (graph, subscriber_above_subscribee_viewparent (tree, treeid))
+    { if graph . relation_membership_is_visible (
+        node_pid, &subscriber_pid,
+        RelationRole::new (NodeRelation::HidesFromSubs, BinaryRolePosition::First),
+        restriction )
+      { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
     if affectsParent == AffectsParent::True
       && matches! (parent_kind, ParentKind::Folder (PartnerFolder::Subscribee, _)) {
@@ -168,6 +179,21 @@ fn set_herald_strings_in_viewnode (
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
+
+/// When the viewparent of the vognode at 'treeid' is a subscribee as
+/// such (subscriber > subscribeeFolder > subscribee > the vognode),
+/// the subscriber's ID; it is three generations up.
+fn subscriber_above_subscribee_viewparent (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> Option<ID> {
+  let subscribee : NodeRef<Viewnode> = tree . get (treeid) ? . parent () ?;
+  let folder : NodeRef<Viewnode> = subscribee . parent () ?;
+  if ! matches! ( &folder . value () . kind,
+                  ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) )
+  { return None; }
+  unrestricted_vognode_pid (tree, subscribee . id ()) ?;
+  unrestricted_vognode_pid (tree, folder . parent () ? . id ()) }
 
 fn parent_kind_of (
   tree   : &Tree<Viewnode>,
