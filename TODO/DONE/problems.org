@@ -17,6 +17,29 @@
   a removed member in content position follows the editability rule,
   so x is editable as b's removed member, its first occurrence, with
   its content list and its container folder. The sets are unchanged.
+* A dangling removed member of a write-protected-set folder counts as a member (2026-10-20; fixed 2026-10-22)
+   In a write-protected-set folder drawn over the straddle (in
+   practice only the hidden folder, whose members can be dangling), a
+   removed member whose ID resolves in neither graph is an unknown
+   phantom with '(diff rel-)'. The save's check of a write-protected
+   occurrence's folders ('partnerFolder_members_in_view' in
+   'server/from_text/write_protected_edits.rs') counts every unknown
+   phantom as a member, so a write-protected occurrence of the
+   recorder showing that folder would be refused with "changed hidden
+   nodes". Present before slice 14 too (the clause slice 14 removed
+   applied only to unrestricted vognodes). Not reproduced in a test.
+  Fixed 2026-10-22 in slice 6 of [[file:../total-diff-view/15_plan.org][the TDV fixes, features and vocabulary plan]].
+* A new headline below a phantom or in a folder gets no skgrepo (2026-10-21; fixed 2026-10-22)
+   'inherit_parent_skgrepo_if_possible'
+   ('server/from_text/buffer_to_viewnodes/add_missing_info.rs')
+   inherits only from an unrestricted parent. A bare headline the user
+   types under a historical phantom, or parks in a folder, is refused
+   with "UnrestrictedVognode must have a repo that exists in the
+   config" unless it carries '(repo NAME)'. The diff view now keeps such
+   notes; typing one is still awkward. Inheriting from the nearest
+   unrestricted ancestor, or from the owned skgrepo of the recorder,
+   would fix it.
+  Fixed 2026-10-22 in slice 6 of [[file:../total-diff-view/15_plan.org][the TDV fixes, features and vocabulary plan]].
 * 'ViewForest::nodes' yields every root twice (2026-10-19; fixed 2026-10-20)
   'nodes' ('server/types/tree/forest.rs') chains each root with
   'root . descendants ()', but ego_tree's 'descendants' already

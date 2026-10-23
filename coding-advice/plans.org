@@ -78,6 +78,20 @@ and 16. So a slice that changes what the server writes into a buffer
 before it ends, whatever the plan's verification section says, and
 the plan says so in that slice.
 
+* Tenses: the present is for the code as it stands
+In a plan, the present tense refers only to the code as it is now,
+before the plan runs: "the walk reads a hash set", "the printer
+quotes nothing". "It has been like this since plan 13" is fine for the
+same state. The past ("it was broken") refers to states before the
+current one. Everything the plan asks for is future, and says so with
+"will", "should", "would", etc.: "the walk will sort its containers", "a
+removed member should be editable there". If that repeats those two words a
+lot, so be it. The reason: a reviewer reading "'in_folder' is renamed
+'parent_is_a_folder'" cannot tell a report from an instruction, and in
+the 16_review round of the diff view that cost a question per item.
+The same rule holds for a review's proposals: what the code does now
+is present, what you propose is "would" or "should".
+
 * The form of a plan
 - It is a unitary declaration: "nothing here is open for discussion",
   self-standing (every term defined in it or in 'docs/glossary.org'),

@@ -1,0 +1,888 @@
+* DONE [Claude] Is detaching important?
+Yes, in four places; elsewhere the code already converts. This
+document answers the question you asked under "S1" in
+'16_review.org': "I'm thinking let's just never detach. Not even
+in the old reconciler. Is there any situation in which detaching
+is critical?" It rests on two read-only surveys of the server,
+the tests, the docs and the git history, and on three throwaway
+runs that exercised the cases a reading could not settle. Section
+"Evidence" says which claims were run and which were only read.
+
+The short answer. The server detaches a viewnode in eight sites.
+Four of them are critical: a reconciler that never detached would
+leak private structure, would read a stale alias or ID back into
+the graph, would have the save refuse the buffer over a
+duplicate, and would keep showing content a subscriber asked to
+hide. In the other four sites "never detach" is possible, and in
+most of them the code converts already: a stale viewnode with
+anything under it becomes a non-member or a dead viewnode, a
+deleted node a deleted phantom, a restricted node an anonymous
+placeholder. What "never detach" would add there is clutter that
+nothing ever removes, a budget drain, and a change to sixteen
+tests and two docs. The runs also found two bugs that have
+nothing to do with the question and are recorded in
+'TODO/problems.org': a folder member kept for a note under it is
+duplicated when its membership returns, and a deleted private
+node keeps its text after a restricting switch. The
+simplification I recommend instead is one rule, stated in one
+place, with one predicate for both reconcilers; it is at the end.
+
+* Terms
+** most of them
+A buffer shows a tree of headlines. The server keeps that tree as
+the buffer's viewforest, whose nodes are viewnodes. A viewnode
+that stands for a node of the graph is an occurrence of that
+node; it is editable or write-protected. An occurrence under
+another occurrence is a member of it when the parent's content
+list holds it ('affectsParent' true) and a non-member otherwise
+('(affectsParent false)', herald '⊥'): a non-member is shown
+there but the save does not read it into the parent's list. A
+folder is a viewnode that lists the nodes in one relationship
+with the node it is drawn under (its viewparent): "These contain
+it", "It subscribes to these", the alias folder, the ID folder,
+the flags folder. A folder's members are its entries. A role
+graft is an occurrence the server draws in a role tree, born
+'RoleGraft'. A phantom stands for a node the buffer cannot show
+as itself: deleted (a node a save deleted), unknown (an ID that
+resolves to nothing), historical (the diff view's image of a node
+HEAD has and the worktree lacks). A dead viewnode is a viewnode
+kept only because something of the user's stands under it; its
+herald reads "DELETED". A restricted vognode is the anonymous
+placeholder for a node of a restricted skgrepo; it has no title
+and no body. A change viewnode is one the diff view adds to show
+a change: a removed member, a historical phantom, a changeset
+marker, an old text.
+
+A reconciler is the pass that, at a viewnode's visit, makes its
+children match the model, what should stand there now. It creates
+what the model has and the children lack, keeps a child the model
+still has (updating its kind and facts in place), and decides
+what to do with a stale child, one it manages that the model no
+longer has, and with a duplicate, a second child with a key a
+sibling has. To detach a child is to remove it and its subtree
+from the viewforest. To convert it is to keep it under a kind the
+buffer can show truthfully: a non-member, a dead viewnode, a
+deleted phantom, a restricted vognode.
+
+A child's key is what a reconciler matches it by: for an
+occurrence of a graph node (a member, a removed member, a folder
+member, a historical phantom) the node's ID as the live graph
+resolves it, so that an occurrence shown by an extra ID still
+matches its node; for an entry of a property folder the entry
+itself, the alias text or the ID string; for any other viewnode
+its kind, since a parent holds at most one old text, one marker
+of a kind and one folder of a kind. Within one parent each key
+appears at most once; the older reconciler calls the same thing
+the goal item's key.
+
+Two reconcilers run. The older one, 'complete_managed_children'
+in 'server/update_buffer/util.rs', runs in every view, for
+content lists and for every folder. The diff view's,
+'reconcile_children_with_shallowModelSubtree' in
+'server/diff_view/shallow_model_subtree.rs', runs for the change
+viewnodes under a vognode, for the member role trees under a
+changed folder's members, and for the old content of a historical
+phantom. Both ask one question of a stale child before detaching
+it: does something of the user's stand below it? The older one
+answers "any child does", since it creates its children without
+subtrees. The diff view's asks 'is_the_users_viewnode': an
+unrestricted vognode born 'Unremarkable', unsigned, and not a
+member of the folder it stands in.
+
+** What a "key" is
+A key is what a reconciler matches children by. Each child of a
+viewnode has one. The reconciler pairs an existing child with the
+model's child that has the same key. A child whose key has no
+match in the model is stale. A second child with a key a sibling
+already has is a duplicate.
+
+What the key is depends on what the child stands for.
+*** An occurrence of a graph node
+A member, a removed member, a folder member or a historical
+phantom has as its key the node's ID, as the live graph resolves
+it, so that an occurrence shown by an extra ID still matches its
+node.
+*** An entry of a property folder
+An alias, an ID or a flag has as its key the entry itself: the
+alias text or the ID string.
+*** Any other viewnode
+An old text, a changeset marker of one kind or a folder of one
+kind has as its key its kind, since a parent holds at most one of
+each.
+*** The rule the duplicate detach enforces
+Within one parent each key appears at most once. The older
+reconciler calls the same thing the goal item's key.
+* Where the server detaches today
+Each subheadline is one site. "Leaf" means a viewnode with no
+children.
+
+Nothing else removes a viewnode. Hoist writes disk; nodeMerge
+rewrites viewnodes in place; delete-node converts to a deleted
+phantom; "delete references to absent node" rewrites disk and
+rerenders; the pruned change view's sets are graph sets and
+remove no viewnode; a restricted vognode is never removed by an
+ordinary rerender.
+** a1: 'complete_managed_children', 'util.rs:307'
+It detaches a stale managed child that is a leaf; one with
+children is kept as a non-member or a dead viewnode. The comment
+says: "only a childless one is detached".
+** a2: 'dispose_orphaned_folder_child', 'ancestry.rs:252'
+It detaches a member leaf of a folder whose viewparent became a
+phantom, a restricted vognode or a dead viewnode. The comment
+says: "a member view-leaf -> delete".
+** b: 'complete_managed_children', 'util.rs:297'
+It detaches the second and later children sharing one key, with
+their subtrees. The comment says: "Duplicates are redundant:
+always detach".
+*** jeff : This seems wrong.
+It is forced by the fact that we use these jerry-rigged 'keys'
+that aren't true viewnode IDs.
+I think we want viewnode IDs. It would simplify a lot of code.
+They don't need to be UUIDs. A typical view holds at most
+a few hundred viewnodes. Viewnode IDs only need to be unique
+within a buffer, not across buffers.
+Each time a buffer is rendered, use only as many hex digits
+as is necessary to guarantee uniqueness.
+If the buffer expands (say from 256 to 257) and another is needed,
+the older ones do not need changing; just add another hex
+digit for the new viewnode IDs.
+The metadata should include (vid <hex number>).
+Every viewnode -- folders, aliasees, whatever -- deserves one.
+
+Maybe most of them don't get used. Still worth it.
+I've put off this refactor a long time,
+but it seems clearly the right way.
+
+If vognodes share a skg id under the same parent,
+they should all be deadened except the writable one,
+or barring its existence, all but the first.
+Dead nodes with no subtree should be detached;
+dead nodes with subtrees, though, remain.
+
+Duplicate aliases or IDs should be uniquified the same way,
+although in those cases I believe 'writable' does not apply.
+
+Once there are viewnode IDs,
+let's throw out all code anywhere (e.g. both reconcilers)
+that keys on that other stuff, and just key on viewnode ID.
+**** [Claude] agreed, with one line drawn
+Identity comes from the vid; the warrant comes from the graph. A
+reconciler answers two questions about a child. Which viewnode is
+this? And does the graph still warrant it here, as what? Today
+one key answers both, and badly for the first: two occurrences of
+one node under one parent are indistinguishable, so the second is
+detached with its subtree. A vid answers the first question
+completely. It cannot answer the second, because the model a
+reconciler builds comes fresh from the graph and has no vids;
+whether an alias entry, a member or a marker should still stand
+is a fact about the graph, looked up by the node's ID, the alias
+text or the kind. So the keys stay as the lookup from a graph
+item to the child that stands for it, but they stop deciding
+ownership: today a reconciler infers "mine" from shape (birth,
+sign, flag, kind), and the first throwaway run showed that
+inference reading drawn content as yours. With vids the server
+records, at creation, which reconciler made each viewnode, and
+"mine" is a lookup. That record is what retires
+'is_the_users_viewnode', 'holds_the_users' and
+'detach_the_servers_below', and it ends the bug run 3 saw where a
+kept stale graft loses its birth and reads as yours forever.
+
+The scheme, with your later note: lowercase letters and digits,
+so two characters cover 1,296 viewnodes and a third is almost
+never needed; assigned at creation, never reused within the
+buffer's life; '(vid xx)' on every headline, folders and
+properties included. Nothing identifies a viewnode today: an
+ego_tree 'NodeId' tracks buffer position after a parse, and every
+state that survives a save rides in an atom ('folded',
+'affectsParent', 'writeProtected', 'birth roleGraft', the diff
+facts). So the vid rides the same way: the printer writes it, the
+parser reads it, and the server keeps per view a table from vid
+to what it knows (owner, graph key, birth). A headline without a
+vid is one you typed; it gets one at the next render. Two
+headlines with one vid (a copy) keep it on the first in buffer
+order and give the second a fresh one. A vid that moved is a
+move, so fold state and facts follow it.
+
+What it costs. The parser treats an unknown atom as a hard error,
+so the atom needs parser and printer support, a 'vac' herald rule
+and the regenerated rules fixture; the clients need nothing,
+since both hide the whole '(skg ...)' sexp and look atoms up by
+name. The real cost is the tests: 1,541 '(skg' literals in the
+Rust tests, 488 in the Emacs tests, 437 in the Neovim tests and
+about 200 in the integration tests. Many are parser inputs, which
+need no vid; the expected-output literals change, unless the
+comparison helpers strip '(vid ...)' before comparing, as
+'assert_metadata_eq!' already ignores atom order. I would add
+that stripping and print the atom last in the form, so that
+substring asserts like "(node (id x) " keep matching. The round-
+trip tests hold as long as a parsed vid is preserved, which is
+the design.
+
+Your duplicate rule stands, with one amendment argued under
+"Duplicates" below: the extra copies become write-protected non-
+members rather than dead viewnodes, so that they keep their title
+and ID and can be adopted back. I would make the vids their own
+slice, first in the plan, since the one rule below is simpler to
+write once ownership is a record.
+***** jeff : error messages can be made nicer with viewids
+(On the wire let's use vid for brevity,
+but anywhere else let's use "view id".)
+
+Those messages that say things like "there's a problem
+with a vognode representing graphnode <ID>"
+can now specify the viewid too,
+so the user doesn't have to search through occurrences.
+****** [Claude] folded, with the messages listed
+'vid' on the wire alone; "view id" in prose and names. An agent
+listed the server's error and warning texts that concern one
+headline. Twenty-three name a node or a title where one
+occurrence is meant, among them "Local structure violation at ID
+X" (whose ID can be a fresh one the headline never showed), "Edit
+request on write-protected (phantom) node X", "The
+write-protected occurrence of node X differs from the graph", "A
+child typed under the write-protected occurrence of T (X) cannot
+become its content", the folder repair "Repaired FOLDER under
+node X: ...", which today merges the repairs of two occurrences
+of one recorder into one line, and "The readiness request on
+"TITLE" names no current change", whose title is empty for a
+folder. Ten more name a node whose several occurrences conflict
+("Multiple occurrences of node X are editable", "Ambiguous
+deletion request for ID X"), where the message would list the
+view id of each. And about sixty metadata parse errors ("Unknown
+metadata key", "node editRequest may appear only once") name
+nothing at all, since the parser never learns which headline it
+is in. The vid slice would add the view id to every message of
+the first two groups and hand the parser the headline's vid for
+the third. The plan says "view id" in prose and names, and 'vid'
+on the wire alone.
+** c1: 'reconcile_children_with_shallowModelSubtree', ':133'
+It detaches a change viewnode the model lacks, with nothing of
+the user's below. 'docs/diff-view.org' says: "a viewnode is
+detached only when what it stands for is in neither graph".
+*** jeff : similarly, let's deaden when we can't detach
+because it has a subtree.
+**** [Claude] folded: deadened when it has a subtree
+Yes. Under the rule below a stale child is never detached: a non-
+vognode (a marker, an old text, a folder, a phantom) becomes a
+dead viewnode, and a vognode (a removed member) becomes a write-
+protected non-member, which keeps its title and ID. Both are
+save-inert holders of what stands under them. The vognode is not
+deadened because a dead viewnode has no title, no ID and no match
+key: the save discards text typed on it, and no reconciler can
+adopt it back when its membership returns.
+** c2: 'detach_the_servers_below', ':143'
+Under a stale child kept for the user's sake, it detaches the
+diff view's own viewnodes that hold nothing of the user's. The
+comment says: "as it would have been with the viewnode".
+*** jeff : How are these distinguished?
+**** [Claude] today by shape; under the rule, not at all
+Today the diff view's reconciler asks 'is_the_users_viewnode' of
+every descendant of a kept stale child: an unrestricted vognode
+born 'Unremarkable', with no relationship sign and neither '∃+'
+nor '∃-', that is not a member of the folder it stands in, is
+yours; a role graft (born 'RoleGraft'), a removed member (signed
+'~-'), a folder's member and every other kind are the server's.
+The first throwaway run showed the inference wrong for drawn
+content, which is born 'Unremarkable' and unsigned like a note of
+yours; and the keep path makes it wrong again by resetting a kept
+vognode's birth and facts, so that a kept stale graft reads as
+yours from then on. Under the rule below nothing asks the
+question: each reconciler converts only what it owns, the prune
+removes dead leaves, and what you typed is owned by no reconciler
+and so holds its ancestors alive. With vids ownership is a
+record; until then the managed predicates (member of the content
+list, entry of the folder, change viewnode by kind) stand in, and
+they encode membership and kind, not authorship.
+** d: 'prune_children_postorder', 'skgrepo_switch.rs:78'
+At a skgrepo-set switch it detaches a restricted leaf, a property
+leaf under a restricted vognode, a write-protected leaf in a
+partner folder, an emptied folder and a dead leaf. The comment
+says: "a write-protected partner defines nothing, and completion
+regenerates current membership afterward".
+** e: 'prune_self_deletable_when_empty', 'complete.rs:547'
+After every completion it detaches a childless dead viewnode,
+deleted phantom, write-protected partner folder, hidden folder or
+ID folder; it never detaches a root. The comment says: "the one
+place self-deletion lives".
+** f: 'remove_id_folders', 'update_buffer.rs:701'
+It detaches every ID folder, at every rerender outside the diff
+view. The comment says: "A view holds one only in the diff view".
+* What already converts instead of detaching
+The question presumes the reconcilers detach freely. They do not.
+** A stale child with anything under it is kept
+'keep_stale_child_holding_the_users' makes an unrestricted
+vognode a non-member with its diff facts cleared and any other
+kind a dead viewnode. You decided this on 2026-06-10 ("a stale
+branch is made a non-member, not discarded") and on 2026-06-04
+("a stale LEAF is deleted uniformly ... Principle:
+demote-to-Independent is only for stale members with a user
+subtree to preserve and no other representation"). The second
+throwaway run saw it in an ordinary view: when a second buffer
+removed x from a's content, the first buffer kept x as '⊥', still
+editable, with xc under it.
+** A deleted node becomes a deleted phantom
+'mutate_unrestrictedVognode_to_deletednode'; the 2026-06-04
+reason for detaching a deleted child (its alias folder would
+reconcile against a missing node and abort the collateral save)
+is gone with it.
+** A node of a restricted skgrepo becomes a restricted vognode
+At a skgrepo-set switch and at every render.
+** A member no longer in its parent's list becomes a non-member
+'mark_erroneous_content_children_as_indep',
+'make_member_children_nonMembers' under a write-protected
+occurrence, 'mark_orphans_under_dead_parents_false', and the diff
+view's removed members. The membership repair warns "made N
+child(ren) non-members, since they are not members".
+** A non-member whose membership returns becomes a member again
+'adopt_nonMember_children_that_are_content' for content;
+'mark_goal_children_as_folder_members' for folders.
+** A dangling ID becomes an unknown phantom
+'normalize_relationship_backed_content_unknowns' and its partner
+twin.
+
+So the reconcilers already follow "convert, and detach only what
+nothing could truthfully stand for". The sites that detach are
+the leaf cases, the duplicates, the diff view's spent change
+viewnodes, and privacy.
+
+* What "never detach" would mean at each site
+Each subsection takes one site, says what the kept viewnode would
+have to become, and what the code downstream does with it. The
+evidence is the surveys unless a run is named.
+** a1, a stale content leaf: possible, with costs
+A stale member that is a leaf would become a non-member, as a
+stale branch does today. The parser accepts a non-member under a
+vognode. Three things change. The leftover takes an editable
+claim: the completion orders non-members ahead of members and
+gives editability to the first occurrence in level order, so a
+stale '⊥' copy can make the real member write-protected (the run
+saw the kept x "still editable"). The leftover spends budget: an
+editable non-member extends its content and is charged, so
+leftovers push later nodes into write-protection. And the
+leftover reads as the user's to every later pass, so nothing ever
+removes it; only you can, by deleting the line (run 2, case C:
+the deletion sticks and no file changes). Two tests assert the
+leaf goes: the collateral break-cycle integration test ("because
+complete_managed_children discards children not in the parent's
+goal_list") and your 2026-06-04 ruling that "a stale LEAF is
+deleted uniformly -- including a user-added extra leaf under an
+editable subscribee (no carve-out)", pinned by two tests in
+'tests/hidden_from_subscriptions.rs' that end "should be deleted,
+not preserved".
+** a1, a stale folder leaf: possible, with a trap
+Keeping it is possible in a write-protected folder. A stale
+member of a partner folder is a node that no longer stands in the
+folder's relationship. Kept as a non-member it passes the parser
+and the write-protected checks, which exclude non-members. The
+trap: the folder's distinctness check at save,
+'partnerFolder_children_have_distinct_skgids', counts every
+unrestricted child, members or not. If the membership later
+returns, the goal has the key again; whether the kept non-member
+is adopted back ('mark_goal_children_as_folder_members') or a
+second member is created beside it decides whether the next save
+is refused. The third throwaway run exercises exactly this (case
+F, below). The regression test
+'tests/collateral_subscribee_staleness.rs' exists because a
+collateral subscribee folder once kept stale members, and the fix
+was to drop them.
+** a1, a stale entry of an alias, ID or flags folder: critical
+These folders are save inputs: the save reads the node's aliases,
+IDs and flags from them. A stale alias entry kept as it is would
+be read back, and the alias removed elsewhere would be re-added
+at the next save of this buffer. A dead viewnode is not an
+escape: the parser rejects a dead viewnode inside every folder
+kind. The one save-inert form that exists is the diff view's
+'removedAlias' and 'removedID', which "Saving reads no alias from
+it and does not count it among the node's IDs". So a stale
+property entry must be detached, or converted to a kind the save
+ignores, which ordinary views do not have today.
+** a2, a member leaf under an orphaned folder: same as a1
+The folder's viewparent became a phantom, a restricted vognode or
+a dead viewnode; the folder is deadened and its member leaves go.
+Kept, they would be non-members under a dead folder, which the
+parser accepts.
+** b, duplicates in content: possible only in one form
+Keeping them is possible only as write-protected non-members. Run
+2 settled this (cases A, A2, B, B2). Two member children with one
+ID under an editable parent refuse the save:
+"UnrestrictedVognode's non-ignored content children must be
+unique (no two sharing the same ID)", and, when both are
+editable, "Multiple occurrences of node ID are editable". A copy
+marked write-protected alone is still refused; a copy marked
+non-member alone is refused as a second editable occurrence; a
+copy marked both is accepted, with no warning and no file change,
+and the rerender moves it ahead of the members. So a reconciler
+that kept a duplicate would have to set both flags, and the kept
+copy would then sort first.
+** b, duplicates in a folder: critical
+The folder's distinctness check counts every unrestricted child,
+so a duplicate in a write-protected or hidden folder cannot be
+kept in any form the save accepts; the validator would have to
+change to count members only, as the content check does.
+** c1 and c2, the diff view's spent change viewnodes: possible
+Keeping them is possible, at a price in clutter. After a commit
+every change is history. A changeset marker, an old text, a
+changed folder and a historical phantom whose node is in neither
+graph would become dead viewnodes, each reading "DELETED", or
+would keep their facts, which are then false ('~-' on a
+relationship both graphs have). Five tests assert that none of
+'(diff ', 'changed)', 'changesetMarker', 'oldText', 'historical',
+'homeSkgrepoMove' and '(ready' remains after a commit; two
+integration tests assert the same. The first throwaway run showed
+what already stays: a removed member with drawn content survives
+the commit as a parked non-member, because the predicate reads
+its drawn content as the user's; a deleted root stays as a
+deleted phantom, by design ("the user should still see a deleted
+root").
+** d, the skgrepo-set switch: critical
+When the restriction narrows, unrestricted vognodes of a now
+restricted skgrepo are converted to restricted vognodes, which
+show nothing but the atom 'restrictedNode', and restricted leaves
+are pruned. Keeping the leaves would leak that a hidden member
+exists, where it stands and how many there are, which a fresh
+render under the same restriction withholds; the code already
+treats "would leak that a hidden node vanished" as a reason not
+to flip a restricted node to a deleted placeholder. The same
+holds for a content member whose membership is recorded in a
+restricted skgrepo while both nodes are public ("the private
+reading-list case"): a stale leaf there, kept as a titled '⊥'
+under its container, would reveal the private membership. The
+third run tests a related leak (case G).
+** e, the prune of empty containers: clutter only
+A childless dead viewnode, deleted phantom, write-protected
+partner folder or hidden folder is removed after every
+completion. Kept, each is a line reading "DELETED" or an empty
+folder; the parser accepts them. One test calls an empty
+write-protected folder "just noise" and asserts its removal.
+** f, ID folders outside the diff view: a side finding
+It is a side finding, not a policy. Every rerender outside the
+diff view removes every ID folder, since only the diff view draws
+one. The parser lets a non-member sit under an ID folder, so a
+note you park there in a diff-view buffer would be lost if that
+buffer were ever rerendered as an ordinary view; this is a
+leftover to fix, not a detach to keep.
+** The hidden content of a subscribee: critical
+Your 2026-06-04 ruling named one more case where a stale member
+"must be REMOVED, not demoted (else a node stays wrongly
+visible)": a content member of a subscribee that the subscriber
+hides belongs in the "It contains these, but the subscribing
+ancestor hides them" folder and nowhere else. Kept under the
+subscribee as a non-member, it would show what the subscriber
+asked not to see.
+
+* The four critical cases, in one place
+** Privacy
+A restricted leaf at a skgrepo-set switch, and a stale leaf whose
+membership is recorded in a restricted skgrepo. Converting
+reveals existence or membership; only removal withholds it.
+*** jeff : I don't really care about this one.
+If we just made them all dead, it would be a tiny leak,
+yes, but it's not important.
+If we can make a single simple rule by throwing this out,
+let's throw it out.
+**** [Claude] folded: no exception is needed
+Under the rule below a restricted leaf at a skgrepo-set switch
+becomes dead and the postorder prune removes it in the same
+completion, so nothing of it reaches the buffer, as today; a
+restricted node with a live subtree stays the anonymous
+'restrictedNode' placeholder, as today. The one leak that remains
+is run 3's case H, a titled stale member kept for its subtree,
+which you accept. Case G (a deleted private node's title after
+the switch) is a separate bug of the switch's conversion and is
+in 'TODO/problems.org'.
+** Save inputs
+A stale entry of an alias, ID or flags folder is read back at the
+next save unless it is detached or converted to a save-inert
+kind, which ordinary views lack.
+*** jeff : this can stay
+Is the rule that an alias or an ID can't have children?
+If so, then yes, let's always detach stale ones.
+If not, then we should instead deaden them when they have children,
+unless all those children are dead too. (There's some
+bottom-up (leaf-first) process that detaches dead stuff this way,
+somewhere in the view-refresh code.)
+
+I don't feel strongly about this either -- whether we
+deaden or detach. I just want a simple rule.
+**** [Claude] an entry holds only parked non-members
+So stale entries vanish by the leaf rule. An alias, ID or flag
+entry may have children of one kind only: unrestricted vognodes
+with an explicit '(affectsParent false)' and a repo. A bare note
+typed under one is refused at save ("Alias must have no
+(non-ignored) children"; it also inherits no skgrepo). So in
+practice entries are leaves, and under the rule below a stale
+entry becomes dead and the postorder prune removes it in the same
+completion, before the buffer is rendered; the save never reads
+it back. The corner is a parked non-member under an entry: the
+entry would then stay as a dead viewnode holding it, and the
+parser refuses a dead viewnode inside every folder today, so the
+rule needs the folder validators to accept one. The leaf-first
+process you remember is 'prune_self_deletable_when_empty':
+postorder, after every completion, so a chain of dead leaves
+collapses in one pass; it stops at a kind it does not prune, such
+as a vognode.
+** Duplicates
+In content a duplicate is accepted only as a write-protected
+non-member; in a folder it is accepted in no form, since the
+validator counts every unrestricted child.
+*** I talked about this where I introduced the idea of viewnode IDs.
+Duplicates will still get deadened with the VIDs,
+but they won't lose their subtrees.
+**** [Claude] folded, with one amendment
+The extra copies become write-protected non-members, not dead
+viewnodes. The extra copies keep their subtrees, as you say. I
+would make them write-protected non-members rather than dead
+viewnodes: a dead viewnode has no title, no ID and no match key,
+so the copy would show "DELETED" where the node lives on, the
+save would discard anything typed on its line, and no reconciler
+could adopt it back. A write-protected non-member keeps the title
+and ID, is never visited for extension (so no budget), can hold
+no editable claim, and is the one form of a duplicate the save
+accepts under a vognode (run 2, case B2). In a folder the
+distinctness check counts every unrestricted child and must count
+members only, as the content check does; that is the second open
+question below. The copy kept as the member is the writable one,
+else the first, as you say. Duplicate alias and ID entries are
+leaves, or hold only a parked non-member, so they die and are
+pruned.
+** Hiding
+A subscribee's content that the subscriber hides must not stay
+under the subscribee in any form.
+*** DONE jeff : agreed
+* What "never detach" costs where it is possible
+** jeff : we should still deaden
+I think most of these concerns (but not the clutter)
+are relieved if,
+although we don't detach,
+we nonetheless deaden the problematic nodes.
+*** [Claude] yes: deadening relieves all four
+A dead viewnode is not visited for extension and so is never
+charged, holds no editable claim, and carries no facts; a write-
+protected non-member extends nothing (so no budget), holds no
+claim, and has its facts cleared. So budget, editability and
+facts go away, and the leaf-first prune relieves the clutter too:
+a leftover stays only while something live stands under it.
+Today's keep path leaves a kept stale vognode editable (run 2,
+case E saw x "still editable"), which is where the budget charge
+and the stolen claim came from; the write-protection is the one
+change.
+** Clutter that nothing removes
+A kept leftover reads as the user's to every later pass, so it
+stays until you delete its line or close the buffer. In an
+all-changes buffer a commit would leave one "DELETED" line per
+marker, old text and changed folder, and one '⊥' line per removed
+member.
+** Budget
+An editable leftover extends its content and is charged against
+the node budget, so leftovers push later nodes into
+write-protection.
+*** jeff : The leaf-first dead-stuff-detachment will help.
+(I mentioned it earlier.)
+** Editability
+A leftover sorts ahead of members and can take the editable claim
+from the real occurrence.
+** Facts
+A kept change viewnode either keeps facts that are now false or
+needs a refresh rule for every kind in a position the model no
+longer describes.
+** Tests and docs
+Sixteen tests assert a detachment (three stale content leaves,
+four stale folder members, one duplicate, five spent change
+viewnodes, three phantom cleanups, three privacy prunes, two
+others); two docs state the policy ('docs/diff-view.org', "What a
+reconciler keeps"; 'docs/glossary.org', "stale-member rule").
+
+* What I recommend
+The complexity you saw in '16_review.org' was in my reasoning
+about two predicates, two of my three predictions being wrong;
+the policy in the code is five lines long. Zero detaching would
+not shorten it, since four exceptions would have to stay, and it
+would add the conversions, the validator change and the refresh
+rules above. What would make the policy legible is to state it
+once and make both reconcilers read it from one place.
+** jeff
+Given what I've said above, what's
+the simplest rule you can think of?
+*** [Claude] the simplest rule
+Convert what you own, then prune dead leaves. In one sentence: a
+reconciler never detaches; a child it owns that the graph no
+longer warrants is converted, and after every completion a
+postorder prune detaches dead leaves.
+
+Spelled out, with each word defined. A reconciler owns the
+children it created; with vids that is a record, and until then
+the managed predicates stand in. The graph warrants a child when
+the model built from the graph has an item with the child's key;
+a second child with the same key is unwarranted, and the copy
+kept is the writable one, else the first. To convert is to make a
+vognode leaf and every non-vognode a dead viewnode, and a vognode
+with a subtree a write-protected non-member, which keeps its
+title and ID, extends nothing, holds no claim and can be adopted
+back when its membership returns. The prune is the existing
+'prune_self_deletable_when_empty': postorder, so a chain of dead
+leaves collapses in one completion, before the buffer is
+rendered; it never prunes a root.
+
+What follows from it. Privacy needs no exception: a restricted
+leaf dies and is pruned at once, and a restricted subtree is the
+anonymous placeholder, as today. The alias, ID and flags folders
+need none: a stale entry is a leaf, dies and is pruned before the
+save could read it. Duplicates need none: the extra copy dies if
+a leaf and is otherwise a write-protected non-member, the one
+form the save accepts. Hidden content under a subscribee dies if
+a leaf; with a subtree it would be a titled non-member, so if
+hiding must be strict that one case deadens the vognode instead,
+and its title goes. Nothing asks whether a viewnode is yours:
+what you typed is owned by no reconciler, so it is never
+converted, and it holds its ancestors alive; everything the
+server made and no longer warrants collapses to the nearest live
+thing.
+
+What goes: 'is_the_users_viewnode', 'holds_the_users',
+'detach_the_servers_below', the two branches of
+'keep_stale_child_holding_the_users' (one convert function
+replaces them), the duplicate detach, the four exceptions, and
+'is_unrestricted_removed_member' as a test of authorship. What
+changes: the folder validators accept a dead viewnode and count
+members only for distinctness; the folder reconciler adopts a
+child whose key returns instead of creating a second (run 3, case
+F); the stale vognode's keep path write-protects it. The sixteen
+detach tests keep their outcomes, since a dead leaf is gone
+before rendering; the docs state the one rule in one place. This
+supersedes the "One rule" and "One predicate" sections below,
+which I leave as the record of the earlier proposal.
+**** jeff : for the hidden node
+Let's not be strict; it can stay, write-protected,
+if it has a subtree. The heeralds will be a little intricate:
+write-protected, does not affect its (subscribee) parent,
+yet contained in its parent,
+and hidden by its (subscriber) great-grandparent.
+***** [Claude] folded: a titled write-protected non-member
+A hidden content member of a subscribee that has a subtree stays
+under the subscribee as a write-protected non-member, '☮⊥', like
+every other stale vognode with a subtree; the exception goes. The
+two further facts you name are already in the metadata of the
+hidden folder's members, as '(rels ...)' stats: contained by the
+ancestor two generations up, hidden by the one four up. The plan
+would give the kept member the same stats, so that the herald can
+draw all four facts, and the glossary's entry on hiding would say
+that a hidden member with a subtree is shown this way.
+** One rule, stated in one place
+"A reconciler never detaches what might be the user's, nor a
+stale child that holds it; such a child is converted (an
+unrestricted vognode to a non-member, anything else to a dead
+viewnode). It detaches a stale child that holds nothing of the
+user's, a duplicate, what privacy requires at a skgrepo-set
+switch, and the hidden content of a subscribee." This is today's
+behavior; the glossary's "stale-member rule" and the diff view's
+"What a reconciler keeps" would become one entry that both
+reconcilers cite.
+** One predicate
+Both reconcilers would ask the same question of what stands below
+a stale child: 'might_be_the_users_viewnode', the diff view's
+predicate under the name the first throwaway run showed to be
+honest. In an ordinary view it gives the older reconciler's
+answer in every case but one: a role graft, born 'RoleGraft', no
+longer counts as the user's, so a stale folder member whose only
+children are grafts would go rather than stay as a non-member
+holding them.
+** One function that detaches
+'keep_stale_child_holding_the_users' already decides
+keep-or-convert for both reconcilers; the detach itself would
+move beside it, so a reader finds every detach but the privacy
+prune and the empty-folder prune in one file, each with its
+reason.
+** The folder reconciler adopts a returning non-member
+It creates no second one. Case F shows the kept non-member is
+adopted back and a second member is created beside it anyway; the
+rule should be that a child whose key is in the goal is the
+member, and the reconciler creates one only when no child has the
+key. The content reconciler has that rule already.
+** The switch withholds phantoms too
+Case G shows the skgrepo-set switch leaves a deleted private
+node's text on screen; the prepass should convert or prune a
+phantom whose node's home skgrepo is restricted as it does an
+unrestricted vognode, and case H says a stale branch whose
+membership is private should go rather than stay.
+** The doc says what stays
+"A commit is an ordinary rerender: the roots stand as plain
+context with their change viewnodes gone" would add: a removed
+member that held content stays as a parked non-member, and a
+deleted root as a deleted phantom.
+** If you still prefer never to detach
+Then the plan would say "never detach, except privacy, save
+inputs, duplicates in folders and hidden content", would add
+'removedAlias' and 'removedID' to ordinary views, would set both
+flags on a kept content duplicate, would refresh or clear the
+facts of every kept change viewnode after a commit, and would
+change the sixteen tests and two docs. I recommend against it for
+the clutter alone.
+
+* Side findings, each worth a test
+** Two bugs confirmed by run 3, recorded in 'TODO/problems.org'
+A deleted phantom of a now restricted node keeps its title, body,
+ID and home skgrepo after a restricting switch (case G), and a
+private membership stays visible when its member has children
+(case H). A stale folder member kept for a note under it is
+duplicated when its membership returns, and the next save is
+refused (case F). The descriptions are in "Run 3" below.
+** Comments that disagree with the code
+'server/update_buffer/reconcile/partner_folder.rs:156' says a
+stale restricted vognode gets the delete-leaf rule;
+'local.rs:342' says the rerender removes it; neither happens,
+since restricted vognodes are unmanaged everywhere.
+'subscribee_folder.rs:29' says an empty subscribee folder is
+deleted; lines 55-62 keep it.
+** A member under a write-protected occurrence on the budget path
+'write_protect ()' on the budget-spent and deferred paths does
+not turn members into non-members, unlike the repeat-occurrence
+path; the survey did not trace whether a member can thus stand
+under a write-protected occurrence, which the save would refuse.
+** A hand deletion under a write-protected parent is undone
+Run 2, case D: deleting a role graft's line saves without error
+and the graft comes back silently; deleting a folder member's
+line comes back with a warning and a new position. Only lines the
+model lacks stay deleted.
+
+* Evidence
+** Run
+Run 1 ('tests/results/review16/throwaway/'): after a commit a
+removed member with drawn content stays as a parked non-member; a
+deleted root keeps nothing; a changed folder goes with everything
+under it. Run 2 ('tests/results/review16/throwaway2/'): the
+duplicate cases A, A2, B, B2; hand deletion of a parked
+non-member sticks (C); hand deletion under a write-protected
+parent is undone (D); an ordinary view keeps a stale member with
+children as an editable non-member (E). Run 3
+('tests/results/review16/throwaway3/'): a stale folder member
+whose membership returns yields two members and a refused save
+(F); a deleted private node keeps its text after a restricting
+switch (G); a private membership stays visible when the member
+has children (H).
+** Read
+Every other claim about the code comes from two read-only surveys
+of 'server/', 'tests/', 'docs/' and the git history, checked at
+the cited lines but not executed: the eight sites, the
+validators' counting, the parser's acceptance of non-members and
+dead viewnodes per position, the budget and editability effects,
+and the sixteen tests.
+
+* Run 3: both claims confirmed, and both are bugs today
+** Case F: a stale folder member whose membership returns
+It leaves two members, and the save is refused. In an ordinary
+content view of x, with the containers folder shown, a note was
+typed under the member b. A second view then made b stop
+containing x and saved; the first view's folder kept b as a
+write-protected non-member holding the note, at the front. The
+second view made b contain x again and saved; the first view's
+folder then held two identical member lines for b, the kept one
+(turned back into a member, with the note) and a new one at the
+end. Saving the first view unchanged was refused: "Local
+structure violation at ID x: containerFolder must not have
+duplicate UnrestrictedVognode children." So the counter-claim and
+the claim are both right: the kept non-member is adopted back,
+and a second member is created anyway. The case needs only a note
+under a folder member and a membership that leaves and returns,
+so it can arise today. Two side findings: the stale role graft b
+under the root lost its '(birth roleGraft container)' and stayed
+a plain non-member after the membership returned, since the keep
+rule resets a kept vognode's birth; and in a first attempt,
+re-adding x under b with no children emptied x's content, which
+the final run avoided by giving x its content back.
+** Case G: a deleted private node keeps its text
+This happens after a restricting switch. With a public and a
+private skgrepo, a private node q with a title and a body was
+deleted from a second view, so that the view of its public
+container u showed q as a deleted phantom. The restriction was
+then switched from 'all' to 'public' through the real handler,
+which reported no errors and no warnings. The view of u still
+showed '(skg (deleted (id q) (repo private))) q secret title',
+the body line 'q secret body', and q's child beneath; the view of
+q showed the same phantom as its root. For contrast, the live
+private node r in the same buffer became an anonymous '(skg
+restrictedNode)', kept only because its public child stood under
+it. So under 'public' a deleted private node's title, body, ID
+and home skgrepo stay on screen. This is a privacy bug,
+independent of the detaching question, and the third critical
+case above (the switch must withhold restricted structure) covers
+phantoms as well as vognodes.
+** Case H: a private membership between public nodes
+It stays visible when the member has children. A membership
+recorded in the private skgrepo between two public nodes, rl
+contains book: after the switch to 'public', book vanished from
+under rl when it was a leaf, and stayed as a titled non-member
+with its child under it when it had one. The line no longer says
+the membership is private, but the placement reveals it. This is
+the stale-branch rule applied where privacy wanted removal, and
+it belongs with case G.
+
+* Open questions
+** DONE [Claude] Do you accept the rule as spelled out above?
+Convert what you own: a vognode leaf and every non-vognode to a
+dead viewnode, a vognode with a subtree to a write-protected
+non-member; then prune dead leaves postorder. It supersedes the
+one-rule form and the predicate.
+*** DONE jeff : yes
+** [Claude] Folder distinctness: count members only?
+Today the check counts every unrestricted child, unlike the
+content check. Counting members only lets a write-protected
+non-member copy stand beside the member of the same node in a
+folder, as it can in content, which the duplicate rule needs; the
+folder validators would also accept a dead viewnode.
+*** jeff : why do we need to distinguish folders?
+And can't we use the viewids?
+Or are you talking about distinguishing a folder's members?
+**** [Claude] a folder's members, not folders
+Vids cannot answer it. The question was badly named. The check is
+the save's validator for one partner folder's children: it
+refuses two children that stand for the same node
+("containerFolder must not have duplicate UnrestrictedVognode
+children"), counting every unrestricted child, members and
+non-members alike. The content list's twin check counts members
+only, which is why a write-protected non-member copy may stand
+beside a member in content but not in a folder. The rule above
+wants that form for a duplicate's extra copy in folders too, so
+the folder check should count members only. Vids do not bear on
+it: the check asks whether two children claim one node of the
+graph, which is a question about node IDs, and two distinct vids
+would still be two claims. So the question stands, in plainer
+words: may a folder hold a write-protected non-member copy beside
+the member of the same node, and may it hold a dead viewnode,
+which the same validators refuse today?
+***** TODO jeff : yes!
+** [Claude] Do the vids come first in the plan?
+They make ownership a record, which the rule above assumes;
+without them the managed predicates stand in. Their own cost is
+the test literals, unless the comparison helpers strip the atom.
+*** DONE Jeff : yes
+** [Claude] Hidden content with a subtree: dead or titled?
+The rule makes it a write-protected non-member, which shows the
+title the subscriber asked not to see. Deadening that one case
+hides the title at the cost of one exception to the rule.
+*** DONE jeff : answered earlier ("Let's not be strict")
+** DONE jeff : what about those two new problems in problems.org?
+You said something but I've forgotten.
+Will we have solved them by the end of this?
+*** [Claude] one solved, one small item, one accepted
+The rule solves the first, the second needs a small item of its
+own, and the third you accepted.
+
+The first, a folder member kept
+for a note under it and duplicated when its membership returns
+(run 3, case F), is solved by the rule's adoption clause: the
+folder reconciler adopts a child whose key returns instead of
+creating a second, as the content reconciler does today; with
+vids the kept copy is known by identity as well.
+
+The second, a deleted private node keeping its title and body after
+a restricting switch (case G), is not about detaching: the switch's
+prepass converts unrestricted vognodes of a now restricted
+skgrepo and never touches a phantom. The plan would make the
+prepass convert such a phantom too, to a dead viewnode, which the
+prune removes if it is a leaf and keeps titleless if it holds a
+subtree.
+
+The third (case H, a private membership visible when its
+member has children) is the tiny leak you accepted, and its entry
+would say so. Both entries in 'TODO/problems.org' move to
+'TODO/DONE/' when their slices land.

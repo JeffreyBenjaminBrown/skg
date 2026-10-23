@@ -1316,58 +1316,101 @@ say; a headline with nothing to say carries no =(diff ...)=, and
 =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and at top
 level on alias, id and flag leaves and on the properties below other
 than =bodyDiff=.
-- =(presence SIGN...)= -- SIGNs are taken from =node+ node- node~
-  rel+ rel-=: the node HEAD lacks (=node+=) or the worktree lacks
-  (=node-=), or which both have and whose file records a change
-  (=node~=, "modified", on a member, a removed member or a root); the
-  relationship to the viewparent that HEAD lacks (=rel+=) or the
-  worktree lacks (=rel-=). On an alias, id or flag leaf, the single
-  diff object is written =rel+= or =rel-=. A lost alias or ID is a
-  =removedAlias= or =removedID= leaf (below), whose =rel-= is display
-  only. Absent when both signs are none.
-- =(leaves N OBJECT...)= -- on every viewnode that names leaves: the
-  OBJECTs a request there may name (=node= and/or =rel= on a vognode
-  or historical phantom, each worth one leaf; =all= on a =node~=
-  vognode, beside =rel= when that names a leaf; =all= on another
-  changed vognode neither of whose objects names a leaf, or on a
-  changeset marker; none where a bare request names them), and N, how
-  many distinct leaves a request naming all of them touches. The clients read it to build their requests and
-  to count the leaves an unmark touches; the server's parser accepts
-  and ignores it.
-- =(ready OBJECT...)= -- the diff objects (=node=, =rel=, and =all=
-  on a vognode whose =(leaves ...)= lists it) whose
-  change-forest leaves are all marked commit-ready; a bare =(ready)=
-  marks a single-object leaf, or a changeset marker, that is ready.
-  Absent when nothing is ready.
-- =(readyRequest OBJECT...)= and =(unreadyRequest OBJECT...)= -- ask
-  the save to set or clear the marks of those leaves; the object =all=
-  names every leaf a vognode's node records, or every leaf of a
-  commit readiness aggregate, one level down. At most one, and
-  absent when no request is pending.
+**** =(presence SIGN...)= -- SIGNs are taken from =node+ node- node~ rel+ rel-=
+They denote the node HEAD lacks (=node+=) or the worktree lacks
+(=node-=), or which both have and whose file records a change
+(=node~=, "modified", on a member, a removed member or a root); the
+relationship to the viewparent that HEAD lacks (=rel+=) or the
+worktree lacks (=rel-=). On an alias, id or flag leaf, the single
+diff object is written =rel+= or =rel-=. A lost alias or ID is a
+=removedAlias= or =removedID= leaf (below), whose =rel-= is display
+only. Absent when both signs are none.
+**** =(leaves N OBJECT...)= -- on every viewnode that names leaves
+It gives the OBJECTs a request there may name (=node= and/or =rel= on
+a vognode or historical phantom, each worth one leaf; =all= on a
+=node~= vognode, beside =rel= when that names a leaf; =all= on another
+changed vognode neither of whose objects names a leaf, or on a
+changeset marker; none where a bare request names them), and N, how
+many distinct leaves a request naming all of them touches. The clients
+read it to build their requests and to count the leaves an unmark
+touches; the server's parser accepts and ignores it.
+**** =(ready OBJECT...)= -- the diff objects whose change-forest leaves are all marked commit-ready
+The objects are =node=, =rel=, and =all= on a vognode whose
+=(leaves ...)= lists it. A bare =(ready)= marks a single-object leaf,
+or a changeset marker, that is ready. Absent when nothing is ready.
+**** =(readyRequest OBJECT...)= and =(unreadyRequest OBJECT...)= ask the save to set or clear the marks of those leaves
+The object =all= names every leaf a vognode's node records, or every
+leaf of a commit readiness aggregate, one level down. At most one, and
+absent when no request is pending.
+
+*** Who writes each part, and who acts on it
+**** The server writes =(presence ...)=, =(leaves ...)= and =(ready ...)=
+The server writes the =(diff ...)= form (=change_fact_forms= in
+=server/org_to_text.rs=), and it writes =(ready ...)= after completion
+(=set_ready_facts_in_viewforest=); see =docs/diff-view.org=, "Facts on
+the wire". A rerender of a buffer of the diff view updates each kept
+viewnode's facts in place, and a save of such a buffer recomputes its
+change facts; see "Diff view" and "Save buffer" above. These three
+parts are display facts: nothing reads =(ready ...)= at save, and the
+server's parser accepts and ignores =(leaves ...)=, as its headline
+above says. The glossary's "display fact vs save input" states the
+general rule: the parser ignores or discards display facts, so editing
+them changes nothing. The clients read =(leaves ...)= to build their
+requests and to count the leaves an unmark touches.
+**** The client's readiness gestures write =(readyRequest ...)= and =(unreadyRequest ...)=
+A gesture writes a readiness request as the last part of a headline's
+=(diff ...)=, creating the form if the headline lacks one, and saves;
+see =docs/diff-view.org=, "Readiness requests and gestures". In Emacs
+the gestures are =C-c r r= (=skg-cycle-commit-ready=), which toggles
+the commit-readiness of the change at point, and =C-c r h=
+(=skg-toggle-homeSkgrepo-move-commitReady=), which toggles the
+commit-readiness of the home-skgrepo move of the node at point. Their
+recursive forms take a prefix argument: =C-u C-c r r= marks every
+change in the subtree at point, or unmarks them if the headline at
+point is ready, and =C-u C-c r h= does the same as =C-c r h= to every
+descendant whose home moved between the same two skgrepos; see
+=docs/COMMANDS.org=, "C-c r : commit readiness, in the diff view". The
+Neovim keys are in =docs/COMMANDS-nvim.org=. A gesture that would
+unmark more than one change first asks for a typed "yes".
+**** The save of any buffer consumes the requests
+A save of any buffer, not only one of the diff view's, consumes the
+readiness requests after its graph edits succeed: each sets or clears
+the marks of the change-forest leaves its headline names, at their
+current fingerprints. A save that stops for a confirmation (strandeds,
+Hoist, forks) or fails consumes none, and leaves them in the buffer. A
+request that names no current change is dropped, with the warning =The
+readiness request on "HEADLINE" names no current change; it was
+dropped.= See "Save buffer" above.
+**** One gesture on a modified node marks its file, on a write-protected occurrence too
+On a modified node (=node~=), =C-c r r= names every leaf the node
+records, and its relationship when that changed, so one gesture marks
+the file; both =C-c r r= and =C-c r h= work on write-protected
+occurrences. See =docs/diff-view.org=, "Readiness requests and
+gestures", and the glossary's "diff object, diff aspect", which says
+that =all= names every leaf a modified node records, so one gesture on
+it marks its file.
 
 *** The diff view's viewnodes
-- =removedAlias=, =removedID= -- in an alias or ID folder: an alias or
-  extra ID that HEAD has and the worktree lacks, its headline the alias
-  or the ID, carrying =(diff (presence rel-) ...)=. Saving reads no alias from it and
-  does not count it among the node's IDs.
-- =(historical (id ID) (repo REPO) ...)= -- a historical phantom: a node
-  HEAD has and the worktree lacks, with HEAD's title and body; the
-  grammar of =(deleted ...)=.
-- =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the
-  node's text at HEAD, under a node whose text changed; its headline is
-  the old title, its body the old body.
-- =bodyDiff= -- under an old text: the line diff of the body, each line
-  prefixed by a space, =-= or =+=.
-- =(homeSkgrepoMove (old REPO) (new REPO))= -- the node's home skgrepo moved.
-- =(relRepoMove (old REPO) (new REPO))= -- under a member: the skgrepo
-  recording its relationship to its viewparent moved.
-- =(changesetMarker content)=, =(changesetMarker relRepo)=,
-  =(changesetMarker orderOnly)= -- a changeset marker.
-- =acquiredByFolder=, =acquiredFolder= -- under a historical phantom, the
-  node that acquired it by a nodeMerge; under an acquirer, the
-  historical phantoms of the nodes it acquired. Both are write-protected
-  and derived; an =acquiredFolder= also accepts a non-member the user
-  parks there.
+**** =removedAlias=, =removedID= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
+Its headline is the alias or the ID, carrying
+=(diff (presence rel-) ...)=. Saving reads no alias from it and does
+not count it among the node's IDs.
+**** =(historical (id ID) (repo REPO) ...)= -- a historical phantom
+It is a node HEAD has and the worktree lacks, with HEAD's title and
+body. It has the grammar of =(deleted ...)=.
+**** =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
+It sits under a node whose text changed; its headline is the old
+title, its body the old body.
+**** =bodyDiff= -- under an old text: the line diff of the body
+Each line is prefixed by a space, =-= or =+=.
+**** =(homeSkgrepoMove (old REPO) (new REPO))= -- the node's home skgrepo moved
+**** =(relRepoMove (old REPO) (new REPO))= -- under a member: the skgrepo recording its relationship to its viewparent moved
+**** =(changesetMarker content)=, =(changesetMarker relRepo)=, =(changesetMarker orderOnly)= -- a changeset marker
+**** =acquiredByFolder=, =acquiredFolder= are write-protected and derived
+Under a historical phantom, an =acquiredByFolder= holds the node that
+acquired it by a nodeMerge; under an acquirer, an =acquiredFolder=
+holds the historical phantoms of the nodes it acquired. An
+=acquiredFolder= also accepts a non-member the user parks there.
 
 *** Changed folders
 A partner, alias, ID or flags folder shown because some relationship of
@@ -1382,7 +1425,7 @@ or "(other files)" (see the glossary's "in, out").
 in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 "Stats metadata" above.
 
-Examples:
+*** Examples
 #+begin_example
 (skg (node (id 7) (repo main) (diff (presence node+ rel+) (leaves 2 node rel) (ready node))))
 (skg (node (id 8) (repo main) writeProtected (diff (presence node~ rel+) (leaves 3 rel all) (ready all))))

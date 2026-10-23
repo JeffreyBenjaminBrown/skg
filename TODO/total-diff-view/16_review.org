@@ -1,0 +1,1713 @@
+#+title: Review of the "Fixes, features and vocabulary" run (2026-10-22)
+#+TODO: TODO ONGOING | DONE
+
+* Verdict
+The run finished [[file:15_plan.org][15_plan.org]]: thirteen
+slices, 32 commits, 3.2 hours of wall clock (00:10 to 03:25 UTC),
+every slice DONE, every suite green after every slice and on the
+final tree, and the commit rule kept by every slice. It did what
+the plan says. Where an agent went beyond the text, it wrote why
+in [[file:progress.org][progress.org]] under "Fixes, features and
+vocabulary", and I agree with every departure; the ones that
+change what you will see are under "Know". The run closed the
+three problems the last run recorded and found one new one, under
+"Decide" with the few other things worth a decision. The
+vocabulary and citation check found
+[[*The two-question check][what is listed below]].
+
+* What I checked myself
+** The suites on the final tree, and a build check
+The build check was run at every commit. Every one of the 32
+commits was checked in a throwaway worktree: see "Results".
+** The commit rule
+Exactly thirteen commits touch '15_plan.org', and each is the
+last commit of its slice.
+** The progress notes, read in full
+I read them against the reports and the commits. Thirteen
+sections, 735 lines. Slice 11's report was lost when the terminal
+restarted mid-slice; its commits and its notes were complete, and
+'run-logs/15_plan/slice-11.txt' was reconstructed from them.
+** The whole diff of 'docs/diff-view.org', against the code
+I read it against the code as the plan and the maps behind it
+describe it: the removed member's editability, the root's sign,
+the nested form, the inheritance walk, the navigation keys. I
+found nothing wrong in it.
+** The three problems the run fixed, moved to the done list
+The slice-5 agent moved the first to 'TODO/DONE/problems.org'; I
+moved the other two beside it, each with its fixing slice named.
+The new one the run found stayed, under "Decide".
+** Results
+Rust 867 of 867 (849 before the run), Emacs 381 of 381 (374),
+Neovim every spec (one spec file's count reads 17, as before),
+integration 68 of 69, 'import-md-and-org' failing as it did
+before the run (the agents of slices 0, 3, 4, 5 and 12 checked
+that). Build check: all 32 commits pass 'cargo check
+--all-targets' with no warnings, in a throwaway worktree with its
+own target dir (the first commit's full build printed three lines
+that merely contain the word "error", in crate names, and no
+diagnostic). The logs are under 'tests/results/review16/'.
+
+* Know: what you will meet while dogfooding
+Each of these is in the plan or is an agent's decision beyond its
+text, written up in 'progress.org' under its slice. I checked
+each and agree.
+** A modified node's headline shows 'M'
+One gesture marks its file. A node that exists in both graphs and
+records any leaf carries the sign 'node~', shown as 'M' in the
+violet of '∃' and '~', with a '✓' after it once every leaf the
+node records is marked. A root shows it too, and so does a
+write-protected repeat of the node. A plain gesture on a headline
+now names every object the headline lists ('all' and 'rel' on a
+modified node in a new relationship, 'node' and 'rel' on a new
+node), so the node-or-rel question is gone. The recursive gesture
+names, below the headline it acts on, every object but 'all'; a
+modified node in a new relationship under it still gets its 'rel'
+marked (slice 4).
+*** jeff : what are the other two signs?
+We have signs for node existence changed, rel changed and node changed at all.
+It sounds like the signs for
+node changed and existence changed could be confusible.
+**** [Claude] three signs for the node, two for the relationship
+The mixing you suspect is real. A node's headline can carry one
+node sign and one relationship sign. The node sign says what
+happened to the node: '∃+' (new since HEAD), '∃-' (deleted) or
+'M' (it exists in both graphs and records a leaf beyond its
+existence: its text, a property, a content relationship). The
+relationship sign says what happened to the relationship between
+the node and the node it hangs under: '~+' (new) or '~-'
+(removed). So "the other two signs" are '∃+' and '∃-'. They
+cannot be confused with 'M' on one headline, since a node is new,
+deleted or modified and never two of those: a new or deleted node
+records only its existence leaf. But you are right that one slot
+holds two kinds of fact. Your "aha!" item below proposes
+separating them; my evaluation is there.
+** A removed member is editable
+It is editable where it is its node's first occurrence. "C:
+removed here" under B is editable when the buffer holds no
+earlier occurrence of C, with C's content list and change
+viewnodes under it, among them "its containers changed (other
+files)". A later occurrence stays write-protected, and C-c r u
+counts a removed member under any node as a place to make
+editable (slice 5).
+*** jeff : what would happen
+if I copied its id (C-c u) and then pasted it to be its own sibling (C-c o n)?
+There should be a way to undo the remove, and that seems natural,
+but if buffer rerender would collapse those two instances,
+and the earlier one with affectsParent=False would win,
+then the gesture won't work.
+**** [Claude] it works, with a surprise in the order
+Editing the membership flag is the clean undo. Pasting C's id
+under B ('C-c o n') writes a write-protected occurrence, because
+a writable occurrence of C, the removed member, is already in the
+buffer ('skg--insert-node-from-entry' in
+'elisp/skg-id-search.el'; Neovim's 'linkstack.lua' does the
+same). The save accepts it: the one-editable-occurrence check
+counts only editable occurrences, the distinct-children check
+counts only members, and B's new content list is read from its
+member children, so B contains C again.
+
+The rerender then holds two children of B standing for C, both
+members now ('align_content_members_with_straddle' makes a
+removed member whose relationship is back a member). The content
+reconciler keeps the first in buffer order and detaches the other
+with its subtree ('complete_managed_children' in
+'server/update_buffer/util.rs': "Duplicates are redundant: always
+detach"). Pasted below the removed member, the paste is detached,
+and the removed member, now a plain member, keeps C's content and
+stays editable; pasted above it, the editable removed member and
+everything under it are detached and the write-protected paste
+survives. So the gesture works, and which copy survives depends
+on where you pasted.
+
+The clean undo is one edit of the removed member: open its
+metadata ('C-c v m'), cycle 'affectsParent' from "false" to "true
+(default)" ('S-<right>') and apply, or delete the '(affectsParent
+false)' atom by hand. The save then lists C in B's content, and
+the rerender keeps the one occurrence. No test covers either
+route, and no command does the flag edit in one key. I recommend
+two things for the next plan: a command on a removed member that
+restores the relationship (the flag edit, under 'C-c s' beside
+the other membership commands), documented beside C-c r u; and
+the duplicate rule preferring an editable occurrence over a
+write-protected one, so the paste works whatever the order.
+Agreed?
+***** jeff : agreed
+Let's call it skg-restore-removed-membership.
+It will work in folders too, right?
+****** [Claude] yes, in folders too, by a request
+The save acts on the request; the flag edit works only where the
+container is editable. The name is good. Two facts decide the
+design. The flag edit works wherever the container's occurrence
+is editable, whatever the removed member's own protection: the
+save lists the parent's content from the buffer, and its
+predicate for a member does not look at the child's protection;
+under a write-protected container the same edit refuses the whole
+save ('MemberChildOfWriteProtectedOccurrence'). And in a folder
+nothing reads the flag: a '~-' member of x's containers folder is
+b, the container that dropped x, and b's content list is nowhere
+in that folder.
+
+So the command should not edit the flag. It should write a
+request, '(restoreRequest)', as the last part of the headline's
+'(diff ...)', and save, as the readiness gesture writes
+'(readyRequest ...)' and saves. The save would act on it after
+its other graph edits, where it consumes the readiness requests
+today, and on write-protected headlines too, as it honors those.
+For each request it would re-add the relationship the headline
+stands for, as HEAD recorded it: the member at its old index,
+clamped to the list's length, in the skgrepo that recorded it.
+The relationship is read from the position: a removed member's
+viewparent contains it; a '~-' member of a partner folder stands
+in the relationship the folder's kind names to the folder's node
+(b contains x; s subscribes to x). In every case the save edits
+the file of the node that records the relationship: the
+viewparent of a removed member, the member of a partner folder. A
+request on a headline carrying no removed relationship would be
+dropped with a warning, as a readiness request naming no current
+change is. The rerender then shows the restored member as a
+member, its subtree and fold state kept, since the reconciler
+updates a kept viewnode's kind in place. A lost alias or ID is no
+relationship; you retype it under an editable occurrence.
+
+The flag edit stays as the by-hand route under an editable
+container. I would bind the command on 'C-c r m' and
+'<localleader>rm', beside the diff view's other commands, and
+keep the duplicate rule for the paste as recommended. Agreed?
+******* jeff
+We'll want two kinds of request: restore-node and restore-rel.
+Restore-node should restore it with all its out-links and in-links
+(only from the last commit, not from all of its history).
+Restore-rel called on a deleted node should refuse,
+explaining the user should first restore the node.
+******** DONE [Claude] folded: restore-node and restore-rel
+The requests are '(restoreRequest node)' and '(restoreRequest
+rel)'; restore-node rebuilds the node from HEAD's graph with its
+links both ways. Terms: a deleted node is one HEAD has and the
+worktree lacks; the diff view shows it as a historical phantom,
+'∃-', with HEAD's title and body and, in content position, its
+old content beneath it as removed members. HEAD's graph is held
+in memory as the straddle's before-graph, read from the git tree,
+and it holds the whole node: title, body, aliases, extra IDs,
+flags, home skgrepo and the four relationship lists with their
+recording skgrepos (the out-links), as well as the inbound
+indexes (who contained, subscribed to, overrode and hid it: the
+in-links). Nothing today recreates a node from it.
+
+The two requests take the two diff objects, as a readiness
+request does: '(restoreRequest rel)' from
+'skg-restore-removed-membership', and '(restoreRequest node)'
+from a second command, say 'skg-restore-deleted-node'. Both are
+parts of '(diff ...)', written by the command, which then saves;
+the save acts on them after its other graph edits, nodes before
+relationships, so that a membership restored in the same save can
+name a node restored in it.
+
+Restore-node, on a historical phantom: the save writes the node's
+file from the before-graph's copy, out-links included, into its
+home skgrepo, and re-adds its in-links: each container,
+subscriber, overrider and hider it had at HEAD gains it again in
+that list, at HEAD's index clamped, in the skgrepo that recorded
+it, unless that recorder is itself deleted (skipped) or lists it
+already (nothing to do). An out-link to a node still deleted is
+kept as HEAD recorded it and shows as an unknown phantom until
+that node is restored too. Mentions are text and need nothing.
+"From the last commit" is this graph, never git's history. The
+rerender then turns the phantom into an unrestricted vognode in
+place, as it does today when you recreate a node by hand.
+
+Restore-rel refuses on a deleted node, as you ask: the client
+refuses at once when the headline is a historical phantom, with
+"This node is deleted; restore it first
+(skg-restore-deleted-node)", and the server drops a request whose
+relationship has a deleted node at either end, with a warning,
+since a folder member's recorder can be the deleted one. A
+request on a headline that is not what it expects (a 'node'
+request off a phantom, a 'rel' request off a removed membership)
+is dropped with a warning too. Keys: 'C-c r m' for the
+membership, 'C-c r d' for the deleted node, and the Neovim twins;
+yours to change.
+********* DONE jeff : they ought to feel like edit requests
+A user would have no reason to expect these to look
+different from other edit requests. The herald ought to look
+the same -- if it's 'editRequest:delete' for deletion,
+it ought to be 'editRequest:restoreNode' to restore the node.
+
+Similarly for the wire.
+
+They happen to be edit requests that can't be reached
+outside the diff view, but i don't think that's enough
+to consider them a new kind of thing.
+********** [Claude] folded: two edit requests
+They are 'restoreNode' and 'restoreMembership'. On the wire they
+are bare atoms beside 'delete': '(editRequest restoreNode)' on a
+historical phantom, and '(editRequest restoreMembership)' on a
+removed member or on a '~-' member of a partner folder. Each
+client's command writes the atom through the same helper the
+delete and merge commands use, and leaves the save to you, as
+every edit request but the fork does ("Save to apply."). The
+herald follows the others: "delete" and "merge:ID" are joined by
+"restore node" and "restore membership", in the same nonstandard
+style, and the metadata editor's cycle of edit requests gains the
+two values where they apply. The save collects them with its
+other graph edits, nodes before memberships, and consumes them
+after the commit, where every edit request is consumed; a save
+that stops for a confirmation or fails leaves them in the buffer,
+as it leaves the rest.
+
+Two doors must open for this, and the code has opened each
+once before. An edit request lives in the editable half of
+'Editability' today, so a write-protected occurrence carries
+none, and the parser refuses 'delete' and 'merge' there with
+"Edit request on write-protected (phantom) node". The relRepo
+request is the one exception, because it describes the
+relationship rather than the node; 'restoreMembership' is the
+second, for the same reason, and the save collects it on the
+recorder as it collects a relRepo request on the parent. The
+parser also refuses every edit request on a deleted or
+historical phantom ("Unknown deleted key: editRequest"), and
+a phantom emits nothing at save; the plan lets a historical
+phantom carry 'restoreNode' alone, and makes the traversal
+emit the restore for it. The refusals you asked for fall out
+of the grammar: 'restoreMembership' on a historical phantom
+is a parse error whose text says to restore the node first,
+and the client refuses it at once as well; 'restoreNode' on
+anything but a historical phantom is refused the same way.
+The conformance list of emittable atoms learns both, and the
+API doc, which today documents only the relRepo and flag
+forms of an edit request, gets all five.
+
+Keys: 'C-c s' is where the edit requests live ('C-c s m'
+merge, 'C-c s r' relRepo, 'C-c s x' flag), so 'C-c s n' for
+the node and 'C-c s l' for the membership, with
+'<localleader>sn' and '<localleader>sl' in Neovim; yours to
+change.
+*********** jeff : yes but call it restoreRel.
+It's still unambiguous.
+************ TODO [Claude] folded: 'restoreRel'
+The membership request is '(editRequest restoreRel)', matching
+the 'rel' object, and the command stays
+'skg-restore-removed-membership'. The closing list says so.
+******* jeff
+Earlier I talked about a node's "nearest ancestor-partner".
+I realize now that that could be dangerous in one context:
+Suppose R subscribes to E, and R hides C which E contains.
+That would look like this:
+#+begin_example
+  * R
+  ** it subscribes to these
+  *** E
+  **** hiddenIn // I forget the exact headline
+  ***** C
+#+end_example
+In this case, C's ancestor-partner is R,
+because it's in a hides folder that describes R --
+whereas C's nearest vognode ancestor is E.
+******** [Claude] the code never asks for an ancestor
+It reads the folder's kind, and the folder in your picture is a
+filter folder the diff view signs nothing in. Terms first. A
+folder's viewparent is the node the folder is drawn under (the
+glossary's word; the code calls it the folder's anchor). A
+partner folder of one kind lists the nodes in one relationship
+with its viewparent, and the kind fixes the direction: "These
+contain it" lists the containers of the viewparent, "It
+subscribes to these" the subscribees of the viewparent. The
+relationship a member stands in is therefore defined by the
+folder's kind and the folder's viewparent, never by the member's
+nearest vognode ancestor. The save computes it that way already
+for a readiness request: 'relationship_to_viewparent'
+('server/diff_view/readiness_requests.rs') returns the relation,
+the recorder and the member, and the restore request would call
+the same function. "Nearest ancestor-partner" is my phrase from
+above as much as yours; the plan would say "the folder's
+viewparent" instead.
+
+Your picture is the one place where two relationships meet. The
+folder under E inside R's subscribees, "It contains these, but
+the subscribing ancestor hides them", lists E's content that R
+hides; its members stand in two relationships at once, E contains
+C and R hides C, and R is four generations up. The code treats
+it, and the similar "The subscriber ancestor hides these, but
+subscribes to nothing that contains them", as filter folders:
+they have no relation member role, the diff view draws neither
+over the straddle, no member there gets a sign, and
+'relationship_to_viewparent' returns nothing for them, so a
+request there is dropped. A change to what R hides shows under R
+itself, in "the nodes it hides changed (this file)", whose
+viewparent is R; a change to what E contains shows in E's
+content. So the danger does not arise, and the plan would say so
+in the glossary's entry for the relationship sign: the sign on a
+folder member concerns the relationship, of the folder's kind,
+between the member and the folder's viewparent; the filter
+folders carry none. One trap for the plan's agents: several
+parameters named 'recorder_pid' hold the folder's viewparent,
+which for a containers folder is not the recorder; they should be
+renamed.
+** Six navigation commands
+'C-c r n c', 'C-c r n u', 'C-c r n r' and 'C-c r p c', 'C-c r p
+u', 'C-c r p r'; Neovim '<localleader>rnc' and so on. Point lands
+on the headline's '(skg', as 'skg-id-next' lands, and the ends
+say "No further change" or "No earlier change" (slice 8).
+** The metadata nests the diff view's facts
+A headline's facts read '(diff (presence node~ rel+) (leaves 2
+rel all) (ready all))', and a request goes in as the last part. A
+headline that lacks the form gets '(diff (readyRequest ...))'
+from the gesture. A changed folder keeps its bare top-level
+'(ready)' (slice 3).
+*** jeff : which gesture?
+**** [Claude] the readiness gesture, C-c r r
+A readiness gesture (C-c r r, C-c r h and their recursive forms)
+writes '(readyRequest OBJECTS)' or '(unreadyRequest OBJECTS)'
+into the headline's metadata before saving. A headline that lists
+leaves always carries the '(diff ...)' form, so a headline
+without the form is one the server gave no leaves fact; a gesture
+there writes '(diff (readyRequest ...))' rather than a '(DELETE
+...)' that would land in the buffer as text, and the save drops
+the request with its warning that it names no current change.
+*** jeff : "A changed folder keeps its bare top-level '(ready)'"
+because it has no (diff ...) sexp?
+**** [Claude] yes
+A changed folder's metadata is '(skg (containerFolder changed)
+(ready))'. The folder carries no '(diff ...)' because it has no
+sign and names no leaf of its own: its "changed" is derived from
+its members, and so is its '(ready)'. The plan left it as it was.
+It could nest as '(diff (ready))' for uniformity, at the cost of
+a '(diff ...)' holding nothing but a readiness; I would leave it.
+***** Jeff : let's nest it in (diff ...) please
+I don't remember whether we wrap bare atoms or not;
+it feels like (diff ready) would be fine,
+but if that for some reason requires new machinery,
+(diff (ready)) is fine.
+****** [Claude] folded: '(diff (ready))'
+A bare atom would need a new parser case. The parts of '(diff
+...)' are all lists headed by a keyword: '(leaves 2 all)',
+'(ready all)', and under the three-kinds form '(node added)'. The
+parser reads the form as a list of such parts. '(diff ready)'
+would put a bare atom beside them, a second kind of element with
+its own parser case, for one headline kind. '(diff (ready))' is
+the existing '(ready OBJECT...)' part with no object, which the
+parser accepts already (a changeset marker carries it today). So
+a changed folder's metadata would read '(skg (containerFolder
+changed) (diff (ready)))', and the clients' folder readers would
+look inside '(diff ...)' as their node readers do. The 'changed'
+flag stays in the kind part, where it stood before the diff form
+existed; I would not move it. Under the three-kinds form a marker
+will say '(ready all)', since it lists '(leaves N all)'; a folder
+lists no leaves, so its objectless '(ready)' stays and means the
+aggregate of its members.
+** Message texts changed
+The readiness summary says "Commit ready." for "COMMIT READY.",
+and set-repo says "not changed" (slice 12). Neovim's
+':SkgSetRepo' and ':SkgSetRepoRecursive' now skip a
+write-protected occurrence and warn, as Emacs does, and both
+clients say the save refuses such an edit (slice 8).
+*** jeff : when does set-repo say 'not changed'?
+**** [Claude] when it skips a write-protected occurrence
+Set-repo (C-c s s, C-c s S) skips a write-protected occurrence,
+since the save would refuse its skgrepo edit, and says so twice:
+once per skipped ID, "skg-set-repo: write-protected occurrence
+not changed (the save would refuse its edit): ID", and in the
+summary after the count of nodes changed, "WARNING: N
+write-protected nodes not changed -- the save would refuse their
+edits. See *Messages* for the ID list." Slice 12 lowercased the
+"NOT" of both. The recursive form drops from the warning an ID
+whose editable occurrence the same walk changed. Neovim's
+messages are the same, prefixed "SkgSetRepo:" and pointing to
+':messages'.
+** Stage-and-commit, server warnings, new headlines
+The confirmation's second reason is '(already-staged ...)' with
+its paths quoted (slice 7). The '*SKG Server Warnings*' buffer
+now shows a foreign manifest whose order contradicts your config
+(slice 7). A bare new headline under a phantom or in a folder
+inherits the skgrepo of the nearest unrestricted ancestor; only
+one at top level is still refused (slice 6).
+*** jeff : Which confirmation?
+What was its first reason? Are there other reasons?
+**** [Claude] stage-and-commit's, which has exactly two reasons
+Stage-and-commit (C-c r c) stops and asks before committing when
+either of two things holds, and stages nothing until the user
+types "yes": not every changed file is ready (the first reason;
+the prompt is the readiness summary, "3 of 5 changed files are
+ready. Type yes to commit anyway: "), or some gitrepo holding an
+owned skgrepo has entries already staged (the second; the prompt
+adds "Staged already, so committed too: GITREPO (PATH, PATH);
+..."). One prompt covers both when both hold. There is no third
+reason: a skgrepo outside any gitrepo is no reason to ask;
+staging it fails, and the failure is reported after the commit as
+an error. The answer carries '(needs-confirmation . t)', the
+readiness summary and, when the list is non-empty,
+'(already-staged ((GITREPO PATH...) ...))'.
+** The names
+"Pruned change view" for PCSVF, "home skgrepo move", "extend" for
+the server's "expand" and the viewforest's "unfold", "fill in the
+defaults", "shallow model subtree", "commit readiness aggregate",
+"render" and "show" for "draw", "the editability rule" for "the
+draw rule" (slices 9 and 10). The glossary defines each.
+*** jeff : Is the 'editability rule, editable map' section
+of the glossary only relevant to the diff view?
+Are there other sections similarly only relevant to the diff view?
+Any that are should explain that that is the only context
+in which they mean anything.
+**** [Claude] no, it holds in every view
+Two diff-view entries describe both reconcilers; the section's
+preamble should state its scope. The editability rule and the
+editable map decide which occurrence is editable in every view:
+the rule lives in 'server/to_org/extend/editable.rs' and runs at
+each visit of the one view completion; the diff view only changes
+what the node budget charges. So that entry sits where it
+belongs, in "Terms and abbreviations specific to Skg", as do
+"view completion, extend, render, rerender" (every view) and
+"startup warnings channel" (not about views at all). The section
+"Terms of the diff view" ('docs/glossary.org:801') opens with
+"'docs/diff-view.org' describes the diff view; these are its
+terms", and does not say that they mean nothing elsewhere; that
+sentence should be added. Two of its entries describe both
+reconcilers and belong in the general section: "reconciler" (the
+older one, 'complete_managed_children', runs in every view; only
+'reconcile_children_with_shallowModelSubtree' is the diff view's)
+and "managed child" (the older reconciler's own term). "The
+user's viewnode" says "neither reconciler created", which is true
+of both, but cites the diff view's predicate alone; the older
+reconciler's rule is simply "a stale child with children holds
+the user's", and the entry should say which rule each applies.
+"Match key" is the diff view's alone and would stay. I recommend
+all three changes for the next housekeeping slice. Agreed?
+***** Jeff : agreed, but
+what does "a stale child with children holds the user's" mean?
+****** [Claude] the older reconciler's rule
+The older reconciler keeps any stale child that has children. The
+older reconciler rebuilds a folder's members from the folder's
+goal list at the folder's visit. A managed child whose node the
+goal list no longer names is stale. That reconciler never looks
+below the children it manages, since it created them without
+subtrees; so it reads any child of a stale child as something you
+added, and keeps such a stale child rather than detach it: an
+unrestricted vognode as a non-member of the folder, born
+'Unremarkable', its change facts cleared; any other kind as a
+dead viewnode. Only a childless stale child is detached. The
+comment in 'server/update_buffer/util.rs' says it: "A stale child
+(managed, not in the goal) that has children is kept as the rule
+says ...; only a childless one is detached." The diff view's
+reconciler adds below the children it manages, so it cannot use
+that rule and asks its predicate instead. That difference is what
+the glossary entry should state. It is also the root of a doubt I
+raise under your question on detaching, below.
+** Smaller things
+*** A comment's label keeps its capitals
+It keeps them when it opens the comment and ends in a colon.
+'PITFALL:', 'DANGER:' and 'ASSUMES:' kept their capitals whatever
+they say; the agent read the plan's list as examples, and I agree
+(slice 12).
+*** The clients' prompt still says "Staged already"
+Its full text is "Staged already, so committed too". The plan
+named no message change there (slice 7).
+*** The integration suite rewrites three tracked fixtures
+The three 'telescope-warnings.org' fixtures change whenever the
+server's warning text changes; slice 12 committed the regenerated
+ones.
+
+* jeff
+I ended a lot of discussions by marking them DONE,
+or by simply removing all progress markers.
+In all such cases I agree with where you were going;
+please include those in the next plan.
+** [Claude] they are counted in the closing list
+The closing section, "What the next plan would hold", now counts
+every item you marked DONE or stripped of its marker, and the
+items past your old "resume here" marker; the plan will state
+each in full.
+* Decide
+** ONGOING [Claude] A containerward role tree
+It orders its branches at random.
+I un-nested these a little for ease of navigation. --jeff
+*** the problem
+Found by the slice-5 agent while building its fixture, recorded
+in 'TODO/problems.org'. 'full_containerward_role_tree'
+('server/dbs/in_rust_graph/containerward_role_tree.rs') iterates
+a 'HashSet', so a node with two or more containers gets its
+branches in an order that varies from call to call. In the diff
+view a folder member's containerward tree is reconciled in the
+order of each new walk, so such a tree can reorder at any
+rerender, and the buffer then does not save back to itself. The
+slice-2 agent saw the same class of thing in the save-lock's
+'lock-views' list ('server/serve/handlers/save_buffer.rs:171'),
+harmless there. I recommend one small slice at the head of the
+next plan: sort the containers in the walk (by ID, as
+'union_containers' sorts), check the live-graph views that walk
+the same function, sort the lock list, and a test that a
+two-container role tree in a diff-view buffer saves back
+unchanged after a rerender.
+*** jeff
+"check the live-graph views" for what?
+What's the lock list?
+Why does this problem not arise for containerward role trees in an ordinary content view?
+**** [Claude] three answers, and a correction to what fails
+What "check the live-graph views" meant: whether an ordinary
+view, which builds its containerward role trees with the same
+walk, shows the same random order. The slice's agent had not
+checked; I have had it checked now, and it does not. An ordinary
+view walks once, when a root's containerward tree is first
+rendered or a role-tree command is fulfilled, and after that the
+tree round-trips as content: a rerender refreshes only a
+write-protected graft's title and repo and never touches its
+children, and under an editable parent the grafts keep their
+relative order. The first render may come out in either order,
+but it then stays put. The diff view walks again at every
+completion and reorders the kept children to the new walk
+('attach_memberRoleTrees_under_straddle_folder_members' in
+'server/diff_view/partner_folders.rs'), which is why only it
+moves. That is also the answer to your third question.
+
+The lock list: when a save begins, the server first answers with
+'((lock-views (ID ...)))', the views the clients should keep
+locked while the save runs, every open view sharing a node with
+the saved one ('view_ids_of_views_to_lock' in
+'server/serve/handlers/save_buffer.rs'). It is collected into a
+hash set and sent in that order. The clients only validate it,
+and test membership in the later relax-lock list, which is sorted
+already; so the order changes nothing but the byte-identity of
+the server's answers between runs. Sorting this list as the other
+is sorted would be one line.
+
+A correction: the buffer does save. The save is not refused and
+no file changes; what fails is that the rerendered buffer differs
+from the one saved, which the test asserts and the user sees as
+branches moving and, in a diamond (c under both b and d, both
+under a), as a's subtree jumping from under one of them to under
+the other, unfolded again, with a bare "repeated" a left behind.
+The fix stands as proposed: sort the containers in the walk, so
+every walk would be the same, and sort the lock list.
+*** jeff : when does this reordering happen?
+Is it at every save?
+Is it only when the user asks to extend the view
+to pull in new changes?
+**** [Claude] at every completion of the buffer
+The reordering happens not only at an extension. The diff view's
+completion runs at the buffer's first render and at every
+rerender of it: after this buffer's own save; after a save in
+another buffer that touches a node this buffer shows; after
+"integrate unshown changes" ('C-c r u'); after a
+stage-and-commit; after a skgrepo-set switch; after "rerender all
+views"; and after "delete references to absent node". At each of
+those, every changed folder's visit walks the member role trees
+again, with no cache, and moves the kept grafts into the new
+walk's order; and the walk iterates a hash set, so the order can
+differ each time. So the branches can move at any save, yours or
+another buffer's. After the fix (the walk sorts its containers)
+every walk would come out the same, and the move would move
+nothing.
+** [Claude] A folder's modified member shows a lone '✓'
+A folder member carries no node sign, by the plan, but lists
+'all' when its node is modified and so gets '(ready all)': its
+'✓' abuts the write-protection mark, '☮✓', with no 'M' to belong
+to. The agent left it (slice 4). Three ways out: give folder
+members their node sign as content members have it, so the mark
+would read '☮ M✓' and a gesture there would mark the file, which
+the glossary now promises "wherever it stands"; list no 'all' on
+folder members, so nothing would be markable there; or leave it.
+I recommend the sign.
+*** jeff : yes, add the M, like a vognode has
+** [Claude] A role graft carries no sign
+The graft comes from a before-only relationship. In x's container
+folder of 'removed_partners', d is a container of c at HEAD only;
+the graft d under c carries '(leaves 1 all)' and no '~-' (slice
+5, "seen, left"). The member role trees are extended over the
+union, so a before-only edge there should show '~-' as it does
+everywhere else. I recommend giving it the sign, cheap, in the
+same slice as the role-tree order.
+*** jeff : please draw me a picture
+like the org-formatted examples I frequently draw in these plans.
+And define all the elements of it before talking about them -- you
+started with "In x's container" like I know what "x" is.
+**** [Claude] the picture
+The fixture 'removed_partners' has one skgrepo. At HEAD, a, b, c
+and e contain x, x contains xc, and d contains c. Since then b
+and e stopped containing x, and d stopped containing c; nothing
+else changed. So x and c are in C (their containers changed), and
+b, d and e are the roots of the "all changes" buffer; x's first
+occurrence in level order is b's removed member, and c's is d's.
+#+begin_example
+  // Jeff's interpretation
+  * x
+  ** xc
+  ** containerward paths from x
+  *** a
+  *** b // this relationships has since disappeared
+  *** c
+  **** d // this relationships has since disappeared
+  *** e // this relationships has since disappeared
+#+end_example
+The diff view, with each node's
+heralds written after its title and my notes in parentheses:
+#+begin_example
+  * b
+  ** x                 ~-   (removed here; editable, x's first occurrence)
+  *** its containers changed (other files)
+  **** a                    (kept container; a role graft, write-protected)
+  **** b               ~-   (dropped x)
+  **** c                    (kept container)
+  ***** d                   (c's container at HEAD only: today no sign)
+  **** e               ~-   (dropped x)
+  *** xc                    (x's member, write-protected, without its content)
+  * d
+  ** c                 ~-   (removed here; editable, c's first occurrence)
+  *** its containers changed (other files)
+  **** d               ~-   (dropped c)
+  *** x                     (c's member, write-protected: a later occurrence)
+  * e
+  ** x                 ~-   (removed here, write-protected: a later occurrence)
+#+end_example
+The folder under x lists x's containers in either graph: a and c
+keep x, b and e dropped it, each marked '~-'. Under each
+container stands its own containerward tree, one role graft per
+ancestor; c's tree holds d, since d contained c at HEAD. That
+edge, d contains c, is in the before-graph only, so d under c
+should read '~-' as b and e do; today it carries nothing but
+'(leaves 1 all)', because the role grafts are built by the
+role-tree walk, which sets no relationship sign. The slice would
+set it from the straddle's partner presence, as the folder's own
+members get theirs. (The tests assert the lines they need, not
+the whole buffer; the picture follows the code.)
+***** jeff : agreed!
+It should show the removal. Excellent work.
+***** jeff : Is 'a' not also a root of the diff view?
+****** [Claude] no: a's file is unchanged
+No climb from a changed node reaches it. The roots come from C,
+the changed nodes. From each node of C the walk climbs
+containerward through the union of the two graphs, following a
+single container, and stops at a content origin: a node with no
+container or with several. a is not in C, since a's file records
+no change (a contains x in both graphs). The climb from x stops
+at x itself, which has four containers in the union (a, b, c and
+e), so it never reaches a. x is then discarded as a root, because
+its containerward walk within U reaches b, kept before it in ID
+order. So the roots are b, d and e, and a appears only as a kept
+container in x's folder, a write-protected role graft, as the
+picture shows.
+** [Claude] The clients' repo prompt
+It may not match the server's new inheritance rule.
+'docs/COMMANDS.org' (C-c v e) says that creating a headline
+through Skg's commands prompts for any skgrepo it cannot inherit.
+The slice-6 agent did not check whether the clients' idea of
+"cannot inherit" matches the server's new walk through phantoms
+and folders. If a client prompts where the server would inherit,
+the prompt is only noise; if it inherits where the server would
+refuse (top level), the save fails later. I recommend a look, and
+aligning both clients to the server's rule, in the next
+housekeeping slice.
+*** DONE jeff : agreed
+** [Claude] Vocabulary drift the check found
+Three words, each with one recommendation.
+*** DONE '(presence SIGN...)' holds a sign that is no presence
+The part holds 'node~' since slice 4, and a modified node is
+present in both graphs: the part's name says less than it holds.
+The glossary already calls these values signs. I recommend
+renaming the part '(signs SIGN...)' and the style key with it:
+the printer, the parser, the herald rules, the clients' one
+reader each, the integration scripts' substrings, the test
+literals (by script, as slice 3 did) and the docs; one slice that
+runs the integration suite.
+**** jeff : please provide more context
+What is the full sexp path (e.g. (node (diff (presence)))) to the 'presence'
+sexp? What does the presence sexp signify? Every token
+in this program is a sign; that is not a sufficiently descriptive name.
+***** [Claude] the path and the meaning
+The name goes with your "aha!" item. The path is '(skg (node (id
+X) (repo R) (diff (presence node~ rel+) (leaves 2 rel all) (ready
+all))))' for a node, and '(skg alias (diff (presence rel+)))' for
+a property, where the form sits at top level. The part says how
+the node and its relationship to the node it hangs under differ
+between HEAD and the worktree: 'node+' the node is new, 'node-'
+deleted, 'node~' modified; 'rel+' the relationship is new, 'rel-'
+removed. "Presence" was the straddle's word for a node being in
+one graph or in both, which fits '+' and '-' and does not fit
+'~'. Your "aha!" item under "Sound" proposes the right split, and
+I answer the naming there, once for both.
+*** DONE "Redraw" in the clients means the rerendered buffer
+It does not mean the screen. The plan kept it in the clients as
+"the screen". The agent read all ten client uses and the eight in
+their tests: every one means the rerendered buffer ("carrying the
+redrawn buffer"), which the clients otherwise call "rerender". I
+recommend "rerender" there too.
+**** DONE jeff : agreed
+*** DONE "Visible in the diff view" is defined and used nowhere
+It is defined at 'docs/glossary.org:1071', and the skgrepo sets
+already give "visible" a meaning. I recommend the entry say
+"shown in the diff view" for that half, and nothing else change.
+**** jeff : can't we just remove it from the glossary, then?
+Users know what "visible" is. If they know what the diff view is,
+and "visible in the diff view" isn't even used anywhere, they're good to go.
+***** [Claude] yes: folded
+The entry would become "editable in the diff view" alone. The
+"visible" half would go; the entry would keep the definition of
+editable and the sentence on what a write-protected occurrence
+shows and lets you mark.
+** [Claude] Small leftovers the agents listed
+Each is a line or two; none needs a decision beyond whether the
+next housekeeping slice would take them all, which I recommend.
+*** DONE 'is_the_diffViews_viewnode'
+It means something other than the phrase means elsewhere. At
+'server/diff_view/shallow_model_subtree.rs:187' it means every
+keyed child but the user's, while "the diff view's viewnode"
+elsewhere means the save-inert kinds the diff view adds;
+'is_a_managed_child' would say what it tests.
+*** DONE The glossary's "the user's viewnode"
+The entry says "carrying no sign". The code accepts '~' alone
+(slice 4; the entry is at :998). The entry would say "carrying no
+relationship sign and no '+' or '-'".
+**** jeff : what are you suggesting be done?
+***** [Claude] one sentence of the glossary entry would change
+The entry "the user's viewnode" ('docs/glossary.org:995') says
+the viewnode carries no sign. The code ('is_the_users_viewnode')
+lets it carry 'M' and nothing else, since a note of yours under a
+write-protected occurrence of a modified node is still yours. The
+sentence should say: an unrestricted vognode born 'Unremarkable',
+carrying no relationship sign and neither '∃+' nor '∃-', and not
+a member of the folder it stands in. Your "smells fishy" item
+below asks about the predicate itself; the answer is there.
+*** DONE The countable "extension" has no gloss
+"Up to 'initial_node_limit' extensions" ('docs/COMMANDS.org:416',
+'docs/diff-view.org:393') would get a sentence in the glossary's
+"extend" entry.
+*** DONE "Makes a node's changes editable" is defined twice
+At 'docs/glossary.org:1071' and again at :1081; one definition
+would stay, and the other would point to it.
+*** DONE Seven tags point at a decision without naming a document
+"(Q10)" ('elisp/skg-request-views.el:5'), "(Q2: ..."
+('elisp/skg-sexpr-edit.el:188'), "per the settled plan"
+('nvim/lua/skg/goto_git.lua:5'), "(Q6)" and "(Q3)"
+('server/export_org.rs:223, :395'), "Decided 2026-06-12"
+('server/update_buffer/reconcile/content.rs:426',
+'server/types/errors.rs:18') and "option b"
+('tests/partner_folder_warnings.rs:166'). Each comment states its
+rule itself, so the tag would go.
+*** DONE Two all-caps leftovers
+'server/from_text/supplement_from_disk.rs:288' "THE
+STICKY-ELSE-DEFAULT RULE" would be lowercased;
+'tests/overridden_as_such.rs:173' "shown RAW" likewise, if
+assertion messages are in scope.
+*** DONE "READONING:" in 'server/consts.rs:31'
+A typo for "REASONING:" (slice 12).
+*** DONE 'server/import_org_roam.rs:74'
+It cites "RelPartner's interim note". It no longer exists (slice
+12).
+*** DONE "One of the six write-protected RoleFolders" survives
+'server/from_text/local_fieldintent_collection/types.rs:32' still
+says it, the count slice 0 removed elsewhere.
+*** DONE Another local 'in_folder'
+'server/diff_view/pruned_change_view.rs' has one near its
+integration walk; slice 0 renamed only the one in the reconciler.
+**** jeff : what are you suggesting be done?
+***** [Claude] rename that local too
+Slice 0 renamed the local 'in_folder' of the reconciler to
+'parent_is_a_folder', as the plan said, and its agent saw a
+second local of the same name and meaning in
+'pruned_change_view.rs' (the walk of "integrate unshown changes"
+that lists folder occurrences), which the plan did not name. It
+should get the same name.
+*** DONE 'tests/hidden_from_subscriptions.rs'
+It keeps a 'mk_test_tcp_stream'. It nearly duplicates the shared
+pair's write end (slice 0).
+**** jeff : "keeps" in the past or the future?
+Let's add to 'plans.org' that in a plan, the present tense should only be
+used to refer to the current, before-plan-execution state of the code.
+"It has been like this ..." is also acceptable,
+(whatever the word is for that kind of construction -- I think it's still
+technically the present tense).
+"It was" should refer to states of the code prior to the current one
+-- "it was broken, now it's fixed, soon it will be awesome".
+Talk about the future with "will" or "should".
+If that means repeating those two words a lot, so be it.
+
+Please have an Opus agent rewrite this plan accordingly,
+and add the rule to coding-advice yourself.
+***** [Claude] the present: it keeps it today
+The rule is in 'plans.org'; this document is rewritten under it.
+"Keeps" described the code as it stands after the run: the file
+still has its own copy, which the plan did not ask slice 0 to
+remove. Your tense rule is in 'coding-advice/plans.org' ("Tenses:
+the present is for the code as it stands"), with the same rule
+for a review's proposals. An Opus agent has rewritten this
+document's [Claude] text under the rule, leaving your words
+untouched; I read "this plan" as this review, where the ambiguity
+bit, since '15_plan.org' has run and the next plan will be
+written under the rule.
+**** jeff : what is the problem described here, and the solution?
+***** [Claude] a private copy of a shared test helper
+The fix is to delete it. 'tests/hidden_from_subscriptions.rs'
+defines its own 'mk_test_tcp_stream', a function that opens a
+local TCP listener and returns the write end of a connected pair,
+which the shared module 'tests/shared/git_fixture_helpers.rs'
+provides as 'mk_test_tcp_stream_pair'. A change to the shared
+helper does not reach the copy. The fix is what slice 0 did for
+'editable_view_cascade_and_budget.rs': delete the copy and bind
+'let (mut stream, _read_end) = mk_test_tcp_stream_pair ();' at
+its call sites.
+*** DONE Two helpers that put facts on a viewnode
+The item also covers some odd literals.
+'tests/change_facts_metadata.rs' and
+'tests/diff_view/roundtrip/metadata.rs' each define one, with
+different arguments (slice 1); and a few 'Viewnode' literals
+rewritten by script break oddly (slice 1).
+**** jeff : please elaborate
+***** [Claude] two near-duplicate test helpers
+There are also lines a script broke. Slice 1 moved the change
+facts onto the viewnode. Two test files each define a helper that
+builds a viewnode and sets those facts on it:
+'tests/change_facts_metadata.rs' (one taking the presence, the
+ready objects and the leaves fact) and
+'tests/diff_view/roundtrip/metadata.rs' (one taking the facts as
+a struct): the same job with two signatures. One helper in
+'tests/shared/' would serve both. And the slice rewrote the 94
+'Viewnode {' literals of the server and the tests with a script,
+which left a few lines longer than the margin or broken at an odd
+place; the agent tidied three and left the rest. Both are
+housekeeping: unify the helpers, reflow the lines.
+*** DONE The stage-and-commit prompt says "Staged already"
+The vocabulary is "already staged" (slice 7).
+*** DONE The over-private-text retry runs at different moments
+The moments differ between the two clients. Neovim runs it at
+'rerender-lock', Emacs at 'rerender-done' (slice 8,
+pre-existing); one timing would be better.
+*** The stage-and-commit response's other strings
+They go through the 'sexp' crate. Its error strings and commit
+entries hold whitespace or safe characters, so this is a note,
+not a bug (slice 7).
+* Sound: departures I checked and agree with, no action needed
+** DONE 'NodeSign', the node slot's own enum
+'NodeSign' ('Plus', 'Minus', 'Modified') is the node slot's own
+enum; 'Sign' keeps two values for relationships and entries, and
+one function, 'GraphStraddle::node_sign', signs every member,
+removed member and root (slice 4).
+*** jeff : aha!
+That's what you meant by sign. If it stays, let's rename this a "change sign".
+
+But maybe it shouldn't. It seems like we're mixing different kinds of things.
+Plus and Minus capture boolean aspects: Was the node or relationship
+added or removed. Really, they should be Added and Removed, not Plus or Minus.
+
+Modified is meant to capture changes to other things --
+source, text, etc. It seems like we really have three kinds of change:
+
+Node existence: Added | Removed
+Rel existence: Added | Removed
+Other properties: Changed | Unchanged
+
+I may have said that the M should appear even when there are no other changes
+beyond existence. I now suspect that's wrong.
+The M should appear only if any other properties changed.
+But note that out-links are also properties of the node,
+so for instance if a node's list of content changed,
+it needs an M (as a place to aggregate
+the individual content commit-readiness statuses).
+"The" rel'the node represents is the relationship from it
+to its parent (actually more precisely to its nearest ancestor-partner,
+since it might be in a folder).
+
+I am not sure about this. Please evaluate.
+**** [Claude] you are right: three kinds of change
+The wire should say so. Today one slot holds the node's sign with
+three values ('node+', 'node-', 'node~') and one slot the
+relationship's ('rel+', 'rel-'). It works because a new or
+deleted node records only its existence leaf, so "exists in both
+graphs and records a leaf" never coincides with "new" or
+"deleted": the three values are exclusive by a property of the
+leaf model, not by their meaning. Your split names the meaning:
+the node's existence (added or removed), the relationship's
+existence (added or removed), and whether the node's other
+properties changed. The third is already what 'M' means, and it
+already appears only when something beyond existence changed; a
+new node shows '∃+' alone. The content list counts: a changed
+content list is a relationship leaf the node records, so it gives
+'M', and 'M✓' gathers the content members' readiness. And "the"
+relationship is the one to the node's nearest ancestor-partner,
+as you say: for a content member its viewparent, for a folder
+member the node whose folder it stands in.
+
+So I propose the wire say it: '(diff (node added) (rel removed)
+(properties changed) (leaves ...) (ready ...) REQUEST)', each of
+the three present only when true, in that order, with 'node
+removed' and 'rel added' as the other values, and 'properties'
+never "unchanged", since absence says so. The Rust side would
+follow: 'NodeSign' and the two-valued 'Sign' would become one
+'Existence { Added, Removed }' for both slots and a boolean for
+the properties; "presence" would leave the wire and the code,
+which answers your question above. The heralds would not change:
+'∃+' and '∃-' for the node's existence, '~+' and '~-' for the
+relationship's, 'M' for the properties, each with its '✓'. With
+'all' now accepted in '(ready ...)', a changeset marker should
+carry '(ready all)' like a modified node, and the clients'
+special reading of a bare '(ready)' would go (your "I don't
+understand" item below). The cost would be slice 3's second half
+again: printer, parser, herald rules, the test literals by
+script, the two integration scripts' substrings, the docs; one
+slice that runs the integration suite, which the "signs" rename
+would have cost anyway. Agreed?
+***** jeff : yes!
+** 'is_the_users_viewnode' and '~' alone
+'is_the_users_viewnode' no longer counts '~' alone against a
+headline: a user's member under a write-protected occurrence of a
+modified node would otherwise have become the server's, for the
+reconciler to detach (slice 4).
+*** jeff : This smells fishy.
+Depending on history is dangerous.
+Why do we need to know whether the user created a viewnode?
+(If we do need it, it should be called is_userCreated_viewnode.)
+**** [Claude] it reads the buffer as it stands, not history
+The name you propose is right. The predicate decides, from the
+viewnode alone, whether the diff view's reconciler may detach it:
+the reconciler detaches what it drew and would no longer draw,
+and must never detach a note you typed under a historical phantom
+or in a changed folder (your decision in 12_total-review: the
+user's structure under change viewnodes must survive). It reads
+no history. An unrestricted vognode born 'Unremarkable', with no
+relationship sign and neither '∃+' nor '∃-', that is not a member
+of the folder it stands in, is one the diff view never creates in
+those positions: its own creations there are role grafts, born
+'RoleGraft'; removed members, signed '~-'; folder members,
+members of their folder; and phantoms, of other kinds. So such a
+viewnode can only be yours, read from the buffer as it is, the
+stateless kind of rule you asked for in the 07 review. Slice 4
+had to let 'M' through because a note of yours under a
+write-protected occurrence is tagged with its node's sign at that
+occurrence's visit. Every viewnode the predicate accepts was
+created by the user, so 'is_userCreated_viewnode' would say what
+it tests; I would rename it, and its glossary entry "the user's
+viewnode" with it. Agreed?
+***** jeff : what are conditions under which the reconciler detaches things?
+My intuition is that it ought not detach.
+When the user first asks for the diff view, or asks for extensions to it
+to cover more changes, it puts stuff there.
+Thereafter those computations need not be thought about;
+what's important is that what the user sees after each save be true.
+
+This also might bear on the containment reordering problem.
+We don't want to redraw that stuff; we just want to make sure
+it is accurate, filling in whatever is missing and adjusting whatever
+is not true to be the truth.
+****** [Claude] three conditions, never the user's
+The code does what you describe, except for the order; and there
+is one doubt. The diff view's reconciler
+('reconcile_children_with_shallowModelSubtree') runs at each
+visit of a vognode, of a changed folder's member and of a
+phantom. It builds the shallow model subtree (what the diff view
+would show under the viewnode now, over the union of the two
+graphs) and matches the existing children to it by key: a node's
+ID for a vognode, the kind for a change viewnode, the entry for a
+folder entry. It detaches a child in three cases and in no other.
+******* A child the model lacks
+What the child stood for is in neither graph any more: a text
+that was restored, a relationship restored by hand or by the
+command above, a commit that made HEAD equal the worktree. Such a
+child describes a change that no longer exists. If something of
+yours stands below it, it is kept (an unrestricted vognode as a
+non-member, anything else as a dead viewnode), and only the
+server's viewnodes below it go.
+******* A duplicate
+A second child with a key a sibling already has.
+******* A child whose key changed
+A folder entry whose text or ID changed, or a vognode whose ID
+now resolves to another node: it is detached and its replacement
+created, and only the fold state is lost.
+******* What it never detaches
+Your viewnodes, which the predicate names; restricted vognodes,
+dead viewnodes and the buffer root, which have no key; and
+anything it does not manage. A matched child is kept with its
+fold state, and its kind and facts are updated in place: a member
+becomes a removed member and back, a deleted phantom a historical
+one and back.
+******* So the code does what you describe
+Filling in what is missing is the creation of what only the model
+has. Adjusting what is not true is the update in place of a kept
+child's kind and facts, and the detaching of a change viewnode
+whose change is gone, which is the one way to stop it lying.
+Nothing is redrawn: "every viewnode that stays keeps its fold
+state, and is moved, not recreated, to where it belongs"
+('server/diff_view/changes.rs').
+******* Except the order, which is the role-tree problem
+The one place it redraws is position: at every completion it
+moves the kept children into the model's order. For content
+members and change viewnodes that order is deliberate. For role
+grafts the model's order is the walk's, and the walk iterates a
+hash set; so the grafts move for no reason. Two fixes would
+satisfy your principle: sort the walk, so that every walk comes
+out the same and the move moves nothing; or leave kept children
+where they stand and place only new ones. I recommend the sort
+alone: the first render is then deterministic too, a new branch
+needs no placement rule of its own, and the tests can compare
+whole buffers.
+******** jeff : no, let's keep the order, whatever it is
+This is because the user might sort those things themselves,
+to e.g. group what's of most interest at the top.
+We can't be undoing their work.
+********* [Claude] folded: kept children keep their order
+Only new ones are placed. The rule for the next plan: the diff
+view's reconciler never moves a kept child; a new child goes
+after the kept child that precedes it in the model, or first when
+none does. That holds for the role grafts and for every other
+child the reconciler manages, since you can reorder any of them.
+The one-line sort of the walk I would still keep: it decides only
+the order of a first render, lets the tests compare whole
+buffers, and never touches a standing order.
+********** DONE jeff : sure
+******* One doubt, which your question uncovered
+The two reconcilers disagree on what "the user's" means. The
+older one, which reconciles a changed folder's members, keeps any
+stale member that has children, since in an ordinary view only
+you put children under a folder member. In the diff view, though,
+the member role trees are hung under those members by the diff
+view's own pass, which runs after the older reconciler at every
+visit. So at a commit, by my reading of
+'server/diff_view/partner_folders.rs' and
+'server/update_buffer/util.rs', a dropped container that has
+containers of its own would not go: the older reconciler would
+keep it as a non-member of the folder, born 'Unremarkable' with
+its facts cleared, which the diff view's predicate then reads as
+yours, with its stale role grafts under it, and the folder would
+stay as a dead viewnode to hold it. A removed member in content
+position raises the same question one level down: its drawn
+content members are born 'Unremarkable' too, and I could not
+settle by reading whether the predicate reads them as yours and
+so keeps the removed member after the commit. The next plan
+should start with a test of a commit's rerender on the
+'removed_partners' fixture, extended by one container of b,
+asserting that both change viewnodes go; and fix whichever stays,
+by letting the diff view's folder reconciliation ask the diff
+view's predicate below a stale member. This is also the concrete
+answer to "why do we need to know whether the user created a
+viewnode": without that distinction a commit would either wipe
+your notes under a historical phantom or keep the server's stale
+grafts.
+****** DONE jeff : Let's start over.
+This is complex.
+From first principles, defining all terms, can you restate the problem to me,
+and the solution(s) you see?
+******* DONE [Claude] the problem restated from first principles
+A throwaway test cut it to one case. Following your rule above,
+an Opus agent wrote a throwaway test over 'removed_partners'
+extended by a container of b and by a deleted root h with old
+content, committed, and printed the rerendered buffer and a fresh
+one; the report and the test's source are under
+'tests/results/review16/throwaway/'. It confirmed one of the
+three leftovers I had predicted by reading and refuted two. The
+restatement below has its results folded in.
+******** Terms
+A buffer shows a tree of headlines; the server keeps that tree as
+the viewforest, whose nodes are viewnodes. A viewnode that stands
+for a node of the graph is an occurrence of it, editable or
+write-protected. The server draws most viewnodes: a node's
+content list, its folders and their members, the role grafts of a
+role tree, and in the diff view the change viewnodes (removed
+members, historical phantoms, markers, old text). You add the
+rest by typing or pasting: a note under a phantom, a node parked
+as a non-member. I call the first kind the server's and the
+second the user's.
+
+A reconciler is the pass that, at a viewnode's visit, makes its
+children match what should be there now, which I call the model:
+it creates what the model has and the children lack, keeps a
+child the model still has (updating its kind and facts in place),
+and decides what to do with a stale child, one it manages that
+the model no longer has. Two reconcilers run. The older one runs
+in every view, for content lists and for a folder's members. The
+diff view's runs for the change viewnodes under a vognode, for
+the member role trees under a changed folder's members, and for
+the old content of a historical phantom.
+
+Both obey one rule: a reconciler detaches only what it created,
+and what you added survives. In practice a stale child is
+detached unless something of yours stands below it; then it is
+kept as a holder (an unrestricted vognode becomes a plain
+non-member with its facts cleared; any other kind becomes a dead
+viewnode), and only the server's viewnodes below it go.
+
+So each reconciler needs a test, "is this viewnode the user's?".
+The older one answers "any child of a stale child is", which is
+right in an ordinary view, since it creates its children without
+subtrees: whatever stands below one was typed. The diff view's
+answers with a predicate: an unrestricted vognode born
+'Unremarkable', carrying no relationship sign and neither '∃+'
+nor '∃-', and not a member of the folder it stands in. A
+viewnode's birth is set at its creation and carried in the
+metadata; it is 'Unremarkable' for everything but a role graft,
+so a typed headline and a drawn content member are born alike.
+******** The problem, as the test shows it
+After a commit every change is history, and the doc promises that
+"the roots stand as plain context with their change viewnodes
+gone". One thing more stays.
+********* Confirmed: a removed member with content stays
+It stays as a parked non-member. x stood under e as a removed
+member, '~-', with x's content (xc) drawn beneath it, born
+'Unremarkable', unsigned. After the commit e contains x in
+neither graph, so x is stale; the predicate reads xc as yours, so
+x is kept as a plain non-member with its facts cleared, and xc
+stays under it. Likewise c under d, holding x. A childless
+removed member (the later, write-protected x under b) went.
+Nothing false is shown: a parked non-member with its content is a
+state the buffer may truthfully show. What is wrong is the reason
+it stays: a content list the server drew counted as yours.
+********* Refuted: a historical phantom's old content
+The prediction was that it lingers with its signs. It does not.
+The deleted root h became '(deleted (id h))' holding nothing: its
+removed members are the server's, so nothing kept them. Had one
+of them held content of its own, the confirmed case would have
+kept it, as a parked non-member with its facts cleared, not
+signed.
+********* Refuted: a changed folder's member survives
+The prediction was that it survives with its grafts. It does not.
+When x is kept as a holder, everything of the server's below it
+goes, the folder with its members and grafts included; and a
+folder the model still has is reconciled from the union, where a
+dropped container stays a '~-' member until the commit removes
+the folder itself. So the older reconciler's "any child of a
+stale member is the user's" is never asked in the diff view, and
+the doubt I raised above was wrong.
+********* Two probes
+The check the stage-and-commit test runs after a commit (no
+'(diff ', 'changed)', 'changesetMarker', 'oldText', 'historical',
+'homeSkgrepoMove', '(ready') passes on this buffer, so the suite
+cannot see the parked non-members. A note typed under the
+editable x and saved stays under the parked x; a note typed under
+the write-protected x under b is saved as a node (its containment
+by x is not recorded, since x is write-protected there) and keeps
+that x as its holder.
+******** The solutions
+********* S1: keep it, and say so
+The parked non-member is true, and it goes when the buffer is
+closed. The doc's promise would be corrected to say what stays,
+and the predicate would be named for what it does: it says a
+viewnode might be yours, never missing one of yours, at the cost
+of keeping content the server drew.
+'might_be_the_users_viewnode', then, and not
+'is_userCreated_viewnode', which the test shows it is not. No
+behavior changes and no test changes.
+********* S2: decide "the user's" by the graph
+The test would be what the graph does not produce. Define the
+user's viewnode as one the server could not redraw from the live
+graph: a non-member occurrence that is no removed member (parked
+by you), or any unrestricted vognode whose parent's content the
+graph does not account for, under a phantom, a dead viewnode or a
+write-protected occurrence. Everything the graph produces is the
+server's: a member the graph lists under its parent, a role
+graft, a folder's member, every change viewnode. Detaching the
+server's loses nothing but fold state, since the next completion
+would draw it again if it were still true. The invariant it
+gives: after a commit the buffer equals a fresh buffer of the
+same kind, plus the roots that stay and your notes that no list
+of the graph places there. Its cost is one behavior change: a
+note you typed under an editable removed member and saved is in
+that node's file; at the commit it leaves the view with the
+member, where today it stays under the parked non-member, and the
+existing test would change to say so. The name
+'is_userCreated_viewnode' would then be right.
+********* What I recommend
+S1. It fits your two decisions above (keep the order; do not
+detach what might be the user's), and the one thing it leaves
+standing is true. The plan would carry the test the throwaway run
+was, a commit's rerender over the extended fixture asserting the
+parked non-member and the deleted root, so that the behavior is
+pinned rather than accidental.
+******** jeff : I think it's not worth it.
+Code that's this hard to reason about
+while it's being created is going to be
+impossible to reason about in a month.
+
+I'm thinking let's just never detach.
+Not even in the old reconciler.
+
+Is there any situation in which detaching is critical?
+********* [Claude] answered in '16_1'
+Your question needed research, so the answer is a document of its
+own: 'TODO/total-diff-view/16_1_is-detaching-important.org'. In
+short: detaching is critical in four places (privacy at a
+skgrepo-set switch and for private memberships; the alias, ID and
+flags folders, which the save reads back; duplicates, which the
+save accepts in a folder in no form; a subscribee's hidden
+content), and everywhere else the code already converts a stale
+child rather than detach it. The document recommends one rule
+stated once, with one predicate for both reconcilers, over "never
+detach", and records two bugs the runs found on the way. Its open
+questions are marked TODO there.
+** A bare '(ready)' in the clients
+A bare '(ready)' covers every listed object in the clients, so a
+changeset marker, which lists 'all' and carries a bare '(ready)',
+toggles by its own fact like every other headline (slice 4).
+*** jeff : I don't understand
+Where is this bare (ready)?
+Are you talking about a bare (ready) on a viewnode?
+I can't imagine why that would count objects of changes
+not related to that viewnode.
+What is a changeset marker?
+What does it mean to 'toggle by its own fact'?
+**** [Claude] the terms, and what the sentence meant
+A changeset marker is a property headline the diff view puts
+under a changed node to gather leaves that have no headline of
+their own: "its content changed" gathers the relationship leaves
+of the node's content list (each member's '~+' or '~-' is
+markable at the member, and the marker lets one gesture mark them
+all); "some content relationships changed skgrepo" gathers the
+relRepo moves; the order-only buffer's marker stands for a
+reorder. Its metadata lists '(leaves N all)': the marker names no
+'node' and no 'rel' of its own, only 'all', the N leaves it
+gathers, which are the content list's own relationships and
+nothing of another viewnode. Its readiness fact is a bare
+'(ready)', with no objects after it, because the parser refused
+'all' in '(ready ...)' until slice 4; a bare '(ready)' on any
+headline means "what this headline names is all marked".
+
+"Toggle by its own fact": the cycle gesture (C-c r r) marks or
+unmarks by reading the headline's own '(ready ...)': if the
+headline is ready, the gesture unmarks, else it marks. Before
+slice 4, a vognode whose leaves fact listed 'all' had no
+readiness fact drawn, so the gesture decided from the children's
+facts instead. Since slice 4 the readiness of 'all' is drawn, so
+every headline, markers included, decides from its own fact. The
+sentence said that a bare '(ready)' on a marker counts as naming
+every object the marker lists (its one object, 'all'), so markers
+follow the same rule as everything else. Under the wire proposed
+in your "aha!" item, a marker would carry '(ready all)' and the
+special reading would go.
+***** Jeff : Please describe the entire (diff ...) sexp syntax
+including what each thing means and how it is acted on.
+Or, is this already documented in one place in the codebase?
+I see a long 'diff' section in docs/api-and-formats.org.
+I would read it but it's inconvenient right now because that's
+only org-formatted to two levels, with long bodies using (markdown?) lists.
+Please (have a subagent) make it headlines all the way down instead,
+and if everything I just asked for is there,
+tell me here to simply go read that.
+****** DONE [Claude] go read 'docs/api-and-formats.org'
+Read "Metadata of the diff view": it is headlines all the way
+down now, and gathers the rest. An agent converted that section's
+two bullet lists into '****' headlines, one per part of the form
+and one per viewnode kind, and gave the examples a headline of
+their own. The syntax was all there: the whole form and where it
+sits, each part and each sign, each object, the bare '(ready)'
+and '(ready all)', the requests, a changed folder's form and a
+marker's. What was not there was how the parts are acted on,
+which the doc stated elsewhere or not at all. The section now has
+a headline "Who writes each part, and who acts on it" with four
+parts: the server writes the three facts; the gestures write the
+requests ('C-c r r', 'C-c r h', their recursive forms with
+'C-u'); the save of any buffer consumes the requests after its
+graph edits, drops one naming no current change with its warning,
+and leaves them all when it stops for a confirmation; and one
+gesture on a modified node marks its file, on a write-protected
+occurrence too. Each part cites the section of
+'docs/diff-view.org' or 'docs/COMMANDS.org' it was taken from,
+and nothing in it is new behavior. Two notes for your reading:
+the section describes today's wire, with '(presence ...)', which
+your "aha!" decision will replace; and the file is modified in
+the tree, yours to commit.
+******* DONE jeff : so will the bare ready problem vanish
+once we've wrapped the things we talked about in (diff ...)?
+******** DONE [Claude] yes
+Under the three-kinds form a changeset marker carries '(ready
+all)', since it lists '(leaves N all)', and a changed folder
+carries '(diff (ready))'. Nothing then needs the clients' special
+reading of a bare '(ready)' as covering every listed object, and
+that code goes. A folder's '(ready)' has no objects because a
+folder lists no leaves: it is the aggregate itself, true when
+every membership the folder shows as changed is marked, and the
+client shows it as read. The section of
+'docs/api-and-formats.org' will be rewritten with the form in the
+slice that changes the wire.
+** DONE 'Viewnode::replace_kind' clears the facts
+'Viewnode::replace_kind' clears the facts where a viewnode
+changes kind, as assigning the kind used to; the parser's
+'MpViewnode' carries the two fields too (slice 1).
+*** jeff : please define all these terms and give an example
+Why would it change kind?
+**** [Claude] the terms, and when a viewnode changes kind
+A viewnode is one node of the viewforest, the tree the server
+keeps of what a buffer shows. Its kind ('ViewnodeKind') says what
+it stands for: an unrestricted vognode (an occurrence of a
+graphnode, editable or write-protected), a restricted vognode (a
+node of a restricted skgrepo, shown anonymous), one of three
+phantoms (deleted: a node a save just deleted; unknown: an ID
+that resolves to nothing; historical: the diff view's image of a
+node HEAD has and the worktree lacks), a property (an alias, an
+ID, a flag, old text, a changeset marker), a folder, the buffer
+root, or a dead viewnode (one kept only because something of
+yours stands under it). The change facts are the diff view's
+facts on a headline (the signs, the leaves fact, the readiness
+fact); the readiness request is a gesture's pending request.
+
+A viewnode changes kind when what it stands for changes state
+while the buffer stays open: a node you delete in another buffer
+turns its occurrences here into deleted phantoms; a historical
+phantom whose node is back (you recreated it) turns into an
+unrestricted vognode; a historical phantom whose deletion a
+commit made part of HEAD is in neither graph and turns into a
+deleted phantom; a repo-set switch turns a node of a
+now-restricted skgrepo into a restricted vognode; an unknown
+phantom no longer a member is deadened before it is pruned.
+Thirteen such sites assign the new kind. Before slice 1 the facts
+lived inside the kind, so assigning a fresh kind dropped them;
+now that they live beside the kind on the viewnode,
+'replace_kind' clears them, so that a viewnode that changed kind
+keeps no sign that was true of its old kind. For instance
+#+begin_example
+  ** (skg (node (id n) (repo main) (diff (presence node~) (leaves 2 all) (ready all)))) n
+#+end_example
+becomes, after a save in another buffer deleted n,
+#+begin_example
+  ** (skg (deleted (id n) (repo main))) n
+#+end_example
+with no 'M' and no '(ready all)' carried over; the next
+completion gives the phantom its own facts ('∃-', '(leaves 1
+node)').
+*** jeff : so it sounds like there's no problem here?
+Those change facts are cleared, but then immediately recomputed
+(likely with different values now), yes?
+**** [Claude] yes: no problem; the facts return at the next visit
+The cleared facts are recomputed at the viewnode's next visit of
+the completion, in the same rerender that changes the kind, with
+the values true of the new kind: a deleted phantom gets '∃-' and
+'(leaves 1 node)'. 'replace_kind' only closes the gap between the
+two moments, so that no fact of the old kind is ever printed. The
+item stands under "Sound" for that reason: nothing to do.
+** A folder's changed member carries a 'rel' sign
+A folder's changed member is one carrying a 'rel' sign, which
+gives exactly the old folder readiness (slice 1).
+*** jeff : I don't understand the clause
+"which gives exactly the old folder readiness".
+Are you saying the changed member *contributes* to its folder's readiness?
+Is the "old folder readiness" old in the sense that it will stop existing?
+**** [Claude] yes, the changed members alone decide it
+"Old" was the past computation, not a readiness that will stop. A
+folder's readiness is computed at render time from its direct
+members, and stored nowhere. A member counts as changed when it
+carries a relationship sign ('rel+' or 'rel-'; a relRepo move
+under it counts too). The folder is "changed" when at least one
+member is, and ready when every changed member is ready. So a
+changed member contributes, and only changed members do: a
+container that still contains the node, modified or not, counts
+for nothing. "The old folder readiness" was the computation
+before slice 1, which read the members through the thirteen
+kinds; the slice replaced it with the predicate above, and the
+two agree on every folder. The readiness itself continues, and
+will nest as '(diff (ready))' by your decision above.
+***** jeff : we should call these 'memberships'
+The member is the node. The membership is the relationship
+that causes the node to be drawn in that part of the view.
+Please (have Opus) sweep the codebase for uses of 'member'
+that should be 'membership', because I'm sure this problem
+predates our discussion; also, please ensure that the plan,
+once implemented, maintains that distinction.
+
+Then we can say: The folder is automatically marked commit-ready
+when all of its membereships have been (manually) so marked.
+****** [Claude] the sweep is done
+The misuse is narrow (31 places), and one ruling of yours decides
+the other 158. An Opus agent read every one of the 2,915
+occurrences of "member", "members", "membership" and
+"memberships" in the tracked files under 'server/', 'tests/',
+'elisp/', 'nvim/', 'docs/' and 'shared/'; its report is
+'tests/results/review16/memberships.md' (git-ignored; the plan
+will carry the list). The rule you state is the one the prose
+mostly follows already: 2,318 occurrences name the node, and 186
+say "membership", for the relationship or for a folder's whole
+set of them.
+******* The clear misuses: 31, from two ideas
+A folder's readiness in the diff view is written as "every
+changed member is ready" in 'docs/glossary.org',
+'docs/api-and-formats.org', 'docs/diff-view.org',
+'server/org_to_text.rs' ('member_change_ready', 'member_changes')
+and one test name; each should say "changed membership", which is
+what carries the leaf. And the leak shape: 'LeakShapedMember' and
+'AbsentTargetLeakShapedMember', their message "leak-shaped
+CONTAINS member" (copied into three integration fixtures) and a
+test name, though the variant's own comment and
+'docs/telescopes.org' say "leak-shaped membership" already. Two
+stray sentences ('elisp/skg-metadata.el:367',
+'server/types/misc.rs:136') and two that say "membership ID" for
+a member's ID make up the rest.
+******* The ruling: is a 'RelPartner' a membership?
+You have to make this ruling. 'RelPartner { relRepo, member }' is
+one entry of a node's relationship list: the member's ID and the
+relationship's recording skgrepo. The code habitually names a
+value of that type 'member' or 'members' (105 places in
+'server/', 14 in 'tests/'), so it writes 'member . relRepo', and
+39 comments credit the relRepo to the member ("members whose
+relRepo is outside the restriction"). Under your rule an entry
+that carries the relationship's relRepo is the membership, and I
+would rule so: the variables become 'membership' and
+'memberships', the comments say "the membership's relRepo", and
+the type itself would be renamed 'Membership', since a type's
+name teaches every reader and the rename is mechanical. If you
+rule the other way (a 'RelPartner' is a member tagged with its
+membership's relRepo), those 158 places stand and only the 31
+change.
+******** jeff : I think keep RelPartner
+So only change the 31.
+********* [Claude] folded: 'RelPartner' stays
+The slice changes the 31. The 158 places that name a 'RelPartner'
+value "member" stand. The slice fixes the 31: the
+folder-readiness sentences and names, the leak-shape variants
+with their message, test name and three fixture copies, and the
+two stray sentences. I would let it fix the two sentences that
+say "membership ID" for a member's ID as well, since they break
+the same rule in the other direction; say no if you want the 31
+alone.
+******* Phrases that name a member by its membership
+They name it by what became of its membership. "Removed member"
+(135 occurrences), "stale member" (16), "former member" (10) and
+"new member" (19) all name the node by its membership's fate, and
+I would keep them: the member is still the node, and the
+command's name, 'skg-restore-removed-membership', says what is
+restored. The glossary would state that reading in one sentence
+under "removed member".
+******** jeff : agreed
+******* The plan would keep the distinction
+One slice, after the three-kinds slice, would make the edits
+above by script and reading, and run the Rust and integration
+suites (the leak-shape message is in three fixtures). The plan's
+Words section would carry your rule verbatim, and its closing
+grep would look for "member's relRepo", "changed member" and
+'member . relRepo'. The wire keeps 'rel' as the object's short
+name, since on an alias or flag leaf it is no membership. Your
+sentence then reads: the folder is marked commit-ready
+automatically when every changed membership it shows has been
+marked; an unchanged membership has no leaf to mark.
+** The two visit functions and 'for_rerender'
+The two visit functions and 'for_rerender' take the straddle and
+the buffer kind as two options and act as the diff view only when
+both are set; five readers of 'sets ()', not three, were
+converted (slice 2).
+** The signs' style key, the parser and the gesture
+The signs' style key in 'shared/herald-styles.json' is
+'presence'; the parser does not enforce the order of the parts
+and accepts an empty '(diff)' it never writes; a gesture on a
+headline without the form writes '(diff REQUEST)' rather than a
+'DELETE' that would land in the buffer literally (slice 3).
+*** I'm not sure 'presence' is carrying its weight.
+IIRC the sexp is something like
+(diff (presence (node +) (rel -)) (otherChanges yes)).
+It seems natural to promote (node) and (rel) up a level,
+and delete (presence).
+Something analogous might apply to the type system.
+**** [Claude] that is the three-kinds form, settled above
+Your "aha!" item under "Sound" settled it: '(diff (node added)
+(rel removed) (properties changed) (leaves ...) (ready ...))',
+each of the first three parts present only when true. 'presence'
+goes, and 'node' and 'rel' stand one level up, as you propose
+here. The types follow: one 'Existence { Added, Removed }' for
+the node slot and the relationship slot, a boolean for the
+properties, and 'NodeSign' and the two-valued 'Sign' go. Today's
+wire is '(diff (presence node+ rel-) ...)', with the signs as
+bare atoms inside the part rather than '(node +)'; that matters
+only as the text the slice will replace.
+** The 'removed_partners' fixture grew
+The 'removed_partners' fixture grew to reach every test (x
+contains xc; d contained c at HEAD only; e also dropped x), and
+'kinds' gives k1 a child; a's retitling, slice 14's workaround,
+was undone (slice 5).
+** The inheritance walk's two more stops
+The inheritance walk also stops at a restricted vognode and at a
+property, which the plan did not name; the function's name says
+what it does now (slice 6).
+** A seventh hand-written printer went
+A seventh hand-written printer, 'elisp_string_literal', went with
+the six; the stage-and-commit confirmation is printed entry by
+entry so the already-staged list can go through the printer
+(slice 7).
+** The repo-set switch's one-shot handler
+The repo-set switch registers its one-shot handler after the
+stream begins, so a refused switch leaves no stray handler; the
+prologue's own unwinding replaced two hand-written cleanups
+(slice 8).
+** "Drew" went with "draw"
+"Drew" went with "draw"; "redraw" stays in the clients and became
+"rerender" in the server, the Rust tests and the docs; the other
+senses of "draw" and "expand" were reworded so the closing greps
+come back clean; the tests' "expand"/"unfold" went too (slices 9
+and 10).
+** Of 114 citations, the judge rejected three
+Of 114 citations, the Sonnet judge rejected three, and the agent
+found four more by a wider grep; claims that were history
+("should fail until that feature is wired in") went with their
+citations (slice 11).
+** Kept capitals, and 1,067 words lowercased
+Metavariables in docstrings, DSL words, role names, key names and
+the warnings the plan names kept their capitals; 1,067 words were
+lowercased (slice 12).
+
+* The two-question check
+Done by one agent over the range '5bb634ee..HEAD', read-only; its
+report is 'tests/results/review16/vocabulary.md'.
+** Vocabulary
+Every rename the plan ordered is clean: no "PCSVF", "home move",
+"expand" or "expansion" in the server, "fresh drawing",
+"pre-staged", "aggregate node", 'DiffViewSource', "draw" of a
+buffer, or "unfold" in the viewforest sense survives outside what
+the plan keeps. The coined terms (pruned change view, shallow
+model subtree, extend, the editability rule, home skgrepo move,
+"fill in", the '(diff ...)' form with '(presence ...)' and
+'node~', change headline, already staged, 'quote_sexp_string',
+the startup warnings channel) are each used with one meaning and,
+but for 'NodeSign', the streaming "prologue" and the '(diff ...)'
+form as a whole, have a glossary entry where a reader needs one.
+What the check found, each verified at its line, is under
+"Decide" ("Vocabulary drift the check found" and the leftovers):
+the '(presence ...)' part now holds a sign that is no presence;
+the clients' "redraw" means the rerendered buffer, not the
+screen, so the plan's premise for keeping it was wrong; "visible
+in the diff view" is defined and used nowhere, and collides with
+the skgrepo sets' sense of visible; 'is_the_diffViews_viewnode'
+means something other than "the diff view's viewnode" means
+elsewhere; the glossary's "the user's viewnode" says "carrying no
+sign" where the code accepts '~'; the countable "extension" (the
+node budget's) has no gloss; and "makes a node's changes
+editable" is defined twice.
+** Citations
+Nothing under 'server/', 'elisp/', 'nvim/', 'tests/', 'bash/' or
+'docs/' cites a plan or a discussion under 'TODO/' by path or by
+bare name; 'docs/README.org:55' and the corrected
+'docs/nvim-client-deviations.org:7' are the two kept links, and
+'bash/run-plan-slices.sh' names the plan it runs as an operand.
+Every section of 'docs/' the range cites exists (76 citations
+checked; five differ from the headline only in markup or a
+suffix). What remains is older than the range: seven tags that
+point at a decision without naming a document ("(Q10)", "(Q2:
+...", "per the settled plan", "(Q6)", "(Q3)", "Decided
+2026-06-12", "option b"), each in a comment that states its rule
+itself, so the tag could go; they are in the leftovers.
+** All-caps
+One clear miss on a line the range touched:
+'server/from_text/supplement_from_disk.rs:288' heads a paragraph
+"THE STICKY-ELSE-DEFAULT RULE (...)" without a colon. One in an
+assertion message, which the rule does not cover
+('tests/overridden_as_such.rs:173', "shown RAW"). Nine more
+labels ending in a colon were kept though 'formatting.org' does
+not list them, as the agent's reading of the rule allows.
+
+* Housekeeping
+** DONE The commit rule was followed
+Thirteen commits touch '15_plan.org', one per slice, each the
+last commit of its slice, each carrying the slice's docs and its
+progress notes.
+** How this run was launched
+Through the Agent tool from my session, as for plan 13: one fresh
+Opus 5.5 agent per slice at high effort, given the runner's
+prompt word for word plus a request for a closing report,
+launched when the previous slice's headline read DONE and the
+tree was clean. The launches and completions are in
+'run-logs/15_plan/sessions.log', the agents' reports in
+'run-logs/15_plan/slice-N.txt'.
+| slice | min | slice | min | slice | min |
+|-------+-----+-------+-----+-------+-----|
+|     0 |   5 |     5 |  17 |    10 |  15 |
+|     1 |  21 |     6 |   9 |    11 |  16 |
+|     2 |   7 |     7 |  12 |    12 |  29 |
+|     3 |  16 |     8 |  11 | total | 194 |
+|     4 |  19 |     9 |  17 |       |     |
+The terminal wedged during slice 11 and the session restarted;
+the agent had finished and committed before that, and only its
+report was lost. The twelve agents whose counts survived used
+about 2.8 million tokens between them.
+** The run's own files
+'tests/results/review16/' (this review's logs), the agents'
+'tests/results/15-slice*' folders, 'tests/results/slice1-*',
+'slice2-15/', 'slice10/', 'allcaps/' and the scratch scripts
+beside them, and 'run-logs/15_plan/' are untracked and
+git-ignored or under 'run-logs/'. The untracked files that
+predate the run are still untracked.
+** The branch
+'total-diff-view', 32 commits ahead of '5bb634ee', not pushed by
+me.
+
+* TODO [Claude] What the next plan would hold, as settled so far
+Each line is a decision above; the plan will state each in
+full. "(open)" marks a line that waits on a TODO headline, here
+or in '16_1_is-detaching-important.org'.
+** Behavior
+*** Kept children keep their order
+The diff view's reconciler would never move a kept child; a
+new child goes after the kept child that precedes it in the
+model, or first. The role-tree walk would sort its containers
+for the first render, and the save-lock's list would be
+sorted; a test would check that a two-container role tree in a
+diff-view buffer saves back unchanged after a rerender.
+*** Detaching
+'16_1_is-detaching-important.org' holds the question and the
+recommendation: one rule stated once, one predicate for both
+reconcilers, one detaching function, the folder reconciler
+adopting a returning non-member without creating a second,
+and the doc saying that a parked non-member stays after a
+commit (open: its two questions). Its two bugs are in
+'TODO/problems.org'.
+*** A folder's member would carry the node sign
+As a content member does, so a modified member would show
+'☮ M✓' and a gesture there would mark the file.
+*** A role graft from a before-only relationship would carry '~-'
+*** The wire would say the three kinds of change
+'(diff (node added) (rel removed) (properties changed)
+(leaves ...) (ready ...) REQUEST)', each of the first three
+present only when true; 'Existence { Added, Removed }' for
+both slots and a boolean for the properties; 'presence' gone
+from the wire and the code; a changeset marker carrying
+'(ready all)', and the clients' special reading of a bare
+'(ready)' gone; a changed folder's readiness nested as
+'(diff (ready))', its 'changed' flag staying in the kind part.
+*** Two edit requests restore what a change removed
+'(editRequest restoreNode)' on a historical phantom rebuilds
+the node from HEAD's graph with its out-links and re-adds its
+in-links; '(editRequest restoreRel)' on a removed member or a
+'~-' folder member re-adds the relationship as HEAD recorded
+it, read from the folder's kind and viewparent.
+Both are written by a command that leaves the save to you,
+rendered as the other edit requests are, collected with the
+graph edits (nodes first) and consumed after the commit. A
+write-protected occurrence may carry 'restoreRel', as
+it may a relRepo request; a historical phantom may carry
+'restoreNode' alone, and the grammar refuses the rest with a
+text that says to restore the node first (open: the keys).
+The duplicate rule would prefer an editable occurrence over a
+write-protected one.
+** Housekeeping
+*** The clients' repo prompt
+It would follow the server's inheritance rule.
+*** Renames
+'is_the_diffViews_viewnode' would become 'is_a_managed_child';
+'is_the_users_viewnode' would become
+'might_be_the_users_viewnode', with the glossary entry (open
+in '16_1'); the 'recorder_pid' parameters that hold a folder's
+viewparent would be renamed.
+*** The glossary would change in seven places
+The "visible" half of "editable in the diff view" would go;
+"the user's viewnode" would say what each reconciler accepts;
+"extension" would get its gloss; "makes a node's changes
+editable" would be defined once; the diff-view section's
+preamble would state that its terms mean nothing outside the
+diff view; "reconciler" and "managed child" would move to the
+general section; the relationship sign's entry would say that
+it concerns the relationship, of the folder's kind, between
+the member and the folder's viewparent, and that the filter
+folders carry none.
+*** The leftovers would go in one slice
+The seven decision tags; the two all-caps leftovers;
+"READONING:"; the "RelPartner" citation; "the six
+write-protected RoleFolders"; the second 'in_folder'; the
+copied 'mk_test_tcp_stream'; the two facts helpers and the
+odd literals; "already staged" in the stage-and-commit
+prompt; one timing for the over-private-text retry.
+** Vocabulary
+*** "Rerender" for the clients' "redraw"
+*** "Presence" would leave with the three-kinds form
+*** "Membership" for the relationship, "member" for the node
+'RelPartner' stays. The 31 clear misuses are fixed (the
+folder-readiness sentences and names, the leak-shape variants
+with their message, test and fixtures, two stray sentences),
+and the two "membership ID" slips unless you say no; "removed
+member", "stale member", "former member" and "new member" are
+kept, with the glossary saying why; the rule goes in the
+plan's Words and in its closing grep.
+** Done already, uncommitted
+'docs/api-and-formats.org', "Metadata of the diff view", is
+headlines all the way down, with the new "Who writes each
+part, and who acts on it"; the file is yours to commit. The
+membership sweep's report is
+'tests/results/review16/memberships.md', and the throwaway
+runs' reports and sources are under
+'tests/results/review16/throwaway/', 'throwaway2/' and
+'throwaway3/' (all git-ignored).

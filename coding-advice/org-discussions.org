@@ -43,8 +43,13 @@ answer added once it is answered. A question that is also discussed
 in a section links there.
 ** Form
 Prefer headlines to bullets, and let the tree be as irregular as the
-content; see [[file:ORIENTATION.org][ORIENTATION]]. Use single apostrophes around code
-references. Do not commit planning files during discussion rounds;
+content; see [[file:ORIENTATION.org][ORIENTATION]]. Prefer an org subtree to a table: a
+table with long cells is unreadable in Emacs. No line is longer than
+65 characters; a headline that would be longer moves its tail into
+the first sentence of its body. Use single apostrophes around code
+references. An org example inside a '#+begin_example' block has
+every line indented two spaces, so that Emacs does not read its stars
+as headlines. Do not commit planning files during discussion rounds;
 Jeff stages and commits them himself.
 ** Clarity
 Every sentence should have a subject and a verb.
