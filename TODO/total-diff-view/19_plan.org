@@ -1,0 +1,976 @@
+#+title: Diff view, plan 19: folders and the two records
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification, and
+nothing here is open for discussion. Writing it has implemented
+nothing. It stands on its own: every term it uses is defined
+below or in 'docs/glossary.org', and the two documents that
+produced it ([[file:18_review.org][18_review.org]] and
+[[file:18_1_birth-and-ownership.org][18_1]]) are background that
+nobody needs to read; where they and this document differ, this
+document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the
+orientation]] and its code-change, architecture, testing and
+execution advice before starting. Preserve unrelated edits. Do
+not change branches or git configuration. Finish the agreed work
+and its verification without stopping for routine choices;
+stopping to ask is for the rare conditions that
+[[file:../../coding-advice/when-to-stop.org][when-to-stop.org]]
+describes, and this plan expects none. Record meaningful
+deviations, and any such question, in
+[[file:progress.org][progress.org]] beside this plan, under a
+top-level headline "Folders, retention, and the two records" with
+one subheadline per slice. This plan's text stays as it is,
+except the keyword of a slice's headline. Write any log or
+scratch file of your own under 'tests/results/', never under
+'TODO/'.
+
+An agent may hand a survey (a grep-and-count, a listing of call
+sites, a check of every occurrence of a word) to a Sonnet
+subagent and keep the judgment, as 'coding-advice/ai-agents.org'
+says; the subagent reads, the agent decides and edits. A claim
+about behavior that rests on reading complex code is confirmed by
+a test before the agent builds on it; the slices below say which
+tests, and an agent may add a throwaway test of its own under
+'tests/results/' and delete it after.
+
+** Commits
+Commit granularly, one or a few commits per slice, each message
+naming the slice and this document ("Slice 4 of
+TODO/total-diff-view/19_plan.org: ..."). A slice's last
+code-modifying commit also carries the slice's documentation
+changes and the change of its headline here from TODO to DONE;
+neither stands as a commit of its own. So update the docs and the
+keyword before making that last commit, and if something is left
+over after it, amend that commit ('git commit --amend'; the
+branch is not pushed) rather than adding one.
+
+** Scope
+Thirteen slices, 0 to 12, in the order they must land, chosen so
+that every suite passes at the end of every slice: the behavior
+first, the removal of the two records last, the renames after
+them. Slice 0 replaces the non-member atom and makes two small
+fixes. Slice 1 renames the viewnode identifiers and makes them
+stable across a skgrepo-set switch. Slice 2 makes every
+reconciler adopt by key among all siblings. Slice 3 lets a copy
+retained as non-member keep its editability. Slices 4 and 5 draw
+every role tree as a folder, on the server and then in the
+clients and the docs. Slice 6 removes the owner record. Slice 7
+removes the birth. Slice 8 renames what the discussion renamed.
+Slice 9 reshapes the messages and adds the command that finds a
+viewnode. Slice 10 gives the metadata editor one shared table and
+Neovim its skgrepo prompt. Slice 11 splits the glossary and reads
+the docs end to end. Slice 12 is the two-question check. The plan
+may be run as one run or as two ('bash/run-plan-slices.sh 0 5',
+then '6 12').
+
+Slices 0 to 7 edit code that still carries the names slice 8
+retires ('DeadViewnode', "deaden", "parked", 'Presence',
+'MadeNonMember'). They leave those names alone in existing code
+and write no new occurrence of a retired word; new code,
+comments, docs and tests use the vocabulary below.
+
+* Words this plan uses
+Terms the glossary defines already are used as it defines them:
+viewforest, viewnode, occurrence, editable and write-protected,
+member and non-member, folder, partner folder, property folder,
+viewparent, phantom (deleted, unknown, historical), restricted
+vognode, change viewnode, removed member, changeset marker, the
+diff view's four buffers, the pruned change view and its sets,
+the straddle (the before-graph, HEAD's, and the after-graph, the
+worktree's), the editability rule, the readiness request, the
+edit request, the view request, the stage-and-commit, the three
+kinds of change, the restore requests. Terms this plan coins or
+fixes:
+** non-member, 'nonMember'
+A non-member is a vognode child that takes no part in the
+membership its viewparent represents. On the wire it will carry
+the bare atom 'nonMember' where today it carries '(affectsParent
+false)'; a member carries nothing, as today. The value 'na',
+which roots carry today, will go: a root carries nothing.
+** retain as non-member
+To retain as non-member a stale vognode with a subtree is to keep
+it in place as a non-member with its title, ID, subtree and the
+editability it had, so that the content reconciler can adopt it
+back when its membership returns. The verb is always spelled out
+this way; "retain" alone and "park" are not used.
+** tombstone, entombstone
+A tombstone is a viewnode with no title, no ID and no change
+facts, shown as DELETED, left where a viewnode the graph no
+longer warrants stood and holding that viewnode's children; the
+save discards anything typed on its line. To entombstone a
+viewnode is to make it one. A childless tombstone is removed by
+the prune before the buffer is rendered. In code the kind is
+'ViewnodeKind::Tombstone' and on the wire the atom 'tombstone';
+until slice 8 the code says 'DeadViewnode' and 'deadViewnode'.
+** retain as non-member or tombstone, then prune
+The rule, named for what it does: a reconciler never detaches; a
+stale vognode with a subtree is retained as non-member,
+everything else stale (a leaf, a non-vognode) is entombstoned,
+and after every completion the postorder prune removes childless
+tombstones. The extra copies of a duplicate are retained
+write-protected. The glossary's entry is "the one rule: convert,
+then prune" today and will be renamed in slice 8.
+** key, warrant, stale, duplicate, adopt
+A child's key is what a reconciler matches it by: a node's ID for
+an occurrence, the entry text for an alias or ID entry, the kind
+for a folder or a change viewnode. The graph warrants a child
+when the model its reconciler builds from the graph has an item
+with the child's key; a stale child is one whose key the model
+lost; a duplicate is a second child of a key already matched. A
+reconciler adopts a child when a key its model has is already
+among the node's children, whoever drew the child: it takes that
+child instead of drawing a second.
+** change facts, commit-readiness marker
+The change facts are a viewnode's '(diff ...)' parts: the three
+kinds of change, the leaves, the readiness. The words are never
+shortened to "facts". A commit-readiness marker is the '(ready
+...)' part and its herald; it is never called a bare "marker",
+since a changeset marker is another thing.
+** foldering, the containerward chain
+To folder a role tree is to draw every partner as a member of a
+partner folder of its role, never as a graft directly under a
+vognode; after this plan every role tree but the contentward one
+is foldered. The containerward chain is the one tree that goes on
+below a folder: under a member of a containers folder its
+containers hang directly as non-members, under each of those its
+containers, up to the roots, as the pruned change view draws a
+root's containers today. A chain node carries no change facts and
+takes no commit-readiness marker; a folder's member does both.
+** editability claim
+The record, in the editable map, that one occurrence of a node is
+the editable one, so that no other occurrence in the buffer may
+be. The word is "editability claim", not "editable claim".
+** viewnode ID, 'vnid', viewforest id
+A viewnode ID identifies one viewnode within one buffer for the
+life of the buffer. On the wire it will be the atom '(vnid X)', X
+one or more lowercase letters and digits as today; to the user it
+is "viewnode ID"; in code 'ViewnodeId' and 'viewnode_id'. The
+identifier of a whole buffer, 'ViewId' today, will be
+'ViewforestId' in code and "viewforest id" in prose; its wire key
+'view-id' stays. Until slice 1 the code says 'Vid', 'vid' and
+'ViewId'.
+** How to say it in messages
+A message names each viewnode it concerns as a subheadline of its
+own: the title when there is one, then "graphnode ID: X", then
+"viewnode ID: X" with the hint that 'C-c g v' finds it, or "not
+yet saved" for a headline typed since the last render.
+* Agreed behavior
+Each subsection is one slice's "what". The "how" is under
+"Implementation sequence", the "why" under "Pitfalls".
+
+** 'nonMember', and two small fixes (slice 0)
+*** The atom
+The parser ('server/serve/parse_metadata_sexp.rs', the
+'affectsParent' arm) will accept the bare atom 'nonMember' and
+refuse '(affectsParent ...)' as an unknown key; the printer
+('server/org_to_text.rs') will write 'nonMember' for a non-member
+and nothing for a member or a root. 'AffectsParent' becomes a
+two-valued type (member or non-member; the name is the agent's
+choice, 'Membership { Member, NonMember }' is fine), and its 'NA'
+arm goes with its two readers ('to_org/util.rs', the claim-ok
+match and the "root given a parent" branch;
+'add_missing_info.rs', the rewrite of 'na' under a parent), both
+of which only ever turned a moved root into a member, which the
+absent atom means already. The herald rule for '⊥'
+('server/heralds.rs', the 'affectsParent' rule and the
+exhaustiveness guard 'affectsParent_emitted_atoms') will key on
+the new atom; the rules fixture 'tests/shared/herald-rules.sexp'
+is regenerated.
+*** The clients
+Both metadata editors cycle 'affectsParent' through "true
+(default)", "false" and "na"
+('elisp/skg-sexpr-edit/skg-sexpr-cycling.el',
+'nvim/lua/skg/metadata_edit.lua') and fill it in by default
+('skg-unrestrictedNode-defaults.el',
+'unrestrictednode_defaults.lua'); they will offer 'nonMember' as
+a bare atom to add or remove, with no default to strip. The
+member tests ('skg--node-affectsParent-content-of-p' in
+'elisp/skg-metadata.el', 'node_affectsParent_content_of_p' in
+'nvim/lua/skg/metadata.lua') read the atom.
+*** Tests and docs
+The 165 '(affectsParent false)' and 89 '(affectsParent na)' in
+test literals outside logs are converted by one script, kept
+under 'tests/results/'; 'docs/api-and-formats.org' (the
+'(affectsParent ...)' bullets around line 830) and the glossary's
+"non-member" entry say the new atom. The integration suite runs,
+since every buffer changes.
+*** Two small fixes
+The HEAD snapshot cache
+('read_owned_head_graph_snapshot_maybe_cached',
+'server/git_ops/git_snapshot.rs') will keep the current HEAD's
+snapshot alone, dropping the rest when a new HEAD is read, with a
+unit test. The comment on the number-like skip in 'take_next_vid'
+('server/types/views_state.rs') says Emacs reads 'inf' as a
+number; only the Rust sexp reader does, and the comment will say
+so.
+
+** Viewnode IDs (slice 1)
+*** The names
+The atom becomes '(vnid X)'. The type 'Vid' becomes 'ViewnodeId',
+the field 'Viewnode::vid' and its locals 'viewnode_id', and every
+derived name follows ('without_vids' becomes
+'without_viewnode_ids', 'take_next_vid' 'take_next_viewnode_id',
+'VID_ATOM' 'VIEWNODE_ID_ATOM', and so on; the names
+'ViewIdRecord', 'view_id_record',
+'assign_view_ids_and_record_owners' and 'view_id_suffix', which
+mean the viewnode, say 'viewnode_id' too). The buffer's
+identifier 'ViewId' ('server/types/views_state.rs') becomes
+'ViewforestId', its family ('view_id_from_request',
+'saved_view_id', 'collateral_view_ids', the locals)
+'viewforest_id'; its wire key 'view-id' and the clients'
+'skg-view-id' and 'skg_view_id' families stay, and the clients'
+prose "view ID" for the buffer stays. Messages say "viewnode ID
+X" where they said "view id X". The 281 test literals with '(vid
+' are converted by one script; the two integration-test helpers
+that strip the atom ('tests/integration/test-nvim-lib.lua',
+'tests/integration/test-wait.el') strip 'vnid'.
+*** Unknown viewnode IDs are dropped
+The parser ('uninterpreted.rs', where a repeated vid is dropped
+today) will also drop a viewnode ID that the view's record does
+not know, so that a hand-typed one or one brought back by an old
+copy of the buffer's text gets a fresh ID at the next render and
+never moves the counter. The record is consulted where
+'set_owners_in_parsed_viewforest' consults it today.
+*** The skgrepo-set switch keeps what it does not touch
+The switch's prepass ('convert_and_prune_for_skgrepo_switch',
+'server/update_buffer/skgrepo_switch.rs') prunes childless
+write-protected folder members and emptied folders the switch
+does not touch, and the completion redraws them with fresh IDs;
+it also drops a containers folder the user requested. The prepass
+will remove restricted leaves only, and a requested folder will
+stay and be refreshed under the new restriction. The anonymous
+placeholder a restricted node becomes stays as it is; its revival
+on the switch back is out of scope.
+*** Tests and docs
+A test pins the stability of viewnode IDs across a save, a
+request and a switch (the cases of
+'tests/results/review18/throwaway-vids/report.md', which it may
+copy); a test shows an unknown ID dropped. The glossary's entry
+"view id, vid" becomes "viewnode ID, vnid" and the entry "view,
+buffer, viewforest" names the viewforest id;
+'docs/api-and-formats.org' says 'vnid'. The integration suite
+runs.
+
+** Adoption by key among all siblings (slice 2)
+*** The rule
+Every reconciler matches its model against all the children of
+the node, whoever drew them, by key; a child of a key the model
+has is adopted; a second child of a matched key is a duplicate,
+converted by the rule's duplicate clause (the editable copy is
+kept, else the first in buffer order; the rest are retained
+write-protected if they have a subtree, entombstoned if not). No
+subtree moves.
+*** The diff view's reconciler
+'reconcile_children_with_shallowModelSubtree'
+('server/diff_view/shallow_model_subtree.rs') takes as candidates
+only the children whose owner is the caller's; it will take every
+child the kind selector admits.
+'align_content_members_with_straddle'
+('server/diff_view/changes.rs') counts a non-member as a member
+or a removed member only when the diff view owns it; it will
+count any non-member whose ID is in the before-list or the
+after-list, so that a copy the user pasted is set aside as the
+removed member rather than doubled. The duplicate clause of
+'complete_managed_children' ('server/update_buffer/util.rs') runs
+in the diff view's reconciler and in the role-tree attach
+('server/diff_view/partner_folders.rs', the member role trees)
+too.
+*** Property folders in the diff view
+A property folder (aliases, IDs, flags) in a diff-view buffer is
+matched by kind among all siblings, so that the folder the user
+requested becomes the changed one when the property changes; it
+is refreshed from the after-graph at every visit (today
+'server/diff_view/visit.rs' returns at once for a property
+folder, which leaves a requested folder stale); and it stays
+until the user deletes it, marked changed while its property
+differs between the graphs and unmarked after, never pruned by
+the diff view.
+*** Tests
+The four duplicates of
+'tests/results/review18/throwaway-folders/report.md' and
+'throwaway-grafts/report.md' become tests: the requested alias
+folder before the aliases change; a containerward graft beside a
+removed member of the same node; a pasted write-protected copy
+beside a removed member; copies of a write-protected graft. Each
+asserts one child per key and a clean unchanged save. A test
+shows a requested alias folder refreshed in a collateral rerender
+and kept after the change ends.
+
+** A copy retained as non-member keeps its editability (slice 3)
+*** The rule
+'convert_unwarranted_child' ('server/update_buffer/util.rs')
+write-protects every retained vognode and makes its members
+non-members. It will leave an editable vognode editable, with its
+members as they are, and leave a write-protected one
+write-protected, with its members made non-members as today (a
+write-protected occurrence may hold no member). The extra copies
+of a duplicate are write-protected whatever they were, since the
+save refuses two editable occurrences of one node
+('Multiple_Defining_Viewnodes').
+*** The editability walk
+'apply_editability_rule' ('server/to_org/extend/editable.rs')
+gives the claim to the first occurrence met in the breadth-first
+walk when neither carries a request. It will prefer a member to a
+non-member: a non-member tentative occurrence yields to a member
+met later, whose content subtree is then extended, and the
+non-member is write-protected as a yielding occurrence is today.
+The outcome 'EditabilityOutcome::Deferred' is renamed
+'ClaimedElsewhere', and its branch makes the yielding
+occurrence's member children non-members
+('make_member_children_nonMembers'), which it does not today, so
+that the save no longer refuses the buffer with
+'MemberChildOfWriteProtectedOccurrence'.
+*** Tests
+From 'tests/convert_then_prune.rs': the stale branch m under k
+stays editable with mc its content, and the buffer saves; a
+pasted write-protected copy beside the member is retained
+write-protected; a duplicate's extra copy is write-protected.
+From 'tests/results/review18/throwaway-folders/report.md', P2:
+the two occurrences with editable requests, the later one
+yielding, and the unchanged save accepted. A test shows a
+retained editable copy yielding the claim to a member met later.
+** Every role tree is a folder: the server (slice 4)
+*** The rule
+A partner stands only in a partner folder of its role, as a
+write-protected member; a vognode child of a vognode is content
+or a non-member note. Every role tree but the contentward one is
+write-protected throughout: a folder's members and the chain
+below them. A folder's member takes a readiness gesture, as every
+folder member does today; a chain node carries no change facts
+and takes none. Only a folder's members show change.
+*** The containers folder and the chain
+Every fresh content view puts a containerward request on its
+root, which 'fulfill_root_containerward_requests'
+('server/update_buffer.rs') fulfils by drawing the whole
+containerward tree directly under the root. It will draw a
+containers folder on the root instead, with the chain under each
+member: the member's containers as non-members under it, theirs
+under them, breadth-first to 'max_roleTree_depth' as today, every
+node write-protected. The pruned change view draws a root's
+containers this way already ('docs/diff-view.org', "Stub roots");
+the content view will do the same, and the folder request
+'(folder containers)' will draw the chain under the folder's
+members too, in every view. A chain is drawn when the folder is,
+and extended by no later request; a request on a chain node for
+its containers draws a containers folder under it like any other.
+*** The nine role-tree requests
+The request '(viewRequests (roleTree ROLENAME))' and its engine
+('server/to_org/extend/role_tree.rs': the paths, branches and
+cycles, the containerward attach,
+'mk_writeProtected_from_viewnode' with a birth) go. The server
+will refuse the request as an unknown view request. Eight of its
+roles are reached by the folder requests that exist ('(folder
+containers)', '(folder mentioners)', '(folder overrides)',
+'(folder hidesFromSubs)', '(folder subscribesTo)', each building
+both folders of its relation where both exist); the ninth, the
+mentioned role, has no folder and will have no request. The
+search buffer ('render_enriched_search_buffer.rs') draws a
+containerward tree and two override chains as grafts under each
+hit; it will draw a containers folder with the chain, an
+overrider folder and an overridden folder under each hit, folded.
+*** The member role trees of the diff view
+'attach_memberRoleTrees_under_straddle_folder_members'
+('server/diff_view/partner_folders.rs') hangs, under a changed
+folder's member, the member's role tree with the containerward
+attach under each graft, and 'tag_before_only_role_grafts' marks
+before-only grafts '(rel removed)'. It will hang the chain alone
+under a containers folder's member, nothing under any other
+folder's member, and tag nothing: a chain node carries no change
+facts.
+*** The command that integrates unshown changes
+'ensure_editableOccurrences_exist'
+('server/diff_view/pruned_change_view.rs') makes a change shown
+only as a folder member editable in place, with its content under
+it. It will not: a change shown only as a write-protected folder
+member counts as not editable here, and the command appends the
+node as a root, as it does for a change shown nowhere.
+*** Tests
+The Rust tests of role trees
+('tests/rebuild/integrate_role_tree.rs',
+'tests/rebuild/mentionerward_role_tree.rs',
+'tests/content_view.rs', 'tests/overrideward_view_subtree.rs',
+'tests/partner_folder_matrix.rs', the role-tree cases of
+'tests/pruned_change_view/' and
+'tests/graph_straddle_engines.rs', 'tests/leak_battery.rs',
+'tests/server_warnings.rs') are rewritten for folders: a root's
+containers folder with its chain; a cycle and a diamond in the
+chain (the 'Repeated' leaf); the search buffer's three folders;
+the member role tree reduced to the chain; the integrate command
+appending a root. The integration suite runs, with its four
+affected tests ('containerward-view-request',
+'mentionerward-view-request', 'content-view-from-non-root',
+'search-enrichment') updated to the folder forms; the clients'
+commands still send the role-tree request in this slice, which
+the server refuses, so those two tests change their request to
+the folder form in both clients' versions.
+
+** Every role tree is a folder: the clients (slice 5)
+*** The commands
+The nine commands 'skg-show-containerward-tree' and its siblings
+('elisp/skg-request-views.el', keys 'C-c p C/L/l/O/o/H/h/S/s' in
+'elisp/skg-keymaps-and-aliases.el') and their Neovim twins
+('nvim/lua/skg/view_requests.lua', 'ShowContainerwardTree' and
+siblings in 'nvim/lua/skg/keymaps.lua', keys 'pC pL pl pO po pH
+ph pS ps') go, with the 'C-c p' and '<localleader>p' prefixes if
+nothing else uses them. The folder commands under 'C-c l' and
+'<localleader>l' remain the way to show a node's partners.
+*** The docs
+'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org' lose the nine
+entries and say, under the folder commands, that the containers
+folder carries the chain; 'docs/api-and-formats.org' loses
+'(roleTree ROLENAME)' and describes the chain under the
+containers folder; 'docs/glossary.org' rewrites "role tree, role
+graft, and the -ward adjectives": a role tree is a folder's
+members and, for containers, the chain; "role graft" is retired;
+'docs/nvim-client-deviations.org' follows. 'docs/diff-view.org'
+says what a changed folder's member shows under it.
+*** Tests
+The Emacs and Neovim tests of the nine commands go; the
+integration suite runs again.
+
+** The owner record goes (slice 6)
+*** Conversion by kind and change facts
+The diff view's reconciler converts a stale child it owns, and
+under a stale child 'convert_unwarranted_subtree'
+('shallow_model_subtree.rs') converts everything but the user's
+and the content reconciler's children, by owner. It will convert
+a stale child by its kind and its change facts at the completion
+that finds it stale (a removed member still carries '(rel
+removed)' then, a phantom, a marker or an old text is known by
+its kind), recursing into descendants that carry change facts or
+are change viewnodes by kind and leaving the rest, which is what
+the owner rule did. 'align_content_members_with_straddle' reads
+no owner after slice 2. The hand-overs between reconcilers
+('changes.rs', 'util.rs') go.
+*** The record
+With no read left, 'Owner', the owner table in 'ViewIdRecord',
+'set_owners_in_parsed_viewforest', 'record_owners_in' and every
+stamp of an owner ('server/' has about thirty) go; the viewnode
+ID assignment stays as it is. The glossary's "owner" entry is
+removed in slice 11; this slice removes the word from code
+comments and 'docs/diff-view.org'.
+*** Tests
+The commit tests of 'tests/pruned_change_view/after_a_commit.rs'
+and 'users_notes.rs' keep their outcomes: the childless removed
+member is gone after a commit, the user's note and the drawn
+content stay. A new test: a pasted write-protected copy under a
+stale child stays.
+
+** The birth goes (slice 7)
+*** Position in place of birth
+Every read of 'Birth' is replaced by position. The relationship a
+headline stands for ('relationship_to_viewparent',
+'server/diff_view/readiness_requests.rs') is the folder's
+relation with its direction for a folder member, content for a
+vognode child of a vognode, and none for a chain node.
+'is_unrestricted_removed_member' ('shallow_model_subtree.rs')
+tests a non-member vognode child of a vognode carrying '(rel
+removed)'. The parser's placement check for 'restoreRel'
+('parse_metadata_sexp.rs') and the clients' guards
+('elisp/skg-metadata.el', 'nvim/lua/skg/metadata.lua') accept the
+request on a removed member and on a folder member carrying '(rel
+removed)', and refuse it elsewhere by position. The herald's low
+letter ('birth_facts', 'server/update_buffer/viewnodestats.rs')
+follows the parent's kind: the relation the folder names, in the
+direction the role implies, for a folder member; the parent's
+containment for a content member; none for a non-member. The
+birth check ('validate_affectsParent_relationships_in_straddle',
+'server/to_org/util.rs'), 'adopt_model_facts''s copy of the
+birth, the 'birth' parameter of 'mk_writeProtected_from_viewnode'
+and the metadata editors' 'birth' field go.
+*** The wire
+'(birth roleGraft ROLENAME)' leaves the parser and the printer;
+'Birth' leaves 'Viewnode' and the maybe-placed twin. The 61 test
+files that write the atom are converted by one script; the
+rendering cases of 'tests/shared/herald-rendering-cases.txt' that
+show a graft's low letter become folder-member cases.
+*** Tests
+The readiness tests of 'tests/pruned_change_view/readiness.rs'
+keep their outcomes with folder members in place of grafts; a
+test shows 'restoreRel' refused on a chain node and accepted on a
+folder member carrying '(rel removed)'; the save tests of
+'tests/save/birth_and_write_protected.rs' lose their birth cases.
+The integration suite runs.
+
+** The renames (slice 8)
+*** Kinds and atoms
+'ViewnodeKind::DeadViewnode' becomes 'Tombstone' and the wire
+atom 'deadViewnode' becomes 'tombstone' (36 test literals, one
+script); "deaden" in names and comments becomes "entombstone";
+"dead viewnode" and "dead leaf" in comments and docs become
+"tombstone" and "childless tombstone". The herald text stays
+DELETED.
+*** Repairs and functions
+'RepairKind::RemovedStaleLeaf' becomes 'EntombstonedStaleLeaf',
+'RemovedDuplicate' 'EntombstonedDuplicate', 'MadeNonMember'
+'Retained' (its text: "retained N child(ren) as non-members"),
+'RestoredMember' 'ReinstatedMember' (its text: "reinstated N
+member(s)"). 'convert_now_restricted_vognodes'
+('skgrepo_switch.rs') becomes
+'anonymize_now_restricted_vognodes'; 'adopt_model_facts' becomes
+'give_model_facts_to'; 'convert_unwarranted_child' keeps its
+name, its doc comment stating the rule under its new name.
+'Presence' ('server/graph_straddle/types.rs') goes: the union
+walk yields 'Option<Existence>' per item, 'Both' being 'None',
+and 'diff_sign' goes with it.
+*** Words in comments and docs
+"parked", "set aside", "the one rule", "convert, then prune" and
+"editable claim" in code comments, tests and docs become
+"retained as non-member", "retain as non-member or tombstone,
+then prune" and "editability claim". The glossary's headline "the
+one rule: convert, then prune" becomes "retain as non-member or
+tombstone, then prune"; its sixteen internal links follow.
+
+** Messages name a headline as a subtree (slice 9)
+*** The server
+'HeadlineName' ('server/types/errors.rs') writes a list line
+today ("- view id: X", "- headline: T"). Every message that names
+a headline will name it as an org subheadline under the message's
+headline: the title when there is one, then "graphnode ID: X",
+then "viewnode ID: X" with the hint 'To find it: C-c g v X', or
+"not yet saved" for a headline typed since the last render.
+'format_save_error_as_org' ('server/types/save.rs') already puts
+each validation error under '** Error N'; the subheadlines nest
+under it. Warnings, which the clients wrap as '** message' today,
+will come from the server as org text in the same shape.
+*** The clients
+Both clients gain a command that jumps to the headline carrying a
+given viewnode ID: 'skg-goto-viewnode-id' on 'C-c g v' and
+'<localleader>gv', reading the ID from the minibuffer and
+searching the buffer text for '(vnid X)'. The viewnode ID stays
+invisible while heralds are on.
+*** Tests and docs
+'tests/new/messages_name_view_ids.rs' and the clients' message
+tests assert the new shape; 'docs/api-and-formats.org' says how a
+message names a headline; 'docs/COMMANDS.org' and
+'docs/COMMANDS-nvim.org' list the command.
+
+** One shared metadata table; Neovim's prompt (slice 10)
+*** The table
+'shared/metadata-fields.json', beside 'relations.json' and
+'herald-styles.json', lists for each headline kind (unrestricted
+node, historical phantom, deleted phantom, unknown phantom,
+alias, ID, flag, the diff-view properties, the folders) the
+fields a user may set, each with its default and the values its
+cycle runs through: for an unrestricted node 'nonMember',
+'writeProtected', 'editRequest' (delete, merge, relRepo, flag,
+restoreRel where the node is a removed member), 'viewRequests'
+(editable, write-protected, write-protected subtree, fork, flags,
+folder); for a historical phantom 'editRequest' (restoreNode);
+for the kinds that take a readiness request, none in the editor,
+since the readiness commands cover it. A server test checks the
+table against the parser as 'relation_accessors.rs' checks
+'relations.json' against 'NodeRelation'.
+*** The editors
+Both editors ('elisp/skg-sexpr-edit.el' and its 'skg-sexpr/',
+'nvim/lua/skg/metadata_edit.lua' and 'sexpr/') read the table for
+the fill-in, the strip step and the cyclers, for every kind, in
+place of the one fixed list they hold for unrestricted nodes
+today. A write-protected occurrence is no longer offered 'delete'
+or 'merge'; the historical phantom is offered 'restoreNode'; the
+default value is stripped for every kind, not only nodes.
+*** Neovim's skgrepo prompt
+Emacs asks for an owned skgrepo after org's insert-heading
+command when the new headline cannot inherit one
+('skg-sexp-edit--after-insert-headline'); Neovim will do the same
+by wrapping nvim-orgmode's 'org_insert_heading_respect_content'
+and 'org_meta_return' actions, through
+'populate_minimal_node_metadata' and
+'picker.prompt_for_owned_repo', with the four cases of the Emacs
+test ('test-skg-insert-heading-repo-prompt.el'); the deviation
+leaves 'docs/nvim-client-deviations.org'.
+*** Tests
+Editor tests open the editor on each kind in both clients; the
+conformance test; the Neovim prompt's test.
+
+** The glossary and the docs (slice 11)
+*** The split
+'docs/glossary.org' is divided into two top-level sections, the
+user-facing first, "Terms a user meets" (what is seen in the
+clients, the heralds, the messages and the user docs) and "Terms
+of the implementation", whose body says that a user almost
+certainly need not read it. Entries that hold both ("view,
+buffer, viewforest", "PartnerFolder", "graphnode, viewnode,
+vognode", "merge", "view completion, extend, render, rerender",
+"mark, fingerprint, readiness", "prominent", "relation,
+relationship, recorder") are split in two, the user's half saying
+what is seen and the technical half how. Each section may hold a
+"diff view" subsection; Tantivy's entries go under the
+implementation except "no search matching" and "flags folder".
+Links inside the glossary name headlines and survive a move; a
+renamed headline's links are updated; the five doc citations of
+"Terms of the diff view" are updated.
+*** The entries
+New or rewritten, in the words of this plan: non-member and
+'nonMember'; retain as non-member; tombstone, entombstone; retain
+as non-member or tombstone, then prune (with "warrant", "stale"
+and "duplicate" in its headline); adopt; editability claim;
+viewnode ID, vnid, viewforest id; foldering and the containerward
+chain; role tree (rewritten); how a message names a headline;
+reinstated. Removed: "owner", "birth", "role graft", "dead
+viewnode", "parked", "set aside", "view id, vid", "the one rule".
+'coding-advice/names.org' gains, under "Some words are never used
+bare": facts (change facts) and marker (changeset marker or
+commit-readiness marker).
+*** The docs
+'docs/diff-view.org', 'docs/api-and-formats.org',
+'docs/heralds.org', 'docs/COMMANDS.org', 'docs/COMMANDS-nvim.org'
+and 'docs/nvim-client-deviations.org' are read end to end once
+and brought to the code as it then stands. The entries of
+'TODO/problems.org' marked "FIX PLANNED" that this plan closed
+move to the top of 'TODO/DONE/problems.org'.
+
+** The two-question check (slice 12)
+One agent answers two questions over the plan's commit range and
+writes the report under 'tests/results/'. First, vocabulary: no
+code, test or doc under 'server/', 'elisp/', 'nvim/', 'tests/' or
+'docs/' says "affectsParent" (the Rust type may keep a name of
+the agent's choice), 'vid' or "view id" for the viewnode, 'Vid',
+'ViewId' for the buffer, 'Owner' or "owner" for a viewnode,
+'Birth' or "birth" or "role graft", 'DeadViewnode' or
+'deadViewnode' or "dead viewnode" or "deaden", "parked", "set
+aside", "the one rule", "convert, then prune", "editable claim",
+'Presence' or 'diff_sign', 'Deferred' for the editability
+outcome, 'MadeNonMember', 'RemovedStaleLeaf', 'RemovedDuplicate',
+'RestoredMember', 'roleTree'; and every term this plan coins has
+its glossary entry. Second, citations: no code under 'server/',
+'elisp/', 'nvim/', 'tests/' or 'bash/' cites a document under
+'TODO/', and every citation of a glossary or doc section names a
+section that exists. The agent fixes what is small and lists the
+rest in the commit message.
+
+** What stays as it is
+The viewnode IDs and their assignment after the prune; the three
+kinds of change on the wire and the folder members' change facts;
+the restore requests on removed members and on folder members;
+the save-written lists following the goal's order; the content
+reconciler, the folder reconcilers and the validators as plan 17
+left them, but for the duplicate clause's reach; the anonymous
+placeholder of a restricted node, which the switch back does not
+revive; the glossary's ban on "viewtree"; the hidden content kept
+under a subscribee as a titled non-member; the 'C-c l' folder
+commands and their requests.
+* Pitfalls the slices must respect
+Facts about the code as it stands, each with its place, that an
+agent would otherwise rediscover or trip over.
+** The saved view is rebuilt from the parsed buffer
+After a save, the saved view's forest is the one rerendered from
+the parsed text ('server/update_buffer.rs', the saved-view
+branch), so every per-viewnode state that must survive a save
+rides in an atom; the parser treats an unknown atom as a hard
+error. Collateral views and "rerender all views" re-complete a
+clone of the stored forest instead, with its change facts. An
+ego_tree 'NodeId' is never stable across a save; a viewnode ID
+is.
+** The parser builds the twin struct
+Headlines parse into the maybe-placed viewnode
+('server/types/maybe_placed_viewnode.rs') and are placed into
+'Viewnode' later; a field removed or renamed goes on both, and
+the 'Viewnode {' struct literals in 'server/' and 'tests/' each
+follow (plan 15 did this by script; do the same).
+** The completion runs every reconciler in one BFS, then prunes
+'complete_viewforest' ('server/update_buffer/complete.rs') visits
+nodes breadth-first, each visit running its node's reconcilers,
+and calls 'prune_self_deletable_when_empty' at the end, before
+the buffer is rendered; the prune is postorder, collapses a chain
+of childless tombstones in one pass, stops at a kind it does not
+prune, and never prunes a view root. The viewnode IDs are
+assigned after the prune, in 'finish_viewforest'.
+** Where a candidate is chosen and where it is converted
+'reconcile_children_with_shallowModelSubtree'
+('server/diff_view/shallow_model_subtree.rs') filters candidates
+by 'child.owner == owner && selects(child)' and converts the
+unmatched ones; 'convert_unwarranted_subtree' there decides by
+owner what under a stale child stays. The older reconciler
+('complete_managed_children', 'server/update_buffer/util.rs')
+chooses by shape: a member of the content list, an entry of the
+folder's kind, a child 'skgid_a_folder_child_stands_for' gives an
+ID (a member, a removed member, an unknown or historical
+phantom). The folder reconcilers already adopt a returning key
+('mark_goal_children_as_folder_members',
+'server/to_org/complete/partner_folder/child_data.rs') and so
+does the content reconciler
+('adopt_nonMember_children_that_are_content',
+'server/update_buffer/reconcile/content.rs').
+** Change facts last until a child is found stale
+'parse_change_fact_part' ('parse_metadata_sexp.rs') keeps the
+'(diff ...)' parts on vognodes and phantoms; nothing strips them
+before the reconcilers run; 'convert_unwarranted_child' clears
+them, 'replace_kind' clears them, 'adopt_model_facts' replaces
+them on matched children. So a removed member still says '(rel
+removed)' when the diff view finds it stale after a commit, and
+only after conversion do a retained removed member, a graft whose
+birth was cleared and a pasted write-protected copy share one
+shape. A pasted copy of a removed member carries the same change
+facts as the original, since 'tag_content_members' tags by ID.
+** What the owner is read for today
+Only in the diff view: the candidate filter and the stale-subtree
+conversion above, 'align_content_members_with_straddle'
+('changes.rs'), and the hand-over of the content reconciler's
+children under a historical phantom ('changes.rs'). The content
+reconciler, the folder reconcilers and the role-tree attach stamp
+owners and never read them. 'set_owners_in_parsed_viewforest'
+('server/types/views_state.rs') gives a headline whose viewnode
+ID the table does not know the owner 'User'; of two headlines
+with one ID the first in buffer order keeps it
+('uninterpreted.rs').
+** What the birth is read for today
+'relationship_to_viewparent' ('readiness_requests.rs'), read by
+the leaves and ready facts, the readiness requests and the
+restore requests; 'is_unrestricted_removed_member'
+('shallow_model_subtree.rs'), read by the folder reconciler's
+managedness and by 'content_occurrences_in_level_order'
+('pruned_change_view.rs'); the parser's 'restoreRel' placement
+check and both clients' guards; 'tag_before_only_role_grafts';
+the birth check in 'finish_viewforest'; 'birth_facts' for the
+herald's low letter; the containerward attach's walk
+('role_tree.rs', the collection of grafts born of the role);
+'adopt_model_facts'; the relRepo gating of a graft
+('role_graft_relRepo', 'role_tree.rs'). The convert keeps a
+retained child's birth; the content reconciler may adopt a graft
+as a member, whose birth survives.
+** How role trees are drawn today
+Three ways. The root's containerward tree: 'render_initial_view'
+('update_buffer.rs') puts 'ViewRequest::RoleTree(CONTAINER)' on
+every root, 'extract_view_requests'
+('reconcile/view_requests.rs') strips it from roots, and
+'fulfill_root_containerward_requests' draws the whole tree
+breadth-first ('insert_full_containerward_role_tree_recursive',
+'role_tree.rs', to 'max_roleTree_depth') with no check for a tree
+already there. A '(roleTree ROLE)' request elsewhere: the path
+engine ('build_and_integrate_role_tree_then_drop_request',
+'role_tree.rs') draws a path to the first branch or cycle,
+reusing any existing child of the wanted ID
+('find_child_by_skgid',
+'server/types/tree/viewnode_graphnode.rs') without a birth, and
+then the attach hangs containers under grafts born of the role,
+for every role but container. The diff view's member role trees:
+'attach_memberRoleTrees_under_straddle_folder_members' in a
+scratch tree, then a reconcile against children owned by the
+attach. The pruned change view already draws a root's containers
+as a folder with the chain. Partner folders are matched by kind
+alone in the diff view ('child_folder_or_new', 'changes.rs');
+property folders by owner.
+** The save's rules for members and copies
+A write-protected occurrence may hold no member
+('MemberChildOfWriteProtectedOccurrence',
+'server/from_text/write_protected_edits.rs'); two editable
+occurrences of one node are refused
+('Multiple_Defining_Viewnodes', 'validate_tree.rs'); two members
+under one parent are refused ('local.rs', "non-ignored content
+children must be unique"); a write-protected non-member copy
+beside a member is accepted; a folder refuses two folders of one
+kind among its siblings ('local.rs', "AliasFolder must be unique
+among its siblings"). A historical phantom's children may be
+vognodes (its old content) and an acquiredBy folder; a folder's
+members are compared to the graph under a write-protected
+occurrence.
+** The editability walk
+'apply_editability_rule' ('server/to_org/extend/editable.rs')
+runs in the breadth-first completion with a map rebuilt every
+completion; an occurrence carrying a request becomes 'Final' and
+write-protects a prior 'Tentative' occurrence's content subtree;
+a request met after a 'Final' one is dropped and the occurrence
+write-protected ('Deferred'), without its members made
+non-members. Of two tentative occurrences the first met wins.
+** The clients hide the whole sexp
+Both clients hide the '(skg ...)' form under one overlay with a
+display string (Emacs, 'heralds-minor-mode.el') or an extmark
+with conceal (Neovim, 'heralds.lua'); neither makes it invisible,
+so a search finds text inside it. Neither reads the viewnode ID
+or the birth; the Emacs client's only read of the birth atom is
+the 'restoreRel' guard, and the metadata editors offer the
+'birth' field with a default the server rejects.
+** The clients' fixed field list
+The editors fill in and strip fields for unrestricted nodes only,
+from one list ('skg-unrestrictedNode-defaults.el',
+'unrestrictednode_defaults.lua'); every other kind shows what the
+headline carries; the cycler finds its field by the parent
+headline's text and never adds one. Both clients read
+'shared/relations.json' and 'shared/herald-styles.json' through
+'elisp/skg-shared.el' and 'nvim/lua/skg/shared.lua'.
+** Test helpers compare substrings by exact text
+Many Rust tests assert by 'contains' on a line's text; 85 of them
+read their buffers through 'without_vids'. A renamed atom changes
+every such literal; convert them by script and keep the script
+under 'tests/results/'.
+** Fixed temp paths collide
+Two Rust tests that build the same fixture path cannot run at
+once ('TODO/problems.org'); when a suite run fails on one such
+test, rerun that test alone before concluding anything. Run the
+suites one at a time.
+** The integration tests read buffers as a client does
+'bash/integration-tests.sh' runs each test in Emacs and in
+Neovim; 'import-md-and-org' fails at baseline. A slice that
+changes what the server writes into a buffer runs it before the
+slice ends.
+
+* Code map
+** Viewnodes and their metadata
+'server/types/viewnode.rs' ('Viewnode', 'ViewnodeKind',
+'Vognode', 'AffectsParent', 'Birth', 'Owner', 'Vid', 'Existence',
+'DiffChange', 'PartnerFolder', 'PropertyFolder',
+'FolderRelation', the constructors);
+'server/types/maybe_placed_viewnode.rs' (the parsed twin);
+'server/serve/parse_metadata_sexp.rs' (the grammar:
+'affectsParent', 'birth', 'vid', the 'diff' form, the placement
+checks); 'server/org_to_text.rs' (the printer);
+'server/from_text/buffer_to_viewnodes/uninterpreted.rs' (the
+duplicate vid rule, 'vid_written_in_metadata');
+'server/metadata_canon.rs' ('without_vids').
+** Views and completion
+'server/types/views_state.rs' ('ViewId', 'ViewIdRecord',
+'take_next_vid', 'assign_view_ids_and_record_owners',
+'set_owners_in_parsed_viewforest'); 'server/update_buffer.rs'
+('render_initial_view', 'finish_viewforest',
+'fulfill_root_containerward_requests');
+'server/update_buffer/complete.rs' ('complete_viewforest',
+'prune_self_deletable_when_empty', the editability arms);
+'server/update_buffer/util.rs' ('convert_unwarranted_child',
+'complete_managed_children', 'RepairSummary', 'KeptChildOrder');
+'server/update_buffer/warnings.rs' ('RepairKind');
+'server/update_buffer/reconcile/' (content, aliasfolder,
+id_folder, flags_folder, partner_folder, view_requests);
+'server/update_buffer/skgrepo_switch.rs';
+'server/update_buffer/viewnodestats.rs' ('birth_facts',
+'birth_facts_for_folder'); 'server/to_org/extend/' (editable.rs,
+role_tree.rs, folder_request.rs, aliases.rs, flags.rs);
+'server/to_org/complete/partner_folder/' (child_data.rs);
+'server/to_org/util.rs' (the birth check,
+'make_member_children_nonMembers', 'mark_view_roots_parent_na').
+** The diff view
+'server/diff_view/changes.rs', 'shallow_model_subtree.rs',
+'partner_folders.rs', 'visit.rs', 'readiness_requests.rs',
+'restore_requests.rs', 'pruned_change_view.rs'
+('ensure_editableOccurrences_exist',
+'content_occurrences_in_level_order'), 'change_leaves.rs';
+'server/graph_straddle/' (types.rs 'Presence', union_walk.rs,
+build.rs); 'server/git_ops/git_snapshot.rs' (the cache);
+'server/serve/handlers/integrate_unshown_changes.rs';
+'server/serve/handlers/text_search/render_enriched_search_buffer.rs'.
+** The save and the messages
+'server/from_text/' (validate_tree.rs, write_protected_edits.rs,
+buffer_to_viewnodes/local.rs, add_missing_info.rs);
+'server/types/errors.rs' ('HeadlineName', 'org_line',
+'view_id_suffix'); 'server/types/save.rs'
+('format_save_error_as_org');
+'server/serve/handlers/save_buffer.rs'.
+** The heralds
+'server/heralds.rs' (the rules, 'affectsParent_emitted_atoms',
+'vac("vid")', 'vac("birth")'); 'tests/shared/herald-rules.sexp'
+(regenerated); 'tests/shared/herald-rendering-cases.txt';
+'shared/herald-styles.json'; 'shared/relations.json'.
+** The clients
+Emacs: 'elisp/skg-keymaps-and-aliases.el',
+'skg-request-views.el', 'skg-metadata.el', 'skg-sexpr-edit.el',
+'skg-sexpr-edit/skg-sexpr-cycling.el',
+'skg-sexpr/skg-unrestrictedNode-defaults.el',
+'skg-request-save.el' (the message buffers), 'skg-shared.el',
+'heralds-minor-mode.el'. Neovim: 'nvim/lua/skg/keymaps.lua',
+'view_requests.lua', 'metadata.lua', 'metadata_edit.lua',
+'sexpr/unrestrictednode_defaults.lua', 'messages.lua',
+'save.lua', 'shared.lua', 'heralds.lua', 'picker.lua'.
+** Tests
+'tests/convert_then_prune.rs', 'tests/view_ids.rs' and
+'tests/view_ids/', 'tests/new/messages_name_view_ids.rs',
+'tests/pruned_change_view/' (buffer, readiness, users_notes,
+after_a_commit, recomputed_sets, view_ids), 'tests/rebuild/'
+(integrate_role_tree, mentionerward_role_tree,
+complete_aliasfolder), 'tests/content_view.rs',
+'tests/overrideward_view_subtree.rs',
+'tests/partner_folder_matrix.rs',
+'tests/editable_view_cascade_and_budget.rs',
+'tests/save/birth_and_write_protected.rs', 'tests/unit/'
+(to_org_util, update_buffer_util, viewnode), 'tests/elisp/',
+'tests/nvim/', 'tests/integration/' (containerward-view-request,
+mentionerward-view-request, content-view-from-non-root,
+search-enrichment, aliases-view-request); the reports and sources
+under 'tests/results/review18/' (throwaway-vids,
+throwaway-folders, throwaway-grafts, throwaway-straddle), which
+the new tests may copy from.
+** Docs
+'docs/glossary.org', 'docs/api-and-formats.org',
+'docs/diff-view.org', 'docs/heralds.org', 'docs/COMMANDS.org',
+'docs/COMMANDS-nvim.org', 'docs/nvim-client-deviations.org';
+'coding-advice/names.org'; 'TODO/problems.org' and
+'TODO/DONE/problems.org'.
+
+* Implementation sequence
+One slice per headline, in order; each ends with its tests. The
+runner ('bash/run-plan-slices.sh') looks for DONE on these
+headlines.
+** TODO Slice 0: 'nonMember', and two small fixes
+The atom, the two-valued type, the herald rule and the
+regenerated rules fixture, both clients' editors and member
+tests, the test literals by script, the docs; the cache's one
+entry; the comment. Run all four suites.
+** TODO Slice 1: viewnode IDs
+The renames in server, tests and docs by script; unknown IDs
+dropped; the switch's prepass and the requested folder; the
+stability test; the glossary entries. Run all four suites.
+** TODO Slice 2: adoption by key among all siblings
+The candidate filter, the alignment of content members, the
+duplicate clause in the diff view and the attach, property
+folders by kind and refreshed and kept, the five tests. Run all
+four suites.
+** TODO Slice 3: a retained copy keeps its editability
+The convert function's two branches, the editability walk's
+preference and 'ClaimedElsewhere' with its fix, the tests. Run
+all four suites.
+** TODO Slice 4: every role tree is a folder, on the server
+The containers folder with the chain on every root and under
+every containers-folder member, the role-tree request and engine
+removed, the search buffer's three folders, the member role trees
+reduced to the chain, the integrate command appending a root, the
+Rust tests rewritten, the four integration tests moved to the
+folder forms. Run all four suites. This slice is the plan's
+largest; commit it in several commits, the containers folder and
+chain first.
+** TODO Slice 5: every role tree is a folder, in the clients
+The nine commands and keys removed in both clients, their tests
+removed, the five docs and the glossary entry. Run the Emacs,
+Neovim and integration suites.
+** TODO Slice 6: the owner record goes
+Conversion by kind and change facts, the hand-overs removed, the
+record removed, the tests. Run all four suites.
+** TODO Slice 7: the birth goes
+Position in place of every read, the atom off the wire, the test
+literals by script, the rendering cases, the tests. Run all four
+suites.
+** TODO Slice 8: the renames
+The kind and atom, the repairs and functions, 'Presence', the
+words in comments and docs, the glossary headline and its links,
+the test literals by script. Run all four suites.
+** TODO Slice 9: messages name a headline as a subtree
+'HeadlineName', the validation errors and the warnings, both
+clients' message buffers and goto commands, the tests, the docs.
+Run all four suites.
+** TODO Slice 10: one shared table, and Neovim's prompt
+The table, the conformance test, both editors, the Neovim prompt
+and its test, the deviations doc. Run the Rust, Emacs and Neovim
+suites.
+** TODO Slice 11: the glossary and the docs
+The split, the entries, the docs read end to end, 'names.org',
+the problem entries moved. No code; run nothing but a grep for
+each term it adds against the code.
+** TODO Slice 12: the two-question check
+The report under 'tests/results/', the small fixes, the commit
+message listing the rest.
+
+* Verification and completion
+'cargo nextest run' (through 'bash/nextest.sh'),
+'bash/emacs-tests.sh' and 'bash/nvim-tests.sh' after every slice
+but 11 and 12, one suite at a time; 'bash/integration-tests.sh'
+after every slice that changes what the server writes into a
+buffer (0, 1, 2, 3, 4, 5, 7, 8, 9), the 'import-md-and-org' test
+failing at baseline as 'TODO/problems.org' records. At the start
+the suites stand at 908 Rust tests, 387 Emacs tests, every Neovim
+spec in 31 files, and 34 of 35 integration tests. After slice 12,
+grep once more for every retired name listed under "The
+two-question check (slice 12)" and for citations of 'TODO/' under
+'server/', 'elisp/', 'nvim/', 'tests/', 'bash/' and 'docs/'; each
+comes back empty or lists only what this plan keeps. Done when
+all thirteen slices are committed and every suite passes.
