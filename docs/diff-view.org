@@ -7,8 +7,8 @@ ordinary editable views. It lets the user review the changes, mark
 each one commit-ready, and commit everything at once. C-c v d
 ('skg-diffView-open'; Neovim '<localleader>vd') opens it.
 
-The vocabulary (graph straddle, presence, C, R, U, D, change-forest
-leaf, mark, changeset marker, ...) is the glossary's "Terms of the
+The vocabulary (graph straddle, the three kinds of change, C, R, U,
+D, change-forest leaf, mark, changeset marker, ...) is the glossary's "Terms of the
 diff view" ('docs/glossary.org'). The wire forms are the API doc's
 "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
@@ -158,9 +158,10 @@ The skgrepo restriction plays no part, since the diff view requires
 At each editable occurrence's visit, after the content reconciler,
 'process_unrestrictedVognode_changes' adds the node's change
 viewnodes:
-- it tags each content member with the sign of its node and the
-  presence of its relationship ('(presence node+ ...)', '(presence
-  node~ ...)', '(presence rel- ...)'), and shows a
+- it tags each content member with the three kinds of change: its
+  node's existence ('(node added)', '(node removed)'), its node's
+  other properties ('(properties changed)') and its relationship's
+  existence ('(rel added)', '(rel removed)'), and shows a
   new member outside U as a write-protected member shown without its
   content (one that was editable when the rerender began stays
   editable);
@@ -182,13 +183,16 @@ A node in U but not in C is context: when completion creates it, its
 body starts folded. A write-protected occurrence gets none of this;
 what an earlier visit added under it while it was editable goes, and
 its viewparent tags it. A root has no viewparent to tag it, so its
-own visit, editable or not, signs its node.
+own visit, editable or not, tags its node.
 
-A node's sign is '+' when only the after-graph has it, '-' when only
-the before-graph does, and '~' ("modified", herald M) when both do and
-it records at least one leaf ('GraphStraddle::node_sign', which every
-site that signs a member, a removed member or a root asks). A folder's
-member and a phantom never carry '~'.
+A node was added when only the after-graph has it, and removed when
+only the before-graph does ('GraphStraddle::node_existence'); its
+other properties changed ("modified", herald M) when both graphs have
+it and it records at least one leaf
+('GraphStraddle::node_properties_changed'). Every site that tags a
+member, a removed member, a folder member or a root asks both
+('GraphStraddle::node_change'). A phantom never carries '(properties
+changed)'.
 ** What each kind of change looks like
 Every label is a herald rule on a metadata atom; 'docs/heralds.org'
 lists them, and the API doc's "Metadata of the diff view" the atoms.
@@ -200,8 +204,9 @@ holding the line diff when the body changed. The text change is one
 leaf, marked on the old-text headline.
 *** content
 Content has no folder. The members are the node's children, each
-tagged ∃+ / ∃- / M for its node's sign and ~+ / ~- for its
-relationship's presence; a removed member stands where it stood (below). The
+tagged ∃+ / ∃- for its node's existence, M for its other properties
+and ~+ / ~- for its relationship's existence; a removed member stands
+where it stood (below). The
 content changeset marker, "its content changed", gathers the
 relationship leaves of the content list.
 *** the in-folders and out-folders
@@ -210,15 +215,26 @@ hiders adds a write-protected folder labelled "its containers changed
 (other files)" and so on; a changed set of subscribees, overridden or
 hidden nodes adds the existing folder labelled "its subscribees
 changed (this file)" and so on. A folder holds the partners in either
-graph, tagged by presence. Under each member of a changed folder
-hangs its member role tree, so that the user sees where the member
-sits: under a container, its full containerward tree; under a
-mentioner, subscriber, overrider or hider, the role tree of that role
-with a containerward tree under each graft.
+graph, each tagged as a content member is: its node's existence and
+other properties, so a modified member shows ☮ M and one gesture
+there marks its file, and the existence of its relationship to the
+folder's viewparent, of the folder's kind. The two filter folders
+("It contains these, but the subscribing ancestor hides them" and
+"The subscriber ancestor hides these, but subscribes to nothing that
+contains them") show no change and carry no '(rel ...)'. Under each
+member of a changed folder hangs its member role tree, so that the
+user sees where the member sits: under a container, its full
+containerward tree; under a mentioner, subscriber, overrider or hider,
+the role tree of that role with a containerward tree under each graft.
+The role-tree engine walks the union of the two graphs, so a role
+graft whose relationship to its viewparent (the one its birth names)
+is in the before-graph only carries '(rel removed)', and a gesture on
+it names that relationship.
 *** aliases, IDs and flags
 The alias, ID and flags folders, shown only when their list changed,
 hold the union of the two lists in the order of their interleaved
-diff, each entry signed + or -. A lost alias or ID is its own kind,
+diff, each entry tagged '(rel added)' (+) or '(rel removed)' (-),
+its existence in the list. A lost alias or ID is its own kind,
 'Property::RemovedAlias' or 'Property::RemovedID', which the save never
 reads. Each entry is one leaf.
 *** home skgrepo and relRepo moves
@@ -368,7 +384,7 @@ list orders, come sorted by ID. So every rendering of the union of the
 two graphs places a removed entry by the LCS.
 ** One encoding of a removed relationship
 A removed member whose node survives is an unrestricted vognode, a
-non-member, with the fact '(presence rel-)': its relationship to its
+non-member, with the fact '(rel removed)': its relationship to its
 viewparent exists in the before-graph only. That is the one encoding
 of a removed relationship, wherever it stands: in content, in a
 partner folder, and in a historical phantom's old content
@@ -397,8 +413,8 @@ membership the save reads (an unknown phantom there would read back
 as a member); its leaf in content is under the content changeset
 marker. In a write-protected-set folder and in a historical phantom's
 old content, where nothing reads back, it is an unknown phantom with
-'(presence rel-)'; the save's check of a write-protected occurrence's
-folder skips an unknown phantom with that sign, as it skips a removed
+'(rel removed)'; the save's check of a write-protected occurrence's
+folder skips an unknown phantom with that part, as it skips a removed
 member by its non-membership ('partnerFolder_members_in_view'). A
 former member is any viewnode standing for a
 before-only relationship, historical phantoms included.
@@ -504,19 +520,21 @@ a second file): it shows M✓ when each of those is marked, wherever it
 stands.
 ** Facts on the wire
 A headline's facts and its readiness request form one form, '(diff
-(presence SIGN...) (leaves N OBJECT...) (ready OBJECT...) REQUEST)',
-each part present only when it has something to say
+(node added|removed) (rel added|removed) (properties changed) (leaves
+N OBJECT...) (ready OBJECT...) REQUEST)', each part present only when
+it has something to say, the first three only when true
 ('change_fact_forms' in 'server/org_to_text.rs'; the grammar is in
 'docs/api-and-formats.org', "Facts and requests"). It sits inside the
 node's or phantom's form, or at top level on a property. A changed
-folder carries no '(diff ...)': its readiness is a bare top-level
-'(ready)'.
+folder's '(diff ...)' holds only its readiness, the objectless
+'(ready)', which is the folder's aggregate.
 
 The part '(ready OBJECT...)' is a display fact the server writes after
 completion ('set_ready_facts_in_viewforest'): the diff objects
-('node', 'rel', and on a vognode that lists it 'all') whose leaves are
-all marked; a bare '(ready)' on a headline that names one leaf, or on
-a ready commit readiness aggregate. Nothing reads it at save.
+('node', 'rel', and on a headline that lists it 'all') whose leaves
+are all marked, so a ready changeset marker carries '(ready all)'; a
+bare '(ready)' on a headline that names one leaf, which lists no
+object. Nothing reads it at save.
 
 Before it, a headline that names leaves
 carries the part '(leaves N OBJECT...)': N is the number of distinct

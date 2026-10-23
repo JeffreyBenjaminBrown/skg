@@ -60,10 +60,73 @@ fn a_mark_shows_on_both_images_of_a_relationship (
       "the image under sub is ready:\n{}", saved );
     assert! ( without_vids (&saved) . lines () . any ( |line|
       line . starts_with ("*** (skg (node (id sub)")
-      && line . ends_with ("(diff (rel removed) (leaves 1 rel) (ready rel)))) sub") ),
+      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel)))) sub") ),
       "the image under s1 is ready:\n{}", saved );
     assert! ( ! without_vids (&saved) . contains ("readyRequest"),
               "the request was consumed:\n{}", saved );
+    Ok (( )) }) }
+
+/// A folder member carries its node's other properties as a content
+/// member does: sub, in s1's subscriber folder, whose file records
+/// two leaves (its subscription to s1 removed, to s2 added), shows
+/// '(properties changed)' there, and one gesture on it, naming 'rel'
+/// and 'all', marks its file: its root shows '(ready all)', and its
+/// image in s2's subscriber folder is ready on both objects too.
+#[test]
+fn a_gesture_on_a_modified_folder_member_marks_its_file (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("kinds", &["public", "private"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let member : &str =
+      "*** (skg (node (id sub) (repo public) (affectsParent false) writeProtected";
+    let marked : String = edit_line (
+      &buffer, member,
+      |line| line . replace (
+        "(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub",
+        "(diff (rel removed) (properties changed) (leaves 2 rel all) (readyRequest rel all)))) sub" ));
+    assert_ne! ( marked, buffer, "the member shows its properties:\n{}", buffer );
+    let saved : String = without_vids (
+      & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
+    let lines_of_sub : Vec<&str> = saved . lines ()
+      . filter ( |line| line . contains ("(node (id sub) ") ) . collect ();
+    for (prefix, ending) in [
+      ( member,
+        "(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel all)))) sub" ),
+      ( "*** (skg (node (id sub) (repo public) writeProtected",
+        "(diff (rel added) (properties changed) (leaves 2 rel all) (ready rel all)))) sub" ),
+      ( "* (skg (node (id sub)",
+        "(diff (properties changed) (leaves 2 all) (ready all)))) sub" ) ] {
+      assert! ( lines_of_sub . iter () . any ( |line|
+                  line . starts_with (prefix) && line . ends_with (ending) ),
+                "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
+    Ok (( )) }) }
+
+/// A role graft under a folder member whose relationship is only in
+/// the before-graph carries '(rel removed)': d, which contained c at
+/// HEAD only, under c in x's container folder. A gesture on it names
+/// that relationship, so its other image, c as d's removed member,
+/// shows ready too.
+#[test]
+fn a_gesture_on_a_before_only_role_graft_marks_its_relationship (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("removed_partners", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let marked : String = edit_line (
+      &buffer,
+      "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected",
+      |line| line . replace ( "(diff (rel removed) (leaves 1 rel)))) d",
+                              "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) d" ));
+    assert_ne! ( marked, buffer, "the graft shows its relationship removed:\n{}", buffer );
+    let saved : String = without_vids (
+      & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
+    for (prefix, ending) in [
+      ( "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected",
+        "(diff (rel removed) (leaves 1 rel) (ready rel)))) d" ),
+      ( "** (skg (node (id c) (repo main) (affectsParent false)",
+        "(diff (rel removed) (leaves 1 rel) (ready rel)))) c" ) ] {
+      assert! ( saved . lines () . any ( |line|
+                  line . starts_with (prefix) && line . ends_with (ending) ),
+                "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
     Ok (( )) }) }
 
 /// Marking a removed alias or a removed ID marks its leaf: ali's lost

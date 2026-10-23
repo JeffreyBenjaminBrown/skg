@@ -66,7 +66,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
 | requests             | nonstandard | =delete=, =merge:...=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
-| diff facts           | nonstandard | =∃+ ∃- ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                          |
+| diff facts           | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= commit-ready                                                              |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
 | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
@@ -188,11 +188,15 @@ viewnode whose node was deleted.
 
 ** Diff heralds
 In the diff view (see the glossary's "Terms of the diff
-view"), a vognode's =∃+= or =∃-= says that HEAD lacks it or the
-worktree does, its =M= ("modified") that both have it and its file
-records a change, and =~+= or =~-= that HEAD or the worktree lacks its
-relationship to its viewparent. =M= stands where =∃= stands: a node
-is new, deleted or modified, never two of those. On an alias, ID or
+view"), the heralds show the three kinds of change: a vognode's =∃+=
+or =∃-= says that HEAD lacks it or the worktree does (its node's
+existence), its =M= ("modified") that both have it and its file
+records a change (its other properties), and =~+= or =~-= that HEAD
+or the worktree lacks its relationship to its viewparent. =M= stands
+where =∃= stands: a node is new, deleted or modified, never two of
+those. A folder member shows them as a content member does, so a
+modified write-protected member reads =☮ M=; its =~+= or =~-= is its
+relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
 flag entry, which has one diff object, the same facts read =+= and
 =-=; a deleted phantom's one object reads =∃+= or =∃-=, and an unknown
 phantom's =~+= or =~-=. A =✓= after a diff object's facts says its
@@ -204,13 +208,16 @@ folder or changeset marker) shows a =✓= when everything under it is ready. =re
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
-'docs/api-and-formats.org', "Facts and requests"): the signs come
-from its =(presence ...)= part, each =✓= from its =(ready ...)= part
-(=M='s from =all= there),
-and the request from its last part; its =(leaves ...)= part shows
-nothing. A changed folder's =✓= comes from its bare top-level
-=(ready)=. The rules match each part once per diff object, so a =✓=
-follows its own object whatever the raw order of the parts.
+'docs/api-and-formats.org', "Facts and requests"): =∃+= and =∃-=
+come from its =(node added)= and =(node removed)= parts, =M= from
+=(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
+removed)= (the style keys 'existence' and 'properties' in
+'shared/herald-styles.json'), each =✓= from its =(ready ...)= part
+(=M='s from =all= there), and the request from its last part; its
+=(leaves ...)= part shows nothing. A changed folder's =✓= comes from
+its =(diff (ready))=. The rules match the ready part once per diff
+object, so a =✓= follows its own object whatever the raw order of the
+parts.
 
 A historical phantom (a node the worktree lacks, shown with HEAD's
 text) carries =☮=. The properties the view adds are labels: =old title

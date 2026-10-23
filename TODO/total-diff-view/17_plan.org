@@ -1014,7 +1014,7 @@ The diff view's reconciler, the owner lookup in place of the
 shape predicates, the historical phantom's old content, the
 commit paragraph, the extended fixture and its tests. Run all
 four suites.
-** TODO Slice 6: the wire says the three kinds of change
+** DONE Slice 6: the wire says the three kinds of change
 The types, the printer and parser, the heralds and style keys,
 the clients' readers, folder members' node parts, the before-only
 graft, markers' '(ready all)', the folder's '(diff (ready))', the

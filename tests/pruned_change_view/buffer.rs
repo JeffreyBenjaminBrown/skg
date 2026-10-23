@@ -100,7 +100,8 @@ fn an_in_changed_only_change_shows_its_changed_containers (
     "** (skg (changesetMarker content) (diff (leaves 1 all)))",
     "** (skg (node (id lo)", "(diff (rel added) (leaves 1 rel)))) lo",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id ln) (repo main) writeProtected", "(diff (rel added) (leaves 1 rel)))) ln",
+    "**** (skg (node (id ln) (repo main) writeProtected",
+    "(diff (rel added) (properties changed) (leaves 1 rel all)))) ln",
     "**** (skg (node (id lp) (repo main) writeProtected" ] );
   Ok (( )) }
 
@@ -175,7 +176,7 @@ fn a_subscription_change_shows_on_both_sides (
     "* (skg (node (id s1)",
     "** (skg (subscriberFolder changed))",
     "*** (skg (node (id sub) (repo public) (affectsParent false) writeProtected",
-    "(diff (rel removed) (leaves 1 rel)))) sub" ] );
+    "(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub" ] );
   Ok (( )) }
 
 #[test]
@@ -260,7 +261,9 @@ fn removed_partners_buffer (
   Ok (buffer) }
 
 /// x's container folder shows b, the container it lost, between the
-/// two it kept, as a removed member: a non-member with '(diff (rel removed))'.
+/// two it kept, as a removed member: a non-member with '(diff (rel
+/// removed))', and, as a content member would, '(properties changed)',
+/// since b's file records the change.
 #[test]
 fn a_removed_container_stands_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
@@ -269,7 +272,7 @@ fn a_removed_container_stands_between_the_kept_ones (
     "*** (skg (containerFolder changed))",
     "**** (skg (node (id a) (repo main) writeProtected",
     "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected",
-    "(diff (rel removed) (leaves 1 rel)))) b",
+    "(diff (rel removed) (properties changed) (leaves 1 rel all)))) b",
     "**** (skg (node (id c) (repo main) writeProtected" ] );
   Ok (( )) }
 

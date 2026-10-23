@@ -24,7 +24,8 @@ use crate::to_org::extend::role_tree::{
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  DiffChange, FolderPolicy, Owner, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+  Birth, DiffChange, Existence, FolderPolicy, Owner, PartnerFolder, Viewnode,
+  ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_vid_of, push_repair_warnings, view_order_preserving_goal_list};
 use crate::update_buffer::util::RepairSummary;
@@ -98,10 +99,8 @@ fn straddle_goal_item (
   editable_set : bool,
 ) -> Option<FolderGoalItem> {
   let node_presence : Option<Presence> = straddle . node_presence (&partner . id);
-  let change : DiffChange = DiffChange {
-    node       : straddle . node_existence (&partner . id),
-    rel        : partner . presence . diff_sign (),
-    properties : false, };
+  let change : DiffChange = // as a content member's
+    straddle . node_change ( &partner . id, partner . presence . diff_sign () );
   let shape : FolderGoalShape = match node_presence {
     Some (Presence::OnlyBefore) => FolderGoalShape::Historical (
       mk_historical_viewnode (straddle, &partner . id, change . rel) ? ),
@@ -119,7 +118,9 @@ fn straddle_goal_item (
 /// under each graft. In a folder of the folder viewparent's own
 /// relationships, only under the members whose relationship changed.
 /// A member whose relationship moved to another skgrepo gets that
-/// move. Each member role tree is built afresh in a scratch tree and
+/// move, and a role graft whose relationship is only in the
+/// before-graph carries '(rel removed)' ('tag_before_only_role_grafts').
+/// Each member role tree is built afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
 /// its kind) at each level, so that a member role tree that stays
 /// keeps its viewnodes, where they stand, and their fold state. The
@@ -161,8 +162,40 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
       } else {
         build_and_integrate_role_tree_with_skgrepo_set (
           &mut model, model_member, &runtime . graph, member_role,
-          &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
+          &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }
+      tag_before_only_role_grafts (&mut model, straddle); }
     reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
       Owner::RoleTreeAttach, &|_| true, &|_| true ) ?; }
   Ok (( )) }
+
+/// Tag each role graft in 'model' whose relationship to its viewparent
+/// (the one its birth names: the graft plays that role toward the
+/// viewparent) is only in the before-graph with '(rel removed)', as a
+/// folder's own members are tagged from the straddle's partners
+/// ('straddle_goal_item'). The role-tree engine walks the union of the
+/// straddle, so such a graft would otherwise look like a relationship
+/// the graph still has.
+fn tag_before_only_role_grafts (
+  model    : &mut Tree<Viewnode>,
+  straddle : &GraphStraddle,
+) {
+  let removed : Vec<NodeId> =
+    model . root () . descendants ()
+    . filter ( |node| {
+      let ViewnodeKind::Vognode (Vognode::Unrestricted (graft)) =
+        &node . value () . kind else { return false; };
+      let Birth::RoleGraft (role) = graft . birth else { return false; };
+      let Some (viewparent_pid) : Option<&ID> =
+        node . parent () . and_then ( |parent| match &parent . value () . kind {
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
+          _ => None, } )
+        else { return false; };
+      straddle . partners (viewparent_pid, role) . iter ()
+        . any ( |partner| partner . id == graft . skgid
+                          && partner . presence == Presence::OnlyBefore ) } )
+    . map ( |node| node . id () )
+    . collect ();
+  for graft in removed {
+    model . get_mut (graft) . unwrap () . value ()
+      . change_facts . change . rel = Some (Existence::Removed); }}

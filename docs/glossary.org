@@ -854,20 +854,34 @@ live graph.
 The *union walk* is the API over the graph straddle that answers
 questions about the union of its two graphs. Each node and each
 relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
-'OnlyAfter'. A view shows a presence as the atoms of the '(presence
-...)' part of a headline's '(diff ...)' form: 'node+' and 'node-' on
-the node itself, 'rel+' and 'rel-' on its relationship to its
-viewparent. The node's atom is its *sign*, which has a third value:
-'node~' (herald M, "modified") on a node in both graphs that records
-at least one change-forest leaf ('GraphStraddle::node_sign'). A
-member, a removed member and a root carry it; a folder's member and a
-phantom never do.
+'OnlyAfter'. A view shows it as [[*the three kinds of change][the three kinds of change]].
+
+*** the three kinds of change
+
+The first three parts of a headline's '(diff ...)' form, each written
+only when true ('DiffChange'): the node's existence, '(node added)'
+or '(node removed)' (herald ∃+, ∃-), when only the after-graph or
+only the before-graph has it ('GraphStraddle::node_existence'); the
+existence of its relationship to its viewparent, '(rel added)' or
+'(rel removed)' (herald ~+, ~-); and the node's other properties,
+'(properties changed)' (herald M, "modified"), on a node in both
+graphs that records at least one change-forest leaf
+('GraphStraddle::node_properties_changed'). The two existences are
+'Existence { Added, Removed }'. A member, a removed member, a folder's
+member and a root carry the node's two; a phantom never carries
+'(properties changed)'. The relationship is the viewparent's content
+under a vognode, the relation of its birth role on a role graft, and,
+in a partner folder, the relationship of the folder's kind between
+the member and the folder's viewparent; the two filter folders' members
+carry none. On an alias, ID or flag entry, '(rel ...)' is the entry's
+existence in its list.
 
 *** diff object, diff aspect
 
 A *diff object* is what a part of a '(diff ...)' form or a readiness request
 names on a headline: the node itself ('node'), or the node's
-relationship to its viewparent ('rel'). There are exactly these two.
+relationship to its viewparent ('rel'; in a partner folder, to the
+folder's viewparent). There are exactly these two.
 A change-forest leaf about a relationship has the relationship as its
 object, never the member. A request, a '(leaves ...)' fact and a
 '(ready ...)' fact may also say 'all', which names every leaf a
@@ -956,7 +970,7 @@ content position holds its old content under it.
 *** removed member, former member
 
 A *removed member* is an unrestricted vognode, a non-member, with the
-fact '(presence rel-)': its node survives, but its relationship to its
+fact '(rel removed)': its node survives, but its relationship to its
 viewparent exists in the before-graph only. It is encoded so in
 content, in a partner folder and in a historical phantom's old content
 alike. In content position it follows the editability rule as a
@@ -978,9 +992,9 @@ model subtree still produces and converts the rest ([[*the one rule: convert, th
 
 What the diff view does at an editable occurrence's visit, after the
 content reconciler ('process_unrestrictedVognode_changes' in
-'server/diff_view/changes.rs'): it tags the members with their signs,
-adds the removed members, and for a node in C adds its change
-viewnodes.
+'server/diff_view/changes.rs'): it tags the members with the three
+kinds of change, adds the removed members, and for a node in C adds
+its change viewnodes.
 
 *** shallow model subtree
 
@@ -1092,10 +1106,10 @@ text.
 
 A partner, alias, ID or flags folder the diff view shows because its
 membership changed since HEAD. It is written '(FOLDER changed)' in
-place of the bare folder atom, holds the members of either graph
-tagged by presence, and reads "its X changed (this file)" or "(other
-files)" (see "in, out"). It shows a bare top-level '(ready)' when
-every changed member is ready, and carries no '(diff ...)'.
+place of the bare folder atom, holds the members of either graph,
+each tagged with the three kinds of change, and reads "its X changed
+(this file)" or "(other files)" (see "in, out"). Its '(diff ...)'
+holds only '(diff (ready))', when every changed member is ready.
 
 *** member role tree
 
@@ -1148,8 +1162,8 @@ A buffer makes a node's changes *editable* when it holds an editable
 occurrence of the node, wherever it sits, or the node's historical
 phantom in content position ('nodes_editable_in_diffView'). A change
 is *visible* when the buffer shows it, which at a write-protected
-occurrence means the node's signs and what they name (its
-relationship, its existence, or its file as a whole), and nothing
+occurrence means the node's three kinds of change and what they name
+(its relationship, its existence, or its file as a whole), and nothing
 else of the node. A change can be neither.
 
 *** changes not editable in the view

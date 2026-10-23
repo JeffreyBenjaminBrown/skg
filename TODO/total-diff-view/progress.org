@@ -3465,3 +3465,66 @@ back byte-identical; with a note under the removed x, stage-and-commit
 rerenders x under e as a write-protected non-member holding the note
 and xc, h as a deleted root, no folder or fact left; that buffer saves
 back byte-identical.
+** Slice 6: deviations
+*** where 'Existence' lives, and the names kept
+'Existence' sits beside 'DiffChange' in 'server/types/viewnode.rs';
+'git.rs' lost 'Sign' and 'NodeSign'. 'ChangeFacts.presence' is
+'ChangeFacts.change', and 'FolderGoalItem.presence' is
+'FolderGoalItem.change'. 'Presence::diff_sign' keeps its name, as the
+plan's "The types" names it, and returns an 'Existence'; 'Presence'
+itself (the union walk's 'Both', 'OnlyBefore', 'OnlyAfter') stays.
+Besides the plan's two functions, 'GraphStraddle::node_change (pid,
+rel)' builds a vognode's whole 'DiffChange' from them, since every
+site that tags a member, a removed member, a folder member or a root
+wanted all three. Code that said "sign" for these facts was renamed
+where it was touched: 'sign_root' is 'tag_root', 'signed_union' is
+'union_with_existence'.
+*** every changeset marker carries '(ready all)'
+The order-only marker, always ready, also carries '(ready all)',
+though it lists no leaves. A ready viewnode's '(ready ...)' otherwise
+names the listed objects; one that lists none writes a bare '(ready)'.
+*** a folder's '(diff ...)' holds only '(ready)'
+The parser accepts a top-level '(diff ...)' on a folder only when it
+holds an objectless '(ready)' and nothing else; a bare top-level
+'(ready)' is refused now, like any unknown key. The herald rule for
+the property leaves' top-level '(diff ...)' renders the folder's ✓
+too, so the separate top-level 'ready' rule went.
+*** a role graft's relationship is its birth's
+The plan has a before-only graft carry '(rel removed)'. For that part
+to name the right leaf, 'relationship_to_viewparent'
+('readiness_requests.rs') now gives a role graft the relationship of
+the role its birth names (the graft records it when that role is a
+first role), where it gave every vognode under a vognode its
+viewparent's content. Without that, the '~-' on the graft d of the
+'removed_partners' fixture could never show ✓, and a gesture there
+named a relationship that does not exist. Only role grafts changed.
+The tagging itself is 'tag_before_only_role_grafts'
+('partner_folders.rs'), run on the scratch model of each member role
+tree, at every depth (the containerward trees under grafts included).
+Only '(rel removed)' is set, as the plan says; an after-only graft
+still shows nothing, though its leaves fact may list 'rel'.
+*** fixture adaptations
+Folder members now show '(properties changed)' with 'all' in their
+leaves: five expected lines in 'tests/pruned_change_view/' (buffer,
+readiness, write_protecting) changed, no behavior. The test literals
+were converted by 'tests/results/17-slice6/convert_literals.py'; the
+malformed-forms list in 'tests/change_facts_metadata.rs' was rewritten
+by hand.
+*** tests
+'a_gesture_on_a_modified_folder_member_marks_its_file' and
+'a_gesture_on_a_before_only_role_graft_marks_its_relationship'
+('tests/pruned_change_view/readiness.rs'; the second fails without the
+graft's relationship), 'a_changed_folders_readiness_parses_and_is_dropped'
+and the new malformed forms ('tests/change_facts_metadata.rs'), and
+the herald case "a modified folder member" ('☮ M✓',
+'tests/shared/herald-rendering-cases.txt').
+*** verification
+nextest 897 passed; Emacs 382; Neovim 359 specs in 31 files, none
+failed. Integration, Emacs and Neovim passes: every test passed but
+'import-md-and-org', which fails at baseline. Over TCP on a scratch
+gitrepo instance of 'removed_partners' ('tests/results/17-slice6/verify/'):
+the "all changes" buffer shows the new forms and saves back
+byte-identical; a readyRequest on the graft d marks Contains(d, c),
+so c under d, d's content marker ('(ready all)'), d's file ('(ready
+all)'), the folder ('(diff (ready))') and d as a folder member show
+ready, and that buffer saves back byte-identical.

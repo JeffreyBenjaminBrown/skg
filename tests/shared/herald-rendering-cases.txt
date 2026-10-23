@@ -242,6 +242,10 @@
 (skg (node (id x) (diff (rel added) (properties changed) (leaves 3 rel all) (ready all))))
 ---- text: M✓ ~+
 ---- styles: nonstandard*1 go*1 -*1 nonstandard*2
+==== diff view: a modified folder member, every leaf it records ready
+(skg (node (id x) writeProtected (diff (properties changed) (leaves 1 all) (ready all))))
+---- text: ☮ M✓
+---- styles: crucial*1 -*1 nonstandard*1 go*1
 ==== diff view: each ✓ follows its own object, whatever the raw order of the parts
 (skg (node (id x) (diff (ready rel node) (node added) (rel removed))))
 ---- text: ∃+✓ ~-✓

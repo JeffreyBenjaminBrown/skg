@@ -36,7 +36,7 @@ use crate::types::errors::view_id_suffix;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
+  Birth, ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -386,10 +386,12 @@ pub fn apply_readiness_requests (
       } else { store . unmark (&key); }} }
   warnings }
 
-/// The relationship by which a vognode is a member here: its
-/// viewparent's content, or the relation of the partner folder it is
-/// in, between it and the folder's viewparent. None at a root, or
-/// under anything else.
+/// The relationship by which a vognode is shown here: for a role
+/// graft, the relation of the role its birth names, between it and its
+/// viewparent; for any other vognode under a vognode, its viewparent's
+/// content; under a partner folder, the relation of the folder,
+/// between it and the folder's viewparent. None at a root, or under
+/// anything else.
 fn relationship_to_viewparent (
   node   : NodeRef<Viewnode>,
   pid    : &ID,
@@ -397,23 +399,28 @@ fn relationship_to_viewparent (
   aspect : RelationshipAspect,
 ) -> Option<LeafKey> {
   let parent : NodeRef<Viewnode> = node . parent () ?;
-  let key = |relation : NodeRelation, recorder : ID, member : ID| -> LeafKey {
+  let key_for_role = |role : RelationRole, partner : ID| -> LeafKey {
+    let (recorder, member) : (ID, ID) =
+      if role . is_first_role () { (pid . clone (), partner) } // the node records it
+      else { (partner, pid . clone ()) };
     LeafKey::Relationship {
-      relationship : RelationshipKey { relation, recorder, member },
+      relationship : RelationshipKey { relation : role . relation, recorder, member },
       aspect } };
   match &parent . value () . kind {
-    ViewnodeKind::Vognode (_) =>
-      Some ( key ( NodeRelation::Contains,
-                   vognode_leaf_pid (parent . value (), pid_of) ?,
-                   pid . clone () )),
+    ViewnodeKind::Vognode (_) => {
+      let viewparent : ID = vognode_leaf_pid (parent . value (), pid_of) ?;
+      Some ( match &node . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          match t . birth {
+            Birth::RoleGraft (role) => key_for_role (role, viewparent),
+            Birth::Unremarkable =>
+              key_for_role (RelationRole::CONTENT, viewparent), },
+        _ => key_for_role (RelationRole::CONTENT, viewparent), } ) },
     ViewnodeKind::PartnerFolder (folder) => {
       let role : RelationRole = folder . relation_member_role () ?;
       let folder_viewparent : ID = vognode_leaf_pid (
         parent . parent () ? . value (), pid_of ) ?;
-      Some ( if role . is_first_role () { // the member records it
-               key ( role . relation, pid . clone (), folder_viewparent )
-             } else {
-               key ( role . relation, folder_viewparent, pid . clone () ) } ) },
+      Some ( key_for_role (role, folder_viewparent) ) },
     _ => None, } }
 
 /// The ID of the vognode two levels up: the node that owns a
