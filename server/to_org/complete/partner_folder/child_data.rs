@@ -16,8 +16,8 @@
 ///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true,
 ///   a removed member, or an unknown or historical phantom (the children
 ///   'skgid_a_folder_child_stands_for' gives an ID).
-///   Managed children whose IDs are not in the goal list are removed
-///   or otherwise made non-members by the caller-specific cleanup step.
+///   Managed children whose IDs are not in the goal list are converted
+///   ('convert_unwarranted_child'), and so are extra copies of one.
 /// - `ChildData` is the pre-fetched title/repo metadata
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
@@ -227,6 +227,8 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     goal_list . iter () . map ( |item| (&item . skgid, item) ) . collect ();
   normalize_relationship_backed_partner_unknowns (
     tree, folder_node, child_data, deleted_by_this_save_extra_ids ) ?;
+  mark_goal_children_as_folder_members (
+    tree, folder_node, goal_list, graph ) ?;
   let summary : RepairSummary<ID> =
     complete_managed_children_in_viewforest (
     tree, folder_node, Owner::FolderReconciler (FolderKind::Partner (kind)),
@@ -252,8 +254,6 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   ) ?;
   apply_goal_shapes (
     tree, folder_node, &items_by_skgid, child_data, graph, label ) ?;
-  mark_goal_children_as_folder_members (
-    tree, folder_node, goal_list) ?;
   Ok (summary) }
 
 /// The viewnode made for a goal item when no child matches it. See
@@ -288,8 +288,9 @@ fn viewnode_of_goal_item (
 /// Give each child that a goal item matched the item's shape, keeping
 /// the viewnode and its fold state, and the item's presence. A member
 /// keeps what it is (an editable subscribee stays editable), unless
-/// it stood as a historical phantom; a removed member is
-/// write-protected and set aside (affectsParent=false).
+/// it stood as a historical phantom, and is a member
+/// (affectsParent=true) even if it stood as a removed member; a
+/// removed member is write-protected and set aside (affectsParent=false).
 fn apply_goal_shapes (
   tree           : &mut Tree<Viewnode>,
   folder_node    : NodeId,
@@ -315,7 +316,9 @@ fn apply_goal_shapes (
     let unrestricted : bool = matches! ( &viewnode . kind,
       ViewnodeKind::Vognode (Vognode::Unrestricted (_)) );
     match &item . shape {
-      FolderGoalShape::Member if ! historical => {},
+      FolderGoalShape::Member if ! historical => {
+        if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
+          t . affectsParent = AffectsParent::True; }},
       FolderGoalShape::Removed if unrestricted => {
         if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
           t . affectsParent = AffectsParent::False;
@@ -449,27 +452,51 @@ mod tests {
 
 /// See this module's header for definition of "goal child".
 ///
-/// This function repairs surviving or newly matched goal children whose
-/// membership sign is stale, so the folder continues to own them
-/// as generated folder members.
+/// Before the folder reconciler matches the managed children with the
+/// goal list, this adopts a returning key: for each goal item (but a
+/// historical phantom) that no managed child stands for, the
+/// unrestricted non-member standing for its node -- the editable one,
+/// else the first -- becomes a member, keeping its viewnode and fold
+/// state, so that the reconciler matches it and creates no second
+/// member beside it. (Such a non-member is typically one the reconciler
+/// parked when the membership went stale: 'convert_unwarranted_child'.)
 fn mark_goal_children_as_folder_members (
-  tree          : &mut Tree<Viewnode>,
-  folder_node      : NodeId,
-  goal_list     : &[FolderGoalItem],
+  tree        : &mut Tree<Viewnode>,
+  folder_node : NodeId,
+  goal_list   : &[FolderGoalItem],
+  graph       : &InRustGraph,
 ) -> Result<(), Box<dyn Error>> {
-  let goal_set : HashSet<ID> = // a removed member is set aside
+  let adoptees : Vec<NodeId> = {
+    let folder_ref : NodeRef<Viewnode> = tree . get (folder_node)
+      . ok_or ("mark_goal_children_as_folder_members: folder not found") ?;
+    let standing_for : HashSet<ID> =
+      folder_ref . children ()
+      . filter_map ( |child| skgid_a_folder_child_stands_for (
+        child . value (), graph ))
+      . collect ();
+    let nonMembers : Vec<(NodeId, ID, bool)> = // (treeid, its node's ID, editable)
+      folder_ref . children ()
+      . filter_map ( |child| match &child . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          if skgid_a_folder_child_stands_for ( child . value (), graph ) . is_none () =>
+          Some (( child . id (),
+                  graph . relationship_member_key (&t . skgid) . into_id (),
+                  ! t . is_writeProtected () )),
+        _ => None, } )
+      . collect ();
     goal_list . iter ()
-    . filter ( |item| ! matches! ( item . shape, FolderGoalShape::Removed ))
-    . map ( |item| item . skgid . clone () ) . collect ();
-  treat_certain_children (
-    tree, folder_node,
-    |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        goal_set . contains (&t . skgid),
-      _ => false },
-    |vn : &mut Viewnode| {
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        = &mut vn . kind
-        { t . affectsParent = AffectsParent::True; }} )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+      . filter ( |item| ! matches! ( item . shape, FolderGoalShape::Historical (_) ))
+      . filter ( |item| ! standing_for . contains (&item . skgid) )
+      . filter_map ( |item| {
+        let candidates : Vec<&(NodeId, ID, bool)> = nonMembers . iter ()
+          . filter ( |(_, skgid, _)| *skgid == item . skgid )
+          . collect ();
+        candidates . iter () . find ( |(_, _, editable)| *editable )
+          . or ( candidates . first () )
+          . map ( |(treeid, _, _)| *treeid ) } )
+      . collect () };
+  for adoptee in adoptees {
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      = &mut tree . get_mut (adoptee) . unwrap () . value () . kind
+    { t . affectsParent = AffectsParent::True; }}
   Ok (( )) }
