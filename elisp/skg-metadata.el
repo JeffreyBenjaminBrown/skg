@@ -364,7 +364,7 @@ next save will do with the relationship."
               ;; The display fact stays under viewStats; only the request goes.
               (skg-edit-metadata-at-point
                '(skg (node (DELETE (editRequest)))))))
-            "Override removed: on save the member keeps its saved (sticky) repo, or its default if new. Save to apply.")
+            "Override removed: on save the membership keeps its saved (sticky) relRepo, or its default if new. Save to apply.")
         "No override present; nothing to remove.")
     (progn
       (cond

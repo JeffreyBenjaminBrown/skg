@@ -1499,7 +1499,7 @@ holds the historical phantoms of the nodes it acquired. An
 A partner, alias, ID or flags folder shown because some relationship of
 it changed is written =(FOLDER changed)=, e.g. =(containerFolder changed)=,
 in place of the bare atom, and is followed by =(diff (ready))= when
-every changed member is ready: the objectless =(ready)= is the
+every changed membership is ready: the objectless =(ready)= is the
 folder's aggregate, and the folder's =(diff ...)= holds nothing else.
 Its herald reads "its X changed (this file)" or "(other files)" (see
 the glossary's "in, out").

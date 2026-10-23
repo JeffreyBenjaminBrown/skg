@@ -132,8 +132,8 @@ impl From<SkgrepoToml> for Skgrepo {
 /// One entry in a node's relationship list: the member and the
 /// relationship instance's relRepo (the skgrepo whose telescope
 /// section records the relationship). The relRepo is about the
-/// relationship, not the member node (a public node can be a private
-/// member). Its default comes from the applicable relRepo rule;
+/// relationship, not the member node (a public node can be the member of a
+/// private membership). Its default comes from the applicable relRepo rule;
 /// 'skg-set-relRepo' may move its privacy anywhere at least as
 /// private as that default;
 /// renormalization never lowers its privacy (the sticky rule). See

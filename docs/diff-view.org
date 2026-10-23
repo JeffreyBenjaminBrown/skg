@@ -510,7 +510,7 @@ the marks whose leaves still exist in the rebuilt straddle.
 ** Commit readiness aggregates
 A commit readiness aggregate -- a folder, a changeset marker, a node,
 a file or the whole changeset -- is ready when every leaf under it
-that can be ready is ready. An unchanged member has no leaf and is
+that can be ready is ready. An unchanged membership has no leaf and is
 never asked. The content changeset marker gathers the
 content relationship leaves of its node; a member's existence leaf
 belongs to the member's own file. A file whose only change is order

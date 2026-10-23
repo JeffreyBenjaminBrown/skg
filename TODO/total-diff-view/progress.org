@@ -3614,3 +3614,33 @@ restoreRel on gc under r, the save wrote g.skg as at HEAD, q (q1 g q2),
 t (subscribes to g) and r (contains gc), with no error or warning; the
 rerender shows g as a node, gd as an unknown phantom under it, and gc a
 member of r again, and saves back byte-identical.
+** Slice 8: deviations
+*** one phrase beyond the plan's list
+The closing grep for "changed member" also found the phrase
+"changed members" that 'changed_partners_phrase'
+('server/from_text/write_protected_edits.rs') returns for the two
+filter folders and the acquired folders (a fallback; those kinds are
+not checked). It says "changed memberships" now, so the grep comes
+back empty.
+*** smaller wording choices
+The test comment above
+'a_folder_is_ready_when_each_changed_membership_is' and the doc
+comment of 'FolderChangeFacts' say "membership" where they said a
+changed member is ready. 'membership_change_ready''s doc says the
+membership is ready when the member's '(ready ...)' names 'rel'. The
+glossary's sentence sits at the end of "removed member, former
+member", and names "stale member" and "new member" with them. The
+three 'telescope-warnings.org' fixtures were edited to the new text;
+the integration run regenerated them unchanged.
+*** tests
+No new tests; the renamed ones pass.
+*** verification
+nextest 908 passed; Emacs 387 passed (run because a message in
+'elisp/skg-metadata.el' changed). Integration: 34 of 35 passed, all
+but 'import-md-and-org', which fails at baseline. The closing grep
+("changed member", "member's relRepo", "member . relRepo" outside
+'RelPartner' field reads, "member is ready", "LeakShapedMember")
+comes back empty.
+Over TCP, a scratch instance of the 'fork' fixture
+('tests/results/17-slice8/verify/') wrote "leak-shaped contains
+membership: ..." into its 'telescope-warnings.org' and served P's view.

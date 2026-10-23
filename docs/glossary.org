@@ -980,7 +980,9 @@ alike. In content position it follows the editability rule as a
 member does: editable at its node's first occurrence in level order,
 write-protected at a later one. A
 *former member* is any viewnode standing for such a before-only
-relationship, historical phantoms included.
+relationship, historical phantoms included. These phrases, like
+"stale member" and "new member", name the node by its membership's
+fate.
 
 *** change viewnode
 
@@ -1112,7 +1114,7 @@ membership changed since HEAD. It is written '(FOLDER changed)' in
 place of the bare folder atom, holds the members of either graph,
 each tagged with the three kinds of change, and reads "its X changed
 (this file)" or "(other files)" (see "in, out"). Its '(diff ...)'
-holds only '(diff (ready))', when every changed member is ready.
+holds only '(diff (ready))', when every changed membership is ready.
 
 *** member role tree
 

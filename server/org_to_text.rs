@@ -121,7 +121,7 @@ pub fn viewnode_to_text (
 /// The diff view's facts about a folder, derived from its
 /// members when the buffer is rendered: it is shown because of a
 /// change when some member carries one, and ready when every such
-/// member's change is ready. Rendered '(KIND changed)' in place of
+/// membership's change is ready. Rendered '(KIND changed)' in place of
 /// the bare folder atom, then '(diff (ready))' when ready.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FolderChangeFacts {
@@ -138,7 +138,7 @@ pub fn folder_change_facts (
                   ViewnodeKind::PartnerFolder (_)
                   | ViewnodeKind::PropertyFolder (_) ) {
     return None; }
-  let member_changes : Vec<bool> = // whether each changed member is ready
+  let membership_changes : Vec<bool> = // whether each changed membership is ready
     node_ref . children ()
     . filter_map ( |member| {
       let relRepo_move_ready : Option<bool> =
@@ -147,21 +147,21 @@ pub fn folder_change_facts (
             Some ( child . value () . change_facts . ready . is_some () ),
           _ => None, } );
       let rel_ready : Option<bool> =
-        member_change_ready (&member . value () . change_facts);
+        membership_change_ready (&member . value () . change_facts);
       match (rel_ready, relRepo_move_ready) {
         (None, None) => None,
         (a, b) => Some ( a . unwrap_or (true) && b . unwrap_or (true) ), } } )
     . collect ();
-  if member_changes . is_empty () { return None; }
+  if membership_changes . is_empty () { return None; }
   Some ( FolderChangeFacts {
-    ready : member_changes . iter () . all ( |ready| *ready ) } ) }
+    ready : membership_changes . iter () . all ( |ready| *ready ) } ) }
 
 /// Some (whether ready) when a folder member's relationship to the
 /// folder's viewparent changed, which its '(rel ...)' part says. The
-/// member is ready when
-/// its '(ready ...)' names 'rel' if its '(leaves ...)' lists 'rel',
+/// membership is ready when
+/// the member's '(ready ...)' names 'rel' if its '(leaves ...)' lists 'rel',
 /// and otherwise when it carries any '(ready ...)'.
-fn member_change_ready (
+fn membership_change_ready (
   facts : &ChangeFacts,
 ) -> Option<bool> {
   facts . change . rel ?;

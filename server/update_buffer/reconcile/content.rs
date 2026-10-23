@@ -318,7 +318,7 @@ fn adopt_nonMember_children_that_are_content (
 
 /// Replace already-rendered raw content children whose newly skgsave-committed
 /// overrides now make another node their visible substitute.  Reconciliation
-/// otherwise recognizes the raw child by its membership ID and retains it,
+/// otherwise recognizes the raw child by its member ID and retains it,
 /// which would leave an implicit fork editable as its foreign original until
 /// the view were reopened.
 ///

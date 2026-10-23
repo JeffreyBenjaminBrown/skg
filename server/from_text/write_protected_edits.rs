@@ -163,7 +163,7 @@ fn changed_partners_phrase (
     PartnerFolder::HiddenInSubscribee // Not checked: these have no
       | PartnerFolder::HiddenOutsideOfSubscribee // relation member role.
       | PartnerFolder::AcquiredBy
-      | PartnerFolder::Acquired              => "changed members", }}
+      | PartnerFolder::Acquired              => "changed memberships", }}
 
 /// The aliases in the occurrence's alias folder, in order, each with
 /// its relRepo request; None if it has no alias folder.

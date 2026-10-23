@@ -159,7 +159,7 @@ means this occurrence substitutes for a node it overrides. =2Oĥ3= is an
 example. It comes from the load-bearing 'overridesHere' fact; an
 override folder or path occurrence without that fact has no =ĥ=. The
 eighth ancestor is a plain =h=, so =Oĥh= shows the two glyphs together.
-The fact preserves the original membership ID when a substituted view
+The fact preserves the original member ID when a substituted view
 is saved. See [[file:override.org][override behavior]].
 
 ** Other heralds

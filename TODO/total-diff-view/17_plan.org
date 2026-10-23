@@ -1023,7 +1023,7 @@ test literals by script, the docs. Run all four suites.
 The grammar and the two doors, the save's handling, the clients'
 commands and keys, the heralds and the metadata editor, the docs,
 the tests. Run all four suites.
-** TODO Slice 8: member and membership
+** DONE Slice 8: member and membership
 The thirty-one and the two, the glossary sentence, the closing
 grep. Run the Rust suite and the integration suite (three
 fixtures regenerate).

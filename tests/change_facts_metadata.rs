@@ -266,12 +266,12 @@ fn facts_of_folder_holding (
   folder_change_facts ( tree . get (folder) . unwrap () ) }
 
 /// A folder is shown as changed when some member carries a '(rel
-/// ...)' part, and is ready when each such member is: a member
+/// ...)' part, and is ready when each such membership is: a member
 /// whose '(leaves ...)' lists 'rel' when its '(ready ...)' names
 /// 'rel'; any other when it carries a '(ready ...)'. A relationship
 /// the member records nothing of leaves the folder unchanged.
 #[test]
-fn a_folder_is_ready_when_each_changed_member_is () {
+fn a_folder_is_ready_when_each_changed_membership_is () {
   let rel_leaf = |ready : Option<&[DiffObject]>| -> ChangeFacts {
     let mut change_facts : ChangeFacts = facts ( None, Some (Existence::Added), ready );
     change_facts . leaves = Some ( LeavesFact {
