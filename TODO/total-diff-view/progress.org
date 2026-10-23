@@ -3073,3 +3073,85 @@ repo prompt the command no longer makes, and now says what it does.
 nextest 869 passed; Emacs 382; Neovim 359 specs in 31 files, none
 failed. Integration: every test passed but 'import-md-and-org', which
 fails at baseline.
+** Slice 1: deviations
+*** the pass ends 'finish_viewforest', not 'complete_viewforest'
+'finish_viewforest' adds viewnodes after the prune (a root's
+containerward role tree), so the end-of-completion pass,
+'ViewIdRecord::assign_view_ids_and_record_owners'
+('server/types/views_state.rs'), runs there, after the skgrepo set and
+just before the text is rendered. The two search renders, which do not
+go through 'finish_viewforest' (the first results and the enrichment),
+call it themselves.
+*** vids spelled like numbers are skipped
+The sexp crate reads '05' as the integer 5 and '1e5' as a float, and
+Emacs does the same, so such a vid would lose its spelling on a round
+trip. The counter skips every value whose base-36 spelling parses as a
+number ('00' to '99', 'inf', '1e5', ...): the first vid is '0a', and
+1,196 of the two-character vids are used, not 1,296.
+*** where the record lives and moves
+'ViewState' holds a 'ViewIdRecord' (the counter and the owner table).
+'register_view' derives it from the forest it is given (the counter
+past its vids, the owners its viewnodes carry), so a de novo render
+assigns from a fresh record and no caller of 'register_view' changed;
+'update_view' takes the record the rerender used. 'rerender_view' and
+'finish_viewforest' take the record as a parameter. The saved view and
+the search enrichment, both parsed from the client's text, look their
+owners up in the view's record before anything else runs
+('set_owners_in_parsed_viewforest').
+*** the table is rebuilt from the forest at each pass
+Instead of recording only the newly assigned vids and dropping the
+departed ones, the pass makes the table the owners the forest's
+viewnodes carry. Where no reconciler changes an owner the two agree;
+where one does (a typed member, below) the table follows.
+*** a kept member is its reconciler's
+'complete_managed_children_in_viewforest' takes the calling
+reconciler's 'Owner' and gives it to every child it creates and every
+managed child it keeps as a goal member, so a member the user typed is
+the content (or folder) reconciler's, as "owner" in the plan says.
+*** owners chosen where the plan left them open
+The folder kind is a new enum 'FolderKind' (a partner folder's kind,
+alias, ID, flags). A folder made at a vognode's visit (the default
+partner folders, the subscribee and hidden-in-subscribee folders, the
+alias and flags folders a view request makes) is the content
+reconciler's; the hidden-outside folder made inside a subscribee folder
+is that folder's reconciler's. In the diff view, every viewnode copied
+from a shallow model subtree ('append_copy_of_subtree') and every
+folder the per-visit step appends is the diff view's reconciler's, the
+role trees under folder members included. The stub roots own the roots
+(content views, the diff view's stubs and historical phantom roots, and
+a stub's container folder) and the search results; a search result's
+alias folder is the content reconciler's and its aliases the alias
+folder reconciler's; the search enrichment's grafts are the role-tree
+attach's.
+*** the tests
+No expected-output literal changed in the Rust tests. 85 assertions
+in the failing tests read their buffers through 'without_vids'
+(largely by a script, 'tests/results/17-slice1/wrap_asserts.py'), and
+the line helpers match lines without their vids: 'edit_line' (which
+also puts the vid back on the edited line), 'without_lines_containing',
+'insert_after_line_starting', 'without_subtree_starting',
+'node_lines' (now returning owned lines) and the matrix's 'want_*'.
+The integration tests gained 'skg-test-without-vids' ('test-wait.el')
+and 'T.without_vids' ('test-nvim-lib.lua'), used at eight comparisons
+in four tests; no literal there changed either.
+*** a diff-view viewnode replaced on every save
+In 'a_change_shown_only_in_a_container_folder_becomes_editable_there'
+a save of the buffer unchanged gives c1's old text, under m's container
+folder, a new vid each time: the viewnode is replaced, not kept.
+Likely cause, from reading: 'attach_memberRoleTrees_under_straddle_folder_members'
+reconciles c1's children against a model holding only its role trees,
+so the old text is stale there and is detached, and c1's own visit
+makes it again. The test now compares without vids; recorded in
+'TODO/problems.org' for slice 5.
+*** a name to watch
+'ViewId' already names a whole buffer (and the clients say "view id"
+for it, e.g. Emacs's 'test-view-id-...' tests); the glossary entry
+"view id, vid" says the two differ.
+*** verification
+nextest 877 passed (one collision in a full run, passing alone);
+Emacs 382; Neovim 359 specs in 31 files, none failed. Integration
+(Emacs, 'bash/integration-tests.sh'): every test passed but
+'import-md-and-org', which fails at baseline; the Neovim pass of every
+integration directory likewise. Over TCP on a scratch instance: an
+unchanged save comes back byte-identical, a copied write-protected line
+keeps 0b and its copy gets 0d, and a typed headline gets 0e.

@@ -1282,6 +1282,21 @@ in-memory types those keys correspond to are in
 =PropertyFolder=, =Property=, =PartnerFolder=, and the diff view's
 =ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
 
+Every viewnode's metadata ends with its view id, =(vid X)=, where X
+is one or more lowercase letters and digits: =(skg (node (id 1) (repo
+main)) (vid 0a))=. It identifies the viewnode within its buffer for the
+life of the buffer. The server assigns one, from the view's counter in
+base 36 (two characters at least, skipping any spelled like a number,
+such as =05= or =1e5=), to every viewnode that lacks one at the end of a
+completion, and never reassigns or reuses one: a headline keeps the
+vid it carried through a save and a rerender, and through a cut and
+paste. A headline typed without one gets one; of two headlines
+carrying one vid, the first in buffer order keeps it and the second (a
+copy) gets a fresh one. The clients show nothing for it and save it
+back untouched. The view's record of its vids, with the counter and
+which reconciler made each viewnode, is 'ViewIdRecord' in
+=server/types/views_state.rs=.
+
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode=, whose rule table is
 served by Rust (see "Herald rules" above; the table lives in

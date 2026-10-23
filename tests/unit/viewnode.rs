@@ -1,6 +1,12 @@
 use super::*;
-use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
-use crate::types::tree::forest::{ViewForest, editable_occurrences};
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use crate::org_to_text::viewnode_to_string;
+use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
+use crate::types::errors::BufferValidationError;
+use crate::types::maybe_placed_viewnode::MpViewnode;
+use crate::types::misc::SkgConfig;
+use crate::types::tree::forest::{MpViewForest, ViewForest, editable_occurrences};
+use std::collections::HashMap;
 
 // 'PartnerFolder::policy' is the single source of truth for how each
 // folder's membership relates to user edits; this pins the mapping.
@@ -134,3 +140,65 @@ fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
                [ "root", "in-folder", "member" ] . into_iter ()
                . map (ID::from) . collect::<HashSet<ID>> () ); }
 
+
+// A view id is base 36, at least two characters long, and reads back
+// as the counter value it was made from.
+#[test]
+fn vids_are_base_36_and_at_least_two_characters_long () {
+  for (counter, text) in [ (0, "00"), (10, "0a"), (35, "0z"), (36, "10"),
+                           (1295, "zz"), (1296, "100") ] {
+    assert_eq! ( Vid::from_counter (counter), Vid (text . to_string ()) );
+    assert_eq! ( Vid::from_counter (counter) . counter_value (), Some (counter) ); }
+  assert! ( Vid::parse ("0a") . is_ok () );
+  for not_a_vid in [ "", "0A", "a-b", "a b" ] {
+    assert! ( Vid::parse (not_a_vid) . is_err (), "{:?}", not_a_vid ); }}
+
+// Every kind of viewnode prints its vid as the last part of its
+// '(skg ...)' wrapper, and the parser reads it back.
+#[test]
+fn every_kind_prints_its_vid_last_and_parses_it_back () {
+  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
+  let kinds : Vec<Viewnode> = vec! [
+    mk_editable_viewnode ( ID::from ("n"), SkgrepoName::from ("main"),
+                           "n" . into (), None ),
+    mk_writeProtected_viewnode ( ID::from ("w"), SkgrepoName::from ("main"),
+                                 "w" . into (), AffectsParent::False ),
+    mk_unknown_viewnode (ID::from ("u")),
+    mk_restricted_viewnode (),
+    viewnode_of (ViewnodeKind::DeadViewnode),
+    viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)),
+    viewnode_of (ViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
+    viewnode_of (ViewnodeKind::Property (Property::Alias {
+      text : "an alias" . into (), relRepo : None, relRepo_request : None })),
+    viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
+      PhantomDeleted { skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
+                       title : "d" . into (), body : None } )))) ];
+  for (counter, kind) in kinds . into_iter () . enumerate () {
+    let vid : Vid = Vid::from_counter (10 + counter as u64);
+    let viewnode : Viewnode = Viewnode { vid : Some (vid . clone ()), .. kind };
+    let rendered : String = viewnode_to_string (&viewnode, &config) . unwrap ();
+    assert! ( rendered . ends_with (&format! (" (vid {})", vid)), "{}", rendered );
+    let metadata : ViewnodeMetadata =
+      parse_metadata_to_viewnodemd (&format! ("(skg {})", rendered)) . unwrap ();
+    let (parsed, _error, _warning)
+      : (MpViewnode, Option<BufferValidationError>, Option<String>)
+      = viewnode_from_metadata (
+      &metadata, viewnode . title () . to_string (), None );
+    assert_eq! ( parsed . vid, Some (vid), "{}", rendered ); }}
+
+// Of two headlines with one vid, the first in buffer order keeps it;
+// the second, a copy, loses it. A headline with no vid has none.
+#[test]
+fn a_repeated_vid_stays_with_its_first_headline () {
+  let (forest, errors, _warnings)
+    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
+    org_to_uninterpreted_viewforest ( concat! (
+      "* (skg (node (id a) (repo main)) (vid 0a)) a\n",
+      "** (skg (node (id b) (repo main)) (vid 0b)) b\n",
+      "** (skg (node (id b) (repo main)) (vid 0b)) b\n",
+      "** typed\n" )) . unwrap ();
+  assert! ( errors . is_empty (), "{:?}", errors );
+  let vids : Vec<Option<Vid>> =
+    forest . nodes () . map ( |node| node . value () . vid . clone () ) . collect ();
+  assert_eq! ( vids, vec! [ Some (Vid ("0a" . into ())), Some (Vid ("0b" . into ())),
+                            None, None ] ); }

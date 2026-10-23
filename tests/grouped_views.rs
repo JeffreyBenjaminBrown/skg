@@ -23,3 +23,6 @@ mod subscribee_folder_empty_persists;
 
 #[path = "subscribee_heralds.rs"]
 mod subscribee_heralds;
+
+#[path = "view_ids.rs"]
+mod view_ids;

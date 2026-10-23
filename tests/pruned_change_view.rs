@@ -30,3 +30,5 @@ mod write_protecting;
 mod partner_folder_check;
 #[path = "pruned_change_view/users_notes.rs"]
 mod users_notes;
+#[path = "pruned_change_view/view_ids.rs"]
+mod view_ids;

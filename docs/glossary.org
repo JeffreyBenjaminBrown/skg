@@ -722,6 +722,20 @@ times in one buffer. Facts that depend on the position (viewStats such
 as =cycle=, the displayed relRepo, =overridesHere=; and the birth) belong
 to the occurrence; graphStats belong to the graphnode.
 
+*** view id, vid
+
+A *view id* identifies one viewnode within one buffer, for the life of
+the buffer: the atom =(vid X)= that ends every viewnode's metadata
+('docs/api-and-formats.org', "The metadata headers"). "vid" is the
+wire's word and the field's name ('Viewnode::vid'); prose, names and
+messages say "view id". The view gives one to each viewnode that lacks
+one at the end of a completion and never reuses one, so a vid that
+reappears after a cut and paste names the same viewnode moved. The
+view's 'ViewIdRecord' ('server/types/views_state.rs') holds the counter
+and the owner of each viewnode a reconciler made. A view id is not a
+view's 'ViewId' (see "view, buffer, viewforest"), which names the whole
+buffer.
+
 *** editable, write-protected
 
 Each occurrence of an unrestricted vognode is either *editable* or
