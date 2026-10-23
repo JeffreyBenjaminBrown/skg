@@ -452,9 +452,9 @@ pub fn skgids_that_can_have_graphnodestats (
   let mut skgids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
-      if let Some (vid) =
+      if let Some (skgid) =
         node_ref . value () . unrestricted_skgid ()
-      { skgids . push ( vid . clone () ); }}}
+      { skgids . push ( skgid . clone () ); }}}
   skgids }
 
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.

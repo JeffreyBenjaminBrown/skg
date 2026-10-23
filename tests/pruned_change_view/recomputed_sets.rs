@@ -9,7 +9,7 @@
 // buffer's roots are q and r, and w is a write-protected member
 // without its content.
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{graph_straddle, save_cleanly};
 use crate::pruned_change_view::common::{
   all_changes_view, integrate_unshown_changes, node_lines,
@@ -91,7 +91,7 @@ fn a_write_protected_leaf_that_changes_becomes_editable_by_the_command (
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert! ( shown_editable (&shown, "w"), "w must be editable:\n{}", shown );
-    assert! ( without_vids (&shown) . contains ("*** (skg (oldText title) (diff (leaves 1))) w"),
+    assert! ( without_viewnode_ids (&shown) . contains ("*** (skg (oldText title) (diff (leaves 1))) w"),
               "w's old title must be shown:\n{}", shown );
     for member in [ "w1", "w2" ] {
       assert! ( ! node_lines (&shown, member) . is_empty ()
@@ -121,7 +121,7 @@ fn a_change_two_levels_under_a_write_protected_leaf_is_shown_by_the_command (
       assert! ( shown_editable (&shown, node),
                 "{} must be editable:\n{}", node, shown ); }
     assert! ( ! shown_editable (&shown, "w2"), "{}", shown );
-    assert! ( without_vids (&shown) . contains ("***** (skg (oldText title) (diff (leaves 1))) w1a"),
+    assert! ( without_viewnode_ids (&shown) . contains ("***** (skg (oldText title) (diff (leaves 1))) w1a"),
               "w1a's old title must be shown under w1:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
@@ -147,7 +147,7 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
     assert! ( s_subtree . iter () . any ( |line|
                 line . starts_with ("** (skg (node (id s1) ")
                 && ! line . contains ("writeProtected") )
-              && s_subtree . iter () . any ( |line| without_vids (line) == "*** (skg (oldText title) (diff (leaves 1))) s1" ),
+              && s_subtree . iter () . any ( |line| without_viewnode_ids (line) == "*** (skg (oldText title) (diff (leaves 1))) s1" ),
               "s1's change must be shown under s:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
@@ -208,13 +208,13 @@ fn a_node_the_user_write_protected_stays_so_until_the_command (
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &saved . saved_view) ?;
     for response in [ &saved, &again ] {
       assert! ( ! shown_editable (&response . saved_view, "a")
-                && ! without_vids (&response . saved_view) . contains ("(oldText body)"),
+                && ! without_viewnode_ids (&response . saved_view) . contains ("(oldText body)"),
                 "a must stay write-protected:\n{}", response . saved_view );
       assert! ( response . readiness_summary . as_ref () . unwrap ()
                 . changes_not_editable_here > 0 ); }
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert! ( shown_editable (&shown, "a")
-              && without_vids (&shown) . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
+              && without_viewnode_ids (&shown) . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
               "a must be editable, its change shown:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
@@ -289,9 +289,9 @@ fn an_editable_view_request_moves_editability_between_occurrences (
           . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
         assert_eq! ( ! line . contains ("writeProtected"), editable,
                      "{}:\n{}", node, saved ); }}
-    assert! ( y_subtree . iter () . any ( |line| without_vids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
+    assert! ( y_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
               "a's change must be shown under y:\n{}", saved );
-    assert! ( ! without_vids (&saved) . contains ("viewRequests"), "{}", saved );
+    assert! ( ! without_viewnode_ids (&saved) . contains ("viewRequests"), "{}", saved );
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     assert_eq! ( again, saved, "the editability moved stays where it is" );
     Ok (( )) }) }
@@ -322,7 +322,7 @@ fn an_editable_view_request_moves_editability_back (
                                             |line, atom| line . replace (atom, "") ))
         . collect () };
     let b_under_x : &str = "(skg (node (id b) (repo main) nonMember writeProtected ";
-    assert! ( without_vids (&moved) . contains (n_under_x) && without_vids (&moved) . contains (b_under_x),
+    assert! ( without_viewnode_ids (&moved) . contains (n_under_x) && without_viewnode_ids (&moved) . contains (b_under_x),
               "n and b must be write-protected under x:\n{}", moved );
     let requested : String = requesting_editable_at (
       &moved . replacen ( b_under_x,
@@ -351,9 +351,9 @@ fn an_editable_view_request_moves_editability_back (
                 . any ( |line| line . starts_with ("*** (skg folded ")
                                && line . contains ("(node (id b) ") ),
               "b stays folded under x:\n{}", saved );
-    assert! ( x_subtree . iter () . any ( |line| without_vids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
+    assert! ( x_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
               "a's change must be shown under x:\n{}", saved );
-    assert! ( ! without_vids (&saved) . contains ("viewRequests"), "{}", saved );
+    assert! ( ! without_viewnode_ids (&saved) . contains ("viewRequests"), "{}", saved );
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     assert_eq! ( again, saved, "the editability moved back stays where it is" );
     Ok (( )) }) }
@@ -400,7 +400,7 @@ fn a_buffer_whose_u_exceeds_the_node_budget_is_rendered_in_full (
       for node in [ "a", "p", "q", "r" ] {
         assert! ( shown_editable (rendered, node),
                   "{} must be editable:\n{}", node, rendered ); }
-      assert! ( without_vids (&rendered) . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
+      assert! ( without_viewnode_ids (&rendered) . contains ("*** (skg (oldText body) (diff (leaves 1)))"),
                 "a's change must be shown:\n{}", rendered ); }
     assert_eq! ( saved, buffer );
     Ok (( )) }) }
@@ -447,7 +447,7 @@ fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
     let c1_subtree : Vec<&str> = subtree_starting (&shown, "*** (skg (node (id c1) ");
     assert! ( ! c1_subtree [0] . contains ("writeProtected"),
               "c1 must be editable in the container folder:\n{}", shown );
-    assert! ( c1_subtree . iter () . any ( |line| without_vids (line) == "**** (skg (oldText title) (diff (leaves 1))) c1" )
+    assert! ( c1_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText title) (diff (leaves 1))) c1" )
               && c1_subtree . iter () . any ( |line|
                    line . starts_with ("**** (skg (node (id m) ") ),
               "c1's change and content must be shown under it:\n{}", shown );
@@ -455,7 +455,7 @@ fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
     assert_eq! ( again . saved_view, shown,
-                 "c1 stays editable, and every viewnode keeps its view id" );
+                 "c1 stays editable, and every viewnode keeps its viewnode ID" );
     Ok (( )) }) }
 
 /// Once the command made c1 editable in m's container folder, a save
@@ -532,7 +532,7 @@ fn the_command_makes_a_member_under_a_historical_phantom_editable (
   with_fixture ("historical_content", &["main"], |f| {
     let m_line : &str = "*** (skg (node (id m) (repo main) nonMember (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_vids (&buffer) . contains (m_line), "{}", buffer );
+    assert! ( without_viewnode_ids (&buffer) . contains (m_line), "{}", buffer );
     let requested : String = buffer . replacen (
       "(node (id m) (repo main) ",
       "(node (id m) (repo main) (viewRequests writeProtectedView) ", 1 );
@@ -541,9 +541,9 @@ fn the_command_makes_a_member_under_a_historical_phantom_editable (
     assert! ( ! shown_editable (&protected, "m"), "{}", protected );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert_eq! ( not_editable, 0, "{}", shown );
-    assert! ( without_vids (&shown) . contains (m_line), "{}", shown );
+    assert! ( without_viewnode_ids (&shown) . contains (m_line), "{}", shown );
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
-    assert! ( without_vids (&response . saved_view) . contains (m_line),
+    assert! ( without_viewnode_ids (&response . saved_view) . contains (m_line),
               "{}", response . saved_view );
     Ok (( )) } ) }
 

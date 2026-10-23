@@ -3,7 +3,7 @@
 // 'kinds' fixture is described in 'buffer.rs'. The 'overrides'
 // fixture: r overrides n, and p, which contains n, is retitled.
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   insert_after_line_starting, open_all_changes_buffer, save, view_id_of,
@@ -44,7 +44,7 @@ fn a_deleted_id_folder_respawns (
               "the save must succeed, got {:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before,
                  "deleting the ID folder must change no file" );
-    assert_eq! ( without_vids (&response . saved_view), without_vids (&buffer),
+    assert_eq! ( without_viewnode_ids (&response . saved_view), without_viewnode_ids (&buffer),
                  "the ID folder must be shown again" );
     Ok (( )) }) }
 
@@ -76,7 +76,7 @@ fn a_removed_alias_is_not_restored_by_a_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_vids (&buffer) . contains ("*** (skg removedAlias (diff (rel removed) (leaves 1))) a1"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg removedAlias (diff (rel removed) (leaves 1))) a1"),
               "{}", buffer );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (),
@@ -96,7 +96,7 @@ fn a_removed_id_does_not_abort_the_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_vids (&buffer) . contains ("*** (skg removedID (diff (rel removed) (leaves 1))) ali-old"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg removedID (diff (rel removed) (leaves 1))) ali-old"),
               "{}", buffer );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &buffer) ?;
@@ -124,7 +124,7 @@ fn deleted_images_of_removed_members_respawn (
               "the save must succeed, got {:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before,
                  "deleting a save-inert image must change no file" );
-    assert_eq! ( without_vids (&response . saved_view), without_vids (&buffer),
+    assert_eq! ( without_viewnode_ids (&response . saved_view), without_viewnode_ids (&buffer),
                  "both removed members must be shown again" );
     Ok (( )) }) }
 
@@ -186,13 +186,13 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
       . and_then ( |message|
         extract_string_field_from_sexp (&message, "content") )
       . expect ("the all-changes buffer is rerendered as a collateral view");
-    assert! ( without_vids (&collateral) . lines () . any ( |line|
+    assert! ( without_viewnode_ids (&collateral) . lines () . any ( |line|
       line . contains ("(diff (node added) (rel added)")
       && line . ends_with ("a new child") ),
       "the new child must be shown as new:\n{}", collateral );
-    assert! ( without_vids (&collateral) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
+    assert! ( without_viewnode_ids (&collateral) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
               "txt's old text must stay:\n{}", collateral );
-    assert! ( without_vids (&collateral) . contains ("(diff (rel removed) (leaves 1 rel)))) k1"),
+    assert! ( without_viewnode_ids (&collateral) . contains ("(diff (rel removed) (leaves 1 rel)))) k1"),
               "the removed member k1 must stay:\n{}", collateral );
     Ok (( )) }) }
 

@@ -6,7 +6,7 @@
 // contains a, whose body changed, and b, unchanged. So n, a node of
 // U, is shown editable under x and write-protected under y.
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   node_lines, open_all_changes_buffer, requesting_editable_at, save,
@@ -146,7 +146,7 @@ fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
     assert! ( matches! (
       &errors [..],
       [ BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-          skgid, title, headline : HeadlineName::ViewId (_) } ]
+          skgid, title, headline : HeadlineName::ViewnodeId (_) } ]
       if *skgid == ID::from ("n") && title == "n" ),
       "{:?}", errors );
     assert! ( errors [0] . to_string () . contains (
@@ -318,8 +318,8 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
       . expect ("s1 is a root");
     let text : String = buffer . replacen ( s1_root, &s1_root . replacen (
       "(repo public) ", "(repo public) writeProtected ", 1 ), 1 );
-    let text_without_vids : String = without_vids (&text);
-    let s1_and_folder : Vec<&str> = text_without_vids . lines ()
+    let text_without_viewnode_ids : String = without_viewnode_ids (&text);
+    let s1_and_folder : Vec<&str> = text_without_viewnode_ids . lines ()
       . skip_while ( |line| ! line . starts_with ("* (skg (node (id s1) ") )
       . take (3) . collect ();
     assert! ( s1_and_folder [0] . contains ("writeProtected")
@@ -333,7 +333,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     let response : SaveResponse = save (f, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before );
-    assert! ( without_vids (&response . saved_view) . contains ("(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub"),
+    assert! ( without_viewnode_ids (&response . saved_view) . contains ("(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub"),
               "{}", response . saved_view );
     Ok (( )) }) }
 

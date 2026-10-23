@@ -25,7 +25,7 @@ use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::metadata_canon::vid_atom_of;
+use skg::metadata_canon::viewnode_id_atom_of;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
@@ -128,14 +128,14 @@ async fn write_protected_folder_repairs_warn_impl (
     . unwrap_or_else (
       || panic! ( "no subscriberFolder repair warning in {:?}",
                   response . warnings ));
-  { // The warning names the folder's view id.
-    let folder_vid : &str =
-      vid_atom_of ( line_containing (&complete_buffer, "subscriberFolder") )
-      . expect ("the rendered folder has a vid")
-      . trim_start_matches ("(vid ") . trim_end_matches (')');
+  { // The warning names the folder's viewnode ID.
+    let folder_viewnode_id : &str =
+      viewnode_id_atom_of ( line_containing (&complete_buffer, "subscriberFolder") )
+      . expect ("the rendered folder has a viewnode ID")
+      . trim_start_matches ("(vnid ") . trim_end_matches (')');
     assert! ( warning . contains ( &format! (
-                "Repaired subscriberFolder (view id {}) under node n",
-                folder_vid )),
+                "Repaired subscriberFolder (viewnode ID {}) under node n",
+                folder_viewnode_id )),
               "{}", warning ); }
   assert! ( warning . contains ("restored 1 member(s): r"),
             "{}", warning );

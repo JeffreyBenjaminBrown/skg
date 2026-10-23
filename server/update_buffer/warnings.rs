@@ -9,9 +9,9 @@
 /// ('render_completion_warnings'), ColRepairs batched per folder
 /// occurrence.
 
-use crate::types::errors::view_id_suffix;
+use crate::types::errors::viewnode_id_suffix;
 use crate::types::misc::ID;
-use crate::types::viewnode::{PartnerFolder, Vid};
+use crate::types::viewnode::{PartnerFolder, ViewnodeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RepairKind {
@@ -26,36 +26,36 @@ pub enum CompletionWarning {
   FolderRepair {
     folder      : PartnerFolder,
     recorder : ID, // the node the folder belongs to (its UnrestrictedVognode parent)
-    folder_vid : Option<Vid>, // the folder's view id; None for a folder the user typed
+    folder_viewnode_id : Option<ViewnodeId>, // the folder's viewnode ID; None for a folder the user typed
     repair   : RepairKind,
     children : Vec<ID>,
   },
 }
 
 /// ColRepairs render one string per folder occurrence (a folder kind,
-/// recorder and view id), in first-appearance order, summarizing
+/// recorder and viewnode ID), in first-appearance order, summarizing
 /// every repair to that occurrence.
 pub fn render_completion_warnings (
   warnings : &[CompletionWarning],
 ) -> Vec<String> {
   let mut rendered : Vec<String> = Vec::new ();
   { // the ColRepairs, batched
-    let mut group_order : Vec<(PartnerFolder, ID, Option<Vid>)> = Vec::new ();
+    let mut group_order : Vec<(PartnerFolder, ID, Option<ViewnodeId>)> = Vec::new ();
     for w in warnings {
-      let CompletionWarning::FolderRepair { folder, recorder, folder_vid, .. } = w;
-      let key : (PartnerFolder, ID, Option<Vid>) =
-        ( *folder, recorder . clone (), folder_vid . clone () );
+      let CompletionWarning::FolderRepair { folder, recorder, folder_viewnode_id, .. } = w;
+      let key : (PartnerFolder, ID, Option<ViewnodeId>) =
+        ( *folder, recorder . clone (), folder_viewnode_id . clone () );
       if ! group_order . contains (&key) {
         group_order . push (key); } }
-    for (folder, recorder, folder_vid) in &group_order {
+    for (folder, recorder, folder_viewnode_id) in &group_order {
       let mut segments : Vec<String> = Vec::new ();
       let mut any_restored : bool = false;
       for w in warnings {
         let CompletionWarning::FolderRepair {
           folder : w_folder, recorder : w_recorder,
-          folder_vid : w_folder_vid, repair, children } = w;
+          folder_viewnode_id : w_folder_viewnode_id, repair, children } = w;
         if w_folder != folder || w_recorder != recorder
-          || w_folder_vid != folder_vid { continue; }
+          || w_folder_viewnode_id != folder_viewnode_id { continue; }
         if children . is_empty () { continue; }
         let skgids : String =
           children . iter ()
@@ -82,7 +82,7 @@ pub fn render_completion_warnings (
       rendered . push (
         format! ( "Repaired {}{} under node {}: {}.{}",
                   folder . repr_in_client (),
-                  view_id_suffix ( folder_vid . as_ref () ),
+                  viewnode_id_suffix ( folder_viewnode_id . as_ref () ),
                   recorder . 0,
                   segments . join ("; "),
                   explainer )); }}

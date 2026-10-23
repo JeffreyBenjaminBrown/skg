@@ -130,7 +130,7 @@
       (message "Expected buffer-content without metadata: %s"
                expected-without-metadata)
 
-      (if (string= (skg-test-without-vids buffer-content) expected)
+      (if (string= (skg-test-without-viewnode-ids buffer-content) expected)
           (progn
             (message "✓ PASS: Buffer-Content matches expected (with metadata)")
             (if (string= stripped-buffer-content expected-without-metadata)

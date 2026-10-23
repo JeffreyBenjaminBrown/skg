@@ -42,19 +42,19 @@
 ///     (relRepoMove (old REPO) (new REPO))
 ///     (changesetMarker content | relRepo | orderOnly)
 ///     acquiredByFolder, acquiredFolder
-///   Every kind may end with its view id, '(vid X)', X being one or
+///   Every kind may end with its viewnode ID, '(vnid X)', X being one or
 ///   more lowercase letters and digits.
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
-use crate::types::errors::{BufferValidationError, HeadlineName, view_id_suffix};
+use crate::types::errors::{BufferValidationError, HeadlineName, viewnode_id_suffix};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, Existence, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
-  Birth, Editability, Membership, Vid,
+  Birth, Editability, Membership, ViewnodeId,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
@@ -75,7 +75,7 @@ pub struct ViewnodeMetadata {
   pub focused: bool,
   pub org_folded: bool,
   pub org_body_folded: bool,
-  pub vid: Option<Vid>,
+  pub viewnode_id: Option<ViewnodeId>,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
@@ -117,7 +117,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     focused: false,
     org_folded: false,
     org_body_folded: false,
-    vid: None,
+    viewnode_id: None,
     non_vognode: None,
     skgid: None,
     home_skgrepo: None,
@@ -156,7 +156,7 @@ pub fn viewnode_from_metadata (
   body     : Option < String >,
 ) -> ( MpViewnode, Option < BufferValidationError >, Option < String > ) {
   let headline : HeadlineName =
-    HeadlineName::of ( metadata . vid . as_ref (), &title );
+    HeadlineName::of ( metadata . viewnode_id . as_ref (), &title );
   let (kind, error, warning)
     : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_skgid {
@@ -234,7 +234,7 @@ pub fn viewnode_from_metadata (
           { Some ( format! (
               "Headline text on a {}{} is not saved; discarded: {:?}",
               maybeplaced_kind_error_label (non_vognode),
-              view_id_suffix ( metadata . vid . as_ref () ),
+              viewnode_id_suffix ( metadata . viewnode_id . as_ref () ),
               title )) }
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
@@ -354,7 +354,7 @@ pub fn viewnode_from_metadata (
                  readiness_request :
                    if never_carries_a_change { None }
                    else { metadata . readiness_request . clone () },
-                 vid               : metadata . vid . clone () },
+                 viewnode_id       : metadata . viewnode_id . clone () },
     error, warning ) }
 
 fn maybeplaced_kind_error_label (
@@ -479,10 +479,10 @@ pub fn parse_metadata_to_viewnodemd (
                            . to_string () ); }
             result . property_relRepo_request =
               request_metadata . relRepo_request; },
-          "vid" => {
-            if result . vid . is_some () {
-              return Err ( "a view id may appear only once" . to_string () ); }
-            result . vid = Some ( Vid::parse (
+          "vnid" => {
+            if result . viewnode_id . is_some () {
+              return Err ( "a viewnode ID may appear only once" . to_string () ); }
+            result . viewnode_id = Some ( ViewnodeId::parse (
               & single_argument (&first, &items[1..]) ? ) ? ); },
           "diff" => {
             // At top level, valid only on a property leaf, and on a

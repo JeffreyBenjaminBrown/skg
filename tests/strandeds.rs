@@ -83,7 +83,7 @@ fn open_view (
   Ok (buffer) }
 
 /// Save 'buffer' as the view 'view_id', with 'review'. Returns the
-/// response and the collateral views streamed meanwhile, by view id.
+/// response and the collateral views streamed meanwhile, by viewforest id.
 fn save (
   f       : &mut Fixture,
   buffer  : &str,

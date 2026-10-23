@@ -32,7 +32,7 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::errors::view_id_suffix;
+use crate::types::errors::viewnode_id_suffix;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -78,7 +78,7 @@ pub struct RequestedReadiness {
   pub ready    : bool,
   pub named    : NamedLeaves,
   /// What a warning calls the headline: its title, or for an
-  /// untitled one its kind, then its view id if it has one.
+  /// untitled one its kind, then its viewnode ID if it has one.
   pub headline : String,
 }
 
@@ -102,8 +102,8 @@ pub fn readiness_requests_in_viewforest (
         headline : readiness_request_headline (node . value ()), } ) } )
     . collect () }
 
-/// '"TITLE" (view id X)', or for an untitled headline (a folder, a
-/// marker) 'the KIND (view id X)'; without the view id when the
+/// '"TITLE" (viewnode ID X)', or for an untitled headline (a folder, a
+/// marker) 'the KIND (viewnode ID X)'; without the viewnode ID when the
 /// headline has none.
 fn readiness_request_headline (
   viewnode : &Viewnode,
@@ -116,7 +116,7 @@ fn readiness_request_headline (
       ViewnodeKind::PropertyFolder (folder) => folder . repr_in_client (),
       ViewnodeKind::Property (property)     => property . repr_in_client (),
       _                                     => "untitled headline", } ) };
-  format! ( "{}{}", what, view_id_suffix ( viewnode . vid . as_ref () )) }
+  format! ( "{}{}", what, viewnode_id_suffix ( viewnode . viewnode_id . as_ref () )) }
 
 /// What a request on a viewnode names.
 #[derive(Clone, Debug, Eq, PartialEq)]

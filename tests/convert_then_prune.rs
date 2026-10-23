@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, without_lines_containing};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -103,18 +103,18 @@ fn contents_of_messages (
     . filter_map ( |message| extract_string_field_from_sexp (&message, "content") )
     . collect () }
 
-/// The lines of 'buffer' containing 'fragment', view ids aside.
+/// The lines of 'buffer' containing 'fragment', viewnode IDs aside.
 fn lines_containing (
   buffer   : &str,
   fragment : &str,
 ) -> Vec<String> {
-  without_vids (buffer) . lines ()
+  without_viewnode_ids (buffer) . lines ()
     . filter ( |line| line . contains (fragment) )
     . map ( |line| line . to_string () )
     . collect () }
 
 /// The one line of 'buffer' that starts with 'prefix' and contains
-/// 'fragment', view ids aside.
+/// 'fragment', viewnode IDs aside.
 fn the_line (
   buffer   : &str,
   prefix   : &str,
@@ -128,14 +128,14 @@ fn the_line (
   lines [0] . clone () }
 
 /// The line after the one line starting with 'prefix' and containing
-/// 'fragment', view ids aside.
+/// 'fragment', viewnode IDs aside.
 fn the_line_after (
   buffer   : &str,
   prefix   : &str,
   fragment : &str,
 ) -> String {
-  let unvidded : String = without_vids (buffer);
-  let lines : Vec<&str> = unvidded . lines () . collect ();
+  let buffer_without_viewnode_ids : String = without_viewnode_ids (buffer);
+  let lines : Vec<&str> = buffer_without_viewnode_ids . lines () . collect ();
   let index : usize = lines . iter ()
     . position ( |line| line . starts_with (prefix) && line . contains (fragment) )
     . unwrap_or_else ( || panic! (

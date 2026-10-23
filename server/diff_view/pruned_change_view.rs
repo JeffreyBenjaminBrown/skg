@@ -36,7 +36,7 @@ use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_po
 use crate::types::viewnode::{
   Membership, Editability, Owner, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
-use crate::types::views_state::{DiffViewBufferKind, ViewIdRecord, pids_from_viewforest};
+use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
 use crate::update_buffer::finish_viewforest;
 
@@ -225,9 +225,9 @@ pub fn diffView_buffer_viewforest (
     &mut viewforest, straddle, diffView_buffer_kind, store, &runtime . graph );
   let text : String = finish_viewforest (
     &mut viewforest,
-    // A new buffer's first vids; 'register_view' reads the record
+    // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
-    &mut ViewIdRecord::default (),
+    &mut ViewnodeIdRecord::default (),
     &runtime . graph, &runtime . config, None,
     Some (&straddle . before) ) ?;
   let pids : Vec<ID> =

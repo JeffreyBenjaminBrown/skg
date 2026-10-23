@@ -8,7 +8,7 @@
 // private; acq acquired acqd by a nodeMerge; gone, which subscribed
 // to orph, is deleted.
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, edit_line, save_cleanly, skg_files};
 use crate::git_fixture_helpers::read_graphnode;
 use crate::pruned_change_view::common::{
@@ -216,7 +216,7 @@ fn marks_in_the_store_show_as_ready (
     let buffer : String = all_changes_buffer_with_marks ( f, &[
       LeafKey::Node { pid : ID::from ("txt"), aspect : NodeAspect::Text },
       alias ("a1") ] ) ? . unwrap ();
-    assert! ( without_vids (&buffer) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
       "** (skg (aliasFolder changed))", // a3 is not ready, so neither is the folder
@@ -224,7 +224,7 @@ fn marks_in_the_store_show_as_ready (
       "*** (skg alias (diff (rel added) (leaves 1))) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (
       f, &[ alias ("a1"), alias ("a3") ] ) ? . unwrap ();
-    assert! ( without_vids (&buffer) . contains ("** (skg (aliasFolder changed) (diff (ready)))"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("** (skg (aliasFolder changed) (diff (ready)))"),
               "{}", buffer );
     Ok (( )) }) }
 
@@ -347,7 +347,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
     let x_line : &str =
       "** (skg (node (id x) (repo main) nonMember (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x\n";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_vids (&buffer) . contains (x_line), "{}", buffer );
+    assert! ( without_viewnode_ids (&buffer) . contains (x_line), "{}", buffer );
     let retitled : String = edit_line (
       &buffer, x_line . trim_end (),
       |line| line . replacen ( ")))) x", ")))) x, retitled", 1 ));

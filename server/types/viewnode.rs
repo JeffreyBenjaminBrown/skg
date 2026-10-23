@@ -140,24 +140,24 @@ pub struct Viewnode {
   /// write-protected occurrence, and beside an edit request.
   /// None on a kind that never carries a change.
   pub readiness_request : Option<ReadinessRequest>,
-  /// The view id, printed '(vid X)'. None until the view assigns
-  /// one, at the end of a completion ('ViewIdRecord' in
+  /// The viewnode ID, printed '(vnid X)'. None until the view assigns
+  /// one, at the end of a completion ('ViewnodeIdRecord' in
   /// 'server/types/views_state.rs'); a parsed viewnode keeps the one
   /// its headline carried.
-  pub vid               : Option<Vid>,
+  pub viewnode_id       : Option<ViewnodeId>,
   /// Who made this viewnode. Not printed: a reconciler sets it on a
-  /// viewnode it creates, and after a parse it is looked up by view
-  /// id in the view's 'ViewIdRecord'.
+  /// viewnode it creates, and after a parse it is looked up by
+  /// viewnode ID in the view's 'ViewnodeIdRecord'.
   pub owner             : Owner,
 }
 
-/// A view id: the identifier of one viewnode within one buffer,
+/// A viewnode ID: the identifier of one viewnode within one buffer,
 /// unique for the life of the buffer ('docs/api-and-formats.org',
 /// "The metadata headers"). One or more lowercase letters and digits.
 /// The view assigns them from a counter in base 36, at least two
-/// characters long; a vid once used is never reused in the buffer.
+/// characters long; a viewnode ID once used is never reused in the buffer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Vid (pub String);
+pub struct ViewnodeId (pub String);
 
 /// The reconciler that created a viewnode, or the user, who owns
 /// what they typed or pasted. A member of a content list is the
@@ -973,12 +973,12 @@ impl ViewRequest {
       "writeProtectedView", "writeProtectedSubtreeView" ];
 }
 
-impl Vid {
-  /// The vid the counter 'counter' names: base 36, padded to at
+impl ViewnodeId {
+  /// The viewnode ID the counter 'counter' names: base 36, padded to at
   /// least two characters.
   pub fn from_counter (
     counter : u64,
-  ) -> Vid {
+  ) -> ViewnodeId {
     const DIGITS : &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
     let mut reversed_digits : Vec<u8> = Vec::new ();
     let mut rest : u64 = counter;
@@ -989,23 +989,23 @@ impl Vid {
     while reversed_digits . len () < 2 {
       reversed_digits . push (b'0'); }
     reversed_digits . reverse ();
-    Vid ( String::from_utf8 (reversed_digits)
+    ViewnodeId ( String::from_utf8 (reversed_digits)
           . expect ("base-36 digits are ASCII") ) }
 
-  /// The vid named by 'text', if it is one or more lowercase letters
+  /// The viewnode ID named by 'text', if it is one or more lowercase letters
   /// and digits.
   pub fn parse (
     text : &str,
-  ) -> Result<Vid, String> {
+  ) -> Result<ViewnodeId, String> {
     if ! text . is_empty ()
        && text . chars () . all ( |c| c . is_ascii_lowercase ()
                                      || c . is_ascii_digit () )
-    { Ok ( Vid ( text . to_string () )) }
+    { Ok ( ViewnodeId ( text . to_string () )) }
     else { Err ( format! (
-      "A view id is one or more lowercase letters and digits, not {:?}",
+      "A viewnode ID is one or more lowercase letters and digits, not {:?}",
       text )) }}
 
-  /// The counter value this vid reads as in base 36, if it fits.
+  /// The counter value this viewnode ID reads as in base 36, if it fits.
   pub fn counter_value (
     &self,
   ) -> Option<u64> {
@@ -1014,7 +1014,7 @@ impl Vid {
       value . checked_mul (36) ? . checked_add (digit) } ) }
 }
 
-impl fmt::Display for Vid {
+impl fmt::Display for ViewnodeId {
   fn fmt (&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
     write! (f, "{}", self . 0) }}
 
@@ -1045,7 +1045,7 @@ impl AsMut<Viewnode> for Viewnode {
 
 impl Viewnode {
   /// Make this viewnode one of kind 'kind', keeping its focus, fold
-  /// state, view id and owner. The diff view's facts and the readiness request
+  /// state, viewnode ID and owner. The diff view's facts and the readiness request
   /// describe the kind replaced, so they go with it.
   pub fn replace_kind (
     &mut self,
@@ -1107,9 +1107,9 @@ impl Viewnode {
         "",
     }}
 
-  /// What a message calls this headline: its view id, else its title.
+  /// What a message calls this headline: its viewnode ID, else its title.
   pub fn headline_name (&self) -> HeadlineName {
-    HeadlineName::of ( self . vid . as_ref (), self . title () ) }
+    HeadlineName::of ( self . viewnode_id . as_ref (), self . title () ) }
 
   /// Reasonable for both UnrestrictedVognodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
@@ -1356,7 +1356,7 @@ pub fn viewforest_root_viewnode () -> Viewnode {
   viewnode_of (ViewnodeKind::BufferRoot) }
 
 /// A viewnode of the given kind, unfocused and not org-folded,
-/// carrying no change facts, no readiness request and no view id,
+/// carrying no change facts, no readiness request and no viewnode ID,
 /// and owned by the user. A literal that
 /// sets other fields can take the rest from it:
 /// 'Viewnode { org_folded : true, .. viewnode_of (kind) }'.
@@ -1369,7 +1369,7 @@ pub fn viewnode_of (
              kind,
              change_facts      : ChangeFacts::default (),
              readiness_request : None,
-             vid               : None,
+             viewnode_id       : None,
              owner             : Owner::User } }
 
 #[cfg(test)]

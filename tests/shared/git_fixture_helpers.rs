@@ -12,7 +12,7 @@ use std::fs;
 use std::net::TcpStream;
 use std::path::Path;
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use skg::test_utils::copy_dir_all;
 use skg::types::misc::SkgrepoName;
 use skg::types::nodes::complete::Graphnode;
@@ -65,10 +65,10 @@ pub fn read_graphnode(gitrepo_path: &Path, skgid: &str) -> Result<Graphnode, Box
 // Buffer editing helpers
 //
 
-/// Remove lines containing, view ids aside, the given substring.
+/// Remove lines containing, viewnode IDs aside, the given substring.
 pub fn without_lines_containing(buffer: &str, substring: &str) -> String {
   buffer . lines()
-    . filter(|line| ! without_vids (line) . contains (substring))
+    . filter(|line| ! without_viewnode_ids (line) . contains (substring))
     . collect::<Vec<_>>()
     . join ("\n") + "\n"
 }

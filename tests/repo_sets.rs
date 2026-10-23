@@ -41,7 +41,7 @@ use skg::types::viewnode::{
   ViewnodeKind,
   viewforest_root_viewnode};
 use skg::types::viewnode::Vognode;
-use skg::types::views_state::{OpenViews, ViewState, ViewId, ViewIdRecord};
+use skg::types::views_state::{OpenViews, ViewState, ViewId, ViewnodeIdRecord};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
@@ -158,7 +158,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         ViewState { viewforest : tree_all . into (),
                     pids       : HashSet::new (),
                     diffView_buffer_kind : None,
-                    view_id_record : ViewIdRecord::default () });
+                    viewnode_id_record : ViewnodeIdRecord::default () });
       let enrichment_slot
         : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (None));
@@ -345,7 +345,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
           pids       : HashSet::from ([ID::from ("active-search-hit")]),
           diffView_buffer_kind : None,
-          view_id_record : ViewIdRecord::default (), });
+          viewnode_id_record : ViewnodeIdRecord::default (), });
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
           runtime        : env . runtime_snapshot (),

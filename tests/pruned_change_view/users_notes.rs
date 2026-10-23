@@ -8,7 +8,7 @@
 // member; r held h, which is deleted, with m in its old content; acq
 // acquired acqd.
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::pruned_change_view::common::{
   assert_lines_in_order, insert_after_line_starting, note, open_all_changes_buffer,
   parent_line_of, rerendered_view_content, saved_and_rerendered,
@@ -60,7 +60,7 @@ fn a_note_under_a_historical_phantom_survives (
     let committed : String = rerendered_view_content (&response);
     assert_eq! ( parent_line_of (&committed, "a note under h"), "** (skg deadViewnode)",
                  "{}", committed );
-    assert! ( ! without_vids (&committed) . contains (old_member), "{}", committed );
+    assert! ( ! without_viewnode_ids (&committed) . contains (old_member), "{}", committed );
     Ok (( )) }) }
 
 /// A note parked in the "it acquired" folder survives beside the

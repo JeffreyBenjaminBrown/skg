@@ -8,7 +8,7 @@ use crate::git_fixture::{
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::diff_view::change_leaves::LeafKey;
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::readiness_store::ReadinessStore;
@@ -83,7 +83,7 @@ pub fn all_changes_buffer_with_marks (
     &runtime, &straddle, &store, DiffViewBufferKind::AllChanges ) ?
     . map ( |rendered| rendered . text ) ) }
 
-/// The view id under which 'open_buffer' registers a buffer: its
+/// The viewforest id under which 'open_buffer' registers a buffer: its
 /// client's name for it.
 pub fn view_id_of (
   diffView_buffer_kind : DiffViewBufferKind,
@@ -136,7 +136,7 @@ pub fn save_buffer (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   save_view (f, &view_id_of (diffView_buffer_kind), text) }
 
-/// The view id of the "all changes" buffer.
+/// The viewforest id of the "all changes" buffer.
 pub fn all_changes_view (
 ) -> ViewId {
   view_id_of (DiffViewBufferKind::AllChanges) }
@@ -282,14 +282,14 @@ fn first_streamed_view_content (
       . expect ("the streamed view has content") ) }
 
 /// The lines of 'buffer' that show an unrestricted vognode of 'node',
-/// without their view ids.
+/// without their viewnode IDs.
 pub fn node_lines (
   buffer : &str,
   node   : &str,
 ) -> Vec<String> {
   let atom : String = format! ("(node (id {}) ", node);
   buffer . lines () . filter ( |line| line . contains (&atom) )
-    . map (without_vids) . collect () }
+    . map (without_viewnode_ids) . collect () }
 
 /// 'buffer' with an editable-view request at the first occurrence of
 /// 'metadata', which must show a write-protected node.
@@ -304,7 +304,7 @@ pub fn requesting_editable_at (
               "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }
 
 /// 'buffer' with 'new_line' inserted after its first line starting,
-/// view id aside, 'prefix'.
+/// viewnode ID aside, 'prefix'.
 pub fn insert_after_line_starting (
   buffer   : &str,
   prefix   : &str,
@@ -314,13 +314,13 @@ pub fn insert_after_line_starting (
   let mut lines : Vec<&str> = Vec::new ();
   for line in buffer . lines () {
     lines . push (line);
-    if ! inserted && without_vids (line) . starts_with (prefix) {
+    if ! inserted && without_viewnode_ids (line) . starts_with (prefix) {
       lines . push (new_line);
       inserted = true; }}
   assert! ( inserted, "no line starts {:?}:\n{}", prefix, buffer );
   lines . join ("\n") + "\n" }
 
-/// 'buffer' without its first line starting, view id aside, 'prefix' and the
+/// 'buffer' without its first line starting, viewnode ID aside, 'prefix' and the
 /// headlines below it, with their bodies.
 pub fn without_subtree_starting (
   buffer : &str,
@@ -335,7 +335,7 @@ pub fn without_subtree_starting (
       if line . starts_with ('*') && depth (line) <= own {
         subtree_depth = None; }
       else { continue; }}
-    if ! found && without_vids (line) . starts_with (prefix) {
+    if ! found && without_viewnode_ids (line) . starts_with (prefix) {
       found = true;
       subtree_depth = Some ( depth (line) );
       continue; }
@@ -343,13 +343,13 @@ pub fn without_subtree_starting (
   assert! ( found, "no line starts {:?}:\n{}", prefix, buffer );
   kept . join ("\n") + "\n" }
 
-/// Panic unless 'lines' occur in 'buffer', its view ids ignored, in
+/// Panic unless 'lines' occur in 'buffer', its viewnode IDs ignored, in
 /// this order.
 pub fn assert_lines_in_order (
   buffer : &str,
   lines  : &[&str],
 ) {
-  let buffer : &str = &without_vids (buffer);
+  let buffer : &str = &without_viewnode_ids (buffer);
   let mut rest : &str = buffer;
   for line in lines {
     match rest . find (line) {
@@ -397,6 +397,6 @@ pub fn parent_line_of (
   assert_eq! ( matching . len (), 1, "one headline titled {:?} in\n{}", title, buffer );
   let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
   let at : usize = matching [0];
-  without_vids ( headlines [.. at] . iter () . rev ()
+  without_viewnode_ids ( headlines [.. at] . iter () . rev ()
     . find ( |line| depth (line) + 1 == depth (headlines [at]) )
     . unwrap_or_else ( || panic! ( "{:?} has no parent in\n{}", title, buffer )) ) }

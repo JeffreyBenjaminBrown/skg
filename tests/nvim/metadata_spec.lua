@@ -294,7 +294,7 @@ describe('skg.metadata commands', function ()
 
   it('restore_deleted_node marks a historical phantom', function ()
     buffer_with('* (skg (historical (id g) (repo main)'
-                .. ' (diff (node removed) (rel removed))) (vid 0d)) g')
+                .. ' (diff (node removed) (rel removed))) (vnid 0d)) g')
     metadata.restore_deleted_node()
     assert.is_true(subtree_p(first_metadata_sexp(),
       '(skg (historical (id g) (editRequest restoreNode)))'))
@@ -304,10 +304,10 @@ describe('skg.metadata commands', function ()
      .. ' write-protected', function ()
     for _, headline in ipairs({
       '** (skg (node (id x) (repo main) nonMember'
-        .. ' (diff (rel removed) (leaves 1 rel))) (vid 0c)) x',
+        .. ' (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x',
       '**** (skg (node (id d) (repo main) nonMember'
         .. ' writeProtected (diff (rel removed) (properties changed)'
-        .. ' (leaves 1 rel all))) (vid 0o)) d' }) do
+        .. ' (leaves 1 rel all))) (vnid 0o)) d' }) do
       buffer_with(headline)
       metadata.restore_removed_membership()
       assert.is_true(subtree_p(first_metadata_sexp(),

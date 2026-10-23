@@ -639,7 +639,7 @@ must not save, so the buffer is all there is."
   "The request goes inside the historical phantom's form."
   (should (skg-sexp-subtree-p
            (test-skg--metadata-after
-            "* (skg (historical (id g) (repo main) (diff (node removed) (rel removed))) (vid 0d)) g"
+            "* (skg (historical (id g) (repo main) (diff (node removed) (rel removed))) (vnid 0d)) g"
             #'skg-restore-deleted-node)
            '(skg (historical (id g) (editRequest restoreNode))))))
 
@@ -647,8 +647,8 @@ must not save, so the buffer is all there is."
   "An editable removed member and a write-protected folder member
 carrying '(rel removed)' both take the request."
   (dolist (headline
-           '("** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vid 0c)) x"
-             "**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vid 0o)) d"))
+           '("** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
+             "**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vnid 0o)) d"))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-after
               headline #'skg-restore-removed-membership)

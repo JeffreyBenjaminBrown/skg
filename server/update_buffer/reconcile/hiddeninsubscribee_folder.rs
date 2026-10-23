@@ -7,7 +7,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
-use crate::update_buffer::reconcile::partner_folder::{folder_vid_of, push_repair_warnings};
+use crate::update_buffer::reconcile::partner_folder::{folder_viewnode_id_of, push_repair_warnings};
 use crate::update_buffer::util::fold_members_of_newborn_folder;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::viewnode::{Viewnode, PartnerFolder};
@@ -80,7 +80,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscribee_pid,
-      folder_vid_of (tree, node) . as_ref (), summary ); }
+      folder_viewnode_id_of (tree, node) . as_ref (), summary ); }
   fold_members_of_newborn_folder (tree, node)
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   // An emptied HiddenInSubscribeeFolder is removed by the single postorder

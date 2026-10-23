@@ -45,7 +45,7 @@ const GC_REMOVED_FROM_R : &str =
 const G_AT_HEAD : &str =
   "title: g\npid: g\nbody: |2-\n  what g said\ncontains:\n- gc\n- gd\n";
 
-/// The line, view id aside, with 'request' added to its node or
+/// The line, viewnode ID aside, with 'request' added to its node or
 /// historical form, before that form's '(diff ...)'.
 fn with_request (
   request : &str,
@@ -179,13 +179,13 @@ fn a_membership_in_a_deleted_node_is_dropped_with_a_warning (
       &requesting (&buffer, GC_UNDER_G, "restoreRel") ) ?;
     assert_eq! ( files, files_before );
     assert_eq! ( response . warnings . len (), 1, "{:?}", response . warnings );
-    assert! ( response . warnings [0] . starts_with ("The restoreRel request on gc (view id ")
+    assert! ( response . warnings [0] . starts_with ("The restoreRel request on gc (viewnode ID ")
               && response . warnings [0] . contains ("deleted node at one end"),
               "{:?}", response . warnings );
     Ok (( )) }) }
 
 /// Each request on the wrong kind of headline stops the save with the
-/// parser's message, naming the headline's view id.
+/// parser's message, naming the headline's viewnode ID.
 #[test]
 fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Error>> {
   with_fixture ("restore", &["main"], |f| {
@@ -198,7 +198,7 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
       let refusal : String = match save ( f, &requesting (&buffer, prefix, request) ) {
         Err (e) => e . to_string (),
         Ok (response) => format! ( "{:?}", response . errors ), };
-      assert! ( refusal . contains (message) && refusal . contains ("(view id "),
+      assert! ( refusal . contains (message) && refusal . contains ("(viewnode ID "),
                 "{} on {:?} should be refused with {:?}, got {}",
                 request, prefix, message, refusal );
       assert_eq! ( skg_files (f) ?, files_before ); }

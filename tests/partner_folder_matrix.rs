@@ -20,7 +20,7 @@
 // established style of partner_folder_order / partner_folder_warnings, which
 // keeps the metadata always correct.
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
 use std::net::TcpStream;
 
@@ -55,19 +55,19 @@ impl Fails {
     self . msgs . push (format! ("[{}] {}", scenario, msg)); }
   fn want_contains (
     &mut self, scenario : &str, buf : &str, needle : &str) {
-    if ! without_vids (buf) . contains (needle) {
+    if ! without_viewnode_ids (buf) . contains (needle) {
       self . record (scenario, format! (
         "expected to contain {:?}, in:\n{}", needle, buf )); } }
   fn want_absent (
     &mut self, scenario : &str, buf : &str, needle : &str) {
-    if without_vids (buf) . contains (needle) {
+    if without_viewnode_ids (buf) . contains (needle) {
       self . record (scenario, format! (
         "expected NOT to contain {:?}, in:\n{}", needle, buf )); } }
   fn want_before (
     &mut self, scenario : &str, buf : &str,
     first : &str, second : &str) {
-    let buf_without_vids : String = without_vids (buf);
-    match ( buf_without_vids . find (first), buf_without_vids . find (second) ) {
+    let buf_without_viewnode_ids : String = without_viewnode_ids (buf);
+    match ( buf_without_viewnode_ids . find (first), buf_without_viewnode_ids . find (second) ) {
       ( Some (i), Some (j) ) => if ! ( i < j ) {
         self . record (scenario, format! (
           "expected {:?} before {:?}, in:\n{}", first, second, buf )); },

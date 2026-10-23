@@ -32,7 +32,7 @@ use crate::serve::handlers::text_release::{
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, sexp_to_client_string, tag_text_response};
-use crate::types::views_state::{ViewId, ViewIdRecord};
+use crate::types::views_state::{ViewId, ViewnodeIdRecord};
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -245,8 +245,8 @@ pub fn handle_text_search_request (
             TextReleaseDecision::AllowWithWarning { warning } =>
               vec! [warning],
             _ => Vec::new (), };
-          ViewIdRecord::default () // 'register_view' reads it back from the forest
-            . assign_view_ids_and_record_owners (&mut viewforest);
+          ViewnodeIdRecord::default () // 'register_view' reads it back from the forest
+            . assign_viewnode_ids_and_record_owners (&mut viewforest);
           let rendered : String =
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &runtime . config )

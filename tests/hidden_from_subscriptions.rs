@@ -5,7 +5,7 @@
 // 1. Initial view shows subscribees as write-protected with HiddenOutsideOfSubscribeeFolder
 // 2. After saving with editable view requests, HiddenInSubscribeeFolder is shown
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
@@ -153,7 +153,7 @@ fn assert_hides_e1_in_subscribee_folder (
   assert! (
     // 'folded': a new hidden folder begins folded,
     // expressed as a folded atom on each member.
-    without_vids (buffer) . contains ("**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
+    without_viewnode_ids (buffer) . contains ("**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
     "Expected e1 to be rendered folded under HiddenInSubscribeeFolder:\n{}",
     buffer );
   assert! (
@@ -176,7 +176,7 @@ fn move_h_from_hiddenin_folder_to_visible_subscribee_content (
   buffer
     . lines()
     . filter_map ( |line| {
-      if without_vids (line) . contains ("(skg hiddenInSubscribeeFolder)") {
+      if without_viewnode_ids (line) . contains ("(skg hiddenInSubscribeeFolder)") {
         None
       } else if line . contains ("(id H)") {
         Some (line . replacen ("***** ", "**** ", 1)
@@ -195,7 +195,7 @@ fn remove_hiddenin_branch (
   buffer
     . lines()
     . filter ( |line|
-      ! without_vids (line) . contains ("(skg hiddenInSubscribeeFolder)")
+      ! without_viewnode_ids (line) . contains ("(skg hiddenInSubscribeeFolder)")
       && ! line . contains ("(id H)") )
     . collect::<Vec<_>>()
     . join ("\n") + "\n" }
@@ -242,7 +242,7 @@ fn insert_after_line_containing (
   let mut result : Vec<String> = Vec::new();
   for line in buffer . lines() {
     result . push (line . to_string());
-    if without_vids (line) . contains (needle) {
+    if without_viewnode_ids (line) . contains (needle) {
       result . extend (
         insertion . lines() . map ( |l| l . to_string() )); }}
   result . join ("\n") + "\n" }
@@ -550,7 +550,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     // subscriber, three generations up, hides it.
     let collateral : &str = &collateral_views[0];
     assert! (
-      without_vids (collateral) . contains (
+      without_viewnode_ids (collateral) . contains (
         "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
       "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
     let parked_e1 : &str = collateral . lines ()
@@ -1031,7 +1031,7 @@ async fn test_deleting_from_hiddenin_folder_does_not_unhide (
       ) . await?;
 
     assert! (
-      without_vids (&rerendered) . contains (
+      without_viewnode_ids (&rerendered) . contains (
         "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id H)"),
       "Expected H to be regenerated under HiddenInSubscribeeFolder:\n{}",
       rerendered );

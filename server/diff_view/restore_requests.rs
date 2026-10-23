@@ -24,7 +24,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, RecorderwardRelmap};
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::types::errors::view_id_suffix;
+use crate::types::errors::viewnode_id_suffix;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
@@ -138,7 +138,7 @@ fn restore_nodes (
     if ! h . restoreNode_request || restored . contains (&h . skgid)
     { continue; }
     let headline : String = format! ( "{}{}",
-      h . skgid, view_id_suffix ( node . value () . vid . as_ref () ));
+      h . skgid, viewnode_id_suffix ( node . value () . viewnode_id . as_ref () ));
     let saved_already : bool = instructions . iter () . any (
       |instruction| instruction_skgid (instruction) == &h . skgid );
     let graphnode : Option<Graphnode> =
@@ -237,7 +237,7 @@ fn restoreRel_requests (
       let headline : String = format! ( "{}{}",
         node . value () . unrestricted_skgid () . map ( |skgid| skgid . to_string () )
           . unwrap_or_default (),
-        view_id_suffix ( node . value () . vid . as_ref () ));
+        viewnode_id_suffix ( node . value () . viewnode_id . as_ref () ));
       let key : Option<RelationshipKey> =
         vognode_leaf_pid (node . value (), &pid_of)
         . and_then ( |pid| relationship_to_viewparent (

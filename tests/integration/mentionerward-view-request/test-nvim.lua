@@ -65,7 +65,7 @@ local function verify_view (line_number, expected_full, expected_stripped)
   local buffer_content = request_on_line(line_number)
   print(string.format('Line %d buffer content: %s',
                       line_number, buffer_content))
-  T.check(T.without_vids(buffer_content) == expected_full,
+  T.check(T.without_viewnode_ids(buffer_content) == expected_full,
           string.format(
             'line %d: buffer content exactly matches expected',
             line_number))

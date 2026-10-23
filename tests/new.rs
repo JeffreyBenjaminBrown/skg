@@ -30,5 +30,5 @@ mod local_fieldintent_collection_pipeline;
 #[path = "new/local_fieldintent_collection/extraction.rs"]
 mod local_fieldintent_collection_extraction;
 
-#[path = "new/messages_name_view_ids.rs"]
-mod messages_name_view_ids;
+#[path = "new/messages_name_viewnode_ids.rs"]
+mod messages_name_viewnode_ids;

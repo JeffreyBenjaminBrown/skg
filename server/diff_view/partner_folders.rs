@@ -27,7 +27,7 @@ use crate::types::viewnode::{
   Birth, DiffChange, Existence, FolderPolicy, Owner, PartnerFolder, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
-  folder_vid_of, push_repair_warnings, view_order_preserving_goal_list};
+  folder_viewnode_id_of, push_repair_warnings, view_order_preserving_goal_list};
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::CompletionWarning;
 
@@ -83,7 +83,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
     if let Some (sink) = warning_sink {
       push_repair_warnings (
         sink, kind, viewparent_pid,
-        folder_vid_of (tree, node) . as_ref (), summary ); }}
+        folder_viewnode_id_of (tree, node) . as_ref (), summary ); }}
   Ok (( )) }
 
 /// The goal item of a partner of a folder over the straddle: a node only

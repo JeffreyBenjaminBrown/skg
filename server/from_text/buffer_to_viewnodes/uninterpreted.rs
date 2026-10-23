@@ -2,11 +2,11 @@
 /// I *believe* the tests constrain its behavior sufficiently.
 
 use crate::types::sexp::find_sexp_end;
-use crate::types::errors::{BufferValidationError, HeadlineName, view_id_suffix};
+use crate::types::errors::{BufferValidationError, HeadlineName, viewnode_id_suffix};
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::tree::forest::MpViewForest;
-use crate::types::viewnode::Vid;
+use crate::types::viewnode::ViewnodeId;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
@@ -66,7 +66,7 @@ pub fn org_to_uninterpreted_viewforest(
     MpViewForest::new();
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   let mut parsing_warnings: Vec<String> = Vec::new();
-  let mut vids_seen: HashSet<Vid> = HashSet::new();
+  let mut viewnode_ids_seen: HashSet<ViewnodeId> = HashSet::new();
   // treeid_stack[0] is the internal forest root,
   // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
@@ -78,13 +78,13 @@ pub fn org_to_uninterpreted_viewforest(
       divide_into_viewNodeLineCols (input)?;
     viewnode_line_cols } {
     if let Some (metadata) = &mut viewnode_line_col . headline . 1 {
-      if let Some (vid) = &metadata . vid {
-        // Of two headlines with one vid, the first in buffer order
+      if let Some (viewnode_id) = &metadata . viewnode_id {
+        // Of two headlines with one viewnode ID, the first in buffer order
         // keeps it; the second is a copy, and will get a fresh one.
         // (Dropped before the headline becomes a viewnode, so that no
-        // message names the copy by the original's vid.)
-        if ! vids_seen . insert (vid . clone ()) {
-          metadata . vid = None; }}}
+        // message names the copy by the original's viewnode ID.)
+        if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
+          metadata . viewnode_id = None; }}}
     let (level, viewnode, error_opt, warning_opt)
       : (usize, MpViewnode, Option<BufferValidationError>, Option<String>)
       = linecol_to_viewnode (viewnode_line_col)?;
@@ -103,7 +103,7 @@ pub fn org_to_uninterpreted_viewforest(
       return Err(format!(
         "Node \"{}\"{} at level {} jumps too far between levels (no valid parent at level {}).",
         viewnode . error_label(),
-        view_id_suffix ( viewnode . vid . as_ref () ),
+        viewnode_id_suffix ( viewnode . viewnode_id . as_ref () ),
         level, level - 1)); }
     treeid_stack . push( {
       let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
@@ -263,7 +263,7 @@ pub fn headline_to_triple (
               return Err (format! (
                 "{} ({})", e,
                 HeadlineName::of (
-                  vid_written_in_metadata (&parsed_sexp) . as_ref (),
+                  viewnode_id_written_in_metadata (&parsed_sexp) . as_ref (),
                   &title ))),
           };
 
@@ -283,16 +283,16 @@ pub fn headline_to_triple (
     Err("__NOT_A_HEADLINE__" . to_string())
   }}
 
-/// The view id a headline's '(skg ...)' sexp carries, read without
+/// The viewnode ID a headline's '(skg ...)' sexp carries, read without
 /// parsing the rest of it, so that an error in the rest can name the
 /// headline. None if it carries none, or one that is malformed.
-fn vid_written_in_metadata (
+fn viewnode_id_written_in_metadata (
   metadata_sexp : &Sexp,
-) -> Option<Vid> {
+) -> Option<ViewnodeId> {
   let Sexp::List (elements) = metadata_sexp else { return None; };
   elements . iter () . find_map ( |element| match element {
     Sexp::List (pair) => match pair . as_slice () {
       [ Sexp::Atom (Atom::S (key)), Sexp::Atom (Atom::S (value)) ]
-        if key == "vid" => Vid::parse (value) . ok (),
+        if key == "vnid" => ViewnodeId::parse (value) . ok (),
       _ => None },
     _ => None } ) }

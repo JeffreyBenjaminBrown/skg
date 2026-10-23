@@ -6,13 +6,13 @@ use skg::from_text::local_fieldintent_collection::types::{
   SubscribeeTextClaim, SubscribeeVisibility };
 use skg::types::errors::HeadlineName;
 use skg::types::misc::{ID, SkgrepoName};
-use skg::types::viewnode::Vid;
+use skg::types::viewnode::ViewnodeId;
 use skg::types::nodes::complete::Flag;
 
 /// The occurrence emitting, for the tests that do not care which.
 fn emitter (
 ) -> HeadlineName {
-  HeadlineName::ViewId ( Vid ("0a" . to_string ()) ) }
+  HeadlineName::ViewnodeId ( ViewnodeId ("0a" . to_string ()) ) }
 
 fn title_intent (
   title : &str,
@@ -150,15 +150,15 @@ fn order_records_first_emission_per_skgid () {
               vec![ID::from ("b"), ID::from ("a")] ); }
 
 #[test]
-fn a_conflict_lists_the_view_ids_of_the_occurrences_emitting () {
+fn a_conflict_lists_the_viewnode_ids_of_the_occurrences_emitting () {
   let mut acc : CollectedFieldIntents =
     CollectedFieldIntents::new();
-  let first : HeadlineName = HeadlineName::ViewId ( Vid ("0a" . to_string ()) );
-  let second : HeadlineName = HeadlineName::ViewId ( Vid ("0c" . to_string ()) );
+  let first : HeadlineName = HeadlineName::ViewnodeId ( ViewnodeId ("0a" . to_string ()) );
+  let second : HeadlineName = HeadlineName::ViewnodeId ( ViewnodeId ("0c" . to_string ()) );
   acc . instructionMerge_fieldIntent (
     &first, ID::from ("a"), title_intent ("t") ) . unwrap();
   let error : String = acc . instructionMerge_fieldIntent (
     &second, ID::from ("a"), title_intent ("different") ) . unwrap_err();
   assert!( error . starts_with (
-             "Conflicting title/body intents for ID a (view ids 0a, 0c;" ),
+             "Conflicting title/body intents for ID a (viewnode IDs 0a, 0c;" ),
            "{}", error ); }

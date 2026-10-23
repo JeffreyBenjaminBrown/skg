@@ -1,15 +1,15 @@
 use super::misc::{ID, SkgrepoName};
-use super::viewnode::Vid;
+use super::viewnode::ViewnodeId;
 use std::error::Error;
 use std::fmt;
 use std::io;
 
-/// What a message calls one headline: its view id, or, for a headline
+/// What a message calls one headline: its viewnode ID, or, for a headline
 /// without one (the user typed it, or copied one, and has not saved),
-/// its title. No message invents a view id.
+/// its title. No message invents a viewnode ID.
 #[derive (Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HeadlineName {
-  ViewId (Vid),
+  ViewnodeId (ViewnodeId),
   Title (String),
 }
 
@@ -102,13 +102,13 @@ pub enum BufferValidationError {
 //
 
 impl HeadlineName {
-  /// The view id when the headline carries one, else the title.
+  /// The viewnode ID when the headline carries one, else the title.
   pub fn of (
-    vid   : Option<&Vid>,
+    viewnode_id   : Option<&ViewnodeId>,
     title : &str,
   ) -> HeadlineName {
-    match vid {
-      Some (vid) => HeadlineName::ViewId (vid . clone ()),
+    match viewnode_id {
+      Some (viewnode_id) => HeadlineName::ViewnodeId (viewnode_id . clone ()),
       None       => HeadlineName::Title (title . to_string ()), }}
 
   /// The line naming the headline in a message's org form.
@@ -116,40 +116,40 @@ impl HeadlineName {
     &self
   ) -> String {
     match self {
-      HeadlineName::ViewId (vid) =>
-        format! ("- view id: {}\n", vid),
+      HeadlineName::ViewnodeId (viewnode_id) =>
+        format! ("- viewnode ID: {}\n", viewnode_id),
       HeadlineName::Title (title) =>
         format! ("- headline: {:?}\n", title), }}
 }
 
 impl fmt::Display for HeadlineName {
-  /// 'view id X', or 'headline "T"'.
+  /// 'viewnode ID X', or 'headline "T"'.
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      HeadlineName::ViewId (vid) =>
-        write! (f, "view id {}", vid),
+      HeadlineName::ViewnodeId (viewnode_id) =>
+        write! (f, "viewnode ID {}", viewnode_id),
       HeadlineName::Title (title) =>
         write! (f, "headline {:?}", title), }}}
 
-/// ' (view id X)', or nothing for a headline without a view id: for
+/// ' (viewnode ID X)', or nothing for a headline without a viewnode ID: for
 /// a message that already names the headline some other way.
-pub fn view_id_suffix (
-  vid : Option<&Vid>,
+pub fn viewnode_id_suffix (
+  viewnode_id : Option<&ViewnodeId>,
 ) -> String {
-  vid . map ( |vid| format! (" (view id {})", vid) )
+  viewnode_id . map ( |viewnode_id| format! (" (viewnode ID {})", viewnode_id) )
     . unwrap_or_default () }
 
-/// Several occurrences' names: 'view ids X, Y' when every one has a
-/// view id, else each named as 'HeadlineName' names it.
+/// Several occurrences' names: 'viewnode IDs X, Y' when every one has a
+/// viewnode ID, else each named as 'HeadlineName' names it.
 pub fn name_headlines (
   names : &[HeadlineName],
 ) -> String {
-  match view_ids_of_all (names) {
-    Some (vids) if names . len () > 1 =>
-      format! ("view ids {}", vids),
+  match viewnode_ids_of_all (names) {
+    Some (viewnode_ids) if names . len () > 1 =>
+      format! ("viewnode IDs {}", viewnode_ids),
     _ =>
       names . iter () . map ( |name| name . to_string () )
       . collect::<Vec<String>> () . join (", "), }}
@@ -158,22 +158,22 @@ pub fn name_headlines (
 pub fn headline_names_org_line (
   names : &[HeadlineName],
 ) -> String {
-  match view_ids_of_all (names) {
-    Some (vids) => format! ("- view ids: {}\n", vids),
+  match viewnode_ids_of_all (names) {
+    Some (viewnode_ids) => format! ("- viewnode IDs: {}\n", viewnode_ids),
     None        => format! ("- occurrences: {}\n",
                             name_headlines (names)), }}
 
-/// The view ids, comma-separated, if every name is one.
-fn view_ids_of_all (
+/// The viewnode IDs, comma-separated, if every name is one.
+fn viewnode_ids_of_all (
   names : &[HeadlineName],
 ) -> Option<String> {
-  let vids : Vec<&str> =
+  let viewnode_ids : Vec<&str> =
     names . iter ()
     . map ( |name| match name {
-      HeadlineName::ViewId (vid) => Some (vid . 0 . as_str ()),
+      HeadlineName::ViewnodeId (viewnode_id) => Some (viewnode_id . 0 . as_str ()),
       HeadlineName::Title (_)    => None } )
     . collect::<Option<Vec<&str>>> () ?;
-  Some ( vids . join (", ") ) }
+  Some ( viewnode_ids . join (", ") ) }
 
 impl std::fmt::Display for LinkParseError {
   fn fmt (

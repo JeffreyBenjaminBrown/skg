@@ -52,7 +52,7 @@ LINE-NUMBER is zero-based."
   (let* ((buffer-content (skg-mentionerward--request-on-line line-number))
          (stripped (strip-metadata-and-bodies buffer-content)))
     (message "Line %d buffer content: %s" line-number buffer-content)
-    (unless (string= (skg-test-without-vids buffer-content) expected-full)
+    (unless (string= (skg-test-without-viewnode-ids buffer-content) expected-full)
       (message "✗ FAIL: Unexpected buffer content for line %d" line-number)
       (message "Expected: %s" expected-full)
       (message "Actual:   %s" buffer-content)

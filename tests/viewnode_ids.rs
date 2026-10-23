@@ -1,9 +1,9 @@
-// cargo nextest run --test grouped_views -E 'test(view_ids::)'
+// cargo nextest run --test grouped_views -E 'test(viewnode_ids::)'
 //
-// View ids ('docs/api-and-formats.org', "The metadata headers"):
-// every viewnode of a rendered buffer carries '(vid X)', the view
+// Viewnode IDs ('docs/api-and-formats.org', "The metadata headers"):
+// every viewnode of a rendered buffer carries '(vnid X)', the view
 // keeps it across saves and rerenders, and the view's
-// 'ViewIdRecord' says who made each viewnode.
+// 'ViewnodeIdRecord' says who made each viewnode.
 //
 // Fixture: p contains a; a contains b and c; c subscribes to d. The
 // view of a shows p as a containerward role graft, b and c as
@@ -12,7 +12,7 @@
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::metadata_canon::{vid_atom_of, without_vids};
+use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
@@ -22,9 +22,9 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{
-  FolderKind, Owner, PartnerFolder, Vid, Viewnode, viewforest_root_viewnode,
+  FolderKind, Owner, PartnerFolder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};
-use skg::types::views_state::{OpenViews, ViewId, ViewIdRecord};
+use skg::types::views_state::{OpenViews, ViewId, ViewnodeIdRecord};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
@@ -32,22 +32,22 @@ use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
 
-const FIXTURES : &str = "tests/view_ids/fixtures";
+const FIXTURES : &str = "tests/viewnode_ids/fixtures";
 
 #[test]
-fn view_ids_in_content_views (
+fn viewnode_ids_in_content_views (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-view-ids",
+    "skg-test-viewnode-ids",
     FIXTURES,
-    "/tmp/tantivy-test-view-ids",
+    "/tmp/tantivy-test-viewnode-ids",
     |config, tantivy| Box::pin ( async move {
-      every_headline_of_a_new_view_has_its_own_vid (config, tantivy) ?;
-      a_vid_survives_a_save_and_a_rerender (config, tantivy) . await ?;
-      a_copied_headline_gets_a_fresh_vid_and_the_original_keeps_its_own (
+      every_headline_of_a_new_view_has_its_own_viewnode_id (config, tantivy) ?;
+      a_viewnode_id_survives_a_save_and_a_rerender (config, tantivy) . await ?;
+      a_copied_headline_gets_a_fresh_viewnode_id_and_the_original_keeps_its_own (
         config, tantivy ) . await ?;
-      a_moved_headline_keeps_its_vid (config, tantivy) . await ?;
-      a_typed_headline_gets_a_vid (config, tantivy) . await ?;
+      a_moved_headline_keeps_its_viewnode_id (config, tantivy) . await ?;
+      a_typed_headline_gets_a_viewnode_id (config, tantivy) . await ?;
       the_owner_table_records_who_made_each_viewnode (config, tantivy) . await ?;
       Ok (( )) } )) }
 
@@ -102,66 +102,66 @@ fn fresh_views_state () -> ViewsState {
   ViewsState { open_views     : OpenViews::new (),
                graph_straddle : None } }
 
-/// The vid of the one headline of 'buffer' that, view ids aside,
+/// The viewnode ID of the one headline of 'buffer' that, viewnode IDs aside,
 /// contains 'needle'.
-fn vid_of_line_containing (
+fn viewnode_id_of_line_containing (
   buffer : &str,
   needle : &str,
 ) -> String {
   let lines : Vec<&str> = buffer . lines ()
-    . filter ( |line| without_vids (line) . contains (needle) ) . collect ();
+    . filter ( |line| without_viewnode_ids (line) . contains (needle) ) . collect ();
   assert_eq! ( lines . len (), 1,
                "one headline should contain {:?}:\n{}", needle, buffer );
-  vid_atom_of (lines [0])
-    . unwrap_or_else ( || panic! ( "{:?} has no vid:\n{}", lines [0], buffer ))
+  viewnode_id_atom_of (lines [0])
+    . unwrap_or_else ( || panic! ( "{:?} has no viewnode ID:\n{}", lines [0], buffer ))
     . to_string () }
 
-/// The vids of the headlines of 'buffer' that, view ids aside,
+/// The viewnode IDs of the headlines of 'buffer' that, viewnode IDs aside,
 /// contain 'needle', in buffer order.
-fn vids_of_lines_containing (
+fn viewnode_ids_of_lines_containing (
   buffer : &str,
   needle : &str,
 ) -> Vec<String> {
   buffer . lines ()
-    . filter ( |line| without_vids (line) . contains (needle) )
-    . map ( |line| vid_atom_of (line) . expect ("a vid") . to_string () )
+    . filter ( |line| without_viewnode_ids (line) . contains (needle) )
+    . map ( |line| viewnode_id_atom_of (line) . expect ("a viewnode ID") . to_string () )
     . collect () }
 
-/// Every vid atom of 'buffer', in buffer order.
-fn vid_atoms (
+/// Every viewnode ID atom of 'buffer', in buffer order.
+fn viewnode_id_atoms (
   buffer : &str,
 ) -> Vec<String> {
   buffer . lines () . filter ( |line| line . starts_with ('*') )
-    . map ( |line| vid_atom_of (line)
-            . unwrap_or_else ( || panic! ( "{:?} has no vid:\n{}", line, buffer ))
+    . map ( |line| viewnode_id_atom_of (line)
+            . unwrap_or_else ( || panic! ( "{:?} has no viewnode ID:\n{}", line, buffer ))
             . to_string () )
     . collect () }
 
-/// The X of a '(vid X)' atom.
-fn vid_of_atom (
-  vid_atom : &str,
-) -> Vid {
-  Vid ( vid_atom . trim_start_matches ("(vid ") . trim_end_matches (')')
+/// The X of a '(vnid X)' atom.
+fn viewnode_id_of_atom (
+  viewnode_id_atom : &str,
+) -> ViewnodeId {
+  ViewnodeId ( viewnode_id_atom . trim_start_matches ("(vnid ") . trim_end_matches (')')
         . to_string () ) }
 
-/// The owner the view's record gives the vid of 'vid_atom'.
+/// The owner the view's record gives the viewnode ID of 'viewnode_id_atom'.
 fn owner_in_view (
   views_state : &ViewsState,
   view_name   : &str,
-  vid_atom    : &str,
+  viewnode_id_atom    : &str,
 ) -> Owner {
   views_state . open_views
-    . view_id_record_of ( &ViewId::ContentView (view_name . to_string ()) )
-    . owner_by_view_id . get ( &vid_of_atom (vid_atom) ) . copied ()
+    . viewnode_id_record_of ( &ViewId::ContentView (view_name . to_string ()) )
+    . owner_by_viewnode_id . get ( &viewnode_id_of_atom (viewnode_id_atom) ) . copied ()
     . unwrap_or (Owner::User) }
 
 //
 // Tests
 //
 
-/// A new view's every headline carries a vid, no two alike, none
+/// A new view's every headline carries a viewnode ID, no two alike, none
 /// spelled like a number, and the view's counter is past them all.
-fn every_headline_of_a_new_view_has_its_own_vid (
+fn every_headline_of_a_new_view_has_its_own_viewnode_id (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -169,23 +169,23 @@ fn every_headline_of_a_new_view_has_its_own_vid (
   let mut views_state : ViewsState = fresh_views_state ();
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
-  let atoms : Vec<String> = vid_atoms (&buffer);
+  let atoms : Vec<String> = viewnode_id_atoms (&buffer);
   assert_eq! ( atoms . iter () . collect::<HashSet<_>> () . len (), atoms . len (),
-               "no two headlines share a vid:\n{}", buffer );
+               "no two headlines share a viewnode ID:\n{}", buffer );
   for atom in &atoms {
-    assert! ( vid_of_atom (atom) . 0 . parse::<f64> () . is_err (),
+    assert! ( viewnode_id_of_atom (atom) . 0 . parse::<f64> () . is_err (),
               "{} reads as a number:\n{}", atom, buffer ); }
-  let record : ViewIdRecord = views_state . open_views
-    . view_id_record_of ( &ViewId::ContentView (VIEW_OF_A . to_string ()) );
+  let record : ViewnodeIdRecord = views_state . open_views
+    . viewnode_id_record_of ( &ViewId::ContentView (VIEW_OF_A . to_string ()) );
   for atom in &atoms {
-    assert! ( vid_of_atom (atom) . counter_value () . unwrap ()
-              < record . next_view_id_counter,
+    assert! ( viewnode_id_of_atom (atom) . counter_value () . unwrap ()
+              < record . next_viewnode_id_counter,
               "the counter is past {}", atom ); }
   Ok (( )) }
 
-/// Saved unchanged, the buffer comes back byte for byte, its vids
+/// Saved unchanged, the buffer comes back byte for byte, its viewnode IDs
 /// with it; and a collateral view rerendered by a save keeps its own.
-async fn a_vid_survives_a_save_and_a_rerender (
+async fn a_viewnode_id_survives_a_save_and_a_rerender (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -197,7 +197,7 @@ async fn a_vid_survives_a_save_and_a_rerender (
     config, tantivy, &graph, &mut views_state, "another view of a", "a" ) ?;
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &buffer, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
-  assert_eq! ( saved . saved_view, buffer, "the vids survive a save" );
+  assert_eq! ( saved . saved_view, buffer, "the viewnode IDs survive a save" );
   let retitled : String = buffer . replacen (")) b\n", ")) b, retitled\n", 1);
   assert_ne! ( retitled, buffer );
   let (_, streamed) : (SaveResponse, Vec<String>) = save_view (
@@ -210,12 +210,12 @@ async fn a_vid_survives_a_save_and_a_rerender (
     . unwrap_or_else ( || panic! ( "the other view is rerendered: {:?}", streamed ));
   assert_eq! ( collateral,
                other . replacen (")) b\n", ")) b, retitled\n", 1),
-               "the collateral view keeps its vids" );
+               "the collateral view keeps its viewnode IDs" );
   Ok (( )) }
 
-/// A copy of a headline, made with its metadata, loses the vid it
+/// A copy of a headline, made with its metadata, loses the viewnode ID it
 /// carried; the original keeps it.
-async fn a_copied_headline_gets_a_fresh_vid_and_the_original_keeps_its_own (
+async fn a_copied_headline_gets_a_fresh_viewnode_id_and_the_original_keeps_its_own (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -226,22 +226,22 @@ async fn a_copied_headline_gets_a_fresh_vid_and_the_original_keeps_its_own (
   let p_line : &str = buffer . lines ()
     . find ( |line| line . contains ("(node (id p) ") )
     . expect ("p is shown");
-  let p_vid : String = vid_atom_of (p_line) . unwrap () . to_string ();
+  let p_viewnode_id : String = viewnode_id_atom_of (p_line) . unwrap () . to_string ();
   let copied : String = buffer . replacen (
     &format! ("{}\n", p_line), &format! ("{}\n{}\n", p_line, p_line), 1 );
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &copied, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
-  let p_vids : Vec<String> =
-    vids_of_lines_containing (&saved . saved_view, "(node (id p) ");
-  assert_eq! ( p_vids . len (), 2, "{}", saved . saved_view );
-  assert_eq! ( p_vids [0], p_vid,
-               "the original keeps its vid:\n{}", saved . saved_view );
-  assert! ( ! vid_atoms (&buffer) . contains (&p_vids [1]),
-            "the copy's vid is new:\n{}", saved . saved_view );
+  let p_viewnode_ids : Vec<String> =
+    viewnode_ids_of_lines_containing (&saved . saved_view, "(node (id p) ");
+  assert_eq! ( p_viewnode_ids . len (), 2, "{}", saved . saved_view );
+  assert_eq! ( p_viewnode_ids [0], p_viewnode_id,
+               "the original keeps its viewnode ID:\n{}", saved . saved_view );
+  assert! ( ! viewnode_id_atoms (&buffer) . contains (&p_viewnode_ids [1]),
+            "the copy's viewnode ID is new:\n{}", saved . saved_view );
   Ok (( )) }
 
-/// A headline moved elsewhere in the buffer keeps its vid.
-async fn a_moved_headline_keeps_its_vid (
+/// A headline moved elsewhere in the buffer keeps its viewnode ID.
+async fn a_moved_headline_keeps_its_viewnode_id (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -252,7 +252,7 @@ async fn a_moved_headline_keeps_its_vid (
   let b_line : &str = buffer . lines ()
     . find ( |line| line . contains ("(node (id b) ") )
     . expect ("b is shown");
-  let b_vid : String = vid_atom_of (b_line) . unwrap () . to_string ();
+  let b_viewnode_id : String = viewnode_id_atom_of (b_line) . unwrap () . to_string ();
   let moved : String = // b, from first in a's content to last
     buffer . replacen ( &format! ("{}\n", b_line), "", 1 )
     + &format! ("{}\n", b_line);
@@ -262,13 +262,13 @@ async fn a_moved_headline_keeps_its_vid (
     . filter ( |line| line . starts_with ('*') ) . last () . unwrap ();
   assert! ( last_headline . contains ("(node (id b) "),
             "b moved to last:\n{}", saved . saved_view );
-  assert_eq! ( vid_of_line_containing (&saved . saved_view, "(node (id b) "),
-               b_vid, "b keeps its vid:\n{}", saved . saved_view );
+  assert_eq! ( viewnode_id_of_line_containing (&saved . saved_view, "(node (id b) "),
+               b_viewnode_id, "b keeps its viewnode ID:\n{}", saved . saved_view );
   Ok (( )) }
 
-/// A headline the user typed, without metadata, gets a vid the buffer
+/// A headline the user typed, without metadata, gets a viewnode ID the buffer
 /// never used.
-async fn a_typed_headline_gets_a_vid (
+async fn a_typed_headline_gets_a_viewnode_id (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -279,10 +279,10 @@ async fn a_typed_headline_gets_a_vid (
   let typed : String = format! ("{}** a typed child\n", buffer);
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &typed, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
-  let typed_vid : String =
-    vid_of_line_containing (&saved . saved_view, "a typed child");
-  assert! ( ! vid_atoms (&buffer) . contains (&typed_vid),
-            "the typed headline's vid is new:\n{}", saved . saved_view );
+  let typed_viewnode_id : String =
+    viewnode_id_of_line_containing (&saved . saved_view, "a typed child");
+  assert! ( ! viewnode_id_atoms (&buffer) . contains (&typed_viewnode_id),
+            "the typed headline's viewnode ID is new:\n{}", saved . saved_view );
   Ok (( )) }
 
 /// The view's record says who made each viewnode, before and after a
@@ -308,7 +308,7 @@ async fn the_owner_table_records_who_made_each_viewnode (
                                   FolderKind::Partner (PartnerFolder::Subscribee)) ) ];
   for (needle, owner) in &expected {
     assert_eq! ( owner_in_view ( &views_state, VIEW_OF_A,
-                                 &vid_of_line_containing (&buffer, needle) ),
+                                 &viewnode_id_of_line_containing (&buffer, needle) ),
                  *owner, "the owner of {:?}, de novo:\n{}", needle, buffer ); }
   let typed : String = format! (
     "{}** a typed member\n** (skg (node nonMember)) a typed note\n",
@@ -319,18 +319,18 @@ async fn the_owner_table_records_who_made_each_viewnode (
     ( "a typed member", Owner::ContentReconciler ),
     ( "a typed note",   Owner::User ) ] . iter () ) {
     assert_eq! ( owner_in_view ( &views_state, VIEW_OF_A,
-                                 &vid_of_line_containing (&saved . saved_view, needle) ),
+                                 &viewnode_id_of_line_containing (&saved . saved_view, needle) ),
                  *owner, "the owner of {:?}, after a save:\n{}",
                  needle, saved . saved_view ); }
   Ok (( )) }
 
-/// The record's end-of-completion pass gives a vid to each viewnode
+/// The record's end-of-completion pass gives a viewnode ID to each viewnode
 /// without one, in buffer order, never one the counter has passed
 /// (so not one a viewnode cut from the buffer had), never one spelled
 /// like a number, and keeps the table to the viewnodes the forest
 /// holds.
 #[test]
-fn the_record_assigns_fresh_vids_and_forgets_what_left (
+fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
 ) {
   let mut tree : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = tree . root () . id ();
@@ -340,21 +340,21 @@ fn the_record_assigns_fresh_vids_and_forgets_what_left (
   for _ in 0 .. 120 {
     tree . get_mut (folder) . unwrap () . append ( viewnode_of (
       ViewnodeKind::DeadViewnode )); }
-  let mut record : ViewIdRecord = ViewIdRecord::default ();
-  record . assign_view_ids_and_record_owners (&mut tree);
-  assert_eq! ( tree . root () . value () . vid, None, "the buffer root gets none" );
-  let vids : Vec<Vid> = tree . root () . descendants () . skip (1)
-    . map ( |node| node . value () . vid . clone () . expect ("a vid") )
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::default ();
+  record . assign_viewnode_ids_and_record_owners (&mut tree);
+  assert_eq! ( tree . root () . value () . viewnode_id, None, "the buffer root gets none" );
+  let viewnode_ids : Vec<ViewnodeId> = tree . root () . descendants () . skip (1)
+    . map ( |node| node . value () . viewnode_id . clone () . expect ("a viewnode ID") )
     . collect ();
-  assert_eq! ( vids [0], Vid ("0a" . to_string ()),
-               "the first vid not spelled like a number" );
-  assert! ( vids . windows (2) . all ( |pair| pair [0] . counter_value ()
+  assert_eq! ( viewnode_ids [0], ViewnodeId ("0a" . to_string ()),
+               "the first viewnode ID not spelled like a number" );
+  assert! ( viewnode_ids . windows (2) . all ( |pair| pair [0] . counter_value ()
                                               < pair [1] . counter_value () ),
-            "assigned in buffer order: {:?}", vids );
-  assert! ( vids . iter () . all ( |vid| vid . 0 . parse::<f64> () . is_err () ),
-            "{:?}", vids );
-  assert_eq! ( record . owner_by_view_id . len (), 1, "only the folder has an owner" );
-  assert_eq! ( record . owner_by_view_id . get (&vids [0]),
+            "assigned in buffer order: {:?}", viewnode_ids );
+  assert! ( viewnode_ids . iter () . all ( |viewnode_id| viewnode_id . 0 . parse::<f64> () . is_err () ),
+            "{:?}", viewnode_ids );
+  assert_eq! ( record . owner_by_viewnode_id . len (), 1, "only the folder has an owner" );
+  assert_eq! ( record . owner_by_viewnode_id . get (&viewnode_ids [0]),
                Some (&Owner::ContentReconciler) );
   { // Cut the folder and its last child; append a new viewnode.
     let last : NodeId = tree . get (folder) . unwrap () . last_child () . unwrap () . id ();
@@ -366,10 +366,10 @@ fn the_record_assigns_fresh_vids_and_forgets_what_left (
     tree . get_mut (folder) . unwrap () . detach ();
     tree . get_mut (root) . unwrap () . append ( viewnode_of (
       ViewnodeKind::DeadViewnode )); }
-  record . assign_view_ids_and_record_owners (&mut tree);
-  let newest : Vid = tree . root () . last_child () . unwrap () . value ()
-    . vid . clone () . unwrap ();
-  assert! ( newest . counter_value () > vids . last () . unwrap () . counter_value (),
-            "{:?} reuses no vid the buffer had", newest );
-  assert! ( record . owner_by_view_id . is_empty (),
-            "the table forgets the folder: {:?}", record . owner_by_view_id ); }
+  record . assign_viewnode_ids_and_record_owners (&mut tree);
+  let newest : ViewnodeId = tree . root () . last_child () . unwrap () . value ()
+    . viewnode_id . clone () . unwrap ();
+  assert! ( newest . counter_value () > viewnode_ids . last () . unwrap () . counter_value (),
+            "{:?} reuses no viewnode ID the buffer had", newest );
+  assert! ( record . owner_by_viewnode_id . is_empty (),
+            "the table forgets the folder: {:?}", record . owner_by_viewnode_id ); }

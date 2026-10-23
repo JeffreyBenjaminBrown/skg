@@ -49,7 +49,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
 use crate::to_org::extend::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
 use crate::to_org::util::EditableMap;
-use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewIdRecord};
+use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewnodeIdRecord};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::forest::ViewForest;
@@ -145,7 +145,7 @@ struct RenderedCollateralView {
   view_id        : ViewId,
   text           : String,
   viewforest     : ViewForest,
-  view_id_record : ViewIdRecord,
+  viewnode_id_record : ViewnodeIdRecord,
 }
 
 /// PURPOSE:
@@ -186,13 +186,13 @@ pub fn update_views_after_save (
     viewid_from_request_result . as_ref () . ok ()
     . and_then ( |view_id| views_state . open_views . diffView_buffer_kind_of_view (view_id) );
   let mut saved_view_mut : ViewForest = saved_view;
-  let mut saved_view_id_record : ViewIdRecord =
-    // The parsed buffer carries vids; the view's record says whose
+  let mut saved_viewnode_id_record : ViewnodeIdRecord =
+    // The parsed buffer carries viewnode IDs; the view's record says whose
     // each viewnode is, before any reconciler runs.
     viewid_from_request_result . as_ref () . ok ()
-    . map ( |view_id| views_state . open_views . view_id_record_of (view_id) )
+    . map ( |view_id| views_state . open_views . viewnode_id_record_of (view_id) )
     . unwrap_or_default ();
-  saved_view_id_record . set_owners_in_parsed_viewforest (&mut saved_view_mut);
+  saved_viewnode_id_record . set_owners_in_parsed_viewforest (&mut saved_view_mut);
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
   // submitted view is now consumed input. Clear all request carriers at this
@@ -235,7 +235,7 @@ pub fn update_views_after_save (
         "rerender_view (saved)" ). entered();
       rerender_view ( // saved view first; collateral ones later
         &mut saved_view_mut,
-        &mut saved_view_id_record,
+        &mut saved_viewnode_id_record,
         &mut context,
         Some (&mut repair_warnings),
         RerenderOptions::for_saved_view (saved_diffView_buffer_kind) ) } ?;
@@ -283,12 +283,12 @@ pub fn update_views_after_save (
   write_graph_straddle_back (views_state, context . graph_straddle . take ());
   if let Ok (view_id) = viewid_from_request_result {
     views_state . open_views . update_view (
-      &context . graph_snap, view_id, saved_view_mut, saved_view_id_record );
+      &context . graph_snap, view_id, saved_view_mut, saved_viewnode_id_record );
     for rendered in collateral_views {
       views_state . open_views . update_view (
         &context . graph_snap,
         &rendered . view_id, rendered . viewforest,
-        rendered . view_id_record );
+        rendered . viewnode_id_record );
       send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
@@ -367,8 +367,8 @@ fn rerender_collateral_view (
         return Err ( format! (
           "Collateral view {}: no viewforest found",
           view_id . repr_in_client () )); } };
-  let mut view_id_record : ViewIdRecord =
-    views_state . open_views . view_id_record_of (&view_id);
+  let mut viewnode_id_record : ViewnodeIdRecord =
+    views_state . open_views . viewnode_id_record_of (&view_id);
   if let Err (e) = rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
     &mut viewforest, &context . graph_snap )
   { return Err ( format! (
@@ -379,7 +379,7 @@ fn rerender_collateral_view (
         tracing::info_span!( "rerender_view (collateral)" ). entered();
       rerender_view (
         &mut viewforest,
-        &mut view_id_record,
+        &mut viewnode_id_record,
         context,
         None, // Collateral views repair silently.
         RerenderOptions::ordinary (
@@ -391,7 +391,7 @@ fn rerender_collateral_view (
     view_id,
     text,
     viewforest,
-    view_id_record,
+    viewnode_id_record,
   }) }
 
 /// Build a de-novo (initial) content view by running the single
@@ -534,7 +534,7 @@ impl RerenderOptions {
 /// in 'finish_diffView_rerender'.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
-  view_id_record : &mut ViewIdRecord, // the view's, which assigns the vids its new viewnodes get
+  viewnode_id_record : &mut ViewnodeIdRecord, // the view's, which assigns the viewnode IDs its new viewnodes get
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
   options       : RerenderOptions,
@@ -591,7 +591,7 @@ pub fn rerender_view (
         "finish_viewforest" ). entered();
       finish_viewforest (
         viewforest,
-        view_id_record,
+        viewnode_id_record,
         &context . runtime . graph,
         &context . runtime . config,
         context . skgrepo_restriction,
@@ -616,8 +616,8 @@ pub fn rerender_view (
 ///     holds its relationship ('diffView_before_graph'),
 ///   - computes graph- then viewnode stats,
 ///   - applies the skgrepo restriction,
-///   - gives a view id to each viewnode that lacks one, from
-///     'view_id_record', which it brings up to date with the forest's
+///   - gives a viewnode ID to each viewnode that lacks one, from
+///     'viewnode_id_record', which it brings up to date with the forest's
 ///     owners (the end-of-completion pass, after the prune and after
 ///     everything this tail adds), and renders to a buffer string.
 /// Step order is immaterial between the membership marks and graphnodestats:
@@ -625,7 +625,7 @@ pub fn rerender_view (
 /// never membership, so the final state is identical either way.
 pub fn finish_viewforest (
   viewforest         : &mut ViewForest,
-  view_id_record     : &mut ViewIdRecord,
+  viewnode_id_record : &mut ViewnodeIdRecord,
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
@@ -659,7 +659,7 @@ pub fn finish_viewforest (
     skgrepo_restriction );
   if let Some (restriction) = skgrepo_restriction {
     apply_skgrepo_set_to_viewforest ( viewforest, restriction ); }
-  view_id_record . assign_view_ids_and_record_owners (viewforest);
+  viewnode_id_record . assign_viewnode_ids_and_record_owners (viewforest);
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "viewforest_to_string" ). entered();
     viewforest_to_string ( viewforest, config ) } }

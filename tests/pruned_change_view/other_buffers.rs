@@ -10,7 +10,7 @@
 // The 'kinds' fixture, described in 'buffer.rs', has a relRepo-only
 // move (rr's containment of rm) and a text-only change (txt).
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, graph_straddle};
 use crate::pruned_change_view::common::{
   assert_lines_in_order, ids, open_buffer, saves_back_unchanged,
@@ -183,7 +183,7 @@ fn the_homeSkgrepoMove_heralds_are_only_in_the_skgrepo_changes_buffer (
 #[test]
 fn the_order_only_buffer_is_a_flat_list_with_markers (
 ) -> Result<(), Box<dyn Error>> {
-  let text : String = without_vids ( &buffer (DiffViewBufferKind::OrderOnlyChanges) ? );
+  let text : String = without_viewnode_ids ( &buffer (DiffViewBufferKind::OrderOnlyChanges) ? );
   let lines : Vec<&str> = text . lines () . collect ();
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   assert! ( lines [0] . starts_with ("* (skg bodyFolded (node (id ord)"),

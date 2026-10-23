@@ -5,11 +5,11 @@
 /// after validation, converted to placed types.
 
 pub use super::viewnode::MpUnrestrictedVognode;
-use super::errors::{HeadlineName, view_id_suffix};
+use super::errors::{HeadlineName, viewnode_id_suffix};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Owner, ReadinessRequest, Vid, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, Membership, };
+use super::viewnode::{ ChangeFacts, Owner, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, Membership, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -29,7 +29,7 @@ pub struct MpViewnode {
   pub kind              : MpViewnodeKind,
   pub change_facts      : ChangeFacts,
   pub readiness_request : Option<ReadinessRequest>,
-  pub vid               : Option<Vid>,
+  pub viewnode_id       : Option<ViewnodeId>,
 }
 
 // MpUnrestrictedVognode is defined in viewnode.rs.
@@ -118,9 +118,9 @@ impl TryFrom<MpViewnode> for Viewnode {
   type Error = String;
 
   fn try_from(u: MpViewnode) -> Result<Self, Self::Error> {
-    let kind : ViewnodeKind = // a refusal names the headline's view id, if any
+    let kind : ViewnodeKind = // a refusal names the headline's viewnode ID, if any
       ViewnodeKind::try_from (u . kind) . map_err (
-        |e| format! ( "{}{}", e, view_id_suffix ( u . vid . as_ref () ))) ?;
+        |e| format! ( "{}{}", e, viewnode_id_suffix ( u . viewnode_id . as_ref () ))) ?;
     Ok(Viewnode {
       focused           : u . focused,
       org_folded        : u . org_folded,
@@ -128,8 +128,8 @@ impl TryFrom<MpViewnode> for Viewnode {
       kind,
       change_facts      : u . change_facts,
       readiness_request : u . readiness_request,
-      vid               : u . vid,
-      owner             : Owner::User, // looked up by vid after the parse
+      viewnode_id       : u . viewnode_id,
+      owner             : Owner::User, // looked up by viewnode ID after the parse
     })
   }
 }
@@ -189,7 +189,7 @@ impl From<Viewnode> for MpViewnode {
       kind              : MpViewnodeKind::from(o . kind),
       change_facts      : o . change_facts,
       readiness_request : o . readiness_request,
-      vid               : o . vid,
+      viewnode_id       : o . viewnode_id,
     }
   }
 }
@@ -281,7 +281,7 @@ impl Default for MpViewnode {
         MpVognode::Unrestricted (MpUnrestrictedVognode::default())),
       change_facts      : ChangeFacts::default (),
       readiness_request : None,
-      vid               : None,
+      viewnode_id       : None,
     }
   }
 }
@@ -308,9 +308,9 @@ impl MpViewnode {
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         "", }}
 
-  /// What a message calls this headline: its view id, else its title.
+  /// What a message calls this headline: its viewnode ID, else its title.
   pub fn headline_name (&self) -> HeadlineName {
-    HeadlineName::of ( self . vid . as_ref (), self . title () ) }
+    HeadlineName::of ( self . viewnode_id . as_ref (), self . title () ) }
 
   /// A distinguishable label for error messages.
   pub fn error_label (&self) -> String {

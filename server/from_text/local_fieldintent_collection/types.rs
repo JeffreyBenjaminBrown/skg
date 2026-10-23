@@ -183,7 +183,7 @@ impl CollectedFieldIntents {
   ///   when duplicate occurrences of an ID emit them separately;
   /// - 'visibility' and 'text_claims' coexist with anything,
   ///   including 'delete' (resolution ignores deleted subscribers).
-  /// An error lists the view ids of the occurrences that emitted
+  /// An error lists the viewnode IDs of the occurrences that emitted
   /// exclusive fieldIntents for the ID, 'emitter' (the occurrence
   /// emitting this one) among them.
   #[allow(non_snake_case)]

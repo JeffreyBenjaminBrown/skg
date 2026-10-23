@@ -110,7 +110,7 @@ print('Stripped buffer-content: ' .. stripped_buffer_content)
 print('Expected buffer-content without metadata: '
       .. expected_without_metadata)
 
-T.check(T.without_vids(buffer_content) == expected,
+T.check(T.without_viewnode_ids(buffer_content) == expected,
         'buffer-content matches expected (with metadata)')
 T.check(stripped_buffer_content == expected_without_metadata,
         'stripped buffer-content matches expected structure; '

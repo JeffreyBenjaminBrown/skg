@@ -213,20 +213,20 @@ pub fn viewnode_to_string (
 ) -> Result < String, Box<dyn Error> > {
   viewnode_to_string_with_folder_facts (viewnode, None, config) }
 
-/// The parts of a viewnode's '(skg ...)' wrapper, its view id
+/// The parts of a viewnode's '(skg ...)' wrapper, its viewnode ID
 /// last.
 fn viewnode_to_string_with_folder_facts (
   viewnode     : &Viewnode,
   folder_facts : Option<FolderChangeFacts>,
   config       : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
-  let parts_but_the_vid : String =
-    viewnode_to_string_without_vid (viewnode, folder_facts, config) ?;
-  Ok ( match &viewnode . vid {
-    None      => parts_but_the_vid,
-    Some (vid) => format! ("{} (vid {})", parts_but_the_vid, vid), } ) }
+  let parts_but_the_viewnode_id : String =
+    viewnode_to_string_without_viewnode_id (viewnode, folder_facts, config) ?;
+  Ok ( match &viewnode . viewnode_id {
+    None      => parts_but_the_viewnode_id,
+    Some (viewnode_id) => format! ("{} (vnid {})", parts_but_the_viewnode_id, viewnode_id), } ) }
 
-fn viewnode_to_string_without_vid (
+fn viewnode_to_string_without_viewnode_id (
   viewnode     : &Viewnode,
   folder_facts : Option<FolderChangeFacts>,
   config       : &SkgConfig,

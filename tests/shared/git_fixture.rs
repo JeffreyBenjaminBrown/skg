@@ -8,7 +8,7 @@ use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fix
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::metadata_canon::{vid_atom_of, with_vid_atom, without_vids};
+use skg::metadata_canon::{viewnode_id_atom_of, with_viewnode_id_atom, without_viewnode_ids};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
@@ -139,7 +139,7 @@ pub fn save_cleanly (
   Ok (response) }
 
 /// 'buffer' with its one line starting 'prefix' replaced by
-/// 'replace (line)'. Both see the line without its view id, which
+/// 'replace (line)'. Both see the line without its viewnode ID, which
 /// the replacement keeps.
 pub fn edit_line (
   buffer  : &str,
@@ -147,17 +147,17 @@ pub fn edit_line (
   replace : impl Fn (&str) -> String,
 ) -> String {
   let matching : usize = buffer . lines ()
-    . filter ( |line| without_vids (line) . starts_with (prefix) ) . count ();
+    . filter ( |line| without_viewnode_ids (line) . starts_with (prefix) ) . count ();
   assert_eq! ( matching, 1,
                "exactly one line should start {:?}:\n{}", prefix, buffer );
   buffer . lines ()
     . map ( |line| {
-      let line_without_vid : String = without_vids (line);
-      if ! line_without_vid . starts_with (prefix) {
+      let line_without_viewnode_id : String = without_viewnode_ids (line);
+      if ! line_without_viewnode_id . starts_with (prefix) {
         return line . to_string (); }
-      let replaced : String = replace (&line_without_vid);
-      match vid_atom_of (line) {
-        Some (vid_atom) => with_vid_atom (&replaced, vid_atom),
+      let replaced : String = replace (&line_without_viewnode_id);
+      match viewnode_id_atom_of (line) {
+        Some (viewnode_id_atom) => with_viewnode_id_atom (&replaced, viewnode_id_atom),
         None => replaced, } } )
     . collect::<Vec<String>> () . join ("\n") + "\n" }
 

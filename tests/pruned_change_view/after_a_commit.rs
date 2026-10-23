@@ -18,7 +18,7 @@ use crate::pruned_change_view::common::{
   saved_and_rerendered, send_stage_and_commit_request, with_fixture};
 use crate::git_fixture::{Fixture, save_cleanly};
 
-use skg::metadata_canon::without_vids;
+use skg::metadata_canon::without_viewnode_ids;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 
@@ -41,20 +41,20 @@ fn committed (
   assert! ( response . contains ("(commits ((main "), "{}", response );
   Ok ( rerendered_view_content (&response) ) }
 
-/// The view id on 'line', a headline.
-fn vid_on (
+/// The viewnode ID on 'line', a headline.
+fn viewnode_id_on (
   line : &str,
 ) -> &str {
-  let start : usize = line . find ("(vid ") . expect ("a headline has a view id") + 5;
+  let start : usize = line . find ("(vnid ") . expect ("a headline has a viewnode ID") + "(vnid " . len ();
   line [start ..] . split (')') . next () . unwrap () }
 
-/// The one line of 'buffer' that starts, view id aside, with 'prefix'.
+/// The one line of 'buffer' that starts, viewnode ID aside, with 'prefix'.
 fn line_starting<'a> (
   buffer : &'a str,
   prefix : &str,
 ) -> &'a str {
   let matching : Vec<&str> = buffer . lines ()
-    . filter ( |line| without_vids (line) . starts_with (prefix) ) . collect ();
+    . filter ( |line| without_viewnode_ids (line) . starts_with (prefix) ) . collect ();
   assert_eq! ( matching . len (), 1, "one line starts {:?} in\n{}", prefix, buffer );
   matching [0] }
 
@@ -77,7 +77,7 @@ fn a_commit_converts_what_the_diff_view_showed (
     let committed : String = committed (f) ?;
     let x_under_e : &str = line_starting (&committed, PARKED_X_UNDER_E);
     assert! ( ! x_under_e . contains ("(diff"), "{}", committed );
-    assert_eq! ( vid_on (x_under_e), vid_on (x_under_e_before),
+    assert_eq! ( viewnode_id_on (x_under_e), viewnode_id_on (x_under_e_before),
                  "the removed member is kept, not made again:\n{}", committed );
     assert_lines_in_order (&committed, &[
       "* (skg (node (id e) (repo main))) e\n",
@@ -133,7 +133,7 @@ fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
     let committed : String = committed (f) ?;
     let x_after : &str = line_starting (&committed, REMOVED_X_UNDER_B);
     assert! ( ! x_after . contains ("(diff"), "{}", committed );
-    assert_eq! ( vid_on (x_after), vid_on (x_before), "{}", committed );
+    assert_eq! ( viewnode_id_on (x_after), viewnode_id_on (x_before), "{}", committed );
     assert! ( parent_line_of (&committed, "a note under x") . starts_with (REMOVED_X_UNDER_B),
               "{}", committed );
     assert_lines_in_order (&committed, &[

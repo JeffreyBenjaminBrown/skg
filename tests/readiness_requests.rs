@@ -93,13 +93,13 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
       let response : SaveResponse = save (f, "\
 * (skg (node (id r) (repo main))) r, retitled
 ** (skg (node (id a) (repo main))) a
-** (skg (node (id b) (repo main) (diff (readyRequest rel))) (vid 0z)) b
+** (skg (node (id b) (repo main) (diff (readyRequest rel))) (vnid 0z)) b
 ") ?;
       assert_eq! ( marked_keys (f),
                    [ a_alias () ] . into_iter () . collect () );
       assert! ( response . warnings . iter ()
                 . any ( |w| w . contains (
-                  "The readiness request on \"b\" (view id 0z) names no current change" )),
-                "the warning names the headline's view id: {:?}",
+                  "The readiness request on \"b\" (viewnode ID 0z) names no current change" )),
+                "the warning names the headline's viewnode ID: {:?}",
                 response . warnings ); }
     Ok (( )) }) }

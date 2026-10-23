@@ -389,7 +389,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      vac ("vid"), // the view id ends every wrapper
+      vac ("vnid"), // the viewnode ID ends every wrapper
       leaf (PropertyFolder::Alias . repr_in_client (), "aliases"),
       leaf ("alias", "alias"), // Property::Alias
       leaf ("removedAlias", "alias"), // Property::RemovedAlias
@@ -691,8 +691,8 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   let mut atoms : Vec<&'static str> = vec! [
     // Bare buffer-position atoms, from org_to_text.rs:
     "focused", "folded", "bodyFolded",
-    // The view id that ends every wrapper; its value is value position.
-    "vid",
+    // The viewnode ID that ends every wrapper; its value is value position.
+    "vnid",
     // Form heads, from org_to_text.rs:
     "node", "deleted", "unknown", "restrictedNode",
     "deadViewnode", "historical",
