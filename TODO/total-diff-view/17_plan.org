@@ -987,7 +987,7 @@ the suites 'bash/nextest.sh', 'bash/emacs-tests.sh',
 One slice per headline, in order; each ends with its tests. The
 runner ('bash/run-plan-slices.sh') looks for DONE on these
 headlines.
-** TODO Slice 0: small housekeeping
+** DONE Slice 0: small housekeeping
 The items of "Small housekeeping (slice 0)". Run the Rust, Emacs
 and Neovim suites; run the integration suite (a prompt's text
 changes).

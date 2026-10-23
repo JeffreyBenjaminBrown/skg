@@ -10,7 +10,7 @@
 -- the title group whatever it holds).
 --
 -- DEVIATION: the elisp advised org-insert-heading-respect-content so
--- a fresh level-1 headline prompted for a skgrepo. vim users type
+-- a fresh headline that cannot inherit a skgrepo prompted for one. vim users type
 -- headlines rather than calling an insert-heading command, so there
 -- is no equivalent seam; the quick path is <localleader>ss on the new
 -- headline (which populates minimal metadata), or <localleader>vm for

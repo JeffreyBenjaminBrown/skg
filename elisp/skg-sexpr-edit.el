@@ -232,16 +232,51 @@ ones the user never populates -- key and all."
 ;;
 
 (defun skg-sexp-edit--after-insert-headline (&rest _)
-  "After `org-insert-heading-respect-content', give new roots a repo.
-Only acts in skg-content-view-mode buffers when a level-1 headline was
-created.  Routes through `skg-set-repo', which on a metadata-less
-headline prompts for an owned repo and writes minimal node metadata
--- the quick path, no edit buffer.  (The full metadata view is reserved
-for an explicit `skg-view-metadata'/C-c v m.)"
+  "After `org-insert-heading-respect-content', give the new headline a
+repo if it cannot inherit one.
+Only acts in skg-content-view-mode buffers, and only when
+`skg--headline-can-inherit-skgrepo-p' says no.  Routes through
+`skg-set-repo', which on a metadata-less headline prompts for an owned
+repo and writes minimal node metadata -- the quick path, no edit
+buffer.  (The full metadata view is reserved for an explicit
+`skg-view-metadata'/C-c v m.)"
   (when (and (derived-mode-p 'skg-content-view-mode)
              (org-at-heading-p)
-             (= (org-outline-level) 1))
+             (not (skg--headline-can-inherit-skgrepo-p)))
     (skg-set-repo)))
+
+(defun skg--headline-can-inherit-skgrepo-p ()
+  "Whether the save can give the headline at point a skgrepo by
+inheritance, as the server's walk rootward decides
+('skgrepo_of_nearest_unrestricted_ancestor'): it passes through
+phantoms and folders, and through headlines without metadata, which
+inherit the same way; the first other ancestor must be an
+unrestricted vognode.  A root cannot inherit, nor can a headline whose
+walk ends at a restricted vognode, a dead viewnode or a property."
+  (save-excursion
+    (catch 'answer
+      (while (org-up-heading-safe)
+        (let (( kind (skg--headline-kind-at-point) ))
+          (cond ((eq kind 'node) (throw 'answer t))
+                ((or (null kind)
+                     (memq kind '(deleted unknown historical))
+                     (string-suffix-p "Folder" (symbol-name kind))))
+                (t (throw 'answer nil)))))
+      nil)))
+
+(defun skg--headline-kind-at-point ()
+  "The kind of the headline at point, as the symbol that heads its
+metadata after the markers 'focused' and 'folded' (node, deleted,
+restrictedNode, aliasFolder, alias ...), or nil for a headline without
+metadata."
+  (let* (( split (skg-split-as-stars-metadata-title
+                  (skg-get-current-headline-text)) )
+         ( metadata-str (and split (cadr split)) ))
+    (when (and metadata-str (not (string-empty-p metadata-str)))
+      (let (( kind (seq-find (lambda (form)
+                               (not (memq form '(focused folded))))
+                             (cdr (read metadata-str))) ))
+        (if (consp kind) (car kind) kind)))))
 
 (advice-add 'org-insert-heading-respect-content :after
             #'skg-sexp-edit--after-insert-headline)

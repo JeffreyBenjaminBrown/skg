@@ -814,8 +814,11 @@ order of a list, each with its content in the new order.
 Opens a blank Skg content view in which to create new nodes.
 **** why
 Creating a headline through Skg's commands prompts for any skgrepo it
-cannot inherit.  Save validation also catches a root whose skgrepo was
-omitted when the headline was entered as plain text.
+cannot inherit: a headline inherits one from the nearest node above it,
+passing through folders and phantoms, so a root, or a headline below a
+restricted vognode, a dead viewnode or a property, prompts.  Save
+validation also catches a node whose skgrepo was omitted when the
+headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode
 This command toggles it.
 This toggles whether, at the start of every node,

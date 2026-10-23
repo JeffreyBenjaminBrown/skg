@@ -689,13 +689,15 @@ ancestor (a, the viewparent; b, the grandparent; ...) moved the same
 way. The order-only buffer lists the nodes whose only change is the
 order of a list, each with its content in the new order.
 *** <localleader>ve : :SkgViewNewEmpty
-Asks you to pick a skgrepo,
-and then provides a root node with that skgrepo.
+Opens a blank Skg content view in which to create new nodes.
 **** why
 Every node needs a skgrepo.
-Children can inherit from their parents,
-but to make a root (which has no parents)
-you need to choose its skgrepo explicitly.
+A headline inherits one from the nearest node above it,
+passing through folders and phantoms;
+a root, or a headline below a restricted vognode, a dead viewnode
+or a property, needs its skgrepo chosen explicitly
+('<localleader>ss' on the new headline prompts for one).
+Save validation catches a node whose skgrepo is missing.
 *** <localleader>vh : :SkgHeraldsToggle
 This command toggles it.
 This toggles whether, at the start of every node,

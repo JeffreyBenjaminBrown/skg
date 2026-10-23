@@ -1,7 +1,8 @@
 ;;; test-skg-insert-heading-repo-prompt.el --- Test C-return skgrepo prompt
 ;;;
-;;; When org-insert-heading-respect-content is called on a root headline
-;;; in a content-view buffer, and the new headline has no metadata,
+;;; When org-insert-heading-respect-content creates a headline that
+;;; cannot inherit a skgrepo (a root, for instance) in a content-view
+;;; buffer, and the new headline has no metadata,
 ;;; skg-view-metadata should prompt for a skgrepo in the minibuffer
 ;;; (not open the sexp-edit buffer) and insert the chosen skgrepo
 ;;; as metadata on the new headline.
@@ -142,6 +143,38 @@ without prompting."
          (should (string-match-p
                   "^\\* (skg (node (repo only))) $"
                   content)))))))
+
+;; Test 2b: The prompt follows the server's inheritance walk.
+
+(ert-deftest test-insert-heading-prompts-only-when-it-cannot-inherit ()
+  "C-return prompts for a repo exactly when the new headline cannot
+inherit one: not below a folder whose viewparent is a node, but below a
+restricted vognode or a dead viewnode."
+  (dolist (case '(("* (skg (node (id x) (repo public))) x\n** (skg subscribeeFolder)\n*** (skg (node (id y) (repo public))) y\n"
+                   nil)
+                  ("* (skg (node (id x) (repo public))) x\n** (skg (deleted (id d) (repo public))) d\n*** (skg (node (id y) (repo public))) y\n"
+                   nil)
+                  ("* (skg (node (id x) (repo public))) x\n** (skg restrictedNode)\n*** (skg (node (id y) (repo public))) y\n"
+                   t)
+                  ("* (skg (node (id x) (repo public))) x\n** (skg deadViewnode)\n*** (skg (node (id y) (repo public))) y\n"
+                   t)))
+    (test--with-skg-content-view
+     (car case)
+     test--config-public-and-private
+     (lambda ()
+       (re-search-forward "^\\*\\*\\* " nil t)
+       (beginning-of-line)
+       (let ((prompted nil))
+         (cl-letf (((symbol-function 'completing-read)
+                    (lambda (&rest _) (setq prompted t) "private")))
+           (org-insert-heading-respect-content))
+         (should (eq prompted (cadr case)))
+         (should (eq (and (string-match-p
+                           "^\\*\\*\\* (skg (node (repo private))) $"
+                           (buffer-substring-no-properties
+                            (point-min) (point-max)))
+                          t)
+                     (cadr case))))))))
 
 ;; Test 3: The cycling closure works correctly.
 

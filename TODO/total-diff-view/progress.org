@@ -3011,3 +3011,65 @@ remaining hit is in a kept category below.
 nextest 867 passed; Emacs 381; Neovim all specs passed. Integration:
 every test passed but 'import-md-and-org', which fails at baseline too
 (this slice's baseline run showed the same).
+* View ids and the one rule
+** Slice 0: deviations
+*** no tag in 'content.rs'
+"Decided 2026-06-12" appeared only in 'server/types/errors.rs' and
+'tests/partner_folder_warnings.rs'; 'reconcile/content.rs' had none.
+*** 'fork.rs' had the same local stream helper
+'tests/fork.rs' kept its own 'mk_test_tcp_stream' too, in a target
+that already declares the shared helpers, so it binds the shared pair
+as 'hidden_from_subscriptions.rs' now does. The 'save_buffer' helper
+of 'tests/partner_folder_warnings.rs' still builds its stream inline;
+it is left.
+*** the facts helper
+'with_facts' sits in 'tests/shared/git_fixture_helpers.rs', the
+module the test targets already declare, and takes a 'Viewnode';
+the round-trip file wraps its kinds in 'viewnode_of'. The two files'
+'assert_round_trip' helpers differ by one assertion (the warning)
+and are left. 'tests/grouped_saves.rs' now declares the shared module
+too, for the ID folder test below.
+*** the reflowed literals
+Five 'viewnode_of' lines the script had left past the margin:
+'server/serve/handlers/text_search.rs' (the alias append),
+'tests/graph_straddle_engines.rs', 'tests/render_util.rs' and two in
+'tests/unit/save_leveling.rs'. Two long 'use' lines that the script
+extended were long before it, and stay.
+*** the viewparent renames
+Besides the two parameters, 'raw_outbound_members''s parameter, the
+local pair in 'reconcile_partnerFolder_children' (now
+'viewparent_pid' and 'viewparent_skgrepo') and the local in
+'to_org/complete/partner_folder/mod.rs' hold the viewparent and took
+its name. 'push_repair_warnings''s 'recorder', the field of
+'CompletionWarning::FolderRepair' it fills, and the graph-level
+'relation_membership_is_visible' keep theirs.
+*** an ID folder holding a non-member
+'remove_id_folders' still detaches a folder that holds only its
+entries; one holding anything else is deadened with
+'deaden_generalized_orphan_folder', so a non-member survives under a
+dead viewnode and the end-of-completion prune removes the entries.
+Test: 'tests/save/id_folder_outside_diff_view.rs'; confirmed over TCP
+on a scratch instance, and the rerendered buffer saves unchanged.
+*** the budget check found the refusal
+'budget_spent_on_a_node_with_members'
+('tests/editable_view_cascade_and_budget.rs') saved a fully editable
+view of 1 with a budget of 2; the next save was refused with
+'MemberChildOfWriteProtectedOccurrence' for 12, 121 and 122. So the
+budget-spent path now calls 'make_member_children_nonMembers' after
+'write_protect ()', and the test asserts the non-members and that the
+rerendered buffer saves. The deferred path of
+'apply_editability_rule' has the same shape; the plan names only the
+budget path, so it is unchanged and untested.
+*** the repo prompt
+Emacs prompted only when the inserted headline was at level 1. It now
+asks 'skg--headline-can-inherit-skgrepo-p', which walks rootward as
+the server does: through phantoms, folders (every folder's wire name
+ends in "Folder") and headlines without metadata, answering yes at a
+node and no at the top or at anything else. Neovim has no automatic
+prompt (a documented deviation, now worded by inheritance); its
+'COMMANDS-nvim.org' entry for '<localleader>ve' still described a
+repo prompt the command no longer makes, and now says what it does.
+*** verification
+nextest 869 passed; Emacs 382; Neovim 359 specs in 31 files, none
+failed. Integration: every test passed but 'import-md-and-org', which
+fails at baseline.
