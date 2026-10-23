@@ -7,7 +7,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::extend::editable::{ apply_editability_rule, apply_writeProtect_request, EditabilityOutcome};
-use crate::to_org::util::EditableMap;
+use crate::to_org::util::{EditableMap, make_member_children_nonMembers};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
@@ -425,11 +425,13 @@ fn update_normal_node (
          . unwrap_or (false) {
     // Budget spent and this is not a view root: leave it write-protected and extend
     // nothing under it; strip any EVR so it is not treated as Final. The content
-    // engine (settled) then clobbers+returns.
+    // engine (settled) then clobbers+returns. A write-protected occurrence holds
+    // no member, so the children it already shows become non-members.
     write_at_unrestrictedVognode_in_tree (
       tree, treeid,
       |t| { t . write_protect (); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
+    make_member_children_nonMembers ( tree, treeid ) ?;
     settled = true;
   } else if had_editableViewRequest {
     match apply_editability_rule (

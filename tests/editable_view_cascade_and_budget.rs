@@ -151,6 +151,14 @@ fn budget_aliasfolder_is_neutral (
     "/tmp/tantivy-test-evcb-budget-aliasfolder-is-neutral",
     |config, tantivy| Box::pin ( test_budget_aliasfolder_is_neutral (config, tantivy) )) }
 
+#[test]
+fn budget_spent_on_a_node_with_members (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-budget-spent-on-a-node-with-members", FIXTURES,
+    "/tmp/tantivy-test-evcb-budget-spent-on-a-node-with-members",
+    |config, tantivy| Box::pin ( test_budget_spent_on_a_node_with_members (config, tantivy) )) }
+
 // ===================================================
 // Test: Editable view with an ample budget -> everything extends.
 // §5.5 budget counts vognode extensions (cost 1 each); the full subtree here is
@@ -1143,4 +1151,50 @@ async fn test_parked_content_node_is_shown_once (
       assert! ( thirteens . len () == 1
                 && ! thirteens [0] . contains ("affectsParent"),
                 "13 is shown once, as 1's member:\n{}", collateral );
+      Ok (( )) }
+
+// ===================================================
+// Test: the budget runs out at a node that shows members
+// ===================================================
+// A view of 1, opened with an ample budget, shows everything
+// editable, 12 with its members 121..124. Saved with a budget of 2,
+// the extensions of 1 and 11 spend it, so the rerender leaves 12
+// write-protected. A write-protected occurrence holds no member, so
+// 121..124 become non-members, keeping their own editability, and a
+// further save of the rerendered buffer is not refused.
+async fn test_budget_spent_on_a_node_with_members (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let (view_id, opened) : (ViewId, String) = {
+        let mut config : SkgConfig = config . clone ();
+        config . initial_node_limit = 100;
+        open_content_view (
+          &config, tantivy, &graph, &mut views_state, &["1"] ) ? };
+      assert! ( ! opened . contains ("writeProtected"),
+                "an ample budget leaves everything editable:\n{}", opened );
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 2;
+      let saved : String = save_view (
+        &opened, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+      println! ("Result of a save that spends the budget at 12:\n{}", saved);
+      let twelve : Vec<&str> = lines_starting (&saved, "** (skg (node (id 12) ");
+      assert! ( twelve . len () == 1 && twelve [0] . contains ("writeProtected"),
+                "the budget runs out at 12:\n{}", saved );
+      let members_of_twelve : Vec<&str> =
+        subtree_headlines (&saved, "** (skg (node (id 12) ")
+        . into_iter ()
+        . filter ( |line| line . starts_with ("*** ") )
+        . collect ();
+      assert_eq! ( members_of_twelve . len (), 4, "{}", saved );
+      assert! ( members_of_twelve . iter () . all ( |line|
+                  line . contains ("(affectsParent false)") ),
+                "121..124 must be non-members under write-protected 12:\n{}", saved );
+      save_view (
+        &saved, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
       Ok (( )) }
