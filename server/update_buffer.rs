@@ -52,15 +52,15 @@ use crate::to_org::util::EditableMap;
 use crate::types::views_state::{DiffViewBufferKind, ViewId};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
-use crate::types::tree::generic::do_everywhere_in_tree_dfs_prunable;
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships_in_straddle, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
-use crate::types::viewnode::{Vognode, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{Property, Vognode, PropertyFolder, ViewRequest};
+use crate::update_buffer::ancestry::deaden_generalized_orphan_folder;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
@@ -698,20 +698,33 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
 /// Remove every ID folder. A view holds one only in the diff
 /// view, whose step at its node's visit
 /// ('process_unrestrictedVognode_changes') reconciles it instead.
+/// The parser lets a non-member sit under an ID folder; a folder
+/// holding anything but its entries is deadened instead, as an
+/// orphaned folder is ('deaden_generalized_orphan_folder'), so what
+/// it holds survives, and the prune that ends the completion removes
+/// its entries.
 fn remove_id_folders (
   viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
-  let viewforest_root_skgid : NodeId =
-    viewforest . internal_root_skgid ();
-  do_everywhere_in_tree_dfs_prunable (
-    viewforest,
-    viewforest_root_skgid,
-    &mut |mut node : NodeMut<Viewnode>| -> Result<bool, String> {
-      if matches! ( &node . value() . kind,
-                    ViewnodeKind::PropertyFolder (PropertyFolder::ID) ) {
-        node . detach();
-        Ok (false) // pruned — don't recurse into detached children
-      } else { Ok (true) } } ) ?;
+  let id_folders : Vec<NodeId> =
+    viewforest . root () . descendants ()
+    . filter ( |node| matches! ( &node . value () . kind,
+                                 ViewnodeKind::PropertyFolder (PropertyFolder::ID) ))
+    . map ( |node| node . id () )
+    . collect ();
+  for folder in id_folders {
+    let holds_only_its_entries : bool =
+      viewforest . get (folder)
+      . ok_or ("remove_id_folders: folder not found") ?
+      . children ()
+      . all ( |child| matches! ( &child . value () . kind,
+                                 ViewnodeKind::Property (Property::ID { .. }) ));
+    if holds_only_its_entries {
+      viewforest . get_mut (folder)
+        . ok_or ("remove_id_folders: folder not found") ?
+        . detach ();
+    } else {
+      deaden_generalized_orphan_folder (viewforest, folder) ?; }}
   Ok (( )) }
 
 /// Fulfill a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-root: attach that

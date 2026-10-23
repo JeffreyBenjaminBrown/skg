@@ -14,3 +14,6 @@ mod validate;
 
 #[path = "save/extra_id_revocation.rs"]
 mod extra_id_revocation;
+
+#[path = "save/id_folder_outside_diff_view.rs"]
+mod id_folder_outside_diff_view;
