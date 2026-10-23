@@ -82,9 +82,10 @@ pub fn reconcile_aliasFolder_children (
     &goal_list,
     create_alias )?;
   treat_certain_children(
-      // Currently unreachable: validation rejects unrestricted vognode
-      // children of AliasFolder. If that is later relaxed, only Unrestricted
-      // Vognodes need repair; affectsParent is a vestigial field in Phantoms.
+      // Validation accepts an unrestricted vognode child of an AliasFolder
+      // only as a non-member, so this changes nothing today; it would make a
+      // member child a non-member. Only UnrestrictedVognodes need it;
+      // affectsParent is a vestigial field in Phantoms.
       tree, aliasfolder_treeid,
       |vn : &Viewnode| matches!( &vn . kind,
                                   ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),

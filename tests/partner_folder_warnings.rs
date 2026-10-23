@@ -163,7 +163,7 @@ async fn failed_save_carries_warnings_with_errors (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Decided 2026-06-12 (option b): a failed save's response carries
+  // A failed save's response carries
   // its warnings alongside its errors. The buffer below produces both
   // a parse-time warning (leftover text on a subscriberFolder headline)
   // and a validation error (an idFolder claiming an id node n lacks).

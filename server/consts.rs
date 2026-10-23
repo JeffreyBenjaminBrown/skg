@@ -28,7 +28,7 @@ pub const BUSYSIGNAL_READ_TIMEOUT_MS : u64 = 500;
 pub const BUSYSIGNAL_POLL_INTERVAL_MS : u64 = 100;
 
 /// Context-based search score multipliers by origin type.
-/// READONING:
+/// REASONING:
 /// These are in approximate logarithmic order.
 /// (3.2 is approximately the square root of 10.)
 pub const MULTIPLIER_ROOT             : f32 = 100.0;

@@ -71,7 +71,7 @@ pub fn import_org_roam_directory (
       node . home_skgrepo = skgrepo . clone();
       { // Re-tag the parse-time placeholder skgrepos with the real
         // skgrepo, so the skgrepos are honest even before the FS
-        // boundary drops them (see RelPartner's interim note).
+        // boundary drops them.
         for m in node . contains . iter_mut () {
           m . relRepo = skgrepo . clone (); }
         node . aliases = rel_partners_at_relRepo_msv (

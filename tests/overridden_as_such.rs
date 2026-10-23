@@ -170,7 +170,7 @@ async fn overridden_as_such_extension_is_raw_and_unhidden (
                   *c == "overriddenFolder"
                   && l . contains ("(id G)")
                   && ! l . contains ("overridesHere") ),
-        "the bypass: G is shown RAW (not as X) below an \
+        "the bypass: G is shown raw (not as X) below an \
          overridden-as-such:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "overriddenFolder"

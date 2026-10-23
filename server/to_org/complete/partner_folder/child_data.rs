@@ -13,7 +13,9 @@
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A managed child is one this reconciliation pass is allowed to
-///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true.
+///   manage: for PartnerFolders, an UnrestrictedVognode marked affectsParent=true,
+///   a removed member, or an unknown or historical phantom (the children
+///   'skgid_a_folder_child_stands_for' gives an ID).
 ///   Managed children whose IDs are not in the goal list are removed
 ///   or otherwise made non-members by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/repo metadata

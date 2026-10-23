@@ -285,7 +285,7 @@ pub fn refuse_delete_with_restricted_sections (
           pid )); }} }
   Ok (( )) }
 
-/// THE STICKY-ELSE-DEFAULT RULE ('docs/telescopes.org', "Where new
+/// The sticky-else-default rule ('docs/telescopes.org', "Where new
 /// relationships land: the sticky-else-default rule"), with its
 /// explicit third path. The lowering stages tag every relationship with the
 /// node's own skgrepo (a placeholder); this pass resolves the real

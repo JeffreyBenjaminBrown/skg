@@ -220,7 +220,7 @@ pub fn export_to_org (
         &mut report . broken_links, &mut report . warnings );
     let rel : String = format! ("{}.org", root . target);
     let path : std::path::PathBuf = output_base . join (&rel);
-    // Best-effort and non-destructive (Q6): a single bad target or
+    // Best-effort and non-destructive: a single bad target or
     // I/O error becomes a warning, not an abort, so one misconfigured
     // root cannot take down every other export.
     match write_export_file (&path, &content) {
@@ -392,7 +392,7 @@ fn title_links_to (
 
 /// Tolerant parse of a marker body. Accepts `target_filepath = X`
 /// where X is bare or quoted. A bare value with whitespace is
-/// refused (Q3). Absolute paths and `.`/`..` components are refused
+/// refused. Absolute paths and `.`/`..` components are refused
 /// (so a target cannot escape the export directory). Returns the
 /// relative path without extension, or None if no target_filepath
 /// line is present.

@@ -41,8 +41,8 @@ pub type RecorderwardRelmap = im::HashMap<ID, im::HashSet<ID>>;
 
 /// The in-Rust-graph projection of the graph.
 ///
-/// Values are 'GraphnodeInRust' — everything a 'Graphnode' has except
-/// 'flags', plus 'linksTo' parsed from body text.
+/// Values are 'GraphnodeInRust' — everything a 'Graphnode' has, plus
+/// 'linksTo' parsed from the title and body.
 ///
 /// One recorderward relmap per relation, plus 'extra_id_to_pid'. Together
 /// they are the graph indexes.

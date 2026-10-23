@@ -185,7 +185,7 @@ the labels skg, node, writeProtected become (skg (node writeProtected))."
 (defun skg-view-metadata--open-empty-node-view (title)
   "Populate minimal metadata on the metadata-less headline at point,
 then open its metadata view.  TITLE is the headline's existing title.
-The view pre-fills the chosen repo (Q2: saving needs a repo, so the
+The view pre-fills the chosen repo (saving needs a repo, so the
 user confronts that choice immediately) and leaves every other editable
 field childless, so an untouched save yields just (skg (node (repo X)))."
   (skg--populate-minimal-node-metadata)

@@ -228,7 +228,7 @@ pub fn adopt_model_facts (
       e . title         = f . title . clone ();
       e . home_skgrepo  = f . home_skgrepo . clone ();
       e . affectsParent = f . affectsParent;
-      e . birth         = f . birth; // a buffer does not carry it back
+      e . birth         = f . birth; // the model's, over what the buffer carried back
       if f . is_writeProtected () {
         e . write_protect (); }},
     (kind, model_kind) => {

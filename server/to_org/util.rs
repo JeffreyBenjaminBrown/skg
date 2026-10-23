@@ -391,14 +391,15 @@ pub fn validate_affectsParent_relationships_in_straddle (
 
 /// An invariant: a *non-dead generalized orphan*
 /// must have AffectsParent=False. An Unrestricted node whose parent is a
-/// non-container -- a historical phantom, a Deleted, or a DeadViewnode -- is exactly
+/// non-container -- a Deleted phantom or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
 /// Make it a non-member so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - parent is historical phantom / Deleted / DeadViewnode -> make a member child a non-member.
+/// - parent is a Deleted phantom / DeadViewnode -> make a member child a non-member.
+/// - parent is a historical phantom (the diff view): left alone.
 /// - parent is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   member; membership is correct -> leave. (A folder whose own ancestry broke is
 ///   deadened to DeadViewnode first, and then this pass catches its members.)

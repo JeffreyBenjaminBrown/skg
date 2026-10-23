@@ -27,7 +27,7 @@ struct SubscribeeFolderContext {
 /// - Error unless it's a SubscribeeFolder.
 /// - Read parent's skg ID and write-protected flag.
 /// - Look up parent's subscribees.
-/// - If no subscribees: transfer focus if needed, then delete.
+/// - If no subscribees: keep the folder, its children reconciled to none.
 /// - Reconcile the subscribee children from the graph.
 /// - Ensure HiddenOutsideOfSubscribeeFolder exists and is last.
 pub fn reconcile_subscribeeFolder_children (

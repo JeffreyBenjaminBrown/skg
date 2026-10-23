@@ -2,7 +2,7 @@
 -- file: ask the server for the file's path, open a git UI on that
 -- skgrepo's gitrepo, and land on the file (or, for the parent variant, on
 -- the first changed line containing this node's id). The Lua port of
--- elisp/skg-request-file-path.el, re-targeted per the settled plan:
+-- elisp/skg-request-file-path.el, re-targeted:
 -- neogit (baked into the docker image) plays magit for the status
 -- jump; the parent variant's land-on-the-id-line has no neogit API,
 -- so it opens a plain git-diff buffer for the parent's file and

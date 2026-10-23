@@ -15,7 +15,7 @@ pub enum SaveError {
   IoError (io::Error),
   // A failed save carries, alongside its errors, the nonfatal
   // warnings collected before the abort (e.g. discarded folder-headline
-  // text). Decided 2026-06-12: warnings always accompany errors.
+  // text). Warnings always accompany errors.
   BufferValidationErrors {
     errors   : Vec<BufferValidationError>,
     warnings : Vec<String>, }, }

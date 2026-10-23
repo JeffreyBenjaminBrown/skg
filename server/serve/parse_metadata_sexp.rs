@@ -13,7 +13,8 @@
 ///                                 [(containers N)]
 ///                                 [(contents N)]
 ///                                 [(linksIn N)])]
-///                         [(editRequest <delete | (merge ID)>)]
+///                         [(editRequest <delete | (merge ID) | (relRepo REPO)
+///                                       | (flag FLAG true|false)>)]
 ///                         [(viewRequests REQUEST...)]
 ///                         [(diff [(presence SIGN...)]
 ///                                [(leaves N OBJECT...)]

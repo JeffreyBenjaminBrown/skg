@@ -2,7 +2,7 @@
 ;;;
 ;;; Commands that request viewbranches by adding a (viewRequests ...)
 ;;; atom to the headline at point and saving, letting Rust fulfill the
-;;; request during completion. Two families, both auto-saving (Q10):
+;;; request during completion. Two families, both auto-saving:
 ;;;   - folders, `skg-show-folder-*' : (folder RELNAME), builds
 ;;;     both folders of the relation (one for containers and mentioners);
 ;;;   - role trees, `skg-show-*ward-tree' : (roleTree ROLENAME), the

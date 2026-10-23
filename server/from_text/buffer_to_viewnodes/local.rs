@@ -339,7 +339,7 @@ fn validate_relation_folder (
                 && matches! ( &node . kind,
                               MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
            || matches!(&node . kind,
-                       MpViewnodeKind::Vognode (MpVognode::Restricted (_))) // tolerated from stale buffers; the rerender removes it (the API doc's "Restricted-skgrepo nodes")
+                       MpViewnodeKind::Vognode (MpVognode::Restricted (_))) // tolerated from stale buffers; unmanaged, so an ordinary rerender keeps it (the API doc's "Restricted-skgrepo nodes")
            || matches!(&node . kind, // a former member, in the diff view; save-inert
                        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))))
     { errors . push(format!("{}'s children must include only UnrestrictedVognodes, restricted vognodes, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
