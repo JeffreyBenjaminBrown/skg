@@ -15,7 +15,7 @@ use skg::test_utils::{
   cleanup_test_tantivy, copy_dir_all, graph_handle_from_config,
   read_all_lp_messages, update_from_and_rerender_buffer_test};
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 
 use futures::executor::block_on;
 use std::collections::{BTreeMap, HashMap};
@@ -114,25 +114,25 @@ pub fn graph_straddle (
 ) -> Result<GraphStraddle, Box<dyn Error>> {
   Ok ( GraphStraddle::from_head_and_live (&f . config, f . graph . load_full ()) ? ) }
 
-/// Save 'text' as the view 'view_id'.
+/// Save 'text' as the view 'viewforest_id'.
 pub fn save_view (
   f       : &mut Fixture,
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
   text    : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   Ok ( block_on ( update_from_and_rerender_buffer_test (
     &mut stream, text, &f . config, &f . tantivy, &f . graph,
-    &Ok ( view_id . clone () ), &mut f . views_state )) ? ) }
+    &Ok ( viewforest_id . clone () ), &mut f . views_state )) ? ) }
 
-/// Save 'text' as the view 'view_id'; it must save without errors.
+/// Save 'text' as the view 'viewforest_id'; it must save without errors.
 pub fn save_cleanly (
   f       : &mut Fixture,
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
   text    : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let response : SaveResponse = save_view (f, view_id, text) ?;
+  let response : SaveResponse = save_view (f, viewforest_id, text) ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
             response . errors, text );

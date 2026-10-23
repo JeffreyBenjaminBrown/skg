@@ -41,7 +41,7 @@ use skg::types::viewnode::{
   ViewnodeKind,
   viewforest_root_viewnode};
 use skg::types::viewnode::Vognode;
-use skg::types::views_state::{OpenViews, ViewState, ViewId, ViewnodeIdRecord};
+use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdRecord};
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
@@ -151,10 +151,10 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
         ViewsState { 
                      open_views        : OpenViews::new (),
                      graph_straddle    : None };
-      let view_id : ViewId =
-        ViewId::SearchView ("ovr-sub" . to_string ());
+      let viewforest_id : ViewforestId =
+        ViewforestId::SearchView ("ovr-sub" . to_string ());
       views_state . open_views . views . insert (
-        view_id . clone (),
+        viewforest_id . clone (),
         ViewState { viewforest : tree_all . into (),
                     pids       : HashSet::new (),
                     diffView_buffer_kind : None,
@@ -177,7 +177,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       // 3. The re-rendered view: N shown directly, R anonymized.
       let view_public : String = {
         let forest = views_state . open_views
-          . viewid_to_view (&view_id)
+          . viewforest_id_to_view (&viewforest_id)
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest, config) ? };
       assert! ( view_public . contains ("restrictedNode"),
@@ -337,10 +337,10 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         ViewsState {
           open_views        : OpenViews::new (),
           graph_straddle    : None, };
-      let view_id : ViewId =
-        ViewId::SearchView ("shared ranking term" . to_string ());
+      let viewforest_id : ViewforestId =
+        ViewforestId::SearchView ("shared ranking term" . to_string ());
       views_state . open_views . views . insert (
-        view_id . clone (),
+        viewforest_id . clone (),
         ViewState {
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
           pids       : HashSet::from ([ID::from ("active-search-hit")]),
@@ -376,7 +376,7 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
         SkgrepoSetName::from ("all"),
         "repo-set switch should update the skgrepo restriction" );
       assert! (
-        views_state . open_views . views . contains_key (&view_id),
+        views_state . open_views . views . contains_key (&viewforest_id),
         "repo-set switch should KEEP registered views (re-rendered \
          in place), not close them" );
       assert! (

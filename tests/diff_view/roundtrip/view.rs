@@ -31,7 +31,7 @@ use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
   ChangesetMarkerKind, Existence, Phantom, Property, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
-use skg::types::views_state::ViewId;
+use skg::types::views_state::ViewforestId;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -45,7 +45,7 @@ fn save (
   f      : &mut Fixture,
   buffer : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  save_view ( f, &ViewId::ContentView ("diffView-roundtrip" . to_string ()), buffer ) }
+  save_view ( f, &ViewforestId::ContentView ("diffView-roundtrip" . to_string ()), buffer ) }
 
 /// Run 'body' on the fixture; see 'with_git_fixture'.
 fn with_fixture (

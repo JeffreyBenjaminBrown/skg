@@ -23,7 +23,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::single_root_view;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 fn mk_pair () -> (TcpStream, TcpStream) {
@@ -34,11 +34,11 @@ fn mk_pair () -> (TcpStream, TcpStream) {
   let (read_end, _) = listener . accept () . unwrap ();
   (write_end, read_end) }
 
-/// Save the buffer attributed to 'view_id', returning the collateral views'
+/// Save the buffer attributed to 'viewforest_id', returning the collateral views'
 /// rendered contents.
 async fn save_and_read_collateral (
   buffer      : &str,
-  view_id     : &ViewId,
+  viewforest_id : &ViewforestId,
 
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
@@ -49,7 +49,7 @@ async fn save_and_read_collateral (
   let response : SaveResponse =
     update_from_and_rerender_buffer (
       &mut stream, buffer, config, tantivy, graph,
-      &Ok (view_id . clone ()), views_state ) . await ?;
+      &Ok (viewforest_id . clone ()), views_state ) . await ?;
   drop (stream);
   let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
   let collateral_views : Vec<String> =
@@ -81,8 +81,8 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
       let mut views_state : ViewsState = ViewsState {
         open_views        : OpenViews::new (),
         graph_straddle    : None, };
-      let a_view_id : ViewId = ViewId::ContentView ("S-a" . into ());
-      let b_view_id : ViewId = ViewId::ContentView ("S-b" . into ());
+      let a_viewforest_id : ViewforestId = ViewforestId::ContentView ("S-a" . into ());
+      let b_viewforest_id : ViewforestId = ViewforestId::ContentView ("S-b" . into ());
 
       // View A rooted at S: S is an editable root, its subscribeeFolder
       // shows both subscribees M and N.
@@ -94,7 +94,7 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
                 && a_view . contains ("(id N)"),
         "view A should show M and N in S's subscribeeFolder:\n{}", a_view );
       views_state . open_views . register_view (
-        &graph . load_full (), a_view_id . clone (), a_vf, &a_pids );
+        &graph . load_full (), a_viewforest_id . clone (), a_vf, &a_pids );
 
       // View B rooted at S too -- the collateral view. S is editable
       // here as well (it is the root).
@@ -105,14 +105,14 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
                 && b_view . contains ("(id N)"),
         "view B should show M and N in S's subscribeeFolder:\n{}", b_view );
       views_state . open_views . register_view (
-        &graph . load_full (), b_view_id . clone (), b_vf, &b_pids );
+        &graph . load_full (), b_viewforest_id . clone (), b_vf, &b_pids );
 
       // In view A, drop N from S's subscribeeFolder (subscribesTo -> [M])
       // and save A.
       let edited_a : String = drop_member_line (&a_view, "(id N)");
       let (_response, collateral_views) =
         save_and_read_collateral (
-          &edited_a, &a_view_id, config, tantivy, &graph,
+          &edited_a, &a_viewforest_id, config, tantivy, &graph,
           &mut views_state ) . await ?;
 
       // The collateral view B must refresh from the just-saved graph:

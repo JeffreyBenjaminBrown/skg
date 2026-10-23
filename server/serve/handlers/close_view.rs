@@ -1,10 +1,10 @@
 use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
-  view_id_from_request,
+  viewforest_id_from_request,
   send_response_with_length_prefix,
   tag_text_response};
-use crate::types::views_state::ViewId;
+use crate::types::views_state::ViewforestId;
 
 use std::net::TcpStream;
 
@@ -13,10 +13,10 @@ pub fn handle_close_view_request (
   stream     : &mut TcpStream,
   request    : &str,
   views_state : &mut ViewsState,
-) -> Option<ViewId> {
-  match view_id_from_request (request) {
-    Ok (view_id) => {
-      views_state . open_views . unregister_view (&view_id);
+) -> Option<ViewforestId> {
+  match viewforest_id_from_request (request) {
+    Ok (viewforest_id) => {
+      views_state . open_views . unregister_view (&viewforest_id);
       if ! views_state . open_views . has_diffView_views () {
         // The graph straddle lives while a diff view is open.
         views_state . graph_straddle = None; }
@@ -24,7 +24,7 @@ pub fn handle_close_view_request (
         stream,
         & tag_text_response (
           TcpToClient::CloseView, "view closed" ));
-      Some (view_id) },
+      Some (viewforest_id) },
     Err (_) => {
       send_response_with_length_prefix (
         stream,

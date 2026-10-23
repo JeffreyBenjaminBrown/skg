@@ -10,7 +10,7 @@ use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   node_lines, open_all_changes_buffer, requesting_editable_at, save,
-  view_id_of, with_fixture};
+  viewforest_id_of, with_fixture};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -19,7 +19,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::errors::{BufferValidationError, HeadlineName, SaveError};
 use skg::types::misc::ID;
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{DiffViewBufferKind, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -75,7 +75,7 @@ fn the_registered_viewforest (
   f : &Fixture,
 ) -> ViewForest {
   f . views_state . open_views
-    . viewid_to_view ( &view_id_of (DiffViewBufferKind::AllChanges) )
+    . viewforest_id_to_view ( &viewforest_id_of (DiffViewBufferKind::AllChanges) )
     . expect ("the buffer is registered")
     . clone () }
 
@@ -210,11 +210,11 @@ fn write_protecting_a_node_outside_u_saves (
 fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("shared", &["main"], |f| {
-    let view_id : ViewId = ViewId::ContentView ("content-view-of-n" . to_string ());
+    let viewforest_id : ViewforestId = ViewforestId::ContentView ("content-view-of-n" . to_string ());
     let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("n") ] ) ?;
     f . views_state . open_views . register_view (
-      &f . graph . load_full (), view_id . clone (), tree, &pids );
+      &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
     assert! ( text . starts_with ("* (skg (node (id n) (repo main) ")
               && ! text . lines () . next () . unwrap () . contains ("writeProtected")
               && node_lines (&text, "a") . len () == 1,
@@ -227,7 +227,7 @@ fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
       update_from_and_rerender_buffer_test (
         &mut stream, &write_protected,
         &f . config, &f . tantivy, &f . graph,
-        &Ok (view_id), &mut f . views_state ));
+        &Ok (viewforest_id), &mut f . views_state ));
     let Err (error) = result else {
       panic! ("the save must be refused") };
     let Ok (save_error) = error . downcast::<SaveError> () else {

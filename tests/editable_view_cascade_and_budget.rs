@@ -21,7 +21,7 @@ use skg::org_to_text::viewforest_to_string;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -645,16 +645,16 @@ fn open_content_view (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
   roots       : &[&str],
-) -> Result<(ViewId, String), Box<dyn Error>> {
-  let view_id : ViewId =
-    ViewId::ContentView ( "content-view".to_string () );
+) -> Result<(ViewforestId, String), Box<dyn Error>> {
+  let viewforest_id : ViewforestId =
+    ViewforestId::ContentView ( "content-view".to_string () );
   let root_ids : Vec<ID> =
     roots . iter () . map ( |root| ID::from (*root) ) . collect ();
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (config, Some (tantivy), &root_ids) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), view_id . clone (), tree, &pids );
-  Ok (( view_id, text )) }
+    &graph . load_full (), viewforest_id . clone (), tree, &pids );
+  Ok (( viewforest_id, text )) }
 
 /// 'buffer' with an editable-view request added to its first line
 /// containing 'metadata', just after it.
@@ -717,7 +717,7 @@ async fn test_editable_view_request_on_an_editable_node (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) = {
+      let (viewforest_id, opened) : (ViewforestId, String) = {
         let mut config : SkgConfig = config . clone ();
         config . initial_node_limit = 1;
         open_content_view (
@@ -731,7 +731,7 @@ async fn test_editable_view_request_on_an_editable_node (
           mk_test_tcp_stream_pair ();
         let response : SaveResponse = update_from_and_rerender_buffer (
           &mut stream, &requested, &config, tantivy, &graph,
-          &Ok (view_id), &mut views_state ) . await ?;
+          &Ok (viewforest_id), &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (),
                   "the request must save, got {:?}", response . errors );
         response . saved_view };
@@ -775,7 +775,7 @@ async fn test_editable_view_request_moves_editability_back (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) =
+      let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
       let mut save = async | buffer : &str | -> Result<String, Box<dyn Error>> {
@@ -783,7 +783,7 @@ async fn test_editable_view_request_moves_editability_back (
           mk_test_tcp_stream_pair ();
         let response : SaveResponse = update_from_and_rerender_buffer (
           &mut stream, buffer, &config, tantivy, &graph,
-          &Ok (view_id . clone ()), &mut views_state ) . await ?;
+          &Ok (viewforest_id . clone ()), &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (),
                   "the buffer must save, got {:?}\n\nbuffer:\n{}",
                   response . errors, buffer );
@@ -885,20 +885,20 @@ async fn test_budget_aliasfolder_is_neutral (
 
       Ok (( )) }
 
-/// Save 'buffer' as the view 'view_id', asserting that it saves.
+/// Save 'buffer' as the view 'viewforest_id', asserting that it saves.
 async fn save_view (
   buffer      : &str,
   config      : &SkgConfig,
   tantivy     : &TantivyIndex,
   graph       : &InRustGraphHandle,
-  view_id     : &ViewId,
+  viewforest_id : &ViewforestId,
   views_state : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response : SaveResponse = update_from_and_rerender_buffer (
     &mut stream, buffer, config, tantivy, graph,
-    &Ok (view_id . clone ()), views_state ) . await ?;
+    &Ok (viewforest_id . clone ()), views_state ) . await ?;
   assert! ( response . errors . is_empty (),
             "the buffer must save, got {:?}\n\nbuffer:\n{}",
             response . errors, buffer );
@@ -925,14 +925,14 @@ async fn test_writeProtect_request_keeps_children_editable (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) =
+      let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
       let requested : String = requesting_at (
         &opened . replacen ( ")) 12\n", ")) twelve\n", 1 ),
         "(node (id 12) (repo main)", "writeProtectedView" );
       let saved : String = save_view (
-        &requested, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &requested, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       println! ("Result of a write-protect request:\n{}", saved);
       let root : &str = saved . lines () . next () . unwrap ();
       assert! ( root . contains ("writeProtected") && root . ends_with (" twelve"),
@@ -952,7 +952,7 @@ async fn test_writeProtect_request_keeps_children_editable (
                   && ! line . contains ("writeProtected") ),
                 "their content must stay editable members:\n{}", saved );
       let again : String = save_view (
-        &saved, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &saved, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       assert_eq! ( again, saved, "a further save changes nothing" );
       Ok (( )) }
 
@@ -970,13 +970,13 @@ async fn test_writeProtect_subtree_request (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) =
+      let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
       let saved : String = save_view (
         &requesting_at (&opened, "(node (id 12) (repo main)",
                         "writeProtectedSubtreeView"),
-        &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       println! ("Result of a write-protect-subtree request:\n{}", saved);
       let headlines : Vec<&str> = lines_starting (&saved, "*");
       assert_eq! ( headlines . len (), 9, // with the 1 of the root's containerward branch
@@ -1007,15 +1007,15 @@ async fn test_writeProtect_request_on_a_writeProtected_occurrence (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) =
+      let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
       let plain : String = save_view (
-        &opened, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &opened, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       for request in [ "writeProtectedView", "writeProtectedSubtreeView" ] {
         let requested : String = save_view (
           &requesting_at (&plain, "(node (id 12) (repo main) writeProtected", request),
-          &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+          &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
         assert_eq! ( requested, plain, "{} on a write-protected occurrence", request ); }
       Ok (( )) }
 
@@ -1041,7 +1041,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) =
+      let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1", "12"] ) ?;
       let root_12 : &str = "* (skg (node (id 12) (repo main)";
@@ -1066,7 +1066,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
         "(node (id 12) (repo main) writeProtected" )
         . replacen ( "** (skg (node (id 121) ", folded_121, 1 );
       let moved : String = save_view (
-        &edited, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &edited, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       println! ("Result of moving editability:\n{}", moved);
       assert! ( lines_starting (&moved, root_12) [0] . contains ("writeProtected")
                 && ! lines_starting (&moved, under_1) [0] . contains ("writeProtected"),
@@ -1086,7 +1086,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
       let moved_back : String = save_view (
         &requesting_editable_at (
           &moved, "(node (id 12) (repo main) writeProtected" ),
-        &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       println! ("Result of moving editability back:\n{}", moved_back);
       assert! ( ! lines_starting (&moved_back, root_12) [0] . contains ("writeProtected")
                 && lines_starting (&moved_back, under_1) [0] . contains ("writeProtected"),
@@ -1120,30 +1120,30 @@ async fn test_parked_content_node_is_shown_once (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) =
+      let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1"] ) ?;
       let parked : String = save_view (
         &opened . replacen ( "** (skg (node (id 13) (repo main) ",
                              "** (skg (node (id 13) (repo main) nonMember ", 1 ),
-        &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       assert! ( lines_starting (&parked, "** (skg (node (id 13) ") . len () == 1
                 && parked . contains ("nonMember"),
                 "13 stays under 1 as a non-member:\n{}", parked );
-      let other_view_id : ViewId = ViewId::ContentView ("other-view-of-1" . to_string ());
+      let other_viewforest_id : ViewforestId = ViewforestId::ContentView ("other-view-of-1" . to_string ());
       let other : String = {
         let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
           multi_root_view (&config, Some (tantivy), &[ ID::from ("1") ]) ?;
         views_state . open_views . register_view (
-          &graph . load_full (), other_view_id . clone (), tree, &pids );
+          &graph . load_full (), other_viewforest_id . clone (), tree, &pids );
         text };
       assert! ( ! other . contains ("(id 13)"), "1 no longer contains 13:\n{}", other );
       save_view (
         &format! ( "{}** (skg (node (id 13) (repo main) writeProtected)) 13\n", other ),
-        &config, tantivy, &graph, &other_view_id, &mut views_state ) . await ?;
+        &config, tantivy, &graph, &other_viewforest_id, &mut views_state ) . await ?;
       let collateral : String = {
         let viewforest : &ViewForest =
-          views_state . open_views . viewid_to_view (&view_id)
+          views_state . open_views . viewforest_id_to_view (&viewforest_id)
           . expect ("the first view is registered");
         viewforest_to_string (viewforest, &config) ? };
       println! ("The first view after the other's save:\n{}", collateral);
@@ -1171,7 +1171,7 @@ async fn test_budget_spent_on_a_node_with_members (
       let mut views_state : ViewsState = ViewsState {
         open_views     : OpenViews::new (),
         graph_straddle : None,};
-      let (view_id, opened) : (ViewId, String) = {
+      let (viewforest_id, opened) : (ViewforestId, String) = {
         let mut config : SkgConfig = config . clone ();
         config . initial_node_limit = 100;
         open_content_view (
@@ -1181,7 +1181,7 @@ async fn test_budget_spent_on_a_node_with_members (
       let mut config : SkgConfig = config . clone ();
       config . initial_node_limit = 2;
       let saved : String = save_view (
-        &opened, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &opened, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       println! ("Result of a save that spends the budget at 12:\n{}", saved);
       let twelve : Vec<&str> = lines_starting (&saved, "** (skg (node (id 12) ");
       assert! ( twelve . len () == 1 && twelve [0] . contains ("writeProtected"),
@@ -1196,5 +1196,5 @@ async fn test_budget_spent_on_a_node_with_members (
                   line . contains ("nonMember") ),
                 "121..124 must be non-members under write-protected 12:\n{}", saved );
       save_view (
-        &saved, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
+        &saved, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       Ok (( )) }

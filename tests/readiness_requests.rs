@@ -12,7 +12,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey}
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::misc::ID;
-use skg::types::views_state::ViewId;
+use skg::types::views_state::ViewforestId;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -25,7 +25,7 @@ fn save (
   f      : &mut Fixture,
   buffer : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  save_view ( f, &ViewId::ContentView ("readiness" . to_string ()), buffer ) }
+  save_view ( f, &ViewforestId::ContentView ("readiness" . to_string ()), buffer ) }
 
 fn marked_keys (
   f : &Fixture,

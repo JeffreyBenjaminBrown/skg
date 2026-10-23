@@ -15,7 +15,7 @@ use skg::serve::handlers::diff_view::handle_diffView_request;
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::SkgEnv;
-use skg::types::views_state::{DiffViewBufferKind, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 
 use git2::{Commit, Oid, Repository, Signature};
 use std::error::Error;
@@ -26,10 +26,10 @@ use std::sync::Arc;
 
 fn request (
   buffer  : &str,
-  view_id : &str,
+  viewforest_id : &str,
 ) -> String {
   format! ( "((request . \"diff view\") (buffer . \"{}\") (view-id . \"{}\"))\n",
-            buffer, view_id ) }
+            buffer, viewforest_id ) }
 
 #[test]
 fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
@@ -53,12 +53,12 @@ fn a_request_registers_its_buffer_and_the_last_close_drops_the_straddle (
         &mut f . views_state, &all );
       let response : String = everything_written (stream, read_end);
       assert! ( response . contains ("(empty . t)"), "{}", response ); }
-    let view_id : ViewId = ViewId::ContentView ("diff-view-1" . to_string ());
-    assert_eq! ( f . views_state . open_views . views . get (&view_id)
+    let viewforest_id : ViewforestId = ViewforestId::ContentView ("diff-view-1" . to_string ());
+    assert_eq! ( f . views_state . open_views . views . get (&viewforest_id)
                  . and_then ( |state| state . diffView_buffer_kind ),
                  Some (DiffViewBufferKind::AllChanges) );
     assert! ( ! f . views_state . open_views . views
-              . contains_key (&ViewId::ContentView ("diff-view-2" . to_string ())),
+              . contains_key (&ViewforestId::ContentView ("diff-view-2" . to_string ())),
               "an empty buffer is not registered" );
     assert! ( f . views_state . graph_straddle . is_some () );
     let (mut stream, _read_end) : (TcpStream, TcpStream) =
@@ -128,16 +128,16 @@ fn request_the_four_buffers (
     let all : SkgrepoRestriction =
       SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
     for diffView_buffer_kind in DiffViewBufferKind::ALL {
-      let view_id : String = format! ( "diff-view: {}", diffView_buffer_kind . wire_name () );
+      let viewforest_id : String = format! ( "diff-view: {}", diffView_buffer_kind . wire_name () );
       let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       handle_diffView_request (
-        &mut stream, &request (diffView_buffer_kind . wire_name (), &view_id), &env,
+        &mut stream, &request (diffView_buffer_kind . wire_name (), &viewforest_id), &env,
         &mut f . views_state, &all );
       let response : String = everything_written (stream, read_end);
       let registered : Option<DiffViewBufferKind> =
         f . views_state . open_views . views
-        . get (&ViewId::ContentView (view_id))
+        . get (&ViewforestId::ContentView (viewforest_id))
         . and_then ( |state| state . diffView_buffer_kind );
       if expected_nonempty . contains (&diffView_buffer_kind) {
         assert! ( response . contains ("(content"), "{}", response );
@@ -172,7 +172,7 @@ fn request_all_changes (
     &mut f . views_state, &all );
   let response : String = everything_written (stream, read_end);
   let registered : bool = f . views_state . open_views . views
-    . contains_key ( &ViewId::ContentView ("diff-view-1" . to_string ()) );
+    . contains_key ( &ViewforestId::ContentView ("diff-view-1" . to_string ()) );
   Ok (( response, registered )) }
 
 /// The 'sets' fixture's one owned skgrepo, main, made a plain folder.

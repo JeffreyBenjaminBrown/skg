@@ -24,7 +24,7 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{
   FolderKind, Owner, PartnerFolder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};
-use skg::types::views_state::{OpenViews, ViewId, ViewnodeIdRecord};
+use skg::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
@@ -70,7 +70,7 @@ fn open_view (
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (config, Some (tantivy), &[ ID::from (root) ]) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), ViewId::ContentView (view_name . to_string ()),
+    &graph . load_full (), ViewforestId::ContentView (view_name . to_string ()),
     tree, &pids );
   Ok (text) }
 
@@ -88,7 +88,7 @@ async fn save_view (
     mk_test_tcp_stream_pair ();
   let response : SaveResponse = update_from_and_rerender_buffer (
     &mut stream, buffer, config, tantivy, graph,
-    &Ok ( ViewId::ContentView (view_name . to_string ()) ),
+    &Ok ( ViewforestId::ContentView (view_name . to_string ()) ),
     views_state ) . await ?;
   drop (stream);
   let streamed : Vec<String> =
@@ -151,7 +151,7 @@ fn owner_in_view (
   viewnode_id_atom    : &str,
 ) -> Owner {
   views_state . open_views
-    . viewnode_id_record_of ( &ViewId::ContentView (view_name . to_string ()) )
+    . viewnode_id_record_of ( &ViewforestId::ContentView (view_name . to_string ()) )
     . owner_by_viewnode_id . get ( &viewnode_id_of_atom (viewnode_id_atom) ) . copied ()
     . unwrap_or (Owner::User) }
 
@@ -176,7 +176,7 @@ fn every_headline_of_a_new_view_has_its_own_viewnode_id (
     assert! ( viewnode_id_of_atom (atom) . 0 . parse::<f64> () . is_err (),
               "{} reads as a number:\n{}", atom, buffer ); }
   let record : ViewnodeIdRecord = views_state . open_views
-    . viewnode_id_record_of ( &ViewId::ContentView (VIEW_OF_A . to_string ()) );
+    . viewnode_id_record_of ( &ViewforestId::ContentView (VIEW_OF_A . to_string ()) );
   for atom in &atoms {
     assert! ( viewnode_id_of_atom (atom) . counter_value () . unwrap ()
               < record . next_viewnode_id_counter,

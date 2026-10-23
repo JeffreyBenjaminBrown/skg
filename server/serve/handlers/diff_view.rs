@@ -15,11 +15,11 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   format_buffer_response_sexp, send_response_with_length_prefix,
   sexp_to_client_string, tag_sexp_response, true_entry_sexp,
-  value_from_request_sexp, view_id_from_request};
+  value_from_request_sexp, viewforest_id_from_request};
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
-use crate::types::views_state::{DiffViewBufferKind, ViewId};
+use crate::types::views_state::{DiffViewBufferKind, ViewforestId};
 
 use std::net::TcpStream;
 use std::sync::{Arc, MutexGuard};
@@ -37,10 +37,10 @@ pub fn handle_diffView_request (
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let runtime : Arc<RuntimeGeneration> = env . runtime_snapshot ();
-  let response : Result<(Option<RenderedDiffViewBuffer>, DiffViewBufferKind, ViewId), String> =
+  let response : Result<(Option<RenderedDiffViewBuffer>, DiffViewBufferKind, ViewforestId), String> =
     ( || {
       require_skgrepo_set_all ("The diff view", skgrepo_restriction) ?;
-      let view_id : ViewId = view_id_from_request (request) ?;
+      let viewforest_id : ViewforestId = viewforest_id_from_request (request) ?;
       let buffer_name : String = value_from_request_sexp ("buffer", request) ?;
       let diffView_buffer_kind : DiffViewBufferKind = DiffViewBufferKind::from_wire_name (&buffer_name)
         . ok_or_else ( || format! (
@@ -54,7 +54,7 @@ pub fn handle_diffView_request (
       let buffer : Option<RenderedDiffViewBuffer> =
         diffView_buffer (&runtime, &straddle, &store, diffView_buffer_kind)
         . map_err ( |e| format! ( "Error generating the diff view: {}", e )) ?;
-      Ok (( buffer, diffView_buffer_kind, view_id )) } ) ();
+      Ok (( buffer, diffView_buffer_kind, viewforest_id )) } ) ();
   let sexp : String = match response {
     Err (error) =>
       format_buffer_response_sexp ( "", &[ error ], &[] ),
@@ -62,9 +62,9 @@ pub fn handle_diffView_request (
       sexp_to_client_string ( &readiness_response_sexp (
         vec! [ true_entry_sexp ("empty") ], None, &[], &[] )),
     Ok (( Some (RenderedDiffViewBuffer { text, pids, viewforest }),
-          diffView_buffer_kind, view_id )) => {
+          diffView_buffer_kind, viewforest_id )) => {
       views_state . open_views . register_diffView_view (
-        &runtime . graph, view_id, viewforest, &pids, diffView_buffer_kind );
+        &runtime . graph, viewforest_id, viewforest, &pids, diffView_buffer_kind );
       format_buffer_response_sexp ( &text, &[], &[] ) }, };
   send_response_with_length_prefix (
     stream, &tag_sexp_response (TcpToClient::DiffView, &sexp) ); }

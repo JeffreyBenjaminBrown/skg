@@ -12,7 +12,7 @@ use crate::types::tree::forest::{MpViewForest, ViewForest};
 use crate::types::viewnode::{
   Editability, NodeEditRequest, Phantom, Property, ViewnodeKind, Vognode,
 };
-use crate::types::views_state::ViewId;
+use crate::types::views_state::ViewforestId;
 
 use std::collections::{HashMap, HashSet};
 
@@ -52,26 +52,26 @@ impl SaveAffectedIds {
     None
   }
 
-  pub(crate) fn collateral_view_ids (
+  pub(crate) fn collateral_viewforest_ids (
     &self,
-    saved_view_id : &ViewId,
+    saved_viewforest_id : &ViewforestId,
     views_state : &ViewsState,
     before     : &InRustGraph,
     after      : &InRustGraph,
-  ) -> Vec<ViewId> {
-    let mut view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
-      .filter (|(view_id, state)| {
-        *view_id != saved_view_id && state . pids . iter () . any (|skgid|
+  ) -> Vec<ViewforestId> {
+    let mut viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
+      .filter (|(viewforest_id, state)| {
+        *viewforest_id != saved_viewforest_id && state . pids . iter () . any (|skgid|
           self . matching_identity (skgid, before, after) . is_some ()) })
-      .map (|(view_id, _)| view_id . clone ())
+      .map (|(viewforest_id, _)| viewforest_id . clone ())
       .collect ();
-    view_ids . sort_by_key (ViewId::repr_in_client);
-    view_ids
+    viewforest_ids . sort_by_key (ViewforestId::repr_in_client);
+    viewforest_ids
   }
 }
 
 pub(crate) struct DirtyViewConflict {
-  pub(crate) view_id : ViewId,
+  pub(crate) viewforest_id : ViewforestId,
   pub(crate) skgids : Vec<ID>,
 }
 
@@ -87,16 +87,16 @@ pub(crate) fn dirty_view_conflicts (
     let baseline : &str = buffer_snapshot . baseline . as_deref () . ok_or_else (||
       format! (
         "Dirty view {} has no verified clean baseline. Run skg-show-unsaved-changes (Emacs) or :SkgShowUnsavedChanges (Neovim), then close or refresh that view before saving.",
-        buffer_snapshot . view_id . repr_in_client ())) ?;
+        buffer_snapshot . viewforest_id . repr_in_client ())) ?;
     let current : &str = buffer_snapshot . current . as_deref () . ok_or_else (||
       format! ("Dirty view {} has no current text",
-               buffer_snapshot . view_id . repr_in_client ())) ?;
+               buffer_snapshot . viewforest_id . repr_in_client ())) ?;
     let mut dependencies : HashSet<ID> = dependencies_from_text (
-      baseline, &buffer_snapshot . view_id) ?;
+      baseline, &buffer_snapshot . viewforest_id) ?;
     dependencies . extend (dependencies_from_text (
-      current, &buffer_snapshot . view_id) ?);
+      current, &buffer_snapshot . viewforest_id) ?);
     if let Some (registered) = views_state . open_views
-        . viewid_to_view (&buffer_snapshot . view_id)
+        . viewforest_id_to_view (&buffer_snapshot . viewforest_id)
     { dependencies . extend (dependencies_from_registered (registered)); }
     // todo | PITFALL : Matching every reference is more conservative than
     // necessary, but much more convenient than classifying dependencies.
@@ -109,22 +109,22 @@ pub(crate) fn dirty_view_conflicts (
     matching . dedup ();
     if ! matching . is_empty () {
       conflicts . push (DirtyViewConflict {
-        view_id : buffer_snapshot . view_id . clone (), skgids : matching, }); }}
+        viewforest_id : buffer_snapshot . viewforest_id . clone (), skgids : matching, }); }}
   Ok (conflicts)
 }
 
 fn dependencies_from_text (
   text : &str,
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
 ) -> Result<HashSet<ID>, String> {
   let (forest, errors, _) = org_to_uninterpreted_viewforest (text)
     .map_err (|error| format! (
       "Cannot inspect dirty view {}: {}. Run its recovery command before saving.",
-      view_id . repr_in_client (), error)) ?;
+      viewforest_id . repr_in_client (), error)) ?;
   if ! errors . is_empty () {
     return Err (format! (
       "Cannot inspect dirty view {} because its dependency metadata is invalid: {}. Run its recovery command before saving.",
-      view_id . repr_in_client (),
+      viewforest_id . repr_in_client (),
       errors . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join ("; "))); }
   let mut result : HashSet<ID> = dependencies_from_uninterpreted (&forest);
@@ -190,7 +190,7 @@ pub(crate) fn format_conflict_error (
 ) -> String {
   let by_view : HashMap<String, String> = conflicts . iter ()
     .map (|conflict| (
-      conflict . view_id . repr_in_client (),
+      conflict . viewforest_id . repr_in_client (),
       conflict . skgids . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join (", ")))
     .collect ();
@@ -200,6 +200,6 @@ pub(crate) fn format_conflict_error (
     "NOTHING WAS SAVED: this save conflicts with unsaved dependencies in {}. Archive those edits with skg-show-unsaved-changes (Emacs) or :SkgShowUnsavedChanges (Neovim), close the archived views, and retry. Conflicts: {}",
     entries . iter () . map (|entry| entry . 0 . as_str ())
       .collect::<Vec<&str>> () . join (", "),
-    entries . iter () . map (|(view_id, skgids)| format! ("{} [{}]", view_id, skgids))
+    entries . iter () . map (|(viewforest_id, skgids)| format! ("{} [{}]", viewforest_id, skgids))
       .collect::<Vec<String>> () . join ("; "))
 }

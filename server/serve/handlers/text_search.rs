@@ -32,7 +32,7 @@ use crate::serve::handlers::text_release::{
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, sexp_to_client_string, tag_text_response};
-use crate::types::views_state::{ViewId, ViewnodeIdRecord};
+use crate::types::views_state::{ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -251,13 +251,13 @@ pub fn handle_text_search_request (
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &runtime . config )
             . expect ("search viewforest rendering never fails");
-          let view_id : ViewId =
-            ViewId::SearchView ( search_terms . clone () );
-          if views_state . open_views . views . contains_key (&view_id) {
+          let viewforest_id : ViewforestId =
+            ViewforestId::SearchView ( search_terms . clone () );
+          if views_state . open_views . views . contains_key (&viewforest_id) {
             // Replace prior search with the same terms.
-            views_state . open_views . unregister_view (&view_id); }
+            views_state . open_views . unregister_view (&viewforest_id); }
           views_state . open_views . register_view (
-            &runtime . graph, view_id, viewforest, &search_results );
+            &runtime . graph, viewforest_id, viewforest, &search_results );
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,

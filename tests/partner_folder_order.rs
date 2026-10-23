@@ -26,7 +26,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -137,11 +137,11 @@ fn a_member_added_elsewhere_follows_the_kept_ones
         config, tantivy ) . await
     } )) }
 
-/// Save 'buffer' as the view 'view_id'; return the saved view and the
+/// Save 'buffer' as the view 'viewforest_id'; return the saved view and the
 /// contents of the collateral views the save sent.
 async fn save_view_and_read_collateral (
   buffer      : &str,
-  view_id     : &ViewId,
+  viewforest_id : &ViewforestId,
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
   graph       : &InRustGraphHandle,
@@ -153,7 +153,7 @@ async fn save_view_and_read_collateral (
   let (read_end, _) = listener . accept () . unwrap ();
   let response : SaveResponse = update_from_and_rerender_buffer (
     &mut stream, buffer, config, tantivy, graph,
-    &Ok (view_id . clone ()), views_state ) . await ?;
+    &Ok (viewforest_id . clone ()), views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
   drop (stream);
@@ -188,14 +188,14 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None, };
-  let n_view_id : ViewId = ViewId::ContentView ("order-n" . into ());
-  let u_view_id : ViewId = ViewId::ContentView ("order-u" . into ());
+  let n_viewforest_id : ViewforestId = ViewforestId::ContentView ("order-n" . into ());
+  let u_viewforest_id : ViewforestId = ViewforestId::ContentView ("order-u" . into ());
   let (n_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("n")) ?;
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &n_view . replacen (
       "(node ",
       "(node (viewRequests (folder subscribesTo))", 1 ),
-    &n_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let reordered : String = { // t above r, and a note parked after them
     let r_line : &str = line_containing (&n_view, "(id r)");
     let t_line : &str = line_containing (&n_view, "(id t)");
@@ -205,14 +205,14 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
         "{}\n*** (skg (node nonMember)) a parked note", r_line ))
       . replace ( "SWAP_PLACEHOLDER", t_line ) };
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
-    &reordered, &n_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &reordered, &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_lines_in_order (
     &n_view, &[ "(id t)", "(id r)", "a parked note" ],
     "the note stays below the members" );
   let (u_view, u_pids, u_viewforest) =
     single_root_view (config, Some (tantivy), &ID::from ("u")) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), u_view_id . clone (), u_viewforest, &u_pids );
+    &graph . load_full (), u_viewforest_id . clone (), u_viewforest, &u_pids );
   let repo : &str = { // u's skgrepo, which n shares
     let start : usize = u_view . find ("(repo ") . expect ("u's line names its repo") + 6;
     &u_view [ start .. start + u_view [start ..] . find (')') . unwrap () ] };
@@ -220,7 +220,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     "{}** (skg subscribeeFolder)\n*** (skg (node (id n) (repo {}))) n\n",
     u_view, repo );
   let (_, collateral_views) : (String, Vec<String>) = save_view_and_read_collateral (
-    &subscribing, &u_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &subscribing, &u_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let collateral_n : &String = collateral_views . iter ()
     . find ( |view| view . contains ("subscriberFolder") )
     . unwrap_or_else ( || panic! ( "n's view is rerendered: {:?}", collateral_views ));

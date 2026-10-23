@@ -24,7 +24,7 @@ use skg::test_utils::{
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::ID;
-use skg::types::views_state::{DiffViewBufferKind, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -85,10 +85,10 @@ pub fn all_changes_buffer_with_marks (
 
 /// The viewforest id under which 'open_buffer' registers a buffer: its
 /// client's name for it.
-pub fn view_id_of (
+pub fn viewforest_id_of (
   diffView_buffer_kind : DiffViewBufferKind,
-) -> ViewId {
-  ViewId::ContentView ( format! ( "diff-view: {}", diffView_buffer_kind . wire_name () )) }
+) -> ViewforestId {
+  ViewforestId::ContentView ( format! ( "diff-view: {}", diffView_buffer_kind . wire_name () )) }
 
 /// Open the "all changes" buffer; see 'open_buffer'.
 pub fn open_all_changes_buffer (
@@ -117,7 +117,7 @@ pub fn open_buffer (
     None => None,
     Some (RenderedDiffViewBuffer { text, pids, viewforest }) => {
       f . views_state . open_views . register_diffView_view (
-        &runtime . graph, view_id_of (diffView_buffer_kind),
+        &runtime . graph, viewforest_id_of (diffView_buffer_kind),
         viewforest, &pids, diffView_buffer_kind );
       Some (text) }, } ) }
 
@@ -134,12 +134,12 @@ pub fn save_buffer (
   diffView_buffer_kind : DiffViewBufferKind,
   text                 : &str,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  save_view (f, &view_id_of (diffView_buffer_kind), text) }
+  save_view (f, &viewforest_id_of (diffView_buffer_kind), text) }
 
 /// The viewforest id of the "all changes" buffer.
 pub fn all_changes_view (
-) -> ViewId {
-  view_id_of (DiffViewBufferKind::AllChanges) }
+) -> ViewforestId {
+  viewforest_id_of (DiffViewBufferKind::AllChanges) }
 
 /// The round-trip invariant for a buffer of the diff view:
 /// saved unchanged, it changes no file, reports no error, and is
@@ -202,7 +202,7 @@ pub fn send_integrate_unshown_changes_request (
   handle_integrate_unshown_changes_request (
     &mut stream,
     &format! ( "((request . \"integrate unshown changes\") (view-id . \"{}\"))\n",
-               view_id_of (diffView_buffer_kind) . repr_in_client () ),
+               viewforest_id_of (diffView_buffer_kind) . repr_in_client () ),
     &env, &mut f . views_state, &all_skgrepos );
   drop (stream);
   let mut response : String = String::new ();
@@ -232,12 +232,12 @@ pub fn retitle_in_a_content_view (
   title  : &str,
   buffer : &str,
 ) -> Result<String, Box<dyn Error>> {
-  let view_id : ViewId =
-    ViewId::ContentView ( format! ("content-view-of-{}", node) );
+  let viewforest_id : ViewforestId =
+    ViewforestId::ContentView ( format! ("content-view-of-{}", node) );
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (node) ] ) ?;
   f . views_state . open_views . register_view (
-    &f . graph . load_full (), view_id . clone (), tree, &pids );
+    &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
   let root_line : &str = text . lines () . next () . unwrap ();
   let edited : String = text . replacen (
     root_line,
@@ -249,7 +249,7 @@ pub fn retitle_in_a_content_view (
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_test (
       &mut stream, &edited, &f . config, &f . tantivy, &f . graph,
-      &Ok (view_id), &mut f . views_state )) ?;
+      &Ok (viewforest_id), &mut f . views_state )) ?;
   assert! ( response . errors . is_empty (),
             "the content view must save, got {:?}", response . errors );
   drop (stream);

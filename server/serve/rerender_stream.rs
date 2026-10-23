@@ -19,7 +19,7 @@ use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, f
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewnodeIdRecord, ViewState};
+use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord, ViewState};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{
   rerender_view, RerenderAfterSaveContext, RerenderOptions};
@@ -30,15 +30,15 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 pub(crate) struct PreparedView {
-  pub(crate) view_id     : ViewId,
-  text                   : String,
-  pub(crate) viewforest  : ViewForest,
-  viewnode_id_record         : ViewnodeIdRecord,
+  pub(crate) viewforest_id : ViewforestId,
+  text                     : String,
+  pub(crate) viewforest    : ViewForest,
+  viewnode_id_record       : ViewnodeIdRecord,
 }
 
 pub(crate) struct PreparedRerenders {
   runtime  : std::sync::Arc<RuntimeGeneration>,
-  pub(crate) view_ids : Vec<ViewId>,
+  pub(crate) viewforest_ids : Vec<ViewforestId>,
   pub(crate) views    : Vec<PreparedView>,
   pub(crate) errors   : Vec<String>,
   warnings : Vec<String>,
@@ -86,11 +86,11 @@ pub(crate) fn prepare_rerender_views_where (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
-  include             : impl Fn (&ViewId, &ViewState) -> bool,
+  include             : impl Fn (&ViewforestId, &ViewState) -> bool,
 ) -> PreparedRerenders {
-  let view_ids : Vec<ViewId> = views_state . open_views . views . iter ()
-    .filter (|(view_id, state)| include (view_id, state))
-    .map (|(view_id, _)| view_id . clone ()) . collect ();
+  let viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
+    .filter (|(viewforest_id, state)| include (viewforest_id, state))
+    .map (|(viewforest_id, _)| viewforest_id . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, skgrepo_restriction );
@@ -99,22 +99,22 @@ pub(crate) fn prepare_rerender_views_where (
   // writes it back, as a save does.
   context . graph_straddle = views_state . graph_straddle . clone ();
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
-  for view_id in &view_ids {
+  for viewforest_id in &viewforest_ids {
     let mut viewforest : ViewForest = match
-      views_state . open_views . viewid_to_view (view_id) {
+      views_state . open_views . viewforest_id_to_view (viewforest_id) {
         Some (f) => f . clone (),
         None => {
           context . errors . push ( format! (
             "View {}: no viewforest found",
-            view_id . repr_in_client () ));
+            viewforest_id . repr_in_client () ));
           continue; } };
     let mut viewnode_id_record : ViewnodeIdRecord =
-      views_state . open_views . viewnode_id_record_of (view_id);
+      views_state . open_views . viewnode_id_record_of (viewforest_id);
     if let Some (prepass) = prepass {
       if let Err (e) = prepass (&mut viewforest) {
         context . errors . push ( format! (
           "View {}: {}",
-          view_id . repr_in_client (), e ));
+          viewforest_id . repr_in_client (), e ));
         continue; }}
     match block_on ( async {
       let _span : tracing::span::EnteredSpan =
@@ -127,18 +127,18 @@ pub(crate) fn prepare_rerender_views_where (
         &mut context,
         None, // streamed rerenders repair silently.
         rerender_options (
-          views_state . open_views . diffView_buffer_kind_of_view (view_id) )) } )
+          views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) )) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {
-          view_id : view_id . clone (), text, viewforest,
+          viewforest_id : viewforest_id . clone (), text, viewforest,
           viewnode_id_record } ); },
       Err (e) => {
         context . errors . push ( format! (
           "View {}: {}",
-          view_id . repr_in_client (), e )); }} }
+          viewforest_id . repr_in_client (), e )); }} }
   PreparedRerenders {
     runtime : context . runtime . clone (),
-    view_ids,
+    viewforest_ids,
     views    : rendered_views,
     errors   : context . errors,
     warnings : context . warnings,
@@ -184,17 +184,17 @@ pub(crate) fn stream_prepared_rerenders (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderLock,
-      & format_lock_views_sexp (&prepared . view_ids) ));
+      & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
   for view in prepared . views {
     views_state . open_views . update_view (
       &prepared . runtime . graph,
-      &view . view_id, view . viewforest, view . viewnode_id_record );
+      &view . viewforest_id, view . viewforest, view . viewnode_id_record );
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response (
         TcpToClient::RerenderView,
-        & format_single_view_sexp (&view . view_id, &view . text) )); }
+        & format_single_view_sexp (&view . viewforest_id, &view . text) )); }
 
   send_response_with_length_prefix (
     stream,

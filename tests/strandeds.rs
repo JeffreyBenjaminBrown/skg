@@ -23,7 +23,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -69,25 +69,25 @@ fn fixture (
       open_views        : OpenViews::new (),
       graph_straddle    : None, } } ) }
 
-/// Render a view of 'roots', registered under 'view_id'.
+/// Render a view of 'roots', registered under 'viewforest_id'.
 fn open_view (
   f       : &mut Fixture,
   roots   : &[&str],
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
 ) -> Result<String, Box<dyn Error>> {
   let root_ids : Vec<ID> = roots . iter () . map ( |r| ID::from (*r) ) . collect ();
   let (buffer, pids, viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (&f . config, None, &root_ids) ?;
   f . views_state . open_views . register_view (
-    &f . graph . load_full (), view_id . clone (), viewforest, &pids );
+    &f . graph . load_full (), viewforest_id . clone (), viewforest, &pids );
   Ok (buffer) }
 
-/// Save 'buffer' as the view 'view_id', with 'review'. Returns the
+/// Save 'buffer' as the view 'viewforest_id', with 'review'. Returns the
 /// response and the collateral views streamed meanwhile, by viewforest id.
 fn save (
   f       : &mut Fixture,
   buffer  : &str,
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
   review  : &StrandedsReview,
 ) -> Result<(SaveResponse, HashMap<String, String>), Box<dyn Error>> {
   let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") ?;
@@ -97,7 +97,7 @@ fn save (
     skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let response : SaveResponse = block_on (
     update_from_and_rerender_buffer_with_approvals (
-      &mut stream, buffer, &mut env,  &Ok (view_id . clone ()),
+      &mut stream, buffer, &mut env,  &Ok (viewforest_id . clone ()),
       &mut f . views_state, None, true, &HashMap::new (),
       &HashSet::new (), &HashSet::new (), review, &[] )) ?;
   // The test helper's env holds its own graph handle: carry the
@@ -137,8 +137,8 @@ fn a_privatizing_move_raises_an_inbound_relationship (
 ) -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture ("skg-test-strandeds-privatizing") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
-    let view_m : ViewId = ViewId::ContentView ("m" . to_string ());
-    let view_p : ViewId = ViewId::ContentView ("p" . to_string ());
+    let view_m : ViewforestId = ViewforestId::ContentView ("m" . to_string ());
+    let view_p : ViewforestId = ViewforestId::ContentView ("p" . to_string ());
     let buffer : String = open_view (&mut f, &["m"], &view_m) ?;
     open_view (&mut f, &["p"], &view_p) ?;
     let (response, collateral) : (SaveResponse, HashMap<String, String>) =
@@ -165,7 +165,7 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
 ) -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture ("skg-test-strandeds-publicizing") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
-    let view_n : ViewId = ViewId::ContentView ("n" . to_string ());
+    let view_n : ViewforestId = ViewforestId::ContentView ("n" . to_string ());
     let buffer : String = open_view (&mut f, &["n"], &view_n) ?;
     let moved : String =
       buffer . replace ("(id n) (repo private)", "(id n) (repo public)");
@@ -203,7 +203,7 @@ fn a_reviewed_save_that_chooses_nothing_leaves_the_relationship_where_it_was (
 ) -> Result<(), Box<dyn Error>> {
   let mut f : Fixture = fixture ("skg-test-strandeds-declined") ?;
   let result : Result<(), Box<dyn Error>> = (|| {
-    let view_n : ViewId = ViewId::ContentView ("n" . to_string ());
+    let view_n : ViewforestId = ViewforestId::ContentView ("n" . to_string ());
     let buffer : String = open_view (&mut f, &["n"], &view_n) ?;
     let (response, _) : (SaveResponse, HashMap<String, String>) =
       save ( &mut f,

@@ -8,7 +8,7 @@ use crate::serve::handlers::text_release::{
   challenge_response,
   decide as decide_text_release};
 use crate::serve::util::{
-  view_id_from_request,
+  viewforest_id_from_request,
   send_response_with_length_prefix,
   format_buffer_response_sexp,
   sexp_to_client_string,
@@ -17,7 +17,7 @@ use crate::serve::util::{
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::misc::ID;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::views_state::ViewId;
+use crate::types::views_state::ViewforestId;
 
 use futures::executor::block_on;
 use sexp::{Sexp, Atom};
@@ -38,8 +38,8 @@ pub fn handle_single_root_view_request (
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
   let runtime = env . runtime_snapshot ();
-  let view_id_result : Result<ViewId, String> =
-    view_id_from_request (request);
+  let viewforest_id_result : Result<ViewforestId, String> =
+    viewforest_id_from_request (request);
   match node_skgid_from_single_root_view_request (request) {
     Ok (skgid) => {
       match skgrepo_restriction . skgid_skgrepo_is_unrestricted (
@@ -71,9 +71,9 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &response_sexp ));
           return; }}
-      if let Some (existing_view_id)
+      if let Some (existing_viewforest_id)
         = views_state . open_views
-          . content_view_id_for_root_skgid ( &skgid )
+          . content_viewforest_id_for_root_skgid ( &skgid )
         { // Following a link to a root that is already open lands in
           // that ordinary content buffer.
           let switch_sexp : String =
@@ -82,7 +82,7 @@ pub fn handle_single_root_view_request (
                 Sexp::Atom ( Atom::S (
                   "switch-to-view" . to_string () )),
                 Sexp::Atom ( Atom::S (
-                  existing_view_id . repr_in_client () )) ] ) ] ));
+                  existing_viewforest_id . repr_in_client () )) ] ) ] ));
           send_response_with_length_prefix (
             stream,
             & tag_sexp_response (
@@ -110,10 +110,10 @@ pub fn handle_single_root_view_request (
                 if matches! (
                   release, TextReleaseDecision::Challenge { .. } ) {
                   return challenge_response (&release) . unwrap (); }
-                if let Ok (view_id) = &view_id_result {
+                if let Ok (viewforest_id) = &viewforest_id_result {
                   views_state . open_views . register_view (
                     &runtime . graph,
-                    view_id . clone (),
+                    viewforest_id . clone (),
                     viewforest,
                     &pids ); }
                 let warnings : Vec<String> =

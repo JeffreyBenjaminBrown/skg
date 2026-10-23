@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 /// Identifies a buffer in the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ViewId {
+pub enum ViewforestId {
   ContentView  (String), // the root skgid
   SearchView   (String), // query
 }
@@ -23,12 +23,12 @@ pub enum ViewId {
 /// set. 'root_ids' is the reverse lookup — which view(s) is this
 /// ID a root of.
 pub struct OpenViews {
-  pub views       : HashMap<ViewId, ViewState>,
-  // Includes both (graph) content views and search result views. See the definition of 'ViewId'.
+  pub views       : HashMap<ViewforestId, ViewState>,
+  // Includes both (graph) content views and search result views. See the definition of 'ViewforestId'.
   // TODO ? OPTIMIZE:
-  // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewId>> maintained alongside this one) for O(1) reverse lookups.
+  // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewforestId>> maintained alongside this one) for O(1) reverse lookups.
 
-  root_skgids        : ManyToMany<ID, ViewId>, // Maps every root ID (primary + extra) ↔ ViewId. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
+  root_skgids        : ManyToMany<ID, ViewforestId>, // Maps every root ID (primary + extra) ↔ ViewforestId. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
 
 /// Invariant: all viewforest mutations must go through register_view /
@@ -92,18 +92,18 @@ impl DiffViewBufferKind {
 // Implementations
 //
 
-impl ViewId {
+impl ViewforestId {
   /// Serialize to the client string format.
   pub fn repr_in_client ( &self ) -> String {
     match self {
-      ViewId::ContentView  (s)  => s . clone (),
-      ViewId::SearchView   (q)  => format! ("search:{}", q) } }
-  /// Parse a client string to a ViewId.
-  pub fn from_client_string ( s : String ) -> ViewId {
+      ViewforestId::ContentView  (s)  => s . clone (),
+      ViewforestId::SearchView   (q)  => format! ("search:{}", q) } }
+  /// Parse a client string to a ViewforestId.
+  pub fn from_client_string ( s : String ) -> ViewforestId {
     if let Some (query) = s . strip_prefix ("search:") {
-      ViewId::SearchView ( query . to_string () )
+      ViewforestId::SearchView ( query . to_string () )
     } else {
-      ViewId::ContentView (s) } }
+      ViewforestId::ContentView (s) } }
 }
 
 impl OpenViews {
@@ -116,37 +116,37 @@ impl OpenViews {
     self . views       . clear ();
     self . root_skgids    = ManyToMany::new (); }
 
-  pub fn viewid_to_pids (
+  pub fn viewforest_id_to_pids (
     &self,
-    view_id : &ViewId,
+    viewforest_id : &ViewforestId,
   ) -> Vec<ID> {
-    self . views . get (view_id)
+    self . views . get (viewforest_id)
       . map ( |vs| vs . pids . iter () . cloned () . collect () )
       . unwrap_or_default () }
 
-  pub fn viewid_to_view (
+  pub fn viewforest_id_to_view (
     &self,
-    view_id : &ViewId,
+    viewforest_id : &ViewforestId,
   ) -> Option<&ViewForest> {
-    self . views . get (view_id)
+    self . views . get (viewforest_id)
       . map ( |vs| &vs . viewforest ) }
 
   /// Returns the first (if any exists) content buffer (not a search
   /// view) for which the ID is a root
   /// (level-1 headline).
-  pub fn content_view_id_for_root_skgid (
+  pub fn content_viewforest_id_for_root_skgid (
     &self,
     skgid : &ID,
-  ) -> Option<&ViewId> {
+  ) -> Option<&ViewforestId> {
     self . root_skgids . get_right (skgid)
-      . and_then ( |view_ids| view_ids . iter ()
+      . and_then ( |viewforest_ids| viewforest_ids . iter ()
                    . find ( |u| matches! (
-                       u, ViewId::ContentView (_) ))) }
+                       u, ViewforestId::ContentView (_) ))) }
 
   pub fn register_view (
     &mut self,
     graph  : &InRustGraph,
-    view_id : ViewId,
+    viewforest_id : ViewforestId,
     viewforest : impl Into<ViewForest>,
     pids   : &[ID],
   ) { let viewforest : ViewForest =
@@ -155,7 +155,7 @@ impl OpenViews {
         root_skgids_from_viewforest ( graph, &viewforest );
       for rid in &rids {
         self . root_skgids . insert (
-          rid . clone (), view_id . clone () ); }
+          rid . clone (), viewforest_id . clone () ); }
       let pids : HashSet<ID> =
         pids . iter () . cloned () . collect ();
       let viewnode_id_record : ViewnodeIdRecord =
@@ -163,18 +163,18 @@ impl OpenViews {
       let state : ViewState =
         ViewState { viewforest, pids, diffView_buffer_kind : None,
                     viewnode_id_record };
-      self . views . insert ( view_id, state ); }
+      self . views . insert ( viewforest_id, state ); }
 
   /// 'register_view' for a buffer of the diff view.
   pub fn register_diffView_view (
     &mut self,
     graph                : &InRustGraph,
-    view_id              : ViewId,
+    viewforest_id        : ViewforestId,
     viewforest           : impl Into<ViewForest>,
     pids                 : &[ID],
     diffView_buffer_kind : DiffViewBufferKind,
-  ) { self . register_view ( graph, view_id . clone (), viewforest, pids );
-      if let Some (state) = self . views . get_mut (&view_id) {
+  ) { self . register_view ( graph, viewforest_id . clone (), viewforest, pids );
+      if let Some (state) = self . views . get_mut (&viewforest_id) {
         state . diffView_buffer_kind = Some (diffView_buffer_kind); }}
 
   /// Whether any open view is a buffer of the diff view.
@@ -183,21 +183,21 @@ impl OpenViews {
   ) -> bool {
     self . views . values () . any ( |state| state . diffView_buffer_kind . is_some () ) }
 
-  /// The buffer of the diff view that 'view_id' is, if it is one.
+  /// The buffer of the diff view that 'viewforest_id' is, if it is one.
   pub fn diffView_buffer_kind_of_view (
     &self,
-    view_id : &ViewId,
+    viewforest_id : &ViewforestId,
   ) -> Option<DiffViewBufferKind> {
-    self . views . get (view_id)
+    self . views . get (viewforest_id)
       . and_then ( |state| state . diffView_buffer_kind ) }
 
-  /// A copy of the viewnode IDs of 'view_id', or an empty record when
+  /// A copy of the viewnode IDs of 'viewforest_id', or an empty record when
   /// no such view is open.
   pub fn viewnode_id_record_of (
     &self,
-    view_id : &ViewId,
+    viewforest_id : &ViewforestId,
   ) -> ViewnodeIdRecord {
-    self . views . get (view_id)
+    self . views . get (viewforest_id)
       . map ( |state| state . viewnode_id_record . clone () )
       . unwrap_or_default () }
 
@@ -206,43 +206,43 @@ impl OpenViews {
   pub fn update_view (
     &mut self,
     graph      : &InRustGraph,
-    view_id    : &ViewId,
+    viewforest_id : &ViewforestId,
     new_viewforest : impl Into<ViewForest>,
     viewnode_id_record : ViewnodeIdRecord,
   ) { let new_viewforest : ViewForest =
         new_viewforest . into ();
       let pids : HashSet<ID> =
         pids_from_viewforest ( &new_viewforest );
-      self . root_skgids . remove_right (view_id);
+      self . root_skgids . remove_right (viewforest_id);
       let rids : HashSet<ID> =
         root_skgids_from_viewforest ( graph, &new_viewforest );
       for rid in &rids {
         self . root_skgids . insert (
-          rid . clone (), view_id . clone () ); }
+          rid . clone (), viewforest_id . clone () ); }
       if let Some (vs)
-        = self . views . get_mut (view_id)
+        = self . views . get_mut (viewforest_id)
         { vs . viewforest = new_viewforest;
           vs . pids = pids;
           vs . viewnode_id_record = viewnode_id_record; }
       else { self . views . insert (
-               view_id . clone (),
+               viewforest_id . clone (),
                ViewState { viewforest : new_viewforest,
                            pids, diffView_buffer_kind : None,
                            viewnode_id_record } ); }}
 
   pub fn unregister_view (
     &mut self,
-    view_id : &ViewId,
-  ) { self . root_skgids . remove_right (view_id);
-      self . views . remove (view_id); }
+    viewforest_id : &ViewforestId,
+  ) { self . root_skgids . remove_right (viewforest_id);
+      self . views . remove (viewforest_id); }
 
   pub fn views_containing (
     &self,
     pid : &ID,
-  ) -> Vec<ViewId> {
+  ) -> Vec<ViewforestId> {
     self . views . iter ()
       . filter ( |(_, vs)| vs . pids . contains (pid) )
-      . map ( |(view_id, _)| view_id . clone () )
+      . map ( |(viewforest_id, _)| viewforest_id . clone () )
       . collect () }
 }
 

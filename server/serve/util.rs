@@ -1,6 +1,6 @@
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-use crate::types::views_state::ViewId;
+use crate::types::views_state::ViewforestId;
 
 use sexp::{Sexp, Atom};
 use std::error::Error;
@@ -95,11 +95,11 @@ pub fn request_type_from_request (
     extract_v_from_kv_pair_in_sexp ( &sexp, "request" ) ?;
   RequestType::from_client_string (&request_value) }
 
-pub fn view_id_from_request (
+pub fn viewforest_id_from_request (
   request : &str,
-) -> Result<ViewId, String> {
+) -> Result<ViewforestId, String> {
   value_from_request_sexp ( "view-id", request )
-    . map (ViewId::from_client_string) }
+    . map (ViewforestId::from_client_string) }
 
 /// Extract a value from a request like
 /// ((request . "type") (key . 'xyz))
@@ -165,29 +165,29 @@ pub(crate) fn format_fork_confirmation_response_sexp (
 /// rerender-view, etc.). The caller tags it with the appropriate
 /// TcpToClient variant.
 pub(crate) fn format_single_view_sexp (
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
   content : &str,
 ) -> String {
   sexp_to_client_string ( &Sexp::List ( vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "view-id" . to_string () )),
-      Sexp::Atom ( Atom::S ( view_id . repr_in_client () )) ] ),
+      Sexp::Atom ( Atom::S ( viewforest_id . repr_in_client () )) ] ),
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "content" . to_string () )),
       Sexp::Atom ( Atom::S ( content . to_string () )) ] ) ] )) }
 
 /// Format: ((lock-views ("VIEW_ID1" "VIEW_ID2" ...)))
 pub(crate) fn format_lock_views_sexp (
-  view_ids : &[ViewId],
+  viewforest_ids : &[ViewforestId],
 ) -> String {
-  let view_id_sexps : Vec<Sexp> =
-    view_ids . iter ()
+  let viewforest_id_sexps : Vec<Sexp> =
+    viewforest_ids . iter ()
     . map ( |u| Sexp::Atom ( Atom::S ( u . repr_in_client () )) )
     . collect ();
   sexp_to_client_string ( &Sexp::List ( vec! [
     Sexp::List ( vec! [
       Sexp::Atom ( Atom::S ( "lock-views" . to_string () )),
-      Sexp::List ( view_id_sexps ) ] ) ] )) }
+      Sexp::List ( viewforest_id_sexps ) ] ) ] )) }
 
 /// Format: ((errors ("e1" ...)) (warnings ("w1" ...)))
 pub(super) fn format_errors_warnings_sexp (

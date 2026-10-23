@@ -34,7 +34,7 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, ForkSpec, SaveNode};
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
 /// an owned container P. The buffer makes N editable and edits its
@@ -839,29 +839,29 @@ async fn fork_collateral_rerender_without_substitution (
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let ( _text, pids, p_view ) = single_root_view (
     config, Some (tantivy), &ID::from ("P") ) ?;
-  let saved_view_id : ViewId = ViewId::ContentView ("saved-P" . to_string ());
-  let collateral_view_id : ViewId = ViewId::SearchView (
+  let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved-P" . to_string ());
+  let collateral_viewforest_id : ViewforestId = ViewforestId::SearchView (
     "P before fork" . to_string ());
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
   let graph_snap = graph . load_full ();
   views_state . open_views . register_view (
-    &graph_snap, saved_view_id . clone (), p_view . clone (), &pids );
+    &graph_snap, saved_viewforest_id . clone (), p_view . clone (), &pids );
   views_state . open_views . register_view (
-    &graph_snap, collateral_view_id . clone (), p_view, &pids );
+    &graph_snap, collateral_viewforest_id . clone (), p_view, &pids );
 
   let (mut stream, _read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let buffer : String = FORK_BUFFER . replace ("P-container", "P-edited");
   let response = update_from_and_rerender_buffer (
     &mut stream, &buffer, config, tantivy, &graph,
-    &Ok (saved_view_id), &mut views_state ) . await ?;
+    &Ok (saved_viewforest_id), &mut views_state ) . await ?;
   assert! ( response . saved_view . contains ("(overridesHere N)"),
     "the saved view must substitute the clone:\n{}", response . saved_view );
 
   let collateral = views_state . open_views
-    . viewid_to_view (&collateral_view_id)
+    . viewforest_id_to_view (&collateral_viewforest_id)
     .ok_or ("the collateral view must remain open") ?;
   let collateral_text : String = viewforest_to_string (collateral, config) ?;
   assert! ( collateral_text . contains ("(id N)"),

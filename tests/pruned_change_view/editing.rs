@@ -6,7 +6,7 @@
 use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
-  insert_after_line_starting, open_all_changes_buffer, save, view_id_of,
+  insert_after_line_starting, open_all_changes_buffer, save, viewforest_id_of,
   with_fixture, without_subtree_starting};
 use crate::git_fixture_helpers::{
   mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
@@ -18,7 +18,7 @@ use skg::test_utils::{
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
-use skg::types::views_state::{DiffViewBufferKind, ViewId};
+use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -163,10 +163,10 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     open_all_changes_buffer (f) ?;
-    let content_view_id : ViewId =
-      ViewId::ContentView ( "content-view-of-ct" . to_string () );
+    let content_viewforest_id : ViewforestId =
+      ViewforestId::ContentView ( "content-view-of-ct" . to_string () );
     let content_view : String = register_content_view_of (
-      f, "ct", &content_view_id ) ?;
+      f, "ct", &content_viewforest_id ) ?;
     let edited : String = insert_after_line_starting (
       &content_view, "* (skg (node (id ct)", "** a new child" );
     let (mut stream, read_end) : (TcpStream, TcpStream) =
@@ -174,7 +174,7 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
     let response : SaveResponse = block_on (
       update_from_and_rerender_buffer_test (
         &mut stream, &edited, &f . config, &f . tantivy, &f . graph,
-        &Ok (content_view_id), &mut f . views_state )) ?;
+        &Ok (content_viewforest_id), &mut f . views_state )) ?;
     assert! ( response . errors . is_empty (),
               "the save must succeed, got {:?}", response . errors );
     drop (stream); // so that reading the stream ends
@@ -182,7 +182,7 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
       &mut BufReader::new (read_end) ) . into_iter ()
       . find ( |message| message . contains ("collateral-view")
                && message . contains (
-                 &view_id_of (DiffViewBufferKind::AllChanges) . repr_in_client () ))
+                 &viewforest_id_of (DiffViewBufferKind::AllChanges) . repr_in_client () ))
       . and_then ( |message|
         extract_string_field_from_sexp (&message, "content") )
       . expect ("the all-changes buffer is rerendered as a collateral view");
@@ -196,16 +196,16 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
               "the removed member k1 must stay:\n{}", collateral );
     Ok (( )) }) }
 
-/// Register a content view of 'root' under 'view_id'; return its text.
+/// Register a content view of 'root' under 'viewforest_id'; return its text.
 fn register_content_view_of (
   f       : &mut Fixture,
   root    : &str,
-  view_id : &ViewId,
+  viewforest_id : &ViewforestId,
 ) -> Result<String, Box<dyn Error>> {
   let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (root) ] ) ?;
   f . views_state . open_views . register_view (
-    &f . graph . load_full (), view_id . clone (), tree, &pids );
+    &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
   Ok (text) }
 
 /// The diff view shows the graph as stored: a member that an

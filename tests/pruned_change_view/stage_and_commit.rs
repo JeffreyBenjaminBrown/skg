@@ -6,7 +6,7 @@
 use crate::git_fixture::{Fixture, graph_straddle};
 use crate::pruned_change_view::common::{
   all_changes_buffer, open_all_changes_buffer, rerendered_view_content,
-  send_stage_and_commit_request, view_id_of, with_fixture};
+  send_stage_and_commit_request, viewforest_id_of, with_fixture};
 
 use skg::diff_view::change_leaves::{ChangeLeaves, LeafKey};
 use skg::git_ops::stage_and_commit::AlreadyStagedGitrepo;
@@ -256,7 +256,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
       assert! ( ! content . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views
-              . get (&view_id_of (DiffViewBufferKind::AllChanges))
+              . get (&viewforest_id_of (DiffViewBufferKind::AllChanges))
               . is_some_and ( |state| ! state . pids . is_empty ()
                               && state . diffView_buffer_kind == Some (DiffViewBufferKind::AllChanges) ));
     Ok (( )) }) }

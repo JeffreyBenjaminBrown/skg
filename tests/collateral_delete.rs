@@ -23,7 +23,7 @@ use skg::to_org::render::content_view::{
   multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::ID;
 
 fn mk_pair () -> (TcpStream, TcpStream) {
@@ -47,8 +47,8 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       let mut views_state : ViewsState = ViewsState {
         open_views        : OpenViews::new (),
         graph_straddle    : None, };
-      let p_view_id : ViewId = ViewId::ContentView ("collat-del-P" . into ());
-      let l_view_id : ViewId = ViewId::ContentView ("collat-del-L" . into ());
+      let p_viewforest_id : ViewforestId = ViewforestId::ContentView ("collat-del-P" . into ());
+      let l_viewforest_id : ViewforestId = ViewforestId::ContentView ("collat-del-L" . into ());
 
       // A view of P (showing L) stays open.
       let (p_view, p_pids, p_vf) =
@@ -57,7 +57,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       assert! ( p_view . contains ("(id L)"),
         "P's view should show L:\n{}", p_view );
       views_state . open_views . register_view (
-        &graph . load_full (), p_view_id . clone (), p_vf, &p_pids );
+        &graph . load_full (), p_viewforest_id . clone (), p_vf, &p_pids );
 
       { // A second content view rooted at L, and a search view whose
         // result list holds L, both stay open too -- the deleted node
@@ -68,13 +68,13 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
             config, Some (tantivy), &ID::from ("L") ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
-          ViewId::ContentView ("collat-del-L-2" . into ()), vf2, &pids2 );
+          ViewforestId::ContentView ("collat-del-L-2" . into ()), vf2, &pids2 );
         let (_v3, pids3, vf3) =
           single_root_view (
             config, Some (tantivy), &ID::from ("L") ) ?;
         views_state . open_views . register_view (
           &graph . load_full (),
-          ViewId::SearchView ("to X" . into ()), vf3, &pids3 ); }
+          ViewforestId::SearchView ("to X" . into ()), vf3, &pids3 ); }
 
       { // A write-protected image is not search-specific. A normal
         // multi-root content view can contain the same PID more than
@@ -90,7 +90,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
           view );
         views_state . open_views . register_view (
           &graph . load_full (),
-          ViewId::ContentView (
+          ViewforestId::ContentView (
             "collat-del-write-protected-L" . into ()), vf, &pids ); }
 
       // A second view of L alone; register it, then save it with L
@@ -99,14 +99,14 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         single_root_view (
           config, Some (tantivy), &ID::from ("L") ) ?;
       views_state . open_views . register_view (
-        &graph . load_full (), l_view_id . clone (), l_vf, &l_pids );
+        &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids );
       let delete_buffer : String =
         "* (skg (node (id L) (repo main) (editRequest delete))) [[id:X][to X]]\n"
         . to_string ();
       let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
       let response : SaveResponse =
         update_from_and_rerender_buffer (
-          &mut stream, &delete_buffer, config, tantivy, &graph, &Ok (l_view_id . clone ()), &mut views_state ) . await ?;
+          &mut stream, &delete_buffer, config, tantivy, &graph, &Ok (l_viewforest_id . clone ()), &mut views_state ) . await ?;
       drop (stream);
       let msgs : Vec<String> = {
         let mut reader : BufReader<TcpStream> = BufReader::new (read_end);

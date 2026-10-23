@@ -16,7 +16,7 @@ use crate::serve::handlers::save_buffer::{
   update_from_and_rerender_buffer_with_approvals,
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
-use crate::types::views_state::ViewId;
+use crate::types::views_state::ViewforestId;
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
@@ -397,7 +397,7 @@ pub async fn update_from_and_rerender_buffer_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  viewid_from_request_result  : &Result<ViewId, String>,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                 : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Auto-approve forks: a test driving the save directly is exercising
@@ -405,7 +405,7 @@ pub async fn update_from_and_rerender_buffer_test (
   // own shim below.
   update_from_and_rerender_buffer_with_fork_approval_test (
     stream, org_buffer_text, config, tantivy_index, graph,
-    viewid_from_request_result, views_state,
+    viewforest_id_from_request_result, views_state,
     /* approved_forks = */ true ) . await }
 
 /// Drive the full prepared-save conflict path with explicit buffer snapshots.
@@ -415,7 +415,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  viewid_from_request_result  : &Result<ViewId, String>,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                 : &mut ViewsState,
   other_views                 : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -423,7 +423,7 @@ pub async fn update_from_and_rerender_buffer_with_snapshots_test (
     skg_env_from_parts (config, tantivy_index, graph);
   update_from_and_rerender_buffer_with_approvals (
     stream, org_buffer_text, &mut env,
-    viewid_from_request_result, views_state, None,
+    viewforest_id_from_request_result, views_state, None,
     true, &HashMap::new (), &std::collections::HashSet::new (),
     &std::collections::HashSet::new (), &StrandedsReview::NotReviewed,
     other_views ) . await
@@ -438,7 +438,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  viewid_from_request_result  : &Result<ViewId, String>,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -446,7 +446,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   // inference-else-default.
   update_from_and_rerender_buffer_with_fork_skgrepos_test (
     stream, org_buffer_text, config, tantivy_index, graph,
-    viewid_from_request_result, views_state,
+    viewforest_id_from_request_result, views_state,
     approved_forks, &HashMap::new () ) . await }
 
 /// As 'update_from_and_rerender_buffer_with_fork_approval_test', but also
@@ -459,7 +459,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
-  viewid_from_request_result  : &Result<ViewId, String>,
+  viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                 : &mut ViewsState,
   approved_forks              : bool,
   fork_skgrepos               : &HashMap<ID, SkgrepoName>,
@@ -470,7 +470,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_skgrepos_test (
     stream,
     org_buffer_text,
     &mut env,
-    viewid_from_request_result,
+    viewforest_id_from_request_result,
     views_state,
     None,
     approved_forks,

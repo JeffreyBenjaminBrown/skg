@@ -30,7 +30,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::single_root_view;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 fn mk_pair () -> (TcpStream, TcpStream) {
@@ -41,11 +41,11 @@ fn mk_pair () -> (TcpStream, TcpStream) {
   let (read_end, _) = listener . accept () . unwrap ();
   (write_end, read_end) }
 
-/// Save the buffer attributed to 'view_id', returning the saved view, the
+/// Save the buffer attributed to 'viewforest_id', returning the saved view, the
 /// full SaveResponse, and the collateral views' rendered contents.
 async fn save_and_read_collateral (
   buffer      : &str,
-  view_id     : &ViewId,
+  viewforest_id : &ViewforestId,
 
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
@@ -56,7 +56,7 @@ async fn save_and_read_collateral (
   let response : SaveResponse =
     update_from_and_rerender_buffer (
       &mut stream, buffer, config, tantivy, graph,
-      &Ok (view_id . clone ()), views_state ) . await ?;
+      &Ok (viewforest_id . clone ()), views_state ) . await ?;
   drop (stream);
   let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
   let collateral_views : Vec<String> =
@@ -88,8 +88,8 @@ fn collateral_partner_folder_update_and_warning_scoping
       let mut views_state : ViewsState = ViewsState {
         open_views        : OpenViews::new (),
         graph_straddle    : None, };
-      let n_view_id : ViewId = ViewId::ContentView ("collat-N" . into ());
-      let s_view_id : ViewId = ViewId::ContentView ("collat-S" . into ());
+      let n_viewforest_id : ViewforestId = ViewforestId::ContentView ("collat-N" . into ());
+      let s_viewforest_id : ViewforestId = ViewforestId::ContentView ("collat-S" . into ());
 
       // Render N, explicitly request its subscription folders, and save it
       // under the view ID that will be updated collaterally.  subscriberFolder
@@ -102,7 +102,7 @@ fn collateral_partner_folder_update_and_warning_scoping
         "(node (viewRequests (folder subscribesTo))", 1 );
       let (n_response, initial_collateral) =
         save_and_read_collateral (
-          &n_folder_request, &n_view_id, config, tantivy, &graph,
+          &n_folder_request, &n_viewforest_id, config, tantivy, &graph,
           &mut views_state ) . await ?;
       assert! ( n_response . errors . is_empty (),
         "N's folder request should save cleanly: {:?}", n_response . errors );
@@ -123,14 +123,14 @@ fn collateral_partner_folder_update_and_warning_scoping
                 && s_view . contains ("(id N)"),
         "S's view should show N in a subscribeeFolder:\n{}", s_view );
       views_state . open_views . register_view (
-        &graph . load_full (), s_view_id . clone (), s_vf, &s_pids );
+        &graph . load_full (), s_viewforest_id . clone (), s_vf, &s_pids );
 
       // Drop N from S's subscribeeFolder (emptying it = explicit empty
       // set) and save S's view.
       let edited_s : String = drop_member_line (&s_view, "(id N)");
       let (response, collateral_views) =
         save_and_read_collateral (
-          &edited_s, &s_view_id, config, tantivy, &graph,
+          &edited_s, &s_viewforest_id, config, tantivy, &graph,
           &mut views_state ) . await ?;
 
       // CELL 1 -- collateral folder-membership update: N's view is

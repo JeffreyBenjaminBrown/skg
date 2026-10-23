@@ -19,10 +19,10 @@ use crate::serve::rerender_stream::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, sexp_to_client_string,
-  tag_sexp_response, view_id_from_request};
+  tag_sexp_response, viewforest_id_from_request};
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::SkgEnv;
-use crate::types::views_state::ViewId;
+use crate::types::views_state::ViewforestId;
 use crate::update_buffer::RerenderOptions;
 
 use std::net::TcpStream;
@@ -66,16 +66,16 @@ fn integrate_unshown_changes (
 ) -> Result<(PreparedRerenders, BufferReadinessSummary), String> {
   require_skgrepo_set_all (
     "Integrating unshown changes", skgrepo_restriction ) ?;
-  let view_id : ViewId = view_id_from_request (request) ?;
-  if views_state . open_views . diffView_buffer_kind_of_view (&view_id) . is_none () {
+  let viewforest_id : ViewforestId = viewforest_id_from_request (request) ?;
+  if views_state . open_views . diffView_buffer_kind_of_view (&viewforest_id) . is_none () {
     return Err ( format! (
       "View {} is not a buffer of the diff view.",
-      view_id . repr_in_client () )); }
+      viewforest_id . repr_in_client () )); }
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
     Some (skgrepo_restriction), None,
     RerenderOptions::for_integrating_unshown_changes,
-    |registered_view_id, _| *registered_view_id == view_id );
+    |registered_viewforest_id, _| *registered_viewforest_id == viewforest_id );
   let (Some (view), Some (straddle)) :
     (Option<&PreparedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())

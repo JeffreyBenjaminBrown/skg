@@ -39,7 +39,7 @@ use skg::types::env::SkgEnv;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::Viewnode;
-use skg::types::views_state::{OpenViews, ViewId};
+use skg::types::views_state::{OpenViews, ViewforestId};
 
 #[test]
 fn all_tests
@@ -71,11 +71,11 @@ fn empty_views_state () -> ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None, }}
 
-/// Save 'buffer' as the view 'view_id'; return the saved view and the
+/// Save 'buffer' as the view 'viewforest_id'; return the saved view and the
 /// contents of the collateral views the save sent. Panics on a refusal.
 async fn save_view (
   buffer      : &str,
-  view_id     : &ViewId,
+  viewforest_id : &ViewforestId,
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
   graph       : &InRustGraphHandle,
@@ -84,7 +84,7 @@ async fn save_view (
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
   let response : SaveResponse = update_from_and_rerender_buffer (
     &mut stream, buffer, config, tantivy, graph,
-    &Ok (view_id . clone ()), views_state ) . await ?;
+    &Ok (viewforest_id . clone ()), views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}\nbuffer:\n{}", response . errors, buffer );
   drop (stream);
@@ -156,10 +156,10 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let first_view_id : ViewId = ViewId::ContentView ("convert-k-1" . into ());
-  let second_view_id : ViewId = ViewId::ContentView ("convert-k-2" . into ());
+  let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-1" . into ());
+  let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-2" . into ());
   let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
-  save_view ( &k_view, &first_view_id, config, tantivy, &graph,
+  save_view ( &k_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let without_content : String =
     without_lines_containing (
@@ -168,7 +168,7 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
         "(id m)" ),
       "(id mc)" );
   let (_, collateral_views) : (String, Vec<String>) = save_view (
-    &without_content, &second_view_id, config, tantivy, &graph,
+    &without_content, &second_viewforest_id, config, tantivy, &graph,
     &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
@@ -178,7 +178,7 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
     "the stale branch is a write-protected non-member:\n{}", first_view );
   assert! ( the_line (first_view, "*** ", "(id mc)") . contains ("nonMember"),
     "a write-protected occurrence holds no member:\n{}", first_view );
-  save_view ( first_view, &first_view_id, config, tantivy, &graph,
+  save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
@@ -193,14 +193,14 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let x_view_id : ViewId = ViewId::ContentView ("convert-x" . into ());
-  let b_view_id : ViewId = ViewId::ContentView ("convert-b" . into ());
+  let x_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-x" . into ());
+  let b_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-b" . into ());
   let (x_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("x")) ?;
   let (x_view, _) : (String, Vec<String>) = save_view (
     &x_view . replacen (
       "(node ",
       "(node (viewRequests (folder containers))", 1 ),
-    &x_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &x_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let with_note : String = {
     let member_b : String = x_view . lines ()
       . find ( |line| line . starts_with ("*** ") && line . contains ("(id b)") )
@@ -210,13 +210,13 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
       &member_b,
       &format! ( "{}\n**** (skg (node nonMember)) a note under b", member_b ),
       1 ) };
-  save_view ( &with_note, &x_view_id, config, tantivy, &graph,
+  save_view ( &with_note, &x_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let (b_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("b")) ?;
   let (b_view, collateral_views) : (String, Vec<String>) = save_view (
     &without_lines_containing (
       &without_lines_containing (&b_view, "(id x)"), "(id xc)" ),
-    &b_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &b_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let x_after_drop : &String = collateral_views . iter ()
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
@@ -227,7 +227,7 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
   let (_, collateral_views) : (String, Vec<String>) = save_view (
     &format! ( "{}** (skg (node (id x) (repo main))) x\n\
                 *** (skg (node (id xc) (repo main))) xc\n", b_view ),
-    &b_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &b_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let x_after_return : &String = collateral_views . iter ()
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
@@ -237,7 +237,7 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
     x_after_return );
   assert! ( the_line_after (x_after_return, "*** ", "(id b)") . contains ("a note under b"),
     "the note still stands under it:\n{}", x_after_return );
-  save_view ( x_after_return, &x_view_id, config, tantivy, &graph,
+  save_view ( x_after_return, &x_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
@@ -251,7 +251,7 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let view_id : ViewId = ViewId::ContentView ("convert-d" . into ());
+  let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-d" . into ());
   let stored : Tree<Viewnode> = maybePlaced_to_placed_tree (
     org_to_uninterpreted_nodes (
       "* (skg (node (id d) (repo main))) d\n\
@@ -261,7 +261,7 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
        ** (skg (node (id e) (repo main))) e\n\
        ** (skg (node (id f) (repo main))) f\n" ) ? . 0 ) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), view_id . clone (), stored, &[ID::from ("d")] );
+    &graph . load_full (), viewforest_id . clone (), stored, &[ID::from ("d")] );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
   let all : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;
@@ -286,7 +286,7 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
   assert_eq! ( lines_containing (view, "(id f)") . len (), 1,
     "the extra leaf copy of f is gone:\n{}", view );
   drop (env);
-  save_view ( view, &view_id, config, tantivy, &graph,
+  save_view ( view, &viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
@@ -298,22 +298,22 @@ async fn a_stale_alias_goes (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let first_view_id : ViewId = ViewId::ContentView ("convert-al-1" . into ());
-  let second_view_id : ViewId = ViewId::ContentView ("convert-al-2" . into ());
+  let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-al-1" . into ());
+  let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-al-2" . into ());
   let (al_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("al")) ?;
   let requesting : String = al_view . replacen (
     "(node ",
     "(node (viewRequests (folder aliases))", 1 );
-  save_view ( &requesting, &first_view_id, config, tantivy, &graph,
+  save_view ( &requesting, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let (second_view, _) : (String, Vec<String>) = save_view (
-    &requesting, &second_view_id, config, tantivy, &graph,
+    &requesting, &second_viewforest_id, config, tantivy, &graph,
     &mut views_state ) . await ?;
   assert_eq! ( lines_containing (&second_view, "alias) one") . len (), 1,
     "the alias folder shows one:\n{}", second_view );
   let (_, collateral_views) : (String, Vec<String>) = save_view (
     &without_lines_containing (&second_view, "alias) one"),
-    &second_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
+    &second_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
   assert! ( lines_containing (first_view, "alias) one") . is_empty (),
@@ -332,7 +332,7 @@ async fn a_deleted_phantom_of_a_restricted_node_loses_its_text (
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
-  let view_id : ViewId = ViewId::ContentView ("convert-u" . into ());
+  let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-u" . into ());
   let stored : Tree<Viewnode> = maybePlaced_to_placed_tree (
     org_to_uninterpreted_nodes (
       "* (skg (node (id u) (repo public))) u\n\
@@ -341,7 +341,7 @@ async fn a_deleted_phantom_of_a_restricted_node_loses_its_text (
        ** (skg (deleted (id q2) (repo private))) q2 secret title\n\
        *** (skg (node (id qc) (repo public) nonMember)) qc\n" ) ? . 0 ) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), view_id . clone (), stored, &[ID::from ("u")] );
+    &graph . load_full (), viewforest_id . clone (), stored, &[ID::from ("u")] );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
   let mut restriction : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;

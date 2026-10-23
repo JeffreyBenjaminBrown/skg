@@ -53,7 +53,7 @@ use crate::skgrepo_sets::apply_skgrepo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::viewnode::Viewnode;
-use crate::types::views_state::{OpenViews, ViewId, ViewnodeIdRecord};
+use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -167,14 +167,14 @@ fn handle_emacs (
               &mut views_state,
               &skgrepo_restriction ),
           Ok (RequestType::CloseView) => {
-            let closed_view_id : Option<ViewId> =
+            let closed_viewforest_id : Option<ViewforestId> =
               handle_close_view_request (
                 &mut stream,
                 &request_header,
                 &mut views_state );
-            if closed_view_id . is_some ()
-               && closed_view_id == ( search_enrichment_owed_for_terms . clone ()
-                                  . map (ViewId::SearchView) ) {
+            if closed_viewforest_id . is_some ()
+               && closed_viewforest_id == ( search_enrichment_owed_for_terms . clone ()
+                                  . map (ViewforestId::SearchView) ) {
               // The client closed the search buffer before its
               // enrichment arrived, so it cannot answer a buffer snapshot
               // request.
@@ -404,10 +404,10 @@ fn enrich_search_buffer_snapshot (
           return Err ( format! ("check failed: {}", e )); }},
     Err (e) => {
       return Err ( format! ("parse failed: {}", e )); }};
-  let view_id : ViewId =
-    ViewId::SearchView ( terms . to_string () );
+  let viewforest_id : ViewforestId =
+    ViewforestId::SearchView ( terms . to_string () );
   let mut viewnode_id_record : ViewnodeIdRecord =
-    views_state . open_views . viewnode_id_record_of (&view_id);
+    views_state . open_views . viewnode_id_record_of (&viewforest_id);
   viewnode_id_record . set_owners_in_parsed_viewforest (&mut viewforest);
   insert_full_containerward_role_trees_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
@@ -470,7 +470,7 @@ fn enrich_search_buffer_snapshot (
     mk_search_enrichment_sexp (
       terms, Some (&enriched), &release_warnings );
   views_state . open_views . update_view ( // the enriched viewforest
-    &runtime . graph, &view_id, viewforest, viewnode_id_record );
+    &runtime . graph, &viewforest_id, viewforest, viewnode_id_record );
   Ok (enriched_sexp) }
 
 fn handle_verify_connection_request (

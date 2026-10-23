@@ -1,18 +1,18 @@
 use skg::serve::handlers::save_buffer::parse_save_request_envelope;
-use skg::types::views_state::ViewId;
+use skg::types::views_state::ViewforestId;
 
 #[test]
 fn accepts_exact_dirty_snapshots_and_explicit_empty_views () {
-  let saved_view_id : ViewId = ViewId::ContentView ("saved" . into ());
+  let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved" . into ());
   let empty = parse_save_request_envelope (
     "((saved-buffer \"* root\n\") (other-views ()))",
-    Some (&saved_view_id)) . unwrap ();
+    Some (&saved_viewforest_id)) . unwrap ();
   assert_eq! (empty . saved_buffer, "* root\n");
   assert! (empty . other_views . is_empty ());
 
   let parsed = parse_save_request_envelope (
     "((saved-buffer \"λ\n\") (other-views (((view-id \"other\") (dirty true) (baseline (present \"before\n\")) (current \"after\tλ\")) ((view-id \"newer\") (dirty true) (baseline unavailable) (current \"new\")) ((view-id \"clean\") (dirty false)))))",
-    Some (&saved_view_id)) . unwrap ();
+    Some (&saved_viewforest_id)) . unwrap ();
   assert_eq! (parsed . saved_buffer, "λ\n");
   assert_eq! (parsed . other_views . len (), 3);
   assert_eq! (parsed . other_views [0] . baseline . as_deref (),
@@ -25,7 +25,7 @@ fn accepts_exact_dirty_snapshots_and_explicit_empty_views () {
 
 #[test]
 fn rejects_legacy_and_ambiguous_envelopes () {
-  let saved_view_id : ViewId = ViewId::ContentView ("saved" . into ());
+  let saved_viewforest_id : ViewforestId = ViewforestId::ContentView ("saved" . into ());
   for malformed in [
     "* legacy raw Org",
     "((saved-buffer \"text\"))",
@@ -39,6 +39,6 @@ fn rejects_legacy_and_ambiguous_envelopes () {
     "((saved-buffer \"text\") (other-views (((view-id \"other\") (dirty true) (baseline (bogus \"old\")) (current \"new\")))))",
   ] {
     assert! (parse_save_request_envelope (
-      malformed, Some (&saved_view_id)) . is_err (),
+      malformed, Some (&saved_viewforest_id)) . is_err (),
       "should reject: {}", malformed); }
 }
