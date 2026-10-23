@@ -249,7 +249,7 @@ pub fn maybe_add_one_partnerFolder (
     )? . is_some ()
   { // There already is one. Don't create a new one.
     return Ok (( )); }
-  let recorder_pid : ID =
+  let viewparent_pid : ID =
     read_at_node_in_tree (
       tree, treeid,
       |vn| match &vn . kind {
@@ -268,7 +268,7 @@ pub fn maybe_add_one_partnerFolder (
     // created at all (de novo creation has no retained members).
     omit_restricted_members (
       graph . other_member_pids_gated (
-        &recorder_pid, recorder_role, skgrepo_restriction ),
+        &viewparent_pid, recorder_role, skgrepo_restriction ),
       skgrepo_restriction,
       |skgid : &ID| graph . pid_and_skgrepo (skgid)
                  . map ( |(_pid, src)| src )

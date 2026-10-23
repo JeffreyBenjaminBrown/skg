@@ -500,9 +500,9 @@ fn folder_occurrences_in_level_order (
     queue . extend ( node . children () );
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       &node . value () . kind else { continue; };
-    let in_folder : bool =
+    let parent_is_a_folder : bool =
       t . affectsParent == AffectsParent::True
       && matches! ( node . parent () . map ( |parent| &parent . value () . kind ),
                     Some (ViewnodeKind::PartnerFolder (_)) );
-    if in_folder { occurrences . push ( node . id () ); }}
+    if parent_is_a_folder { occurrences . push ( node . id () ); }}
   occurrences }

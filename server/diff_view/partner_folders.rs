@@ -47,14 +47,14 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
   straddle     : &GraphStraddle,
-  recorder_pid : &ID,
+  viewparent_pid : &ID,
   member_role  : RelationRole,
   runtime      : &RuntimeGeneration,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   warning_sink : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   let partners : Vec<Partner> =
-    straddle . partners (recorder_pid, member_role);
+    straddle . partners (viewparent_pid, member_role);
   let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
   let items : Vec<FolderGoalItem> =
     partners . iter ()
@@ -83,7 +83,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
     if let Some (sink) = warning_sink {
-      push_repair_warnings (sink, kind, recorder_pid, summary); }}
+      push_repair_warnings (sink, kind, viewparent_pid, summary); }}
   Ok (( )) }
 
 /// The goal item of a partner of a folder over the straddle: a node only
