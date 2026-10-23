@@ -57,7 +57,7 @@ fn editing_the_id_folder_aborts_the_save (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String =
-      without_lines_containing (&buffer, "(skg id (diff (presence rel+) (leaves 1))) acqd");
+      without_lines_containing (&buffer, "(skg id (diff (rel added) (leaves 1))) acqd");
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let error : String = format! ( "{:?}",
       save (f, &edited) . err ()
@@ -76,7 +76,7 @@ fn a_removed_alias_is_not_restored_by_a_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_vids (&buffer) . contains ("*** (skg removedAlias (diff (presence rel-) (leaves 1))) a1"),
+    assert! ( without_vids (&buffer) . contains ("*** (skg removedAlias (diff (rel removed) (leaves 1))) a1"),
               "{}", buffer );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (),
@@ -96,7 +96,7 @@ fn a_removed_id_does_not_abort_the_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_vids (&buffer) . contains ("*** (skg removedID (diff (presence rel-) (leaves 1))) ali-old"),
+    assert! ( without_vids (&buffer) . contains ("*** (skg removedID (diff (rel removed) (leaves 1))) ali-old"),
               "{}", buffer );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &buffer) ?;
@@ -150,7 +150,7 @@ fn a_new_child_is_created_and_shown_as_new (
               "the new child's file must exist" );
     assert! ( response . saved_view . lines () . any ( |line|
       line . starts_with ( &format! ("** (skg (node (id {})", new_child . 0) )
-      && line . contains ("(diff (presence node+ rel+)")
+      && line . contains ("(diff (node added) (rel added)")
       && line . ends_with ("a new child") ),
       "the new child must be shown as new:\n{}", response . saved_view );
     Ok (( )) }) }
@@ -187,12 +187,12 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
         extract_string_field_from_sexp (&message, "content") )
       . expect ("the all-changes buffer is rerendered as a collateral view");
     assert! ( without_vids (&collateral) . lines () . any ( |line|
-      line . contains ("(diff (presence node+ rel+)")
+      line . contains ("(diff (node added) (rel added)")
       && line . ends_with ("a new child") ),
       "the new child must be shown as new:\n{}", collateral );
     assert! ( without_vids (&collateral) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
               "txt's old text must stay:\n{}", collateral );
-    assert! ( without_vids (&collateral) . contains ("(diff (presence rel-) (leaves 1 rel)))) k1"),
+    assert! ( without_vids (&collateral) . contains ("(diff (rel removed) (leaves 1 rel)))) k1"),
               "the removed member k1 must stay:\n{}", collateral );
     Ok (( )) }) }
 

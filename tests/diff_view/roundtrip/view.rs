@@ -26,11 +26,10 @@ use skg::diff_view::change_viewnodes::{
   append_acquired_folder, append_historical_phantom_content, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_relRepo_move_viewnode};
 use skg::to_org::render::content_view::multi_root_view;
-use skg::types::git::Sign;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
-  ChangesetMarkerKind, Phantom, Property, Viewnode, ViewnodeKind,
+  ChangesetMarkerKind, Existence, Phantom, Property, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use skg::types::views_state::ViewId;
 
@@ -74,7 +73,7 @@ fn append_historical_phantom (
   parent   : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
-  rel      : Option<Sign>,
+  rel      : Option<Existence>,
 ) -> Option<NodeId> {
   let phantom : NodeId = tree . get_mut (parent) ? . append (
     mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
@@ -104,7 +103,7 @@ fn buffer_with_every_new_viewnode (
   let b : NodeId = treeid_of (&tree, "b");
   { // gone, a removed member of p, where it stood: before b.
     let gone : NodeId = append_historical_phantom (
-      &mut tree, p, &straddle, &ID::from ("gone"), Some (Sign::Minus) )
+      &mut tree, p, &straddle, &ID::from ("gone"), Some (Existence::Removed) )
       . expect ("gone is in the before-graph only");
     move_before (&mut tree, b, gone) ?; }
   for kind in ChangesetMarkerKind::ALL . into_iter () . rev () {
@@ -140,17 +139,17 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?;
     let atoms : [&str; 14] = [
-      "(historical (id gone) (repo main) (diff (presence node- rel-)))",
-      "(historical (id gc) (repo main) (diff (presence node- rel-)))",
-      "(diff (presence rel-)))) kept", // a surviving member under gone
-      "(unknown (id ghost) (diff (presence rel-)))",
+      "(historical (id gone) (repo main) (diff (node removed) (rel removed)))",
+      "(historical (id gc) (repo main) (diff (node removed) (rel removed)))",
+      "(diff (rel removed)))) kept", // a surviving member under gone
+      "(unknown (id ghost) (diff (rel removed)))",
       "(oldText titleAndBody)", "bodyDiff",
       "(homeSkgrepoMove (old main) (new elsewhere))",
       "(relRepoMove (old main) (new elsewhere))",
       "(changesetMarker content)", "(changesetMarker relRepo)",
       "(changesetMarker orderOnly)",
       "acquiredFolder", "acquiredByFolder",
-      "(historical (id acquired) (repo main) (diff (presence node-)))" ];
+      "(historical (id acquired) (repo main) (diff (node removed)))" ];
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let mut saved : String = buffer;
     for _ in 0 .. 2 {
@@ -181,8 +180,8 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     let buffer : String = buffer_with_every_new_viewnode (f) ?
       . replace ( "(skg (oldText titleAndBody))",
                   "(skg (oldText titleAndBody) (diff (readyRequest)))" )
-      . replace ( "(historical (id gone) (repo main) (diff (presence node- rel-)))",
-                  "(historical (id gone) (repo main) (diff (presence node- rel-) (readyRequest node)))" );
+      . replace ( "(historical (id gone) (repo main) (diff (node removed) (rel removed)))",
+                  "(historical (id gone) (repo main) (diff (node removed) (rel removed) (readyRequest node)))" );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );

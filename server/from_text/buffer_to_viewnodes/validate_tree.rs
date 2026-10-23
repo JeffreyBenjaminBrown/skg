@@ -114,7 +114,7 @@ pub fn find_buffer_errors_for_saving (
 /// plus extra_ids). Reordering passes (the order is view-local:
 /// the rerender keeps it); adding, deleting or text-editing an ID property fails,
 /// with a message naming the escape hatch (edit the .skg file
-/// directly). In the diff view, an ID entry tagged '(presence rel-)'
+/// directly). In the diff view, an ID entry tagged '(rel removed)'
 /// is a lost ID, not a membership claim, and is excluded before
 /// comparing. An absent idFolder means no opinion, as
 /// for other folders. Shapes that other validations reject (an idFolder

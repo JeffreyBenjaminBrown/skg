@@ -7,7 +7,6 @@
 /// aliases, IDs, and partner folders.
 
 use super::errors::HeadlineName;
-use super::git::{NodeSign, Sign};
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -49,15 +48,14 @@ pub enum Birth {
 }
 
 /// The diff view's facts about one viewnode, the parts of its
-/// '(diff ...)' form: which graphs of the graph straddle hold its
-/// node and its relationship to its viewparent ('(presence ...)'),
-/// which leaves a request on it may name ('(leaves ...)'), and which
-/// of its change-forest leaves are marked commit-ready ('(ready
-/// ...)'). Display facts: the view derives them, and a save reads
-/// nothing from them.
+/// '(diff ...)' form: the three kinds of change ('(node ...)',
+/// '(rel ...)', '(properties changed)'), which leaves a request on it
+/// may name ('(leaves ...)'), and which of its change-forest leaves
+/// are marked commit-ready ('(ready ...)'). Display facts: the view
+/// derives them, and a save reads nothing from them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangeFacts {
-  pub presence : DiffPresence,
+  pub change   : DiffChange,
   /// None when nothing is ready. 'Some' of an empty set is the bare
   /// '(ready)' of a leaf with a single object.
   pub ready    : Option<BTreeSet<DiffObject>>,
@@ -78,16 +76,28 @@ pub struct LeavesFact {
   pub objects : BTreeSet<DiffObject>,
 }
 
-/// The '(presence ATOMS)' of a viewnode, from 'node+ node- node~
-/// rel+ rel-'. None on the node means it is in both graphs of the
-/// straddle and records no leaf, or that the object does not apply;
-/// None on the relationship, that it is in both graphs, or does not
-/// apply.
+/// The three kinds of change a viewnode shows, the first three parts
+/// of its '(diff ...)' form: its node's existence ('(node added)',
+/// '(node removed)'), the existence of its relationship to its
+/// viewparent ('(rel added)', '(rel removed)'), and whether its node's
+/// other properties changed ('(properties changed)'). None on an
+/// existence means the thing is in both graphs of the straddle, or
+/// that it does not apply. A node in only one graph has no other
+/// properties to compare, so 'properties' is true only when 'node' is
+/// None. On a property leaf the one existence it shows is 'rel': that
+/// of its entry in its folder.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct DiffPresence {
-  pub node : Option<NodeSign>,
-  pub rel  : Option<Sign>,
+pub struct DiffChange {
+  pub node       : Option<Existence>,
+  pub rel        : Option<Existence>,
+  pub properties : bool,
 }
+
+/// One step of change between the two graphs of a straddle: 'Added'
+/// when only the after-graph holds the thing (a node, a relationship,
+/// a folder entry), 'Removed' when only the before-graph does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Existence { Added, Removed }
 
 /// The diff objects of a viewnode's change-forest leaves: 'node' (the node's
 /// own existence), 'rel' (its relationship to its viewparent), and
@@ -286,9 +296,9 @@ pub struct PhantomUnknown {
 /// reconciler owns it.
 ///
 /// DISTINCT INFO: the before-graph's title, body and home skgrepo.
-/// Its viewnode's change facts are those of its existence (node-) and
-/// of its relationship to its viewparent (rel-), each a change-forest
-/// leaf.
+/// Its viewnode's change facts are those of its existence ('(node
+/// removed)') and of its relationship to its viewparent ('(rel
+/// removed)'), each a change-forest leaf.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomHistorical {
   pub skgid             : ID,
@@ -870,21 +880,42 @@ impl Phantom {
     } }
 }
 
-impl DiffPresence {
-  /// The '(presence ...)' atoms, the node object first.
-  pub fn atoms (
+impl DiffChange {
+  /// The forms of the change, in their order on the wire: '(node
+  /// added|removed)', '(rel added|removed)', '(properties changed)',
+  /// each only when true.
+  pub fn forms (
     &self,
-  ) -> Vec<&'static str> {
-    let node : Option<&'static str> = self . node . map ( |sign| match sign {
-      NodeSign::Plus => "node+", NodeSign::Minus => "node-",
-      NodeSign::Modified => "node~" } );
-    let rel : Option<&'static str> = self . rel . map ( |sign| match sign {
-      Sign::Plus => "rel+", Sign::Minus => "rel-" } );
-    node . into_iter () . chain (rel) . collect () }
+  ) -> Vec<String> {
+    let existence = |head : &str, existence : Option<Existence>| -> Option<String> {
+      existence . map ( |existence|
+        format! ( "({} {})", head, existence . wire_name () )) };
+    existence ("node", self . node) . into_iter ()
+      . chain ( existence ("rel", self . rel) )
+      . chain ( self . properties . then ( ||
+        "(properties changed)" . to_string () ))
+      . collect () }
 
   /// The atoms the serializer can emit, for the herald conformance test.
-  pub const EMITTABLE_ATOMS : [&'static str; 5] =
-    [ "node+", "node-", "node~", "rel+", "rel-" ];
+  pub const EMITTABLE_ATOMS : [&'static str; 6] =
+    [ "node", "rel", "added", "removed", "properties", "changed" ];
+}
+
+impl Existence {
+  pub fn wire_name (
+    self,
+  ) -> &'static str {
+    match self {
+      Existence::Added   => "added",
+      Existence::Removed => "removed", } }
+
+  pub fn from_wire_name (
+    name : &str,
+  ) -> Option<Existence> {
+    match name {
+      "added"   => Some (Existence::Added),
+      "removed" => Some (Existence::Removed),
+      _         => None, } }
 }
 
 impl DiffObject {

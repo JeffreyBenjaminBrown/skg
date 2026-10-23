@@ -394,7 +394,7 @@ the first occurrence of AFTER (or at buffer start), then return
 
 (ert-deftest test-skg-id-and-repo-of-a-historical-phantom ()
   "A historical phantom's metadata yields its id and repo."
-  (let ((sexp '(skg (historical (id gone) (repo main) (diff (presence node- rel-))))))
+  (let ((sexp '(skg (historical (id gone) (repo main) (diff (node removed) (rel removed))))))
     (should (skg--metadata-sexp-contains-id-p sexp))
     (should (equal (skg--extract-id-from-metadata-sexp sexp) "gone"))
     (should (equal (skg--extract-repo-from-metadata-sexp sexp) "main"))))

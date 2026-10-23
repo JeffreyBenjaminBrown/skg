@@ -8,7 +8,7 @@
 /// - A `goal_list` is the ordered list of goal items, one per node
 ///   ID, that a folder should present after completion.  The list is
 ///   computed from the graph, or from the union of a graph straddle,
-///   whose items carry a presence and a shape ('FolderGoalItem').
+///   whose items carry a change and a shape ('FolderGoalItem').
 /// - A goal child is a child Viewnode whose UnrestrictedVognode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
@@ -28,7 +28,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::diff_view::shallow_model_subtree::{
   adopt_model_facts, is_unrestricted_removed_member};
-use crate::types::viewnode::{DiffPresence, FolderKind, Owner, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffChange, FolderKind, Owner, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -54,10 +54,10 @@ pub struct ChildData {
 #[derive(Clone, Debug)]
 pub struct FolderGoalItem {
   pub skgid    : ID,
-  /// The presence of its node and of its relationship to the
-  /// folder's viewparent, when the folder shows the union of a graph
-  /// straddle; None from the live graph.
-  pub presence : Option<DiffPresence>,
+  /// The change of its node and of its relationship to the folder's
+  /// viewparent, when the folder shows the union of a graph straddle;
+  /// None from the live graph.
+  pub change   : Option<DiffChange>,
   pub shape    : FolderGoalShape,
 }
 
@@ -84,7 +84,7 @@ impl FolderGoalItem {
     skgids . iter ()
       . map ( |skgid| FolderGoalItem {
         skgid    : skgid . clone (),
-        presence : None,
+        change   : None,
         shape    : FolderGoalShape::Member, } )
       . collect () }
 }
@@ -281,12 +281,12 @@ fn viewnode_of_goal_item (
         d . title . clone (),
         match shape { FolderGoalShape::Removed => AffectsParent::False,
                       _ => AffectsParent::True, } ) } }, };
-  if let Some (presence) = item . presence {
-    viewnode . change_facts . presence = presence; }
+  if let Some (change) = item . change {
+    viewnode . change_facts . change = change; }
   Ok (viewnode) }
 
 /// Give each child that a goal item matched the item's shape, keeping
-/// the viewnode and its fold state, and the item's presence. A member
+/// the viewnode and its fold state, and the item's change. A member
 /// keeps what it is (an editable subscribee stays editable), unless
 /// it stood as a historical phantom, and is a member
 /// (affectsParent=true) even if it stood as a removed member; a
@@ -325,8 +325,8 @@ fn apply_goal_shapes (
           t . write_protect (); }},
       _ => adopt_model_facts (
         viewnode, &viewnode_of_goal_item (item, child_data, label) ? ), }
-    if let Some (presence) = item . presence {
-      viewnode . change_facts . presence = presence; }}
+    if let Some (change) = item . change {
+      viewnode . change_facts . change = change; }}
   Ok (( )) }
 
 /// An already-open PartnerFolder can still hold an Unrestricted occurrence after its

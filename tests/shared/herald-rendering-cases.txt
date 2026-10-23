@@ -231,27 +231,27 @@
 ---- text: merge:y
 ---- styles: nonstandard*7
 ==== diff view: a new member whose node object is ready
-(skg (node (id x) (diff (presence node+ rel+) (ready node))))
+(skg (node (id x) (diff (node added) (rel added) (ready node))))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: a modified node
-(skg (node (id x) (diff (presence node~) (leaves 2 all))))
+(skg (node (id x) (diff (properties changed) (leaves 2 all))))
 ---- text: M
 ---- styles: nonstandard*1
 ==== diff view: a modified node in a new relationship, every leaf it records ready
-(skg (node (id x) (diff (presence node~ rel+) (leaves 3 rel all) (ready all))))
+(skg (node (id x) (diff (rel added) (properties changed) (leaves 3 rel all) (ready all))))
 ---- text: M✓ ~+
 ---- styles: nonstandard*1 go*1 -*1 nonstandard*2
 ==== diff view: each ✓ follows its own object, whatever the raw order of the parts
-(skg (node (id x) (diff (ready rel node) (presence rel- node+))))
+(skg (node (id x) (diff (ready rel node) (node added) (rel removed))))
 ---- text: ∃+✓ ~-✓
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
 ==== diff view: an added alias, ready
-(skg alias (diff (presence rel+) (ready)))
+(skg alias (diff (rel added) (ready)))
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
 ==== diff view: a deleted node with a request to unmark it
-(skg (deleted (id x) (diff (presence node-) (unreadyRequest))))
+(skg (deleted (id x) (diff (node removed) (unreadyRequest))))
 ---- text: DELETED ∃- request:unready
 ---- styles: message*7 -*1 nonstandard*2 -*1 nonstandard*15
 ==== diff view: a request to mark both objects of a member
@@ -283,7 +283,7 @@
 ---- text: relationship moved from pub to priv
 ---- styles: message*23 -*1 normal*3 -*1 message*2 -*1 normal*4
 ==== diff view: the content changeset marker, ready
-(skg (changesetMarker content) (diff (ready)))
+(skg (changesetMarker content) (diff (ready all)))
 ---- text: its content changed✓
 ---- styles: message*19 go*1
 ==== diff view: the relRepo changeset marker
@@ -291,11 +291,11 @@
 ---- text: some content relationships changed skgrepo
 ---- styles: message*42
 ==== diff view: the order-only changeset marker
-(skg (changesetMarker orderOnly) (diff (ready)))
+(skg (changesetMarker orderOnly) (diff (ready all)))
 ---- text: order-only change✓
 ---- styles: message*17 go*1
 ==== diff view: a historical phantom, its existence ready
-(skg (historical (id x) (repo main) (diff (presence node- rel-) (ready node))))
+(skg (historical (id x) (repo main) (diff (node removed) (rel removed) (ready node))))
 ---- text: ☮ ∃-✓ ~-
 ---- styles: crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: the acquired-by folder
@@ -307,7 +307,7 @@
 ---- text: ☮ it acquired
 ---- styles: crucial*1 -*1 message*11
 ==== diff view: a folder of recorders shown because of a change, ready
-(skg (containerFolder changed) (ready))
+(skg (containerFolder changed) (diff (ready)))
 ---- text: ☮ its containers changed (other files)✓
 ---- styles: crucial*1 -*1 message*36 go*1
 ==== diff view: a folder of the node's own list shown because of a change

@@ -4,11 +4,10 @@
 //! judged by the graph alone: it must say what the graph says.
 
 use crate::types::errors::{BufferValidationError, HeadlineName};
-use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{AffectsParent, PartnerFolder, Phantom, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{AffectsParent, Existence, PartnerFolder, Phantom, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -121,15 +120,15 @@ fn partnerFolder_differences_from_graph (
 /// with the graph:
 /// - an unrestricted vognode that affects the folder;
 /// - an unknown phantom (a partner no node has), unless its
-///   relationship sign is '-'.
+///   relationship was removed ('(rel removed)').
 /// Every other child is the user's or the diff view's and is not
 /// counted. In particular a removed member, of either kind, is not:
 /// it stands for a relationship the before-graph had and the
 /// after-graph lacks, so counting it would refuse the folder the diff
 /// view rendered. The diff view shows a removed member as a non-member
-/// unrestricted vognode with '(presence rel-)', or, when the partner
-/// is dangling, as an unknown phantom with that sign; the first is
-/// excluded by its non-membership, the second by its sign.
+/// unrestricted vognode with '(rel removed)', or, when the partner
+/// is dangling, as an unknown phantom with that part; the first is
+/// excluded by its non-membership, the second by that part.
 fn partnerFolder_members_in_view (
   folder : NodeRef<Viewnode>,
   graph  : &InRustGraph,
@@ -140,8 +139,8 @@ fn partnerFolder_members_in_view (
         if member . affectsParent == AffectsParent::True =>
         member . relRepo_request . clone (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown)))
-        if child . value () . change_facts . presence . rel
-           != Some (Sign::Minus) =>
+        if child . value () . change_facts . change . rel
+           != Some (Existence::Removed) =>
         unknown . relRepo_request . clone (),
       _ => return None, };
     Some (( skgid_a_folder_child_stands_for (child . value (), graph) ?,
@@ -526,15 +525,15 @@ mod tests {
   }
 
   /// As a buffer of the diff view shows the folder: each member
-  /// with its presence facts.
+  /// with the existence of its relationship.
   #[test]
   fn a_subscribee_folder_with_an_extra_member_is_refused_in_a_diffView_buffer () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id sub) (repo main) writeProtected (diff (presence rel+)))) sub
+      *** (skg (node (id sub) (repo main) writeProtected (diff (rel added)))) sub
       *** (skg (node (id private_sub) (repo private) writeProtected)) private_sub
-      *** (skg (node (id c1) (repo main) writeProtected (diff (presence rel+)))) c1
+      *** (skg (node (id c1) (repo main) writeProtected (diff (rel added)))) c1
     "});
     assert_eq! (refused_changes (&errors),
                 vec! ["changed subscriptions" . to_string ()]);
@@ -620,12 +619,12 @@ mod tests {
   }
 
   /// A dangling removed member, as the diff view shows one (an
-  /// unknown phantom with '(presence rel-)'), is not counted: the
+  /// unknown phantom with '(rel removed)'), is not counted: the
   /// folder beside it says what the graph says, and passes. The same
-  /// phantom without the sign is a member, compared by its raw ID as
+  /// phantom without that part is a member, compared by its raw ID as
   /// any unknown member is, and recorder does not list it.
   #[test]
-  fn an_unknown_phantom_with_the_sign_minus_is_not_counted () {
+  fn an_unknown_phantom_whose_relationship_was_removed_is_not_counted () {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
     let text_with = |gone : &str| -> String { format! (
       "* (skg (node (id recorder) (repo main) writeProtected)) recorder
@@ -636,7 +635,7 @@ mod tests {
 ", gone ) };
     assert_eq! (
       errors_for_writeProtected_occurrences (
-        &forest (&text_with ("(skg (unknown (id gone) (diff (presence rel-))))")),
+        &forest (&text_with ("(skg (unknown (id gone) (diff (rel removed))))")),
         &graph, &config (), None ),
       vec! [] );
     assert_eq! (
@@ -665,14 +664,14 @@ mod tests {
         .. node ("x") } ]) }
 
   /// A removed member, as the diff view shows one (a non-member with
-  /// '(presence rel-)'), is not counted, nor is any other non-member.
+  /// '(rel removed)'), is not counted, nor is any other non-member.
   #[test]
   fn a_removed_member_is_not_counted () {
     assert_eq! (errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) (affectsParent false) writeProtected (diff (presence rel-)))) c1
+      *** (skg (node (id c1) (repo main) (affectsParent false) writeProtected (diff (rel removed)))) c1
       *** (skg (node (id c2) (repo main) writeProtected (affectsParent false))) c2
     "}), vec! []);
   }
@@ -685,7 +684,7 @@ mod tests {
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) writeProtected (diff (presence rel-)))) c1
+      *** (skg (node (id c1) (repo main) writeProtected (diff (rel removed)))) c1
     "})), vec! ["changed containers" . to_string ()]);
   }
 

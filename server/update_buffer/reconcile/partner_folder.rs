@@ -30,7 +30,7 @@ pub enum PartnerFolderGoalSource<'a> {
   /// The live graph.
   LiveGraph,
   /// The union of a graph straddle: the members of either graph, each
-  /// tagged with the presence of its node and of its relationship.
+  /// tagged with the change of its node and of its relationship.
   GraphStraddle (&'a GraphStraddle),
 }
 

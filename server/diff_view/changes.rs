@@ -4,8 +4,9 @@
 //! historical phantom's.
 //!
 //! On an editable occurrence: the content members (which the content
-//! reconciler made from the after-graph) are tagged with the presence
-//! of their node and of their relationship, members outside U that
+//! reconciler made from the after-graph) are tagged with the three
+//! kinds of change (their node's existence and other properties, and
+//! their relationship's existence), members outside U that
 //! were not editable already become write-protected members
 //! without their content, and the former members stand where
 //! 'phantom_insertion_plan' places them. A node in C also gets, ahead
@@ -42,7 +43,6 @@ use crate::diff_view::change_viewnodes::{
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::shallow_model_subtree::{
   adopt_model_facts, reconcile_children_with_shallowModelSubtree};
-use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -53,7 +53,7 @@ use crate::types::tree::moves::{
   place_created_children_after_their_model_predecessors};
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
-  AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffPresence,
+  AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
   Editability, Owner, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
@@ -162,7 +162,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         ( t . skgid . clone (), ! t . is_writeProtected () ),
       _ => return Ok (( )), };
-  sign_root (tree, treeid, straddle, &pid) ?;
+  tag_root (tree, treeid, straddle, &pid) ?;
   let content : Vec<Partner> =
     straddle . partners (&pid, RelationRole::CONTENT);
   if ! editable {
@@ -211,22 +211,23 @@ pub(crate) fn process_unrestrictedVognode_changes (
     tree, treeid, &order, &created ) ?;
   Ok (( )) }
 
-/// A root is signed at its own visit, as a member is at its
-/// viewparent's ('tag_content_members'): '∃+' when new, 'M' when
-/// modified ('GraphStraddle::node_sign'). Nothing for a non-root.
-fn sign_root (
+/// A root is tagged at its own visit, as a member is at its
+/// viewparent's ('tag_content_members'): '(node added)' when new,
+/// '(properties changed)' when modified ('GraphStraddle::node_change').
+/// Nothing for a non-root.
+fn tag_root (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Result<(), Box<dyn Error>> {
   let is_root : bool =
-    tree . get (treeid) . ok_or ("sign_root: node not found") ?
+    tree . get (treeid) . ok_or ("tag_root: node not found") ?
     . parent () . is_some_and ( |parent|
       matches! ( parent . value () . kind, ViewnodeKind::BufferRoot ));
   if is_root {
     tree . get_mut (treeid) . unwrap () . value ()
-      . change_facts . presence . node = straddle . node_sign (pid); }
+      . change_facts . change = straddle . node_change (pid, None); }
   Ok (( )) }
 
 /// Before the content reconciler runs at an editable node's visit,
@@ -406,7 +407,7 @@ pub(crate) fn deleted_phantom_becomes_historical (
         _ => None, } )) };
   if straddle . node_presence (&skgid) != Some (Presence::OnlyBefore) {
     return Ok (false); }
-  let rel : Option<Sign> = // its relationship to a viewparent that contained it
+  let rel : Option<Existence> = // its relationship to a viewparent that contained it
     parent_pid . and_then ( |parent_pid|
       straddle . partners (&parent_pid, RelationRole::CONTENT) . into_iter ()
       . find ( |partner| partner . id == skgid )
@@ -518,7 +519,7 @@ fn changed_partner_folders (
   folders }
 
 /// Tag each content member, and each non-member child whose node is
-/// content, with the presence of its node and of its relationship,
+/// content, with the three kinds of change of its node and its relationship,
 /// show a member outside U as a write-protected member without its
 /// content unless it was
 /// editable before completion ('u_and_editable', when given), and
@@ -549,9 +550,8 @@ fn tag_content_members (
           // A non-member whose node is content (as under a
           // write-protected node) is tagged too, but never recreated.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
-          viewnode . change_facts . presence = DiffPresence {
-            node : straddle . node_sign (&t . skgid),
-            rel  : partner . and_then ( |p| p . presence . diff_sign () ), };
+          viewnode . change_facts . change = straddle . node_change (
+            &t . skgid, partner . and_then ( |p| p . presence . diff_sign () ));
           if t . affectsParent == AffectsParent::True
              && u_and_editable . is_some_and ( |(u, writable)|
             ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
@@ -559,7 +559,7 @@ fn tag_content_members (
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
-          viewnode . change_facts . presence . rel =
+          viewnode . change_facts . change . rel =
             by_id . get (&unknown . skgid)
             . and_then ( |p| p . presence . diff_sign () ); },
         _ => continue, }}
@@ -599,7 +599,7 @@ fn reconcile_removed_content_members (
   for (removed, anchor) in plan {
     let removed_viewnode : Option<Viewnode> = match straddle . node_presence (&removed) {
       Some (Presence::OnlyBefore) =>
-        mk_historical_viewnode (straddle, &removed, Some (Sign::Minus)),
+        mk_historical_viewnode (straddle, &removed, Some (Existence::Removed)),
       Some (_) => Some (
         mk_removed_member_viewnode (straddle, &removed, u)
         . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? ),
@@ -698,14 +698,14 @@ fn append_changed_property_folders (
   if aspects . aliases {
     append_property_folder (
       tree, treeid, PropertyFolder::Alias,
-      signed_union ( &before . alias_texts (), &after . alias_texts () )
+      union_with_existence ( &before . alias_texts (), &after . alias_texts () )
       . into_iter ()
-      . map ( |(text, sign)| match sign {
-        Some (Sign::Minus) => entry_viewnode (
-          Property::RemovedAlias { text }, sign ),
+      . map ( |(text, existence)| match existence {
+        Some (Existence::Removed) => entry_viewnode (
+          Property::RemovedAlias { text }, existence ),
         _ => entry_viewnode (
           Property::Alias { text, relRepo : None, relRepo_request : None },
-          sign ), } )
+          existence ), } )
       . collect () ); }
   if aspects . extra_ids {
     let ids = |node : &GraphnodeInRust| -> Vec<ID> {
@@ -713,55 +713,56 @@ fn append_changed_property_folders (
         . chain ( node . extra_ids . iter () . cloned () ) . collect () };
     append_property_folder (
       tree, treeid, PropertyFolder::ID,
-      signed_union ( &ids (before), &ids (after) ) . into_iter ()
-      . map ( |(skgid, sign)| match sign {
-        Some (Sign::Minus) => entry_viewnode (
-          Property::RemovedID { skgid }, sign ),
-        _ => entry_viewnode ( Property::ID { skgid }, sign ), } )
+      union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
+      . map ( |(skgid, existence)| match existence {
+        Some (Existence::Removed) => entry_viewnode (
+          Property::RemovedID { skgid }, existence ),
+        _ => entry_viewnode ( Property::ID { skgid }, existence ), } )
       . collect () ); }
   if aspects . flags {
     append_property_folder (
       tree, treeid, PropertyFolder::flags (),
       Flag::ALL . into_iter ()
       . filter_map ( |flag| {
-        let sign : Option<Sign> =
+        let existence : Option<Existence> =
           match ( before . flags . contains (&flag),
                   after  . flags . contains (&flag) ) {
-            (false, true)  => Some (Sign::Plus),
-            (true,  false) => Some (Sign::Minus),
+            (false, true)  => Some (Existence::Added),
+            (true,  false) => Some (Existence::Removed),
             (true,  true)  => None,
             (false, false) => return None, };
         Some ( entry_viewnode (
           Property::Flag { flag, title : String::new (), body : None },
-          sign )) } )
+          existence )) } )
       . collect () ); }
   }
 
 /// The entries of the union of two lists, in the order of their
-/// interleaved diff, each with + if only the new list holds it and
-/// - if only the old one does.
-fn signed_union<T : Clone + Eq + Hash + Ord> (
+/// interleaved diff, each added if only the new list holds it and
+/// removed if only the old one does.
+fn union_with_existence<T : Clone + Eq + Hash + Ord> (
   old : &[T],
   new : &[T],
-) -> Vec<(T, Option<Sign>)> {
+) -> Vec<(T, Option<Existence>)> {
   let old_set : HashSet<&T> = old . iter () . collect ();
   interleaved_diff_without_reorders (old, new) . into_iter ()
     . map ( |item| match item {
-      Diff_Item::Removed (x) => (x, Some (Sign::Minus)),
+      Diff_Item::Removed (x) => (x, Some (Existence::Removed)),
       Diff_Item::Unchanged (x) | Diff_Item::New (x) => {
-        let sign : Option<Sign> =
-          ( ! old_set . contains (&x) ) . then_some (Sign::Plus);
-        (x, sign) }, } )
+        let existence : Option<Existence> =
+          ( ! old_set . contains (&x) ) . then_some (Existence::Added);
+        (x, existence) }, } )
     . collect () }
 
-/// A property folder's entry, whose presence in the folder is 'sign'.
+/// A property folder's entry, whose existence in the folder changed
+/// by 'existence'.
 fn entry_viewnode (
   property : Property,
-  sign     : Option<Sign>,
+  existence : Option<Existence>,
 ) -> Viewnode {
   Viewnode {
     change_facts : ChangeFacts {
-      presence : DiffPresence { node : None, rel : sign },
+      change : DiffChange { rel : existence, .. DiffChange::default () },
       ready    : None,
       leaves   : None },
     .. viewnode_of ( ViewnodeKind::Property (property) ) } }

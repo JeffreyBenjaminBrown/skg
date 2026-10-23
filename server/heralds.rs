@@ -23,7 +23,7 @@
 use crate::sexp_string::quote_sexp_string;
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangesetMarkerKind, DiffPresence, PartnerFolder, Property, PropertyFolder,
+  ChangesetMarkerKind, DiffChange, PartnerFolder, Property, PropertyFolder,
   DiffObject, ViewRequest};
 
 use serde_json::Value;
@@ -268,46 +268,51 @@ fn changed_folder_rules (
     changed (PartnerFolder::Hidden . repr_in_client (), true,
              "the nodes it hides changed (this file)") ] }
 
-/// The diff view's '(diff ...)' form on a vognode: its '(presence
-/// ...)' as ∃+ ∃- M (the node itself: new, deleted or modified) and
-/// ~+ ~- (its relationship to its viewparent), each followed by a ✓
-/// when '(ready ...)' names that diff object ('all' for M), then the
-/// readiness request. '(leaves ...)' is
-/// for the clients' gestures and shows nothing. The same part is
+/// The diff view's '(diff ...)' form on a vognode: its node's
+/// existence ('(node added)', '(node removed)') as ∃+ ∃-, its other
+/// properties ('(properties changed)') as M, and the existence of its
+/// relationship to its viewparent ('(rel added)', '(rel removed)') as
+/// ~+ ~-, each followed by a ✓ when '(ready ...)' names that diff
+/// object ('all' for M), then the readiness request. '(leaves ...)'
+/// is for the clients' gestures and shows nothing. The ready part is
 /// matched once per object, so each ✓ lands after its own object
 /// whatever the raw order.
 fn change_fact_rules_for_two_objects (
 ) -> Vec<RuleChild> {
   vec! [
     rule ("diff", vec! [
-      rule ("presence", vec! [
-        leaf_styled_as ("presence", "node+", "∃+"),
-        leaf_styled_as ("presence", "node-", "∃-"),
-        leaf_styled_as ("presence", "node~", "M") ]),
+      rule ("node", vec! [
+        leaf_styled_as ("existence", "added",   "∃+"),
+        leaf_styled_as ("existence", "removed", "∃-") ]),
+      rule ("properties", vec! [
+        leaf_styled_as ("properties", "changed", "M") ]),
       rule ("ready", vec! [ leaf_abut_styled_as ("ready", "node", "✓"),
                             leaf_abut_styled_as ("ready", "all",  "✓") ]),
-      rule ("presence", vec! [
-        leaf_styled_as ("presence", "rel+", "~+"),
-        leaf_styled_as ("presence", "rel-", "~-") ]),
+      rule ("rel", vec! [
+        leaf_styled_as ("existence", "added",   "~+"),
+        leaf_styled_as ("existence", "removed", "~-") ]),
       rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
       vac ("leaves"),
       readiness_request_rule ("readyRequest",   "request:ready"),
       readiness_request_rule ("unreadyRequest", "request:unready") ]) ] }
 
-/// The same for a leaf with a single diff object (a property leaf, a deleted
-/// or unknown phantom), whose '(ready)' names no object. 'plus' and
-/// 'minus' render its presence atoms, whichever object they name.
+/// The same for a leaf with a single diff object (a property leaf, a
+/// deleted or unknown phantom), whose '(ready)' names no object, or
+/// 'all' on a changeset marker, and for a changed folder's '(diff
+/// (ready))'. 'added' and 'removed' render its existence, whichever
+/// object it names.
 fn change_fact_rules_for_one_object (
-  plus  : &'static str,
-  minus : &'static str,
+  added   : &'static str,
+  removed : &'static str,
 ) -> Vec<RuleChild> {
+  let existence = |object : &'static str| -> RuleChild {
+    rule ( object, vec! [
+      leaf_styled_as ("existence", "added",   added),
+      leaf_styled_as ("existence", "removed", removed) ] ) };
   vec! [
     rule ("diff", vec! [
-      rule ("presence", vec! [
-        leaf_styled_as ("presence", "node+", plus),
-        leaf_styled_as ("presence", "node-", minus),
-        leaf_styled_as ("presence", "rel+",  plus),
-        leaf_styled_as ("presence", "rel-",  minus) ]),
+      existence ("node"),
+      existence ("rel"),
       rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
       vac ("leaves"),
       readiness_request_rule ("readyRequest",   "request:ready"),
@@ -445,11 +450,10 @@ pub fn herald_rule_table () -> HeraldRule {
       diffView_property_rules (),
       changed_folder_rules (),
       // The diff view's facts on a property leaf: + and - for
-      // its presence, ✓ when ready.
+      // its existence in its folder, ✓ when ready; and a changed
+      // folder's '(diff (ready))'.
       change_fact_rules_for_one_object ("+", "-"),
       vec! [
-      // A changed folder's bare '(ready)', outside any '(diff ...)'.
-      rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
       crule ("deadViewnode", vec! [ s ("DELETED") ]),
       crule ("deleted", vec! [
         s ("DELETED"),
@@ -722,23 +726,23 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . into_iter () . collect () }
 
 /// The diff view's form, from org_to_text.rs's 'change_fact_forms':
-/// its head, the heads of its parts, the presence atoms and the diff
+/// its head, the heads of its parts and their atoms, and the diff
 /// objects.
 fn change_fact_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ChangeFacts;
   fn guard ( facts : ChangeFacts, object : DiffObject ) {
     let ChangeFacts {
-      presence : _, // -> presence, with DiffPresence::EMITTABLE_ATOMS
+      change : _,   // -> node, rel, properties, with DiffChange::EMITTABLE_ATOMS
       ready : _,    // -> ready, with the objects
       leaves : _,   // -> leaves, with the objects
     } = facts;
     match object { // compile error here = update DiffObject::ALL
       DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
   let _ = guard;
-  [ vec! [ "diff", "presence", "ready", "leaves", "readyRequest",
+  [ vec! [ "diff", "ready", "leaves", "readyRequest",
            "unreadyRequest",
            "changed" ], // the head of a changed folder's form
-    DiffPresence::EMITTABLE_ATOMS . to_vec (),
+    DiffChange::EMITTABLE_ATOMS . to_vec (),
     DiffObject::ALL . into_iter () . map (DiffObject::wire_name)
       . collect () ] . concat () }
 

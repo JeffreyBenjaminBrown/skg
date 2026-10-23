@@ -463,7 +463,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
         indoc! {"
                 * (skg (node (id root) (repo main))) parent
                 ** (skg (node (id 1) (repo main))) real child
-                ** (skg (historical (id 1) (repo main) (diff (presence node- rel-)))) phantom child
+                ** (skg (historical (id 1) (repo main) (diff (node removed) (rel removed)))) phantom child
             "};
 
       let viewforest: MpViewForest =

@@ -5,7 +5,7 @@
 ;;;
 ;;; Phase 1: Open the diff view.
 ;;; Phase 2: In its "all changes" buffer, b appears under a as a
-;;;          removed member: write-protected, tagged (diff (presence rel-)).
+;;;          removed member: write-protected, tagged (diff (rel removed)).
 ;;; Phase 3: Call skg-goto-in-magit-parent on b.
 ;;; Phase 4: Verify magit opened on a.skg's diff,
 ;;;          point on the line showing deletion of b's ID.
@@ -31,7 +31,7 @@
 ;;; The line of the diff view's "all changes" buffer that shows
 ;;; b as a removed member of a.
 (defconst test-removed-member-line-regexp
-  "(id b).*(diff (presence rel-)")
+  "(id b).*(diff (rel removed)")
 
 (defun find-all-changes-buffer ()
   (cl-find-if

@@ -16,16 +16,18 @@
 ///                         [(editRequest <delete | (merge ID) | (relRepo REPO)
 ///                                       | (flag FLAG true|false)>)]
 ///                         [(viewRequests REQUEST...)]
-///                         [(diff [(presence SIGN...)]
+///                         [(diff [(node added|removed)]
+///                                [(rel added|removed)]
+///                                [(properties changed)]
 ///                                [(leaves N OBJECT...)]
 ///                                [(ready OBJECT...)]
 ///                                [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]))
-///   where SIGN is node+, node-, node~, rel+ or rel-, and OBJECT is
-///   node, rel or all. The '(diff ...)' form may also
+///   where OBJECT is node, rel or all. The '(diff ...)' form may also
 ///   appear in (deleted ...), (unknown ...) and (historical ...), and
 ///   at top level on an alias, id or flag property and on the
-///   diff view's properties other than bodyDiff. A changed folder
-///   carries a bare '(ready)' at top level instead.
+///   diff view's properties other than bodyDiff. A changed folder,
+///   '(KIND changed)', may carry '(diff (ready))' at top level, and
+///   nothing else in it.
 ///   The diff view's own viewnodes:
 ///     (historical (id ID) (repo REPO) ...)   a historical phantom
 ///     (oldText titleAndBody | title | body)  the text at HEAD
@@ -41,9 +43,8 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::errors::{BufferValidationError, HeadlineName, view_id_suffix};
 use crate::types::nodes::complete::Flag;
-use crate::types::git::{NodeSign, Sign};
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, DiffPresence, ReadinessRequest,
+  ChangeFacts, DiffObject, Existence, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
@@ -385,7 +386,6 @@ pub fn parse_metadata_to_viewnodemd (
     };
 
   let mut top_level_diff : bool = false;
-  let mut top_level_ready : bool = false;
   // Process each element
   for element in elements {
     match element {
@@ -465,15 +465,10 @@ pub fn parse_metadata_to_viewnodemd (
             result . vid = Some ( Vid::parse (
               & single_argument (&first, &items[1..]) ? ) ? ); },
           "diff" => {
-            // At top level, valid only on a property leaf (checked
-            // below).
+            // At top level, valid only on a property leaf, and on a
+            // changed folder holding only '(ready)' (checked below).
             parse_diff_form ( &items[1..], &mut result ) ?;
             top_level_diff = true; },
-          "ready" => {
-            // A changed folder's bare '(ready)' (checked below).
-            parse_change_fact_part (
-              &first, &items[1..], &mut result ) ?;
-            top_level_ready = true; },
           "flag" => {
             if items . len () != 2 {
               return Err ("flag requires exactly one flag name"
@@ -495,7 +490,8 @@ pub fn parse_metadata_to_viewnodemd (
               first )); },
           folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
             // '(KIND changed)': a folder the diff view shows
-            // because of a change. A display fact, like its '(ready)'.
+            // because of a change. A display fact, like its '(diff
+            // (ready))'.
             if items . len () != 2
               || atom_to_string (&items[1]) ? != "changed" {
               return Err ( format! (
@@ -578,10 +574,14 @@ pub fn parse_metadata_to_viewnodemd (
   let is_folder : bool = matches! ( result . non_vognode,
     Some ( MpViewnodeKind::PartnerFolder (_)
            | MpViewnodeKind::PropertyFolder (_) ));
-  if top_level_ready && ! is_folder
-  { return Err ( "A top-level ready is valid only on a folder; elsewhere it belongs in (diff ...)"
+  let holds_only_an_objectless_ready : bool =
+    result . change_facts == ChangeFacts {
+      ready : Some (BTreeSet::new ()), .. ChangeFacts::default () }
+    && result . readiness_request . is_none ();
+  if top_level_diff && is_folder && ! holds_only_an_objectless_ready
+  { return Err ( "A folder's diff may hold only an objectless (ready)"
                  . to_string () ); }
-  if top_level_diff
+  if top_level_diff && ! is_folder
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Property (
                        Property::Alias { .. } | Property::ID { .. }
@@ -591,7 +591,7 @@ pub fn parse_metadata_to_viewnodemd (
                        | Property::HomeSkgrepoMove { .. }
                        | Property::RelRepoMove { .. }
                        | Property::ChangesetMarker { .. } )) )
-  { return Err ( "A top-level diff is valid only on alias, id and flag properties and the diff view's properties other than bodyDiff"
+  { return Err ( "A top-level diff is valid only on alias, id and flag properties, the diff view's properties other than bodyDiff, and changed folders"
                  . to_string () ); }
   Ok (result) }
 
@@ -988,11 +988,11 @@ fn parse_diff_form (
       _ => return Err ( "Each part of diff must be a list" . to_string () ), }}
   Ok (( )) }
 
-/// Parse one part of the diff view's '(diff ...)' form --
-/// '(presence SIGN...)', '(leaves N OBJECT...)', '(ready
-/// OBJECT...)', '(readyRequest OBJECT...)' or '(unreadyRequest
-/// OBJECT...)' -- whose head is 'key' and whose arguments are 'args',
-/// into 'metadata'. Each may appear once; a viewnode carries at most
+/// Parse one part of the diff view's '(diff ...)' form -- '(node
+/// added|removed)', '(rel added|removed)', '(properties changed)',
+/// '(leaves N OBJECT...)', '(ready OBJECT...)', '(readyRequest
+/// OBJECT...)' or '(unreadyRequest OBJECT...)' -- whose head is 'key'
+/// and whose arguments are 'args', into 'metadata'. Each may appear once; a viewnode carries at most
 /// one readiness request. '(leaves ...)' is accepted and ignored: it
 /// serves only the clients' gestures, and the view derives it again.
 fn parse_change_fact_part (
@@ -1003,24 +1003,23 @@ fn parse_change_fact_part (
   let atoms : Vec<String> =
     args . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
   match key {
-    "presence" => {
-      if metadata . change_facts . presence != Default::default () {
-        return Err ( "presence may appear only once" . to_string () ); }
-      let presence : &mut DiffPresence = &mut metadata . change_facts . presence;
-      for atom in &atoms {
-        let names_twice : bool = match atom . as_str () {
-          "node+" | "node-" | "node~" => presence . node . replace (
-            match atom . as_str () {
-              "node+" => NodeSign::Plus,
-              "node-" => NodeSign::Minus,
-              _       => NodeSign::Modified, } ) . is_some (),
-          "rel+" | "rel-" => presence . rel . replace (
-            if atom . ends_with ('+') { Sign::Plus }
-            else { Sign::Minus } ) . is_some (),
-          other => return Err ( format! (
-            "Unknown presence atom: {}", other )), };
-        if names_twice {
-          return Err ( format! ( "presence names an object twice: {}", atom )); }}},
+    "node" | "rel" => {
+      let existence : Existence = match atoms . as_slice () {
+        [ atom ] => Existence::from_wire_name (atom),
+        _ => None, }
+        . ok_or_else ( || format! (
+          "{} must be ({} added) or ({} removed)", key, key, key )) ?;
+      let slot : &mut Option<Existence> =
+        if key == "node" { &mut metadata . change_facts . change . node }
+        else { &mut metadata . change_facts . change . rel };
+      if slot . replace (existence) . is_some () {
+        return Err ( format! ( "{} may appear only once", key )); }},
+    "properties" => {
+      if atoms != [ "changed" ] {
+        return Err ( "properties must be (properties changed)" . to_string () ); }
+      if metadata . change_facts . change . properties {
+        return Err ( "properties may appear only once" . to_string () ); }
+      metadata . change_facts . change . properties = true; },
     "ready" => {
       if metadata . change_facts . ready . is_some () {
         return Err ( "ready may appear only once" . to_string () ); }

@@ -122,14 +122,15 @@ pub fn viewnode_to_text (
 /// members when the buffer is rendered: it is shown because of a
 /// change when some member carries one, and ready when every such
 /// member's change is ready. Rendered '(KIND changed)' in place of
-/// the bare folder atom, then '(ready)'.
+/// the bare folder atom, then '(diff (ready))' when ready.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FolderChangeFacts {
   pub ready : bool,
 }
 
 /// None unless 'node_ref' is a folder some member of which carries a
-/// change: a presence sign, or (on a member) a relRepo move.
+/// change of its relationship to the folder's viewparent: a '(rel
+/// ...)' part, or (on a member) a relRepo move.
 pub fn folder_change_facts (
   node_ref : NodeRef<Viewnode>,
 ) -> Option<FolderChangeFacts> {
@@ -145,9 +146,9 @@ pub fn folder_change_facts (
           ViewnodeKind::Property (Property::RelRepoMove { .. }) =>
             Some ( child . value () . change_facts . ready . is_some () ),
           _ => None, } );
-      let presence_ready : Option<bool> =
+      let rel_ready : Option<bool> =
         member_change_ready (&member . value () . change_facts);
-      match (presence_ready, relRepo_move_ready) {
+      match (rel_ready, relRepo_move_ready) {
         (None, None) => None,
         (a, b) => Some ( a . unwrap_or (true) && b . unwrap_or (true) ), } } )
     . collect ();
@@ -156,14 +157,14 @@ pub fn folder_change_facts (
     ready : member_changes . iter () . all ( |ready| *ready ) } ) }
 
 /// Some (whether ready) when a folder member's relationship to the
-/// folder changed, which its 'rel' sign says. (A property entry and
-/// an unknown phantom carry no other sign.) The member is ready when
+/// folder's viewparent changed, which its '(rel ...)' part says. The
+/// member is ready when
 /// its '(ready ...)' names 'rel' if its '(leaves ...)' lists 'rel',
 /// and otherwise when it carries any '(ready ...)'.
 fn member_change_ready (
   facts : &ChangeFacts,
 ) -> Option<bool> {
-  facts . presence . rel ?;
+  facts . change . rel ?;
   let rel_is_listed : bool =
     facts . leaves . as_ref () . is_some_and (
       |leaves| leaves . objects . contains (&DiffObject::Rel) );
@@ -290,7 +291,8 @@ fn non_vognode_atom_metadata_to_string (
   parts . join (" ") }
 
 /// A folder's atom, or, when it is shown because of a change,
-/// '(ATOM changed)' and '(ready)' if that change is ready.
+/// '(ATOM changed)', then '(diff (ready))' if that change is ready:
+/// the objectless '(ready)' is the folder's aggregate.
 fn folder_atom_metadata_to_string (
   focused         : bool,
   org_folded      : bool,
@@ -304,7 +306,7 @@ fn folder_atom_metadata_to_string (
     Some (facts) => {
       let mut metadata : String = non_vognode_atom_metadata_to_string (
         focused, org_folded, org_body_folded, &format! ("({} changed)", atom) );
-      if facts . ready { metadata . push_str (" (ready)"); }
+      if facts . ready { metadata . push_str (" (diff (ready))"); }
       metadata }, } }
 
 fn property_metadata_to_string (
@@ -362,10 +364,12 @@ fn property_metadata_to_string (
   }
   Ok ( parts . join (" ")) }
 
-/// The diff view's one form for a viewnode, '(diff (presence
-/// SIGN...) (leaves N OBJECT...) (ready OBJECT...) REQUEST)', each
-/// part present only when it has something to say. None outside the
-/// diff view, and wherever no part has: '(diff)' is never written.
+/// The diff view's one form for a viewnode, '(diff (node
+/// added|removed) (rel added|removed) (properties changed) (leaves N
+/// OBJECT...) (ready OBJECT...) REQUEST)', each part present only
+/// when it has something to say (the first three only when true).
+/// None outside the diff view, and wherever no part has: '(diff)' is
+/// never written.
 fn change_fact_forms (
   facts   : &ChangeFacts,
   request : &Option<ReadinessRequest>,
@@ -374,9 +378,7 @@ fn change_fact_forms (
     if atoms . is_empty () { format! ("({})", head) }
     else { format! ("({} {})", head, atoms . join (" ")) } };
   let mut parts : Vec<String> = Vec::new ();
-  let presence : Vec<&'static str> = facts . presence . atoms ();
-  if ! presence . is_empty () {
-    parts . push ( form ("presence", presence) ); }
+  parts . extend ( facts . change . forms () );
   if let Some (leaves) = &facts . leaves {
     let count : String = leaves . count . to_string ();
     parts . push ( form ( "leaves",

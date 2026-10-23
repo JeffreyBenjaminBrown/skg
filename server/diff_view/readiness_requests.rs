@@ -33,7 +33,6 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::errors::view_id_suffix;
-use crate::types::git::NodeSign;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -238,7 +237,9 @@ fn keys_in_forest (
 /// fingerprint ('store'); the order-only marker is always ready. The
 /// '(leaves ...)' fact is 'leaves_fact_at'. On an unrestricted vognode
 /// whose leaves fact lists 'all', '(ready ...)' names 'all' when every
-/// leaf its node records is marked.
+/// leaf its node records is marked. A ready changeset marker's '(ready
+/// ...)' names 'all'; any other ready viewnode with a single object
+/// writes it bare, '(ready)'.
 pub fn set_ready_facts_in_viewforest (
   viewforest : &mut ViewForest,
   forest     : &ChangeLeaves,
@@ -274,9 +275,10 @@ pub fn set_ready_facts_in_viewforest (
           ViewnodeKind::Vognode (
             Vognode::Phantom (Phantom::Deleted (_) | Phantom::Unknown (_)) ) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
-          ViewnodeKind::Property ( Property::ChangesetMarker {
-            kind : ChangesetMarkerKind::OrderOnly, .. } ) =>
-            Some (BTreeSet::new ()),
+          ViewnodeKind::Property ( Property::ChangesetMarker { kind } ) =>
+            ( *kind == ChangesetMarkerKind::OrderOnly
+              || object_is_ready (node, &[]) )
+            . then ( || BTreeSet::from ([ DiffObject::All ]) ),
           ViewnodeKind::Property (property)
             if ! matches! (property, Property::BodyDiff { .. }) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
@@ -290,8 +292,8 @@ pub fn set_ready_facts_in_viewforest (
     change_facts . leaves = leaves; }}
 
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
-/// on an unrestricted vognode whose node's sign is '~' (modified),
-/// 'all', beside 'rel' when that names a leaf of 'forest'; on any
+/// on an unrestricted vognode whose node's other properties changed
+/// (modified), 'all', beside 'rel' when that names a leaf of 'forest'; on any
 /// other unrestricted vognode or a historical phantom, each of 'node'
 /// and 'rel' that names a leaf, or else 'all' if its node records any
 /// leaf; on anything else, 'all' when a bare request names a commit
@@ -307,8 +309,7 @@ fn leaves_fact_at (
     ! keys_named_at (node, objects, forest, pid_of) . is_empty () };
   let objects : BTreeSet<DiffObject> = match &node . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (_))
-      if node . value () . change_facts . presence . node
-         == Some (NodeSign::Modified) =>
+      if node . value () . change_facts . change . properties =>
       [ DiffObject::Rel ] . into_iter ()
       . filter ( |object| names_some_leaf (&[ *object ]) )
       . chain ([ DiffObject::All ])

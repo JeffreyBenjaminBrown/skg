@@ -46,7 +46,7 @@ fn a_member_shown_by_an_extra_id_and_an_unknown_member_pass (
     Ok (( )) }) }
 
 /// A dangling removed member, as the diff view shows one in a
-/// write-protected folder (an unknown phantom with '(presence rel-)'),
+/// write-protected folder (an unknown phantom with '(rel removed)'),
 /// is not counted: beside the members recorder lists, the folder
 /// saves unchanged.
 #[test]
@@ -57,7 +57,7 @@ fn a_dangling_removed_member_is_not_counted (
     let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
       &buffer, &[ "(skg (node (id x2) (repo main) writeProtected)) x",
                   "(skg (unknown (id ghost)))",
-                  "(skg (unknown (id gone) (diff (presence rel-))))" ] )) ?;
+                  "(skg (unknown (id gone) (diff (rel removed))))" ] )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 

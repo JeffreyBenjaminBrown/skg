@@ -1,9 +1,8 @@
 use super::*;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
-  Birth, DiffPresence, PartnerFolder, mk_editable_viewnode, mk_restricted_viewnode,
+  Birth, DiffChange, Existence, PartnerFolder, mk_editable_viewnode, mk_restricted_viewnode,
   mk_writeProtected_viewnode_with_birth, viewforest_root_viewnode, viewnode_of };
 use ego_tree::Tree;
 
@@ -44,7 +43,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
   let mut graft : Viewnode = mk_writeProtected_viewnode_with_birth (
     ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
     AffectsParent::True, Birth::RoleGraft (RelationRole::CONTAINER) );
-  graft . change_facts . presence . rel = Some (Sign::Minus);
+  graft . change_facts . change . rel = Some (Existence::Removed);
   let branch : NodeId = t . get_mut (root) . unwrap () . append (graft) . id ();
   let member_below : NodeId = t . get_mut (branch) . unwrap () . append (
     mk_editable_viewnode ( ID::from ("m"), SkgrepoName::from ("main"),
@@ -71,7 +70,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
   assert_eq! ( u . affectsParent, AffectsParent::False );
   assert! ( u . is_writeProtected () );
   assert_eq! ( u . birth, Birth::RoleGraft (RelationRole::CONTAINER) );
-  assert_eq! ( parked . change_facts . presence, DiffPresence::default () );
+  assert_eq! ( parked . change_facts . change, DiffChange::default () );
   let ViewnodeKind::Vognode (Vognode::Unrestricted (below)) =
     &t . get (member_below) . unwrap () . value () . kind
     else { panic! ("the member below stays an unrestricted vognode") };

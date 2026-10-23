@@ -10,9 +10,9 @@
 use crate::diff_view::change_leaves::ChangeLeaves;
 use crate::diff_view::pruned_change_view::PrunedChangeViewCache;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
+use crate::types::viewnode::Existence;
 
 use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
@@ -124,15 +124,16 @@ impl Presence {
       (false, true)  => Some (Presence::OnlyAfter),
       (false, false) => None, } }
 
-  /// The sign of the '(presence ...)' atom for this presence: + for only
-  /// after, - for only before, none for both.
+  /// The existence change this presence shows in a '(diff ...)'
+  /// form: added for only after, removed for only before, none for
+  /// both.
   pub fn diff_sign (
     self,
-  ) -> Option<Sign> {
+  ) -> Option<Existence> {
     match self {
       Presence::Both       => None,
-      Presence::OnlyBefore => Some (Sign::Minus),
-      Presence::OnlyAfter  => Some (Sign::Plus), } }
+      Presence::OnlyBefore => Some (Existence::Removed),
+      Presence::OnlyAfter  => Some (Existence::Added), } }
 }
 
 impl NodeChanges {

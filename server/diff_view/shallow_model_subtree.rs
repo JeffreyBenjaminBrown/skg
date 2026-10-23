@@ -15,11 +15,10 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
-use crate::types::git::Sign;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Owner, Property, PropertyFolder,
+  AffectsParent, Birth, ChangeFacts, Existence, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, convert_unwarranted_child};
 
@@ -178,7 +177,7 @@ pub fn convert_unwarranted_subtree (
   Ok ( if holds_something { Conversion::Parked } else { Conversion::DeadLeaf } ) }
 
 /// Give 'existing' the kind and facts of 'model', keeping its fold
-/// state and focus. Of the facts, it takes the presence, and its
+/// state and focus. Of the facts, it takes the kinds of change, and its
 /// '(ready ...)' and '(leaves ...)' are cleared, for the pass after
 /// completion to set. An unrestricted vognode keeps what the view
 /// decides about it (its view requests, its stats, its readiness
@@ -188,7 +187,7 @@ pub fn adopt_model_facts (
   model    : &Viewnode,
 ) {
   existing . change_facts = ChangeFacts {
-    presence : model . change_facts . presence,
+    change   : model . change_facts . change,
     ready    : None,
     leaves   : None };
   match ( &mut existing . kind, &model . kind ) {
@@ -225,7 +224,7 @@ pub fn append_copy_of_subtree (
   Ok (copy) }
 
 /// A removed member: a viewnode the diff view made as a non-member
-/// with '(presence rel-)', because its relationship to its viewparent is
+/// with '(rel removed)', because its relationship to its viewparent is
 /// only in the before-graph (or, while a visit reconciles, is about
 /// to be). That is the one encoding of a removed relationship, in
 /// content, in a partner folder and in a historical phantom's old
@@ -238,4 +237,4 @@ pub fn is_unrestricted_removed_member (
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . affectsParent == AffectsParent::False
          && t . birth == Birth::Unremarkable
-         && viewnode . change_facts . presence . rel == Some (Sign::Minus) ) }
+         && viewnode . change_facts . change . rel == Some (Existence::Removed) ) }

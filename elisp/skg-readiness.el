@@ -106,7 +106,8 @@ its move. Works on write-protected occurrences too."
 (defun skg--readiness-host (metadata-sexp)
   "The list in METADATA-SEXP that holds its '(diff ...)' form: the
 form among its elements that holds one, as a vognode's or a
-phantom's does, if one does, else the whole sexp, as a property's."
+phantom's does, if one does, else the whole sexp, as a property's or
+a changed folder's."
   (or (seq-find (lambda (element)
                   (and (consp element)
                        (assq 'diff (cdr element))))
@@ -138,12 +139,12 @@ as (N . OBJECTS), or nil when it names no leaf."
 
 (defun skg--readiness-objects-ready-p (metadata-sexp objects)
   "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline:
-when its '(ready ...)' names it, or is a bare '(ready)', which names
-the headline's only leaf or commit readiness aggregate."
+when it carries a '(ready ...)' that names each of them. A headline
+that lists no object (one naming a single leaf) is ready when it
+carries any '(ready ...)'."
   (let ((ready (skg--readiness-form metadata-sexp 'ready)))
     (and ready
-         (seq-every-p (lambda (object)
-                        (or (null (cdr ready)) (memq object (cdr ready))))
+         (seq-every-p (lambda (object) (memq object (cdr ready)))
                       objects))))
 
 (defun skg--readiness-changed-folder-p (metadata-sexp)
@@ -156,13 +157,12 @@ the headline's only leaf or commit readiness aggregate."
 
 (defun skg--readiness-ready-p (metadata-sexp)
   "Non-nil when the headline with METADATA-SEXP is ready: a headline
-that names leaves, on all the objects it lists, or a folder that
-carries (ready)."
+that names leaves, on all the objects it lists, or a changed folder
+whose '(diff ...)' carries its aggregate, the objectless '(ready)'."
   (let ((leaves (skg--readiness-leaves metadata-sexp)))
     (cond (leaves (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
           ((skg--readiness-changed-folder-p metadata-sexp)
-           ;; A folder's bare '(ready)' stands outside any '(diff ...)'.
-           (assq 'ready (cdr metadata-sexp))))))
+           (skg--readiness-form metadata-sexp 'ready)))))
 
 (defun skg--readiness-homeSkgrepo-move (metadata-sexp)
   "The (OLD NEW) skgrepos of METADATA-SEXP when it is a home skgrepo move."

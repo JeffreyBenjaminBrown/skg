@@ -2,7 +2,7 @@
 //! partner-folder reconciler ('update_buffer/reconcile/partner_folder.rs'
 //! holds the live-graph half and dispatches here). A partner folder
 //! over the graph straddle holds the union of its members in
-//! both graphs, each tagged with its presence, and under each member
+//! both graphs, each tagged with its change, and under each member
 //! its member role tree, extended over the union ('docs/diff-view.org',
 //! "the in-folders and out-folders").
 
@@ -22,10 +22,9 @@ use crate::to_org::extend::role_tree::{
   RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set,
   build_and_integrate_role_tree_with_skgrepo_set};
 use crate::types::env::RuntimeGeneration;
-use crate::types::git::NodeSign;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  DiffPresence, FolderPolicy, Owner, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+  DiffChange, FolderPolicy, Owner, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_vid_of, push_repair_warnings, view_order_preserving_goal_list};
 use crate::update_buffer::util::RepairSummary;
@@ -37,7 +36,7 @@ use std::error::Error;
 
 /// 'reconcile_partnerFolder_children' with its goal list from the union
 /// of a graph straddle: the partners in either graph, each item tagged
-/// with its presence and shaped as 'straddle_goal_item' says. A child
+/// with its change and shaped as 'straddle_goal_item' says. A child
 /// standing for an item is kept whatever it stood as before, and
 /// takes the item's shape.
 pub fn reconcile_partnerFolder_children_from_graph_straddle (
@@ -89,7 +88,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
 /// The goal item of a partner of a folder over the straddle: a node only
 /// in the before-graph is its historical phantom; a member whose
 /// relationship is only in the before-graph is removed (a non-member
-/// with '(presence rel-)', the one encoding of a removed relationship);
+/// with '(rel removed)', the one encoding of a removed relationship);
 /// any other is a member. In a folder whose membership the save reads
 /// (an EditableSet), a removed member that is dangling is not shown at
 /// all, since an unknown phantom there would read back as a member.
@@ -99,19 +98,19 @@ fn straddle_goal_item (
   editable_set : bool,
 ) -> Option<FolderGoalItem> {
   let node_presence : Option<Presence> = straddle . node_presence (&partner . id);
-  let presence : DiffPresence = DiffPresence {
-    node : node_presence . and_then ( |presence| presence . diff_sign () )
-           . map (NodeSign::from), // a folder member is never '~'
-    rel  : partner . presence . diff_sign (), };
+  let change : DiffChange = DiffChange {
+    node       : straddle . node_existence (&partner . id),
+    rel        : partner . presence . diff_sign (),
+    properties : false, };
   let shape : FolderGoalShape = match node_presence {
     Some (Presence::OnlyBefore) => FolderGoalShape::Historical (
-      mk_historical_viewnode (straddle, &partner . id, presence . rel) ? ),
+      mk_historical_viewnode (straddle, &partner . id, change . rel) ? ),
     _ if partner . presence == Presence::OnlyBefore => {
       if editable_set { node_presence ?; } // dangling
       FolderGoalShape::Removed },
     _ => FolderGoalShape::Member, };
   Some ( FolderGoalItem {
-    skgid : partner . id . clone (), presence : Some (presence), shape } ) }
+    skgid : partner . id . clone (), change : Some (change), shape } ) }
 
 /// Under each member of a folder over the straddle, its member role tree,
 /// extended by the role-tree engine over the union of the straddle: under

@@ -3,16 +3,15 @@
 //! looks like"): the old text and its body diff, the home and relRepo
 //! moves, the changeset markers, the historical phantom of a node
 //! the after-graph lacks, and the two derived acquisition folders.
-//! Each is save-inert. The presence facts are set here; readiness is
-//! read from the store where they are placed.
+//! Each is save-inert. The kinds of change they show are set here;
+//! readiness is read from the store where they are placed.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
-use crate::types::git::{NodeSign, Sign};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
+  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
   Editability, PartnerFolder, Phantom, PhantomHistorical, Property,
   Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
@@ -99,18 +98,19 @@ pub fn mk_changeset_marker_viewnode (
     Property::ChangesetMarker { kind } )) }
 
 /// The historical phantom of 'pid', a node of the before-graph that
-/// the after-graph lacks. 'rel' is the presence sign of its
-/// relationship to its viewparent: Minus under a former container,
+/// the after-graph lacks. 'rel' is the existence change of its
+/// relationship to its viewparent: removed under a former container,
 /// None at a root or in a folder. None if the before-graph lacks it.
 pub fn mk_historical_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
-  rel      : Option<Sign>,
+  rel      : Option<Existence>,
 ) -> Option<Viewnode> {
   let before : &GraphnodeInRust = straddle . before . get (pid) ?;
   Some ( Viewnode {
     change_facts : ChangeFacts {
-      presence : DiffPresence { node : Some (NodeSign::Minus), rel },
+      change : DiffChange { node : Some (Existence::Removed), rel,
+                            properties : false },
       ready    : None,
       leaves   : None },
     .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
@@ -145,10 +145,10 @@ pub fn append_historical_phantom_content (
     let member : Option<Viewnode> =
       match straddle . node_presence (&partner . id) {
         Some (Presence::OnlyBefore) =>
-          mk_historical_viewnode (straddle, &partner . id, Some (Sign::Minus)),
+          mk_historical_viewnode (straddle, &partner . id, Some (Existence::Removed)),
         Some (_) => mk_removed_member_viewnode (straddle, &partner . id, u),
         None => Some ( mk_member_viewnode (
-          straddle, &partner . id, Some (Sign::Minus) )), };
+          straddle, &partner . id, Some (Existence::Removed) )), };
     if let Some (member) = member {
       tree . get_mut (phantom) ? . append (member); }}
   Some (( )) }
@@ -174,7 +174,7 @@ pub fn append_acquired_folder (
 
 /// A removed member: the image of a node of the after-graph whose
 /// relationship to its viewparent is only in the before-graph, a
-/// non-member with '(presence rel-)', the one encoding of a removed
+/// non-member with '(rel removed)', the one encoding of a removed
 /// relationship ('is_unrestricted_removed_member' reads it). It is
 /// created editable, with its body from the after-graph, when its
 /// node is in 'u' (U of the buffer being completed), and
@@ -195,23 +195,22 @@ pub fn mk_removed_member_viewnode (
       Editability::Editable { body : node . body . clone (), edit_request : None } }
     else { Editability::WriteProtected },
     HashSet::new () ); // view_requests
-  member . change_facts . presence = DiffPresence {
-    node : straddle . node_sign (pid),
-    rel  : Some (Sign::Minus) };
+  member . change_facts . change =
+    straddle . node_change (pid, Some (Existence::Removed));
   Some (member) }
 
 /// A write-protected image of a node of the after-graph, whose
-/// relationship to its viewparent has presence 'rel'; an unknown
+/// relationship to its viewparent changed by 'rel'; an unknown
 /// phantom if the after-graph lacks it.
 fn mk_member_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
-  rel      : Option<Sign>,
+  rel      : Option<Existence>,
 ) -> Viewnode {
   let mut viewnode : Viewnode = match straddle . after . get (pid) {
     Some (node) => mk_writeProtected_viewnode (
       pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
       AffectsParent::True ),
     None => mk_unknown_viewnode ( pid . clone () ), };
-  viewnode . change_facts . presence = DiffPresence { node : None, rel };
+  viewnode . change_facts . change = DiffChange { rel, .. DiffChange::default () };
   viewnode }

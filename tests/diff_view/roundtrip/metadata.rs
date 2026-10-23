@@ -6,11 +6,10 @@ use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::git::{NodeSign, Sign};
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence, PartnerFolder, Phantom,
+  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, mk_writeProtected_viewnode_with_birth, viewnode_of};
 
@@ -19,7 +18,7 @@ use std::collections::{BTreeSet, HashMap};
 fn ready (
   objects : &[DiffObject],
 ) -> ChangeFacts {
-  ChangeFacts { presence : DiffPresence::default (),
+  ChangeFacts { change   : DiffChange::default (),
                 ready    : Some ( objects . iter () . copied () . collect () ),
                 leaves   : None } }
 
@@ -96,27 +95,27 @@ fn skgrepo_moves_round_trip () {
 #[test]
 fn changeset_markers_round_trip () {
   for (kind, expected) in [
-    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (ready))" ),
-    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (ready))" ),
-    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (ready))" ), ] {
+    ( ChangesetMarkerKind::Content,   "(changesetMarker content) (diff (ready all))" ),
+    ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (ready all))" ),
+    ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (ready all))" ), ] {
     assert_round_trip (
-      property ( Property::ChangesetMarker { kind }, ready (&[]), None ),
+      property ( Property::ChangesetMarker { kind }, ready (&[ DiffObject::All ]), None ),
       expected ); }}
 
 #[test]
 fn removed_aliases_and_ids_round_trip () {
   let removed : ChangeFacts = ChangeFacts {
-    presence : DiffPresence { node : None, rel : Some (Sign::Minus) },
+    change   : DiffChange { rel : Some (Existence::Removed), .. DiffChange::default () },
     ready    : Some (BTreeSet::new ()),
     leaves   : None };
   assert_round_trip (
     property ( Property::RemovedAlias { text : "an old alias" . into () },
                removed . clone (), None ),
-    "removedAlias (diff (presence rel-) (ready))" );
+    "removedAlias (diff (rel removed) (ready))" );
   assert_round_trip (
     property ( Property::RemovedID { skgid : ID::from ("old-id") },
                removed, request_all () ),
-    "removedID (diff (presence rel-) (ready) (readyRequest all))" ); }
+    "removedID (diff (rel removed) (ready) (readyRequest all))" ); }
 
 #[test]
 fn a_historical_phantom_round_trips () {
@@ -127,12 +126,13 @@ fn a_historical_phantom_round_trips () {
           skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : Some ("its body\n" . into ()) } )))),
       ChangeFacts {
-        presence : DiffPresence { node : Some (NodeSign::Minus),
-                                  rel  : Some (Sign::Minus) },
+        change   : DiffChange { node : Some (Existence::Removed),
+                                rel  : Some (Existence::Removed),
+                                properties : false },
         ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
         leaves   : None },
       request_all () ),
-    "(historical (id gone) (repo main) (diff (presence node- rel-) (ready node) (readyRequest all)))" ); }
+    "(historical (id gone) (repo main) (diff (node removed) (rel removed) (ready node) (readyRequest all)))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {

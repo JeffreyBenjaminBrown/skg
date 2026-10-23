@@ -242,10 +242,10 @@ fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
       "{:?}", errors );
     Ok (( )) }) }
 
-/// c, typed under n under x and so created, carries presence facts. A
+/// c, typed under n under x and so created, carries change facts. A
 /// write-protect request on n under x and an editable-view request
 /// on n under y, in one save, move editability: a, b and c are shown
-/// once under x, as non-members, c keeping its presence facts, and
+/// once under x, as non-members, c keeping its change facts, and
 /// editable under y. An editable-view request on n under x moves it
 /// back: n under x adopts them as its members again.
 #[test]
@@ -287,7 +287,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
                 && ! lines [1] . contains ("affectsParent"),
                 "{} must be shown once under each n:\n{}", child, moved ); }
     assert! ( at_depth (&moved, "***", "c") [0] . contains ("(diff "),
-              "c keeps its presence facts under x:\n{}", moved );
+              "c keeps its change facts under x:\n{}", moved );
     let moved_back : String = save (
       f, &requesting_editable_at (&moved, "\n** (skg bodyFolded (node (id n) (repo main) writeProtected ") ) ?
       . saved_view;
@@ -305,7 +305,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
 
 /// In the 'kinds' fixture the worktree removed sub's subscription to
 /// s1, so the buffer shows s1's subscriber folder holding sub as a
-/// removed member, a non-member marked '(diff (presence rel-))'. Write-protected,
+/// removed member, a non-member marked '(diff (rel removed))'. Write-protected,
 /// s1 saves unchanged: the check of a write-protected occurrence's
 /// partner folders counts only members.
 #[test]
@@ -325,7 +325,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     assert! ( s1_and_folder [0] . contains ("writeProtected")
               && s1_and_folder [1] == "** (skg (subscriberFolder changed))"
               && s1_and_folder [2] . starts_with ("*** (skg (node (id sub) ")
-              && s1_and_folder [2] . ends_with ("(diff (presence rel-) (leaves 1 rel)))) sub")
+              && s1_and_folder [2] . ends_with ("(diff (rel removed) (leaves 1 rel)))) sub")
               && s1_and_folder [2] . contains ("(affectsParent false)"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
@@ -333,7 +333,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     let response : SaveResponse = save (f, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before );
-    assert! ( without_vids (&response . saved_view) . contains ("(diff (presence rel-) (leaves 1 rel)))) sub"),
+    assert! ( without_vids (&response . saved_view) . contains ("(diff (rel removed) (leaves 1 rel)))) sub"),
               "{}", response . saved_view );
     Ok (( )) }) }
 

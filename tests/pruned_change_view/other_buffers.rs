@@ -143,7 +143,7 @@ fn the_merges_buffer_shows_only_the_merge (
   assert! ( child_headlines_of_editable (&text, "acq") . iter ()
             . any ( |line| line . contains ("(node (id pres)") ),
             "the text preserver is shown in acq's content:\n{}", text );
-  assert! ( headline_of (&text, "pres") . contains ("(diff (presence node+ rel+)"),
+  assert! ( headline_of (&text, "pres") . contains ("(diff (node added) (rel added)"),
             "the text preserver is new in acq's content:\n{}", text );
   assert! ( text . contains ("acquiredByFolder")
             && text . contains ("acquiredFolder"), "{}", text );
@@ -188,7 +188,7 @@ fn the_order_only_buffer_is_a_flat_list_with_markers (
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
   assert! ( lines [0] . starts_with ("* (skg bodyFolded (node (id ord)"),
             "{}", text );
-  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (ready)))" );
+  assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (ready all)))" );
   assert! ( lines [2] . contains ("(node (id o2) (repo public) writeProtected")
             && lines [3] . contains ("(node (id o1) (repo public) writeProtected"),
             "the content is shown in its new order, as leaves:\n{}", text );

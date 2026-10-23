@@ -114,7 +114,7 @@ describe('skg.metadata commands', function ()
       metadata.strip_metadata_from_org_text(
         '* (skg (node (id 1) (repo public))) root\n'
         .. 'body line\n'
-        .. '** (skg alias (diff (presence rel+))) alias title\n'
+        .. '** (skg alias (diff (rel added))) alias title\n'
         .. '** plain child\n'))
   end)
 

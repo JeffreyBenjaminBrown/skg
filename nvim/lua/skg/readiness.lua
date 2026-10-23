@@ -43,7 +43,8 @@ end
 
 ---The list in METADATA_SEXP that holds its '(diff ...)' form: the
 ---form among its elements that holds one, as a vognode's or a
----phantom's does, if one does, else the whole sexp, as a property's.
+---phantom's does, if one does, else the whole sexp, as a property's
+---or a changed folder's.
 ---@param metadata_sexp any
 ---@return any
 function M.host (metadata_sexp)
@@ -114,20 +115,19 @@ end
 
 ---@param metadata_sexp any
 ---@param objects string[]
----@return boolean is every one of OBJECTS ready? One is when the
----headline's '(ready ...)' names it, or is a bare '(ready)', which
----names the headline's only leaf or commit readiness aggregate.
+---@return boolean is every one of OBJECTS ready? It is when the
+---headline carries a '(ready ...)' that names each of them. A
+---headline that lists no object (one naming a single leaf) is ready
+---when it carries any '(ready ...)'.
 function M.objects_ready_p (metadata_sexp, objects)
   local ready = M.form(metadata_sexp, 'ready')
   if not ready then return false end
   local ready_objects = {}
-  local bare = true
   for _, object in ipairs(arguments(ready)) do
     ready_objects[object] = true
-    bare = false
   end
   for _, object in ipairs(objects) do
-    if not bare and not ready_objects[object] then return false end
+    if not ready_objects[object] then return false end
   end
   return true
 end
@@ -145,15 +145,15 @@ function M.changed_folder_p (metadata_sexp)
 end
 
 ---Whether the headline is ready: a headline that names leaves, on all
----the objects it lists, or a folder that carries (ready).
+---the objects it lists, or a changed folder whose '(diff ...)'
+---carries its aggregate, the objectless '(ready)'.
 ---@param metadata_sexp any
 ---@return boolean
 function M.ready_p (metadata_sexp)
   local leaves = M.leaves(metadata_sexp)
   if leaves then return M.objects_ready_p(metadata_sexp, leaves.objects) end
-  -- A folder's bare '(ready)' stands outside any '(diff ...)'.
   return M.changed_folder_p(metadata_sexp)
-         and child_with_head(metadata_sexp, 'ready') ~= nil
+         and M.form(metadata_sexp, 'ready') ~= nil
 end
 
 -- ── moving between change headlines ─────────────────────────────

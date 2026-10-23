@@ -14,11 +14,11 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::diff_view::change_leaves::ChangeLeaves;
 use crate::graph_straddle::types::{
   ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
-use crate::types::git::NodeSign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
+use crate::types::viewnode::{DiffChange, Existence};
 use crate::util::setlike_vector_subtraction;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -42,22 +42,39 @@ impl GraphStraddle {
       self . before . nodes . contains_key (pid),
       self . after  . nodes . contains_key (pid) ) }
 
-  /// The node's sign as the diff view shows it: '+' when only the
-  /// after-graph has it, '-' when only the before-graph does, '~'
-  /// (modified) when both do and it records at least one
-  /// change-forest leaf ('ChangeLeaves::leaves_under'), else none.
-  /// Every site that signs an unrestricted vognode in content
-  /// position, or a root, asks this.
-  pub fn node_sign (
+  /// The node's existence change as the diff view shows it: added
+  /// when only the after-graph has it, removed when only the
+  /// before-graph does, else none.
+  pub fn node_existence (
     &self,
     pid : &ID,
-  ) -> Option<NodeSign> {
-    match self . node_presence (pid) ? {
-      Presence::OnlyAfter  => Some (NodeSign::Plus),
-      Presence::OnlyBefore => Some (NodeSign::Minus),
-      Presence::Both =>
-        ( ! self . change_leaves () . leaves_under (pid) . is_empty () )
-        . then_some (NodeSign::Modified), } }
+  ) -> Option<Existence> {
+    self . node_presence (pid) ? . diff_sign () }
+
+  /// Whether the node's other properties changed, as the diff view
+  /// shows it ('(properties changed)', herald M): both graphs have it
+  /// and it records at least one change-forest leaf
+  /// ('ChangeLeaves::leaves_under'). Every site that tags an
+  /// unrestricted vognode in content position, a folder member or a
+  /// root asks this and 'node_existence'.
+  pub fn node_properties_changed (
+    &self,
+    pid : &ID,
+  ) -> bool {
+    self . node_presence (pid) == Some (Presence::Both)
+    && ! self . change_leaves () . leaves_under (pid) . is_empty () }
+
+  /// The change a vognode standing for the node shows, from
+  /// 'node_existence' and 'node_properties_changed', its relationship
+  /// to its viewparent having changed by 'rel'.
+  pub fn node_change (
+    &self,
+    pid : &ID,
+    rel : Option<Existence>,
+  ) -> DiffChange {
+    DiffChange { node       : self . node_existence (pid),
+                 rel,
+                 properties : self . node_properties_changed (pid) } }
 
   /// Empty unless the node is in both graphs: a created or deleted
   /// node's change is its existence ('node_presence').
