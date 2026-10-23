@@ -296,8 +296,10 @@ impl ViewIdRecord {
     self . record_owners_in (viewforest); }
 
   /// The next vid from the counter, skipping any that would read as a
-  /// number ('05', '1e5', 'inf'): a reader of the sexp (the sexp crate,
-  /// Emacs) would turn it into one and lose its spelling.
+  /// number, since a reader of the sexp would turn it into one and
+  /// lose its spelling: Emacs and the Rust sexp crate read '05' and
+  /// '1e5' as numbers, and the sexp crate, which parses an atom as
+  /// Rust's 'f64' does, also reads 'inf' and 'nan'.
   fn take_next_vid (
     &mut self,
   ) -> Vid {
