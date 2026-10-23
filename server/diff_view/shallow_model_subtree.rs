@@ -17,7 +17,7 @@ use crate::types::git::{NodeSign, Sign};
 use crate::types::misc::ID;
 use crate::types::tree::moves::arrange_last_children;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, DiffPresence, Property, PropertyFolder,
+  AffectsParent, Birth, ChangeFacts, DiffPresence, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{
   detach_viewnode_transferring_focus, keep_stale_child_holding_the_users};
@@ -236,7 +236,7 @@ pub fn adopt_model_facts (
       existing . readiness_request = model . readiness_request . clone (); }, }}
 
 /// Append under 'parent' a copy of the subtree of 'model' at
-/// 'model_node'.
+/// 'model_node', every viewnode of it the diff view's reconciler's.
 pub fn append_copy_of_subtree (
   tree       : &mut Tree<Viewnode>,
   parent     : NodeId,
@@ -247,7 +247,8 @@ pub fn append_copy_of_subtree (
     . ok_or ("append_copy_of_subtree: model node not found") ?;
   let copy : NodeId =
     tree . get_mut (parent) . ok_or ("append_copy_of_subtree: parent not found") ?
-    . append ( model_ref . value () . clone () ) . id ();
+    . append ( Viewnode { owner : Owner::DiffViewReconciler,
+                          .. model_ref . value () . clone () } ) . id ();
   let model_children : Vec<NodeId> =
     model_ref . children () . map ( |child| child . id () ) . collect ();
   for model_child in model_children {

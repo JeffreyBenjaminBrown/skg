@@ -929,7 +929,7 @@ async fn test_writeProtect_request_keeps_children_editable (
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["12"] ) ?;
       let requested : String = requesting_at (
-        &opened . replacen ( ")))) 12\n", ")))) twelve\n", 1 ),
+        &opened . replacen ( ")) 12\n", ")) twelve\n", 1 ),
         "(node (id 12) (repo main)", "writeProtectedView" );
       let saved : String = save_view (
         &requested, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;

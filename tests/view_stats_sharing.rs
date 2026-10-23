@@ -17,6 +17,7 @@
 // save (the viewStats parser errors on unknown atoms, so this also
 // pins the parse arms).
 
+use skg::metadata_canon::without_vids;
 use std::error::Error;
 use std::net::TcpStream;
 
@@ -61,8 +62,8 @@ fn e_lines_by_enclosing_folder (
   let mut current_folder : &'static str = "";
   let mut result : Vec<(&'static str, &str)> = Vec::new ();
   for line in buf . lines () {
-    if line . contains ("subscribeeFolder)") { current_folder = "subscribeeFolder"; }
-    else if line . contains ("overriddenFolder)") { current_folder = "overriddenFolder"; }
+    if without_vids (line) . contains ("subscribeeFolder)") { current_folder = "subscribeeFolder"; }
+    else if without_vids (line) . contains ("overriddenFolder)") { current_folder = "overriddenFolder"; }
     else if line . contains ("(id E)") {
       result . push ((current_folder, line)); }}
   result }

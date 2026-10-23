@@ -8,6 +8,7 @@
 // member; r held h, which is deleted, with m in its old content; acq
 // acquired acqd.
 
+use skg::metadata_canon::without_vids;
 use crate::pruned_change_view::common::{
   assert_lines_in_order, insert_after_line_starting, open_all_changes_buffer,
   rerendered_view_content, save, send_stage_and_commit_request, with_fixture};
@@ -47,10 +48,10 @@ fn saved_and_rerendered (
   Ok (second . saved_view) }
 
 /// The headline of the parent of the one line whose title is 'title'.
-fn parent_line_of<'a> (
-  buffer : &'a str,
+fn parent_line_of (
+  buffer : &str,
   title  : &str,
-) -> &'a str {
+) -> String {
   let headlines : Vec<&str> =
     buffer . lines () . filter ( |line| line . starts_with ('*') ) . collect ();
   let suffix : String = format! (" {}", title);
@@ -59,9 +60,9 @@ fn parent_line_of<'a> (
   assert_eq! ( matching . len (), 1, "one headline titled {:?} in\n{}", title, buffer );
   let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
   let at : usize = matching [0];
-  headlines [.. at] . iter () . rev ()
+  without_vids ( headlines [.. at] . iter () . rev ()
     . find ( |line| depth (line) + 1 == depth (headlines [at]) )
-    . unwrap_or_else ( || panic! ( "{:?} has no parent in\n{}", title, buffer )) }
+    . unwrap_or_else ( || panic! ( "{:?} has no parent in\n{}", title, buffer )) ) }
 
 const MEMBER_A : &str = "**** (skg (node (id a) (repo main) writeProtected";
 const GRAFT_P  : &str =
@@ -104,7 +105,7 @@ fn a_note_under_a_historical_phantom_survives (
     let committed : String = rerendered_view_content (&response);
     assert_eq! ( parent_line_of (&committed, "a note under h"), "** (skg deadViewnode)",
                  "{}", committed );
-    assert! ( ! committed . contains (old_member), "{}", committed );
+    assert! ( ! without_vids (&committed) . contains (old_member), "{}", committed );
     Ok (( )) }) }
 
 /// A note parked in the "it acquired" folder survives beside the
@@ -133,7 +134,7 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, removed, &note (3, "a note under x") )) ?;
-    let parent : &str = parent_line_of (&saved, "a note under x");
+    let parent : String = parent_line_of (&saved, "a note under x");
     assert! ( parent . starts_with (removed) && parent . contains ("(diff (presence rel-)"),
               "{}", saved );
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
@@ -141,7 +142,7 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
       "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
     assert! ( response . contains ("(commits ((main "), "{}", response );
     let committed : String = rerendered_view_content (&response);
-    let parent : &str = parent_line_of (&committed, "a note under x");
+    let parent : String = parent_line_of (&committed, "a note under x");
     assert! ( parent . starts_with (removed) && ! parent . contains ("(diff"),
               "the note stands under a plain non-member occurrence of x:\n{}", committed );
     assert_lines_in_order (&committed, &[

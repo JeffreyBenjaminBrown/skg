@@ -19,6 +19,11 @@ bugs caused by normal interactive fontification."
   (advice-add 'skg-request-save-buffer
               :before #'skg-test-fontify-before-save))
 
+(defun skg-test-without-vids (text)
+  "TEXT without its view ids: every '(vid X)' atom, and the space
+before it. A literal of expected buffer text does not spell them."
+  (replace-regexp-in-string " ?(vid [a-z0-9]+)" "" text t t))
+
 (defun skg-test-wait-for (predicate &optional timeout-secs)
   "Poll PREDICATE every 0.1s, processing network I/O between polls.
 Returns the first non-nil value from PREDICATE, or nil after

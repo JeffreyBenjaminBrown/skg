@@ -15,7 +15,7 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, PhantomDeleted, Editability,
     AffectsParent, ViewRequest, mk_editable_viewnode};
-use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
+use crate::types::viewnode::{Owner, Vognode, Phantom, PartnerFolder};
 use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_graphnode::{
@@ -596,7 +596,7 @@ fn complete_content_children (
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
   complete_managed_children_in_viewforest(
-    tree, node,
+    tree, node, Owner::ContentReconciler,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => t . affectsParent == AffectsParent::True,

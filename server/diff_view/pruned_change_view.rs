@@ -34,9 +34,9 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  AffectsParent, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  AffectsParent, Editability, Owner, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
-use crate::types::views_state::{DiffViewBufferKind, pids_from_viewforest};
+use crate::types::views_state::{DiffViewBufferKind, ViewIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
 use crate::update_buffer::finish_viewforest;
 
@@ -224,7 +224,11 @@ pub fn diffView_buffer_viewforest (
   set_diffView_facts_in_viewforest (
     &mut viewforest, straddle, diffView_buffer_kind, store, &runtime . graph );
   let text : String = finish_viewforest (
-    &mut viewforest, &runtime . graph, &runtime . config, None,
+    &mut viewforest,
+    // A new buffer's first vids; 'register_view' reads the record
+    // back from the forest.
+    &mut ViewIdRecord::default (),
+    &runtime . graph, &runtime . config, None,
     Some (&straddle . before) ) ?;
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
@@ -358,7 +362,7 @@ fn append_stub_root (
         "diffView_buffer_viewforest: root {} is in neither graph", root )) ?;
     return Ok ( viewforest . as_internal_tree_mut () . get_mut (buffer_root)
                 . ok_or ("diffView_buffer_viewforest: no buffer root") ?
-                . append (phantom) . id () ); }
+                . append ( Viewnode { owner : Owner::StubRoots, .. phantom } ) . id () ); }
   let root_treeid : NodeId = append_plain_stub_root (
     viewforest, root, &runtime . graph, &runtime . config,
     stub_editable_map, None ) ?;
@@ -368,6 +372,7 @@ fn append_stub_root (
       . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?
       . append ( Viewnode {
         org_folded : true,
+        owner      : Owner::StubRoots,
         .. viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) ) } ); }
   Ok (root_treeid) }
 

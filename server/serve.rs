@@ -53,7 +53,7 @@ use crate::skgrepo_sets::apply_skgrepo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::viewnode::Viewnode;
-use crate::types::views_state::{OpenViews, ViewId};
+use crate::types::views_state::{OpenViews, ViewId, ViewIdRecord};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -404,6 +404,11 @@ fn enrich_search_buffer_snapshot (
           return Err ( format! ("check failed: {}", e )); }},
     Err (e) => {
       return Err ( format! ("parse failed: {}", e )); }};
+  let view_id : ViewId =
+    ViewId::SearchView ( terms . to_string () );
+  let mut view_id_record : ViewIdRecord =
+    views_state . open_views . view_id_record_of (&view_id);
+  view_id_record . set_owners_in_parsed_viewforest (&mut viewforest);
   insert_full_containerward_role_trees_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . containerward_role_trees_by_skgid, &runtime . tantivy_index,
@@ -457,16 +462,15 @@ fn enrich_search_buffer_snapshot (
   let release_warnings : Vec<String> = match release {
     TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
+  view_id_record . assign_view_ids_and_record_owners (&mut viewforest);
   let enriched : String =
     viewforest_to_string ( &viewforest, &runtime . config )
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp (
       terms, Some (&enriched), &release_warnings );
-  { let view_id : ViewId = // update ViewsState with enriched viewforest
-      ViewId::SearchView ( terms . to_string () );
-    views_state . open_views . update_view (
-      &runtime . graph, &view_id, viewforest ); }
+  views_state . open_views . update_view ( // the enriched viewforest
+    &runtime . graph, &view_id, viewforest, view_id_record );
   Ok (enriched_sexp) }
 
 fn handle_verify_connection_request (

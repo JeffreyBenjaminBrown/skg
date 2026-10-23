@@ -2,7 +2,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, AffectsParent};
+use crate::types::viewnode::{FolderKind, Owner, Viewnode, ViewnodeKind, AffectsParent};
 use crate::types::viewnode::{Vognode, PropertyFolder, Property, viewnode_of};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -77,6 +77,7 @@ pub fn reconcile_aliasFolder_children (
   complete_managed_children_in_viewforest(
     tree,
     aliasfolder_treeid,
+    Owner::FolderReconciler (FolderKind::Alias),
     is_alias,
     view_alias_text,
     &goal_list,

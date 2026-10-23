@@ -8,7 +8,8 @@
 // private; acq acquired acqd by a nodeMerge; gone, which subscribed
 // to orph, is deleted.
 
-use crate::git_fixture::{Fixture, save_cleanly, skg_files};
+use skg::metadata_canon::without_vids;
+use crate::git_fixture::{Fixture, edit_line, save_cleanly, skg_files};
 use crate::git_fixture_helpers::read_graphnode;
 use crate::pruned_change_view::common::{
   all_changes_buffer, all_changes_buffer_with_marks, all_changes_view,
@@ -214,7 +215,7 @@ fn marks_in_the_store_show_as_ready (
     let buffer : String = all_changes_buffer_with_marks ( f, &[
       LeafKey::Node { pid : ID::from ("txt"), aspect : NodeAspect::Text },
       alias ("a1") ] ) ? . unwrap ();
-    assert! ( buffer . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
+    assert! ( without_vids (&buffer) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
       "** (skg (aliasFolder changed))", // a3 is not ready, so neither is the folder
@@ -222,7 +223,7 @@ fn marks_in_the_store_show_as_ready (
       "*** (skg alias (diff (presence rel+) (leaves 1))) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (
       f, &[ alias ("a1"), alias ("a3") ] ) ? . unwrap ();
-    assert! ( buffer . contains ("** (skg (aliasFolder changed) (ready))"),
+    assert! ( without_vids (&buffer) . contains ("** (skg (aliasFolder changed) (ready))"),
               "{}", buffer );
     Ok (( )) }) }
 
@@ -295,7 +296,7 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
     "* (skg (node (id d)",
     "** (skg (node (id c) (repo main) (affectsParent false) (rels",
     "*** (skg (node (id x) (repo main) writeProtected" ] );
-  let editable : Vec<&str> = node_lines (&buffer, "x") . into_iter ()
+  let editable : Vec<String> = node_lines (&buffer, "x") . into_iter ()
     . filter ( |line| ! line . contains ("writeProtected") ) . collect ();
   assert_eq! ( editable . len (), 1, "{}", buffer );
   Ok (( )) }
@@ -343,9 +344,10 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
     let x_line : &str =
       "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (presence rel-) (leaves 1 rel)))) x\n";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( buffer . contains (x_line), "{}", buffer );
-    let retitled : String = buffer . replacen (
-      x_line, &x_line . replacen ( ")))) x\n", ")))) x, retitled\n", 1 ), 1 );
+    assert! ( without_vids (&buffer) . contains (x_line), "{}", buffer );
+    let retitled : String = edit_line (
+      &buffer, x_line . trim_end (),
+      |line| line . replacen ( ")))) x", ")))) x, retitled", 1 ));
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let saved : String = save_cleanly (f, &all_changes_view (), &retitled) ? . saved_view;
     assert_ne! ( skg_files (f) ?, files_before );
@@ -356,7 +358,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
       "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (presence node~ rel-)",
       "x, retitled\n",
       "*** (skg (oldText title)" ] );
-    let editable : Vec<&str> = node_lines (&saved, "x") . into_iter ()
+    let editable : Vec<String> = node_lines (&saved, "x") . into_iter ()
       . filter ( |line| ! line . contains ("writeProtected") ) . collect ();
     assert_eq! ( editable . len (), 1, "{}", saved );
     Ok (( )) }) }

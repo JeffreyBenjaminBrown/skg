@@ -8,7 +8,7 @@ pub use super::viewnode::MpUnrestrictedVognode;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, ReadinessRequest, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ ChangeFacts, Owner, ReadinessRequest, Vid, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -28,6 +28,7 @@ pub struct MpViewnode {
   pub kind              : MpViewnodeKind,
   pub change_facts      : ChangeFacts,
   pub readiness_request : Option<ReadinessRequest>,
+  pub vid               : Option<Vid>,
 }
 
 // MpUnrestrictedVognode is defined in viewnode.rs.
@@ -122,6 +123,8 @@ impl TryFrom<MpViewnode> for Viewnode {
       kind              : ViewnodeKind::try_from(u . kind)?,
       change_facts      : u . change_facts,
       readiness_request : u . readiness_request,
+      vid               : u . vid,
+      owner             : Owner::User, // looked up by vid after the parse
     })
   }
 }
@@ -180,6 +183,7 @@ impl From<Viewnode> for MpViewnode {
       kind              : MpViewnodeKind::from(o . kind),
       change_facts      : o . change_facts,
       readiness_request : o . readiness_request,
+      vid               : o . vid,
     }
   }
 }
@@ -270,6 +274,7 @@ impl Default for MpViewnode {
         MpVognode::Unrestricted (MpUnrestrictedVognode::default())),
       change_facts      : ChangeFacts::default (),
       readiness_request : None,
+      vid               : None,
     }
   }
 }

@@ -15,7 +15,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::Viewnode;
-use crate::types::views_state::pids_from_viewforest;
+use crate::types::views_state::{ViewIdRecord, pids_from_viewforest};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -120,7 +120,11 @@ pub(crate) fn multi_root_view_via_runtime (
   // itself is caller-agnostic -- no mode flag.
   let buffer_content : String =
     finish_viewforest (
-      &mut viewforest, &runtime . graph, &runtime . config,
+      &mut viewforest,
+      // A new buffer's first vids; 'register_view' reads the record
+      // back from the forest.
+      &mut ViewIdRecord::default (),
+      &runtime . graph, &runtime . config,
       skgrepo_restriction, None ) ?;
   // The pids the caller registers for this view -- the {Unrestricted, Restricted}
   // set, via the one shared skgrepo of which-kinds-count

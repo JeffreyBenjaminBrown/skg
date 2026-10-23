@@ -128,6 +128,47 @@ pub struct Viewnode {
   /// write-protected occurrence, and beside an edit request.
   /// None on a kind that never carries a change.
   pub readiness_request : Option<ReadinessRequest>,
+  /// The view id, printed '(vid X)'. None until the view assigns
+  /// one, at the end of a completion ('ViewIdRecord' in
+  /// 'server/types/views_state.rs'); a parsed viewnode keeps the one
+  /// its headline carried.
+  pub vid               : Option<Vid>,
+  /// Who made this viewnode. Not printed: a reconciler sets it on a
+  /// viewnode it creates, and after a parse it is looked up by view
+  /// id in the view's 'ViewIdRecord'.
+  pub owner             : Owner,
+}
+
+/// A view id: the identifier of one viewnode within one buffer,
+/// unique for the life of the buffer ('docs/api-and-formats.org',
+/// "The metadata headers"). One or more lowercase letters and digits.
+/// The view assigns them from a counter in base 36, at least two
+/// characters long; a vid once used is never reused in the buffer.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Vid (pub String);
+
+/// The reconciler that created a viewnode, or the user, who owns
+/// what they typed or pasted. A member of a content list is the
+/// content reconciler's and a member of a folder that folder's
+/// reconciler's, whoever typed it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Owner {
+  ContentReconciler,
+  FolderReconciler (FolderKind),
+  RoleTreeAttach,
+  DiffViewReconciler,
+  StubRoots,
+  #[default]
+  User,
+}
+
+/// Which kind of folder a folder reconciler reconciles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FolderKind {
+  Partner (PartnerFolder),
+  Alias,
+  ID,
+  Flags,
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -883,6 +924,68 @@ impl ViewRequest {
       "writeProtectedView", "writeProtectedSubtreeView" ];
 }
 
+impl Vid {
+  /// The vid the counter 'counter' names: base 36, padded to at
+  /// least two characters.
+  pub fn from_counter (
+    counter : u64,
+  ) -> Vid {
+    const DIGITS : &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let mut reversed_digits : Vec<u8> = Vec::new ();
+    let mut rest : u64 = counter;
+    loop {
+      reversed_digits . push ( DIGITS [ (rest % 36) as usize ] );
+      rest /= 36;
+      if rest == 0 { break; }}
+    while reversed_digits . len () < 2 {
+      reversed_digits . push (b'0'); }
+    reversed_digits . reverse ();
+    Vid ( String::from_utf8 (reversed_digits)
+          . expect ("base-36 digits are ASCII") ) }
+
+  /// The vid named by 'text', if it is one or more lowercase letters
+  /// and digits.
+  pub fn parse (
+    text : &str,
+  ) -> Result<Vid, String> {
+    if ! text . is_empty ()
+       && text . chars () . all ( |c| c . is_ascii_lowercase ()
+                                     || c . is_ascii_digit () )
+    { Ok ( Vid ( text . to_string () )) }
+    else { Err ( format! (
+      "A view id is one or more lowercase letters and digits, not {:?}",
+      text )) }}
+
+  /// The counter value this vid reads as in base 36, if it fits.
+  pub fn counter_value (
+    &self,
+  ) -> Option<u64> {
+    self . 0 . chars () . try_fold ( 0u64, |value, c| {
+      let digit : u64 = c . to_digit (36) ? as u64;
+      value . checked_mul (36) ? . checked_add (digit) } ) }
+}
+
+impl fmt::Display for Vid {
+  fn fmt (&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
+    write! (f, "{}", self . 0) }}
+
+impl FolderKind {
+  /// The folder kind of 'kind', if it is a folder.
+  pub fn of_viewnodeKind (
+    kind : &ViewnodeKind,
+  ) -> Option<FolderKind> {
+    match kind {
+      ViewnodeKind::PartnerFolder (partnerFolder) =>
+        Some ( FolderKind::Partner (*partnerFolder) ),
+      ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
+        Some (FolderKind::Alias),
+      ViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
+        Some (FolderKind::ID),
+      ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
+        Some (FolderKind::Flags),
+      _ => None, }}
+}
+
 impl AsRef<Viewnode> for Viewnode {
   fn as_ref (&self) -> &Viewnode {
     self }}
@@ -892,8 +995,8 @@ impl AsMut<Viewnode> for Viewnode {
     self }}
 
 impl Viewnode {
-  /// Make this viewnode one of kind 'kind', keeping its focus and
-  /// fold state. The diff view's facts and the readiness request
+  /// Make this viewnode one of kind 'kind', keeping its focus, fold
+  /// state, view id and owner. The diff view's facts and the readiness request
   /// describe the kind replaced, so they go with it.
   pub fn replace_kind (
     &mut self,
@@ -1192,7 +1295,8 @@ pub fn viewforest_root_viewnode () -> Viewnode {
   viewnode_of (ViewnodeKind::BufferRoot) }
 
 /// A viewnode of the given kind, unfocused and not org-folded,
-/// carrying no change facts and no readiness request. A literal that
+/// carrying no change facts, no readiness request and no view id,
+/// and owned by the user. A literal that
 /// sets other fields can take the rest from it:
 /// 'Viewnode { org_folded : true, .. viewnode_of (kind) }'.
 pub fn viewnode_of (
@@ -1203,7 +1307,9 @@ pub fn viewnode_of (
              org_body_folded   : false,
              kind,
              change_facts      : ChangeFacts::default (),
-             readiness_request : None } }
+             readiness_request : None,
+             vid               : None,
+             owner             : Owner::User } }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

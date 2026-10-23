@@ -36,7 +36,7 @@
 
             ;; Verify exact content: should include skgrepo metadata
             (let ((expected-content "* (skg (node (id 1) (repo main) (affectsParent na))) 1\n"))
-              (if (string= content expected-content)
+              (if (string= (skg-test-without-vids content) expected-content)
                   (progn
                     (message "✓ PASS: Buffer content exactly matches expected")
                     (setq integration-test-phase "content-view-complete"))

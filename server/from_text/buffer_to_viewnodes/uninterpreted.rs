@@ -6,9 +6,11 @@ use crate::types::errors::BufferValidationError;
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::tree::forest::MpViewForest;
+use crate::types::viewnode::Vid;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 /// Type alias for headline information: (level, metadata, title)
@@ -63,6 +65,7 @@ pub fn org_to_uninterpreted_viewforest(
     MpViewForest::new();
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   let mut parsing_warnings: Vec<String> = Vec::new();
+  let mut vids_seen: HashSet<Vid> = HashSet::new();
   // treeid_stack[0] is the internal forest root,
   // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
@@ -73,9 +76,14 @@ pub fn org_to_uninterpreted_viewforest(
     let viewnode_line_cols: Vec<ViewnodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
     viewnode_line_cols } {
-    let (level, viewnode, error_opt, warning_opt)
+    let (level, mut viewnode, error_opt, warning_opt)
       : (usize, MpViewnode, Option<BufferValidationError>, Option<String>)
       = linecol_to_viewnode (viewnode_line_col)?;
+    if let Some (vid) = &viewnode . vid {
+      // Of two headlines with one vid, the first in buffer order
+      // keeps it; the second is a copy, and will get a fresh one.
+      if ! vids_seen . insert (vid . clone ()) {
+        viewnode . vid = None; }}
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
     if let Some (warning) = warning_opt {

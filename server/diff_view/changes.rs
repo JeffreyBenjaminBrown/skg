@@ -54,7 +54,7 @@ use crate::types::tree::moves::{
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
-  Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
+  Editability, Owner, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
@@ -760,12 +760,14 @@ fn child_folder_or_new (
   existing . unwrap_or_else ( ||
     append ( tree, treeid, viewnode_of ( ViewnodeKind::PartnerFolder (kind) ))) }
 
+/// Append 'viewnode' under 'treeid', the diff view's reconciler's.
 fn append (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   viewnode : Viewnode,
 ) -> NodeId {
-  tree . get_mut (treeid) . unwrap () . append (viewnode) . id () }
+  tree . get_mut (treeid) . unwrap ()
+    . append ( Viewnode { owner : Owner::DiffViewReconciler, .. viewnode } ) . id () }
 
 #[cfg(test)]
 #[path = "../../tests/unit/render_changes.rs"]

@@ -5,6 +5,7 @@
 // are described in 'buffer.rs' ('sets', 'kinds') and in
 // 'other_buffers.rs' ('buffers').
 
+use skg::metadata_canon::without_vids;
 use crate::git_fixture::{edit_line, save_cleanly};
 use crate::pruned_change_view::common::{
   all_changes_view, open_all_changes_buffer, rerendered_view_content,
@@ -84,7 +85,7 @@ fn assert_kinds_folds_stay (
                 "*** (skg folded alias (diff (presence rel+) (leaves 1))) a3",
                 "** (skg bodyFolded (oldText titleAndBody) (diff (leaves 1))) txt",
                 "*** (skg folded bodyDiff)" ] {
-    assert! ( saved . lines () . any ( |l| l == line ),
+    assert! ( without_vids (&saved) . lines () . any ( |l| l == line ),
               "{:?} must stay:\n{}", line, saved ); }}
 
 /// A folded change folder and a folded old-text line stay folded
@@ -105,7 +106,7 @@ fn folded_change_folders_and_old_text_stay_folded (
         "*** (skg (node (id txt) (repo public) writeProtected)) txt, retitled",
         "*** (skg (node (id ali) (repo public) writeProtected)) ali" ] );
     let saved : String = save_cleanly (f, &all_changes_view (), &contained) ? . saved_view;
-    assert! ( saved . contains ("a new container"), "{}", saved );
+    assert! ( without_vids (&saved) . contains ("a new container"), "{}", saved );
     assert_kinds_folds_stay (&saved);
     Ok (( )) }) }
 
@@ -191,7 +192,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
         |line| line . replacen ("(node (id cy1)", "(node (id cy1) (editRequest delete)", 1) ),
       "*** (skg (node (id cy2)", "folded" );
     let deleted : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
-    assert! ( deleted . contains (
+    assert! ( without_vids (&deleted) . contains (
       "** (skg bodyFolded (historical (id cy1) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) cy1\n\
        *** (skg folded (node (id cy2)" ),
       "cy1 is historical where it stood, its subtree folded as it was:\n{}", deleted );
@@ -203,9 +204,9 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       |_| "*** (skg folded (node (id cy2) (repo main) writeProtected)) cy2, retitled"
           . to_string () );
     let restored : String = save_cleanly (f, &all_changes_view (), &restoring) ? . saved_view;
-    assert! ( restored . contains ("** (skg bodyFolded (node (id cy1)")
-              && restored . contains ("*** (skg folded (node (id cy2)")
-              && ! restored . contains ("historical (id cy1)"),
+    assert! ( without_vids (&restored) . contains ("** (skg bodyFolded (node (id cy1)")
+              && without_vids (&restored) . contains ("*** (skg folded (node (id cy2)")
+              && ! without_vids (&restored) . contains ("historical (id cy1)"),
               "cy1 is a live member again, its subtree folded as it was:\n{}",
               restored );
     Ok (( )) }) }

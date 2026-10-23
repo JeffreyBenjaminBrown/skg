@@ -21,7 +21,7 @@ local content = T.buffer_text(view)
 print('Content: ' .. content)
 -- The exact expected text, like the emacs test: the server's content
 -- ends with a newline, which survives as a final empty buffer line.
-T.check(content ==
+T.check(T.without_vids(content) ==
         '* (skg (node (id 1) (repo main) (affectsParent na))) 1\n',
         'buffer content exactly matches expected')
 

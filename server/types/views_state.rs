@@ -1,10 +1,10 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::ViewnodeKind;
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{Owner, Vid, Viewnode, ViewnodeKind, Vognode};
 use super::misc::ID;
 
+use ego_tree::{NodeId, NodeMut, Tree};
 use std::collections::{HashMap, HashSet};
 
 //
@@ -40,6 +40,19 @@ pub struct ViewState {
                             // kind this view renders meaningfully; see
                             // pids_from_viewforest)
   pub diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
+  pub view_id_record : ViewIdRecord,
+}
+
+/// The view ids of one buffer: the counter they are assigned from,
+/// and the owner of each viewnode a reconciler made. A vid the table
+/// lacks is the user's. The forest's viewnodes carry their owners in
+/// memory; the table is how a parsed buffer, whose text carries only
+/// the vids, gets them back ('set_owners_in_parsed_viewforest').
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ViewIdRecord {
+  /// Never decreases, so a vid once used is not used again.
+  pub next_view_id_counter : u64,
+  pub owner_by_view_id     : HashMap<Vid, Owner>,
 }
 
 /// The four buffers of the diff view
@@ -145,8 +158,11 @@ impl OpenViews {
           rid . clone (), view_id . clone () ); }
       let pids : HashSet<ID> =
         pids . iter () . cloned () . collect ();
+      let view_id_record : ViewIdRecord =
+        ViewIdRecord::of_viewforest (&viewforest);
       let state : ViewState =
-        ViewState { viewforest, pids, diffView_buffer_kind : None };
+        ViewState { viewforest, pids, diffView_buffer_kind : None,
+                    view_id_record };
       self . views . insert ( view_id, state ); }
 
   /// 'register_view' for a buffer of the diff view.
@@ -175,11 +191,24 @@ impl OpenViews {
     self . views . get (view_id)
       . and_then ( |state| state . diffView_buffer_kind ) }
 
+  /// A copy of the view ids of 'view_id', or an empty record when
+  /// no such view is open.
+  pub fn view_id_record_of (
+    &self,
+    view_id : &ViewId,
+  ) -> ViewIdRecord {
+    self . views . get (view_id)
+      . map ( |state| state . view_id_record . clone () )
+      . unwrap_or_default () }
+
+  /// 'view_id_record' is the record the rerender of
+  /// 'new_viewforest' assigned its vids from.
   pub fn update_view (
     &mut self,
     graph      : &InRustGraph,
     view_id    : &ViewId,
     new_viewforest : impl Into<ViewForest>,
+    view_id_record : ViewIdRecord,
   ) { let new_viewforest : ViewForest =
         new_viewforest . into ();
       let pids : HashSet<ID> =
@@ -193,11 +222,13 @@ impl OpenViews {
       if let Some (vs)
         = self . views . get_mut (view_id)
         { vs . viewforest = new_viewforest;
-          vs . pids = pids; }
+          vs . pids = pids;
+          vs . view_id_record = view_id_record; }
       else { self . views . insert (
                view_id . clone (),
                ViewState { viewforest : new_viewforest,
-                           pids, diffView_buffer_kind : None } ); }}
+                           pids, diffView_buffer_kind : None,
+                           view_id_record } ); }}
 
   pub fn unregister_view (
     &mut self,
@@ -213,6 +244,89 @@ impl OpenViews {
       . filter ( |(_, vs)| vs . pids . contains (pid) )
       . map ( |(view_id, _)| view_id . clone () )
       . collect () }
+}
+
+impl ViewIdRecord {
+  /// The record a view registered with 'viewforest' starts with: the
+  /// counter past every vid it holds, and the owners its viewnodes
+  /// carry.
+  pub fn of_viewforest (
+    viewforest : &Tree<Viewnode>,
+  ) -> ViewIdRecord {
+    let mut record : ViewIdRecord = ViewIdRecord::default ();
+    record . advance_counter_past_vids_in (viewforest);
+    record . record_owners_in (viewforest);
+    record }
+
+  /// After a parse, before any reconciler runs: give each viewnode
+  /// the owner its vid has in the table, and the user's to the rest.
+  pub fn set_owners_in_parsed_viewforest (
+    &self,
+    viewforest : &mut Tree<Viewnode>,
+  ) {
+    let treeids : Vec<NodeId> =
+      viewforest . root () . descendants () . map ( |node| node . id () ) . collect ();
+    for treeid in treeids {
+      let mut node_mut : NodeMut<Viewnode> =
+        viewforest . get_mut (treeid) . unwrap ();
+      let viewnode : &mut Viewnode = node_mut . value ();
+      viewnode . owner =
+        viewnode . vid . as_ref ()
+        . and_then ( |vid| self . owner_by_view_id . get (vid) . copied () )
+        . unwrap_or (Owner::User); }}
+
+  /// The end-of-completion pass, after the prune and just before the
+  /// text is rendered: give a fresh vid to every viewnode (but the
+  /// buffer root) that lacks one, in buffer order, and make the table
+  /// say the owner of every viewnode the forest holds and nothing else.
+  pub fn assign_view_ids_and_record_owners (
+    &mut self,
+    viewforest : &mut Tree<Viewnode>,
+  ) {
+    self . advance_counter_past_vids_in (viewforest);
+    let treeids_without_vids : Vec<NodeId> =
+      viewforest . root () . descendants ()
+      . filter ( |node| node . value () . vid . is_none ()
+                        && node . value () . kind != ViewnodeKind::BufferRoot )
+      . map ( |node| node . id () )
+      . collect ();
+    for treeid in treeids_without_vids {
+      let vid : Vid = self . take_next_vid ();
+      viewforest . get_mut (treeid) . unwrap () . value () . vid = Some (vid); }
+    self . record_owners_in (viewforest); }
+
+  /// The next vid from the counter, skipping any that would read as a
+  /// number ('05', '1e5', 'inf'): a reader of the sexp (the sexp crate,
+  /// Emacs) would turn it into one and lose its spelling.
+  fn take_next_vid (
+    &mut self,
+  ) -> Vid {
+    loop {
+      let vid : Vid = Vid::from_counter (self . next_view_id_counter);
+      self . next_view_id_counter += 1;
+      if vid . 0 . parse::<f64> () . is_err () { return vid; }} }
+
+  fn advance_counter_past_vids_in (
+    &mut self,
+    viewforest : &Tree<Viewnode>,
+  ) {
+    for node in viewforest . root () . descendants () {
+      if let Some (counter) = node . value () . vid . as_ref ()
+        . and_then (Vid::counter_value)
+      { self . next_view_id_counter =
+          self . next_view_id_counter . max ( counter . saturating_add (1) ); }} }
+
+  fn record_owners_in (
+    &mut self,
+    viewforest : &Tree<Viewnode>,
+  ) {
+    self . owner_by_view_id = viewforest . root () . descendants ()
+      . filter_map ( |node| {
+        let viewnode : &Viewnode = node . value ();
+        match (&viewnode . vid, viewnode . owner) {
+          (_, Owner::User) | (None, _) => None,
+          (Some (vid), owner) => Some (( vid . clone (), owner )), } } )
+      . collect (); }
 }
 
 //

@@ -1,5 +1,5 @@
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Viewnode, ViewnodeKind, Vognode};
+  AffectsParent, Birth, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 use crate::types::tree::moves::move_to_last_child;
 
@@ -177,7 +177,44 @@ pub fn keep_stale_child_holding_the_users (
 /// This one specializes it so that:
 /// - problem discards are those that would discard the focused node.
 /// - if any discard is problematic, transfer focus to 'treeid'
+/// - 'owner' (the calling reconciler) owns every child it creates,
+///   and every managed child it keeps as a member of the goal,
+///   whoever typed it.
 pub fn complete_managed_children_in_viewforest
+<Orderkey, Managed, View> (
+  tree                : &mut Tree<Viewnode>,
+  treeid              : NodeId,
+  owner               : Owner,
+  managed             : Managed,
+  view_child_orderkey : View,
+  goal_list           : &[Orderkey],
+  create_child        : impl Fn (&Orderkey) -> Result<Viewnode, String>,
+) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
+where Managed  : Fn (&Viewnode) -> bool,
+      View     : Fn (&Viewnode) -> Result<Orderkey, String>,
+      Orderkey : Eq + Hash + Clone,
+{
+  let summary : RepairSummary<Orderkey> =
+    complete_managed_children_in_viewforest_ignoring_owners (
+      tree, treeid, &managed, &view_child_orderkey, goal_list,
+      |orderkey : &Orderkey| create_child (orderkey)
+        . map ( |viewnode : Viewnode| Viewnode { owner, .. viewnode } ) ) ?;
+  let goal_set : HashSet<&Orderkey> = goal_list . iter () . collect ();
+  let kept_members : Vec<NodeId> =
+    tree . get (treeid)
+    . ok_or ("complete_managed_children_in_viewforest: node not found") ?
+    . children ()
+    . filter ( |child| managed ( child . value () )
+               && view_child_orderkey ( child . value () )
+                  . is_ok_and ( |orderkey| goal_set . contains (&orderkey) ))
+    . map ( |child| child . id () )
+    . collect ();
+  for member in kept_members {
+    tree . get_mut (member) . unwrap () . value () . owner = owner; }
+  Ok (summary) }
+
+/// 'complete_managed_children_in_viewforest' without the owners.
+fn complete_managed_children_in_viewforest_ignoring_owners
 <Orderkey, Managed, View> (
   tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,

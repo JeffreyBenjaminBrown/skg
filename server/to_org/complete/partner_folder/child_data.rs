@@ -28,7 +28,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::diff_view::shallow_model_subtree::{
   adopt_model_facts, is_unrestricted_removed_member};
-use crate::types::viewnode::{DiffPresence, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffPresence, FolderKind, Owner, Phantom, Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -229,7 +229,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     tree, folder_node, child_data, deleted_by_this_save_extra_ids ) ?;
   let summary : RepairSummary<ID> =
     complete_managed_children_in_viewforest (
-    tree, folder_node,
+    tree, folder_node, Owner::FolderReconciler (FolderKind::Partner (kind)),
     // A RestrictedVognode child is unmanaged
     // (the API doc's "Restricted-skgrepo nodes"): the goal omits
     // every restricted member, and a retained placeholder already in the

@@ -6,6 +6,7 @@
 // contains a, whose body changed, and b, unchanged. So n, a node of
 // U, is shown editable under x and write-protected under y.
 
+use skg::metadata_canon::without_vids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   node_lines, open_all_changes_buffer, requesting_editable_at, save,
@@ -107,7 +108,9 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
     let created : String = save ( f, &format! (
       "{}**** (skg (node (id c) (repo main))) c\n{}",
       &buffer [.. b_under_x], &buffer [b_under_x ..] )) ? . saved_view;
-    let c_line : &str = node_lines (&created, "c") [0];
+    let c_line : &str = created . lines ()
+      . find ( |line| line . contains ("(node (id c) ") )
+      . expect ("c is shown");
     let marked : String = save ( f, &created . replacen (
       c_line, &c_line . replacen (
         "(diff ", "(diff (readyRequest all) ", 1 ), 1 )) ?
@@ -169,7 +172,7 @@ fn write_protecting_one_occurrence_and_requesting_another_moves_editability (
     let response : SaveResponse = save (f, &edited) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let saved : String = response . saved_view;
-    let n_lines : Vec<&str> = node_lines (&saved, "n");
+    let n_lines : Vec<String> = node_lines (&saved, "n");
     assert! ( saved . find ("* (skg (node (id x) ")
               < saved . find ("* (skg (node (id y) ")
               && n_lines . len () == 2,
@@ -315,7 +318,8 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
       . expect ("s1 is a root");
     let text : String = buffer . replacen ( s1_root, &s1_root . replacen (
       "(repo public) ", "(repo public) writeProtected ", 1 ), 1 );
-    let s1_and_folder : Vec<&str> = text . lines ()
+    let text_without_vids : String = without_vids (&text);
+    let s1_and_folder : Vec<&str> = text_without_vids . lines ()
       . skip_while ( |line| ! line . starts_with ("* (skg (node (id s1) ") )
       . take (3) . collect ();
     assert! ( s1_and_folder [0] . contains ("writeProtected")
@@ -329,7 +333,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
     let response : SaveResponse = save (f, &text) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert_eq! ( skg_files (f) ?, files_before );
-    assert! ( response . saved_view . contains ("(diff (presence rel-) (leaves 1 rel)))) sub"),
+    assert! ( without_vids (&response . saved_view) . contains ("(diff (presence rel-) (leaves 1 rel)))) sub"),
               "{}", response . saved_view );
     Ok (( )) }) }
 

@@ -114,6 +114,14 @@ function M.fail (message)
   os.exit(1)
 end
 
+---TEXT without its view ids: every '(vid X)' atom, and the space
+---before it. A literal of expected buffer text does not spell them.
+---@param text string
+---@return string
+function M.without_vids (text)
+  return (text:gsub(' ?%(vid [%l%d]+%)', ''))
+end
+
 ---FAIL unless CONDITION; the message names what was expected.
 ---@param condition any
 ---@param message string

@@ -19,7 +19,7 @@ use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, f
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewState};
+use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewIdRecord, ViewState};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{
   rerender_view, RerenderAfterSaveContext, RerenderOptions};
@@ -33,6 +33,7 @@ pub(crate) struct PreparedView {
   pub(crate) view_id     : ViewId,
   text                   : String,
   pub(crate) viewforest  : ViewForest,
+  view_id_record         : ViewIdRecord,
 }
 
 pub(crate) struct PreparedRerenders {
@@ -107,6 +108,8 @@ pub(crate) fn prepare_rerender_views_where (
             "View {}: no viewforest found",
             view_id . repr_in_client () ));
           continue; } };
+    let mut view_id_record : ViewIdRecord =
+      views_state . open_views . view_id_record_of (view_id);
     if let Some (prepass) = prepass {
       if let Err (e) = prepass (&mut viewforest) {
         context . errors . push ( format! (
@@ -120,13 +123,15 @@ pub(crate) fn prepare_rerender_views_where (
         ) . entered ();
       rerender_view (
         &mut viewforest,
+        &mut view_id_record,
         &mut context,
         None, // streamed rerenders repair silently.
         rerender_options (
           views_state . open_views . diffView_buffer_kind_of_view (view_id) )) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {
-          view_id : view_id . clone (), text, viewforest } ); },
+          view_id : view_id . clone (), text, viewforest,
+          view_id_record } ); },
       Err (e) => {
         context . errors . push ( format! (
           "View {}: {}",
@@ -184,7 +189,7 @@ pub(crate) fn stream_prepared_rerenders (
   for view in prepared . views {
     views_state . open_views . update_view (
       &prepared . runtime . graph,
-      &view . view_id, view . viewforest);
+      &view . view_id, view . viewforest, view . view_id_record );
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response (

@@ -9,7 +9,7 @@ use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::viewnode_graphnode::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, PartnerFolder};
-use crate::types::viewnode::Vognode;
+use crate::types::viewnode::{FolderKind, Owner, Vognode};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -154,7 +154,8 @@ fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
         insert_non_vognode_as_child(
           tree, node,
           ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
-          false ) ?;
+          false,
+          Owner::FolderReconciler (FolderKind::Partner (PartnerFolder::Subscribee)) ) ?;
       with_node_mut ( tree, new_folder,
         |mut n| {
           // A new hidden folder begins folded. The

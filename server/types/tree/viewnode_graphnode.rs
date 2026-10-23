@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, AffectsParent, viewnode_of };
-use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
+use crate::types::viewnode::{Owner, Vognode, Phantom, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::MpVognode;
@@ -128,9 +128,10 @@ pub fn insert_non_vognode_as_child (
   parent_skgid  : NodeId,
   non_vognode_kind : ViewnodeKind,
   prepend       : bool, // otherwise, append
+  owner         : Owner, // who is creating it
 ) -> Result < NodeId, Box<dyn Error> > {
   let viewnode : Viewnode =
-    viewnode_of (non_vognode_kind);
+    Viewnode { owner, .. viewnode_of (non_vognode_kind) };
   let folder_skgid : NodeId = with_node_mut (
     tree, parent_skgid,
     |mut parent_mut| {

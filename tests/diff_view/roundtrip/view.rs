@@ -12,6 +12,7 @@
 // 'acquired' by a nodeMerge. (One skgrepo cannot show a skgrepo move,
 // so the two move properties are taken from made-up skgrepos.)
 
+use skg::metadata_canon::without_vids;
 use crate::git_fixture::{
   Fixture, OwnedSkgrepos, save_view, skg_files, with_git_fixture};
 
@@ -154,7 +155,7 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
     let mut saved : String = buffer;
     for _ in 0 .. 2 {
       for atom in atoms {
-        assert! ( saved . contains (atom),
+        assert! ( without_vids (&saved) . contains (atom),
                   "the buffer should hold {}:\n{}", atom, saved ); }
       let response : SaveResponse = save (f, &saved) ?;
       assert! ( response . errors . is_empty (),
@@ -196,12 +197,12 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
       [ LeafKey::Node { pid : ID::from ("a"), aspect : NodeAspect::Text },
         LeafKey::Node { pid : ID::from ("gone"), aspect : NodeAspect::Existence } ]
       . into_iter () . collect () );
-    assert! ( ! response . saved_view . contains ("Request"),
+    assert! ( ! without_vids (&response . saved_view) . contains ("Request"),
               "the save consumes its requests:\n{}", response . saved_view );
     let response : SaveResponse = save ( f,
       &response . saved_view . replace (
-        "(skg (changesetMarker content))",
-        "(skg (changesetMarker content) (diff (readyRequest all)))" )) ?;
+        "(skg (changesetMarker content) (vid",
+        "(skg (changesetMarker content) (diff (readyRequest all)) (vid" )) ?;
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     assert! ( ReadinessStore::load (&f . config . data_root) . marks
               . contains_key (&p_contains_gone) );

@@ -15,6 +15,7 @@
 use std::error::Error;
 use std::net::TcpStream;
 
+use skg::metadata_canon::without_vids;
 use skg::serve::ViewsState;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
@@ -65,11 +66,12 @@ fn lines_by_enclosing_folder (
       stack . last () . map ( |(_, c)| *c ) . unwrap_or (""),
       line ));
     if depth > 0 {
-      if line . contains ("(skg subscribeeFolder)")
+      let line_without_vid : String = without_vids (line);
+      if line_without_vid . contains ("(skg subscribeeFolder)")
         { stack . push ((depth, "subscribeeFolder")); }
-      else if line . contains ("(skg overriddenFolder)")
+      else if line_without_vid . contains ("(skg overriddenFolder)")
         { stack . push ((depth, "overriddenFolder")); }
-      else if line . contains ("(skg hiddenInSubscribeeFolder)")
+      else if line_without_vid . contains ("(skg hiddenInSubscribeeFolder)")
         { stack . push ((depth, "hiddenInSubscribeeFolder")); }}}
   result }
 

@@ -26,15 +26,22 @@
 //! `(rels ...)` form. Span display-order is pinned separately by the
 //! `herald_tokens` unit tests, which assert the assembled order directly.
 //!
+//! Both ignore the view ids: '(vid X)' differs from one rendering to
+//! the next, so 'assert_metadata_eq!' compares buffers 'without_vids',
+//! which any other whole-buffer assertion can use too.
+//!
 //! It lives in the library (not under a test module) so every
 //! integration-test binary can reach it as
 //! `skg::metadata_canon::canonicalize_metadata_ordering`, alongside the
 //! other shared test helpers in `skg::test_utils`.
 
+use regex::Regex;
 use sexp::{Atom, Sexp};
+use std::sync::LazyLock;
 
-/// Assert two rendered org buffers equal, ignoring the sibling order
-/// inside every `(skg ...)` metadata sexp (see this module's docs).
+/// Assert two rendered org buffers equal, ignoring their view ids and
+/// the sibling order inside every `(skg ...)` metadata sexp (see this
+/// module's docs).
 /// A drop-in for `assert_eq!` at buffer-comparison sites: both sides
 /// are run through `canonicalize_metadata_ordering` first, so the diff
 /// stays readable and any content difference still fails. Accepts an
@@ -43,14 +50,49 @@ use sexp::{Atom, Sexp};
 macro_rules! assert_metadata_eq {
   ($actual:expr, $expected:expr $(,)?) => {
     assert_eq! (
-      $crate::metadata_canon::canonicalize_metadata_ordering ( &($actual) ),
-      $crate::metadata_canon::canonicalize_metadata_ordering ( &($expected) ) ) };
+      $crate::metadata_canon::canonicalize_metadata_ordering (
+        & $crate::metadata_canon::without_vids ( &($actual) ) ),
+      $crate::metadata_canon::canonicalize_metadata_ordering (
+        & $crate::metadata_canon::without_vids ( &($expected) ) ) ) };
   ($actual:expr, $expected:expr, $($arg:tt)+) => {
     assert_eq! (
-      $crate::metadata_canon::canonicalize_metadata_ordering ( &($actual) ),
-      $crate::metadata_canon::canonicalize_metadata_ordering ( &($expected) ),
+      $crate::metadata_canon::canonicalize_metadata_ordering (
+        & $crate::metadata_canon::without_vids ( &($actual) ) ),
+      $crate::metadata_canon::canonicalize_metadata_ordering (
+        & $crate::metadata_canon::without_vids ( &($expected) ) ),
       $($arg)+ ) };
 }
+
+static VID_ATOM : LazyLock<Regex> = LazyLock::new ( ||
+  Regex::new (r" ?\(vid [a-z0-9]+\)") . unwrap () );
+
+/// 'text' with every '(vid X)' atom, and the space before it, removed.
+pub fn without_vids (
+  text : &str,
+) -> String {
+  VID_ATOM . replace_all (text, "") . into_owned () }
+
+/// The '(vid X)' atom of 'line', if it has one.
+pub fn vid_atom_of (
+  line : &str,
+) -> Option<&str> {
+  VID_ATOM . find (line)
+    . map ( |found| found . as_str () . trim_start () ) }
+
+/// 'line' with 'vid_atom' put at the end of its '(skg ...)' wrapper,
+/// where the printer puts a view id. 'line' unchanged if it has no
+/// wrapper.
+pub fn with_vid_atom (
+  line     : &str,
+  vid_atom : &str,
+) -> String {
+  let Some (wrapper_start) : Option<usize> = line . find ("(skg") else {
+    return line . to_string (); };
+  let Some (wrapper_len) : Option<usize> = sexp_byte_len ( &line [wrapper_start ..] ) else {
+    return line . to_string (); };
+  let wrapper_close : usize = wrapper_start + wrapper_len - 1;
+  format! ( "{} {}{}", &line [.. wrapper_close], vid_atom,
+            &line [wrapper_close ..] ) }
 
 /// Rewrite every `(skg ...)` sexp in `buffer` into canonical
 /// (tail-sorted) form, leaving all other text untouched. A `(skg ...)`
@@ -227,6 +269,24 @@ mod tests {
     let c : String = canonicalize_metadata_ordering (s);
     assert! ( c . contains ("⌂:main"), "got: {}", c );
     assert! ( c . contains ("cycle") ); }
+
+  #[test]
+  fn without_vids_drops_each_view_id_and_its_space () {
+    assert_eq! (
+      without_vids ( concat! (
+        "* (skg (node (id 1) (repo main)) (vid 0a)) one\n",
+        "** (skg folded aliasFolder (vid 0b))\n" )),
+      concat! (
+        "* (skg (node (id 1) (repo main))) one\n",
+        "** (skg folded aliasFolder)\n" )); }
+
+  #[test]
+  fn a_vid_atom_moves_from_one_line_to_another () {
+    let original : &str = "** (skg (node (id 2) (repo main)) (vid 1x)) two";
+    let edited : String =
+      without_vids (original) . replace ("main", "other");
+    assert_eq! ( with_vid_atom ( &edited, vid_atom_of (original) . unwrap () ),
+                 "** (skg (node (id 2) (repo other)) (vid 1x)) two" ); }
 
   #[test]
   fn text_outside_any_skg_form_is_verbatim () {

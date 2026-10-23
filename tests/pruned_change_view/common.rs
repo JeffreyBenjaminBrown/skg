@@ -8,6 +8,7 @@ use crate::git_fixture::{
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::diff_view::change_leaves::LeafKey;
+use skg::metadata_canon::without_vids;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
 use skg::graph_straddle::types::GraphStraddle;
 use skg::diff_view::readiness_store::ReadinessStore;
@@ -280,13 +281,15 @@ fn first_streamed_view_content (
         &message [ message . find ('(') . unwrap () .. ], "content" )
       . expect ("the streamed view has content") ) }
 
-/// The lines of 'buffer' that show an unrestricted vognode of 'node'.
-pub fn node_lines<'a> (
-  buffer : &'a str,
+/// The lines of 'buffer' that show an unrestricted vognode of 'node',
+/// without their view ids.
+pub fn node_lines (
+  buffer : &str,
   node   : &str,
-) -> Vec<&'a str> {
+) -> Vec<String> {
   let atom : String = format! ("(node (id {}) ", node);
-  buffer . lines () . filter ( |line| line . contains (&atom) ) . collect () }
+  buffer . lines () . filter ( |line| line . contains (&atom) )
+    . map (without_vids) . collect () }
 
 /// 'buffer' with an editable-view request at the first occurrence of
 /// 'metadata', which must show a write-protected node.
@@ -300,8 +303,8 @@ pub fn requesting_editable_at (
             buffer [at ..] . replacen (
               "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }
 
-/// 'buffer' with 'new_line' inserted after its first line starting
-/// 'prefix'.
+/// 'buffer' with 'new_line' inserted after its first line starting,
+/// view id aside, 'prefix'.
 pub fn insert_after_line_starting (
   buffer   : &str,
   prefix   : &str,
@@ -311,13 +314,13 @@ pub fn insert_after_line_starting (
   let mut lines : Vec<&str> = Vec::new ();
   for line in buffer . lines () {
     lines . push (line);
-    if ! inserted && line . starts_with (prefix) {
+    if ! inserted && without_vids (line) . starts_with (prefix) {
       lines . push (new_line);
       inserted = true; }}
   assert! ( inserted, "no line starts {:?}:\n{}", prefix, buffer );
   lines . join ("\n") + "\n" }
 
-/// 'buffer' without its first line starting 'prefix' and the
+/// 'buffer' without its first line starting, view id aside, 'prefix' and the
 /// headlines below it, with their bodies.
 pub fn without_subtree_starting (
   buffer : &str,
@@ -332,7 +335,7 @@ pub fn without_subtree_starting (
       if line . starts_with ('*') && depth (line) <= own {
         subtree_depth = None; }
       else { continue; }}
-    if ! found && line . starts_with (prefix) {
+    if ! found && without_vids (line) . starts_with (prefix) {
       found = true;
       subtree_depth = Some ( depth (line) );
       continue; }
@@ -340,11 +343,13 @@ pub fn without_subtree_starting (
   assert! ( found, "no line starts {:?}:\n{}", prefix, buffer );
   kept . join ("\n") + "\n" }
 
-/// Panic unless 'lines' occur in 'buffer' in this order.
+/// Panic unless 'lines' occur in 'buffer', its view ids ignored, in
+/// this order.
 pub fn assert_lines_in_order (
   buffer : &str,
   lines  : &[&str],
 ) {
+  let buffer : &str = &without_vids (buffer);
   let mut rest : &str = buffer;
   for line in lines {
     match rest . find (line) {
