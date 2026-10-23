@@ -408,6 +408,7 @@ fn enrich_search_buffer_snapshot (
     ViewforestId::SearchView ( terms . to_string () );
   let mut viewnode_id_record : ViewnodeIdRecord =
     views_state . open_views . viewnode_id_record_of (&viewforest_id);
+  viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut viewforest);
   viewnode_id_record . set_owners_in_parsed_viewforest (&mut viewforest);
   insert_full_containerward_role_trees_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,

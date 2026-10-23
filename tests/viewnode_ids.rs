@@ -49,6 +49,8 @@ fn viewnode_ids_in_content_views (
       a_moved_headline_keeps_its_viewnode_id (config, tantivy) . await ?;
       a_typed_headline_gets_a_viewnode_id (config, tantivy) . await ?;
       the_owner_table_records_who_made_each_viewnode (config, tantivy) . await ?;
+      // last, since it cuts b from a's content
+      an_unknown_viewnode_id_is_dropped (config, tantivy) . await ?;
       Ok (( )) } )) }
 
 //
@@ -283,6 +285,52 @@ async fn a_typed_headline_gets_a_viewnode_id (
     viewnode_id_of_line_containing (&saved . saved_view, "a typed child");
   assert! ( ! viewnode_id_atoms (&buffer) . contains (&typed_viewnode_id),
             "the typed headline's viewnode ID is new:\n{}", saved . saved_view );
+  Ok (( )) }
+
+/// A viewnode ID the view's record does not know is dropped at the
+/// parse, so its headline gets a fresh one: one brought back from a
+/// headline cut at an earlier save, and one typed by hand past the
+/// counter, which leaves the counter where it was.
+async fn an_unknown_viewnode_id_is_dropped (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = fresh_views_state ();
+  let buffer : String = open_view (
+    config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
+  let b_line : &str = buffer . lines ()
+    . find ( |line| line . contains ("(node (id b) ") )
+    . expect ("b is shown");
+  let b_viewnode_id_atom : String =
+    viewnode_id_atom_of (b_line) . unwrap () . to_string ();
+  let without_b : String = buffer . replacen ( &format! ("{}\n", b_line), "", 1 );
+  let (cut, _) : (SaveResponse, Vec<String>) = save_view (
+    &without_b, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
+  assert! ( ! cut . saved_view . contains (&b_viewnode_id_atom),
+            "b's viewnode ID left with b:\n{}", cut . saved_view );
+  let counter_before : u64 = views_state . open_views
+    . viewnode_id_record_of ( &ViewforestId::ContentView (VIEW_OF_A . to_string ()) )
+    . next_viewnode_id_counter;
+  let typed : String = format! (
+    "{}** (skg {}) brought back\n** (skg (vnid zz)) typed past the counter\n",
+    cut . saved_view, b_viewnode_id_atom );
+  let (saved, _) : (SaveResponse, Vec<String>) = save_view (
+    &typed, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
+  for needle in ["brought back", "typed past the counter"] {
+    let atom : String =
+      viewnode_id_of_line_containing (&saved . saved_view, needle);
+    assert! ( atom != b_viewnode_id_atom && atom != "(vnid zz)",
+              "{:?} has a fresh viewnode ID:\n{}", needle, saved . saved_view );
+    assert! ( viewnode_id_of_atom (&atom) . counter_value () . unwrap ()
+              < counter_before + 4,
+              "{:?} got the next fresh viewnode ID:\n{}", needle, saved . saved_view ); }
+  let counter_after : u64 = views_state . open_views
+    . viewnode_id_record_of ( &ViewforestId::ContentView (VIEW_OF_A . to_string ()) )
+    . next_viewnode_id_counter;
+  assert! ( counter_after < counter_before + 4,
+            "the counter moved only past the two fresh viewnode IDs: {} -> {}",
+            counter_before, counter_after );
   Ok (( )) }
 
 /// The view's record says who made each viewnode, before and after a

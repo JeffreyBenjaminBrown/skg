@@ -83,6 +83,8 @@ pub fn org_to_uninterpreted_viewforest(
         // keeps it; the second is a copy, and will get a fresh one.
         // (Dropped before the headline becomes a viewnode, so that no
         // message names the copy by the original's viewnode ID.)
+        // One the view's record does not know is dropped after the
+        // parse ('drop_unknown_viewnode_ids_in_parsed_viewforest').
         if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
           metadata . viewnode_id = None; }}}
     let (level, viewnode, error_opt, warning_opt)

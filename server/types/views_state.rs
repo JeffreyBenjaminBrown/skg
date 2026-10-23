@@ -44,14 +44,19 @@ pub struct ViewState {
 }
 
 /// The viewnode IDs of one buffer: the counter they are assigned from,
-/// and the owner of each viewnode a reconciler made. A viewnode ID the table
-/// lacks is the user's. The forest's viewnodes carry their owners in
-/// memory; the table is how a parsed buffer, whose text carries only
-/// the viewnode IDs, gets them back ('set_owners_in_parsed_viewforest').
+/// the ones the forest holds, and the owner of each viewnode a
+/// reconciler made. A viewnode ID the table lacks is the user's. The
+/// forest's viewnodes carry their owners in memory; the table is how a
+/// parsed buffer, whose text carries only the viewnode IDs, gets them
+/// back ('set_owners_in_parsed_viewforest').
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ViewnodeIdRecord {
   /// Never decreases, so a viewnode ID once used is not used again.
   pub next_viewnode_id_counter : u64,
+  /// The viewnode IDs of the forest as last rendered (or registered).
+  /// A parsed headline carrying any other is given a fresh one
+  /// ('drop_unknown_viewnode_ids_in_parsed_viewforest').
+  pub known_viewnode_ids       : HashSet<ViewnodeId>,
   pub owner_by_viewnode_id     : HashMap<ViewnodeId, Owner>,
 }
 
@@ -255,8 +260,30 @@ impl ViewnodeIdRecord {
   ) -> ViewnodeIdRecord {
     let mut record : ViewnodeIdRecord = ViewnodeIdRecord::default ();
     record . advance_counter_past_viewnode_ids_in (viewforest);
+    record . record_known_viewnode_ids_in (viewforest);
     record . record_owners_in (viewforest);
     record }
+
+  /// After a parse, before any reconciler runs: drop every viewnode ID
+  /// the record does not know -- one typed by hand, or brought back by
+  /// an old copy of the buffer's text -- so that its headline gets a
+  /// fresh one at the end of the completion, and the counter is not
+  /// moved by it.
+  pub fn drop_unknown_viewnode_ids_in_parsed_viewforest (
+    &self,
+    viewforest : &mut Tree<Viewnode>,
+  ) {
+    let treeids : Vec<NodeId> =
+      viewforest . root () . descendants () . map ( |node| node . id () ) . collect ();
+    for treeid in treeids {
+      let mut node_mut : NodeMut<Viewnode> =
+        viewforest . get_mut (treeid) . unwrap ();
+      let viewnode : &mut Viewnode = node_mut . value ();
+      let is_unknown : bool =
+        viewnode . viewnode_id . as_ref ()
+        . is_some_and ( |viewnode_id| ! self . known_viewnode_ids . contains (viewnode_id) );
+      if is_unknown {
+        viewnode . viewnode_id = None; }}}
 
   /// After a parse, before any reconciler runs: give each viewnode
   /// the owner its viewnode ID has in the table, and the user's to the rest.
@@ -277,8 +304,9 @@ impl ViewnodeIdRecord {
 
   /// The end-of-completion pass, after the prune and just before the
   /// text is rendered: give a fresh viewnode ID to every viewnode (but the
-  /// buffer root) that lacks one, in buffer order, and make the table
-  /// say the owner of every viewnode the forest holds and nothing else.
+  /// buffer root) that lacks one, in buffer order, and make the record
+  /// know the viewnode ID and the owner of every viewnode the forest
+  /// holds and nothing else.
   pub fn assign_viewnode_ids_and_record_owners (
     &mut self,
     viewforest : &mut Tree<Viewnode>,
@@ -293,6 +321,7 @@ impl ViewnodeIdRecord {
     for treeid in treeids_without_viewnode_ids {
       let viewnode_id : ViewnodeId = self . take_next_viewnode_id ();
       viewforest . get_mut (treeid) . unwrap () . value () . viewnode_id = Some (viewnode_id); }
+    self . record_known_viewnode_ids_in (viewforest);
     self . record_owners_in (viewforest); }
 
   /// The next viewnode ID from the counter, skipping any that would read as a
@@ -317,6 +346,14 @@ impl ViewnodeIdRecord {
         . and_then (ViewnodeId::counter_value)
       { self . next_viewnode_id_counter =
           self . next_viewnode_id_counter . max ( counter . saturating_add (1) ); }} }
+
+  fn record_known_viewnode_ids_in (
+    &mut self,
+    viewforest : &Tree<Viewnode>,
+  ) {
+    self . known_viewnode_ids = viewforest . root () . descendants ()
+      . filter_map ( |node| node . value () . viewnode_id . clone () )
+      . collect (); }
 
   fn record_owners_in (
     &mut self,

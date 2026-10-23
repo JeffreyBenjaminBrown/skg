@@ -21,7 +21,7 @@ use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{SaveError, BufferValidationError};
@@ -44,16 +44,16 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
+/// Save 'buf' as the view of n. The save registers the view in
+/// 'views_state', so a later save there knows the viewnode IDs this
+/// one rendered.
 async fn save_buffer (
-  buf     : &str,
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-  graph   : &InRustGraphHandle, // must be the explicit handle, or the save's coherence debug-assert reads a stale graph
+  buf         : &str,
+  config      : &SkgConfig,
+  tantivy     : &mut TantivyIndex,
+  graph       : &InRustGraphHandle, // must be the explicit handle, or the save's coherence debug-assert reads a stale graph
+  views_state : &mut ViewsState,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
   let listener : std::net::TcpListener =
     std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
   let mut stream : TcpStream =
@@ -61,7 +61,12 @@ async fn save_buffer (
   update_from_and_rerender_buffer (
     &mut stream,
     buf, config, tantivy, graph,
-    &Err ( String::new () ), &mut views_state ) . await }
+    &Ok ( ViewforestId::ContentView ("view of n" . to_string ()) ),
+    views_state ) . await }
+
+fn fresh_views_state () -> ViewsState {
+  ViewsState { open_views     : OpenViews::new (),
+               graph_straddle : None } }
 
 fn line_containing<'a> (
   buf      : &'a str,
@@ -87,8 +92,9 @@ async fn write_protected_folder_repairs_warn_impl (
   let folder_request : String = initial_buffer . replacen (
     "(node ",
     "(node (viewRequests (folder subscribesTo))", 1 );
+  let mut views_state : ViewsState = fresh_views_state ();
   let complete_buffer : String =
-    save_buffer (&folder_request, config, tantivy, &graph)
+    save_buffer (&folder_request, config, tantivy, &graph, &mut views_state)
     . await ? . saved_view;
   let edited : String = {
     let r_line : String =
@@ -119,7 +125,7 @@ async fn write_protected_folder_repairs_warn_impl (
       . replace ( &folder_line,                      // edit the folder headline text
                   &format! ("{} HELLO", folder_line) ) };
   let response : SaveResponse =
-    save_buffer (&edited, config, tantivy, &graph) . await ?;
+    save_buffer (&edited, config, tantivy, &graph, &mut views_state) . await ?;
   assert! ( response . errors . is_empty (),
     "save must succeed; got errors: {:?}", response . errors );
   let warning : &String =
@@ -163,7 +169,7 @@ async fn write_protected_folder_repairs_warn_impl (
       saved . replace ( &folder_line,
                         &format! ("{}\nan illegal body", folder_line) );
     let result =
-      save_buffer (&with_body, config, tantivy, &graph) . await;
+      save_buffer (&with_body, config, tantivy, &graph, &mut views_state) . await;
     assert! ( result . is_err (),
       "a body on a folder must still abort the save" ); }
   Ok (( )) }
@@ -188,7 +194,8 @@ async fn failed_save_carries_warnings_with_errors (
 *** (skg id) bogus-id
 ";
       let result : Result<SaveResponse, Box<dyn Error>> =
-        save_buffer (buffer, config, tantivy, &graph) . await;
+        save_buffer (buffer, config, tantivy, &graph,
+                     &mut fresh_views_state ()) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! ("save should fail (idFolder edited)"),
         Err (e) => e, };
