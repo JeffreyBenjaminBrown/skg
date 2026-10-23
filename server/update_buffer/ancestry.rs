@@ -29,9 +29,8 @@
 
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
-use crate::types::viewnode::{ AffectsParent, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode };
-use crate::update_buffer::util::detach_viewnode_transferring_focus;
+use crate::types::viewnode::{ PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode };
+use crate::update_buffer::util::convert_unwarranted_child;
 
 use ego_tree::{ NodeId, NodeRef, Tree };
 use std::error::Error;
@@ -220,10 +219,11 @@ pub fn deaden_generalized_orphan_folder (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
-/// Dispose one direct child of a deadened orphan folder:
-/// - a member (affectsParent=true Unrestricted) view-leaf -> delete;
-/// - a member branch (has children) -> make it a non-member (affectsParent=false), so
-///   the user's subtree survives;
+/// Dispose one direct child of a deadened orphan folder, by the one
+/// rule ('convert_unwarranted_child'):
+/// - a member (affectsParent=true Unrestricted) -> convert it: a
+///   view-leaf to a dead viewnode, which the prune removes; a branch
+///   to a write-protected non-member, so the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> leave it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and
 ///   disposes its own children -- at its own BFS visit. (Converting a nested
@@ -231,8 +231,8 @@ pub fn deaden_generalized_orphan_folder (
 ///   own leaf members, leaving them stranded under a dead chain. Leaving it to
 ///   self-deaden is what makes leaf members at every depth die. A Property
 ///   leaf does not self-dispatch, so it is still converted below.)
-/// - any other non-vognode, non-phantom child (a Property, a DeadViewnode) -> convert
-///   to DeadViewnode;
+/// - any other non-vognode child (a Property, a DeadViewnode) -> convert
+///   it to a dead viewnode;
 /// - any other child (a non-member vognode -- a non-member Unrestricted or an
 ///   Restricted -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_folder_child (
@@ -248,20 +248,10 @@ fn dispose_orphaned_folder_child (
       matches! ( &c . value () . kind,
                  ViewnodeKind::Vognode (_) ),
       is_folder_kind (&c . value () . kind) ) };
-  if affected {
-    if is_leaf {
-      detach_viewnode_transferring_focus (tree, child) ?;
-    } else {
-      write_at_unrestrictedVognode_in_tree ( tree, child,
-        |t| { t . affectsParent = AffectsParent::False; } )
-        . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  } else if is_folder {
-    // Leave it: a nested folder self-deadens at its own visit (see doc above).
-  } else if ! is_vognode_or_phantom {
-    write_at_node_in_tree ( tree, child,
-      |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::DeadViewnode); } )
-      . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  // else: a non-member vognode or a phantom -- kept untouched.
+  if affected || ( ! is_folder && ! is_vognode_or_phantom ) {
+    convert_unwarranted_child (tree, child, is_leaf) ?; }
+  // else: a nested folder (it self-deadens at its own visit; see the
+  // doc above), a non-member vognode or a phantom -- kept untouched.
   Ok (( )) }
 
 #[cfg(test)]

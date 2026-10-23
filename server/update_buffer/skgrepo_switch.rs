@@ -1,7 +1,10 @@
 /// Applying a repo-set switch to an already-rendered view
 /// (the API doc's "Restricted-skgrepo nodes").  Two passes:
 /// convert every Unrestricted viewnode from a now-restricted skgrepo into an
-/// RestrictedVognode, then prune (DFS postorder, so emptied parents prune
+/// RestrictedVognode, and every deleted or unknown phantom whose
+/// relationship or node a now-restricted skgrepo records (a deleted
+/// phantom's home skgrepo; an unknown phantom's relRepo, or, when it
+/// has none, its recorder's home) into a dead viewnode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:
 /// - RestrictedVognode leaf;
 /// - Property leaf whose owning vognode (grandparent) is restricted;
@@ -17,9 +20,10 @@
 /// skgrepo restriction.
 
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::types::misc::SkgrepoName;
 use crate::types::viewnode::{
-  mk_restricted_viewnode, PartnerFolder, PropertyFolder, Viewnode, ViewnodeKind,
-  Vognode };
+  mk_restricted_viewnode, PartnerFolder, Phantom, PropertyFolder, Viewnode,
+  ViewnodeKind, Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -29,6 +33,8 @@ pub fn convert_and_prune_for_skgrepo_switch (
   tree   : &mut Tree<Viewnode>,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
+  // The phantoms first, while their recorders are still unrestricted.
+  convert_now_restricted_phantoms (tree, restriction);
   convert_now_restricted_vognodes (tree, restriction);
   let root : NodeId = tree . root () . id ();
   prune_children_postorder (tree, root) ?;
@@ -53,6 +59,47 @@ fn convert_now_restricted_vognodes (
           _ => None } );
     if let Some (kind) = conversion {
       tree . get_mut (skgid) . unwrap () . value () . replace_kind (kind); }}}
+
+/// A phantom shows its node's ID, and a deleted one its last title and
+/// body, so one that a now-restricted skgrepo records becomes a dead
+/// viewnode: the prune below removes it if it is a leaf, and otherwise
+/// it stays, titleless, holding what is under it.
+fn convert_now_restricted_phantoms (
+  tree        : &mut Tree<Viewnode>,
+  restriction : &SkgrepoRestriction,
+) {
+  if restriction . is_all () { return; }
+  let phantoms : Vec<NodeId> =
+    tree . root () . descendants ()
+    . filter ( |node| match &node . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
+          ! restriction . contains_skgrepo (&d . home_skgrepo),
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+          u . relRepo . clone ()
+          . or_else ( || recorder_home_skgrepo (*node) )
+          . is_some_and ( |skgrepo| ! restriction . contains_skgrepo (&skgrepo) ),
+        _ => false } )
+    . map ( |node| node . id () )
+    . collect ();
+  for phantom in phantoms {
+    tree . get_mut (phantom) . unwrap () . value ()
+      . replace_kind (ViewnodeKind::DeadViewnode); }}
+
+/// The home skgrepo of the unrestricted vognode that records the
+/// relationship an unknown phantom without a relRepo stands in: its
+/// viewparent, or, in a folder, the folder's viewparent.
+fn recorder_home_skgrepo (
+  node : NodeRef<Viewnode>,
+) -> Option<SkgrepoName> {
+  let parent : NodeRef<Viewnode> = node . parent () ?;
+  let recorder : NodeRef<Viewnode> = match &parent . value () . kind {
+    ViewnodeKind::PartnerFolder (_) | ViewnodeKind::PropertyFolder (_) =>
+      parent . parent () ?,
+    _ => parent, };
+  match &recorder . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      Some ( t . home_skgrepo . clone () ),
+    _ => None, }}
 
 /// Recursively prune 'node's descendants, then report whether 'node'
 /// itself should be detached (the parent's loop detaches it, so the

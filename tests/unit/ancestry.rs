@@ -1,6 +1,6 @@
 use super::*;
 use crate::types::viewnode::{
-  mk_writeProtected_viewnode, viewforest_root_viewnode,
+  AffectsParent, mk_writeProtected_viewnode, viewforest_root_viewnode,
   Phantom, PhantomDeleted, Property, PropertyFolder, viewnode_of };
 
 fn sid (s : &str) -> ID { ID::from (s) }
@@ -134,9 +134,9 @@ fn deaden_disposes_each_child_kind () {
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
   let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
-  // Member leaf -> delete.
+  // Member leaf -> a dead viewnode, for the prune to remove.
   let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", AffectsParent::True));
-  // Member branch (has a child) -> make it a non-member, keep.
+  // Member branch (has a child) -> a write-protected non-member, kept.
   let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", AffectsParent::True));
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", AffectsParent::True));
   // Nested folder -> leave it (self-deadens at its own visit).
@@ -149,10 +149,16 @@ fn deaden_disposes_each_child_kind () {
 
   assert! ( matches! ( kind_at (&t, subscribee_folder), ViewnodeKind::DeadViewnode ),
     "the orphan folder itself becomes a DeadViewnode" );
-  assert! ( is_detached (&t, subscribee_folder, leaf),
-    "a member leaf is deleted" );
+  assert! ( matches! ( kind_at (&t, leaf), ViewnodeKind::DeadViewnode ),
+    "a member leaf becomes a dead viewnode" );
+  assert! ( ! is_detached (&t, subscribee_folder, leaf),
+    "the prune, not the disposal, removes it" );
   assert_eq! ( parentis_at (&t, branch), Some (AffectsParent::False),
     "a member branch is made a non-member and kept" );
+  assert! ( matches! ( kind_at (&t, branch),
+                       ViewnodeKind::Vognode (Vognode::Unrestricted (ref u))
+                       if u . is_writeProtected () ),
+    "the kept branch is write-protected" );
   assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
                        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
