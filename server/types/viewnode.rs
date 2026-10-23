@@ -562,7 +562,8 @@ pub enum PartnerFolder {
 /// Every policy obeys the one rule (the glossary's "the one rule:
 /// convert, then prune"): during reconciliation a stale member is
 /// converted, a leaf to a dead viewnode the prune removes, one with
-/// children to a write-protected non-member (nonMember).
+/// children retained as non-member (nonMember), keeping its
+/// editability.
 /// The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('EditableSet' and 'EditableFilter'),

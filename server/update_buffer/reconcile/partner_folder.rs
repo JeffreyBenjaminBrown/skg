@@ -109,8 +109,8 @@ pub fn reconcile_partnerFolder_children (
     build_child_data (
       tree, node, &goal_items, &relRepos, runtime ) ?;
   // The one rule ('docs/glossary.org'): the reconciler converts a stale
-  // member, a leaf to a dead viewnode the prune removes and a branch to a
-  // write-protected non-member, so a write-protected PartnerFolder drops a
+  // member, a leaf to a dead viewnode the prune removes and a branch
+  // retained as non-member, so a write-protected PartnerFolder drops a
   // stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (

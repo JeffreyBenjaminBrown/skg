@@ -4,9 +4,11 @@
 // prune"): a reconciler never detaches. A child the graph no longer
 // warrants is converted -- a leaf, and every non-vognode, to a dead
 // viewnode that the prune ending the completion removes; an unrestricted
-// vognode with a subtree to a write-protected non-member -- and a folder
-// adopts such a non-member back when its membership returns. Each test
-// rerenders a view over a fixture and saves the result.
+// vognode with a subtree is retained as non-member, keeping its
+// editability if stale, write-protected if an extra copy of a
+// duplicate -- and a folder adopts such a non-member back when its
+// membership returns. Each test rerenders a view over a fixture and
+// saves the result.
 //
 // Fixture 'main': k contains l and m, m contains mc; a, b and c contain
 // x, x contains xc, p contains b; al has the aliases one and two; d
@@ -52,11 +54,17 @@ fn all_tests
       s . reset ("a_stale_content_leaf_goes_and_a_stale_branch_is_parked", main) ?;
       a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
         &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected", main) ?;
+      a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected (
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_parked_folder_member_is_adopted_when_its_membership_returns", main) ?;
       a_parked_folder_member_is_adopted_when_its_membership_returns (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_duplicate_member_leaves_one_member_and_one_parked_copy", main) ?;
       a_duplicate_member_leaves_one_member_and_one_parked_copy (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("an_editable_extra_copy_of_a_duplicate_is_writeProtected", main) ?;
+      an_editable_extra_copy_of_a_duplicate_is_writeProtected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_stale_alias_goes", main) ?;
       a_stale_alias_goes (
@@ -147,9 +155,8 @@ fn is_parked (line : &str) -> bool {
   line . contains ("nonMember") && line . contains ("writeProtected") }
 
 /// k loses l (a leaf) and m (which holds mc), saved from a second view
-/// of k. The first view's rerender drops l and keeps m as a
-/// write-protected non-member holding mc, now a non-member too; that
-/// buffer saves.
+/// of k. The first view's rerender drops l and retains m as non-member,
+/// still editable, with mc still its content; that buffer saves.
 async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -174,10 +181,63 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
   let first_view : &str = &collateral_views [0];
   assert! ( lines_containing (first_view, "(id l)") . is_empty (),
     "the stale leaf is gone:\n{}", first_view );
-  assert! ( is_parked ( &the_line (first_view, "** ", "(id m)") ),
-    "the stale branch is a write-protected non-member:\n{}", first_view );
-  assert! ( the_line (first_view, "*** ", "(id mc)") . contains ("nonMember"),
-    "a write-protected occurrence holds no member:\n{}", first_view );
+  let m : String = the_line (first_view, "** ", "(id m)");
+  assert! ( m . contains ("nonMember") && ! m . contains ("writeProtected"),
+    "the stale branch is retained as non-member, still editable:\n{}", first_view );
+  let mc : String = the_line (first_view, "*** ", "(id mc)");
+  assert! ( ! mc . contains ("nonMember") && ! mc . contains ("writeProtected"),
+    "mc stays m's content:\n{}", first_view );
+  save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
+              &mut views_state ) . await ?;
+  Ok (( )) }
+
+/// In a view of k, a write-protected copy of m holding a note is
+/// pasted, as a non-member, beside the member m. When k loses l and m,
+/// saved from a second view of k, the first view's rerender retains
+/// the member m as non-member, still editable, and leaves the pasted
+/// copy write-protected, its note under it; that buffer saves.
+async fn a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = empty_views_state ();
+  let first_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-1" . into ());
+  let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-k-2" . into ());
+  let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
+  let with_copy : String = {
+    let mc_line : String = k_view . lines ()
+      . find ( |line| line . contains ("(id mc)") )
+      . unwrap_or_else ( || panic! ( "mc is in the view:\n{}", k_view ))
+      . to_string ();
+    k_view . replacen (
+      &mc_line,
+      &format! ( "{}\n** (skg (node (id m) (repo main) nonMember writeProtected)) m\n\
+                  *** (skg (node nonMember)) a note under the copy", mc_line ),
+      1 ) };
+  save_view ( &with_copy, &first_viewforest_id, config, tantivy, &graph,
+              &mut views_state ) . await ?;
+  let without_content : String =
+    without_lines_containing (
+      &without_lines_containing (
+        &without_lines_containing (&k_view, "(id l)"),
+        "(id m)" ),
+      "(id mc)" );
+  let (_, collateral_views) : (String, Vec<String>) = save_view (
+    &without_content, &second_viewforest_id, config, tantivy, &graph,
+    &mut views_state ) . await ?;
+  assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
+  let first_view : &str = &collateral_views [0];
+  let m_lines : Vec<String> = lines_containing (first_view, "(id m)");
+  assert_eq! ( m_lines . len (), 2, "two copies of m remain:\n{}", first_view );
+  assert! ( m_lines . iter () . any ( |line| line . contains ("nonMember")
+                                           && ! line . contains ("writeProtected") ),
+    "the stale member is retained as non-member, still editable:\n{}", first_view );
+  assert! ( m_lines . iter () . any ( |line| is_parked (line) ),
+    "the pasted copy stays a write-protected non-member:\n{}", first_view );
+  assert! ( the_line_after (first_view, "** ", "nonMember writeProtected")
+              . contains ("a note under the copy"),
+    "the note stands under the copy:\n{}", first_view );
   save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
@@ -252,17 +312,75 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut views_state : ViewsState = empty_views_state ();
   let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-d" . into ());
-  let stored : Tree<Viewnode> = maybePlaced_to_placed_tree (
-    org_to_uninterpreted_nodes (
-      "* (skg (node (id d) (repo main))) d\n\
-       ** (skg (node (id e) (repo main) writeProtected)) e\n\
-       *** (skg (node (id ec) (repo main))) ec\n\
-       ** (skg (node (id f) (repo main))) f\n\
-       ** (skg (node (id e) (repo main))) e\n\
-       ** (skg (node (id f) (repo main))) f\n" ) ? . 0 ) ?;
+  let view : String = rerendered_stored_view (
+    "* (skg (node (id d) (repo main))) d\n\
+     ** (skg (node (id e) (repo main) writeProtected)) e\n\
+     *** (skg (node (id ec) (repo main))) ec\n\
+     ** (skg (node (id f) (repo main))) f\n\
+     ** (skg (node (id e) (repo main))) e\n\
+     ** (skg (node (id f) (repo main))) f\n",
+    &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
+  let e_lines : Vec<String> = lines_containing (&view, "(id e)");
+  assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
+  assert! ( is_parked (&e_lines [0]),
+    "the write-protected copy is parked:\n{}", view );
+  assert! ( ! e_lines [1] . contains ("nonMember")
+            && ! e_lines [1] . contains ("writeProtected"),
+    "the editable copy is the member:\n{}", view );
+  assert_eq! ( lines_containing (&view, "(id f)") . len (), 1,
+    "the extra leaf copy of f is gone:\n{}", view );
+  save_view ( &view, &viewforest_id, config, tantivy, &graph,
+              &mut views_state ) . await ?;
+  Ok (( )) }
+
+/// The rerender of a stored view whose d holds two editable copies of
+/// e, each holding ec, keeps one as the member and retains the other
+/// as a write-protected non-member, its ec a non-member; that buffer
+/// saves.
+async fn an_editable_extra_copy_of_a_duplicate_is_writeProtected (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = empty_views_state ();
+  let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-d" . into ());
+  let view : String = rerendered_stored_view (
+    "* (skg (node (id d) (repo main))) d\n\
+     ** (skg (node (id e) (repo main))) e\n\
+     *** (skg (node (id ec) (repo main))) ec\n\
+     ** (skg (node (id f) (repo main))) f\n\
+     ** (skg (node (id e) (repo main))) e\n\
+     *** (skg (node (id ec) (repo main))) ec\n",
+    &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
+  let e_lines : Vec<String> = lines_containing (&view, "(id e)");
+  assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
+  // The reconciler puts what it converts before the members.
+  assert! ( is_parked (&e_lines [0]),
+    "the extra copy is retained write-protected:\n{}", view );
+  assert! ( ! e_lines [1] . contains ("nonMember")
+            && ! e_lines [1] . contains ("writeProtected"),
+    "one editable copy is the member:\n{}", view );
+  assert! ( the_line_after (&view, "** ", "nonMember writeProtected") . contains ("nonMember"),
+    "the extra copy holds no member:\n{}", view );
+  save_view ( &view, &viewforest_id, config, tantivy, &graph,
+              &mut views_state ) . await ?;
+  Ok (( )) }
+
+/// Register 'stored', a buffer's text rooted at d, as the view
+/// 'viewforest_id', rerender every view, and return its text.
+fn rerendered_stored_view (
+  stored        : &str,
+  viewforest_id : &ViewforestId,
+  config        : &SkgConfig,
+  tantivy       : &mut TantivyIndex,
+  graph         : &InRustGraphHandle,
+  views_state   : &mut ViewsState,
+) -> Result<String, Box<dyn Error>> {
+  let stored_tree : Tree<Viewnode> = maybePlaced_to_placed_tree (
+    org_to_uninterpreted_nodes (stored) ? . 0 ) ?;
   views_state . open_views . register_view (
-    &graph . load_full (), viewforest_id . clone (), stored, &[ID::from ("d")] );
-  let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
+    &graph . load_full (), viewforest_id . clone (), stored_tree, &[ID::from ("d")] );
+  let env : SkgEnv = skg_env_from_parts (config, tantivy, graph);
   let all : SkgrepoRestriction =
     SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;
   let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
@@ -271,24 +389,11 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
     // this test's executor.
     scope . spawn ( || handle_rerender_all_views_request (
       &mut stream, "((request . \"rerender all views\"))\n", &env,
-      &mut views_state, &all )); } );
+      views_state, &all )); } );
   drop (stream);
   let rerendered : Vec<String> = contents_of_messages (read_end, "rerender-view");
   assert_eq! ( rerendered . len (), 1, "{:?}", rerendered );
-  let view : &str = &rerendered [0];
-  let e_lines : Vec<String> = lines_containing (view, "(id e)");
-  assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
-  assert! ( is_parked (&e_lines [0]),
-    "the write-protected copy is parked:\n{}", view );
-  assert! ( ! e_lines [1] . contains ("nonMember")
-            && ! e_lines [1] . contains ("writeProtected"),
-    "the editable copy is the member:\n{}", view );
-  assert_eq! ( lines_containing (view, "(id f)") . len (), 1,
-    "the extra leaf copy of f is gone:\n{}", view );
-  drop (env);
-  save_view ( view, &viewforest_id, config, tantivy, &graph,
-              &mut views_state ) . await ?;
-  Ok (( )) }
+  Ok ( rerendered [0] . clone () ) }
 
 /// al loses its alias one, saved from a second view of al; the first
 /// view's alias folder no longer shows it.

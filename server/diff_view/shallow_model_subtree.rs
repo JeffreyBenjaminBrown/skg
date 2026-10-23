@@ -24,7 +24,7 @@ use crate::types::tree::moves::place_created_children_after_their_model_predeces
 use crate::types::viewnode::{
   Membership, Birth, ChangeFacts, Existence, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
-use crate::update_buffer::util::{Conversion, convert_unwarranted_child};
+use crate::update_buffer::util::{Conversion, Unwarranted, convert_unwarranted_child};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashSet;
@@ -185,7 +185,7 @@ fn convert_duplicate (
   let is_leaf : bool =
     tree . get (duplicate) . ok_or ("convert_duplicate: node not found") ?
     . children () . next () . is_none ();
-  convert_unwarranted_child (tree, duplicate, is_leaf) }
+  convert_unwarranted_child (tree, duplicate, is_leaf, Unwarranted::Duplicate) }
 
 /// Convert 'node', a child the model no longer warrants, by the one
 /// rule ('convert_unwarranted_child'), and, first, what was made below
@@ -213,7 +213,7 @@ pub fn convert_unwarranted_subtree (
       if stays { Conversion::Parked }
       else { convert_unwarranted_subtree (tree, child) ? };
     if conversion == Conversion::Parked { holds_something = true; }}
-  convert_unwarranted_child (tree, node, ! holds_something) ?;
+  convert_unwarranted_child (tree, node, ! holds_something, Unwarranted::Stale) ?;
   Ok ( if holds_something { Conversion::Parked } else { Conversion::DeadLeaf } ) }
 
 /// Give 'existing' the kind and facts of 'model', keeping its fold

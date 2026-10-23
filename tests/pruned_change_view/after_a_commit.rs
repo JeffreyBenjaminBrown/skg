@@ -27,8 +27,8 @@ use std::error::Error;
 const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) nonMember ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
   "*** (skg (node (id x) (repo main) nonMember writeProtected (rels (contains (in 2) (out 1))";
-const PARKED_X_UNDER_E : &str =
-  "** (skg (node (id x) (repo main) nonMember writeProtected ";
+const PARKED_X_UNDER_E : &str = // retained as non-member, still editable
+  "** (skg (node (id x) (repo main) nonMember (rels ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
 /// rerender stream that follows sends it.
@@ -58,8 +58,9 @@ fn line_starting<'a> (
   assert_eq! ( matching . len (), 1, "one line starts {:?} in\n{}", prefix, buffer );
   matching [0] }
 
-/// After the commit: the removed member with content stays as a
-/// write-protected non-member holding it, without facts; the
+/// After the commit: the editable removed member with content is
+/// retained as non-member, still editable, holding it as its content,
+/// without facts; the
 /// childless removed member is gone; the deleted root stays as a
 /// deleted phantom holding nothing; the changed folders are gone; no
 /// change fact remains; and the buffer saves back to itself.
@@ -82,7 +83,7 @@ fn a_commit_converts_what_the_diff_view_showed (
     assert_lines_in_order (&committed, &[
       "* (skg (node (id e) (repo main))) e\n",
       PARKED_X_UNDER_E, ") x\n",
-      "*** (skg (node (id xc) (repo main) nonMember writeProtected " ]);
+      "*** (skg (node (id xc) (repo main) writeProtected " ]);
     assert_lines_in_order (&committed, &[ // b, under p, holds nothing
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b) ", ") b\n* (skg (node (id s)" ]);
     assert_lines_in_order (&committed, &[
@@ -101,7 +102,8 @@ fn a_commit_converts_what_the_diff_view_showed (
     Ok (( )) }) }
 
 /// A note typed under an editable removed member survives the commit
-/// under the converted member, a write-protected non-member.
+/// under the converted member, retained as non-member and still
+/// editable.
 #[test]
 fn a_note_under_a_removed_member_survives_under_the_parked_member (
 ) -> Result<(), Box<dyn Error>> {

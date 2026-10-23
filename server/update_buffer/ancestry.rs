@@ -30,7 +30,7 @@
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::viewnode::{ PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode };
-use crate::update_buffer::util::convert_unwarranted_child;
+use crate::update_buffer::util::{Unwarranted, convert_unwarranted_child};
 
 use ego_tree::{ NodeId, NodeRef, Tree };
 use std::error::Error;
@@ -223,7 +223,7 @@ pub fn deaden_generalized_orphan_folder (
 /// rule ('convert_unwarranted_child'):
 /// - a member (an Unrestricted member) -> convert it: a
 ///   view-leaf to a dead viewnode, which the prune removes; a branch
-///   to a write-protected non-member, so the user's subtree survives;
+///   retained as non-member, so the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> leave it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and
 ///   disposes its own children -- at its own BFS visit. (Converting a nested
@@ -249,7 +249,7 @@ fn dispose_orphaned_folder_child (
                  ViewnodeKind::Vognode (_) ),
       is_folder_kind (&c . value () . kind) ) };
   if affected || ( ! is_folder && ! is_vognode_or_phantom ) {
-    convert_unwarranted_child (tree, child, is_leaf) ?; }
+    convert_unwarranted_child (tree, child, is_leaf, Unwarranted::Stale) ?; }
   // else: a nested folder (it self-deadens at its own visit; see the
   // doc above), a non-member vognode or a phantom -- kept untouched.
   Ok (( )) }

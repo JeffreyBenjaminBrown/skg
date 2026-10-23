@@ -58,7 +58,7 @@ use crate::types::viewnode::{
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
-use crate::update_buffer::util::convert_unwarranted_child;
+use crate::update_buffer::util::{Unwarranted, convert_unwarranted_child};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -524,7 +524,7 @@ fn unmark_property_folders_except (
     if lost {
       let is_leaf : bool =
         tree . get (entry) . unwrap () . children () . next () . is_none ();
-      convert_unwarranted_child (tree, entry, is_leaf) ?; }}
+      convert_unwarranted_child (tree, entry, is_leaf, Unwarranted::Stale) ?; }}
   Ok (( )) }
 
 /// The shallow model subtree of what an editable node holds ahead of its

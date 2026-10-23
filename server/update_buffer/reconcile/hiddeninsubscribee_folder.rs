@@ -73,7 +73,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       // that becomes stale (e.g. the user moved it into the subscribee-as-such,
       // 'unhiding' it) is converted: a leaf -- the common case for hidden
       // members -- to a dead viewnode the prune removes, one holding a subtree
-      // to a write-protected non-member.
+      // retained as non-member.
       tree, node, kind,
       &goal_items, &child_data, &runtime . graph,
       deleted_by_this_save_extra_ids ) ?;

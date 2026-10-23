@@ -32,10 +32,12 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
   assert! ( result . unwrap_err () . to_string ()
             . contains ("not an Unrestricted vognode") ); }
 
-// The one rule: a vognode with a subtree is parked as a write-protected
-// non-member, keeping its birth, its facts cleared and its members made
-// non-members; a vognode leaf and every non-vognode become dead viewnodes,
-// a leaf to be pruned, one holding children to stay.
+// The one rule: a stale vognode with a subtree is retained as
+// non-member, keeping its birth and its editability, its facts
+// cleared; a write-protected one's members become non-members, an
+// editable one's stay members. A vognode leaf and every non-vognode
+// become dead viewnodes, a leaf to be pruned, one holding children to
+// stay.
 #[test]
 fn an_unwarranted_child_is_converted_never_detached () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
@@ -48,6 +50,12 @@ fn an_unwarranted_child_is_converted_never_detached () {
   let member_below : NodeId = t . get_mut (branch) . unwrap () . append (
     mk_editable_viewnode ( ID::from ("m"), SkgrepoName::from ("main"),
                            "m" . into (), None )) . id ();
+  let editable_branch : NodeId = t . get_mut (root) . unwrap () . append (
+    mk_editable_viewnode ( ID::from ("e"), SkgrepoName::from ("main"),
+                           "e" . into (), None )) . id ();
+  let member_below_editable : NodeId = t . get_mut (editable_branch) . unwrap () . append (
+    mk_editable_viewnode ( ID::from ("ec"), SkgrepoName::from ("main"),
+                           "ec" . into (), None )) . id ();
   let vognode_leaf : NodeId = t . get_mut (root) . unwrap () . append (
     mk_editable_viewnode ( ID::from ("l"), SkgrepoName::from ("main"),
                            "l" . into (), None )) . id ();
@@ -56,31 +64,76 @@ fn an_unwarranted_child_is_converted_never_detached () {
   t . get_mut (folder) . unwrap () . append ( mk_restricted_viewnode () );
   let childless : NodeId = t . get_mut (root) . unwrap () . append (
     viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) )) . id ();
-  assert_eq! ( convert_unwarranted_child (&mut t, branch, false) . unwrap (),
+  assert_eq! ( convert_unwarranted_child (
+                 &mut t, branch, false, Unwarranted::Stale ) . unwrap (),
                Conversion::Parked );
-  assert_eq! ( convert_unwarranted_child (&mut t, vognode_leaf, true) . unwrap (),
-               Conversion::DeadLeaf );
-  assert_eq! ( convert_unwarranted_child (&mut t, folder, false) . unwrap (),
+  assert_eq! ( convert_unwarranted_child (
+                 &mut t, editable_branch, false, Unwarranted::Stale ) . unwrap (),
                Conversion::Parked );
-  assert_eq! ( convert_unwarranted_child (&mut t, childless, true) . unwrap (),
+  assert_eq! ( convert_unwarranted_child (
+                 &mut t, vognode_leaf, true, Unwarranted::Stale ) . unwrap (),
                Conversion::DeadLeaf );
-  let parked : &Viewnode = t . get (branch) . unwrap () . value ();
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &parked . kind
+  assert_eq! ( convert_unwarranted_child (
+                 &mut t, folder, false, Unwarranted::Stale ) . unwrap (),
+               Conversion::Parked );
+  assert_eq! ( convert_unwarranted_child (
+                 &mut t, childless, true, Unwarranted::Stale ) . unwrap (),
+               Conversion::DeadLeaf );
+  let retained : &Viewnode = t . get (branch) . unwrap () . value ();
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &retained . kind
     else { panic! ("the branch stays an unrestricted vognode") };
   assert_eq! ( u . membership, Membership::NonMember );
   assert! ( u . is_writeProtected () );
   assert_eq! ( u . birth, Birth::RoleGraft (RelationRole::CONTAINER) );
-  assert_eq! ( parked . change_facts . change, DiffChange::default () );
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (below)) =
-    &t . get (member_below) . unwrap () . value () . kind
-    else { panic! ("the member below stays an unrestricted vognode") };
-  assert_eq! ( below . membership, Membership::NonMember,
+  assert_eq! ( retained . change_facts . change, DiffChange::default () );
+  assert_eq! ( membership_of (&t, member_below), Membership::NonMember,
     "a write-protected occurrence holds no member" );
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (e)) =
+    &t . get (editable_branch) . unwrap () . value () . kind
+    else { panic! ("the editable branch stays an unrestricted vognode") };
+  assert_eq! ( e . membership, Membership::NonMember );
+  assert! ( ! e . is_writeProtected (), "a stale copy keeps its editability" );
+  assert_eq! ( membership_of (&t, member_below_editable), Membership::Member,
+    "an editable retained copy keeps its members" );
   for dead in [vognode_leaf, folder, childless] {
     assert_eq! ( t . get (dead) . unwrap () . value () . kind,
                  ViewnodeKind::DeadViewnode ); }
-  assert_eq! ( t . root () . children () . count (), 4,
+  assert_eq! ( t . root () . children () . count (), 5,
     "nothing is detached" ); }
+
+// An extra copy of a duplicate with a subtree is retained
+// write-protected, whatever it was, and its members become
+// non-members.
+#[test]
+fn an_extra_copy_of_a_duplicate_is_writeProtected () {
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
+  let root : NodeId = t . root () . id ();
+  let copy : NodeId = t . get_mut (root) . unwrap () . append (
+    mk_editable_viewnode ( ID::from ("e"), SkgrepoName::from ("main"),
+                           "e" . into (), None )) . id ();
+  let member_below : NodeId = t . get_mut (copy) . unwrap () . append (
+    mk_editable_viewnode ( ID::from ("ec"), SkgrepoName::from ("main"),
+                           "ec" . into (), None )) . id ();
+  assert_eq! ( convert_unwarranted_child (
+                 &mut t, copy, false, Unwarranted::Duplicate ) . unwrap (),
+               Conversion::Parked );
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) =
+    &t . get (copy) . unwrap () . value () . kind
+    else { panic! ("the copy stays an unrestricted vognode") };
+  assert_eq! ( u . membership, Membership::NonMember );
+  assert! ( u . is_writeProtected () );
+  assert_eq! ( membership_of (&t, member_below), Membership::NonMember,
+    "a write-protected occurrence holds no member" ); }
+
+/// The membership of the unrestricted vognode at 'treeid'.
+fn membership_of (
+  t      : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> Membership {
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) =
+    &t . get (treeid) . unwrap () . value () . kind
+    else { panic! ("not an unrestricted vognode") };
+  u . membership }
 
 /// The children of 'parent', in order, after completing them against
 /// 'goal' as 'kept_child_order' says. Managed children are those
@@ -104,7 +157,7 @@ fn complete_letters (
     |s : &String| s . ends_with ('!'),
     &goal,
     |s : &String| Ok ( s . clone () ),
-    |t : &mut Tree<String>, child : NodeId| {
+    |t : &mut Tree<String>, child : NodeId, _unwarranted : Unwarranted| {
       let mut node : NodeMut<String> = t . get_mut (child) . unwrap ();
       let lowered : String = node . value () . to_lowercase ();
       *node . value () = lowered;

@@ -118,8 +118,8 @@ pub fn detach_viewnode_transferring_focus (
 
 /// What 'complete_managed_children' changed while reconciling: the
 /// orderkeys it created, those of the stale or duplicate children it
-/// parked (as write-protected non-members, or as dead viewnodes
-/// holding something), and those of the stale and duplicate children
+/// retained as non-members or converted to dead viewnodes holding
+/// something, and those of the stale and duplicate children
 /// it converted to childless dead viewnodes, which the prune that ends
 /// the completion removes. Callers that warn about repairs to
 /// write-protected folders consume this ('CompletionWarning'); other
@@ -146,9 +146,18 @@ impl<Orderkey> RepairSummary<Orderkey> {
 pub enum Conversion {
   /// A dead viewnode with no children, which the prune removes.
   DeadLeaf,
-  /// A write-protected non-member, or a dead viewnode holding
+  /// A vognode retained as non-member, or a dead viewnode holding
   /// children: either stays in the buffer.
   Parked,
+}
+
+/// Why a reconciler converts a child ('convert_unwarranted_child').
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unwarranted {
+  /// The reconciler's model lacks the child's key.
+  Stale,
+  /// The child is an extra copy of a key a sibling holds.
+  Duplicate,
 }
 
 /// Whether 'complete_managed_children' moves the children it keeps.
@@ -173,35 +182,44 @@ pub enum KeptChildOrder {
 /// The one rule ('docs/glossary.org', "the one rule: convert, then
 /// prune"): a child the graph no longer warrants (a stale child, or an
 /// extra copy of a duplicate) is converted, never detached. An
-/// unrestricted vognode with a subtree ('is_leaf' false) becomes a
-/// write-protected non-member: it keeps its title, ID and birth, loses
-/// its change facts and readiness request, and its member children
-/// become non-members, since a write-protected occurrence holds no
-/// member. Any other child -- a leaf, a non-vognode, a phantom or a
+/// unrestricted vognode with a subtree ('is_leaf' false) is retained
+/// as non-member: it keeps its title, ID and birth, and loses its
+/// change facts and readiness request. A stale one keeps its
+/// editability: an editable one keeps its members, while a
+/// write-protected one's members become non-members, since a
+/// write-protected occurrence holds no member. An extra copy of a
+/// duplicate is write-protected whatever it was, its members made
+/// non-members, since the save refuses two editable occurrences of
+/// one node. Any other child -- a leaf, a non-vognode, a phantom or a
 /// restricted vognode -- becomes a dead viewnode, which the prune
 /// that ends the completion removes once it is childless
 /// ('prune_self_deletable_when_empty'), so that whatever stands below
 /// it survives.
 pub fn convert_unwarranted_child (
-  tree    : &mut Tree<Viewnode>,
-  child   : NodeId,
-  is_leaf : bool,
+  tree        : &mut Tree<Viewnode>,
+  child       : NodeId,
+  is_leaf     : bool,
+  unwarranted : Unwarranted,
 ) -> Result<Conversion, Box<dyn Error>> {
-  let kept_as_nonMember : bool = {
+  let retained_writeProtected : Option<bool> = {
+    // Some (whether it is write-protected) when retained as non-member.
     let mut node_mut : NodeMut<Viewnode> = tree . get_mut (child)
       . ok_or ("convert_unwarranted_child: node not found") ?;
     let viewnode : &mut Viewnode = node_mut . value ();
     match &mut viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if ! is_leaf => {
         t . membership = Membership::NonMember;
-        t . write_protect ();
+        if unwarranted == Unwarranted::Duplicate {
+          t . write_protect (); }
+        let writeProtected : bool = t . is_writeProtected ();
         viewnode . change_facts      = ChangeFacts::default ();
         viewnode . readiness_request = None;
-        true },
+        Some (writeProtected) },
       _ => { viewnode . replace_kind (ViewnodeKind::DeadViewnode);
-             false }, }};
-  if kept_as_nonMember {
-    make_member_children_nonMembers (tree, child) ?;
+             None }, }};
+  if let Some (writeProtected) = retained_writeProtected {
+    if writeProtected {
+      make_member_children_nonMembers (tree, child) ?; }
     return Ok (Conversion::Parked); }
   let has_children : bool =
     tree . get (child) . unwrap () . children () . next () . is_some ();
@@ -239,11 +257,11 @@ where Managed  : Fn (&Viewnode) -> bool,
       goal_list,
       |orderkey : &Orderkey| create_child (orderkey)
         . map ( |viewnode : Viewnode| Viewnode { owner, .. viewnode } ),
-      |tree : &mut Tree<Viewnode>, child : NodeId| {
+      |tree : &mut Tree<Viewnode>, child : NodeId, unwarranted : Unwarranted| {
         let is_leaf : bool = tree . get (child)
           . ok_or ("complete_managed_children_in_viewforest: child not found") ?
           . children () . next () . is_none ();
-        convert_unwarranted_child (tree, child, is_leaf) } ) ?;
+        convert_unwarranted_child (tree, child, is_leaf, unwarranted) } ) ?;
   let goal_set : HashSet<&Orderkey> = goal_list . iter () . collect ();
   let kept_members : Vec<NodeId> =
     tree . get (treeid)
@@ -271,7 +289,7 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///   with one orderkey, the first that 'preferred_copy' selects is
 ///   kept, else the first; the others are duplicates.
 /// - Hands every duplicate and every stale child to
-///   'convert_unwarranted', and detaches nothing.
+///   'convert_unwarranted', saying which it is, and detaches nothing.
 /// - Creates new children for any orderkeys missing from the original
 ///   children, placed as 'kept_child_order' says: with
 ///   'KeptChildOrder::Unmoved', each after the managed child that precedes
@@ -302,7 +320,7 @@ where
   View            : Fn (&Node) -> Result<Orderkey, String>,
   Orderkey        : Eq + Hash + Clone,
   PreferredCopy   : Fn (&Node) -> bool,
-  ConvertUnwarranted : Fn (&mut Tree<Node>, NodeId) -> Result<Conversion, Box<dyn Error>>,
+  ConvertUnwarranted : Fn (&mut Tree<Node>, NodeId, Unwarranted) -> Result<Conversion, Box<dyn Error>>,
 {
   let managed_skgids : Vec<NodeId> =
     tree . get (parent_skgid)
@@ -338,11 +356,11 @@ where
         duplicate_skgids . push ( ( copy, orderkey . clone () )); }}}
   let mut summary : RepairSummary<Orderkey> = RepairSummary::new();
   for ( treeid, orderkey ) in duplicate_skgids {
-    match convert_unwarranted ( tree, treeid ) ? {
+    match convert_unwarranted ( tree, treeid, Unwarranted::Duplicate ) ? {
       Conversion::DeadLeaf => summary . deleted_duplicates . push (orderkey),
       Conversion::Parked   => summary . made_nonMembers    . push (orderkey), }}
   for ( treeid, orderkey ) in invalid_skgids {
-    match convert_unwarranted ( tree, treeid ) ? {
+    match convert_unwarranted ( tree, treeid, Unwarranted::Stale ) ? {
       Conversion::DeadLeaf => summary . deleted_stale   . push (orderkey),
       Conversion::Parked   => summary . made_nonMembers . push (orderkey), }}
   let kept_members : HashSet<NodeId> =
