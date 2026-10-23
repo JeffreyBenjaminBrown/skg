@@ -1,5 +1,6 @@
+use crate::to_org::util::make_member_children_nonMembers;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
+  AffectsParent, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 use crate::types::tree::moves::{
   move_to_last_child, place_created_children_after_their_model_predecessors};
@@ -116,11 +117,13 @@ pub fn detach_viewnode_transferring_focus (
   Ok (()) }
 
 /// What 'complete_managed_children' changed while reconciling: the
-/// orderkeys it created, those of the stale branches it made
-/// non-members, those it detached as stale leaves, and those it
-/// detached as duplicates. Callers
-/// that warn about repairs to write-protected folders consume this
-/// ('CompletionWarning'); other callers ignore it.
+/// orderkeys it created, those of the stale or duplicate children it
+/// parked (as write-protected non-members, or as dead viewnodes
+/// holding something), and those of the stale and duplicate children
+/// it converted to childless dead viewnodes, which the prune that ends
+/// the completion removes. Callers that warn about repairs to
+/// write-protected folders consume this ('CompletionWarning'); other
+/// callers ignore it.
 #[derive(Debug)]
 pub struct RepairSummary<Orderkey> {
   pub created            : Vec<Orderkey>,
@@ -136,6 +139,16 @@ impl<Orderkey> RepairSummary<Orderkey> {
       made_nonMembers    : Vec::new (),
       deleted_stale      : Vec::new (),
       deleted_duplicates : Vec::new (), }}
+}
+
+/// What 'convert_unwarranted_child' made of a child.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Conversion {
+  /// A dead viewnode with no children, which the prune removes.
+  DeadLeaf,
+  /// A write-protected non-member, or a dead viewnode holding
+  /// children: either stays in the buffer.
+  Parked,
 }
 
 /// Whether 'complete_managed_children' moves the children it keeps.
@@ -157,46 +170,50 @@ pub enum KeptChildOrder {
   FollowsGoal,
 }
 
-/// The rule both reconcilers obey ('docs/diff-view.org', "What a
-/// reconciler keeps"): a reconciler detaches only what it created, and
-/// what the user added survives. A stale child (one the reconciler
-/// manages but would no longer show) under which 'holds_the_users'
-/// finds something of the user's is kept: an unrestricted vognode as
-/// a plain non-member occurrence of its node, its diff facts cleared;
-/// any other kind (a restricted vognode, a phantom, a property or a
-/// folder) deadened, so that the orphan pass keeps what is under it
-/// ('mark_orphans_under_dead_parents_false'). Returns whether it kept
-/// the child; one it did not keep is the caller's to detach.
-/// 'complete_managed_children_in_viewforest' never looks below the
-/// children it manages, so for it any child of a stale child is the
-/// user's; the diff view's reconciler adds below the children it
-/// manages, and asks 'holds_the_users' in
-/// 'server/diff_view/shallow_model_subtree.rs'.
-pub fn keep_stale_child_holding_the_users (
-  tree            : &mut Tree<Viewnode>,
-  stale           : NodeId,
-  holds_the_users : &dyn Fn (NodeRef<Viewnode>) -> bool,
-) -> Result<bool, Box<dyn Error>> {
-  { let node : NodeRef<Viewnode> = tree . get (stale)
-      . ok_or ("keep_stale_child_holding_the_users: node not found") ?;
-    if node . value () . kind == ViewnodeKind::BufferRoot
-       || ! holds_the_users (node) {
-      return Ok (false); }}
-  let mut node_mut : NodeMut<Viewnode> = tree . get_mut (stale) . unwrap ();
-  let viewnode : &mut Viewnode = node_mut . value ();
-  match &mut viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
-      t . affectsParent = AffectsParent::False;
-      t . birth         = Birth::Unremarkable;
-      viewnode . change_facts = ChangeFacts::default (); },
-    _ => viewnode . replace_kind (ViewnodeKind::DeadViewnode), }
-  Ok (true) }
+/// The one rule ('docs/glossary.org', "the one rule: convert, then
+/// prune"): a child the graph no longer warrants (a stale child, or an
+/// extra copy of a duplicate) is converted, never detached. An
+/// unrestricted vognode with a subtree ('is_leaf' false) becomes a
+/// write-protected non-member: it keeps its title, ID and birth, loses
+/// its change facts and readiness request, and its member children
+/// become non-members, since a write-protected occurrence holds no
+/// member. Any other child -- a leaf, a non-vognode, a phantom or a
+/// restricted vognode -- becomes a dead viewnode, which the prune
+/// that ends the completion removes once it is childless
+/// ('prune_self_deletable_when_empty'), so that whatever stands below
+/// it survives.
+pub fn convert_unwarranted_child (
+  tree    : &mut Tree<Viewnode>,
+  child   : NodeId,
+  is_leaf : bool,
+) -> Result<Conversion, Box<dyn Error>> {
+  let kept_as_nonMember : bool = {
+    let mut node_mut : NodeMut<Viewnode> = tree . get_mut (child)
+      . ok_or ("convert_unwarranted_child: node not found") ?;
+    let viewnode : &mut Viewnode = node_mut . value ();
+    match &mut viewnode . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if ! is_leaf => {
+        t . affectsParent = AffectsParent::False;
+        t . write_protect ();
+        viewnode . change_facts      = ChangeFacts::default ();
+        viewnode . readiness_request = None;
+        true },
+      _ => { viewnode . replace_kind (ViewnodeKind::DeadViewnode);
+             false }, }};
+  if kept_as_nonMember {
+    make_member_children_nonMembers (tree, child) ?;
+    return Ok (Conversion::Parked); }
+  let has_children : bool =
+    tree . get (child) . unwrap () . children () . next () . is_some ();
+  Ok ( if has_children { Conversion::Parked } else { Conversion::DeadLeaf } ) }
 
 /// Viewnode-specialized version of complete_managed_children.
 /// See that one's description for more info.
 /// This one specializes it so that:
-/// - problem discards are those that would discard the focused node.
-/// - if any discard is problematic, transfer focus to 'treeid'
+/// - of several managed children with one key, the editable one is
+///   kept as the member, else the first;
+/// - a stale or duplicate child is converted by
+///   'convert_unwarranted_child', as a leaf when it has no children;
 /// - 'owner' (the calling reconciler) owns every child it creates,
 ///   and every managed child it keeps as a member of the goal,
 ///   whoever typed it.
@@ -216,10 +233,17 @@ where Managed  : Fn (&Viewnode) -> bool,
       Orderkey : Eq + Hash + Clone,
 {
   let summary : RepairSummary<Orderkey> =
-    complete_managed_children_in_viewforest_ignoring_owners (
-      tree, treeid, kept_child_order, &managed, &view_child_orderkey, goal_list,
+    complete_managed_children (
+      tree, treeid, kept_child_order, &managed, &view_child_orderkey,
+      |viewnode : &Viewnode| viewnode . editable_skgid () . is_some (),
+      goal_list,
       |orderkey : &Orderkey| create_child (orderkey)
-        . map ( |viewnode : Viewnode| Viewnode { owner, .. viewnode } ) ) ?;
+        . map ( |viewnode : Viewnode| Viewnode { owner, .. viewnode } ),
+      |tree : &mut Tree<Viewnode>, child : NodeId| {
+        let is_leaf : bool = tree . get (child)
+          . ok_or ("complete_managed_children_in_viewforest: child not found") ?
+          . children () . next () . is_none ();
+        convert_unwarranted_child (tree, child, is_leaf) } ) ?;
   let goal_set : HashSet<&Orderkey> = goal_list . iter () . collect ();
   let kept_members : Vec<NodeId> =
     tree . get (treeid)
@@ -234,47 +258,6 @@ where Managed  : Fn (&Viewnode) -> bool,
     tree . get_mut (member) . unwrap () . value () . owner = owner; }
   Ok (summary) }
 
-/// 'complete_managed_children_in_viewforest' without the owners.
-fn complete_managed_children_in_viewforest_ignoring_owners
-<Orderkey, Managed, View> (
-  tree                : &mut Tree<Viewnode>,
-  treeid              : NodeId,
-  kept_child_order    : KeptChildOrder,
-  managed             : Managed,
-  view_child_orderkey : View,
-  goal_list           : &[Orderkey],
-  create_child        : impl Fn (&Orderkey) -> Result<Viewnode, String>,
-) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
-where Managed  : Fn (&Viewnode) -> bool,
-      View     : Fn (&Viewnode) -> Result<Orderkey, String>,
-      Orderkey : Eq + Hash + Clone,
-{
-  let problem_discard =
-    |tree: &Tree<Viewnode>, stale_treeid: NodeId| -> Result<bool, String> {
-      subtree_satisfies( tree, stale_treeid, &|n: &Viewnode| n . focused ) };
-  let problem_discard_response =
-    |n: &mut Viewnode| { n . focused = true; };
-  // A stale child (managed, not in the goal) that has children is
-  // kept as the rule says (an Unrestricted one as a non-member,
-  // anything else as a DeadViewnode); only a childless one is detached.
-  let make_stale_a_nonMember =
-    |tree: &mut Tree<Viewnode>, stale_treeid: NodeId|
-      -> Result<bool, Box<dyn Error>> {
-      keep_stale_child_holding_the_users (
-        tree, stale_treeid,
-        &|stale : NodeRef<Viewnode>| stale . children () . next () . is_some () ) };
-  complete_managed_children(
-    tree,
-    treeid,
-    kept_child_order,
-    managed,
-    view_child_orderkey,
-    goal_list,
-    create_child,
-    problem_discard,
-    problem_discard_response,
-    make_stale_a_nonMember ) }
-
 /// PURPOSE:
 /// Reconciles a parent's "managed" children against a desired list of 'orderkeys'.
 /// The payload of each tree node should be some possibly-improper supertype of 'orderkey' -- that is,
@@ -284,33 +267,32 @@ where Managed  : Fn (&Viewnode) -> bool,
 /// - Partitions children into "managed" (matching a predicate) and "unmanaged".
 ///   It is not necessary that unmanaged children be able to provide an orderkey.
 /// - Among managed children, identifies duplicates and "stale" members (those
-///   whose orderkey is not in goal_list).
-///   - Duplicates are always detached.
-///   - A stale member is offered to 'make_stale_a_nonMember'; if that keeps
-///     it (returns true, e.g. by making a branch a non-member) it survives,
-///     otherwise it is detached.
-///   Runs problem_discard on each node that is actually detached; if any returns
-///   true, runs problem_discard_response on the parent afterward.
+///   whose orderkey is not in goal_list). Of several managed children
+///   with one orderkey, the first that 'preferred_copy' selects is
+///   kept, else the first; the others are duplicates.
+/// - Hands every duplicate and every stale child to
+///   'convert_unwarranted', and detaches nothing.
 /// - Creates new children for any orderkeys missing from the original
 ///   children, placed as 'kept_child_order' says: with
 ///   'KeptChildOrder::Unmoved', each after the managed child that precedes
 ///   it in goal_list (or first), every other child staying where it
 ///   stands; with 'KeptChildOrder::FollowsGoal', the children are
-///   reordered, unmanaged first, then managed in goal_list order.
-/// - Returns a RepairSummary: which children it created, which it made
-///   non-members, and which it detached.
+///   reordered: first every child that is not a kept member (the
+///   unmanaged and the converted ones, in their order), then the
+///   members in goal_list order.
+/// - Returns a RepairSummary: which children it created, which it
+///   parked, and which it converted to dead leaves.
 pub fn complete_managed_children
-<Node, Orderkey, Managed, View, ProblemDiscard, ProblemResponse, MakeStaleANonMember> (
-  tree                     : &mut Tree<Node>,
-  parent_skgid             : NodeId,
-  kept_child_order         : KeptChildOrder,
-  managed                  : Managed,
-  view_child_orderkey      : View,
-  goal_list                : &[Orderkey],
-  create_child             : impl Fn (&Orderkey) -> Result<Node, String>,
-  problem_discard          : ProblemDiscard,
-  mut problem_discard_response : ProblemResponse,
-  make_stale_a_nonMember   : MakeStaleANonMember,
+<Node, Orderkey, Managed, View, PreferredCopy, ConvertUnwarranted> (
+  tree                : &mut Tree<Node>,
+  parent_skgid        : NodeId,
+  kept_child_order    : KeptChildOrder,
+  managed             : Managed,
+  view_child_orderkey : View,
+  preferred_copy      : PreferredCopy,
+  goal_list           : &[Orderkey],
+  create_child        : impl Fn (&Orderkey) -> Result<Node, String>,
+  convert_unwarranted : ConvertUnwarranted,
 ) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
 where
   Managed         : Fn (&Node) -> bool,
@@ -319,65 +301,57 @@ where
   // as an Err from this function rather than a panic in a closure.
   View            : Fn (&Node) -> Result<Orderkey, String>,
   Orderkey        : Eq + Hash + Clone,
-  ProblemDiscard  : Fn(&Tree<Node>, NodeId) -> Result<bool, String>,
-  ProblemResponse : FnMut (&mut Node),
-  MakeStaleANonMember : Fn(&mut Tree<Node>, NodeId) -> Result<bool, Box<dyn Error>>,
+  PreferredCopy   : Fn (&Node) -> bool,
+  ConvertUnwarranted : Fn (&mut Tree<Node>, NodeId) -> Result<Conversion, Box<dyn Error>>,
 {
-  let groups : HashMap<i32, Vec<NodeId>> =
-    partition_children (
-      tree, parent_skgid,
-      |n| if managed (n) { 1 } else { 0 } )
-        . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-  let managed_skgids    : Vec<NodeId> =
-    groups . get( &1 ) . cloned() . unwrap_or_default();
-  let unmanaged_skgids : Vec<NodeId> =
-    groups . get( &0 ) . cloned() . unwrap_or_default();
+  let managed_skgids : Vec<NodeId> =
+    tree . get (parent_skgid)
+    . ok_or ("complete_managed_children: node not found") ?
+    . children ()
+    . filter ( |child| managed ( child . value () ))
+    . map ( |child| child . id () )
+    . collect ();
   let goal_list_as_set : HashSet<Orderkey> =
     goal_list . iter() . cloned() . collect();
-
-  let mut orderkey_to_treeid
-    : HashMap<Orderkey, NodeId> = HashMap::new();
-  let mut duplicate_skgids : Vec<( NodeId, Orderkey )> = Vec::new();
+  let mut copies_by_orderkey : HashMap<Orderkey, Vec<NodeId>> = HashMap::new ();
   let mut invalid_skgids : Vec<( NodeId, Orderkey )> = Vec::new();
-  for &treeid in &managed_skgids { // populate the above three variables
-    let node_ref : NodeRef<Node> =
-    tree . get (treeid)
-      . ok_or ("complete_managed_children: node not found")?;
+  for &treeid in &managed_skgids { // populate the above two variables
     let orderkey : Orderkey =
-      view_child_orderkey( node_ref . value() ) ?;
+      view_child_orderkey ( tree . get (treeid) . unwrap () . value () ) ?;
     if !goal_list_as_set . contains (&orderkey) {
       invalid_skgids . push( ( treeid, orderkey ) ); // hopefully none
-    } else if orderkey_to_treeid . contains_key (&orderkey) {
-      duplicate_skgids . push( ( treeid, orderkey ) ); // hopefully none
     } else {
-      orderkey_to_treeid . insert( orderkey, treeid ); } }
+      copies_by_orderkey . entry (orderkey) . or_default () . push (treeid); }}
+  let mut orderkey_to_treeid : HashMap<Orderkey, NodeId> = HashMap::new ();
+  let mut duplicate_skgids : Vec<( NodeId, Orderkey )> = Vec::new ();
+  for orderkey in goal_list { // keep one copy of each, in goal order
+    let Some (copies) = copies_by_orderkey . remove (orderkey)
+      else { continue; };
+    let kept : NodeId =
+      copies . iter ()
+      . find ( |copy| preferred_copy ( tree . get (**copy) . unwrap () . value () ))
+      . copied ()
+      . unwrap_or ( copies [0] );
+    orderkey_to_treeid . insert ( orderkey . clone (), kept );
+    for copy in copies {
+      if copy != kept {
+        duplicate_skgids . push ( ( copy, orderkey . clone () )); }}}
   let mut summary : RepairSummary<Orderkey> = RepairSummary::new();
-  let mut discard_has_problem : bool = false;
-  // Duplicates are redundant: always detach (recording focus loss).
-  for ( treeid, orderkey ) in &duplicate_skgids {
-    if problem_discard( tree, *treeid )? { discard_has_problem = true; }
-    with_node_mut( tree, *treeid,
-                   |mut n| { n . detach(); } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-    summary . deleted_duplicates . push( orderkey . clone() ); }
-  // Stale members: make_stale_a_nonMember may keep one (a branch made a
-  // non-member); only a node it does not keep is detached, and only that
-  // detach can lose focus.
-  for ( treeid, orderkey ) in &invalid_skgids {
-    if make_stale_a_nonMember( tree, *treeid )? {
-      summary . made_nonMembers . push( orderkey . clone() );
-      continue; }
-    if problem_discard( tree, *treeid )? { discard_has_problem = true; }
-    with_node_mut( tree, *treeid,
-                   |mut n| { n . detach(); } )
-      . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-    summary . deleted_stale . push( orderkey . clone() ); }
-  if discard_has_problem {
-    // Respond to problem if any discard was problematic
-    with_node_mut(
-        tree, parent_skgid,
-        |mut n| { problem_discard_response( n . value() ); }
-      ) . map_err( |e| -> Box<dyn Error> { e . into() } )?; }
+  for ( treeid, orderkey ) in duplicate_skgids {
+    match convert_unwarranted ( tree, treeid ) ? {
+      Conversion::DeadLeaf => summary . deleted_duplicates . push (orderkey),
+      Conversion::Parked   => summary . made_nonMembers    . push (orderkey), }}
+  for ( treeid, orderkey ) in invalid_skgids {
+    match convert_unwarranted ( tree, treeid ) ? {
+      Conversion::DeadLeaf => summary . deleted_stale   . push (orderkey),
+      Conversion::Parked   => summary . made_nonMembers . push (orderkey), }}
+  let kept_members : HashSet<NodeId> =
+    orderkey_to_treeid . values () . copied () . collect ();
+  let other_children : Vec<NodeId> = // the unmanaged and the converted
+    tree . get (parent_skgid) . unwrap () . children ()
+    . map ( |child| child . id () )
+    . filter ( |child| ! kept_members . contains (child) )
+    . collect ();
   let mut in_goal_order : Vec<NodeId> = Vec::new ();
   let mut created : HashSet<NodeId> = HashSet::new ();
   for orderkey in goal_list { // create the missing children, at the end
@@ -396,8 +370,8 @@ where
       place_created_children_after_their_model_predecessors (
         tree, parent_skgid, &in_goal_order, &created ) ?,
     KeptChildOrder::FollowsGoal => {
-      for &child_skgid in unmanaged_skgids . iter () . chain (&in_goal_order) {
-        // The unmanaged children, then the managed ones in goal order.
+      for &child_skgid in other_children . iter () . chain (&in_goal_order) {
+        // The other children, then the members in goal order.
         move_to_last_child( tree, parent_skgid, child_skgid )?; }}, }
   Ok (summary) }
 

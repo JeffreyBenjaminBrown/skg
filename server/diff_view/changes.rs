@@ -137,10 +137,11 @@ impl ChangedAspects {
 /// the content list first, as in every view (and each folder's
 /// members at the folder's own visit); then this step runs the diff
 /// view's, 'reconcile_children_with_shallowModelSubtree', over the change
-/// viewnodes, the removed members and what stands below them. They
-/// obey one rule: a reconciler detaches only what it created, and what
-/// the user added survives, under a stale child too
-/// ('keep_stale_child_holding_the_users'). What this step keeps
+/// viewnodes, the removed members and what stands below them. What
+/// the user added survives, under a stale child too: the older
+/// reconciler converts every stale child ('convert_unwarranted_child'),
+/// and this one converts a stale child holding something of the
+/// user's and detaches the rest. What this step keeps
 /// stays where it stands; what it creates goes after what precedes
 /// it here: the change viewnodes ahead of the markers, then the
 /// changed partner folders, then the markers.

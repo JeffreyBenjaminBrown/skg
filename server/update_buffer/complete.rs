@@ -528,7 +528,7 @@ fn is_self_deletable_when_empty (
 /// collapses completely in one pass. Focus is transferred to the surviving
 /// parent if the removed node held it. Never prunes a *view root* (child of the
 /// invisible BufferRoot): the user should still see a deleted root.
-fn prune_self_deletable_when_empty (
+pub fn prune_self_deletable_when_empty (
   tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =

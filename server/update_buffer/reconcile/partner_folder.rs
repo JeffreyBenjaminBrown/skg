@@ -108,9 +108,10 @@ pub fn reconcile_partnerFolder_children (
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &goal_items, &relRepos, runtime ) ?;
-  // The stale-member rule of 'complete_managed_children': the reconciler deletes a stale member that is a view-leaf and
-  // makes one that is a branch a non-member, so a write-protected PartnerFolder
-  // drops a stale leaf member instead of preserving it.
+  // The one rule ('docs/glossary.org'): the reconciler converts a stale
+  // member, a leaf to a dead viewnode the prune removes and a branch to a
+  // write-protected non-member, so a write-protected PartnerFolder drops a
+  // stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_items, &child_data, graph_snap,
@@ -213,7 +214,7 @@ pub fn folder_vid_of (
 /// 'skgid_a_folder_child_stands_for' over 'graph' says which ID each
 /// stands for), in their
 /// current view order, filtered to graph-real members (first
-/// occurrence of a duplicate wins; the reconciler detaches the
+/// occurrence of a duplicate wins; the reconciler converts the
 /// duplicates themselves), then every graph member not yet listed,
 /// appended in the deterministic order 'other_member_pids' returns
 /// (sorted by ID, for the inbound relations these folders hold).

@@ -4,9 +4,9 @@
 //! The shallow model subtree is built in a scratch tree. Each existing
 //! viewnode it also produces is kept where it stands, with its fold
 //! state, and its kind and facts are updated in place; each it does
-//! not is detached, unless something the user added stands below it
-//! ('keep_stale_child_holding_the_users', the rule both reconcilers
-//! obey); what only it has is copied in, after the child that
+//! not is detached, unless something the user added stands below it,
+//! in which case it is converted ('convert_unwarranted_child', the
+//! rule the older reconciler obeys); what only it has is copied in, after the child that
 //! precedes it in the shallow model subtree. A viewnode that stands
 //! for a graphnode is matched by the ID it stands for, any other by
 //! its kind (and a folder entry by the entry): within one parent each
@@ -21,7 +21,7 @@ use crate::types::viewnode::{
   AffectsParent, Birth, ChangeFacts, DiffPresence, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{
-  detach_viewnode_transferring_focus, keep_stale_child_holding_the_users};
+  convert_unwarranted_child, detach_viewnode_transferring_focus};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
@@ -138,7 +138,9 @@ pub fn reconcile_children_with_shallowModelSubtree (
         created . insert (copy);
         result . push (copy); }, }}
   for (stale, _) in unmatched {
-    if keep_stale_child_holding_the_users (tree, stale, &holds_the_users) ? {
+    let holds_users : bool = holds_the_users ( tree . get (stale) . unwrap () );
+    if holds_users {
+      convert_unwarranted_child (tree, stale, false) ?;
       detach_the_servers_below (tree, stale) ?;
     } else {
       detach_viewnode_transferring_focus (tree, stale) ?; }}

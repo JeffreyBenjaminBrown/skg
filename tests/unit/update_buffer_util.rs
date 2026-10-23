@@ -3,8 +3,8 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
-  DiffPresence, PartnerFolder, mk_restricted_viewnode, mk_writeProtected_viewnode_with_birth,
-  viewforest_root_viewnode, viewnode_of };
+  Birth, DiffPresence, PartnerFolder, mk_editable_viewnode, mk_restricted_viewnode,
+  mk_writeProtected_viewnode_with_birth, viewforest_root_viewnode, viewnode_of };
 use ego_tree::Tree;
 
 // The orderkey closure is fallible: a managed child whose kind the
@@ -33,42 +33,61 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
   assert! ( result . unwrap_err () . to_string ()
             . contains ("not an Unrestricted vognode") ); }
 
-// The stale rule both reconcilers share: a stale child with something
-// of the user's below it survives, an unrestricted vognode as a plain
-// non-member with its diff facts cleared, a folder deadened; one with
-// nothing of the user's below it is left for the caller to detach.
+// The one rule: a vognode with a subtree is parked as a write-protected
+// non-member, keeping its birth, its facts cleared and its members made
+// non-members; a vognode leaf and every non-vognode become dead viewnodes,
+// a leaf to be pruned, one holding children to stay.
 #[test]
-fn a_stale_child_survives_only_with_the_users_below_it () {
+fn an_unwarranted_child_is_converted_never_detached () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let mut graft : Viewnode = mk_writeProtected_viewnode_with_birth (
     ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
     AffectsParent::True, Birth::RoleGraft (RelationRole::CONTAINER) );
   graft . change_facts . presence . rel = Some (Sign::Minus);
-  let vognode : NodeId = t . get_mut (root) . unwrap () . append (graft) . id ();
+  let branch : NodeId = t . get_mut (root) . unwrap () . append (graft) . id ();
+  let member_below : NodeId = t . get_mut (branch) . unwrap () . append (
+    mk_editable_viewnode ( ID::from ("m"), SkgrepoName::from ("main"),
+                           "m" . into (), None )) . id ();
+  let vognode_leaf : NodeId = t . get_mut (root) . unwrap () . append (
+    mk_editable_viewnode ( ID::from ("l"), SkgrepoName::from ("main"),
+                           "l" . into (), None )) . id ();
   let folder : NodeId = t . get_mut (root) . unwrap () . append (
     viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) )) . id ();
+  t . get_mut (folder) . unwrap () . append ( mk_restricted_viewnode () );
   let childless : NodeId = t . get_mut (root) . unwrap () . append (
     viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) )) . id ();
-  for parent in [vognode, folder] {
-    t . get_mut (parent) . unwrap () . append ( mk_restricted_viewnode () ); }
-  let has_children = |node : NodeRef<Viewnode>| node . children () . next () . is_some ();
-  for kept in [vognode, folder] {
-    assert! ( keep_stale_child_holding_the_users (&mut t, kept, &has_children) . unwrap () ); }
-  assert! ( ! keep_stale_child_holding_the_users (&mut t, childless, &has_children) . unwrap () );
-  let kept_vognode : &Viewnode = t . get (vognode) . unwrap () . value ();
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &kept_vognode . kind
-    else { panic! ("the vognode stays an unrestricted vognode") };
+  assert_eq! ( convert_unwarranted_child (&mut t, branch, false) . unwrap (),
+               Conversion::Parked );
+  assert_eq! ( convert_unwarranted_child (&mut t, vognode_leaf, true) . unwrap (),
+               Conversion::DeadLeaf );
+  assert_eq! ( convert_unwarranted_child (&mut t, folder, false) . unwrap (),
+               Conversion::Parked );
+  assert_eq! ( convert_unwarranted_child (&mut t, childless, true) . unwrap (),
+               Conversion::DeadLeaf );
+  let parked : &Viewnode = t . get (branch) . unwrap () . value ();
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &parked . kind
+    else { panic! ("the branch stays an unrestricted vognode") };
   assert_eq! ( u . affectsParent, AffectsParent::False );
-  assert_eq! ( u . birth, Birth::Unremarkable );
-  assert_eq! ( kept_vognode . change_facts . presence, DiffPresence::default () );
-  assert_eq! ( t . get (folder) . unwrap () . value () . kind, ViewnodeKind::DeadViewnode );
-  assert_eq! ( t . get (childless) . unwrap () . value () . kind,
-               ViewnodeKind::PartnerFolder (PartnerFolder::Container) ); }
+  assert! ( u . is_writeProtected () );
+  assert_eq! ( u . birth, Birth::RoleGraft (RelationRole::CONTAINER) );
+  assert_eq! ( parked . change_facts . presence, DiffPresence::default () );
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (below)) =
+    &t . get (member_below) . unwrap () . value () . kind
+    else { panic! ("the member below stays an unrestricted vognode") };
+  assert_eq! ( below . affectsParent, AffectsParent::False,
+    "a write-protected occurrence holds no member" );
+  for dead in [vognode_leaf, folder, childless] {
+    assert_eq! ( t . get (dead) . unwrap () . value () . kind,
+                 ViewnodeKind::DeadViewnode ); }
+  assert_eq! ( t . root () . children () . count (), 4,
+    "nothing is detached" ); }
 
 /// The children of 'parent', in order, after completing them against
 /// 'goal' as 'kept_child_order' says. Managed children are those
-/// spelled in capitals; the rest are the user's notes.
+/// starting with a capital, keyed by their text without a trailing
+/// '!', which marks the copy preferred among duplicates; the rest are
+/// the user's notes. A converted child is lowercased.
 fn complete_letters (
   children         : &[&str],
   goal             : &[&str],
@@ -81,27 +100,42 @@ fn complete_letters (
   let goal : Vec<String> = goal . iter () . map ( |s| s . to_string () ) . collect ();
   complete_managed_children (
     &mut t, root, kept_child_order,
-    |s : &String| s . chars () . all ( |c| c . is_ascii_uppercase () ),
-    |s : &String| Ok ( s . clone () ),
+    |s : &String| s . chars () . next () . is_some_and ( |c| c . is_ascii_uppercase () ),
+    |s : &String| Ok ( s . trim_end_matches ('!') . to_string () ),
+    |s : &String| s . ends_with ('!'),
     &goal,
     |s : &String| Ok ( s . clone () ),
-    |_ : &Tree<String>, _ : NodeId| Ok (false),
-    |_ : &mut String| {},
-    |_ : &mut Tree<String>, _ : NodeId| Ok (false) ) . unwrap ();
+    |t : &mut Tree<String>, child : NodeId| {
+      let mut node : NodeMut<String> = t . get_mut (child) . unwrap ();
+      let lowered : String = node . value () . to_lowercase ();
+      *node . value () = lowered;
+      Ok (Conversion::DeadLeaf) } ) . unwrap ();
   t . root () . children () . map ( |c| c . value () . clone () ) . collect () }
 
 // Unmoved, every kept child stays where it stands, the user's notes
-// too, and a created one follows its predecessor in the goal, or goes
-// first; following the goal, the notes go first and the managed
-// children follow the goal's order.
+// and the converted stale child too, and a created one follows its
+// predecessor in the goal, or goes first; following the goal, the notes
+// and the converted child go first and the members follow the goal's
+// order.
 #[test]
 fn kept_children_stay_unless_the_order_follows_the_goal () {
   assert_eq! ( complete_letters ( &[ "note", "B", "A", "Z" ], &[ "C", "B", "A", "D" ],
                                   KeptChildOrder::Unmoved ),
-               vec! [ "C", "note", "B", "A", "D" ] );
+               vec! [ "C", "note", "B", "A", "D", "z" ] );
   assert_eq! ( complete_letters ( &[ "note", "B", "A", "Z" ], &[ "C", "B", "A", "D" ],
                                   KeptChildOrder::FollowsGoal ),
-               vec! [ "note", "C", "B", "A", "D" ] );
+               vec! [ "note", "z", "C", "B", "A", "D" ] );
   assert_eq! ( complete_letters ( &[ "B", "note", "A" ], &[ "A", "B" ],
                                   KeptChildOrder::FollowsGoal ),
                vec! [ "note", "A", "B" ] ); }
+
+// Of several copies of one key, the preferred one is kept, else the
+// first; the others are converted where they stand.
+#[test]
+fn of_duplicates_the_preferred_copy_is_kept () {
+  assert_eq! ( complete_letters ( &[ "A", "A!", "A" ], &[ "A" ],
+                                  KeptChildOrder::Unmoved ),
+               vec! [ "a", "A!", "a" ] );
+  assert_eq! ( complete_letters ( &[ "A", "B", "A" ], &[ "A", "B" ],
+                                  KeptChildOrder::Unmoved ),
+               vec! [ "A", "B", "a" ] ); }
