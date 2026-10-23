@@ -24,11 +24,11 @@ use skg::types::env::SkgEnv;
 
 use std::error::Error;
 
-const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) (affectsParent false) ";
+const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) nonMember ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
-  "*** (skg (node (id x) (repo main) (affectsParent false) writeProtected (rels (contains (in 2) (out 1))";
+  "*** (skg (node (id x) (repo main) nonMember writeProtected (rels (contains (in 2) (out 1))";
 const PARKED_X_UNDER_E : &str =
-  "** (skg (node (id x) (repo main) (affectsParent false) writeProtected ";
+  "** (skg (node (id x) (repo main) nonMember writeProtected ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
 /// rerender stream that follows sends it.
@@ -80,9 +80,9 @@ fn a_commit_converts_what_the_diff_view_showed (
     assert_eq! ( vid_on (x_under_e), vid_on (x_under_e_before),
                  "the removed member is kept, not made again:\n{}", committed );
     assert_lines_in_order (&committed, &[
-      "* (skg (node (id e) (repo main) (affectsParent na))) e\n",
+      "* (skg (node (id e) (repo main))) e\n",
       PARKED_X_UNDER_E, ") x\n",
-      "*** (skg (node (id xc) (repo main) (affectsParent false) writeProtected " ]);
+      "*** (skg (node (id xc) (repo main) nonMember writeProtected " ]);
     assert_lines_in_order (&committed, &[ // b, under p, holds nothing
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b) ", ") b\n* (skg (node (id s)" ]);
     assert_lines_in_order (&committed, &[

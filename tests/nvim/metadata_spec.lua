@@ -145,15 +145,15 @@ describe('skg.metadata commands', function ()
     assert.is_false(subtree_p(result, '(skg (node (repo public)))'))
   end)
 
-  it('set_repo_recursive prunes non-content affectsParent', function ()
-    -- Mirrors test-skg-set-repo-recursive-prunes-non-content-affectsParent.
+  it('set_repo_recursive prunes non-members', function ()
+    -- Mirrors test-skg-set-repo-recursive-prunes-non-members.
     buffer_with(table.concat({
-      '* (skg (node (id root) (repo public) (affectsParent na))) root',
+      '* (skg (node (id root) (repo public))) root',
       '** (skg (node (id content-child) (repo public))) content child',
       '*** (skg (node (id content-grandchild) (repo public))) content grandchild',
       '** (skg (node (id mismatched-content) (repo foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch',
-      '** (skg (node (id link-child) (repo public) (affectsParent false) (birth roleGraft mentioner))) link child',
+      '** (skg (node (id link-child) (repo public) nonMember (birth roleGraft mentioner))) link child',
       '*** (skg (node (id under-link) (repo public))) under link',
       '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-non-vognode) (repo public))) under non-vognode' },
@@ -303,9 +303,9 @@ describe('skg.metadata commands', function ()
   it('restore_removed_membership marks a removed member, editable or'
      .. ' write-protected', function ()
     for _, headline in ipairs({
-      '** (skg (node (id x) (repo main) (affectsParent false)'
+      '** (skg (node (id x) (repo main) nonMember'
         .. ' (diff (rel removed) (leaves 1 rel))) (vid 0c)) x',
-      '**** (skg (node (id d) (repo main) (affectsParent false)'
+      '**** (skg (node (id d) (repo main) nonMember'
         .. ' writeProtected (diff (rel removed) (properties changed)'
         .. ' (leaves 1 rel all))) (vid 0o)) d' }) do
       buffer_with(headline)
@@ -324,7 +324,7 @@ describe('skg.metadata commands', function ()
     for _, headline in ipairs({
       '* (skg (node (id x) (repo main) (diff (rel added)))) x',
       '* (skg (node (id x) (repo main))) x',
-      '* (skg (node (id d) (repo main) (affectsParent false)'
+      '* (skg (node (id d) (repo main) nonMember'
         .. ' (birth roleGraft container) writeProtected'
         .. ' (diff (rel removed)))) d' }) do
       assert.are.equal('Only a removed membership can be restored',
@@ -344,7 +344,7 @@ describe('skg.metadata commands', function ()
     for _, case in ipairs({
       { '* (skg (historical (id g) (repo main) (diff (node removed)))) g',
         { 'none (default)', 'restoreNode' } },
-      { '* (skg (node (id x) (repo main) (affectsParent false)'
+      { '* (skg (node (id x) (repo main) nonMember'
           .. ' (diff (rel removed)))) x',
         { 'none (default)', 'delete', 'merge', 'restoreRel' } },
       { '* (skg (node (id x) (repo main))) x',

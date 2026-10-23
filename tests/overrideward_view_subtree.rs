@@ -26,7 +26,7 @@ use skg::serve::handlers::text_search::render_enriched_search_buffer::{
 use skg::skgrepo_sets::{
   SkgrepoRestriction, SkgrepoSetName, apply_skgrepo_set_to_viewforest};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
-use skg::to_org::util::mark_view_roots_parent_na;
+use skg::to_org::util::mark_view_roots_as_members;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Birth, Viewnode, ViewnodeKind, Vognode};
@@ -108,7 +108,7 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
   let root_skgid : NodeId = viewforest . root () . id ();
   set_metadata_relationships_in_node_recursive (
     &mut viewforest, root_skgid, &graph, &stats, config );
-  mark_view_roots_parent_na ( &mut viewforest );
+  mark_view_roots_as_members ( &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,
     &graph,

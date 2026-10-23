@@ -111,9 +111,9 @@ async fn extend_e_under (
       &[ ID::from ("R") ] ) ?;
   let view_with_folder : String =
     if folder == "overriddenFolder" {
-      let request : String = de_novo . replace (
-        "(affectsParent na)",
-        "(affectsParent na) (viewRequests (folder overrides))" );
+      let request : String = de_novo . replacen (
+        "(node ",
+        "(node (viewRequests (folder overrides))", 1 );
       save_and_rerender (&request, config, tantivy) . await ?
     } else { de_novo };
   let edited : String =
@@ -193,9 +193,9 @@ async fn folder_members_never_substitute (
         multi_root_view (
           config, Some (tantivy),
           &[ ID::from ("R") ] ) ?;
-      let request : String = de_novo . replace (
-        "(affectsParent na)",
-        "(affectsParent na) (viewRequests (folder overrides))" );
+      let request : String = de_novo . replacen (
+        "(node ",
+        "(node (viewRequests (folder overrides))", 1 );
       let view : String =
         save_and_rerender (&request, config, tantivy) . await ?;
       // R overrides E, yet both folder copies of E are shown raw: the

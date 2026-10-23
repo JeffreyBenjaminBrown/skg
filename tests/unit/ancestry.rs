@@ -1,12 +1,12 @@
 use super::*;
 use crate::types::viewnode::{
-  AffectsParent, mk_writeProtected_viewnode, viewforest_root_viewnode,
+  Membership, mk_writeProtected_viewnode, viewforest_root_viewnode,
   Phantom, PhantomDeleted, Property, PropertyFolder, viewnode_of };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SkgrepoName { SkgrepoName::from ("main") }
 
-fn normal (title : &str, pi : AffectsParent) -> Viewnode {
+fn normal (title : &str, pi : Membership) -> Viewnode {
   mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }
 
 fn deleted (title : &str) -> Viewnode {
@@ -34,9 +34,9 @@ fn child (
 fn kind_at (tree : &Tree<Viewnode>, skgid : NodeId) -> ViewnodeKind {
   tree . get (skgid) . unwrap () . value () . kind . clone () }
 
-fn parentis_at (tree : &Tree<Viewnode>, skgid : NodeId) -> Option<AffectsParent> {
+fn parentis_at (tree : &Tree<Viewnode>, skgid : NodeId) -> Option<Membership> {
   match &tree . get (skgid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (t . affectsParent),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (t . membership),
     _ => None } }
 
 fn is_detached (tree : &Tree<Viewnode>, parent : NodeId, skgid : NodeId) -> bool {
@@ -49,7 +49,7 @@ fn is_detached (tree : &Tree<Viewnode>, parent : NodeId, skgid : NodeId) -> bool
 fn aliasfolder_under_normal_is_not_orphan () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
-  let n : NodeId = child (&mut t, root, normal ("N", AffectsParent::True));
+  let n : NodeId = child (&mut t, root, normal ("N", Membership::Member));
   let ac : NodeId = child (&mut t, n, property_folder (PropertyFolder::Alias));
   assert! ( ! folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
@@ -81,7 +81,7 @@ fn build_subscribee_chain (
   let sber : NodeId = child (&mut t, root, subscriber);
   let subscribee_folder : NodeId = child (&mut t, sber, role_folder (PartnerFolder::Subscribee));
   let sbee : NodeId = child (&mut t, subscribee_folder,
-    normal ("subscribee", AffectsParent::True));
+    normal ("subscribee", Membership::Member));
   let hin : NodeId = child (&mut t, sbee,
     role_folder (PartnerFolder::HiddenInSubscribee));
   (t, sber, subscribee_folder, sbee, hin) }
@@ -89,7 +89,7 @@ fn build_subscribee_chain (
 #[test]
 fn hiddenin_full_valid_chain_is_not_orphan () {
   let (t, _sber, _sfolder, _sbee, hin) =
-    build_subscribee_chain (normal ("subscriber", AffectsParent::True));
+    build_subscribee_chain (normal ("subscriber", Membership::Member));
   assert! ( ! folder_is_generalized_orphan (&t, hin) . unwrap () ); }
 
 #[test]
@@ -105,7 +105,7 @@ fn hiddenin_dead_far_subscriber_is_orphan () {
 #[test]
 fn required_ancestor_walks_the_chain () {
   let (t, sber, subscribee_folder, sbee, hin) =
-    build_subscribee_chain (normal ("subscriber", AffectsParent::True));
+    build_subscribee_chain (normal ("subscriber", Membership::Member));
   assert_eq! ( required_ancestor (&t, hin, 0) . unwrap (), Some (sbee) );
   assert_eq! ( required_ancestor (&t, hin, 1) . unwrap (), Some (subscribee_folder) );
   assert_eq! ( required_ancestor (&t, hin, 2) . unwrap (), Some (sber) );
@@ -135,15 +135,15 @@ fn deaden_disposes_each_child_kind () {
   let d : NodeId = child (&mut t, root, deleted ("D"));
   let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
   // Member leaf -> a dead viewnode, for the prune to remove.
-  let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", AffectsParent::True));
+  let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", Membership::Member));
   // Member branch (has a child) -> a write-protected non-member, kept.
-  let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", AffectsParent::True));
-  let _bchild : NodeId = child (&mut t, branch, normal ("Bc", AffectsParent::True));
+  let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", Membership::Member));
+  let _bchild : NodeId = child (&mut t, branch, normal ("Bc", Membership::Member));
   // Nested folder -> leave it (self-deadens at its own visit).
   let nested : NodeId = child (&mut t, subscribee_folder,
     role_folder (PartnerFolder::HiddenOutsideOfSubscribee));
   // Non-member vognode -> keep untouched.
-  let indep : NodeId = child (&mut t, subscribee_folder, normal ("I", AffectsParent::False));
+  let indep : NodeId = child (&mut t, subscribee_folder, normal ("I", Membership::NonMember));
 
   deaden_generalized_orphan_folder (&mut t, subscribee_folder) . unwrap ();
 
@@ -153,7 +153,7 @@ fn deaden_disposes_each_child_kind () {
     "a member leaf becomes a dead viewnode" );
   assert! ( ! is_detached (&t, subscribee_folder, leaf),
     "the prune, not the disposal, removes it" );
-  assert_eq! ( parentis_at (&t, branch), Some (AffectsParent::False),
+  assert_eq! ( parentis_at (&t, branch), Some (Membership::NonMember),
     "a member branch is made a non-member and kept" );
   assert! ( matches! ( kind_at (&t, branch),
                        ViewnodeKind::Vognode (Vognode::Unrestricted (ref u))
@@ -163,7 +163,7 @@ fn deaden_disposes_each_child_kind () {
   assert! ( matches! ( kind_at (&t, nested),
                        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
     "a nested folder is left untouched to self-deaden at its visit" );
-  assert_eq! ( parentis_at (&t, indep), Some (AffectsParent::False),
+  assert_eq! ( parentis_at (&t, indep), Some (Membership::NonMember),
     "a non-member vognode is kept untouched" ); }
 
 #[test]

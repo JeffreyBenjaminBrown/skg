@@ -5,7 +5,7 @@
 ///   UnrestrictedVognodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(repo REPO)]
-///                         [(affectsParent true|false|na)]
+///                         [nonMember]        ; marks the occurrence a non-member
 ///                         [(birth roleGraft ROLENAME)]
 ///                         [writeProtected]   ; marks the occurrence write-protected
 ///                         [cycle]
@@ -54,7 +54,7 @@ use crate::types::viewnode::{
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
-  Birth, Editability, AffectsParent, Vid,
+  Birth, Editability, Membership, Vid,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
@@ -81,7 +81,7 @@ pub struct ViewnodeMetadata {
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
   pub skgid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
-  pub affectsParent: AffectsParent,
+  pub membership: Membership,
   pub birth: Birth,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
@@ -121,7 +121,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     non_vognode: None,
     skgid: None,
     home_skgrepo: None,
-    affectsParent: AffectsParent::True,
+    membership: Membership::Member,
     birth: Birth::Unremarkable,
     writeProtected: false,
     graphStats: GraphnodeStats::default(),
@@ -323,7 +323,7 @@ pub fn viewnode_from_metadata (
             title,
             skgid            : metadata . skgid . clone (),
             home_skgrepo     : metadata . home_skgrepo . clone (),
-            affectsParent         : metadata . affectsParent,
+            membership         : metadata . membership,
             birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
@@ -727,17 +727,6 @@ fn parse_node_sexp (
           "viewRequests" => {
             parse_viewrequests_sexp (
               &subitems[1..], &mut metadata . view_requests ) ?; },
-          "affectsParent" => {
-            if subitems . len () != 2 {
-              return Err ( "affectsParent requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . affectsParent = match value . as_str () {
-              "true"  => AffectsParent::True,
-              "false" => AffectsParent::False,
-              "na"    => AffectsParent::NA,
-              _ => return Err ( format! (
-                "Invalid affectsParent value: {}", value )), }; },
           "diff" =>
             parse_diff_form ( &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown node key: {}",
@@ -750,6 +739,10 @@ fn parse_node_sexp (
           // The server emits and accepts this exact atom (see org_to_text.rs).
           "writeProtected" =>
             metadata . writeProtected = true,
+          // A 'nonMember' atom makes this occurrence a non-member; a
+          // member carries nothing.
+          "nonMember" =>
+            metadata . membership = Membership::NonMember,
           "omittedBody" =>
             // Display-only (like rels): the view
             // regenerates it, so accept and discard.

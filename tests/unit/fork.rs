@@ -13,7 +13,7 @@ use crate::types::misc::{Skgrepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, empty_graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{AffectsParent, Viewnode, ViewnodeKind, PartnerFolder,
+use crate::types::viewnode::{Membership, Viewnode, ViewnodeKind, PartnerFolder,
                              mk_editable_viewnode, mk_writeProtected_viewnode,
                              viewnode_of};
 use std::collections::HashMap;
@@ -103,7 +103,7 @@ fn writeProtected_ancestor_skgrepo_is_read_from_its_skgid () {
   let x : ego_tree::NodeId = forest . append_root (
     mk_writeProtected_viewnode (
       ID::from ("X"), SkgrepoName::from ("owned1"), "X" . to_string (),
-      AffectsParent::NA ));
+      Membership::Member ));
   forest . get_mut (x) . unwrap () . append ( restriction ("N", "foreign") );
   let writeProtected_skgrepos_after_save : HashMap<ID, SkgrepoName> =
     HashMap::from ([ ( ID::from ("X"), SkgrepoName::from ("owned2") ) ]);
@@ -183,7 +183,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   // skgrepo, write-protected, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
       l . starts_with ("** (skg (node (id N) (repo foreign)")
-      && l . contains ("(affectsParent false)")
+      && l . contains ("nonMember")
       && l . contains ("writeProtected")
       && l . contains ("parentOverrides")
       && l . ends_with ("N-original") ),

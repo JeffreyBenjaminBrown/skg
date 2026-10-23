@@ -98,9 +98,9 @@ async fn write_protected_folder_order_is_preserved_impl (
     multi_root_view (
       config, Some (tantivy),
       &[ ID ("n" . to_string ()) ] ) ?;
-  let folder_request : String = initial_buffer . replace (
-    "(affectsParent na)",
-    "(affectsParent na) (viewRequests (folder subscribesTo))" );
+  let folder_request : String = initial_buffer . replacen (
+    "(node ",
+    "(node (viewRequests (folder subscribesTo))", 1 );
   let complete_buffer : String =
     save_and_rerender (&folder_request, config, tantivy) . await ?;
   assert_member_order (
@@ -192,9 +192,9 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   let u_view_id : ViewId = ViewId::ContentView ("order-u" . into ());
   let (n_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("n")) ?;
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
-    &n_view . replace (
-      "(affectsParent na)",
-      "(affectsParent na) (viewRequests (folder subscribesTo))" ),
+    &n_view . replacen (
+      "(node ",
+      "(node (viewRequests (folder subscribesTo))", 1 ),
     &n_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let reordered : String = { // t above r, and a note parked after them
     let r_line : &str = line_containing (&n_view, "(id r)");
@@ -202,7 +202,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     n_view
       . replace ( r_line, "SWAP_PLACEHOLDER" )
       . replace ( t_line, &format! (
-        "{}\n*** (skg (node (affectsParent false))) a parked note", r_line ))
+        "{}\n*** (skg (node nonMember)) a parked note", r_line ))
       . replace ( "SWAP_PLACEHOLDER", t_line ) };
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &reordered, &n_view_id, config, tantivy, &graph, &mut views_state ) . await ?;

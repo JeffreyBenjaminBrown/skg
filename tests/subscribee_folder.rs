@@ -51,7 +51,7 @@ fn test_subscribee_folder_appears_for_subscribers(
     // the fixture records both relationships at exactly that default, no
     // (relRepo ...) override appears.
     let expected = indoc! {
-      "* (skg (node (id 1) (repo home) (affectsParent na) (rels (contains (out 4))) (viewStats (homeRepoHerald ⌂:home)))) 1
+      "* (skg (node (id 1) (repo home) (rels (contains (out 4))) (viewStats (homeRepoHerald ⌂:home)))) 1
       ** (skg (node (id 11) (repo home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribesTo (out 1)) (birth (contains in 1))))) 11
       *** (skg subscribeeFolder)
       **** (skg (node (id 11-sees) (repo away) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))) (viewStats (homeRepoHerald ⌂:away)))) 11-sees

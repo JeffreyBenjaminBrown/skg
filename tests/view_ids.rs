@@ -311,7 +311,7 @@ async fn the_owner_table_records_who_made_each_viewnode (
                                  &vid_of_line_containing (&buffer, needle) ),
                  *owner, "the owner of {:?}, de novo:\n{}", needle, buffer ); }
   let typed : String = format! (
-    "{}** a typed member\n** (skg (node (affectsParent false))) a typed note\n",
+    "{}** a typed member\n** (skg (node nonMember)) a typed note\n",
     buffer );
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &typed, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;

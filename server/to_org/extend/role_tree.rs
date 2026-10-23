@@ -23,7 +23,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::tree::viewnode_graphnode::{ find_child_by_skgid, find_children_by_skgids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, Owner, Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Owner, Viewnode, ViewnodeKind, Membership, mk_writeProtected_from_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId,Tree};
@@ -508,7 +508,7 @@ pub fn prepend_writeProtected_indep_child (
     ) ? {
       Some ((_nc, child_viewnode)) =>
         mk_writeProtected_from_viewnode (
-          child_viewnode, AffectsParent::False, birth )
+          child_viewnode, Membership::NonMember, birth )
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
       None => mk_unknown_viewnode (child_skgid . clone ()), };
   let new_child_treeid : NodeId =

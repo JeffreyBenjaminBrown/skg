@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, view_id_suffix};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Owner, ReadinessRequest, Vid, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ ChangeFacts, Owner, ReadinessRequest, Vid, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, Membership, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -74,7 +74,7 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       title          : u . title,
       skgid          : skgid,
       home_skgrepo: skgrepo,
-      affectsParent          : u . affectsParent,
+      membership          : u . membership,
       birth          : u . birth,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
@@ -142,7 +142,7 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       title          : t . title,
       skgid          : Some(t . skgid),
       home_skgrepo   : Some(t . home_skgrepo),
-      affectsParent          : t . affectsParent,
+      membership          : t . membership,
       birth          : t . birth,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
@@ -257,7 +257,7 @@ impl Default for MpUnrestrictedVognode {
       title          : String::new(),
       skgid          : None,
       home_skgrepo   : None,
-      affectsParent       : AffectsParent::True,
+      membership       : Membership::Member,
       birth          : Birth::Unremarkable,
       graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),

@@ -44,7 +44,7 @@ local function recursive_targets (root_line)
   while line and (metadata.outline_level(line) or 0) > root_level do
     local meta = metadata.metadata_sexp_at_line_or_nil(line)
     if metadata.unrestrictedNode_sexp_p(meta)
-       and metadata.node_affectsParent_content_of_p(meta) then
+       and metadata.node_member_p(meta) then
       table.insert(result, line)
       line = metadata.next_headline_line(line)
     else

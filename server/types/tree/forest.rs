@@ -47,7 +47,7 @@ pub fn editable_occurrences (
 /// Whether 'node' stands where content does: its parent is the buffer
 /// root, an unrestricted vognode, or a historical phantom that is
 /// itself in content position. (Whether it is a member there, its
-/// 'affectsParent', is a separate question.)
+/// 'membership', is a separate question.)
 pub fn in_content_position (
   node : NodeRef<Viewnode>,
 ) -> bool {

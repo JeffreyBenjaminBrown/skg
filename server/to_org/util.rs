@@ -9,7 +9,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, Owner, Viewnode, ViewnodeKind, Editability, AffectsParent, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Owner, Viewnode, ViewnodeKind, Editability, Membership, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_skgids};
 
@@ -198,13 +198,13 @@ pub fn make_member_children_nonMembers (
     . children ()
     . filter ( |child| matches! ( &child . value () . kind,
                                   ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                                  if t . affectsParent == AffectsParent::True ))
+                                  if t . membership == Membership::Member ))
     . map ( |child| child . id () )
     . collect ();
   for member in &members {
     write_at_unrestrictedVognode_in_tree (
       tree, *member,
-      |t| { t . affectsParent = AffectsParent::False; } )
+      |t| { t . membership = Membership::NonMember; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
   Ok (members) }
 
@@ -267,8 +267,10 @@ pub fn append_plain_stub_root (
     . value () . owner = Owner::StubRoots;
   Ok (root_treeid) }
 
-/// Mark forest-root UnrestrictedVognodes as having no parent in the view.
-pub fn mark_view_roots_parent_na (
+/// Mark forest-root UnrestrictedVognodes as members, so that a root
+/// carries no 'nonMember' atom; a root has no viewparent whose
+/// membership it could take part in.
+pub fn mark_view_roots_as_members (
   viewforest : &mut Tree<Viewnode>,
 ) {
   let root_skgids : Vec<NodeId> =
@@ -279,7 +281,7 @@ pub fn mark_view_roots_parent_na (
     let vn : &mut Viewnode = node_mut . value ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = vn . kind
-      { t . affectsParent = AffectsParent::NA; }}}
+      { t . membership = Membership::Member; }}}
 
 /// Walk the view and correct any UnrestrictedVognode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
@@ -292,7 +294,7 @@ pub fn mark_view_roots_parent_na (
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
 ///   P; MENTIONER -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
-/// - 'AffectsParent::True' on child C with WRITE_PROTECTED UnrestrictedVognode
+/// - 'Membership::Member' on child C with WRITE_PROTECTED UnrestrictedVognode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Editable parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -327,9 +329,7 @@ pub fn validate_affectsParent_relationships_in_straddle (
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
   let mut to_independent : Vec<NodeId> = Vec::new ();
-    // these will be marked affectsParent = independent
-  let mut to_affected : Vec<NodeId> = Vec::new ();
-    // these will be marked affectsParent = affected
+    // these will be made non-members
   let mut to_unremarkable : Vec<NodeId> = Vec::new ();
     // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
@@ -345,18 +345,13 @@ pub fn validate_affectsParent_relationships_in_straddle (
           ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
           // A non-UnrestrictedVognode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
-      if child_tn . affectsParent == AffectsParent::NA {
-        // The child was a root, and the user gave it a parent, so let the parent contain it.
-        to_affected . push ( child_ref . id () );
-        continue; }
-      let affects_parent_claim_ok : bool = match child_tn . affectsParent {
-        AffectsParent::True => {
+      let affects_parent_claim_ok : bool = match child_tn . membership {
+        Membership::Member => {
           if parent_tn . is_writeProtected () {
             child_contained_by_parent (graph, &child_tn . skgid, &parent_tn . skgid)
           } else { // The editable parent *defines* content, so cannot be incorrect.
             true }}
-        AffectsParent::False => true,
-        AffectsParent::NA => false, };
+        Membership::NonMember => true, };
       if ! affects_parent_claim_ok { to_independent . push ( child_ref . id () ); }
       let birth_claim_ok : bool = match child_tn . birth {
         Birth::RoleGraft (role) => {
@@ -380,13 +375,7 @@ pub fn validate_affectsParent_relationships_in_straddle (
       viewforest . get_mut (skgid) . unwrap ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
-    { t . affectsParent = AffectsParent::False; } }
-  for skgid in to_affected {
-    let mut node_mut : NodeMut<Viewnode> =
-      viewforest . get_mut (skgid) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
-      = node_mut . value () . kind
-    { t . affectsParent = AffectsParent::True; } }
+    { t . membership = Membership::NonMember; } }
   for skgid in to_unremarkable {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
@@ -395,7 +384,7 @@ pub fn validate_affectsParent_relationships_in_straddle (
     { t . birth = Birth::Unremarkable; } } }
 
 /// An invariant: a *non-dead generalized orphan*
-/// must have AffectsParent=False. An Unrestricted node whose parent is a
+/// must have Membership=False. An Unrestricted node whose parent is a
 /// non-container -- a Deleted phantom or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
@@ -410,7 +399,7 @@ pub fn validate_affectsParent_relationships_in_straddle (
 ///   deadened to DeadViewnode first, and then this pass catches its members.)
 /// - parent is an Unrestricted vognode: handled by validate_affectsParent_relationships.
 /// - parent is BufferRoot: the child is a forest root, handled by
-///   mark_view_roots_parent_na.
+///   mark_view_roots_as_members.
 /// Belt-and-suspenders: most such children are already made non-members during the BFS
 /// (mark_erroneous_content_children_as_indep for content children;
 /// dispose_orphaned_folder_child for a deadened folder's members). This final pass
@@ -425,7 +414,7 @@ pub fn mark_orphans_under_dead_parents_false (
       let is_affected_normal : bool =
         matches! ( & child_ref . value () . kind,
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-            if t . affectsParent == AffectsParent::True );
+            if t . membership == Membership::Member );
       if ! is_affected_normal { continue; }
       let affects_parent_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
@@ -438,7 +427,7 @@ pub fn mark_orphans_under_dead_parents_false (
       viewforest . get_mut (skgid) . unwrap ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
-    { t . affectsParent = AffectsParent::False; } } }
+    { t . membership = Membership::NonMember; } } }
 
 /// Does 'parent's 'contains' list include 'child' (modulo extra_id
 /// aliasing on either side)? The inverse of "child contains parent".

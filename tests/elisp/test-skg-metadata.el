@@ -288,18 +288,18 @@ C-c p o must bind to distinct commands."
                      "[[id:acquiree][Acquiree title]]"))
       (should (null skg-linkstack)))))
 
-(ert-deftest test-skg-set-repo-recursive-prunes-non-content-affectsParent ()
+(ert-deftest test-skg-set-repo-recursive-prunes-non-members ()
   "Test recursive repo change follows only container org relationships."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id root) (repo public) (affectsParent na))) root\n"
+      "* (skg (node (id root) (repo public))) root\n"
       "** (skg (node (id content-child) (repo public))) content child\n"
       "*** (skg (node (id content-grandchild) (repo public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (repo foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch\n"
-      "** (skg (node (id link-child) (repo public) (affectsParent false) (birth roleGraft mentioner))) link child\n"
+      "** (skg (node (id link-child) (repo public) nonMember (birth roleGraft mentioner))) link child\n"
       "*** (skg (node (id under-link) (repo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-non-vognode) (repo public))) under non-vognode\n"))
@@ -647,8 +647,8 @@ must not save, so the buffer is all there is."
   "An editable removed member and a write-protected folder member
 carrying '(rel removed)' both take the request."
   (dolist (headline
-           '("** (skg (node (id x) (repo main) (affectsParent false) (diff (rel removed) (leaves 1 rel))) (vid 0c)) x"
-             "**** (skg (node (id d) (repo main) (affectsParent false) writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vid 0o)) d"))
+           '("** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vid 0c)) x"
+             "**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vid 0o)) d"))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-after
               headline #'skg-restore-removed-membership)
@@ -663,7 +663,7 @@ carrying '(rel removed)' both take the request."
   (dolist (headline
            '("* (skg (node (id x) (repo main) (diff (rel added)))) x"
              "* (skg (node (id x) (repo main))) x"
-             "* (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected (diff (rel removed)))) d"))
+             "* (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected (diff (rel removed)))) d"))
     (should (equal (test-skg--refusal-of
                     headline #'skg-restore-removed-membership)
                    "Only a removed membership can be restored")))
@@ -681,7 +681,7 @@ membership, and neither elsewhere."
   (dolist (case
            '(("* (skg (historical (id g) (repo main) (diff (node removed)))) g"
               . ("none (default)" "restoreNode"))
-             ("* (skg (node (id x) (repo main) (affectsParent false) (diff (rel removed)))) x"
+             ("* (skg (node (id x) (repo main) nonMember (diff (rel removed)))) x"
               . ("none (default)" "delete" "merge" "restoreRel"))
              ("* (skg (node (id x) (repo main))) x"
               . ("none (default)" "delete" "merge"))))

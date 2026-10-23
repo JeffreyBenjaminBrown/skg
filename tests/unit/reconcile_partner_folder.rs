@@ -1,15 +1,15 @@
 use super::*;
-use crate::types::viewnode::{AffectsParent, ViewnodeKind, mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of};
+use crate::types::viewnode::{Membership, ViewnodeKind, mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of};
 
 fn unrestricted_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id_str), SkgrepoName::from ("main"),
-    id_str . to_string (), AffectsParent::True ) }
+    id_str . to_string (), Membership::Member ) }
 
 fn unrestricted_independent (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id_str), SkgrepoName::from ("main"),
-    id_str . to_string (), AffectsParent::False ) }
+    id_str . to_string (), Membership::NonMember ) }
 
 fn mk_folder (kind : PartnerFolder) -> Viewnode {
   viewnode_of (ViewnodeKind::PartnerFolder (kind)) }

@@ -5,7 +5,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, UnrestrictedVognode, AffectsParent, viewnode_of };
+    Viewnode, ViewnodeKind, UnrestrictedVognode, Membership, viewnode_of };
 use crate::types::viewnode::{Owner, Vognode, Phantom, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
@@ -175,7 +175,7 @@ pub fn find_children_by_skgids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes UnrestrictedVognodes with affectsParent != True.
+/// If skip_non_content, excludes UnrestrictedVognodes that are non-members.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -191,7 +191,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes UnrestrictedVognodes with affectsParent != True.
+/// If skip_non_content, excludes UnrestrictedVognodes that are non-members.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -209,7 +209,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes UnrestrictedVognodes with affectsParent != True.
+/// If skip_non_content, excludes UnrestrictedVognodes that are non-members.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -224,7 +224,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude UnrestrictedVognodes with affectsParent != True.
+///   then we exclude UnrestrictedVognodes that are non-members.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -254,11 +254,11 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
-                          // A phantom has no affectsParent and is implicitly
+                          // A phantom has no membership field and is implicitly
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-                                    if t . affectsParent != AffectsParent::True ))
+                                    if t . membership != Membership::Member ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }

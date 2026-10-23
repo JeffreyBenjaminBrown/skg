@@ -61,7 +61,7 @@ describe('skg.flag staging', function ()
       '** (skg (node (id protected) (repo main) writeProtected)) protected',
       '** (skg (node (id foreign) (repo elsewhere))) foreign',
       '** (skg (node (id conflict) (repo main) (editRequest delete))) conflict',
-      '** (skg (node (id link) (repo main) (affectsParent false))) link',
+      '** (skg (node (id link) (repo main) nonMember)) link',
       '*** (skg (node (id under-link) (repo main))) under link',
       '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-folder) (repo main))) under folder',

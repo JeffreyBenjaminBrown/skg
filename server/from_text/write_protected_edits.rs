@@ -7,7 +7,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{AffectsParent, Existence, PartnerFolder, Phantom, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{Membership, Existence, PartnerFolder, Phantom, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -136,7 +136,7 @@ fn partnerFolder_members_in_view (
   folder . children () . filter_map ( |child| {
     let relRepo_request : Option<SkgrepoName> = match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (member))
-        if member . affectsParent == AffectsParent::True =>
+        if member . membership == Membership::Member =>
         member . relRepo_request . clone (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown)))
         if child . value () . change_facts . change . rel
@@ -183,7 +183,7 @@ fn is_member (
 ) -> bool {
   matches! ( &viewnode . kind,
              ViewnodeKind::Vognode (Vognode::Unrestricted (child))
-             if child . affectsParent == AffectsParent::True ) }
+             if child . membership == Membership::Member ) }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FlagsFolderSurface {
@@ -228,7 +228,7 @@ fn collect_flags_surfaces (
             // non-member parked in the folder are no part of its surface.
             ViewnodeKind::DeadViewnode => (),
             ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-              if t . affectsParent != AffectsParent::True => (),
+              if t . membership != Membership::Member => (),
             other => other_children . push (format! ("{:?}", other)), } }
         viewnodes . sort_by_key ( |(flag, _, _)| // The flags are a set.
           Flag::ALL . iter () . position ( |each| each == flag ) );
@@ -470,8 +470,8 @@ mod tests {
     // The graph has c1 before c2; non-members are the user's own.
     assert_eq! (errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
-      ** (skg (node (id c2) (repo main) (affectsParent false))) c2
-      ** (skg (node (id c1) (repo main) (affectsParent false))) c1
+      ** (skg (node (id c2) (repo main) nonMember)) c2
+      ** (skg (node (id c1) (repo main) nonMember)) c1
     "}), vec! []);
   }
 
@@ -548,7 +548,7 @@ mod tests {
       *** (skg (node (id sub) (repo main) writeProtected)) sub
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      ** (skg (node (id c2) (repo main) (affectsParent false))) a non-member
+      ** (skg (node (id c2) (repo main) nonMember)) a non-member
     "}), vec! []);
     assert_eq! (errors_in (indoc! {"
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
@@ -671,8 +671,8 @@ mod tests {
       * (skg (node (id recorder) (repo main) writeProtected)) recorder
       ** (skg containerFolder)
       *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) (affectsParent false) writeProtected (diff (rel removed)))) c1
-      *** (skg (node (id c2) (repo main) writeProtected (affectsParent false))) c2
+      *** (skg (node (id c1) (repo main) nonMember writeProtected (diff (rel removed)))) c1
+      *** (skg (node (id c2) (repo main) writeProtected nonMember)) c2
     "}), vec! []);
   }
 

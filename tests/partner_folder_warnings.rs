@@ -7,8 +7,8 @@
 // subscribes to, overrides, or hides this node"):
 // - a deleted generated member is restored, with a warning that
 //   explains membership is edited from the other side;
-// - a child parked with affectsParent true and a subtree, though not
-//   a member, is made a non-member (affectsParent false), with a warning.
+// - a child parked as a member with a subtree, though not
+//   a member, is made a non-member nonMember, with a warning.
 //
 // Fixture: r and t subscribe to n; the test explicitly asks for n's
 // subscription folders. x is an unrelated node the test parks inside that
@@ -84,9 +84,9 @@ async fn write_protected_folder_repairs_warn_impl (
     multi_root_view (
       config, Some (tantivy),
       &[ ID ("n" . to_string ()) ] ) ?;
-  let folder_request : String = initial_buffer . replace (
-    "(affectsParent na)",
-    "(affectsParent na) (viewRequests (folder subscribesTo))" );
+  let folder_request : String = initial_buffer . replacen (
+    "(node ",
+    "(node (viewRequests (folder subscribesTo))", 1 );
   let complete_buffer : String =
     save_buffer (&folder_request, config, tantivy, &graph)
     . await ? . saved_view;
@@ -151,8 +151,8 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( saved . contains ("(id r)"),
     "deleted member r must respawn:\n{}", saved );
   { let x_line_after : &str = line_containing (&saved, "(id x)");
-    assert! ( x_line_after . contains ("false"),
-      "x must be rerendered as false: {}", x_line_after ); }
+    assert! ( x_line_after . contains ("nonMember"),
+      "x must be rerendered as a non-member: {}", x_line_after ); }
   assert! ( ! line_containing (&saved, "subscriberFolder")
               . contains ("HELLO"),
     "the folder headline edit must not survive the rerender:\n{}", saved );

@@ -35,7 +35,7 @@
 /// save-eligible for itself but invisible to the folder's recorder.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an Unrestricted, affectsParent=true direct child of a SubscribeeFolder.
+/// is an Unrestricted member direct child of a SubscribeeFolder.
 /// A non-member child of a SubscribeeFolder is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
@@ -51,7 +51,7 @@ use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
+  NodeEditRequest, Membership, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -133,7 +133,7 @@ fn visit_unrestricted_vognode (
     match context {
       LocalContext::SubscribeeAsSuchPosition {
         subscriber, subscriber_is_editable }
-        if t . affectsParent == AffectsParent::True =>
+        if t . membership == Membership::Member =>
         Some (( subscriber, *subscriber_is_editable )),
       _ => None };
   let is_editable : bool =

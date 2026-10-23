@@ -5,7 +5,6 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::viewnode::AffectsParent;
 use crate::types::viewnode::{Editability, PropertyFolder, Property};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::MpViewForest;
@@ -134,29 +133,6 @@ fn finish_missing_info_enrichment(
          inherited_skgrepo_nodes,
          writeProtected_skgrepos_after_save, } ) }
 
-pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
-  viewforest : &mut MpViewForest,
-) {
-  let root_skgid : NodeId =
-    viewforest . internal_root_skgid ();
-  let mut need_changing : Vec<NodeId> = Vec::new();
-  for node_ref in viewforest . nodes() {
-    // collect immuatable references to what needs changing
-    let affects_parent_visible : bool =
-      node_ref . parent()
-      . map ( |p| p . id() != root_skgid )
-      . unwrap_or (false);
-    if ! affects_parent_visible { continue; }
-    if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-      = &node_ref . value() . kind
-      { if t . affectsParent == AffectsParent::NA
-        { need_changing . push (node_ref . id()); }}}
-  for treeid in need_changing { // change them
-    let mut node_mut : NodeMut<MpViewnode> =
-      viewforest . get_mut (treeid) . unwrap();
-    if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-      = &mut node_mut . value() . kind
-      { t . affectsParent = AffectsParent::True; }}}
 
 /// Make it a Property::Alias if both:
 /// - it is an UnrestrictedVognode

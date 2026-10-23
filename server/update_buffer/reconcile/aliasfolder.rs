@@ -2,7 +2,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{FolderKind, Owner, Viewnode, ViewnodeKind, AffectsParent};
+use crate::types::viewnode::{FolderKind, Owner, Viewnode, ViewnodeKind, Membership};
 use crate::types::viewnode::{Vognode, PropertyFolder, Property, viewnode_of};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -20,7 +20,7 @@ use std::error::Error;
 /// - Fetch the corresponding Graphnode from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasFolder's children into:
-///   - UnrestrictedVognodes with affectsParent != True
+///   - UnrestrictedVognodes that are non-members
 ///   - Alias property nodes
 ///   (Error if any child does not fit these categories.)
 /// - Reorder children: ignored UnrestrictedVognodes first, then Alias nodes
@@ -87,13 +87,13 @@ pub fn reconcile_aliasFolder_children (
       // Validation accepts an unrestricted vognode child of an AliasFolder
       // only as a non-member, so this changes nothing today; it would make a
       // member child a non-member. Only UnrestrictedVognodes need it;
-      // affectsParent is a vestigial field in Phantoms.
+      // membership is a vestigial field in Phantoms.
       tree, aliasfolder_treeid,
       |vn : &Viewnode| matches!( &vn . kind,
                                   ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
       |vn : &mut Viewnode| {
         if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
           = vn . kind
-          { t . affectsParent = AffectsParent::False; }},
+          { t . membership = Membership::NonMember; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }

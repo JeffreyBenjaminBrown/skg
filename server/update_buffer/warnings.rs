@@ -16,7 +16,7 @@ use crate::types::viewnode::{PartnerFolder, Vid};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RepairKind {
   RestoredMember,    // a generated member was missing from the buffer; completion restored it
-  MadeNonMember,     // a child claiming membership was not a real member; the child, a branch, was made a non-member (affectsParent=false)
+  MadeNonMember,     // a child claiming membership was not a real member; the child, a branch, was made a non-member (nonMember)
   RemovedStaleLeaf,  // a child claiming membership was not a real member and had no subtree; it was removed
   RemovedDuplicate,  // a member appeared more than once; the duplicate was removed
 }

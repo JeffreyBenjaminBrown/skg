@@ -10,7 +10,7 @@ graft relates outbound to a tracked ancestor: it has a relation with an
 -> container, linksTo -> mentioner, subscribesTo -> subscribee,
 overrides -> overrider, hidesFromSubs -> hider. Only
 meaningful for a node
-already known to be a role graft (affectsParent false); an ordinary content
+already known to be a role graft nonMember; an ordinary content
 child can carry the same outbound ancestor (e.g. a cycle) yet is not a
 role graft."
   (cl-loop for (rel . role) in '((contains    . container)
@@ -26,28 +26,25 @@ role graft."
 
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
-Birth provenance is more specific than affectsParent: a role graft (a node
-with (affectsParent false)) returns its ROLENAME from its (rels ...)
-facts (e.g. `container', `mentioner'); otherwise the result is the
-explicit affectsParent or the implicit `true'."
-  (let* ((affectsParent-list (when sexp
-                          (skg-sexp-cdr-at-path sexp
-                                                '(skg node affectsParent))))
+Birth provenance is more specific than membership: a role graft (a node
+with nonMember) returns its ROLENAME from its (rels ...)
+facts (e.g. `container', `mentioner'); otherwise the result is
+`nonMember' for a non-member and `member' for a member."
+  (let* ((non-member (and sexp
+                          (skg-sexp-subtree-p sexp '(skg (node nonMember)))))
          (rels-body (when sexp
                       (skg-sexp-cdr-at-path sexp '(skg node rels))))
-         (false (eq (car affectsParent-list) 'false))
-         (role-graft-role (when false
+         (role-graft-role (when non-member
                        (headline--role-of-role-graft-from-rels rels-body))))
     (cond
-     ;; A role graft: false, with an outbound-ancestor herald.
+     ;; A role graft: a non-member, with an outbound-ancestor herald.
      (role-graft-role role-graft-role)
-     ((or (not affectsParent-list)
-          (eq (car affectsParent-list) 'true)) 'true)
-     (t (car affectsParent-list)))))
+     (non-member 'nonMember)
+     (t 'member))))
 
 (defun headline-structure (buffer)
   "Extract (depth relation id) triples from every headline in BUFFER.
-Depth is the number of asterisks. Relation is a affectsParent or birth symbol;
+Depth is the number of asterisks. Relation is a membership or birth symbol;
 see `headline--relation-from-sexp'.
 ID comes from the (skg (node (id X) ...)) metadata. Headlines
 without metadata are skipped."

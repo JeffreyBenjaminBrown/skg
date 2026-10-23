@@ -43,7 +43,7 @@
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, repo : jeff,
-    ;; write-protected : false (default), affectsParent : true (default),
+    ;; write-protected : false (default), nonMember : false (default),
     ;; birth : unremarkable (default),
     ;; editRequest : none (default), viewRequests : none (default)
     (should (= (length headlines) 16)) ;; each key *and each value* is a separate headline
@@ -75,21 +75,24 @@
     (should (string= (cdr (nth (1+ write-protected-idx) headlines)) "true"))))
 
 ;;
-;; Fill in: sexp without affectsParent -> inserts 'true (default)' child
+;; Fill in: a member (no nonMember atom) -> inserts 'false (default)';
+;; a non-member's bare atom -> shows 'true'
 ;;
 
-(ert-deftest test-fillIn-affectsParent-default-inserted ()
-  "Filling in a sexp without affectsParent inserts 'true (default)'."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
-         (org-text (sexp-to-org sexp))
-         (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
-         (lines (split-string filledIn "\n"))
-         (headlines (org-to-sexp--extract-headlines lines))
-         (affectsParent-idx (cl-position "affectsParent" headlines
-                                 :key #'cdr :test #'string=)))
-    (should affectsParent-idx)
-    (should (string= (cdr (nth (1+ affectsParent-idx) headlines))
-                      "true (default)"))))
+(ert-deftest test-fillIn-nonMember ()
+  "Filling in offers nonMember as a bare atom: 'false (default)' on a
+member, 'true' on a non-member."
+  (dolist (case '(((skg (node (id abc) (repo jeff))) . "false (default)")
+                  ((skg (node (id abc) (repo jeff) nonMember)) . "true")))
+    (let* ((org-text (sexp-to-org (car case)))
+           (filledIn (skg-unrestrictedNode-fillIn-defaults-in-org org-text))
+           (lines (split-string filledIn "\n"))
+           (headlines (org-to-sexp--extract-headlines lines))
+           (nonMember-idx (cl-position "nonMember" headlines
+                                       :key #'cdr :test #'string=)))
+      (should nonMember-idx)
+      (should (string= (cdr (nth (1+ nonMember-idx) headlines))
+                       (cdr case))))))
 
 ;;
 ;; Strip: unmodified filled-in org -> returns original sexp
@@ -118,8 +121,8 @@
                            "**** jeff\n"
                            "*** writeProtected\n"
                            "**** true\n"
-                           "*** affectsParent\n"
-                           "**** true (default)\n"
+                           "*** nonMember\n"
+                           "**** false (default)\n"
                            "*** birth\n"
                            "**** unremarkable (default)\n"
                            "*** editRequest\n"
@@ -135,7 +138,7 @@
 ;;
 
 (ert-deftest test-strip-bare-false ()
-  "Stripping accepts bare 'false' and 'true' as default values."
+  "Stripping accepts bare 'false' as the default value."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
@@ -144,8 +147,8 @@
                            "**** jeff\n"
                            "*** writeProtected\n"
                            "**** false\n"
-                           "*** affectsParent\n"
-                           "**** true\n"
+                           "*** nonMember\n"
+                           "**** false\n"
                            "*** birth\n"
                            "**** unremarkable\n"
                            "*** editRequest\n"
@@ -211,10 +214,10 @@
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, repo, write-protected, affectsParent, birth,
+    ;; Order should be: id, repo, write-protected, nonMember, birth,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
-                   '("id" "repo" "writeProtected" "affectsParent"
+                   '("id" "repo" "writeProtected" "nonMember"
                      "birth" "editRequest" "viewRequests" "graphStats")))))
 
 ;;
@@ -238,23 +241,23 @@
                                (editRequest (merge XYZ))))))))
 
 ;;
-;; Strip: affectsParent false -> kept as (affectsParent false)
+;; Strip: nonMember true -> the bare atom
 ;;
 
-(ert-deftest test-strip-affectsParent-false ()
-  "Stripping affectsParent=false keeps field and value."
+(ert-deftest test-strip-nonMember-true ()
+  "Stripping nonMember=true produces the bare atom in the sexp."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
                            "**** abc\n"
                            "*** repo\n"
                            "**** jeff\n"
-                           "*** affectsParent\n"
-                           "**** false"))
+                           "*** nonMember\n"
+                           "**** true"))
          (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (repo jeff) (affectsParent false)))))))
+                   '(skg (node (id abc) (repo jeff) nonMember))))))
 
 ;;
 ;; Strip: viewRequests with actual values -> kept as-is
@@ -293,7 +296,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "*** repo\n"
                            "**** only\n"
                            "*** writeProtected\n"
-                           "*** affectsParent\n"
+                           "*** nonMember\n"
                            "*** birth\n"
                            "*** editRequest\n"
                            "*** viewRequests"))
@@ -440,7 +443,7 @@ preserves repo and all fields."
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; All editable defaults must be present
     (should (cl-find "writeProtected" headlines :key #'cdr :test #'string=))
-    (should (cl-find "affectsParent" headlines :key #'cdr :test #'string=))
+    (should (cl-find "nonMember" headlines :key #'cdr :test #'string=))
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
     ;; the rels herald must be preserved
     (should (cl-find "rels" headlines :key #'cdr :test #'string=))))

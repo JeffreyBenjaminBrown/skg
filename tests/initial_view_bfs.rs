@@ -83,18 +83,18 @@ async fn test_bfs_limit_across_multiple_trees (
 
       println!("BFS multi-tree limit result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
                               ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 12
                               *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
                               *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 122
                               *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
                               ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-                              * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (repo main) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 21
                               ** (skg (node (id 22) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 22
                               ** (skg (node (id 23) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 23
-                              * (skg (node (id 3) (repo main) (affectsParent na) (rels (contains (out 3))))) 3
+                              * (skg (node (id 3) (repo main) (rels (contains (out 3))))) 3
                               ** (skg (node (id 31) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 31
                               ** (skg (node (id 32) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 32
                               ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 33
@@ -129,21 +129,21 @@ async fn test_bfs_limit_9_three_branches (
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
                               ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 12
                               *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
                               *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 122
                               *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
                               ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-                              * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (repo main) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 21
                               ** (skg (node (id 22) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 22
                               *** (skg (node (id 221) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 221
                               *** (skg (node (id 222) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 222
                               *** (skg (node (id 223) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 223
                               ** (skg (node (id 23) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 23
-                              * (skg (node (id 3) (repo main) (affectsParent na) (rels (contains (out 3))))) 3
+                              * (skg (node (id 3) (repo main) (rels (contains (out 3))))) 3
                               ** (skg (node (id 31) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 31
                               ** (skg (node (id 32) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 32
                               ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 33
@@ -177,14 +177,14 @@ async fn test_bfs_limit_8_two_branches (
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
                               ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 12
                               *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
                               *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 122
                               *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
                               ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-                              * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (repo main) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 21
                               ** (skg (node (id 22) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 22
                               *** (skg (node (id 221) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 221
@@ -220,7 +220,7 @@ async fn test_budget_content_beats_subscribers (
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id r) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2))))) r
+      let expected = indoc! {"* (skg (node (id r) (repo main) (rels (contains (out 1)) (subscribesTo (out 2))))) r
                               ** (skg subscribeeFolder)
                               *** (skg (node (id s1) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) s1
                               *** (skg (node (id s2) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) s2

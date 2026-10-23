@@ -306,12 +306,10 @@ function M.unknown_id_at_point ()
 end
 
 ---@param metadata_sexp any
----@return boolean implicit or explicit affectsParent=true?
-function M.node_affectsParent_content_of_p (metadata_sexp)
-  local values = M.sexp_cdr_at_path(metadata_sexp,
-                                    { 'skg', 'node', 'affectsParent' })
-  return values == nil
-         or values[1] == sexpr.symbol('true')
+---@return boolean is it a member: does it lack the bare nonMember atom?
+function M.node_member_p (metadata_sexp)
+  return not compare.subtree_p(metadata_sexp,
+    { SKG, { NODE, sexpr.symbol('nonMember') } })
 end
 
 ---@param metadata_sexp any
@@ -533,7 +531,8 @@ function M.change_repo_at_line_unless_write_protected (line_number,
 end
 
 ---Change OLD_REPO to NEW_REPO in this content subtree (root
----inclusive; only affectsParent=true descendants are traversed).
+---inclusive; only member descendants (no nonMember atom) are
+---traversed).
 ---A write-protected occurrence is not edited -- the save would
 ---refuse its skgrepo edit -- and its ID is returned instead, for the
 ---caller to warn about, unless the walk also changed that ID's
@@ -567,7 +566,7 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if not (M.unrestrictedNode_sexp_p(metadata)
-            and M.node_affectsParent_content_of_p(metadata)) then
+            and M.node_member_p(metadata)) then
       line = M.next_headline_after_subtree(line)
     else
       if M.node_repo(metadata) == old_skgrepo then

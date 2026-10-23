@@ -3,7 +3,7 @@ use crate::skgrepo_sets::SkgrepoSetName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, mk_editable_viewnode,
-  viewforest_root_viewnode, viewnode_of, AffectsParent };
+  viewforest_root_viewnode, viewnode_of, Membership };
 
 use std::collections::BTreeSet;
 
@@ -20,7 +20,7 @@ fn def (skgid : &str, skgrepo : &str) -> Viewnode {
 fn writeProtected (skgid : &str, skgrepo : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (skgid), SkgrepoName::from (skgrepo),
-    skgid . to_string (), AffectsParent::True ) }
+    skgid . to_string (), Membership::Member ) }
 
 fn folder (kind : PartnerFolder) -> Viewnode {
   viewnode_of (ViewnodeKind::PartnerFolder (kind)) }

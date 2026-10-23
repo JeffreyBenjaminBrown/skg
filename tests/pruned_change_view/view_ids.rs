@@ -35,7 +35,7 @@ fn a_removed_member_and_a_marker_are_the_diff_views_reconcilers (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let removed_member : &str = "** (skg (node (id x) (repo main) (affectsParent false)";
+    let removed_member : &str = "** (skg (node (id x) (repo main) nonMember";
     let marker : &str = "** (skg (changesetMarker content)";
     for needle in [ removed_member, marker ] {
       assert_eq! ( owner_of_first_line_starting (f, &buffer, needle),

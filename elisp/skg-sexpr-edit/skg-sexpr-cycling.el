@@ -46,10 +46,8 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 FIELD-VALUE is the current headline text, needed for repo defaulting.
 Returns nil if the field is not cycleable."
   (cond
-   ((string= field-name "writeProtected")
-   '("false (default)" "true"))
-   ((string= field-name "affectsParent")
-    '("true (default)" "false" "na"))
+   ((member field-name '("writeProtected" "nonMember"))
+    '("false (default)" "true"))
    ((string= field-name "editRequest")
     (skg-sexp-edit--edit-request-cycle-values))
    ((string= field-name "repo") ;; from the config

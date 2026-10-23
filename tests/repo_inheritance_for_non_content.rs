@@ -5,7 +5,7 @@
 // even if the parent ignores it.
 
 use skg::types::misc::{ ID, SkgrepoName, SkgConfig, Skgrepo };
-use skg::types::viewnode::{ AffectsParent, Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
+use skg::types::viewnode::{ Membership, Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 use skg::dbs::in_rust_graph::InRustGraph;
@@ -34,7 +34,7 @@ fn two_skgrepo_config () -> SkgConfig {
   SkgConfig::dummyFromSkgrepos (skgrepos) }
 
 /// When a node N has the same skgrepo as its nearest unrestrictedVognode ancestor,
-/// even if N is marked affectsParent=false,
+/// even if N is marked nonMember,
 /// homeRepoAtBoundary should be false.
 #[test]
 fn skgrepo_inheritance_across_non_content_same_skgrepo () {
@@ -54,7 +54,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
       ID::from ("b"),
       SkgrepoName::from ("pub"),
       "node B" . to_string (),
-      AffectsParent::False );
+      Membership::NonMember );
     viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
@@ -64,7 +64,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
     &config,
     None );
   // B has same skgrepo as A, so homeRepoAtBoundary should be false,
-  // even though B has affectsParent != True.
+  // even though B is a non-member.
   let b_ref =
     viewforest . get (a_skgid) . unwrap ()
     . first_child () . unwrap ();
@@ -75,7 +75,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
             "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a non-content child (affectsParent != True) has a different skgrepo
+/// When a non-content child (a non-member) has a different skgrepo
 /// from its nearest unrestrictedVognode ancestor,
 /// homeRepoAtBoundary should be true.
 #[test]
@@ -96,7 +96,7 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
       ID::from ("b"),
       SkgrepoName::from ("priv"),
       "node B" . to_string (),
-      AffectsParent::False );
+      Membership::NonMember );
     viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,

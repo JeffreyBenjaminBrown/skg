@@ -555,7 +555,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
     let parked_e1 : &str = collateral . lines ()
       . find ( |line| line . starts_with ("**** (skg (node (id e1)")
-                      && line . contains ("(affectsParent false)") )
+                      && line . contains ("nonMember") )
       . unwrap_or_else ( || panic! (
         "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
         collateral ));
@@ -767,7 +767,7 @@ async fn test_subscribee_and_filter_folders (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) writeProtected (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        *** (skg (node (id E2) (repo main) writeProtected (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-2
@@ -800,7 +800,7 @@ async fn test_subscribee_and_filter_folders (
     println!("View from R after save with editable view requests:\n{}", extended);
 
     let expected_extended = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 3))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
@@ -840,7 +840,7 @@ async fn test_hidden_within_but_none_without (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) writeProtected (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
@@ -872,7 +872,7 @@ async fn test_hidden_within_but_none_without (
     // HiddenInSubscribeeFolder precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeFolder (with H) before E11 and E12.
     let expected_extended = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 1)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
@@ -1065,7 +1065,7 @@ async fn test_hidden_without_but_none_within (
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) writeProtected (rels (contains (out 2 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        *** (skg (node (id E2) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-2
@@ -1096,7 +1096,7 @@ async fn test_hidden_without_but_none_within (
     println!("View from R after save with editable view requests:\n{}",
              with_subscribees_extended);
     let expected_extended = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 2 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg (node (id E11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) E11
@@ -1204,7 +1204,7 @@ async fn test_overlapping_hidden_within (
                           &ID("R" . to_string()) )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) writeProtected (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        *** (skg (node (id E2) (repo main) writeProtected (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-2
@@ -1233,7 +1233,7 @@ async fn test_overlapping_hidden_within (
       response . saved_view };
     println!("View from R after save with editable view requests:\n{}", extended);
     let expected_extended = indoc! {
-      "* (skg (node (id R) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
+      "* (skg (node (id R) (repo main) (rels (contains (out 1)) (subscribesTo (out 2)) (hidesFromSubs (out 1))))) R
        ** (skg subscribeeFolder)
        *** (skg (node (id E1) (repo main) (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)

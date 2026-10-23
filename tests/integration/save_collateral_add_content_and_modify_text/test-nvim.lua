@@ -57,26 +57,20 @@ local function role_of_role_graft_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP's headline relation: a
----role graft's rolename, else the explicit affectsParent, else 'true'. The
+---role graft's rolename, else 'nonMember' or 'member'. The
 ---port of test-helpers.el's headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
-  local affectsParent_list = sexp and metadata.sexp_cdr_at_path(
-    sexp, { 'skg', 'node', 'affectsParent' }) or nil
-  local independent = affectsParent_list ~= nil
-    and affectsParent_list[1] == sexpr.symbol('false')
+  local non_member = sexp ~= nil and not metadata.node_member_p(sexp)
   local role_graft_role = nil
-  if independent then
+  if non_member then
     role_graft_role = role_of_role_graft_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' }))
   end
   if role_graft_role then return role_graft_role end
-  if affectsParent_list == nil
-     or affectsParent_list[1] == sexpr.symbol('true') then
-    return 'true'
-  end
-  return sexpr.atom_text(affectsParent_list[1])
+  if non_member then return 'nonMember' end
+  return 'member'
 end
 
 ---(depth relation id) triples for every headline in BUF that carries
@@ -179,11 +173,11 @@ require('skg.content_view').request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, 'Buffer skg://a was created')
 assert_headline_structure(buf_a,
-  { { 1, 'na', 'a' },
+  { { 1, 'member', 'a' },
     { 2, 'container', 'b' },
     { 3, 'container', 'a' },
-    { 2, 'true', 'b' },
-    { 3, 'true', 'a' } },
+    { 2, 'member', 'b' },
+    { 3, 'member', 'a' } },
   'phase 1: buffer A initial')
 
 print('=== PHASE 2: Open buffer B ===')
@@ -191,20 +185,20 @@ require('skg.content_view').request_single_root_content_view_from_id('b')
 local buf_b = T.wait_for_buffer('skg://b')
 T.check(buf_b, 'Buffer skg://b was created')
 assert_headline_structure(buf_b,
-  { { 1, 'na', 'b' },
+  { { 1, 'member', 'b' },
     { 2, 'container', 'a' },
     { 3, 'container', 'b' },
-    { 2, 'true', 'a' },
-    { 3, 'true', 'b' } },
+    { 2, 'member', 'a' },
+    { 3, 'member', 'b' } },
   'phase 2: buffer B initial')
 
 print("=== PHASE 3: Edit a's title, add child c, save ===")
 assert_headline_titles(buf_b,
-  { { 1, 'na', 'b' },
+  { { 1, 'member', 'b' },
     { 2, 'container', 'a' },
     { 3, 'container', 'b' },
-    { 2, 'true', 'a' },
-    { 3, 'true', 'b' } },
+    { 2, 'member', 'a' },
+    { 3, 'member', 'b' } },
   'phase 3: buffer B before edit')
 vim.api.nvim_set_current_buf(buf_b)
 do -- Change a's title on line 4 (the editable a): replace the
@@ -218,12 +212,12 @@ end
 vim.api.nvim_buf_set_lines(buf_b, -1, -1, false, { '*** c' })
 print('Buffer B after edit: ' .. T.buffer_text(buf_b))
 assert_headline_titles(buf_b,
-  { { 1, 'na', 'b' },
+  { { 1, 'member', 'b' },
     { 2, 'container', 'a' },
     { 3, 'container', 'b' },
-    { 2, 'true', 'Node a was given this longer title' },
-    { 3, 'true', 'b' },
-    { 3, 'true', 'c' } },
+    { 2, 'member', 'Node a was given this longer title' },
+    { 3, 'member', 'b' },
+    { 3, 'member', 'c' } },
   'phase 3: buffer B after edit')
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 3: save response arrived')
@@ -231,12 +225,12 @@ T.check(T.wait_for_response(15), 'phase 3: save response arrived')
 print('=== PHASE 4: Verify buffer B after save ===')
 T.check(vim.api.nvim_buf_is_valid(buf_b), 'Buffer B still exists')
 assert_headline_titles(buf_b,
-  { { 1, 'na', 'b' },
+  { { 1, 'member', 'b' },
     { 2, 'container', 'Node a was given this longer title' },
     { 3, 'container', 'b' },
-    { 2, 'true', 'Node a was given this longer title' },
-    { 3, 'true', 'b' },
-    { 3, 'true', 'c' } },
+    { 2, 'member', 'Node a was given this longer title' },
+    { 3, 'member', 'b' },
+    { 3, 'member', 'c' } },
   'phase 4: buffer B after save')
 do -- The line for c should now have its title and a server id.
   local line6 = vim.api.nvim_buf_get_lines(buf_b, 5, 6, false)[1]
@@ -258,12 +252,12 @@ print('=== PHASE 5: Verify collateral buffer A ===')
 T.check(vim.api.nvim_buf_is_valid(buf_a), 'Buffer A still exists')
 print('Buffer A content: ' .. T.buffer_text(buf_a))
 assert_headline_titles(buf_a,
-  { { 1, 'na', 'Node a was given this longer title' },
+  { { 1, 'member', 'Node a was given this longer title' },
     { 2, 'container', 'b' },
     { 3, 'container', 'Node a was given this longer title' },
-    { 2, 'true', 'b' },
-    { 3, 'true', 'Node a was given this longer title' },
-    { 2, 'true', 'c' } },
+    { 2, 'member', 'b' },
+    { 3, 'member', 'Node a was given this longer title' },
+    { 2, 'member', 'c' } },
   'phase 5: buffer A after collateral update')
 
 T.pass('PASS: All phases completed successfully!')

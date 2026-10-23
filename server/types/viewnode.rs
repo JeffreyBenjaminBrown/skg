@@ -18,17 +18,18 @@ use std::str::FromStr;
 /// its viewparent. For an ordinary Vognode parent, that membership
 /// is the parent's content. For a PartnerFolder parent, the PartnerFolder
 /// decides the membership (per its relation and role). For other kinds of parent's,
-/// a node's AffectsParent has no effect.
+/// a node's Membership has no effect; a view root is a 'Member'.
+/// On the wire a non-member carries the bare atom 'nonMember' and a
+/// member carries nothing.
 ///
 /// PITFALL: If a vognode is write-protected, *none* of it children affect it,
 /// just as edits to itself do not affect it,
-/// regardless of what the children might claim with their AffectsParent field.
+/// regardless of what the children might claim with their Membership field.
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum AffectsParent {
-  True,  // this node affects its parent
-  False, // it doesn't
-  NA,    // It has no parent
+pub enum Membership {
+  Member,    // this node takes part in its viewparent's membership
+  NonMember, // it doesn't
 }
 
 /// Why a generated node was originally displayed under its viewparent.
@@ -343,7 +344,7 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub title         : String,
   pub skgid         : Id,
   pub home_skgrepo  : Repo,
-  pub affectsParent      : AffectsParent,
+  pub membership      : Membership,
   pub birth         : Birth,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
@@ -411,7 +412,7 @@ pub struct GraphnodeStats {
 
 /// View-specific statistics about a node.
 /// These depend on the node's position in the current viewforest.
-/// `cycle` depends on ancestors; `affectsParent*` depends on the specific parent.
+/// `cycle` depends on ancestors; `membership` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
@@ -450,7 +451,7 @@ pub struct ViewnodeStats {
   /// "What leaks, and what repair fixes") -- the herald marks
   /// exactly the deliberately privatized relationships. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (affectsParent != True, or a role graft); and for the two
+  /// (a non-member, or a role graft); and for the two
   /// compound filter folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
@@ -561,7 +562,7 @@ pub enum PartnerFolder {
 /// Every policy obeys the one rule (the glossary's "the one rule:
 /// convert, then prune"): during reconciliation a stale member is
 /// converted, a leaf to a dead viewnode the prune removes, one with
-/// children to a write-protected non-member (affectsParent=false).
+/// children to a write-protected non-member (nonMember).
 /// The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('EditableSet' and 'EditableFilter'),
@@ -1125,10 +1126,10 @@ impl Viewnode {
         | ViewnodeKind::DeadViewnode => None,
     }}
 
-  pub fn is_unrestrictedVognode_and_affectsParent_true (&self) -> bool {
+  pub fn is_unrestrictedVognode_and_member (&self) -> bool {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        t . affectsParent == AffectsParent::True,
+        t . membership == Membership::Member,
       _ => false,
     }}
 
@@ -1236,7 +1237,7 @@ pub fn default_unrestrictedVognode (
     title,
     skgid,
     home_skgrepo: skgrepo,
-    affectsParent       : AffectsParent::True,
+    membership       : Membership::Member,
     birth          : Birth::Unremarkable,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
@@ -1256,7 +1257,7 @@ pub fn mk_editable_viewnode (
 ) -> Viewnode { mk_viewnode ( skgid,
                             skgrepo,
                             title,
-                            AffectsParent::True,
+                            Membership::Member,
                             Birth::Unremarkable,
                             Editability::Editable {
                               body,
@@ -1287,21 +1288,21 @@ pub fn mk_writeProtected_viewnode (
   skgid     : ID,
   skgrepo : SkgrepoName,
   title  : String,
-  affectsParent  : AffectsParent,
+  membership  : Membership,
 ) -> Viewnode {
   mk_writeProtected_viewnode_with_birth (
-    skgid, skgrepo, title, affectsParent, Birth::Unremarkable ) }
+    skgid, skgrepo, title, membership, Birth::Unremarkable ) }
 
 pub fn mk_writeProtected_viewnode_with_birth (
   skgid    : ID,
   skgrepo  : SkgrepoName,
   title    : String,
-  affectsParent : AffectsParent,
+  membership : Membership,
   birth    : Birth,
 ) -> Viewnode { mk_viewnode ( skgid,
                             skgrepo,
                             title,
-                            affectsParent,
+                            membership,
                             birth,
                             Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
@@ -1311,7 +1312,7 @@ pub fn mk_writeProtected_viewnode_with_birth (
 /// Errors if the input is not an UnrestrictedVognode.
 pub fn mk_writeProtected_from_viewnode (
   mut viewnode : Viewnode,
-  affectsParent    : AffectsParent,
+  membership    : Membership,
   birth       : Birth,
 ) -> Result < Viewnode, String > {
   match &mut viewnode . kind {
@@ -1320,7 +1321,7 @@ pub fn mk_writeProtected_from_viewnode (
       // (the other view_requests, graphStats,
       // viewStats, and any field added later) is preserved rather
       // than silently reset.
-      t . affectsParent = affectsParent;
+      t . membership = membership;
       t . birth = birth;
       t . write_protect ();
       Ok (viewnode) },
@@ -1336,14 +1337,14 @@ pub fn mk_viewnode (
   skgid         : ID,
   skgrepo       : SkgrepoName,
   title         : String,
-  affectsParent      : AffectsParent,
+  membership      : Membership,
   birth         : Birth,
   editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> Viewnode {
   viewnode_of ( ViewnodeKind::Vognode (
     Vognode::Unrestricted (
-      UnrestrictedVognode { affectsParent,
+      UnrestrictedVognode { membership,
                             birth,
                             view_requests,
                             editability,

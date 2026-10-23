@@ -18,15 +18,19 @@ local M = {}
 ---Canonical order for node fields. Fields not in this list go last.
 M.canonical_field_order = {
   'id', 'repo',
-  'writeProtected', 'affectsParent', 'birth', 'editRequest', 'viewRequests' }
+  'writeProtected', 'nonMember', 'birth', 'editRequest', 'viewRequests' }
 
 ---Editable field names mapped to their default value text.
 M.editable_defaults = {
   { name = 'writeProtected', default = 'false (default)' },
-  { name = 'affectsParent', default = 'true (default)' },
+  { name = 'nonMember', default = 'false (default)' },
   { name = 'birth', default = 'unremarkable (default)' },
   { name = 'editRequest', default = 'none (default)' },
   { name = 'viewRequests', default = 'none (default)' } }
+
+---Fields that are bare atoms: present means true, absent false. Each
+---is shown with a 'true' or 'false (default)' child while edited.
+M.bare_boolean_fields = { writeProtected = true, nonMember = true }
 
 ---@param name string
 ---@return string|nil the default value text for editable field NAME
@@ -197,8 +201,8 @@ function M.fillIn_and_reorder (children, child_level, default_skgrepo)
   return ordered
 end
 
----Fill in GROUP for display: a bare 'writeProtected' boolean gains a 'true'
----child; a skgrepo value matching DEFAULT_REPO gains ' (default)'.
+---Fill in GROUP for display: a bare boolean atom ('writeProtected',
+---'nonMember') gains a 'true' child; a skgrepo value matching DEFAULT_REPO gains ' (default)'.
 ---@param group table[]
 ---@param child_level integer
 ---@param field_name string
@@ -206,7 +210,7 @@ end
 ---@return table[]
 function M.maybe_fillIn_field (group, child_level, field_name,
                                default_skgrepo)
-  if #group == 1 and field_name == 'writeProtected' then
+  if #group == 1 and M.bare_boolean_fields[field_name] then
     return { group[1], { level = child_level + 1, text = 'true' } } end
   if field_name == 'repo' and default_skgrepo and #group == 2 then
     local value = vim.trim(group[2].text)
@@ -283,16 +287,12 @@ end
 function M.strip_one_field (group, field_name, child_level)
   local value_text = nil
   if #group > 1 then value_text = vim.trim(group[2].text) end
-  if field_name == 'writeProtected' then
+  if M.bare_boolean_fields[field_name] then
     if value_text == nil or M.default_false_p(value_text) then
       return nil end
     if value_text == 'true' then
       -- Collapse to bare atom (no children).
       return { { level = child_level, text = field_name } } end
-    return group end
-  if field_name == 'affectsParent' then
-    if value_text == nil or M.default_affected_p(value_text) then
-      return nil end
     return group end
   if field_name == 'birth' then
     if value_text == nil or M.default_birth_p(value_text) then
@@ -339,13 +339,6 @@ end
 function M.default_false_p (text)
   local trimmed = vim.trim(text)
   return trimmed == 'false (default)' or trimmed == 'false'
-end
-
----@param text string
----@return boolean
-function M.default_affected_p (text)
-  local trimmed = vim.trim(text)
-  return trimmed == 'true (default)' or trimmed == 'true'
 end
 
 ---@param text string

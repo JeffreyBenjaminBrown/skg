@@ -126,10 +126,10 @@ async fn test_multi_root_view_logic (
 
   println!("Multi-root view result:\n{}", result);
 
-  let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na))) 1
+  let expected = indoc! {"* (skg (node (id 1) (repo main))) 1
                           1 has a body
-                          * (skg (node (id 2) (repo main) (affectsParent na))) 2
-                          * (skg (node (id 1) (repo main) (affectsParent na) writeProtected omittedBody)) 1
+                          * (skg (node (id 2) (repo main))) 2
+                          * (skg (node (id 1) (repo main) writeProtected omittedBody)) 1
                           "};
                           // 'omittedBody': node 1 has a body, and this
                           // (repeated, hence write-protected) occurrence of it
@@ -153,7 +153,7 @@ async fn test_single_root_view_with_cycle (
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (repo main) (affectsParent na) (rels (contains (out 1))))) a
+      let expected = indoc! {"* (skg (node (id a) (repo main) (rels (contains (out 1))))) a
                               ** (skg (node (id b) (repo main) (rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1))))) b
                               b has a body
                               *** (skg (node (id c) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1))))) c
@@ -188,15 +188,15 @@ async fn test_multi_root_view_with_shared_nodes (
       // write-protected Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
+        "* (skg (node (id 1) (repo main) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1) (birth (contains in 1))))) title 2
          ** (skg (node (id 5) (repo main) (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1))) (extraIds 1) (birth (overrides out))) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (repo main) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
+         ** (skg (node (id 1) (repo main) nonMember (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
          ** (skg subscribeeFolder)
          *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]
@@ -234,15 +234,15 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + default folders (folders are not budget-bound);
       // subscribee members are write-protected.
       let expected = indoc! {
-        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
+        "* (skg (node (id 1) (repo main) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg (node (id 2) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1) (birth (contains in 1))))) title 2
          ** (skg (node (id 5) (repo main) (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1))) (extraIds 1) (birth (overrides out))) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (repo main) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) (affectsParent false) (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
+         ** (skg (node (id 1) (repo main) nonMember (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
          ** (skg subscribeeFolder)
          *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]
@@ -282,7 +282,7 @@ async fn test_limit_with_multiple_sibling_groups (
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 2))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (repo main) (rels (contains (out 2))))) 1
                               1 body
                               ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1))))) 11
                               11 body

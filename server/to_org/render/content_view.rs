@@ -8,7 +8,7 @@
 /// at its BFS visit. After view completion, the shared finish_viewforest
 /// tail (server/update_buffer.rs)
 /// attaches the roots' containerward role trees,
-/// marks/validates affectsParent, sets graph/view stats, applies the skgrepo set,
+/// marks/validates membership, sets graph/view stats, applies the skgrepo set,
 /// and renders to string.
 
 use crate::types::tree::forest::ViewForest;

@@ -367,7 +367,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
 ///     token with no space (used so the write-protected glyph "☮" sits
-///     directly on its affectsParent glyph).
+///     directly on its nonMember glyph).
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
 ///
@@ -381,10 +381,6 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     server depending on whether the deletion is on a non-vognode viewnode
 ///     (like a deleted aliasFolder) or on a file-level node. Each gets
 ///     its own matcher; both render as "DELETED".
-///
-///   * The 'affectsParent' sub-rule 'true' is vacuous: the server leaves
-///     affectsParent=true implicit, and an explicit '(affectsParent
-///     true)', which the parser accepts, stays quiet.
 pub fn herald_rule_table () -> HeraldRule {
   HeraldRule {
     node_heralds_key : None, interc : None, label : Some ("skg"),
@@ -492,10 +488,7 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("node", [ vec! [
         vac ("id"),
         vac ("repo"),
-        rule ("affectsParent", vec! [
-          vac ("na"),
-          vac ("true"),
-          leaf_styled_as ("affectsParent_false", "false", "⊥") ]),
+        leaf ("nonMember", "⊥"),
         // A role graft's birth: the (rels ...) facts already show it.
         vac ("birth"),
         // The server emits the atom 'writeProtected'
@@ -705,7 +698,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "deadViewnode", "historical",
     // Keys inside node / deleted / unknown forms:
     "id", "repo",
-    "affectsParent", "writeProtected", "omittedBody",
+    "writeProtected", "omittedBody",
     // A role graft's '(birth roleGraft ROLENAME)'; its role is value
     // position.
     "birth",
@@ -727,7 +720,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend (Flag::ALL . map (Flag::wire_name));
   atoms . extend ( graphstats_atoms () );
   atoms . extend ( viewstats_atoms () );
-  atoms . extend ( affectsParent_emitted_atoms () );
+  atoms . extend ( membership_emitted_atoms () );
   atoms . extend ( property_and_folder_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . extend ( change_fact_atoms () );
@@ -790,15 +783,15 @@ fn viewstats_atoms () -> Vec<&'static str> {
   vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo",
          "homeSkgrepoMove", "movedLikeAncestor" ] }
 
-/// AffectsParent values the serializer can emit (True stays implicit).
-fn affectsParent_emitted_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::AffectsParent;
-  fn guard ( p : AffectsParent ) { // compile error here = update the list below
+/// Membership atoms the serializer can emit (a member carries nothing).
+fn membership_emitted_atoms () -> Vec<&'static str> {
+  use crate::types::viewnode::Membership;
+  fn guard ( p : Membership ) { // compile error here = update the list below
     match p {
-      AffectsParent::True | AffectsParent::False | AffectsParent::NA
+      Membership::Member | Membership::NonMember
         => () }}
   let _ = guard;
-  vec! [ "false", "na" ] }
+  vec! [ "nonMember" ] }
 
 /// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.

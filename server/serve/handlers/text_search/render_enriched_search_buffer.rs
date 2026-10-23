@@ -5,7 +5,7 @@ use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::viewnode::{Birth, Owner, Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_viewnode_with_birth};
+use crate::types::viewnode::{Birth, Owner, Viewnode, ViewnodeKind, Membership, mk_writeProtected_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -195,7 +195,7 @@ fn graft_override_chain (
     if ! restriction . contains_skgrepo (&node . home_skgrepo) { continue; }
     let child : Viewnode = mk_writeProtected_viewnode_with_birth (
       rel . clone (), node . home_skgrepo . clone (), node . title . clone (),
-      AffectsParent::False, Birth::RoleGraft (birth_role) );
+      Membership::NonMember, Birth::RoleGraft (birth_role) );
     let child : Viewnode = Viewnode { owner : Owner::RoleTreeAttach, .. child };
     let child_treeid : NodeId = {
       let mut parent_mut : NodeMut<Viewnode> =
@@ -226,12 +226,12 @@ fn prepend_containing_child_from_tantivy (
         } else {
           mk_writeProtected_viewnode_with_birth (
             skgid . clone (), skgrepo, title,
-            AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) }},
+            Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER) ) }},
       None =>
         mk_writeProtected_viewnode_with_birth (
           skgid . clone (), SkgrepoName::from ("search"),
           skgid . as_str () . to_string (),
-          AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER) ) };
+          Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER) ) };
   let mut parent_mut : NodeMut<Viewnode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some ( parent_mut . prepend (

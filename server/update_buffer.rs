@@ -1,7 +1,7 @@
 //! Bringing views up to date with the graph. Every rendering of a
 //! view runs view completion ('complete_viewforest' in
 //! 'update_buffer/complete.rs') and then the shared tail
-//! ('finish_viewforest': root role trees, affectsParent marking,
+//! ('finish_viewforest': root role trees, membership marking,
 //! stats, the skgrepo set, the text):
 //! - 'render_initial_view' renders a new content view from a stub of its
 //!   roots;
@@ -53,7 +53,7 @@ use crate::types::views_state::{DiffViewBufferKind, ViewId, ViewIdRecord};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships_in_straddle, mark_orphans_under_dead_parents_false};
+use crate::to_org::util::{mark_view_roots_as_members, validate_affectsParent_relationships_in_straddle, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Property, Vognode, PropertyFolder, ViewRequest};
@@ -609,8 +609,8 @@ pub fn rerender_view (
 ///     containerward role tree and dropping the request. This is data-driven:
 ///     post-save roots come from the saved buffer without the request, so a save
 ///     never re-generates the containerward (it round-trips as ordinary content).
-///   - marks view-root and orphan affectsParent,
-///   - validates affectsParent against the captured graph (the de-novo path could
+///   - marks view-root and orphan membership,
+///   - validates membership against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one); in a
 ///     diff view a role graft's birth holds if either graph of the straddle
 ///     holds its relationship ('diffView_before_graph'),
@@ -620,9 +620,9 @@ pub fn rerender_view (
 ///     'view_id_record', which it brings up to date with the forest's
 ///     owners (the end-of-completion pass, after the prune and after
 ///     everything this tail adds), and renders to a buffer string.
-/// Step order is immaterial between the affectsParent marks and graphnodestats:
-/// affectsParent is a view property and graphnodestats reads only the in-Rust graph,
-/// never affectsParent, so the final state is identical either way.
+/// Step order is immaterial between the membership marks and graphnodestats:
+/// membership is a view property and graphnodestats reads only the in-Rust graph,
+/// never membership, so the final state is identical either way.
 pub fn finish_viewforest (
   viewforest         : &mut ViewForest,
   view_id_record     : &mut ViewIdRecord,
@@ -635,12 +635,12 @@ pub fn finish_viewforest (
       "fulfill_root_containerward_requests" ). entered();
     fulfill_root_containerward_requests (
       viewforest, graph, config, skgrepo_restriction ) ? ; }
-  mark_view_roots_parent_na ( viewforest );
+  mark_view_roots_as_members ( viewforest );
   // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
   // (a phantom / Deleted / DeadViewnode) is a non-dead generalized orphan and
   // must become a non-member.
   mark_orphans_under_dead_parents_false ( viewforest );
-  // Correct any affectsParent atoms whose claimed relation to the parent doesn't
+  // Correct any membership claims whose claimed relation to the parent doesn't
   // hold in the captured graph (e.g. user moved a birth=linksToParent node
   // under a new parent it doesn't link to).
   validate_affectsParent_relationships_in_straddle (

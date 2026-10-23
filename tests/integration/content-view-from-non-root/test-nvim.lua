@@ -43,17 +43,17 @@ end
 T.check(root_line, string.format(
   'view-root not as expected; got:\n%s', text))
 
-T.check(not root_line:find('(affectsParent false)', 1, true),
+T.check(not root_line:find('nonMember', 1, true),
   string.format(
     'contained view-root should be content, not false; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
+    'nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(affectsParent false) writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
+    'nonMember writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 
@@ -69,9 +69,9 @@ T.check(parent_line, string.format(
   'no level-2 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true) ~= nil,
+    'nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true) ~= nil,
   string.format(
-    'parent is not (affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); '
+    'parent is not nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); '
     .. 'line: %s', parent_line))
 T.check(parent_line:find(' writeProtected%f[%A]') ~= nil,
   string.format('parent is not writeProtected; line: %s', parent_line))

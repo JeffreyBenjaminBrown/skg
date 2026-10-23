@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Property, PropertyFolder};
+use crate::types::viewnode::{NodeEditRequest, Editability, Membership, PartnerFolder, Property, PropertyFolder};
 use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgConfig};
@@ -229,12 +229,12 @@ fn validate_hiddenInSubscribee_folder (
     tree, treeid, 1, true,
     dead_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-        => t . affectsParent == AffectsParent::True,
+        => t . membership == Membership::Member,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => true,
       _ => false, }) )
     { errors . push(
-        "HiddenInSubscribeeFolder UnrestrictedVognode children must have affectsParent=true."
+        "HiddenInSubscribeeFolder UnrestrictedVognode children must be members (no nonMember)."
       . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
@@ -272,12 +272,12 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tree, treeid, 1, true,
     dead_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-        => t . affectsParent == AffectsParent::True,
+        => t . membership == Membership::Member,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => true,
       _ => false, }) )
     { errors . push(
-        "HiddenOutsideOfSubscribeeFolder UnrestrictedVognode children must be affectsParent=true."
+        "HiddenOutsideOfSubscribeeFolder UnrestrictedVognode children must be members (no nonMember)."
         . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
@@ -316,7 +316,7 @@ fn validate_subscribeefolder (
     tree, treeid, 1, true,
     dead_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
-        t . affectsParent == AffectsParent::True,
+        t . membership == Membership::Member,
       MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
         true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
@@ -327,7 +327,7 @@ fn validate_subscribeefolder (
         PartnerFolder::HiddenOutsideOfSubscribee)
         => true,
       _ => false, }) )
-    { errors . push("SubscribeeFolder UnrestrictedVognode children must have affectsParent=true."
+    { errors . push("SubscribeeFolder UnrestrictedVognode children must be members (no nonMember)."
                     . to_string() ); }
   // There is no duplicate-member check here: SubscribeeFolder is a
   // defining folder, and duplicate members of defining folders are
@@ -363,7 +363,7 @@ fn validate_relation_folder (
     tree, treeid, 1, true,
     dead_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-        => t . affectsParent == AffectsParent::True,
+        => t . membership == Membership::Member,
       MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         => true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
@@ -372,7 +372,7 @@ fn validate_relation_folder (
         => true,
       _ => false, }) )
     { errors . push(format!(
-        "{} UnrestrictedVognode children must have affectsParent=true.", label)); }
+        "{} UnrestrictedVognode children must be members (no nonMember).", label)); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
@@ -436,7 +436,7 @@ fn validate_acquired_folder (
                     MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-                       if t . affectsParent == AffectsParent::False)) }
+                       if t . membership == Membership::NonMember)) }
 
 /// The checks shared by the two derived acquisition folders: which
 /// parent, which children, one per parent.
@@ -699,7 +699,7 @@ fn has_empty_title ( t : &MpUnrestrictedVognode ) -> bool {
 
 /// Check that all non-ignored content children
 /// have distinct IDs.
-/// "Non-ignored" means affectsParent == True.
+/// "Non-ignored" means a member (Membership::Member).
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
 pub fn nonignored_children_have_distinct_skgids (
@@ -717,7 +717,7 @@ pub fn nonignored_children_have_distinct_skgids (
       // originals.
       match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-          if t . affectsParent == AffectsParent::True
+          if t . membership == Membership::Member
           => t . collected_skgid (),
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
           Some (u . skgid . clone()),
@@ -745,7 +745,7 @@ fn partnerFolder_children_have_distinct_skgids (
     let Some (skgid) =
       (match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-          if t . affectsParent == AffectsParent::True =>
+          if t . membership == Membership::Member =>
           t . skgid . clone(),
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
           Some (u . skgid . clone()),

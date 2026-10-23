@@ -31,19 +31,19 @@ fn test_birth_and_write_protected(
   // Run test with database
   let result : Result<(), Box<dyn Error>> =
     run_with_test_stores (
-      "skg-test-affectsParent",
+      "skg-test-nonMember",
       "tests/save/birth_and_write_protected/fixtures",
-      "/tmp/tantivy-test-affectsParent",
+      "/tmp/tantivy-test-nonMember",
       |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
-        // Node 1 contains node 2 (which has affectsParent=false and write-protected)
+        // Node 1 contains node 2 (which is nonMember and write-protected)
         // Node 2 contains node 3 (already); node 4 (new) sits under it
         // without affecting it, as a write-protected node holds no member.
-        // Node 2 should not affect node 1 because affectsParent=false
+        // Node 2 should not affect node 1 because it is nonMember
         let org_text = indoc! {"
           * (skg (node (id 1) (repo main))) 1
-          ** (skg (node (id 2) (repo main) (affectsParent false) writeProtected)) 2
-          *** (skg (node (id 4) (repo main) (affectsParent false))) 4
+          ** (skg (node (id 2) (repo main) nonMember writeProtected)) 2
+          *** (skg (node (id 4) (repo main) nonMember)) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
@@ -64,14 +64,14 @@ fn test_birth_and_write_protected(
           vec![ ID("3" . to_string()) ],
           "Node 2 should only contain [3]. Node 2 is 'writeProtected', so it writes no content." ); }
 
-        { // verify affectsParent=false is treated correctly
+        { // verify nonMember is treated correctly
           let node1 : Graphnode =
             graphnode_from_skgid(
               config, &ID("1" . to_string() ))
 ?;
         assert!(
           node1 . contains . is_empty(),
-          "Node 1 should have empty contents (empty when read from disk), because its child 2 has affectsParent=false in its metadata." ); }
+          "Node 1 should have empty contents (empty when read from disk), because its child 2 has nonMember in its metadata." ); }
 
         Ok (( )) } )
     );

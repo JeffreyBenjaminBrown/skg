@@ -45,7 +45,7 @@ fn ordinary_editable_emissions () {
       * (skg (node (id root) (repo main) (editRequest (flag noSearchMatching true)))) root
       Root body
       ** (skg (node (id child) (repo main))) child
-      ** (skg (node (id independent) (repo main) (affectsParent false))) independent
+      ** (skg (node (id independent) (repo main) nonMember)) independent
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
       ** (skg subscribeeFolder)
@@ -115,7 +115,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       *** (skg (node (id e) (repo main))) e
       Subscribee body
       **** (skg (node (id visible) (repo main))) visible
-      **** (skg (node (id parked) (repo main) (affectsParent false))) parked
+      **** (skg (node (id parked) (repo main) nonMember)) parked
       **** (skg (node (id leaving) (repo main) (editRequest delete))) leaving
       "} );
   { let e : &FieldIntentsForOneId = entry (&collected, "e");

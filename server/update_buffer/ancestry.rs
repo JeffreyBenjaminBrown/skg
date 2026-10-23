@@ -221,7 +221,7 @@ pub fn deaden_generalized_orphan_folder (
 
 /// Dispose one direct child of a deadened orphan folder, by the one
 /// rule ('convert_unwarranted_child'):
-/// - a member (affectsParent=true Unrestricted) -> convert it: a
+/// - a member (an Unrestricted member) -> convert it: a
 ///   view-leaf to a dead viewnode, which the prune removes; a branch
 ///   to a write-protected non-member, so the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> leave it untouched: it is itself a
@@ -243,7 +243,7 @@ fn dispose_orphaned_folder_child (
     : (bool, bool, bool, bool) = {
     let c : NodeRef<Viewnode> = tree . get (child)
       . ok_or ("dispose_orphaned_folder_child: child not found") ?;
-    ( c . value () . is_unrestrictedVognode_and_affectsParent_true (),
+    ( c . value () . is_unrestrictedVognode_and_member (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
                  ViewnodeKind::Vognode (_) ),

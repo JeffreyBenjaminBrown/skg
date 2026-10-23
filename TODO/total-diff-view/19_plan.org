@@ -902,7 +902,7 @@ the new tests may copy from.
 One slice per headline, in order; each ends with its tests. The
 runner ('bash/run-plan-slices.sh') looks for DONE on these
 headlines.
-** TODO Slice 0: 'nonMember', and two small fixes
+** DONE Slice 0: 'nonMember', and two small fixes
 The atom, the two-valued type, the herald rule and the
 regenerated rules fixture, both clients' editors and member
 tests, the test literals by script, the docs; the cache's one

@@ -34,13 +34,13 @@
                             (match-string 0 text))))
         (unless root-line
           (fail "no view-root headline for child; buffer:\n%s" text))
-        (when (string-match-p "(affectsParent false)" root-line)
+        (when (string-match-p "nonMember" root-line)
           (fail "contained view-root should be content, not false; line: %S"
                 root-line))
-        (when (string-match-p "(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" root-line)
+        (when (string-match-p "nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" root-line)
           (fail "contained view-root should be content, not content; line: %S"
                 root-line))
-        (when (string-match-p "(affectsParent false) writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" root-line)
+        (when (string-match-p "nonMember writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
       (let ((line (and (string-match
@@ -48,8 +48,8 @@
                        (match-string 0 text))))
         (unless line
           (fail "no level-2 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "(affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
-          (fail "parent is not (affectsParent false) (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); line: %S" line))
+        (unless (string-match-p "nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
+          (fail "parent is not nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); line: %S" line))
         (unless (string-match-p " writeProtected\\b" line)
           (fail "parent is not writeProtected; line: %S" line))))))
 

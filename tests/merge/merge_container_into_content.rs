@@ -201,17 +201,17 @@ async fn merge_container_into_content_impl (
       failures . push (
         "b does not appear as a child of aa"
         . to_string() );
-    } else if b_under_aa . unwrap() . contains ("affectsParent") {
+    } else if b_under_aa . unwrap() . contains ("nonMember") {
       failures . push (
-        "b under aa is marked affectsParent=false"
+        "b under aa is marked nonMember"
         . to_string() ); }
     if c_under_aa . is_none() {
       failures . push (
         "c does not appear as a child of aa"
         . to_string() );
-    } else if c_under_aa . unwrap() . contains ("affectsParent") {
+    } else if c_under_aa . unwrap() . contains ("nonMember") {
       failures . push (
-        "c under aa is marked affectsParent=false"
+        "c under aa is marked nonMember"
         . to_string() ); }
 
     // Text preserver should appear under aa.

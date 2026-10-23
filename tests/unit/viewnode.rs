@@ -33,7 +33,7 @@ fn partnerFolder_policy_mapping () {
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut restriction : Viewnode = mk_viewnode (
     ID::from ("unrestricted"), SkgrepoName::from ("public"), "unrestricted" . into (),
-    AffectsParent::True, Birth::Unremarkable,
+    Membership::Member, Birth::Unremarkable,
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
@@ -95,12 +95,12 @@ fn writeProtect_requests_round_trip () {
 
 // 'write_protect' discards the body and edit request and drops the
 // editable-view request, and touches nothing else: not the other view
-// requests, not 'affectsParent', not 'birth'.
+// requests, not 'membership', not 'birth'.
 #[test]
 fn write_protect_drops_the_editable_request_and_keeps_membership_and_birth () {
   let mut viewnode : Viewnode = mk_viewnode (
     ID::from ("node"), SkgrepoName::from ("public"), "node" . into (),
-    AffectsParent::True, Birth::RoleGraft (RelationRole::CONTAINER),
+    Membership::Member, Birth::RoleGraft (RelationRole::CONTAINER),
     Editability::Editable {
       body : Some ("body" . into ()),
       edit_request : Some (NodeEditRequest::Delete) },
@@ -111,7 +111,7 @@ fn write_protect_drops_the_editable_request_and_keeps_membership_and_birth () {
   assert_eq! (t . editability, Editability::WriteProtected);
   assert_eq! ( t . view_requests,
                [ ViewRequest::Flags ] . into_iter () . collect () );
-  assert_eq! (t . affectsParent, AffectsParent::True);
+  assert_eq! (t . membership, Membership::Member);
   assert_eq! (t . birth, Birth::RoleGraft (RelationRole::CONTAINER)); }
 
 // 'editable_occurrences' collects the IDs of the editable unrestricted
@@ -134,7 +134,7 @@ fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
   tree . get_mut (root) . unwrap () . append (editable ("member"));
   tree . get_mut (root) . unwrap () . append ( mk_writeProtected_viewnode (
     ID::from ("protected"), SkgrepoName::from ("public"), "protected" . into (),
-    AffectsParent::True ));
+    Membership::Member ));
   tree . get_mut (root) . unwrap () . append ( mk_unknown_viewnode (ID::from ("unknown")) );
   assert_eq! ( editable_occurrences (&viewforest),
                [ "root", "in-folder", "member" ] . into_iter ()
@@ -162,7 +162,7 @@ fn every_kind_prints_its_vid_last_and_parses_it_back () {
     mk_editable_viewnode ( ID::from ("n"), SkgrepoName::from ("main"),
                            "n" . into (), None ),
     mk_writeProtected_viewnode ( ID::from ("w"), SkgrepoName::from ("main"),
-                                 "w" . into (), AffectsParent::False ),
+                                 "w" . into (), Membership::NonMember ),
     mk_unknown_viewnode (ID::from ("u")),
     mk_restricted_viewnode (),
     viewnode_of (ViewnodeKind::DeadViewnode),

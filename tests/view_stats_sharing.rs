@@ -163,9 +163,9 @@ async fn sharing_view_stats_appear_and_roundtrip (
         multi_root_view (
           config, Some (tantivy),
           &[ ID ("R" . to_string ()) ] ) ?;
-      let folder_request : String = initial . replace (
-        "(affectsParent na)",
-        "(affectsParent na) (viewRequests (folder overrides))" );
+      let folder_request : String = initial . replacen (
+        "(node ",
+        "(node (viewRequests (folder overrides))", 1 );
       let de_novo : String =
         save_and_rerender (&folder_request, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&de_novo, "de novo");

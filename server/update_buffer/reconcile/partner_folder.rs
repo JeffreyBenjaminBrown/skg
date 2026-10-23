@@ -38,9 +38,9 @@ pub enum PartnerFolderGoalSource<'a> {
 /// from a node in the viewforest with the current in-Rust graph snapshot's data
 /// about that node, or with a graph straddle's ('goal_source';
 /// 'diff_view/partner_folders.rs').
-/// Makes the folder's UnrestrictedVognode children marked affectsParent=true match a goal list,
+/// Makes the folder's UnrestrictedVognode children that are members match a goal list,
 /// preserving reusable children and creating missing ones,
-/// then makes stale children marked affectsParent=true non-members ('affectsParent=false').
+/// then makes stale member children non-members ('nonMember').
 pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,

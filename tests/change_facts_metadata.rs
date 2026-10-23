@@ -15,7 +15,7 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  AffectsParent, ChangeFacts, DiffChange, Existence, LeavesFact, Phantom,
+  Membership, ChangeFacts, DiffChange, Existence, LeavesFact, Phantom,
   PhantomDeleted, PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
   PartnerFolder, ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
@@ -85,7 +85,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
     with_facts (
       mk_writeProtected_viewnode (
         ID::from ("b"), SkgrepoName::from ("main"), "B" . into (),
-        AffectsParent::True ),
+        Membership::Member ),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       request (false, &[DiffObject::Rel]) ),
     "(node (id b) (repo main) writeProtected (diff (rel added) (ready) (unreadyRequest rel)))" );
@@ -95,7 +95,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
     with_facts (
       mk_writeProtected_viewnode (
         ID::from ("m"), SkgrepoName::from ("main"), "M" . into (),
-        AffectsParent::True ),
+        Membership::Member ),
       modified ( Some (Existence::Added),
                  Some (&[DiffObject::Rel, DiffObject::All]) ),
       request (false, &[DiffObject::Rel, DiffObject::All]) ),
@@ -280,7 +280,7 @@ fn a_folder_is_ready_when_each_changed_membership_is () {
   let member = |id : &str| -> Viewnode {
     mk_writeProtected_viewnode (
       ID::from (id), SkgrepoName::from ("main"), id . into (),
-      AffectsParent::True ) };
+      Membership::Member ) };
   let rel_ready : Viewnode = with_facts (
     member ("ready"), rel_leaf ( Some (&[DiffObject::Rel]) ), None );
   let rel_unready : Viewnode = with_facts (

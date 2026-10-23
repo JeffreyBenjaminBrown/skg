@@ -56,7 +56,7 @@ fn write_protecting_at (
         line . replacen ( "(repo main) ", "(repo main) writeProtected ", 1 ) }
       else if in_subtree && stars == child_depth
               && line . contains ("(skg (node ")
-      { line . replacen ( "(repo main) ", "(repo main) (affectsParent false) ", 1 ) }
+      { line . replacen ( "(repo main) ", "(repo main) nonMember ", 1 ) }
       else { line . to_string () } } )
     . collect ();
   assert! ( found, "no editable {} at depth {:?}:\n{}", node, depth, buffer );
@@ -155,7 +155,7 @@ fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
     assert! ( the_registered_viewforest (f) == registered,
               "a refused save leaves the registered viewforest alone" );
     let response : SaveResponse = save (
-      f, &typing ("*** (skg (node (affectsParent false))) typed child") ) ?;
+      f, &typing ("*** (skg (node nonMember)) typed child") ) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 
@@ -282,9 +282,9 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
     for child in ["a", "b", "c"] {
       let lines : Vec<String> = at_depth (&moved, "***", child);
       assert! ( lines . len () == 2
-                && lines [0] . contains ("(affectsParent false)")
+                && lines [0] . contains ("nonMember")
                 && lines [0] . contains ("writeProtected")
-                && ! lines [1] . contains ("affectsParent"),
+                && ! lines [1] . contains ("nonMember"),
                 "{} must be shown once under each n:\n{}", child, moved ); }
     assert! ( at_depth (&moved, "***", "c") [0] . contains ("(diff "),
               "c keeps its change facts under x:\n{}", moved );
@@ -299,7 +299,7 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
     for child in ["a", "b", "c"] {
       let lines : Vec<String> = at_depth (&moved_back, "***", child);
       assert! ( lines . len () == 2
-                && ! lines [0] . contains ("affectsParent"),
+                && ! lines [0] . contains ("nonMember"),
                 "{} must be n's member under x again:\n{}", child, moved_back ); }
     Ok (( )) }) }
 
@@ -326,7 +326,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
               && s1_and_folder [1] == "** (skg (subscriberFolder changed))"
               && s1_and_folder [2] . starts_with ("*** (skg (node (id sub) ")
               && s1_and_folder [2] . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub")
-              && s1_and_folder [2] . contains ("(affectsParent false)"),
+              && s1_and_folder [2] . contains ("nonMember"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
@@ -415,8 +415,8 @@ fn an_adopted_child_moves_into_content_order (
       . expect ("n is shown write-protected under y");
     let typed : String = buffer . replacen ( n_under_y_line, &format! (
       "{}\n{}\n{}", n_under_y_line,
-      "*** (skg folded (node (id b) (repo main) (affectsParent false) writeProtected)) b",
-      "*** (skg (node (id a) (repo main) (affectsParent false) writeProtected)) a" ), 1 );
+      "*** (skg folded (node (id b) (repo main) nonMember writeProtected)) b",
+      "*** (skg (node (id a) (repo main) nonMember writeProtected)) a" ), 1 );
     let response : SaveResponse =
       save ( f, &requesting_editable_at (&typed, N_UNDER_Y) ) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
@@ -432,7 +432,7 @@ fn an_adopted_child_moves_into_content_order (
               && ! under_y [0] . contains ("writeProtected")
               && under_y [1] . starts_with ("*** (skg (node (id a) ")
               && under_y [2] . starts_with ("*** (skg folded (node (id b) ")
-              && ! under_y [1 ..] . iter () . any ( |line| line . contains ("affectsParent") ),
+              && ! under_y [1 ..] . iter () . any ( |line| line . contains ("nonMember") ),
               "n under y must be editable, its members a then b, b folded:\n{}",
               saved );
     Ok (( )) }) }

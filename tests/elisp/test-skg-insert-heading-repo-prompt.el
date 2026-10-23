@@ -365,7 +365,7 @@ and shows the title under a `title' group."
                      (3 . "repo")
                      (4 . "only")
                      (3 . "writeProtected")
-                     (3 . "affectsParent")
+                     (3 . "nonMember")
                      (3 . "birth")
                      (3 . "editRequest")
                      (3 . "viewRequests"))))))

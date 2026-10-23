@@ -56,7 +56,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
                               "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_vids (&saved) . contains (
-      "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
+      "*** (skg (node (id s1) (repo public) nonMember writeProtected (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
       "the image under sub is ready:\n{}", saved );
     assert! ( without_vids (&saved) . lines () . any ( |line|
       line . starts_with ("*** (skg (node (id sub)")
@@ -78,7 +78,7 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let member : &str =
-      "*** (skg (node (id sub) (repo public) (affectsParent false) writeProtected";
+      "*** (skg (node (id sub) (repo public) nonMember writeProtected";
     let marked : String = edit_line (
       &buffer, member,
       |line| line . replace (
@@ -113,16 +113,16 @@ fn a_gesture_on_a_before_only_role_graft_marks_its_relationship (
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = edit_line (
       &buffer,
-      "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected",
+      "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected",
       |line| line . replace ( "(diff (rel removed) (leaves 1 rel)))) d",
                               "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) d" ));
     assert_ne! ( marked, buffer, "the graft shows its relationship removed:\n{}", buffer );
     let saved : String = without_vids (
       & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
     for (prefix, ending) in [
-      ( "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected",
+      ( "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected",
         "(diff (rel removed) (leaves 1 rel) (ready rel)))) d" ),
-      ( "** (skg (node (id c) (repo main) (affectsParent false)",
+      ( "** (skg (node (id c) (repo main) nonMember",
         "(diff (rel removed) (leaves 1 rel) (ready rel)))) c" ) ] {
       assert! ( saved . lines () . any ( |line|
                   line . starts_with (prefix) && line . ends_with (ending) ),

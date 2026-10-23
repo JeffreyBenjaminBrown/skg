@@ -120,7 +120,7 @@ fn a_content_change_tags_the_members_and_shows_the_removed_one (
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id ct)",
     "** (skg (changesetMarker content) (diff (leaves 2 all)))",
-    "** (skg (node (id k1) (repo public) (affectsParent false) (rels (contains (out 1))) (diff (rel removed) (leaves 1 rel)))) k1",
+    "** (skg (node (id k1) (repo public) nonMember (rels (contains (out 1))) (diff (rel removed) (leaves 1 rel)))) k1",
     "** (skg (node (id ctx) (repo public) writeProtected",
     "** (skg (node (id k2) (repo public)", "(diff (rel added) (leaves 1 rel)))) k2" ] );
   Ok (( )) }
@@ -135,9 +135,9 @@ fn a_node_its_only_container_dropped_is_editable_as_the_removed_member (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id ct)",
-    "** (skg (node (id k1) (repo public) (affectsParent false) (rels",
+    "** (skg (node (id k1) (repo public) nonMember (rels",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id ct) (repo public) (affectsParent false) writeProtected",
+    "**** (skg (node (id ct) (repo public) nonMember writeProtected",
     "*** (skg (node (id k1c) (repo public) writeProtected" ] );
   assert_eq! ( node_lines (&buffer, "k1") . len (), 1, "{}", buffer );
   Ok (( )) }
@@ -170,12 +170,12 @@ fn a_subscription_change_shows_on_both_sides (
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id sub)",
     "** (skg (subscribeeFolder changed))",
-    "*** (skg (node (id s1) (repo public) (affectsParent false) writeProtected (diff (rel removed) (leaves 1 rel)))) s1",
+    "*** (skg (node (id s1) (repo public) nonMember writeProtected (diff (rel removed) (leaves 1 rel)))) s1",
     "*** (skg (node (id s2)", "(diff (rel added) (leaves 1 rel)))) s2" ] );
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id s1)",
     "** (skg (subscriberFolder changed))",
-    "*** (skg (node (id sub) (repo public) (affectsParent false) writeProtected",
+    "*** (skg (node (id sub) (repo public) nonMember writeProtected",
     "(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub" ] );
   Ok (( )) }
 
@@ -268,10 +268,10 @@ fn removed_partners_buffer (
 fn a_removed_container_stands_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
-    "** (skg (node (id x) (repo main) (affectsParent false) (rels",
+    "** (skg (node (id x) (repo main) nonMember (rels",
     "*** (skg (containerFolder changed))",
     "**** (skg (node (id a) (repo main) writeProtected",
-    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected",
+    "**** (skg (node (id b) (repo main) nonMember writeProtected",
     "(diff (rel removed) (properties changed) (leaves 1 rel all)))) b",
     "**** (skg (node (id c) (repo main) writeProtected" ] );
   Ok (( )) }
@@ -288,16 +288,16 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
   let buffer : String = removed_partners_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id b)",
-    "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x",
+    "** (skg (node (id x) (repo main) nonMember (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x",
     "*** (skg (containerFolder changed))",
     "**** (skg (node (id a) (repo main) writeProtected",
-    "**** (skg (node (id b) (repo main) (affectsParent false) writeProtected",
+    "**** (skg (node (id b) (repo main) nonMember writeProtected",
     "**** (skg (node (id c) (repo main) writeProtected",
-    "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected",
-    "**** (skg (node (id e) (repo main) (affectsParent false) writeProtected",
+    "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected",
+    "**** (skg (node (id e) (repo main) nonMember writeProtected",
     "*** (skg (node (id xc) (repo main) writeProtected",
     "* (skg (node (id d)",
-    "** (skg (node (id c) (repo main) (affectsParent false) (rels",
+    "** (skg (node (id c) (repo main) nonMember (rels",
     "*** (skg (node (id x) (repo main) writeProtected" ] );
   let editable : Vec<String> = node_lines (&buffer, "x") . into_iter ()
     . filter ( |line| ! line . contains ("writeProtected") ) . collect ();
@@ -311,9 +311,9 @@ fn a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
     "* (skg (node (id b)",
-    "** (skg (node (id x) (repo main) (affectsParent false) (rels",
+    "** (skg (node (id x) (repo main) nonMember (rels",
     "* (skg (node (id e)",
-    "** (skg (node (id x) (repo main) (affectsParent false) writeProtected (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x\n* " ] );
+    "** (skg (node (id x) (repo main) nonMember writeProtected (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x\n* " ] );
   Ok (( )) }
 
 /// The role graft d under c in x's container folder, from a
@@ -324,7 +324,7 @@ fn a_role_graft_under_an_editable_removed_member_keeps_its_birth_through_a_save 
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let graft : &str =
-      "***** (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected";
+      "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_eq! ( buffer . matches (graft) . count (), 1, "{}", buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;
@@ -332,7 +332,7 @@ fn a_role_graft_under_an_editable_removed_member_keeps_its_birth_through_a_save 
     for view in [ &saved, &again ] {
       assert_eq! ( view . matches (graft) . count (), 1, "{}", view );
       assert_lines_in_order ( view, &[
-        "** (skg (node (id x) (repo main) (affectsParent false)",
+        "** (skg (node (id x) (repo main) nonMember",
         "**** (skg (node (id c) (repo main) writeProtected",
         graft ] ); }
     Ok (( )) }) }
@@ -345,7 +345,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let x_line : &str =
-      "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x\n";
+      "** (skg (node (id x) (repo main) nonMember (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x\n";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_vids (&buffer) . contains (x_line), "{}", buffer );
     let retitled : String = edit_line (
@@ -358,7 +358,7 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
                  "x, retitled" );
     assert_lines_in_order ( &saved, &[
       "* (skg (node (id b)",
-      "** (skg (node (id x) (repo main) (affectsParent false) (rels (contains (in 2) (out 1))) (diff (rel removed) (properties changed)",
+      "** (skg (node (id x) (repo main) nonMember (rels (contains (in 2) (out 1))) (diff (rel removed) (properties changed)",
       "x, retitled\n",
       "*** (skg (oldText title)" ] );
     let editable : Vec<String> = node_lines (&saved, "x") . into_iter ()
@@ -375,7 +375,7 @@ fn a_removed_subscribee_is_shown_where_it_stood (
     "* (skg (node (id s)",
     "** (skg (subscribeeFolder changed))",
     "*** (skg (node (id s1) (repo main) writeProtected",
-    "*** (skg (node (id s2) (repo main) (affectsParent false) writeProtected (diff (rel removed) (leaves 1 rel)))) s2",
+    "*** (skg (node (id s2) (repo main) nonMember writeProtected (diff (rel removed) (leaves 1 rel)))) s2",
     "*** (skg (node (id s3) (repo main) writeProtected" ] );
   Ok (( )) }
 
@@ -399,6 +399,6 @@ fn a_historical_phantoms_old_content_is_shown_as_removed_members (
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg (historical (id h) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel)))) h",
-    "*** (skg (node (id m) (repo main) (affectsParent false) (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled",
+    "*** (skg (node (id m) (repo main) nonMember (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled",
     "**** (skg (oldText title) (diff (leaves 1))) m" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

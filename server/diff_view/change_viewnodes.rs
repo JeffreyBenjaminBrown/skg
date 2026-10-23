@@ -11,7 +11,7 @@ use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
+  Membership, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
   Editability, PartnerFolder, Phantom, PhantomHistorical, Property,
   Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
@@ -191,7 +191,7 @@ pub fn mk_removed_member_viewnode (
   let node : &GraphnodeInRust = straddle . after . get (pid) ?;
   let mut member : Viewnode = mk_viewnode (
     pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
-    AffectsParent::False, Birth::Unremarkable,
+    Membership::NonMember, Birth::Unremarkable,
     if u . contains (pid) {
       Editability::Editable { body : node . body . clone (), edit_request : None } }
     else { Editability::WriteProtected },
@@ -211,7 +211,7 @@ fn mk_member_viewnode (
   let mut viewnode : Viewnode = match straddle . after . get (pid) {
     Some (node) => mk_writeProtected_viewnode (
       pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
-      AffectsParent::True ),
+      Membership::Member ),
     None => mk_unknown_viewnode ( pid . clone () ), };
   viewnode . change_facts . change = DiffChange { rel, .. DiffChange::default () };
   viewnode }

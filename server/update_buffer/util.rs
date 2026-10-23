@@ -1,6 +1,6 @@
 use crate::to_org::util::make_member_children_nonMembers;
 use crate::types::viewnode::{
-  AffectsParent, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
+  Membership, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 use crate::types::tree::moves::{
   move_to_last_child, place_created_children_after_their_model_predecessors};
@@ -193,7 +193,7 @@ pub fn convert_unwarranted_child (
     let viewnode : &mut Viewnode = node_mut . value ();
     match &mut viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if ! is_leaf => {
-        t . affectsParent = AffectsParent::False;
+        t . membership = Membership::NonMember;
         t . write_protect ();
         viewnode . change_facts      = ChangeFacts::default ();
         viewnode . readiness_request = None;

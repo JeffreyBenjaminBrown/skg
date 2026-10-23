@@ -5,8 +5,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_uninterpreted_nodes,
   org_to_uninterpreted_viewforest};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
-  add_missing_info_to_viewforest,
-  na_affectsParent_under_visible_parent_becomes_isContainer};
+  add_missing_info_to_viewforest};
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::types::errors::BufferValidationError;
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees};
@@ -16,7 +15,7 @@ use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_skgids};
-use skg::types::viewnode::AffectsParent;
+use skg::types::viewnode::Membership;
 
 use ego_tree::Tree;
 
@@ -55,15 +54,15 @@ fn all_tests
       Ok (( )) } )) }
 
 /// The 'new note' headline of 'viewforest': its skgrepo and its
-/// 'affectsParent'.
-fn new_note_skgrepo_and_affectsParent (
+/// membership.
+fn new_note_skgrepo_and_membership (
   viewforest : &MpViewForest,
-) -> (Option<SkgrepoName>, AffectsParent) {
+) -> (Option<SkgrepoName>, Membership) {
   viewforest . nodes ()
     . find_map ( |node_ref| match &node_ref . value () . kind {
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
           if t . title == "new note"
-          => Some (( t . home_skgrepo . clone (), t . affectsParent )),
+          => Some (( t . home_skgrepo . clone (), t . membership )),
         _ => None } )
     . expect ("the new note should be in the forest") }
 
@@ -77,34 +76,34 @@ fn new_note_skgrepo_and_affectsParent (
 async fn test_new_headline_inherits_through_phantoms_and_folders (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  for (input, expected_skgrepo, expected_affectsParent) in [
+  for (input, expected_skgrepo, expected_membership) in [
     ( // Under a historical phantom under an editable node.
       indoc! {"
         * (skg (node (id editable) (repo alt))) editable
         ** (skg (historical (id gone) (repo main) (diff (node removed) (rel removed)))) gone
         *** new note
-      "}, "alt", AffectsParent::True ),
+      "}, "alt", Membership::Member ),
     ( // In a partner folder of an editable node, as a non-member.
       indoc! {"
         * (skg (node (id editable) (repo alt))) editable
         ** (skg containerFolder)
-        *** (skg (node (affectsParent false))) new note
-      "}, "alt", AffectsParent::False ),
+        *** (skg (node nonMember)) new note
+      "}, "alt", Membership::NonMember ),
     ( // In a partner folder under a write-protected occurrence whose
       // shown skgrepo is stale: the graph says 'main'.
       indoc! {"
         * (skg (node (id other) (repo alt))) other
         ** (skg (node (id root) (repo stale) writeProtected)) root again
         *** (skg containerFolder)
-        **** (skg (node (affectsParent false))) new note
-      "}, "main", AffectsParent::False ), ] {
+        **** (skg (node nonMember)) new note
+      "}, "main", Membership::NonMember ), ] {
     let mut viewforest : MpViewForest =
       org_to_uninterpreted_viewforest (input) . unwrap() . 0;
     add_missing_info_to_viewforest (
       &mut viewforest, &config) ?;
-    assert_eq! ( new_note_skgrepo_and_affectsParent (&viewforest),
+    assert_eq! ( new_note_skgrepo_and_membership (&viewforest),
                  ( Some (SkgrepoName::from (expected_skgrepo)),
-                   expected_affectsParent ),
+                   expected_membership ),
                  "new note, in:\n{}", input ); }
   Ok (( )) }
 
@@ -117,7 +116,7 @@ async fn test_new_headline_at_top_level_is_refused (
     org_to_uninterpreted_viewforest ("* new note\n") . unwrap() . 0;
   add_missing_info_to_viewforest (
     &mut viewforest, &config) ?;
-  assert_eq! ( new_note_skgrepo_and_affectsParent (&viewforest) . 0,
+  assert_eq! ( new_note_skgrepo_and_membership (&viewforest) . 0,
                None );
   let errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (&viewforest, config) ?;
@@ -271,36 +270,6 @@ async fn test_add_missing_info_logic (
     ); }
 
   Ok (( )) }
-
-#[test]
-fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
-  let input : &str =
-    indoc! {"
-            * (skg (node (id root) (repo main) (affectsParent na))) root
-            ** (skg (node (id moved) (repo main) (affectsParent na))) moved
-        "};
-  let mut viewforest : MpViewForest =
-    org_to_uninterpreted_viewforest (input) . unwrap() . 0;
-
-  na_affectsParent_under_visible_parent_becomes_isContainer (
-    &mut viewforest );
-
-  let root_node =
-    viewforest . root() . first_child() . unwrap();
-  let moved_node =
-    root_node . first_child() . unwrap();
-
-  match &root_node . value() . kind {
-    MpViewnodeKind::Vognode (
-      MpVognode::Unrestricted (t)) =>
-      assert_eq! (t . affectsParent, AffectsParent::NA),
-    _ => panic! ("expected root UnrestrictedVognode") }
-  match &moved_node . value() . kind {
-    MpViewnodeKind::Vognode (
-      MpVognode::Unrestricted (t)) =>
-      assert_eq! (t . affectsParent, AffectsParent::True),
-    _ => panic! ("expected moved UnrestrictedVognode") }
-}
 
 async fn test_skgrepo_inheritance_multi_level (
   config : &SkgConfig,

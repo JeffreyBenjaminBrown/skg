@@ -29,17 +29,17 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 const X_REMOVED_FROM_B : &str =
-  "** (skg (node (id x) (repo main) (affectsParent false) (rels";
+  "** (skg (node (id x) (repo main) nonMember (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg (node (id d) (repo main) (affectsParent false) writeProtected (viewStats cycle)";
+  "**** (skg (node (id d) (repo main) nonMember writeProtected (viewStats cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
-  "*** (skg (node (id s) (repo main) (affectsParent false) writeProtected";
+  "*** (skg (node (id s) (repo main) nonMember writeProtected";
 const G_UNDER_Q : &str =
   "** (skg (historical (id g)";
 const GC_UNDER_G : &str =
-  "*** (skg (node (id gc) (repo main) (affectsParent false) writeProtected";
+  "*** (skg (node (id gc) (repo main) nonMember writeProtected";
 const GC_REMOVED_FROM_R : &str =
-  "** (skg (node (id gc) (repo main) (affectsParent false) (diff";
+  "** (skg (node (id gc) (repo main) nonMember (diff";
 
 /// g's file at HEAD, as the save writes a node.
 const G_AT_HEAD : &str =
@@ -92,7 +92,7 @@ fn restoring_a_removed_content_member () -> Result<(), Box<dyn Error>> {
               "the request is consumed:\n{}", response . saved_view );
     assert_lines_in_order ( &response . saved_view, &[
       // b no longer differs from HEAD, and x is its member again
-      "* (skg (node (id b) (repo main) (affectsParent na) (rels (contains (out 1))))) b",
+      "* (skg (node (id b) (repo main) (rels (contains (out 1))))) b",
       "** (skg (node (id x) (repo main) (rels (contains (in 3 (ancestors 1)) (out 1)) (birth (contains in 1))))) x" ] );
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }

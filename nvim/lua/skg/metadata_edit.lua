@@ -180,10 +180,8 @@ end
 ---@param field_value string
 ---@return string[]|nil
 function M.cycle_values_for_field (field_name, field_value)
-  if field_name == 'writeProtected' then
+  if field_name == 'writeProtected' or field_name == 'nonMember' then
     return { 'false (default)', 'true' } end
-  if field_name == 'affectsParent' then
-    return { 'true (default)', 'false', 'na' } end
   if field_name == 'editRequest' then
     return M.edit_request_cycle_values() end
   if field_name == 'repo' then

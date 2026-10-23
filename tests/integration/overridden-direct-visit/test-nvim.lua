@@ -33,7 +33,7 @@ T.check(raw_buf, 'ordinary visit did not open a raw view of Z')
 local raw_content = T.buffer_text(raw_buf)
 T.check(raw_content:find('cooking', 1, true),
         "raw view lacks Z's title")
-T.check(not raw_content:match('\n%*%* %(skg %(node %(id R%).-affectsParent false'),
+T.check(not raw_content:match('\n%*%* %(skg %(node %(id R%).-nonMember'),
         'ordinary visit injected overrider R as an independent sibling')
 print('ordinary visit opened raw Z without an overrider sibling')
 

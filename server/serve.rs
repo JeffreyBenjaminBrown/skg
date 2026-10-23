@@ -45,7 +45,7 @@ use crate::serve::handlers::diff_view::handle_diffView_request;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
-use crate::to_org::util::mark_view_roots_parent_na;
+use crate::to_org::util::mark_view_roots_as_members;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -423,7 +423,7 @@ fn enrich_search_buffer_snapshot (
       &runtime . graph,
       &payload . graphnodestats,
       &runtime . config ); }
-  mark_view_roots_parent_na (
+  mark_view_roots_as_members (
     &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,

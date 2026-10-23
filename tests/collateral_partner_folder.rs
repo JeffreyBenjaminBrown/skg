@@ -97,9 +97,9 @@ fn collateral_partner_folder_update_and_warning_scoping
       let (n_view, _n_pids, _n_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("N") ) ?;
-      let n_folder_request : String = n_view . replace (
-        "(affectsParent na)",
-        "(affectsParent na) (viewRequests (folder subscribesTo))" );
+      let n_folder_request : String = n_view . replacen (
+        "(node ",
+        "(node (viewRequests (folder subscribesTo))", 1 );
       let (n_response, initial_collateral) =
         save_and_read_collateral (
           &n_folder_request, &n_view_id, config, tantivy, &graph,

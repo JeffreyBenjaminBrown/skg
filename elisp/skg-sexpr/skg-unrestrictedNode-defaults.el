@@ -19,16 +19,21 @@
 
 (defconst skg-unrestrictedNode--canonical-field-order
   '("id" "repo"
-    "writeProtected" "affectsParent" "birth" "editRequest" "viewRequests")
+    "writeProtected" "nonMember" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-unrestrictedNode--editable-defaults
   '(("writeProtected"  . "false (default)")
-    ("affectsParent"      . "true (default)")
+    ("nonMember"       . "false (default)")
     ("birth"         . "unremarkable (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
   "Alist of editable field names to their default value text.")
+
+(defconst skg-unrestrictedNode--bare-boolean-fields
+  '("writeProtected" "nonMember")
+  "Fields that are bare atoms: present means true, absent false.
+Each is shown with a 'true' or 'false (default)' child while edited.")
 
 ;;
 ;; Predicate
@@ -207,7 +212,7 @@ Returns the group, possibly with a value child added or modified."
   (cond
    ;; Bare boolean atom: fill in a 'true' child
    ((and (= (length group) 1)
-         (string= field-name "writeProtected"))
+         (member field-name skg-unrestrictedNode--bare-boolean-fields))
     (list (car group)
           (cons (1+ child-level) "true")))
    ;; Repo field: mark with (default) if it matches
@@ -280,7 +285,7 @@ CHILD-LEVEL is the level of the field headline."
          (when (> (length group) 1)
            (string-trim (cdr (nth 1 group))))))
     (cond
-     ((string= field-name "writeProtected") ;; Boolean field
+     ((member field-name skg-unrestrictedNode--bare-boolean-fields)
       (cond
        ((or (null value-text)
             (skg-unrestrictedNode--default-false-p value-text))
@@ -288,12 +293,6 @@ CHILD-LEVEL is the level of the field headline."
        ((string= value-text "true")
         ;; Collapse to bare atom (no children)
         (list (cons child-level field-name)))
-       (t group)))
-     ((string= field-name "affectsParent")
-      (cond
-       ((or (null value-text)
-            (skg-unrestrictedNode--default-content-p value-text))
-        nil) ;; remove: at default (content)
        (t group)))
      ((string= field-name "birth")
       (cond
@@ -351,12 +350,6 @@ CHILD-LEVEL is the level of the field headline."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "false (default)")
         (string= trimmed "false"))))
-
-(defun skg-unrestrictedNode--default-content-p (text)
-  "Return non-nil if TEXT represents the default 'true' value."
-  (let ((trimmed (string-trim text)))
-    (or (string= trimmed "true (default)")
-        (string= trimmed "true"))))
 
 (defun skg-unrestrictedNode--default-birth-p (text)
   "Return non-nil if TEXT represents the default birth value."

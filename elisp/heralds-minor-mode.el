@@ -51,8 +51,8 @@ directives, ANY/IT, ABUT, and INTERC are documented there. The rule
 patterns the table uses are documented on `herald_rule_table` in
 server/heralds.rs.
 
-No client-side normalisation is needed: omitted affectsParent=true
-content carries no affectsParent herald of its own. Its relationship
+No client-side normalisation is needed: a member carries no
+membership atom and so no membership herald of its own. Its relationship
 and birth facts arrive in `(rels ...)'.")
 
 (defun heralds-install-rules (rules)
@@ -70,7 +70,7 @@ Tokens carry `skg-style' on character ranges (single-style tokens
 propertize the whole string; INTERC-built tokens carry per-segment
 styles). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
-with no separator (used to glue e.g. ☮ onto its affectsParent character).
+with no separator (used to glue e.g. ☮ onto its nonMember character).
 Structural colons added by the transform (like `3:{' -> `3{') are
 stripped when either side is non-alphanumeric."
   (when tokens
@@ -501,8 +501,8 @@ space-separated."
 
 (defun heralds--read-metadata (metadata-sexp)
   "Read METADATA-SEXP string into a Lisp object.
-Returns nil if parsing fails. Omitted affectsParent=true membership
-has no affectsParent herald of its own; relationship and birth facts
+Returns nil if parsing fails. A member carries no membership atom
+and so no membership herald of its own; relationship and birth facts
 are rendered from `(rels ...)'."
   (condition-case nil
       (car (read-from-string metadata-sexp))

@@ -11,7 +11,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
+  Membership, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_writeProtected_viewnode_with_birth, viewnode_of};
@@ -153,12 +153,12 @@ fn the_acquisition_folders_round_trip () {
 fn a_role_graft_round_trips_with_its_birth () {
   for (role, expected) in [
     ( RelationRole::CONTAINER,
-      "(node (id g) (repo main) (affectsParent false) (birth roleGraft container) writeProtected)" ),
+      "(node (id g) (repo main) nonMember (birth roleGraft container) writeProtected)" ),
     ( RelationRole::SUBSCRIBEE,
-      "(node (id g) (repo main) (affectsParent false) (birth roleGraft subscribee) writeProtected)" ), ] {
+      "(node (id g) (repo main) nonMember (birth roleGraft subscribee) writeProtected)" ), ] {
     let graft : Viewnode = mk_writeProtected_viewnode_with_birth (
       ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
-      AffectsParent::False, Birth::RoleGraft (role) );
+      Membership::NonMember, Birth::RoleGraft (role) );
     assert_round_trip (graft, expected); }}
 
 #[test]
@@ -216,12 +216,12 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (), None );
   let mut write_protected : Viewnode = mk_writeProtected_viewnode_with_birth (
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (),
-    AffectsParent::False, Birth::Unremarkable );
+    Membership::NonMember, Birth::Unremarkable );
   for (node, expected) in [
     ( &mut editable,
       "(node (id x) (repo main) (editRequest restoreRel) (diff (rel removed)))" ),
     ( &mut write_protected,
-      "(node (id x) (repo main) (affectsParent false) writeProtected (editRequest restoreRel) (diff (rel removed)))" ), ] {
+      "(node (id x) (repo main) nonMember writeProtected (editRequest restoreRel) (diff (rel removed)))" ), ] {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut node . kind
     { t . restoreRel_request = true; }
     assert_round_trip (

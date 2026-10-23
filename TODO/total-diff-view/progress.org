@@ -3717,3 +3717,56 @@ intended and are listed, not removed.
 nextest 908 passed. The three save-lock integration files changed
 only in their header comments and pass a syntax check; the Emacs,
 Neovim and integration suites were not run.
+* Folders, retention, and the two records
+** Slice 0: deviations
+*** the type and its field
+'AffectsParent' is 'Membership { Member, NonMember }', and the
+field 'affectsParent' is 'membership', by script
+('tests/results/plan19-slice0/rename_membership_type.py').
+Names that embedded a retired value were renamed with it:
+'is_unrestrictedVognode_and_member',
+'mark_view_roots_as_members', 'membership_emitted_atoms',
+and the clients' member tests 'skg--node-member-p' and
+'node_member_p'.
+**** a name kept for later slices
+'validate_affectsParent_relationships' (and its
+'_in_straddle' twin and test module) keeps its name: slice 7
+cites it as the birth check. Slice 12 decides.
+*** roots are marked members
+'mark_view_roots_parent_na' became 'mark_view_roots_as_members'
+rather than going: it makes every root a member, so a
+non-member the user promotes to a root prints nothing.
+*** the editors show 'nonMember' as 'writeProtected' is shown
+Both editors list 'nonMember' among the fields, filled in as
+"false (default)" or "true" and cycled between the two; the
+strip drops "false" and collapses "true" to the bare atom, as
+for 'writeProtected'. A field must be shown to be added, since
+the cycler never adds one; this is the reading taken of "a bare
+atom to add or remove, with no default to strip".
+*** the herald style key
+'node_heralds' keys the ⊥ rule 'nonMember', not
+'affectsParent_false'; the rule is a plain leaf on the bare
+atom.
+*** two tests removed with the behavior they tested
+'test_na_affectsParent_under_visible_parent_becomes_isContainer'
+and 'absent_under_visible_parent_becomes_container' tested the
+rewrite of 'na' under a parent, which went with 'NA'.
+*** tests that found the root by its 'na'
+Nine Rust tests inserted a view request after
+'(affectsParent na)', the root's mark. They now insert it
+after the buffer's first '(node ', the root's form ('replacen'
+once). The two save_collateral integration tests classify a
+headline as 'member', 'nonMember' or a role name, where they
+said 'na', 'true' and 'false'.
+*** the literal counts
+The literal script
+('tests/results/plan19-slice0/convert_nonMember_literals.py')
+converted 194 '(affectsParent false)' and 98 '(affectsParent
+na)' under 'server/', 'tests/', 'elisp/' and 'nvim/', which is
+more than the plan's 165 and 89 because it also covered source
+files and fixtures. The few '(affectsParent true)', in a doc
+and a comment, were edited by hand.
+*** the cache
+'GitSnapshotCache' holds one key and its snapshot; its unit
+test ('tests/unit/git_snapshot_cache.rs') exercises the struct,
+not the process-wide static.

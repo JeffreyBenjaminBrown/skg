@@ -746,7 +746,7 @@ When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) applies
 the edited tree back into the source headline; ':bd!' cancels;
-S-Left / S-Right cycle a field's value (writeProtected, affectsParent,
+S-Left / S-Right cycle a field's value (writeProtected, nonMember,
 editRequest, skgrepo, ...).
 It's easy to edit this way.
 Note that some properties don't make sense to edit,

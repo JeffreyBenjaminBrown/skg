@@ -21,7 +21,7 @@ use std::error::Error;
 
 const MEMBER_A : &str = "**** (skg (node (id a) (repo main) writeProtected";
 const GRAFT_P  : &str =
-  "***** (skg (node (id p) (repo main) (affectsParent false) (birth roleGraft container) writeProtected";
+  "***** (skg (node (id p) (repo main) nonMember (birth roleGraft container) writeProtected";
 
 /// A note under a member of a changed container folder survives, and
 /// the member's role tree is still shown around it, once.
@@ -48,7 +48,7 @@ fn a_note_under_a_historical_phantom_survives (
   with_fixture ("users_notes", &["main"], |f| {
     let phantom : &str = "** (skg (historical (id h)";
     let old_member : &str =
-      "*** (skg (node (id m) (repo main) (affectsParent false) (diff (rel removed)";
+      "*** (skg (node (id m) (repo main) nonMember (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;
@@ -85,7 +85,7 @@ fn a_note_in_the_acquired_folder_survives (
 fn a_note_under_a_removed_member_survives_it_going_stale (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let removed : &str = "** (skg (node (id x) (repo main) (affectsParent false) ";
+    let removed : &str = "** (skg (node (id x) (repo main) nonMember ";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, removed, &note (3, "a note under x") )) ?;

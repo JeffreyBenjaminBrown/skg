@@ -144,7 +144,7 @@ fn the_line_after (
     . unwrap_or_default () }
 
 fn is_parked (line : &str) -> bool {
-  line . contains ("(affectsParent false)") && line . contains ("writeProtected") }
+  line . contains ("nonMember") && line . contains ("writeProtected") }
 
 /// k loses l (a leaf) and m (which holds mc), saved from a second view
 /// of k. The first view's rerender drops l and keeps m as a
@@ -176,7 +176,7 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
     "the stale leaf is gone:\n{}", first_view );
   assert! ( is_parked ( &the_line (first_view, "** ", "(id m)") ),
     "the stale branch is a write-protected non-member:\n{}", first_view );
-  assert! ( the_line (first_view, "*** ", "(id mc)") . contains ("(affectsParent false)"),
+  assert! ( the_line (first_view, "*** ", "(id mc)") . contains ("nonMember"),
     "a write-protected occurrence holds no member:\n{}", first_view );
   save_view ( first_view, &first_view_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
@@ -198,8 +198,8 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
   let (x_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("x")) ?;
   let (x_view, _) : (String, Vec<String>) = save_view (
     &x_view . replacen (
-      "(affectsParent na)",
-      "(affectsParent na) (viewRequests (folder containers))", 1 ),
+      "(node ",
+      "(node (viewRequests (folder containers))", 1 ),
     &x_view_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let with_note : String = {
     let member_b : String = x_view . lines ()
@@ -208,7 +208,7 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
       . to_string ();
     x_view . replacen (
       &member_b,
-      &format! ( "{}\n**** (skg (node (affectsParent false))) a note under b", member_b ),
+      &format! ( "{}\n**** (skg (node nonMember)) a note under b", member_b ),
       1 ) };
   save_view ( &with_note, &x_view_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
@@ -232,7 +232,7 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
   let member_b : String = the_line (x_after_return, "*** ", "(id b)");
-  assert! ( ! member_b . contains ("(affectsParent false)"),
+  assert! ( ! member_b . contains ("nonMember"),
     "the parked b is the member again, and the only b in the folder:\n{}",
     x_after_return );
   assert! ( the_line_after (x_after_return, "*** ", "(id b)") . contains ("a note under b"),
@@ -280,7 +280,7 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
   assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
   assert! ( is_parked (&e_lines [0]),
     "the write-protected copy is parked:\n{}", view );
-  assert! ( ! e_lines [1] . contains ("(affectsParent false)")
+  assert! ( ! e_lines [1] . contains ("nonMember")
             && ! e_lines [1] . contains ("writeProtected"),
     "the editable copy is the member:\n{}", view );
   assert_eq! ( lines_containing (view, "(id f)") . len (), 1,
@@ -302,8 +302,8 @@ async fn a_stale_alias_goes (
   let second_view_id : ViewId = ViewId::ContentView ("convert-al-2" . into ());
   let (al_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("al")) ?;
   let requesting : String = al_view . replacen (
-    "(affectsParent na)",
-    "(affectsParent na) (viewRequests (folder aliases))", 1 );
+    "(node ",
+    "(node (viewRequests (folder aliases))", 1 );
   save_view ( &requesting, &first_view_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let (second_view, _) : (String, Vec<String>) = save_view (
@@ -339,7 +339,7 @@ async fn a_deleted_phantom_of_a_restricted_node_loses_its_text (
        ** (skg (deleted (id q) (repo private))) q secret title\n\
        q secret body\n\
        ** (skg (deleted (id q2) (repo private))) q2 secret title\n\
-       *** (skg (node (id qc) (repo public) (affectsParent false))) qc\n" ) ? . 0 ) ?;
+       *** (skg (node (id qc) (repo public) nonMember)) qc\n" ) ? . 0 ) ?;
   views_state . open_views . register_view (
     &graph . load_full (), view_id . clone (), stored, &[ID::from ("u")] );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);

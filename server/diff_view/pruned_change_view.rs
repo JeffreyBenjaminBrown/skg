@@ -34,7 +34,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  AffectsParent, Editability, Owner, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  Membership, Editability, Owner, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
@@ -478,7 +478,7 @@ fn content_occurrences_in_level_order (
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
         let is_root_or_member : bool =
-          t . affectsParent == AffectsParent::True
+          t . membership == Membership::Member
           || node . parent () . is_some_and ( |parent| match parent . value () . kind {
                ViewnodeKind::BufferRoot => true,
                ViewnodeKind::Vognode (
@@ -494,7 +494,7 @@ fn content_occurrences_in_level_order (
   occurrences }
 
 /// The viewforest's unrestricted vognodes that are members of a
-/// partner folder (affectsParent true), in level order.
+/// partner folder (a member), in level order.
 fn folder_occurrences_in_level_order (
   viewforest : &ViewForest,
 ) -> Vec<NodeId> {
@@ -506,7 +506,7 @@ fn folder_occurrences_in_level_order (
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       &node . value () . kind else { continue; };
     let parent_is_a_folder : bool =
-      t . affectsParent == AffectsParent::True
+      t . membership == Membership::Member
       && matches! ( node . parent () . map ( |parent| &parent . value () . kind ),
                     Some (ViewnodeKind::PartnerFolder (_)) );
     if parent_is_a_folder { occurrences . push ( node . id () ); }}

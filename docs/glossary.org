@@ -376,7 +376,7 @@ goes as deep as 'max_roleTree_depth'.
 
 A *role graft* is one node of a role tree other than its origin. It is
 in the view because of the role, not because its parent contains it, so
-it carries 'affectsParent false' and a birth fact naming its role's
+it carries 'nonMember' and a birth fact naming its role's
 relation. ("Role" is in the name because other things might someday be
 grafted onto views.)
 
@@ -700,8 +700,8 @@ The subscriberFolder ("folder of subscribers") is a write-protected set.
 Thus the user could flip the order of R and T in the subscriberFolder,
 and this change would be respected in the display, but have no effect
 in the graph. The user could insert X under subscriberFolder,
-but because it is a write-protected set, X will have its affectsParent field
-rewritten to 'false' (a non-member), and have no effect on N.
+but because it is a write-protected set, X will be
+marked 'nonMember' (a non-member), and have no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it will respawn as soon as they save,
 because, again, the subscriberFolder is a write-protected set.
@@ -764,8 +764,8 @@ content subtree), which writes a =writeProtectedView= or
 *** non-member
 
 A viewnode that takes no part in the membership its viewparent
-represents: its metadata says '(affectsParent false)', where a
-member's omits the atom ('docs/api-and-formats.org', "Content
+represents: its metadata carries the bare atom 'nonMember', where a
+member's carries nothing ('docs/api-and-formats.org', "Content
 view"). Under a vognode a non-member is not in the content list,
 and in a folder it is not one of the folder's members, so a save
 neither adds nor removes a relationship for it; what it shows of

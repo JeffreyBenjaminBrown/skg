@@ -199,7 +199,7 @@ async fn test_editable_view_ample_budget (
 
       // With an ample budget, all children should be extended
       let expected = indoc! {"
-        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        * (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
         ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
@@ -218,7 +218,7 @@ async fn test_editable_view_ample_budget (
         *** (skg (node (id 124) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
         124 body
         ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-        * (skg (node (id 2) (repo main) (affectsParent na))) 2
+        * (skg (node (id 2) (repo main))) 2
       "};
 
       assert_metadata_eq!(result, expected,
@@ -294,7 +294,7 @@ async fn test_editable_view_limit_5_or_6 (
       // and showed its whole group 121..124, but the budget hit 0 at 13, so when
       // 121..124 are visited they stay write-protected (none extends -> no gen-3).
       let expected_5 = indoc! {"
-        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        * (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
         ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
@@ -303,13 +303,13 @@ async fn test_editable_view_limit_5_or_6 (
         *** (skg (node (id 123) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
         *** (skg (node (id 124) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
         ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-        * (skg (node (id 2) (repo main) (affectsParent na))) 2
+        * (skg (node (id 2) (repo main))) 2
       "};
       // limit=6: one more extension than limit=5 -- 121 (the 6th) now extends and
       // shows its whole gen-3 group 1211,1212 (both then write-protected, budget
       // spent); 122..124 remain write-protected.
       let expected_6 = indoc! {"
-        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        * (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
         ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
@@ -321,7 +321,7 @@ async fn test_editable_view_limit_5_or_6 (
         *** (skg (node (id 123) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
         *** (skg (node (id 124) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
         ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-        * (skg (node (id 2) (repo main) (affectsParent na))) 2
+        * (skg (node (id 2) (repo main))) 2
       "};
 
       assert_metadata_eq!(result_5, expected_5,
@@ -396,11 +396,11 @@ async fn test_editable_view_limit_1_to_4 (
       // all three are then write-protected (budget spent), so 12 never extends and
       // none of 121.. is created. Root 2 still extends (root exemption).
       let expected_1 = indoc! {"
-        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        * (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
         ** (skg (node (id 12) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         ** (skg (node (id 13) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-        * (skg (node (id 2) (repo main) (affectsParent na))) 2
+        * (skg (node (id 2) (repo main))) 2
       "};
       // omittedBody marks only 12: the saved buffer showed 11 and 13
       // editable with no body text, wiping their bodies, while
@@ -409,7 +409,7 @@ async fn test_editable_view_limit_1_to_4 (
       // whole group 121..124, all write-protected (budget spent); 13 is reached
       // after the budget is gone, so it too is write-protected.
       let expected_4 = indoc! {"
-        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        * (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
         ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
@@ -418,7 +418,7 @@ async fn test_editable_view_limit_1_to_4 (
         *** (skg (node (id 123) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
         *** (skg (node (id 124) (repo main) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
         ** (skg (node (id 13) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-        * (skg (node (id 2) (repo main) (affectsParent na))) 2
+        * (skg (node (id 2) (repo main))) 2
       "};
 
       assert_metadata_eq!(result_1, expected_1,
@@ -474,10 +474,10 @@ async fn test_editable_view_conflicting (
         // The second 12 (root with request) should be extended.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 1))))) 1
+        "* (skg (node (id 1) (repo main) (rels (contains (out 1))))) 1
          ** (skg (node (id 12) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12
-         *** (skg (node (id 122) (repo main) (affectsParent false) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
-         * (skg (node (id 12) (repo main) (affectsParent na) (rels (contains (in 1) (out 1))))) 12
+         *** (skg (node (id 122) (repo main) nonMember writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
+         * (skg (node (id 12) (repo main) (rels (contains (in 1) (out 1))))) 12
          ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
          122 body
          *** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1221
@@ -525,7 +525,7 @@ async fn test_editable_view_with_cycle (
 
       // a should extend to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg (node (id cyc-a) (repo main) (affectsParent na) (rels (contains (in 1) (out 1))))) cyc-a
+        * (skg (node (id cyc-a) (repo main) (rels (contains (in 1) (out 1))))) cyc-a
         cyc-a body
         ** (skg (node (id cyc-b) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1))))) cyc-b
         cyc-b body
@@ -579,8 +579,8 @@ async fn test_editable_view_with_repeat (
         // and so clobbers the Tentative bare root 121 (§5.2). So the bare
         // root 121 is now write-protected and 12's child 121 is the editable
         // occurrence (childless, since the save emptied 121's contains).
-        "* (skg (node (id 121) (repo main) (affectsParent na) writeProtected (rels (contains (in 1))))) 121
-         * (skg (node (id 12) (repo main) (affectsParent na) (rels (contains (in 1) (out 4))))) 12
+        "* (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1))))) 121
+         * (skg (node (id 12) (repo main) (rels (contains (in 1) (out 4))))) 12
          12 body
          ** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
          ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
@@ -737,7 +737,7 @@ async fn test_editable_view_request_on_an_editable_node (
         response . saved_view };
       println! ("Result of a request on an editable node:\n{}", result);
       let expected = indoc! {"
-        * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
+        * (skg (node (id 1) (repo main) (rels (contains (out 3))))) 1
         1 body
         ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
         11 body
@@ -801,7 +801,7 @@ async fn test_editable_view_request_moves_editability_back (
           . map ( |line| line . replace ("writeProtected ", "")
                               . replace ("omittedBody ", "")
                               // write-protected, the content stops being members
-                              . replace ("(affectsParent false) ", "")
+                              . replace ("nonMember ", "")
                               . replace (" (birth (contains in 1))", "") )
           . collect () };
       let moved : String = save (
@@ -814,7 +814,7 @@ async fn test_editable_view_request_moves_editability_back (
                 "root 12 keeps its shown content:\n{}", moved );
       let moved_back : String = save (
         &requesting_editable_at (
-          &moved, "* (skg (node (id 12) (repo main) (affectsParent na) writeProtected")
+          &moved, "* (skg (node (id 12) (repo main) writeProtected")
       ) . await ?;
       println! ("Result of moving editability back:\n{}", moved_back);
       assert! ( line_starting (&moved_back, under_1) . contains ("writeProtected")
@@ -873,7 +873,7 @@ async fn test_budget_aliasfolder_is_neutral (
       println!("alias-budget (budget 3):\n{}", result);
 
       let expected = indoc! {"
-        * (skg (node (id r) (repo main) (affectsParent na) (rels (contains (out 1)) (aliases 2)))) r
+        * (skg (node (id r) (repo main) (rels (contains (out 1)) (aliases 2)))) r
         ** (skg aliasFolder)
         *** (skg alias) first alias
         *** (skg alias) second alias
@@ -942,13 +942,13 @@ async fn test_writeProtect_request_keeps_children_editable (
         lines_starting (&saved, "** (skg (node (id 12");
       assert_eq! ( children . len (), 4, "{}", saved );
       assert! ( children . iter () . all ( |line|
-                  line . contains ("(affectsParent false)")
+                  line . contains ("nonMember")
                   && ! line . contains ("writeProtected") ),
                 "121..124 must be editable non-members:\n{}", saved );
       let grandchildren : Vec<&str> = lines_starting (&saved, "*** ");
       assert_eq! ( grandchildren . len (), 3, "{}", saved );
       assert! ( grandchildren . iter () . all ( |line|
-                  ! line . contains ("affectsParent")
+                  ! line . contains ("nonMember")
                   && ! line . contains ("writeProtected") ),
                 "their content must stay editable members:\n{}", saved );
       let again : String = save_view (
@@ -984,7 +984,7 @@ async fn test_writeProtect_subtree_request (
       assert! ( headlines . iter () . all ( |line| line . contains ("writeProtected") ),
                 "everything must be write-protected:\n{}", saved );
       assert! ( headlines [1 ..] . iter () . all ( |line|
-                  line . contains ("(affectsParent false)") ),
+                  line . contains ("nonMember") ),
                 "every child must be a non-member:\n{}", saved );
       assert! ( ! saved . contains ("viewRequests")
                 && ! saved . contains ("body\n"),
@@ -1061,7 +1061,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
                               . split (')') . next () . unwrap () . to_string () )
           . collect () };
       let edited : String = requesting_editable_at (
-        &requesting_at ( &opened, "(node (id 12) (repo main) (affectsParent na)",
+        &requesting_at ( &opened, "\n* (skg (node (id 12) (repo main)",
                          "writeProtectedView" ),
         "(node (id 12) (repo main) writeProtected" )
         . replacen ( "** (skg (node (id 121) ", folded_121, 1 );
@@ -1075,17 +1075,17 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
                    "root 12 shows its content once:\n{}", moved );
       assert! ( content_under (&moved, root_12) . iter ()
                   . all ( |line| line . contains ("writeProtected")
-                                 && line . contains ("(affectsParent false)") ),
+                                 && line . contains ("nonMember") ),
                 "under root 12, write-protected non-members:\n{}", moved );
       assert_eq! ( ids_under (&moved, under_1), [ "121", "122", "123", "124" ],
                    "{}", moved );
       assert! ( content_under (&moved, under_1) . iter ()
                   . all ( |line| ! line . contains ("writeProtected")
-                                 && ! line . contains ("affectsParent") ),
+                                 && ! line . contains ("nonMember") ),
                 "under the 12 under 1, editable members:\n{}", moved );
       let moved_back : String = save_view (
         &requesting_editable_at (
-          &moved, "(node (id 12) (repo main) (affectsParent na) writeProtected" ),
+          &moved, "(node (id 12) (repo main) writeProtected" ),
         &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
       println! ("Result of moving editability back:\n{}", moved_back);
       assert! ( ! lines_starting (&moved_back, root_12) [0] . contains ("writeProtected")
@@ -1095,7 +1095,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
                    "{}", moved_back );
       assert! ( content_under (&moved_back, root_12) . iter ()
                   . all ( |line| ! line . contains ("writeProtected")
-                                 && ! line . contains ("affectsParent") ),
+                                 && ! line . contains ("nonMember") ),
                 "root 12's content must be editable members again:\n{}", moved_back );
       assert! ( content_under (&moved_back, root_12) [0] . starts_with (folded_121),
                 "the adopted 121 keeps its fold:\n{}", moved_back );
@@ -1125,10 +1125,10 @@ async fn test_parked_content_node_is_shown_once (
           &config, tantivy, &graph, &mut views_state, &["1"] ) ?;
       let parked : String = save_view (
         &opened . replacen ( "** (skg (node (id 13) (repo main) ",
-                             "** (skg (node (id 13) (repo main) (affectsParent false) ", 1 ),
+                             "** (skg (node (id 13) (repo main) nonMember ", 1 ),
         &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;
       assert! ( lines_starting (&parked, "** (skg (node (id 13) ") . len () == 1
-                && parked . contains ("(affectsParent false)"),
+                && parked . contains ("nonMember"),
                 "13 stays under 1 as a non-member:\n{}", parked );
       let other_view_id : ViewId = ViewId::ContentView ("other-view-of-1" . to_string ());
       let other : String = {
@@ -1149,7 +1149,7 @@ async fn test_parked_content_node_is_shown_once (
       println! ("The first view after the other's save:\n{}", collateral);
       let thirteens : Vec<&str> = lines_starting (&collateral, "** (skg (node (id 13) ");
       assert! ( thirteens . len () == 1
-                && ! thirteens [0] . contains ("affectsParent"),
+                && ! thirteens [0] . contains ("nonMember"),
                 "13 is shown once, as 1's member:\n{}", collateral );
       Ok (( )) }
 
@@ -1193,7 +1193,7 @@ async fn test_budget_spent_on_a_node_with_members (
         . collect ();
       assert_eq! ( members_of_twelve . len (), 4, "{}", saved );
       assert! ( members_of_twelve . iter () . all ( |line|
-                  line . contains ("(affectsParent false)") ),
+                  line . contains ("nonMember") ),
                 "121..124 must be non-members under write-protected 12:\n{}", saved );
       save_view (
         &saved, &config, tantivy, &graph, &view_id, &mut views_state ) . await ?;

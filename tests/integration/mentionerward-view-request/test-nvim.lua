@@ -79,16 +79,16 @@ end
 print('=== SKG Mentionerward View Request Integration Test ===')
 
 local expected_line0 =
-  '* (skg (node (id 1) (repo main) (affectsParent na)'
+  '* (skg (node (id 1) (repo main)'
   .. ' (rels (contains (out 2))))) 1\n'
   .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n'
   .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n'
 local expected_line2 = expected_line0
 local expected_changed =
-  '* (skg (node (id 1) (repo main) (affectsParent na)'
+  '* (skg (node (id 1) (repo main)'
   .. ' (rels (contains (out 2))))) 1\n'
   .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n'
-  .. '*** (skg (node (id l-11) (repo main) (affectsParent false)'
+  .. '*** (skg (node (id l-11) (repo main) nonMember'
   .. ' (birth roleGraft mentioner) writeProtected (rels (linksTo (out 1 (ancestors 1))) (birth (linksTo out 1))))) [[id:11][a link to 11]]\n'
   .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'

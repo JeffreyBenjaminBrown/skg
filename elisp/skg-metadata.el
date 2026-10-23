@@ -129,7 +129,7 @@ through owned repos, C-? displays all configured repos and
 their paths, and typed repo names are accepted directly.
 With a prefix argument RECURSIVE, changes every true content
 descendent whose repo matches the repo at point.
-Only descendents for which affectsParent=true are traversed.
+Only member descendents (no nonMember atom) are traversed.
 On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
@@ -160,7 +160,7 @@ Does not save; call `skg-request-save-buffer' afterward."
   "Prompt for and recursively change the repo of the node at point.
 This is the recursive form of `skg-set-repo': it changes every
 content-descendent whose repo matches the repo at point.
-Only descendents for which affectsParent=true are traversed.
+Only member descendents (no nonMember atom) are traversed.
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-repo t))
@@ -450,7 +450,7 @@ floor check (see `apply_sticky_relRepos') is what validates each one.
 
 The walk starts at the node at point (inclusive: its own relationship to
 its view-parent counts when it matches) and recurses only on
-viewchildren that affect their viewparents: affectsParent=true
+viewchildren that affect their viewparents: member
 unrestrictedNodes and writable folders. It prunes below write-protected nodes
 and subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
@@ -554,8 +554,8 @@ subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`content', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
-nodes and subscribee-as-such members, prunes non-true
-(affectsParent=false) nodes -- except the walk's root, which the
+nodes and subscribee-as-such members, prunes non-member
+(nonMember) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the two
 writable folders. Returns the number of relationships true."
   (let ((targets (skg--relRepo-recursive-targets kind)))
@@ -592,7 +592,7 @@ command, but does not edit anything."
           (let ((meta (skg--metadata-sexp-at-point-or-nil)))
             (cond
              ((skg--unrestrictedNode-sexp-p meta)
-              (if (not (skg--node-affectsParent-content-of-p meta))
+              (if (not (skg--node-member-p meta))
                   (skg--goto-next-headline-after-subtree)
                 (when (skg--relationship-kind-matches-p kind)
                   (push (copy-marker (line-beginning-position)) targets))
@@ -620,7 +620,7 @@ inert); for `subscribee' and `overridden', the viewparent must be
 the matching writable folder with a editable anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--unrestrictedNode-sexp-p meta)
-                  (skg--node-affectsParent-content-of-p meta))
+                  (skg--node-member-p meta))
              (skg--unknown-headline-p meta))
          (save-excursion
            (and (org-up-heading-safe)
@@ -654,7 +654,7 @@ not writable relationships."
 position: an true unrestrictedNode member of a subscribeeFolder."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (skg--unrestrictedNode-sexp-p meta)
-         (skg--node-affectsParent-content-of-p meta)
+         (skg--node-member-p meta)
          (save-excursion
            (and (org-up-heading-safe)
                 (skg--non-vognode-atom-present-p
@@ -788,7 +788,7 @@ graft, whose '(diff ...)' says its relationship was removed."
 (defun skg--change-repo-recursive (old-skgrepo new-skgrepo)
   "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
-only descendents for which affectsParent=true are traversed.
+only member descendents (no nonMember atom) are traversed.
 A write-protected occurrence is not edited -- the save would refuse
 its repo edit -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about,
@@ -818,7 +818,7 @@ their repo edits take effect even under a write-protected parent."
 (defun skg--do-at-recursive-repo-move-occurrences (old-skgrepo fn)
   "Call FN, with point on each headline a recursive repo move from
 the headline at point covers: that root, and every viewdescendant
-reached through affectsParent=true UnrestrictedVognodes whose repo is
+reached through member UnrestrictedVognodes whose repo is
 OLD-REPO. Restores point afterward."
   (save-excursion
     (let ((start-level (org-outline-level)))
@@ -828,7 +828,7 @@ OLD-REPO. Restores point afterward."
                   (> (org-outline-level) start-level))
         (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
           (if (not (and (skg--unrestrictedNode-sexp-p metadata-sexp)
-                        (skg--node-affectsParent-content-of-p metadata-sexp)))
+                        (skg--node-member-p metadata-sexp)))
               (skg--goto-next-headline-after-subtree)
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
               (save-excursion (funcall fn)))
@@ -857,12 +857,10 @@ OLD-REPO. Restores point afterward."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
 
-(defun skg--node-affectsParent-content-of-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has implicit or explicit affectsParent=true."
-  (let ((affectsParent-values (skg-sexp-cdr-at-path metadata-sexp
-                                            '(skg node affectsParent))))
-    (or (not affectsParent-values)
-        (eq (car affectsParent-values) 'true))))
+(defun skg--node-member-p (metadata-sexp)
+  "Return non-nil unless METADATA-SEXP carries the bare nonMember atom.
+A member carries nothing."
+  (not (skg-sexp-subtree-p metadata-sexp '(skg (node nonMember)))))
 
 (defun skg--node-repo (metadata-sexp)
   "Return METADATA-SEXP's node repo as a string, or nil."

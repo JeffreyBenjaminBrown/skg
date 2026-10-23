@@ -133,10 +133,10 @@ async fn render_with_requested_relation_folders (
   graph   : &InRustGraphHandle,
 ) -> Result<String, Box<dyn Error>> {
   let initial : String = render (root, config) . await ?;
-  let request : String = initial . replace (
-    "(affectsParent na)",
+  let request : String = initial . replacen (
+    "(node ",
     &format! (
-      "(affectsParent na) (viewRequests (folder {}))", relation ) );
+      "(node (viewRequests (folder {}))", relation ), 1 );
   let response : SaveResponse =
     save (&request, config, tantivy, graph) . await ?;
   if ! response . errors . is_empty () {
@@ -269,12 +269,12 @@ async fn write_protected_insert (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // The intruder is made a non-member (affectsParent=false) in the rerendered view.
+  // The intruder is made a non-member (nonMember) in the rerendered view.
   { let intruder_after : &str = line_containing (
       &resp . saved_view, &format! ("(id {})", spec . intruder) );
-    if ! intruder_after . contains ("(affectsParent false)") {
+    if ! intruder_after . contains ("nonMember") {
       fails . record (&scenario, format! (
-        "intruder must be made a non-member (affectsParent=false): {}",
+        "intruder must be made a non-member (nonMember): {}",
         intruder_after )); } }
   // ... and a warning says so.
   if ! resp . warnings . iter () . any ( |w|

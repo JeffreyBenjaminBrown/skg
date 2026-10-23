@@ -827,14 +827,10 @@ if and only if it adheres to the following:
     whitespace is represented as a quoted string atom; server-rendered skgrepo
     names and repo-derived herald values use this form automatically.
 
-Inside a =(node ...)= form, =(affectsParent ...)= describes whether the
-node participates in the membership represented by its viewparent:
-
-- omitted =affectsParent= means =true=;
-- =(affectsParent true)= is accepted but normally omitted when rendered;
-- =(affectsParent false)= means the node is preserved/displayed but
-  does not alter the parent's membership on save;
-- =(affectsParent na)= is rendered for view roots.
+Inside a =(node ...)= form, the bare atom =nonMember= says the node
+takes no part in the membership represented by its viewparent: it is
+preserved and displayed but does not alter the parent's membership on
+save. A member carries nothing, and so does a view root.
 
 The bare atom =omittedBody= accompanies =writeProtected= on a write-protected
 node whose graphnode has a body — one the rendering hides. Herald
@@ -845,7 +841,7 @@ A role graft -- a node a role tree added, playing a partner role toward
 its viewparent (e.g. =container= for a containerward role tree,
 =mentioner= for a node that links to it, also =mentioned=, =overrider=,
 =overridden=, =hider=, =hidden=, =subscriber=, =subscribee=) -- carries
-=(affectsParent false)= and =(birth roleGraft ROLENAME)=, and its =(rels
+=nonMember= and =(birth roleGraft ROLENAME)=, and its =(rels
 ...)= carries a birth fact naming its role's relation (see "Stats
 metadata" below). The parser reads =birth= back, so a role graft is
 still one after a save; the diff view reads from it which
@@ -1523,7 +1519,7 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 #+begin_example
 (skg (node (id 7) (repo main) (diff (node added) (rel added) (leaves 2 node rel) (ready node))))
 (skg (node (id 8) (repo main) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (ready all))))
-(skg (node (id 9) (repo main) (affectsParent false) writeProtected (diff (rel removed) (leaves 1 rel))))
+(skg (node (id 9) (repo main) nonMember writeProtected (diff (rel removed) (leaves 1 rel))))
 (skg alias (diff (rel added) (leaves 1) (readyRequest)))
 (skg removedAlias (diff (rel removed) (leaves 1) (ready)))
 (skg (historical (id 4) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel))))

@@ -109,7 +109,7 @@ describe('skg.heralds', function ()
     -- renders as the C token 2aC: the in-side numeral "2" (medium), the
     -- ancestor "a" at its floor (low), and the birth letter "C" (low).
     local buf = scratch_buffer_with({
-      'Line with (skg (node (id 123) (affectsParent false)'
+      'Line with (skg (node (id 123) nonMember'
       .. ' (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))'
       .. ' (viewStats cycle) (editRequest delete))) text' })
     heralds.enable(buf)

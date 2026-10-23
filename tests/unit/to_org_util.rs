@@ -49,12 +49,12 @@ fn graph_with (nodes: Vec<GraphnodeInRust>) -> InRustGraph {
     g . nodes . insert (n . pid . clone (), n); }
   g }
 
-fn affectsParent_if_normal (
+fn membership_if_normal (
   viewforest : &Tree<Viewnode>,
   treeid     : NodeId,
-) -> AffectsParent {
+) -> Membership {
   match & viewforest . get (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . affectsParent,
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . membership,
     _ => panic! ("expected UnrestrictedVognode") } }
 
 fn birth_if_normal (
@@ -77,15 +77,15 @@ fn linksto_false_claim_flipped_to_independent () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False,
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember,
     "LinksToParent claim with no backing link should flip to non-member");
 }
 
@@ -101,11 +101,11 @@ fn linksto_true_claim_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -125,15 +125,15 @@ fn containerof_false_claim_flipped () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False);
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember);
 }
 
 #[test]
@@ -152,25 +152,25 @@ fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
   ) . id ();
   let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("A"), src (), "A" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let dead : NodeId = vf . get_mut (root) . unwrap () . append (
     viewnode_of (ViewnodeKind::DeadViewnode) ) . id ();
   let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("B"), src (), "B" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let folder : NodeId = vf . get_mut (root) . unwrap () . append (
     viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) ) . id ();
   let member : NodeId = vf . get_mut (folder) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
 
   mark_orphans_under_dead_parents_false (&mut vf);
 
-  assert_eq! (affectsParent_if_normal (&vf, under_phantom), AffectsParent::False,
+  assert_eq! (membership_if_normal (&vf, under_phantom), Membership::NonMember,
     "A member child under a Deleted phantom must be made a non-member");
-  assert_eq! (affectsParent_if_normal (&vf, under_dead), AffectsParent::False,
+  assert_eq! (membership_if_normal (&vf, under_dead), Membership::NonMember,
     "A member child under a DeadViewnode must be made a non-member");
-  assert_eq! (affectsParent_if_normal (&vf, member), AffectsParent::True,
+  assert_eq! (membership_if_normal (&vf, member), Membership::Member,
     "A member under a PartnerFolder must stay a member (legitimate membership)");
 }
 
@@ -190,11 +190,11 @@ fn containerof_via_merged_extra_id_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -216,11 +216,11 @@ fn containerof_view_affects_parent_acquiree_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P-old"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -241,14 +241,14 @@ fn contentof_writeProtected_parent_false_claim_flipped () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False);
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember);
 }
 
 #[test]
@@ -267,17 +267,17 @@ fn contentof_editable_parent_skipped () {
                             "P" . to_string (), None) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::True,
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::Member,
     "Editable parent: Container claim is never flipped here");
 }
 
 #[test]
 fn independent_always_preserved () {
-  // affectsParent false is never touched.
+  // a non-member is never touched.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &[]),
@@ -286,34 +286,14 @@ fn independent_always_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::False) ) . id ();
+                              Membership::NonMember) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False);
-}
-
-#[test]
-fn absent_under_visible_parent_becomes_container () {
-  let graph : InRustGraph = graph_with (vec! [
-    mk_node ("P", &[], &[], &["C"]),
-    mk_node ("C", &[], &[], &[]),
-  ]);
-  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
-  let root : NodeId = viewforest . root () . id ();
-  let p_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                              AffectsParent::True) ) . id ();
-  let c_skgid : NodeId = viewforest . get_mut (p_skgid) . unwrap () . append (
-    mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::NA) ) . id ();
-
-  validate_affectsParent_relationships (&mut viewforest, &graph);
-
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::True);
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember);
 }
 
 // ===== 3x2 matrix: moving a {content, container, linksToParent}
@@ -345,11 +325,11 @@ fn moved_containerof_relationship_holds_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_new_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("p_new"), src (), "p_new" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_new_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -370,15 +350,15 @@ fn moved_containerof_relationship_broken_flipped () {
   let root : NodeId = viewforest . root () . id ();
   let p_new_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("p_new"), src (), "p_new" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_new_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False,
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember,
     "Moved content child no longer contains new parent — flip");
 }
 
@@ -397,14 +377,14 @@ fn moved_contentof_writeProtected_parent_relationship_holds_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_new_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("p_new"), src (), "p_new" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_new_skgid) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::True,
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::Member,
     "Moved container: writeProtected p_new actually contains C — keep");
 }
 
@@ -420,14 +400,14 @@ fn moved_contentof_writeProtected_parent_relationship_broken_flipped () {
   let root : NodeId = viewforest . root () . id ();
   let p_new_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("p_new"), src (), "p_new" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_new_skgid) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False,
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember,
     "Moved container: writeProtected p_new doesn't contain C — flip");
 }
 
@@ -446,11 +426,11 @@ fn moved_linksto_relationship_holds_preserved () {
   let root : NodeId = viewforest . root () . id ();
   let p_new_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("p_new"), src (), "p_new" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_new_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
@@ -470,15 +450,15 @@ fn moved_linksto_relationship_broken_flipped () {
   let root : NodeId = viewforest . root () . id ();
   let p_new_skgid : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("p_new"), src (), "p_new" . to_string (),
-                              AffectsParent::True) ) . id ();
+                              Membership::Member) ) . id ();
   let c_skgid : NodeId = viewforest . get_mut (p_new_skgid) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       skgid ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
+      Membership::NonMember, Birth::RoleGraft (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (affectsParent_if_normal (&viewforest, c_skgid), AffectsParent::False,
+  assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember,
     "Moved linksToParent: C doesn't link to p_new — flip");
 }
 
@@ -499,10 +479,10 @@ fn a_containers_claim_held_only_at_head_keeps_its_birth_in_the_diff_view () {
     let root : NodeId = viewforest . root () . id ();
     let p_treeid : NodeId = viewforest . get_mut (root) . unwrap () . append (
       mk_writeProtected_viewnode (skgid ("P"), src (), "P" . to_string (),
-                                AffectsParent::True) ) . id ();
+                                Membership::Member) ) . id ();
     let c_treeid : NodeId = viewforest . get_mut (p_treeid) . unwrap () . append (
       mk_writeProtected_viewnode_with_birth (
         skgid ("C"), src (), "C" . to_string (),
-        AffectsParent::False, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
+        Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER)) ) . id ();
     validate_affectsParent_relationships_in_straddle (&mut viewforest, &after, before_graph);
     assert_eq! (birth_if_normal (&viewforest, c_treeid), expected); }}

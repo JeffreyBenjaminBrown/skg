@@ -235,7 +235,7 @@ pub const FORK_SKGREPO_PLACEHOLDER : &str = "PICK-A-REPO";
 ///                           offers as the prompt's default.
 ///   ** <original title>  -- the original N that C overrides: its real id,
 ///                           real skgrepo, write-protected,
-///                           affectsParent=false, marked "pO".
+///                           nonMember, marked "pO".
 ///
 /// The client shows this and asks the user to approve (re-save the
 /// source buffer with the chosen skgrepos) or decline (kill the buffer),
@@ -275,7 +275,7 @@ pub fn build_fork_confirmation_buffer (
       metadata_value_atom (&format! ("⌂:{}", shown_skgrepo)),
       spec . clone . 0 . title ));
     out . push_str ( & format! (
-      "** (skg (node (id {}) (repo {}) (affectsParent false) writeProtected \
+      "** (skg (node (id {}) (repo {}) nonMember writeProtected \
        (viewStats parentOverrides))) {}\n",
       spec . original_skgid . 0,
       metadata_value_atom (&spec . original_skgrepo),

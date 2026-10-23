@@ -42,7 +42,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
   let root : NodeId = t . root () . id ();
   let mut graft : Viewnode = mk_writeProtected_viewnode_with_birth (
     ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
-    AffectsParent::True, Birth::RoleGraft (RelationRole::CONTAINER) );
+    Membership::Member, Birth::RoleGraft (RelationRole::CONTAINER) );
   graft . change_facts . change . rel = Some (Existence::Removed);
   let branch : NodeId = t . get_mut (root) . unwrap () . append (graft) . id ();
   let member_below : NodeId = t . get_mut (branch) . unwrap () . append (
@@ -67,14 +67,14 @@ fn an_unwarranted_child_is_converted_never_detached () {
   let parked : &Viewnode = t . get (branch) . unwrap () . value ();
   let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &parked . kind
     else { panic! ("the branch stays an unrestricted vognode") };
-  assert_eq! ( u . affectsParent, AffectsParent::False );
+  assert_eq! ( u . membership, Membership::NonMember );
   assert! ( u . is_writeProtected () );
   assert_eq! ( u . birth, Birth::RoleGraft (RelationRole::CONTAINER) );
   assert_eq! ( parked . change_facts . change, DiffChange::default () );
   let ViewnodeKind::Vognode (Vognode::Unrestricted (below)) =
     &t . get (member_below) . unwrap () . value () . kind
     else { panic! ("the member below stays an unrestricted vognode") };
-  assert_eq! ( below . affectsParent, AffectsParent::False,
+  assert_eq! ( below . membership, Membership::NonMember,
     "a write-protected occurrence holds no member" );
   for dead in [vognode_leaf, folder, childless] {
     assert_eq! ( t . get (dead) . unwrap () . value () . kind,

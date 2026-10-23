@@ -5,7 +5,7 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
-  AffectsParent, Birth,
+  Membership, Birth,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -485,14 +485,9 @@ fn unrestrictedVognode_metadata_to_string (
     parts . push ( format! ( "(id {})", unrestrictedVognode . skgid . 0 ));
     parts . push ( format! (
       "(repo {})", metadata_value_atom (&unrestrictedVognode . home_skgrepo) ));
-    // AffectsParent::True is left implicit because it is the default
-    // membership relation.
-    match unrestrictedVognode . affectsParent {
-      AffectsParent::True => {},
-      AffectsParent::NA =>
-        parts . push ( "(affectsParent na)" . to_string () ),
-      AffectsParent::False =>
-        parts . push ( "(affectsParent false)" . to_string () ) }
+    // A member carries nothing, being the default.
+    if unrestrictedVognode . membership == Membership::NonMember {
+      parts . push ( "nonMember" . to_string () ); }
     if let Birth::RoleGraft (role) = unrestrictedVognode . birth {
       // Written so that a role graft is still the server's after a
       // save; the parser reads it back.

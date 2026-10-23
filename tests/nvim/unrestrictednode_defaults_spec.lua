@@ -64,7 +64,7 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
   it('inserts all default fields into a minimal UnrestrictedVognode', function ()
     local headlines =
       filledIn_headlines('(skg (node (id abc) (repo jeff)))')
-    -- skg, node, id/abc, skgrepo/jeff, write-protected/false, affectsParent/true,
+    -- skg, node, id/abc, skgrepo/jeff, write-protected/false, nonMember/false,
     -- birth/unremarkable, editRequest/none, viewRequests/none:
     -- each key and each value is a separate headline.
     assert.are.equal(16, #headlines)
@@ -82,13 +82,15 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
     assert.are.equal('true', headlines[write_protected_index + 1].text)
   end)
 
-  it('inserts true (default) when affectsParent is missing', function ()
-    local headlines =
-      filledIn_headlines('(skg (node (id abc) (repo jeff)))')
-    local affectsParent_index = find_text(headlines, 'affectsParent')
-    assert.is_not_nil(affectsParent_index)
-    assert.are.equal('true (default)',
-                     headlines[affectsParent_index + 1].text)
+  it('offers nonMember as a bare atom', function ()
+    for sexp_text, value in pairs({
+        ['(skg (node (id abc) (repo jeff)))'] = 'false (default)',
+        ['(skg (node (id abc) (repo jeff) nonMember))'] = 'true' }) do
+      local headlines = filledIn_headlines(sexp_text)
+      local nonMember_index = find_text(headlines, 'nonMember')
+      assert.is_not_nil(nonMember_index)
+      assert.are.equal(value, headlines[nonMember_index + 1].text)
+    end
   end)
 
   it('orders fields canonically', function ()
@@ -100,7 +102,7 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
         table.insert(level_3, headline.text) end
     end
     assert.are.same(
-      { 'id', 'repo', 'writeProtected', 'affectsParent', 'birth',
+      { 'id', 'repo', 'writeProtected', 'nonMember', 'birth',
         'editRequest', 'viewRequests', 'graphStats' },
       level_3)
   end)
@@ -119,7 +121,7 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
         '*** writeProtected', '**** true',
-        '*** affectsParent', '**** true (default)',
+        '*** nonMember', '**** false (default)',
         '*** birth', '**** unremarkable (default)',
         '*** editRequest', '**** none (default)',
         '*** viewRequests', '**** none (default)' }, '\n')))
@@ -131,7 +133,7 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
         '*** writeProtected', '**** false',
-        '*** affectsParent', '**** true',
+        '*** nonMember', '**** false',
         '*** birth', '**** unremarkable',
         '*** editRequest', '**** none',
         '*** viewRequests', '**** none' }, '\n')))
@@ -170,14 +172,14 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
         '\n')))
   end)
 
-  it('keeps affectsParent=false', function ()
+  it('collapses nonMember=true to a bare atom', function ()
     assert.are.same(
       sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' (affectsParent false)))'),
+                 .. ' nonMember))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
-        '*** affectsParent', '**** false' }, '\n')))
+        '*** nonMember', '**** true' }, '\n')))
   end)
 
   it('keeps populated viewRequests', function ()
@@ -196,7 +198,7 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
     assert.are.same(sexpr.read('(skg (node (repo only)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** repo', '**** only',
-        '*** writeProtected', '*** affectsParent', '*** birth',
+        '*** writeProtected', '*** nonMember', '*** birth',
         '*** editRequest', '*** viewRequests' }, '\n')))
   end)
 
@@ -283,7 +285,7 @@ describe('skg.sexpr.unrestrictednode_defaults real-world metadata', function ()
     assert.is_not_nil(find_text(headlines, 'repo'))
     assert.is_not_nil(find_text(headlines, 'public'))
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
-    assert.is_not_nil(find_text(headlines, 'affectsParent'))
+    assert.is_not_nil(find_text(headlines, 'nonMember'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
     assert.is_not_nil(find_text(headlines, 'rels'))
   end)

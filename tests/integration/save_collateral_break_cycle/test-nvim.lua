@@ -50,26 +50,20 @@ local function role_of_role_graft_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP's headline relation: a
----role graft's rolename, else the explicit affectsParent, else 'true'. The
+---role graft's rolename, else 'nonMember' or 'member'. The
 ---port of test-helpers.el's headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
-  local affectsParent_list = sexp and metadata.sexp_cdr_at_path(
-    sexp, { 'skg', 'node', 'affectsParent' }) or nil
-  local independent = affectsParent_list ~= nil
-    and affectsParent_list[1] == sexpr.symbol('false')
+  local non_member = sexp ~= nil and not metadata.node_member_p(sexp)
   local role_graft_role = nil
-  if independent then
+  if non_member then
     role_graft_role = role_of_role_graft_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' }))
   end
   if role_graft_role then return role_graft_role end
-  if affectsParent_list == nil
-     or affectsParent_list[1] == sexpr.symbol('true') then
-    return 'true'
-  end
-  return sexpr.atom_text(affectsParent_list[1])
+  if non_member then return 'nonMember' end
+  return 'member'
 end
 
 ---(depth relation id) triples for every headline in BUF that carries
@@ -133,11 +127,11 @@ require('skg.content_view').request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, 'Buffer skg://a was created')
 assert_headline_structure(buf_a,
-  { { 1, 'na', 'a' },
+  { { 1, 'member', 'a' },
     { 2, 'container', 'b' },
     { 3, 'container', 'a' },
-    { 2, 'true', 'b' },
-    { 3, 'true', 'a' } },
+    { 2, 'member', 'b' },
+    { 3, 'member', 'a' } },
   'phase 1: buffer A initial')
 
 print('=== PHASE 2: Open buffer B ===')
@@ -145,11 +139,11 @@ require('skg.content_view').request_single_root_content_view_from_id('b')
 local buf_b = T.wait_for_buffer('skg://b')
 T.check(buf_b, 'Buffer skg://b was created')
 assert_headline_structure(buf_b,
-  { { 1, 'na', 'b' },
+  { { 1, 'member', 'b' },
     { 2, 'container', 'a' },
     { 3, 'container', 'b' },
-    { 2, 'true', 'a' },
-    { 3, 'true', 'b' } },
+    { 2, 'member', 'a' },
+    { 3, 'member', 'b' } },
   'phase 2: buffer B initial')
 
 print("=== PHASE 3: Remove a from b's children, save ===")
@@ -168,11 +162,11 @@ T.check(vim.api.nvim_buf_is_valid(buf_a), 'Buffer A still exists')
 print('Buffer A content after collateral update: '
       .. T.buffer_text(buf_a))
 assert_headline_structure(buf_a,
-  { { 1, 'na', 'a' },
+  { { 1, 'member', 'a' },
     -- was container; corrected after b dropped a:
-    { 2, 'false', 'b' },
+    { 2, 'nonMember', 'b' },
     { 3, 'container', 'a' },
-    { 2, 'true', 'b' } },
+    { 2, 'member', 'b' } },
   'phase 4: buffer A after collateral update')
 
 T.pass('PASS: All phases completed successfully!')

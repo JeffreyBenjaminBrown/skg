@@ -18,7 +18,7 @@ use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_st
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, Existence, Owner, Property, PropertyFolder,
+  Membership, Birth, ChangeFacts, Existence, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, convert_unwarranted_child};
 
@@ -195,7 +195,7 @@ pub fn adopt_model_facts (
       ViewnodeKind::Vognode (Vognode::Unrestricted (f)) ) => {
       e . title         = f . title . clone ();
       e . home_skgrepo  = f . home_skgrepo . clone ();
-      e . affectsParent = f . affectsParent;
+      e . membership = f . membership;
       e . birth         = f . birth; // the model's, over what the buffer carried back
       if f . is_writeProtected () {
         e . write_protect (); }},
@@ -235,6 +235,6 @@ pub fn is_unrestricted_removed_member (
 ) -> bool {
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if t . affectsParent == AffectsParent::False
+      if t . membership == Membership::NonMember
          && t . birth == Birth::Unremarkable
          && viewnode . change_facts . change . rel == Some (Existence::Removed) ) }

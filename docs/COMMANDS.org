@@ -595,7 +595,7 @@ validates each relationship (an offered skgrepo more public than some relationsh
 default makes the save fail, naming that relationship).
 
 The walk applies to, and recurses on, only viewchildren that affect
-their viewparents: affectsParent=true unrestrictedNodes, through the two
+their viewparents: member unrestrictedNodes, through the two
 editable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
