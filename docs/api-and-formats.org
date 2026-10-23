@@ -182,6 +182,17 @@ So far there are these endpoints:
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
+       A message about one headline names its view id (see "The
+       metadata headers") after the node's ID, as =(view id X)=, and
+       an error's Org form gains a line =- view id: X=. A message
+       about several occurrences of a node lists their view ids:
+       =(view ids X, Y)=, and the line =- view ids: X, Y=. A headline
+       without a view id (one the user typed or copied, not yet
+       saved) is named by its title instead, =headline "TITLE"=; no
+       message invents a view id. An error in a headline's metadata
+       ends by naming that headline the same way. A repair warning
+       names the repaired folder's view id, one warning per folder
+       occurrence.
        When the saved buffer is one of the diff view's, the response
        ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
@@ -213,8 +224,9 @@ So far there are these endpoints:
     fingerprints. A save that stops for a confirmation (strandeds,
     Hoist, forks) or fails consumes none, and leaves them in the
     buffer. A request that names no current change is dropped, with
-    the warning =The readiness request on "HEADLINE" names no current
-    change; it was dropped.=
+    the warning =The readiness request on "HEADLINE" (view id X)
+    names no current change; it was dropped.=, which names an untitled
+    headline by its kind (=the subscribeeFolder=).
   - A write-protected occurrence saves nothing of its own, so a save is
     refused, before anything is written, if one differs from the graph:
     in its title or home skgrepo, in its alias folder or a partner
@@ -1394,8 +1406,8 @@ the marks of the change-forest leaves its headline names, at their
 current fingerprints. A save that stops for a confirmation (strandeds,
 Hoist, forks) or fails consumes none, and leaves them in the buffer. A
 request that names no current change is dropped, with the warning =The
-readiness request on "HEADLINE" names no current change; it was
-dropped.= See "Save buffer" above.
+readiness request on "HEADLINE" (view id X) names no current change; it
+was dropped.= See "Save buffer" above.
 **** One gesture on a modified node marks its file, on a write-protected occurrence too
 On a modified node (=node~=), =C-c r r= names every leaf the node
 records, and its relationship when that changed, so one gesture marks

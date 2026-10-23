@@ -995,7 +995,7 @@ changes).
 The field, the atom, the counter, the end-of-completion pass, the
 owner table, the conformance rule, the test helpers and the new
 tests, the docs. Run all four suites.
-** TODO Slice 2: messages name the view id
+** DONE Slice 2: messages name the view id
 The three groups of messages, the parser's headline context, the
 tests per group, the docs that quote a message. Run the Rust
 suite and the integration suite.

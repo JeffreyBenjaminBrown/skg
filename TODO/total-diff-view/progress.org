@@ -3155,3 +3155,78 @@ Emacs 382; Neovim 359 specs in 31 files, none failed. Integration
 integration directory likewise. Over TCP on a scratch instance: an
 unchanged save comes back byte-identical, a copied write-protected line
 keeps 0b and its copy gets 0d, and a typed headline gets 0e.
+** Slice 2: deviations
+*** the name of a headline: 'HeadlineName'
+'server/types/errors.rs' defines 'HeadlineName' (a view id, or the
+title of a headline without one), 'name_headlines' for several
+occurrences ("view ids 0a, 0c", or each named in turn when one lacks
+a vid) and 'view_id_suffix' for a message that already names the
+headline otherwise (the folder-text warning, "jumps too far", "has no
+ID", the repair warning: they add " (view id X)" only when there is
+one). 'Viewnode' and 'MpViewnode' have 'headline_name'. The error
+variants that concern one headline carry a 'HeadlineName'; those
+about several carry a 'Vec' of them. A message reads "node X (view id
+Y)"; an untitled headline without a vid reads 'headline ""'. The Org
+form's line is "- view id: X", "- view ids: X, Y", or, when some
+occurrence lacks a vid, "- occurrences: view id X, headline \"T\"".
+*** which headline a folder error names
+"The flags surface under node X" and "The idFolder under node X" name
+the recorder's occurrence (the node the message already names), not
+the folder.
+*** copies lose their vid before the headline becomes a viewnode
+The parser now drops a repeated vid from the headline's metadata
+before building the viewnode, so the parse-time errors
+('EditRequestOnWriteProtectedOccurrence', 'Body_of_NonVognode', the
+write-protected body text) name a copy by its title, not by the
+original's vid. A metadata parse error, raised before that point,
+names the vid as written.
+*** the metadata parse errors
+'headline_to_triple' appends "(view id X)" or "(headline \"T\")" to
+every error 'parse_metadata_to_viewnodemd' returns, reading the vid
+from the already-parsed sexp ('vid_written_in_metadata'); the
+"Invalid s-expression syntax" error names the title. "Unclosed
+metadata parentheses" names nothing: no title can be told from the
+rest of the line.
+*** messages beyond the plan's list
+"Unknown phantom content cannot be edited", "Restricted vognode
+content cannot be edited" and the id-less write-protected body error
+also name their headline; they concern one headline too.
+*** several occurrences: one error per ID
+'MultipleEditableViewRequestsForSameId' and 'ForkRequestMultiple'
+were pushed once per extra occurrence; they are now one error per ID
+listing every occurrence ('occurrences_requesting' in
+'validate_tree.rs'). The fork checks after it run once per ID, on its
+first occurrence, as before.
+*** the conflicting-intent messages
+'instructionMerge_fieldIntent' takes the emitting occurrence's name as
+its first argument; 'CollectedFieldIntents.exclusive_emitters' keeps,
+per ID, the occurrences that emitted an exclusive fieldIntent, and
+the conflict messages list them. The defining folders' intents are
+their recorder's ('DefiningFolderRecorder.headline'). The subscribee
+text claim carries its occurrence's name for "Cannot edit title/body".
+*** the repair warning
+'CompletionWarning::FolderRepair' carries the folder's vid, and the
+warnings are batched per (folder kind, recorder, vid), so two
+occurrences of one recorder's folder warn separately. Two typed
+folders without vids under one recorder still share a line.
+*** the readiness warning
+'RequestedReadiness.headline' is now the whole phrase: '"TITLE" (view
+id X)', or 'the KIND (view id X)' for an untitled headline.
+*** tests
+'tests/new/messages_name_view_ids.rs' (five tests: parse time,
+validation, several occurrences, a metadata parse error, a headline
+without a vid); 'a_conflict_lists_the_view_ids_of_the_occurrences_emitting'
+in 'tests/new/local_fieldintent_collection/types.rs'; the repair
+warning's vid in 'tests/partner_folder_warnings.rs', the readiness
+warning's in 'tests/readiness_requests.rs', the folder-occurrence
+batching in 'tests/unit/completion_warnings.rs'. The existing
+patterns over the changed variants were updated by a script
+('tests/results/17-slice2/fix_patterns.py'). No integration fixture
+changed: 'telescope-warnings.org' holds telescope warnings only.
+*** verification
+nextest 883 passed. Integration: every test passed but
+'import-md-and-org', which fails at baseline. Over TCP on a scratch
+instance: an edit request on a write-protected occurrence is refused
+with "- view id: 0b"; text typed on an alias folder warns "Headline
+text on a aliasFolder (view id 0c)"; a copied editable root is
+refused with "- occurrences: view id 0b, headline \"two\"".
