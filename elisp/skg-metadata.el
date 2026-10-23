@@ -702,6 +702,63 @@ Does not save; call `skg-request-save-buffer' afterward."
     (message "Merge request set for acquiree %s. Save to apply."
              acquiree-skgid)))
 
+;;; The diff view's restore requests ('docs/diff-view.org',
+;;; "Restoring what a change removed"). The server refuses them on the
+;;; wrong kind of headline with the same texts.
+
+(defconst skg--restore-rel-on-a-deleted-node
+  "This node is deleted; restore it first (skg-restore-deleted-node)"
+  "Why a removed membership cannot be restored on a historical phantom.")
+
+(defconst skg--restore-node-on-a-node-not-deleted
+  "Only a node deleted since HEAD can be restored"
+  "Why `skg-restore-deleted-node' refuses anything but a historical phantom.")
+
+(defconst skg--restore-rel-without-a-removed-membership
+  "Only a removed membership can be restored"
+  "Why `skg-restore-removed-membership' refuses a headline.")
+
+(defun skg-restore-deleted-node ()
+  "Ask the next save to write back the deleted node at point.
+The headline must be a historical phantom: a node of the diff view
+deleted since HEAD. The save writes its file as HEAD had it, and
+re-adds it to the lists of the nodes that recorded it at HEAD.
+Does not save; call `skg-request-save-buffer' afterward."
+  (interactive)
+  (unless (skg-sexp-subtree-p (skg--metadata-sexp-at-point-or-nil)
+                              '(skg (historical)))
+    (user-error "%s" skg--restore-node-on-a-node-not-deleted))
+  (skg-edit-metadata-at-point
+   '(skg (historical (DELETE (editRequest))
+                     (editRequest restoreNode))))
+  (message "Restore request set. Save to apply."))
+
+(defun skg-restore-removed-membership ()
+  "Ask the next save to re-add the removed relationship at point.
+The headline must be a removed member, or a member of a partner
+folder carrying '(rel removed)': its relationship to its viewparent
+(in a folder, to the folder's viewparent) existed at HEAD and is gone.
+The save re-adds it as HEAD recorded it.
+Does not save; call `skg-request-save-buffer' afterward."
+  (interactive)
+  (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
+    (cond ((skg-sexp-subtree-p metadata '(skg (historical)))
+           (user-error "%s" skg--restore-rel-on-a-deleted-node))
+          ((not (skg--removed-membership-p metadata))
+           (user-error "%s" skg--restore-rel-without-a-removed-membership)))
+    (skg-edit-metadata-at-point
+     '(skg (node (DELETE (editRequest))
+                 (editRequest restoreRel))))
+    (message "Restore request set. Save to apply.")))
+
+(defun skg--removed-membership-p (metadata-sexp)
+  "Non-nil when METADATA-SEXP is an UnrestrictedVognode, no role
+graft, whose '(diff ...)' says its relationship was removed."
+  (and (skg--unrestrictedNode-sexp-p metadata-sexp)
+       (not (skg-sexp-cdr-at-path metadata-sexp '(skg node birth)))
+       (equal (skg-sexp-cdr-at-path metadata-sexp '(skg node diff rel))
+              '(removed))))
+
 (defun skg--read-id-or-link (prompt)
   "Read an ID or link with linkstack paste/pop bindings in the minibuffer."
   (minibuffer-with-setup-hook #'skg--install-linkstack-minibuffer-bindings

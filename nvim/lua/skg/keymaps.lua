@@ -99,6 +99,10 @@ M.commands = {
                                      desc = 'Request this view and its content write-protected' },
   SetMergeRequest = { module = 'skg.metadata', fn = 'set_merge_request',
                       desc = 'Request merging another node into this one' },
+  RestoreDeletedNode = { module = 'skg.metadata', fn = 'restore_deleted_node',
+                         desc = 'Request writing back this deleted node (diff view)' },
+  RestoreRemovedMembership = { module = 'skg.metadata', fn = 'restore_removed_membership',
+                               desc = 'Request re-adding this removed membership (diff view)' },
   SetRepo = { module = 'skg.metadata', fn = 'set_repo',
                 desc = "Change the node's repo (in-buffer; save applies)" },
   SetRepoRecursive = { module = 'skg.metadata', fn = 'set_repo_recursive',
@@ -282,6 +286,8 @@ M.content_view_bindings = {
   { 'sw', 'RequestWriteProtected' },     -- C-c s w
   { 'sW', 'RequestWriteProtectedRecursive' }, -- C-c s W
   { 'sm', 'SetMergeRequest' },           -- C-c s m
+  { 'sn', 'RestoreDeletedNode' },        -- C-c s n
+  { 'sl', 'RestoreRemovedMembership' },  -- C-c s l
   { 'ss', 'SetRepo' },                 -- C-c s s
   { 'sS', 'SetRepoRecursive' },        -- C-c s S
   { 'rr', 'CycleCommitReady' },          -- C-c r r

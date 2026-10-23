@@ -65,7 +65,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
-| requests             | nonstandard | =delete=, =merge:...=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
+| requests             | nonstandard | =delete=, =merge:...=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
 | diff facts           | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= commit-ready                                                              |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
@@ -178,8 +178,9 @@ Folder labels, =alias=, =ID= and the flag rows describe their view
 positions. The flags folder spells out =had ID before import=, =was
 overloaded during org-roam import=, and =no search matching= when true.
 =req:folder:...=, =req:roleTree:...=, =req:flags=, =req:editable=,
-=req:write-protected= and =req:write-protected-subtree= request a view. =delete=, =merge:...=, and =request:no search matching=
-or =request:search matching= are save requests.
+=req:write-protected= and =req:write-protected-subtree= request a view. =delete=, =merge:...=, =request:no search matching=
+or =request:search matching=, and in the diff view =restore membership=
+and =restore node=, are save requests.
 
 An unknown node is labeled =Reference to unknown node.=; a restricted
 skgrepo yields an anonymous =node from restricted skgrepo= placeholder, which

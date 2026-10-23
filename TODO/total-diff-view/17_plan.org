@@ -1019,7 +1019,7 @@ The types, the printer and parser, the heralds and style keys,
 the clients' readers, folder members' node parts, the before-only
 graft, markers' '(ready all)', the folder's '(diff (ready))', the
 test literals by script, the docs. Run all four suites.
-** TODO Slice 7: two restore edit requests
+** DONE Slice 7: two restore edit requests
 The grammar and the two doors, the save's handling, the clients'
 commands and keys, the heralds and the metadata editor, the docs,
 the tests. Run all four suites.

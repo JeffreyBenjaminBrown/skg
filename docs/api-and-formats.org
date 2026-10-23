@@ -913,6 +913,62 @@ node's heralds.
   at fork detection (not during view completion), then dropped. Emitted
   by =skg-fork-node= (=C-c m f=).
 
+** Edit requests: (editRequest ...)
+
+=(editRequest ...)= carries a client→server request that the save change
+the graph. A save that succeeds consumes every request in the buffer
+it saves, after its graph edits; a save that stops for a confirmation
+or fails leaves them in the buffer. A headline carries at most one. The
+heralds are nonstandard. The five requests on a =(node ...)=, and the
+one on a historical phantom:
+
+- =delete= — delete the node. Herald "delete". Written by =skg-delete=
+  (=C-c <backspace>=). Only an editable occurrence carries it.
+- =(merge ID)= — this node, the acquirer, acquires the node ID by a
+  nodeMerge (see =docs/merging.org=). Herald "merge:ID". Written by
+  =skg-set-merge-request= (=C-c s m=). Only an editable occurrence
+  carries it.
+- =(relRepo NAME)= — herald "request:~NAME".
+  This is the sole explicit relRepo request, written by
+  =skg-set-relRepo= (C-c s r) and consumed at save, where
+  the server enforces the floor (an offered skgrepo more
+  public than the relationship's default is a save error; a skgrepo at the
+  default or more private is honored, which is how a stuck relationship's
+  privacy is lowered; a legacy or hand-authored relationship whose disk
+  skgrepo already sits more public than the default may be held or
+  made more private, never made still more public). Absent means the
+  relationship sits at its default relRepo. The relationship belongs to the
+  view-parent (or a writable folder's viewparent), so a write-protected headline
+  may carry this request too; the save refuses it only when nothing editable
+  writes that relationship, e.g. under a write-protected parent.
+  Alias and Unknown headlines likewise
+  expose a flat/nested display =relRepo= fact and put write requests only
+  under =editRequest=; copying a fact is harmless while copying a request
+  deliberately requests it at the destination.
+- =(flag noSearchMatching true|false)= — an idempotent
+  save-only desired-state request. The provenance flags =hadId= and
+  =wasOverloaded= are write-protected and rejected here. A successful save consumes
+  the request; a failed save leaves it in the buffer. Herald view presents the
+  request as one red semantic state: =request:no search matching= for =true=,
+  or =request:search matching= for =false=.
+- =restoreRel= — in the diff view, re-add the relationship this headline
+  stands for, as HEAD recorded it: on a removed member, its content
+  relationship to its viewparent; on a member of a partner folder carrying
+  =(rel removed)=, the folder's relationship between it and the folder's
+  viewparent. Herald "restore membership". Written by
+  =skg-restore-removed-membership= (=C-c s l=). Like the relRepo request it
+  concerns that relationship, so a write-protected occurrence carries it
+  too. Anywhere else it is a parse error: on a historical phantom "This
+  node is deleted; restore it first (skg-restore-deleted-node)".
+- =(historical ... (editRequest restoreNode))= — in the diff view, write
+  back the node this historical phantom stands for, as HEAD had it.
+  Herald "restore node". Written by =skg-restore-deleted-node=
+  (=C-c s n=). The only edit request a phantom accepts; =restoreNode= on
+  anything else is a parse error.
+
+What the save does with the two restore requests is described in
+=docs/diff-view.org=, "Restoring what a change removed".
+
 ** Stats metadata: graphStats and viewStats
 
 Generated display facts decorate a =(node ...)= and are never save input.
@@ -1009,29 +1065,6 @@ under different parents):
   the folder's relation for a PartnerFolder member), when its privacy was
   deliberately raised above the relationship's default. This is an observed,
   recomputed display fact: save never reads it as input.
-- =(editRequest (relRepo NAME))= — nonstandard herald "request:~NAME".
-  This is the sole explicit relRepo request, written by
-  =skg-set-relRepo= (C-c s r) and consumed at save, where
-  the server enforces the floor (an offered skgrepo more
-  public than the relationship's default is a save error; a skgrepo at the
-  default or more private is honored, which is how a stuck relationship's
-  privacy is lowered; a legacy or hand-authored relationship whose disk
-  skgrepo already sits more public than the default may be held or
-  made more private, never made still more public). Absent means the
-  relationship sits at its default relRepo. The relationship belongs to the
-  view-parent (or a writable folder's viewparent), so a write-protected headline
-  may carry this request too; the save refuses it only when nothing editable
-  writes that relationship, e.g. under a write-protected parent.
-  Alias and Unknown headlines likewise
-  expose a flat/nested display =relRepo= fact and put write requests only
-  under =editRequest=; copying a fact is harmless while copying a request
-  deliberately requests it at the destination.
-- =(editRequest (flag noSearchMatching true|false))= — an idempotent
-  save-only desired-state request. The provenance flags =hadId= and
-  =wasOverloaded= are write-protected and rejected here. A successful save consumes
-  the request; a failed save leaves it in the buffer. Herald view presents the
-  request as one red semantic state: =request:no search matching= for =true=,
-  or =request:search matching= for =false=.
 - =(overridesHere N)= — crucial =ĥ= immediately after the =O= token; the load-bearing
   substitution fact, documented in the next subsection.
 
@@ -1445,7 +1478,9 @@ Its headline is the alias or the ID, carrying
 not count it among the node's IDs.
 **** =(historical (id ID) (repo REPO) ...)= -- a historical phantom
 It is a node HEAD has and the worktree lacks, with HEAD's title and
-body. It has the grammar of =(deleted ...)=.
+body. It has the grammar of =(deleted ...)=, and may also carry
+=(editRequest restoreNode)= (see "Edit requests: (editRequest ...)"),
+which a deleted phantom may not.
 **** =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
 It sits under a node whose text changed; its headline is the old
 title, its body the old body.

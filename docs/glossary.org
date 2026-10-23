@@ -515,9 +515,12 @@ consumes. A *view request* (=(viewRequests ...)=: =folder=, =roleTree=,
 or changes which occurrence of a node is editable; the server fulfills
 it while completing the view and then drops it. (=fork= is also
 written as a view request, but the save consumes it.) An *edit
-request* (=(editRequest ...)=: =merge=, =toDelete=, =flag=, =relRepo=) asks
-the save to change the graph; a successful save consumes it, and a
-failed save leaves it in the buffer. A *readiness request* (see
+request* (=(editRequest ...)=: =delete=, =merge=, =flag=, =relRepo=, and in
+the diff view =restoreRel= on a removed membership and =restoreNode= on a
+historical phantom) asks the save to change the graph; a successful save
+consumes it, and a failed save leaves it in the buffer. The two restore
+requests are described in 'docs/diff-view.org', "Restoring what a change
+removed". A *readiness request* (see
 "readiness request, readiness gesture") is a third kind: the save
 consumes it after its graph edits succeed, to mark or unmark changes
 commit-ready, and changes neither the view nor the graph.

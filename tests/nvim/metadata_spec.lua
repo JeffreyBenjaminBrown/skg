@@ -279,6 +279,84 @@ describe('skg.metadata commands', function ()
       '(skg (node (editRequest delete)))'))
   end)
 
+  -- The diff view's restore requests; mirrors the restore tests of
+  -- tests/elisp/test-skg-metadata.el.
+
+  ---The message with which COMMAND refuses HEADLINE, which it must
+  ---leave as it was.
+  local function refusal_of (headline, command)
+    buffer_with(headline)
+    local ok, err = pcall(command)
+    assert.is_false(ok)
+    assert.are.equal(headline, buffer_text())
+    return err
+  end
+
+  it('restore_deleted_node marks a historical phantom', function ()
+    buffer_with('* (skg (historical (id g) (repo main)'
+                .. ' (diff (node removed) (rel removed))) (vid 0d)) g')
+    metadata.restore_deleted_node()
+    assert.is_true(subtree_p(first_metadata_sexp(),
+      '(skg (historical (id g) (editRequest restoreNode)))'))
+  end)
+
+  it('restore_removed_membership marks a removed member, editable or'
+     .. ' write-protected', function ()
+    for _, headline in ipairs({
+      '** (skg (node (id x) (repo main) (affectsParent false)'
+        .. ' (diff (rel removed) (leaves 1 rel))) (vid 0c)) x',
+      '**** (skg (node (id d) (repo main) (affectsParent false)'
+        .. ' writeProtected (diff (rel removed) (properties changed)'
+        .. ' (leaves 1 rel all))) (vid 0o)) d' }) do
+      buffer_with(headline)
+      metadata.restore_removed_membership()
+      assert.is_true(subtree_p(first_metadata_sexp(),
+        '(skg (node (editRequest restoreRel)))'))
+    end
+  end)
+
+  it('the restore commands refuse the wrong kind of headline', function ()
+    assert.are.equal(
+      'This node is deleted; restore it first (skg-restore-deleted-node)',
+      refusal_of('* (skg (historical (id g) (repo main)'
+                 .. ' (diff (node removed) (rel removed)))) g',
+                 metadata.restore_removed_membership))
+    for _, headline in ipairs({
+      '* (skg (node (id x) (repo main) (diff (rel added)))) x',
+      '* (skg (node (id x) (repo main))) x',
+      '* (skg (node (id d) (repo main) (affectsParent false)'
+        .. ' (birth roleGraft container) writeProtected'
+        .. ' (diff (rel removed)))) d' }) do
+      assert.are.equal('Only a removed membership can be restored',
+        refusal_of(headline, metadata.restore_removed_membership))
+    end
+    for _, headline in ipairs({
+      '* (skg (node (id x) (repo main) (diff (rel removed)))) x',
+      '* (skg (deleted (id x) (repo main))) x' }) do
+      assert.are.equal('Only a node deleted since HEAD can be restored',
+        refusal_of(headline, metadata.restore_deleted_node))
+    end
+  end)
+
+  it('the metadata editor offers the restore requests where they apply',
+     function ()
+    local metadata_edit = require('skg.metadata_edit')
+    for _, case in ipairs({
+      { '* (skg (historical (id g) (repo main) (diff (node removed)))) g',
+        { 'none (default)', 'restoreNode' } },
+      { '* (skg (node (id x) (repo main) (affectsParent false)'
+          .. ' (diff (rel removed)))) x',
+        { 'none (default)', 'delete', 'merge', 'restoreRel' } },
+      { '* (skg (node (id x) (repo main))) x',
+        { 'none (default)', 'delete', 'merge' } } }) do
+      buffer_with(case[1])
+      metadata_edit.edit_metadata()
+      assert.are.same(case[2],
+        metadata_edit.cycle_values_for_field('editRequest', 'none (default)'))
+      vim.api.nvim_buf_delete(0, { force = true })
+    end
+  end)
+
   it('beginning_of_line toggles between title and column zero',
      function ()
     buffer_with('* (skg (node (id 1))) my title')
@@ -313,6 +391,8 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('ShowOverriddenwardTree', by_lhs['po'])
     assert.are.equal('ShowSubscribeewardTree', by_lhs['ps'])
     assert.are.equal('SetMergeRequest', by_lhs['sm'])
+    assert.are.equal('RestoreDeletedNode', by_lhs['sn'])
+    assert.are.equal('RestoreRemovedMembership', by_lhs['sl'])
   end)
 
   it("opens the container folder with '<localleader>lc'", function ()

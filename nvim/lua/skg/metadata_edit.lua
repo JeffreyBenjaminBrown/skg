@@ -185,7 +185,7 @@ function M.cycle_values_for_field (field_name, field_value)
   if field_name == 'affectsParent' then
     return { 'true (default)', 'false', 'na' } end
   if field_name == 'editRequest' then
-    return { 'none (default)', 'delete', 'merge' } end
+    return M.edit_request_cycle_values() end
   if field_name == 'repo' then
     return M.repo_cycle_values(field_value) end
   if field_name == 'viewRequests' then
@@ -193,6 +193,37 @@ function M.cycle_values_for_field (field_name, field_value)
     -- are structured forms inserted by their dedicated commands.
     return { 'none (default)', 'editableView', 'writeProtectedView',
              'writeProtectedSubtreeView' } end
+  return nil
+end
+
+---The edit requests to cycle through for the headline being edited: a
+---historical phantom takes only restoreNode, a removed membership also
+---takes restoreRel ('docs/diff-view.org', "Restoring what a change
+---removed"). Mirrors skg-sexp-edit--edit-request-cycle-values.
+---@return string[]
+function M.edit_request_cycle_values ()
+  local source_sexp = M.source_sexp()
+  if metadata.historical_sexp_p(source_sexp) then
+    return { 'none (default)', 'restoreNode' } end
+  if metadata.removed_membership_p(source_sexp) then
+    return { 'none (default)', 'delete', 'merge', 'restoreRel' } end
+  return { 'none (default)', 'delete', 'merge' }
+end
+
+---The metadata sexp the current edit buffer was opened on, as its
+---source buffer still holds it, or nil.
+---@return any
+function M.source_sexp ()
+  local source_buf = vim.b.skg_edit_source_buf
+  if not source_buf or not vim.api.nvim_buf_is_valid(source_buf) then
+    return nil end
+  local line = vim.api.nvim_buf_get_lines(
+    source_buf, vim.b.skg_edit_line - 1, vim.b.skg_edit_line, false)[1]
+  if not line then return nil end
+  local ok, parsed = pcall(sexpr.read,
+    line:sub(vim.b.skg_edit_start + 1,
+             vim.b.skg_edit_start + vim.b.skg_edit_length))
+  if ok then return parsed end
   return nil
 end
 

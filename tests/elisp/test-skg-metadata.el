@@ -604,3 +604,99 @@ C-c p o must bind to distinct commands."
       (should (= save-count 0)))))
 
 (provide 'test-skg-metadata)
+
+;;; The diff view's restore requests
+
+(ert-deftest test-skg-restore-keybindings ()
+  "C-c s n and C-c s l are bound to the two restore commands."
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s n"))
+              'skg-restore-deleted-node))
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s l"))
+              'skg-restore-removed-membership)))
+
+(defun test-skg--metadata-after (headline command)
+  "The metadata of HEADLINE after COMMAND runs on it; the command
+must not save, so the buffer is all there is."
+  (with-temp-buffer
+    (org-mode)
+    (insert headline)
+    (goto-char (point-min))
+    (funcall command)
+    (test-skg--extract-metadata-sexp)))
+
+(defun test-skg--refusal-of (headline command)
+  "The message with which COMMAND refuses HEADLINE, leaving it as it was."
+  (with-temp-buffer
+    (org-mode)
+    (insert headline)
+    (goto-char (point-min))
+    (let ((refusal (condition-case err (progn (funcall command) nil)
+                     (user-error (cadr err)))))
+      (should (equal (buffer-string) headline))
+      refusal)))
+
+(ert-deftest test-skg-restore-deleted-node-marks-a-historical-phantom ()
+  "The request goes inside the historical phantom's form."
+  (should (skg-sexp-subtree-p
+           (test-skg--metadata-after
+            "* (skg (historical (id g) (repo main) (diff (node removed) (rel removed))) (vid 0d)) g"
+            #'skg-restore-deleted-node)
+           '(skg (historical (id g) (editRequest restoreNode))))))
+
+(ert-deftest test-skg-restore-removed-membership-marks-a-removed-member ()
+  "An editable removed member and a write-protected folder member
+carrying '(rel removed)' both take the request."
+  (dolist (headline
+           '("** (skg (node (id x) (repo main) (affectsParent false) (diff (rel removed) (leaves 1 rel))) (vid 0c)) x"
+             "**** (skg (node (id d) (repo main) (affectsParent false) writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vid 0o)) d"))
+    (should (skg-sexp-subtree-p
+             (test-skg--metadata-after
+              headline #'skg-restore-removed-membership)
+             '(skg (node (editRequest restoreRel)))))))
+
+(ert-deftest test-skg-restore-commands-refuse-the-wrong-kind ()
+  "Each command refuses a headline of the wrong kind at once."
+  (should (equal (test-skg--refusal-of
+                  "* (skg (historical (id g) (repo main) (diff (node removed) (rel removed)))) g"
+                  #'skg-restore-removed-membership)
+                 "This node is deleted; restore it first (skg-restore-deleted-node)"))
+  (dolist (headline
+           '("* (skg (node (id x) (repo main) (diff (rel added)))) x"
+             "* (skg (node (id x) (repo main))) x"
+             "* (skg (node (id d) (repo main) (affectsParent false) (birth roleGraft container) writeProtected (diff (rel removed)))) d"))
+    (should (equal (test-skg--refusal-of
+                    headline #'skg-restore-removed-membership)
+                   "Only a removed membership can be restored")))
+  (dolist (headline
+           '("* (skg (node (id x) (repo main) (diff (rel removed)))) x"
+             "* (skg (deleted (id x) (repo main))) x"))
+    (should (equal (test-skg--refusal-of headline #'skg-restore-deleted-node)
+                   "Only a node deleted since HEAD can be restored"))))
+
+(ert-deftest test-skg-metadata-editor-offers-the-restore-requests-where-they-apply ()
+  "The metadata editor's cycle of edit requests offers restoreNode on
+a historical phantom, restoreRel beside the others on a removed
+membership, and neither elsewhere."
+  (require 'skg-sexpr-cycling)
+  (dolist (case
+           '(("* (skg (historical (id g) (repo main) (diff (node removed)))) g"
+              . ("none (default)" "restoreNode"))
+             ("* (skg (node (id x) (repo main) (affectsParent false) (diff (rel removed)))) x"
+              . ("none (default)" "delete" "merge" "restoreRel"))
+             ("* (skg (node (id x) (repo main))) x"
+              . ("none (default)" "delete" "merge"))))
+    (let ((source (generate-new-buffer " *source*")))
+      (unwind-protect
+          (progn
+            (with-current-buffer source (insert (car case)))
+            (with-temp-buffer
+              (setq-local skg-sexp-edit--source-buffer source)
+              (setq-local skg-sexp-edit--start 3)
+              (setq-local skg-sexp-edit--end
+                          (with-current-buffer source
+                            (save-excursion
+                              (goto-char 3) (forward-sexp) (point))))
+              (should (equal (skg-sexp-edit--cycle-values-for-field
+                              "editRequest" "none (default)")
+                             (cdr case)))))
+        (kill-buffer source)))))

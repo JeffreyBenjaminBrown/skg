@@ -3528,3 +3528,89 @@ byte-identical; a readyRequest on the graft d marks Contains(d, c),
 so c under d, d's content marker ('(ready all)'), d's file ('(ready
 all)'), the folder ('(diff (ready))') and d as a folder member show
 ready, and that buffer saves back byte-identical.
+** Slice 7: deviations
+*** where the two requests live
+'NodeEditRequest' gained 'RestoreNode' and 'RestoreRel', but neither is
+kept inside 'Editability': the parser turns a 'RestoreNode' into
+'PhantomHistorical::restoreNode_request' and a 'RestoreRel' into
+'UnrestrictedVognode_Generic::restoreRel_request', both booleans, so a
+write-protected occurrence carries the second and no editable one holds
+either in its 'edit_request'. 'consume_edit_request_after_save' clears
+both.
+*** what the parser can see of "a removed member"
+The parser reads one headline, so it accepts 'restoreRel' on an
+unrestricted vognode that carries '(rel removed)' and has no role-graft
+birth; that is how a removed member and a folder member with a removed
+relationship read on the wire. A before-only role graft also carries
+'(rel removed)' since slice 6, and is refused, as the plan's list of
+places leaves it out. 'check_where_the_edit_request_sits'
+('parse_metadata_sexp.rs') runs once the whole metadata is read.
+*** the refusal texts
+The plan gives the text for 'restoreRel' on a historical phantom. For
+the other wrong kinds: "Only a node deleted since HEAD can be restored;
+restoreNode belongs on a historical phantom (skg-restore-deleted-node)"
+and "Only a removed membership can be restored; restoreRel belongs on a
+removed member, or on a folder member carrying (rel removed)
+(skg-restore-removed-membership)" (constants beside the parser). The
+clients show the first clause of each, and the plan's text whole. Any
+other edit request on a deleted or historical phantom now gets "A
+deleted node accepts no edit request but restoreNode, on a historical
+phantom" in place of "Unknown deleted key: editRequest". A restore
+request on an unknown phantom or at an alias's top level gets the
+restore texts too.
+*** where the save adds them
+'add_restore_instructions' ('server/diff_view/restore_requests.rs')
+runs in the save handler right after the save plan is built, on its
+disk-supplemented NodeInstructions and before delete propagation, the
+strandeds and the Hoist classification, so those see the restored
+writes. It builds the graph straddle only when the buffer carries a
+restore request; if the straddle cannot be built, the save stops with
+that error rather than drop the requests. A recorder the save already
+writes gains the relationship in its own Save; otherwise a Save of it
+is made from the live graph. A list the Save left unspecified is first
+filled from the live graph. Relationships are written in order of their
+index at HEAD, so two that land in one list keep their HEAD order.
+*** reasons to drop a request beyond the plan's
+Each with a warning: a 'restoreNode' whose node exists (a retried save,
+say, or an acquired node, whose ID is an extra ID now) or that the save
+already writes; a 'restoreRel' whose relationship is a link (it lives
+in its mentioner's text), or that HEAD does not record; and a
+relationship that HEAD recorded in a skgrepo the user does not own. An
+in-link of a restored node whose recorder is deleted is skipped
+silently, as the plan says.
+*** the metadata editor
+Both clients' cycles of edit requests read the headline the editor was
+opened on: a historical phantom cycles none and 'restoreNode', a removed
+membership adds 'restoreRel' to none, delete and merge. The editor fills
+in no default fields for a phantom, so on one the user adds the
+'editRequest' field before cycling it.
+*** the docs
+'docs/api-and-formats.org' has a new section "Edit requests:
+(editRequest ...)" under "Content view"; the relRepo and flag bullets
+moved there from the stats section. The glossary's "view request vs
+edit request" said 'toDelete', which is not the wire's word; it says
+'delete' now. 'docs/heralds.org' lists the two new heralds; their style
+keys are 'restoreNode' and 'restoreRel' (nonstandard).
+*** tests
+'tests/pruned_change_view/restore.rs': a removed content member, a '~-'
+container in a container folder, a removed subscription from a
+subscriber folder (it returns between s1 and s3), a deleted node with a
+container, a subscriber and content (its file, q's and t's lists, gd
+left deleted and shown as an unknown phantom under g), both requests in
+one save, a membership in a still-deleted node dropped with a warning,
+and the refusals stopping a save. The 'restore' fixture
+('tests/pruned_change_view/fixtures/restore/') is new; its g.skg at HEAD
+is in the writer's form, so the restored file is HEAD's byte for byte.
+Round trips and refusals of the grammar in
+'tests/diff_view/roundtrip/metadata.rs'; two herald rendering cases;
+the commands, keys and editor cycle in 'tests/elisp/test-skg-metadata.el'
+and 'tests/nvim/metadata_spec.lua'.
+*** verification
+nextest 908 passed; Emacs 387; Neovim 363 specs in 31 files, none
+failed. Integration: 34 of 35 passed, all but 'import-md-and-org', which
+fails at baseline. Over TCP on a scratch gitrepo instance of 'restore'
+('tests/results/17-slice7/verify/'): with restoreNode on g under q and
+restoreRel on gc under r, the save wrote g.skg as at HEAD, q (q1 g q2),
+t (subscribes to g) and r (contains gc), with no error or warning; the
+rerender shows g as a node, gd as an unknown phantom under it, and gc a
+member of r again, and saves back byte-identical.

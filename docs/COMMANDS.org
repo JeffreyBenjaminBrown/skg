@@ -488,6 +488,26 @@ and edits the acquirer's metadata to request a merge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
+*** C-c s n : skg-restore-deleted-node
+In a buffer of the diff view, on a historical phantom (a node deleted
+since HEAD, shown =☮ ∃-=), requests that the save write the node back
+as HEAD had it: its file in its home skgrepo, its own relationships
+included, and its place in each list that recorded it at HEAD (at its
+index there, in the skgrepo that recorded it), unless that recorder is
+itself deleted. The headline shows =restore node= until the save. On
+any other headline it refuses at once. It does not save. Save the view
+afterward to apply it. See "Restoring what a change removed" in
+[[./diff-view.org][the diff view's docs]].
+*** C-c s l : skg-restore-removed-membership
+In a buffer of the diff view, on a removed member, or on a member of
+a partner folder whose relationship to the folder's owner was removed
+(=~-=), editable or write-protected, requests that the save re-add that
+one relationship as HEAD recorded it. The headline shows =restore
+membership= until the save. On a historical phantom it refuses with
+"This node is deleted; restore it first (skg-restore-deleted-node)",
+and on any other headline likewise at once. It does not save. Save the view
+afterward to apply it. A relationship whose other end is still deleted
+is not restored; the save says so.
 *** C-c s r : skg-set-relRepo
 Sets the relRepo of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's

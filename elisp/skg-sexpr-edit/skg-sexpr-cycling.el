@@ -12,6 +12,11 @@
 (require 'skg-metadata)
 (require 'skg-state)
 
+;; Buffer-local in the edit buffer; defined in skg-sexpr-edit.el.
+(defvar skg-sexp-edit--source-buffer)
+(defvar skg-sexp-edit--start)
+(defvar skg-sexp-edit--end)
+
 ;;
 ;; Helpers
 ;;
@@ -46,7 +51,7 @@ Returns nil if the field is not cycleable."
    ((string= field-name "affectsParent")
     '("true (default)" "false" "na"))
    ((string= field-name "editRequest")
-    '("none (default)" "delete" "merge"))
+    (skg-sexp-edit--edit-request-cycle-values))
    ((string= field-name "repo") ;; from the config
     (skg-sexp-edit--repo-cycle-values field-value))
    ((string= field-name "viewRequests")
@@ -71,6 +76,30 @@ starts there rather than jumping to a bare repo name."
                                       (length " (default)")))
                         skgrepos))
         skgrepos))))
+
+(defun skg-sexp-edit--edit-request-cycle-values ()
+  "The edit requests to cycle through for the headline being edited.
+A historical phantom takes only restoreNode; a removed membership
+also takes restoreRel. The diff view's restore requests are
+described in 'docs/diff-view.org', \"Restoring what a change removed\"."
+  (let ((source-sexp (skg-sexp-edit--source-sexp)))
+    (cond ((skg-sexp-subtree-p source-sexp '(skg (historical)))
+           '("none (default)" "restoreNode"))
+          ((skg--removed-membership-p source-sexp)
+           '("none (default)" "delete" "merge" "restoreRel"))
+          (t '("none (default)" "delete" "merge")))))
+
+(defun skg-sexp-edit--source-sexp ()
+  "The metadata sexp the edit buffer was opened on, as its source
+buffer still holds it, or nil."
+  (when (and (bound-and-true-p skg-sexp-edit--source-buffer)
+             (buffer-live-p skg-sexp-edit--source-buffer))
+    (let ((start skg-sexp-edit--start)
+          (end skg-sexp-edit--end))
+      (with-current-buffer skg-sexp-edit--source-buffer
+        (ignore-errors
+          (car (read-from-string
+                (buffer-substring-no-properties start end))))))))
 
 ;;
 ;; Dispatch

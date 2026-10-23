@@ -142,6 +142,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s w") #'skg-request-write-protected)
     (define-key map (kbd "C-c s W") #'skg-request-write-protected-recursive)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
+    (define-key map (kbd "C-c s n") #'skg-restore-deleted-node)
+    (define-key map (kbd "C-c s l") #'skg-restore-removed-membership)
     (define-key map (kbd "C-c s r") #'skg-set-relRepo)
     (define-key map (kbd "C-c s R") #'skg-set-relRepo-recursive)
     (define-key map (kbd "C-c s x") #'skg-set-flag-search-matching)

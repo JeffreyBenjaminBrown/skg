@@ -599,6 +599,57 @@ the leaves whose recorder the buffer does not make editable (see
 them. A save and C-c r u compute it alike
 ('buffer_readiness_summary_for', 'server/diff_view/readiness_requests.rs').
 
+* Restoring what a change removed
+Two edit requests undo a removal from the diff view's buffers, without
+leaving them. Each is written by a command that refuses at once on the
+wrong kind of headline, and does not save; the parser refuses each
+there too. They are carried, applied and consumed like every edit
+request: the save collects them with its graph edits, and consumes them
+after the skgsave-commit; a save that stops for a confirmation or fails
+leaves them in the buffer.
+** '(editRequest restoreNode)': a deleted node
+C-c s n ('skg-restore-deleted-node'; Neovim '<localleader>sn',
+':SkgRestoreDeletedNode') writes it into a historical phantom, the only
+headline that accepts it (herald "restore node"). The save writes the
+node's file from the before-graph's copy of it (title, body, aliases,
+extra IDs, flags, home skgrepo, and its four relationship lists with
+their relRepos), as it writes any node. An out-link to a node still
+deleted is kept as HEAD recorded it, and shows as an unknown phantom.
+Then it re-adds the node's in-links, from the before-graph's inbound
+indexes: each node that recorded it at HEAD (as content, a
+subscription, an override or a hide) gains it in that list, at the
+index it had at HEAD, clamped to the list's length, in the skgrepo
+that recorded it, unless that recorder is itself deleted (it is
+skipped) or lists it already. A recorder the save already writes, as
+the buffer's editable occurrence of it, gains it there.
+** '(editRequest restoreRel)': a removed membership
+C-c s l ('skg-restore-removed-membership'; Neovim '<localleader>sl',
+':SkgRestoreRemovedMembership') writes it into an unrestricted vognode
+carrying '(rel removed)' that is no role graft: a removed member in
+content position, or a member of a partner folder whose relationship to
+the folder's viewparent was removed, editable or write-protected (herald
+"restore membership"). On a historical phantom it refuses with "This
+node is deleted; restore it first (skg-restore-deleted-node)". The save
+re-adds the one relationship the headline stands for (the readiness
+requests' 'relationship_to_viewparent' names it), as HEAD recorded it:
+at its index in the recorder's list at HEAD, clamped, in the skgrepo
+that recorded it. A request whose headline stands for no relationship
+(as under an acquisition folder), whose relationship is a link, has a
+deleted node at either end, or is not recorded at HEAD, is dropped with
+a warning naming the view id.
+** Both in one save
+The restored nodes come first, then the relationships, so a
+relationship restored in a save may name a node restored in the same
+save. A relationship that a restored node records is restored with its
+file.
+** The rerender
+The save's rerender shows the result as any save's does: the
+historical phantom of a restored node becomes the node again, and a
+removed member whose relationship returned becomes a member again. A
+change that no longer differs from HEAD leaves the change view; what
+the buffer still holds of it is kept or converted as "What a
+reconciler keeps" describes.
+
 * Stage and commit
 C-c r c ('skg-stage-and-commit') prompts once for a message and sends
 "stage and commit". The server stages the changed '.skg' files of

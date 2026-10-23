@@ -613,6 +613,63 @@ function M.set_merge_request (acquiree_id_or_link)
     'Merge request set for acquiree %s. Save to apply.', acquiree_skgid))
 end
 
+-- The diff view's restore requests ('docs/diff-view.org', "Restoring
+-- what a change removed"). The server refuses them on the wrong kind of
+-- headline with the same texts. Mirrors elisp/skg-metadata.el.
+
+M.restore_rel_on_a_deleted_node =
+  'This node is deleted; restore it first (skg-restore-deleted-node)'
+M.restore_node_on_a_node_not_deleted =
+  'Only a node deleted since HEAD can be restored'
+M.restore_rel_without_a_removed_membership =
+  'Only a removed membership can be restored'
+
+---@param metadata_sexp any
+---@return boolean is it a historical phantom?
+function M.historical_sexp_p (metadata_sexp)
+  return metadata_sexp ~= nil
+         and compare.subtree_p(metadata_sexp,
+                               { SKG, { sexpr.symbol('historical') } })
+end
+
+---@param metadata_sexp any
+---@return boolean is it an UnrestrictedVognode, no role graft, whose
+---'(diff ...)' says its relationship was removed?
+function M.removed_membership_p (metadata_sexp)
+  if not M.unrestrictedNode_sexp_p(metadata_sexp) then return false end
+  if M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'node', 'birth' }) then
+    return false end
+  local rel = M.sexp_cdr_at_path(metadata_sexp,
+                                 { 'skg', 'node', 'diff', 'rel' })
+  return rel ~= nil and #rel == 1
+         and sexpr.atom_text(rel[1]) == 'removed'
+end
+
+---Ask the next save to write back the deleted node at point, a
+---historical phantom: its file as HEAD had it, and its place in the
+---lists of the nodes that recorded it at HEAD. Does not save.
+function M.restore_deleted_node ()
+  if not M.historical_sexp_p(M.metadata_sexp_at_line_or_nil(nil)) then
+    error(M.restore_node_on_a_node_not_deleted, 0) end
+  M.edit_metadata_at_point(sexpr.read(
+    '(skg (historical (DELETE (editRequest)) (editRequest restoreNode)))'))
+  vim.notify('Restore request set. Save to apply.')
+end
+
+---Ask the next save to re-add the removed relationship at point: a
+---removed member's, or a folder member's carrying '(rel removed)', as
+---HEAD recorded it. Does not save.
+function M.restore_removed_membership ()
+  local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
+  if M.historical_sexp_p(metadata_sexp) then
+    error(M.restore_rel_on_a_deleted_node, 0) end
+  if not M.removed_membership_p(metadata_sexp) then
+    error(M.restore_rel_without_a_removed_membership, 0) end
+  M.edit_metadata_at_point(sexpr.read(
+    '(skg (node (DELETE (editRequest)) (editRequest restoreRel)))'))
+  vim.notify('Restore request set. Save to apply.')
+end
+
 ---An ID from TEXT, accepting org id links or bare IDs.
 ---@param text string
 ---@return string
