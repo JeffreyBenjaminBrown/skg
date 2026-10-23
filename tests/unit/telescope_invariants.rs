@@ -48,7 +48,7 @@ fn node_at (
   n }
 
 #[test]
-fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
+fn leak_shaped_membership_is_caught_and_honest_shapes_are_not (
 ) {
   let config        : SkgConfig = two_skgrepo_config ();
   let mut container : Graphnode = node_at ("container", "public");
@@ -70,7 +70,7 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
   assert_eq! ( violations . len (), 1, "{:?}", violations );
   assert! ( matches! (
     & violations [0],
-    TelescopeViolation::LeakShapedMember { member, member_home, .. }
+    TelescopeViolation::LeakShapedMembership { member, member_home, .. }
       if member . 0 == "secret" && member_home . 0 == "private" ));
 }
 
@@ -129,7 +129,7 @@ fn unconfigured_skgrepo_and_msv_relations_are_covered (
     . into_iter () . map ( |(_, v)| v ) . collect ();
   assert_eq! ( violations . len (), 2, "{:?}", violations );
   assert! ( violations . iter () . any ( |v| matches! (
-    v, TelescopeViolation::LeakShapedMember {
+    v, TelescopeViolation::LeakShapedMembership {
       relation : "subscribesTo", .. } )));
   assert! ( violations . iter () . any ( |v| matches! (
     v, TelescopeViolation::UnconfiguredRelRepo { .. } )));
@@ -156,7 +156,7 @@ fn absent_targets_use_recorder_home_for_all_four_relationships () {
   ] {
     assert! (violations . iter () . any (|violation| matches! (
       violation,
-      TelescopeViolation::AbsentTargetLeakShapedMember {
+      TelescopeViolation::AbsentTargetLeakShapedMembership {
         relation : actual, recorder_home, ..
       } if actual == &relation && recorder_home == &SkgrepoName::from ("private")))); }
   assert! (violations [0] . to_string () . contains (

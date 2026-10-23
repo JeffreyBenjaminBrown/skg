@@ -133,7 +133,7 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
       OverrideInvariantViolation::MultipleOwnedOverriders { overridden, .. })
       if overridden == &ID::from ("target"))));
   assert_eq! (report . warnings . iter () . filter (|(_, warning)| matches! (
-    warning, TelescopeViolation::LeakShapedMember {
+    warning, TelescopeViolation::LeakShapedMembership {
       relation : "overrides", .. })) . count (), 2);
 }
 

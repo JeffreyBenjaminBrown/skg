@@ -33,7 +33,7 @@ pub enum TelescopeViolation {
   /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
   /// bleeding.
-  LeakShapedMember {
+  LeakShapedMembership {
     relation    : &'static str,
     relRepo     : SkgrepoName,
     member      : ID,
@@ -42,7 +42,7 @@ pub enum TelescopeViolation {
   /// A dangling relationship recorded more publicly than its extant recorder.
   /// With no target home to consult, the recorder's home is the conservative
   /// privacy ceiling.
-  AbsentTargetLeakShapedMember {
+  AbsentTargetLeakShapedMembership {
     relation      : &'static str,
     relRepo       : SkgrepoName,
     member        : ID,
@@ -75,20 +75,20 @@ impl fmt::Display for TelescopeViolation {
     f : &mut fmt::Formatter<'_>,
   ) -> fmt::Result {
     match self {
-      TelescopeViolation::LeakShapedMember {
+      TelescopeViolation::LeakShapedMembership {
         relation, relRepo, member, member_home } =>
         write! ( f,
-          "leak-shaped {} member: relationship at relRepo '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relRepo (C-c s r). The leaking file's git history already contains the ID.",
+          "leak-shaped {} membership: relationship at relRepo '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relRepo (C-c s r). The leaking file's git history already contains the ID.",
           relation, relRepo, member, member_home ),
       TelescopeViolation::UnconfiguredRelRepo {
         relation, relRepo, member } =>
         write! ( f,
           "{} member '{}' carries relRepo '{}', which is not configured",
           relation, member, relRepo ),
-      TelescopeViolation::AbsentTargetLeakShapedMember {
+      TelescopeViolation::AbsentTargetLeakShapedMembership {
         relation, relRepo, member, recorder_home } =>
         write! ( f,
-          "leak-shaped {} member with absent target: relationship at relRepo '{}' names '{}'; because the target is absent, privacy is judged against the extant recorder's home '{}'. Move the membership with skg-set-relRepo (C-c s r).",
+          "leak-shaped {} membership with absent target: relationship at relRepo '{}' names '{}'; because the target is absent, privacy is judged against the extant recorder's home '{}'. Move the membership with skg-set-relRepo (C-c s r).",
           relation, relRepo, member, recorder_home ),
       TelescopeViolation::IgnoredForeignPidFolderlision {
         ignored_skgrepos } =>
@@ -129,14 +129,14 @@ pub fn telescope_violations_of (
       if config . is_strictly_more_public ( &m . relRepo, privacy_ceiling ) {
         match target_home {
           Some (home) =>
-          violations . push ( TelescopeViolation::LeakShapedMember {
+          violations . push ( TelescopeViolation::LeakShapedMembership {
             relation,
             relRepo   : m . relRepo . clone (),
             member      : m . member . clone (),
             member_home : home, } ),
           None =>
             violations . push (
-              TelescopeViolation::AbsentTargetLeakShapedMember {
+              TelescopeViolation::AbsentTargetLeakShapedMembership {
                 relation,
                 relRepo  : m . relRepo . clone (),
                 member     : m . member . clone (),
