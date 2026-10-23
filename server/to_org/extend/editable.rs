@@ -19,7 +19,7 @@
 //!   another occurrence first
 //!   ('make_writeProtected_if_repeat_then_extend_editable_map'). An
 //!   occurrence carrying an editable-view request ('ViewRequest::Editable',
-//!   C-c s d) defers to a Final occurrence elsewhere, becoming
+//!   C-c s d) yields to a Final occurrence elsewhere, becoming
 //!   write-protected and losing the request; otherwise it becomes
 //!   editable and Final, and a Tentative occurrence elsewhere is
 //!   write-protected with its whole content subtree
@@ -117,9 +117,11 @@ pub fn execute_view_requests (
 /// comment) to a node that carries a 'ViewRequest::Editable' (a user
 /// EVR, or one the cascade passed down).
 pub enum EditabilityOutcome {
-  /// An existing Final occurrence of this id won: the EVR was dropped and
-  /// the node left write-protected. No content extension should follow.
-  Deferred,
+  /// An existing Final occurrence of this id holds the editability
+  /// claim: the EVR was dropped, the node left write-protected and its
+  /// member children made non-members. No content extension should
+  /// follow.
+  ClaimedElsewhere,
   /// The node was made Final (and any prior Tentative occurrence of its id
   /// write-protectd). The caller extends its content next, and cascades.
   MadeFinal,
@@ -127,8 +129,9 @@ pub enum EditabilityOutcome {
 
 /// Apply the editability rule (see the module comment) for a node carrying
 /// 'ViewRequest::Editable', without extending its content:
-/// - defer to an existing Final occurrence (drop the EVR, stay
-///   write-protected) -> 'EditabilityOutcome::Deferred';
+/// - yield to an existing Final occurrence (drop the EVR, stay
+///   write-protected, make the member children non-members)
+///   -> 'EditabilityOutcome::ClaimedElsewhere';
 /// - otherwise write-protect any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
 ///   and clear the request -> 'EditabilityOutcome::MadeFinal'.
@@ -151,11 +154,14 @@ pub fn apply_editability_rule (
       // cascade EVR landing on a freshly-created editable child whose id
       // is already Final elsewhere; for a user EVR on an already-write-protected
       // node it is a no-op. The extend step then clobbers/refreshes it.)
+      // A write-protected occurrence holds no member, so the children
+      // it already shows become non-members.
       write_at_unrestrictedVognode_in_tree (
         viewforest, treeid,
         |t| { t . write_protect (); } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-      return Ok ( EditabilityOutcome::Deferred ); }
+      make_member_children_nonMembers ( viewforest, treeid ) ?;
+      return Ok ( EditabilityOutcome::ClaimedElsewhere ); }
     if prior . treeid () != treeid {
       writeProtect_content_subtree ( viewforest,
                                      prior . treeid (),

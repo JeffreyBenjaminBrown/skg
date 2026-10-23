@@ -437,8 +437,8 @@ fn update_normal_node (
     match apply_editability_rule (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config, context . editable_map ) ? {
-      EditabilityOutcome::Deferred => {
-        // Deferred to an existing Final occurrence: the node is now
+      EditabilityOutcome::ClaimedElsewhere => {
+        // Yielded to an existing Final occurrence: the node is now
         // write-protected; the content engine (settled) will clobber+return.
         settled = true; }
       EditabilityOutcome::MadeFinal => {

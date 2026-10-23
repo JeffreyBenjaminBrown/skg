@@ -144,6 +144,14 @@ fn parked_content_node_is_shown_once (
     |config, tantivy| Box::pin ( test_parked_content_node_is_shown_once (config, tantivy) )) }
 
 #[test]
+fn a_request_claimed_elsewhere_leaves_no_member (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-evcb-a-request-claimed-elsewhere-leaves-no-member", FIXTURES,
+    "/tmp/tantivy-test-evcb-a-request-claimed-elsewhere-leaves-no-member",
+    |config, tantivy| Box::pin ( test_a_request_claimed_elsewhere_leaves_no_member (config, tantivy) )) }
+
+#[test]
 fn budget_aliasfolder_is_neutral (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
@@ -1197,4 +1205,54 @@ async fn test_budget_spent_on_a_node_with_members (
                 "121..124 must be non-members under write-protected 12:\n{}", saved );
       save_view (
         &saved, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
+      Ok (( )) }
+
+// ===================================================
+// Test: a request claimed elsewhere leaves no member
+// ===================================================
+// Both roots carry an editable-view request, and the 12 under 1 shows
+// 122. Root 12 is made Final at its visit; root 1's cascade hands a
+// request to the 12 under 1, which, met later, yields: it is
+// write-protected and its member 122 becomes a non-member, so the
+// rerendered buffer saves unchanged.
+async fn test_a_request_claimed_elsewhere_leaves_no_member (
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+      let mut config : SkgConfig = config . clone ();
+      config . initial_node_limit = 100;
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (&config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None,};
+      let input : &str = indoc! {"
+        * (skg (node (id 1) (repo main) (viewRequests editableView))) 1
+        ** (skg (node (id 12))) 12
+        *** (skg (node (id 122) writeProtected omittedBody)) 122
+        * (skg (node (id 12) (repo main) writeProtected (viewRequests editableView))) 12
+      "};
+      let mut saved : Vec<String> = Vec::new ();
+      for buffer_index in 0 .. 2 {
+        let buffer : &str = if buffer_index == 0 { input } else { &saved [0] };
+        let (mut stream, _read_end) : (TcpStream, TcpStream) =
+          mk_test_tcp_stream_pair ();
+        let response : SaveResponse = update_from_and_rerender_buffer (
+          &mut stream, buffer, &config, tantivy, &graph,
+          &Err ( String::new () ), &mut views_state ) . await ?;
+        assert! ( response . errors . is_empty (),
+                  "the buffer must save, got {:?}\n\nbuffer:\n{}",
+                  response . errors, buffer );
+        saved . push (response . saved_view); }
+      let rerendered : &str = &saved [0];
+      println! ("The rerendered buffer:\n{}", rerendered);
+      let twelve_under_one : Vec<&str> = lines_starting (rerendered, "** (skg (node (id 12) ");
+      assert! ( twelve_under_one . len () == 1
+                && twelve_under_one [0] . contains ("writeProtected"),
+                "the 12 under 1 yields the claim:\n{}", rerendered );
+      let under_twelve : Vec<&str> =
+        subtree_headlines (rerendered, "** (skg (node (id 12) ");
+      assert! ( ! under_twelve . is_empty ()
+                && under_twelve . iter () . all ( |line| line . contains ("nonMember") ),
+                "a write-protected occurrence holds no member:\n{}", rerendered );
       Ok (( )) }
