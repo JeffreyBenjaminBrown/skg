@@ -351,7 +351,7 @@ fn keys_named_at (
 /// The ID a vognode's leaves are keyed by: a historical phantom's as
 /// written (a node of the before-graph), any other's resolved by
 /// 'pid_of'. None for a restricted vognode or a non-vognode.
-fn vognode_leaf_pid (
+pub(crate) fn vognode_leaf_pid (
   viewnode : &Viewnode,
   pid_of   : &dyn Fn (&ID) -> ID,
 ) -> Option<ID> {
@@ -392,7 +392,7 @@ pub fn apply_readiness_requests (
 /// content; under a partner folder, the relation of the folder,
 /// between it and the folder's viewparent. None at a root, or under
 /// anything else.
-fn relationship_to_viewparent (
+pub(crate) fn relationship_to_viewparent (
   node   : NodeRef<Viewnode>,
   pid    : &ID,
   pid_of : &dyn Fn (&ID) -> ID,

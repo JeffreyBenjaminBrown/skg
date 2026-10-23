@@ -26,6 +26,10 @@ use crate::serve::handlers::telescope_hoist::{
   repair_saves_for_unwritten_candidates,
 };
 use crate::diff_view::readiness_requests::consume_readiness_requests;
+use crate::diff_view::restore_requests::{
+  add_restore_instructions, viewforest_has_restore_requests};
+use crate::graph_straddle::build::current_graph_straddle_in_slot;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::handlers::text_release::{
   approved_pids_from_request as text_approved_pids_from_request,
 };
@@ -712,6 +716,22 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     fork_specs,
     post_skgsave_commit_notice_candidates }
     = save_plan;
+  let restore_warnings : Vec<String> =
+    // The restore requests become more graph edits, written from the
+    // before-graph of the graph straddle; built only when needed.
+    if viewforest_has_restore_requests (&viewforest) {
+      let straddle : std::sync::Arc<GraphStraddle> =
+        current_graph_straddle_in_slot (
+          &mut views_state . graph_straddle, &runtime . config,
+          runtime . graph . clone () )
+        . map_err ( |e| Box::new ( SaveError::BufferValidationErrors {
+            errors : vec! [ crate::types::errors::BufferValidationError::Other (
+              format! ( "The restore requests could not be applied: {}", e )) ],
+            warnings : parse_warnings . clone (), } ) as Box<dyn Error> ) ?;
+      add_restore_instructions (
+        &viewforest, &mut nonmerge_nodeInstructions,
+        &runtime . graph, &straddle, &runtime . config )
+    } else { Vec::new () };
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
     // this save will actually rewrite, not only what appeared in the buffer.
@@ -920,6 +940,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
       warnings . extend ( strandeds_warnings );
+      warnings . extend ( restore_warnings );
       warnings . extend ( readiness_warnings );
       warnings . extend (
         post_skgsave_commit_hiddenoutside_warnings (

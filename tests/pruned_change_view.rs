@@ -36,3 +36,5 @@ mod view_ids;
 mod order;
 #[path = "pruned_change_view/after_a_commit.rs"]
 mod after_a_commit;
+#[path = "pruned_change_view/restore.rs"]
+mod restore;

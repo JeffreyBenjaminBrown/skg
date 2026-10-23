@@ -14,7 +14,9 @@
 //! - 'partner_folders.rs': the partner folders over the straddle;
 //! - 'change_leaves.rs': the change-forest leaves and their readiness;
 //! - 'readiness_store.rs': the marks the user set;
-//! - 'readiness_requests.rs': where the store meets a viewforest.
+//! - 'readiness_requests.rs': where the store meets a viewforest;
+//! - 'restore_requests.rs': what a save writes for the two restore
+//!   requests.
 
 pub mod change_leaves;
 pub mod change_viewnodes;
@@ -25,4 +27,5 @@ pub mod partner_folders;
 pub mod pruned_change_view;
 pub mod readiness_requests;
 pub mod readiness_store;
+pub mod restore_requests;
 pub mod visit;

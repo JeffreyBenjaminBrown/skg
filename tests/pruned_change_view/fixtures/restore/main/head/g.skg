@@ -1,0 +1,7 @@
+title: g
+pid: g
+body: |2-
+  what g said
+contains:
+- gc
+- gd
