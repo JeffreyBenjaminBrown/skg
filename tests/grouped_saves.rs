@@ -2,6 +2,10 @@
 // and parsing/extraction tests. See tests/grouped_unit.rs for why
 // test files are grouped into a few [[test]] targets.
 
+#[path = "shared/git_fixture_helpers.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod git_fixture_helpers;
+
 #[path = "dangling_reference_renders_unknown_node.rs"]
 mod dangling_reference_renders_unknown_node;
 

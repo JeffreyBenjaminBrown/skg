@@ -9,7 +9,9 @@
 // subscribeeFolder content read it), so it belongs among the
 // grouped_overrides installers.
 
+use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use std::error::Error;
+use std::net::TcpStream;
 
 use indoc::indoc;
 
@@ -112,12 +114,6 @@ fn clone_overriding_on_disk (
              . any ( |m| m . member == ID::from (target) ) )
     . ok_or_else ( || format! (
         "no clone (overrides [{}]) on disk", target ) . into () ) }
-
-fn mk_test_tcp_stream () -> std::net::TcpStream {
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  std::net::TcpStream::connect (
-    listener . local_addr () . unwrap () ) . unwrap () }
 
 async fn fork_specs_from (
   buffer : &str,
@@ -281,7 +277,8 @@ async fn explicit_fork_round_trip_and_monogamy (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, EXPLICIT_FORK_BUFFER, config, tantivy, &graph,
      &Err ( String::new () ), &mut views_state,
@@ -370,7 +367,8 @@ async fn fork_no_owned_ancestor_defaults (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, FORK_ROOT_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
@@ -405,7 +403,8 @@ async fn fork_user_set_skgrepo_overrides (
     graph_straddle : None };
   let fork_skgrepos : HashMap<ID, SkgrepoName> =
     HashMap::from ([ ( ID::from ("N"), SkgrepoName::from ("owned2") ) ]);
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_skgrepos_test (
     &mut stream, FORK_BUFFER, config, tantivy, &graph, 
     &Err ( String::new () ), &mut views_state,
@@ -510,7 +509,8 @@ async fn fork_confirmation_gates_skgsave_commit (
     graph_straddle : None };
 
   // Unapproved save -> fork-confirmation, nothing skgsave-committed.
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_BUFFER, config, tantivy, &graph, 
     &Err ( String::new () ), &mut views_state,
@@ -526,7 +526,8 @@ async fn fork_confirmation_gates_skgsave_commit (
     "N must be untouched before approval" );
 
   // Approved re-issue -> skgsave-commits the clone.
-  let mut stream2 : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream2, _read_end2) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response2 = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream2, FORK_BUFFER, config, tantivy, &graph, 
     &Err ( String::new () ), &mut views_state,
@@ -607,7 +608,8 @@ async fn fork_from_bare_new_child_skgsave_commits (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
     &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, config, tantivy,
     &graph,  &Err ( String::new () ), &mut views_state,
@@ -662,7 +664,8 @@ async fn fork_monogamy (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
@@ -754,7 +757,8 @@ async fn fork_fixture_files (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
@@ -793,7 +797,8 @@ async fn fork_round_trip (
   let mut views_state : ViewsState = ViewsState {
     open_views     : OpenViews::new (),
     graph_straddle : None };
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   update_from_and_rerender_buffer (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
@@ -846,7 +851,8 @@ async fn fork_collateral_rerender_without_substitution (
   views_state . open_views . register_view (
     &graph_snap, collateral_view_id . clone (), p_view, &pids );
 
-  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let buffer : String = FORK_BUFFER . replace ("P-container", "P-edited");
   let response = update_from_and_rerender_buffer (
     &mut stream, &buffer, config, tantivy, &graph,

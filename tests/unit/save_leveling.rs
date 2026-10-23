@@ -695,7 +695,8 @@ fn relrepo_fact_and_request_round_trip_separately (
       ID::new ("n"), SkgrepoName::from ("public"), "N" . to_string () );
   t . viewStats . relRepo = Some ( SkgrepoName::from ("private") );
   t . relRepo_request = Some ( SkgrepoName::from ("secret") );
-  let viewnode : Viewnode = viewnode_of (ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ));
+  let viewnode : Viewnode =
+    viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ));
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let rendered : String =
@@ -762,7 +763,9 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
         flag : Flag::NoSearchMatching,
         value, }); }
     else { unreachable! (); }
-    let mut node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)));
+    let mut node : Viewnode =
+      viewnode_of ( ViewnodeKind::Vognode (
+        Vognode::Unrestricted (restriction) ));
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (

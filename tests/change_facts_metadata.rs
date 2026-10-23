@@ -6,6 +6,7 @@
 // renders, then parses back to the same viewnode. Its '(leaves ...)'
 // renders and parses back to nothing.
 
+use crate::git_fixture_helpers::with_facts;
 use skg::org_to_text::{FolderChangeFacts, folder_change_facts, viewnode_to_string};
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
@@ -59,15 +60,6 @@ fn assert_round_trip (
       &metadata, node . title () . to_string (), node . body () . cloned () );
   assert_eq! ( error, None );
   assert_eq! ( Viewnode::try_from (parsed) . unwrap (), node ); }
-
-fn with_facts (
-  mut node : Viewnode,
-  change_facts      : ChangeFacts,
-  readiness_request : Option<ReadinessRequest>,
-) -> Viewnode {
-  node . change_facts = change_facts;
-  node . readiness_request = readiness_request;
-  node }
 
 #[test]
 fn a_vognode_round_trips_its_presence_readiness_and_request () {

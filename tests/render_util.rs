@@ -66,7 +66,9 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
       ID::from ("cheese-node"), skgrepo . clone (),
       "Cooking" . to_string () );
   unrestricted_node . viewStats . homeSkgrepoAtBoundary = true;
-  let node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (unrestricted_node)));
+  let node : Viewnode =
+    viewnode_of ( ViewnodeKind::Vognode (
+      Vognode::Unrestricted (unrestricted_node) ));
   let config = SkgConfig::dummyFromSkgrepos (HashMap::from ([
     ( skgrepo . clone (), Skgrepo {
         name         : skgrepo,

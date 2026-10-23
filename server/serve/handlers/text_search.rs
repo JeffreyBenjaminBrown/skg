@@ -689,8 +689,9 @@ pub fn build_search_viewforest (
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliasfolder_mut : NodeMut<Viewnode> =
             viewforest . get_mut (aliasfolder_skgid) . unwrap ();
-          aliasfolder_mut . append ( viewnode_of (ViewnodeKind::Property (Property::Alias {
-                text       : title . clone (),
-                relRepo : None,
-                relRepo_request : None } )) ); }} }
+          aliasfolder_mut . append ( viewnode_of (
+            ViewnodeKind::Property ( Property::Alias {
+              text            : title . clone (),
+              relRepo         : None,
+              relRepo_request : None } )) ); }} }
   (viewforest, search_results) }

@@ -29,16 +29,6 @@ use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
 
-fn mk_test_tcp_stream ()
-  -> TcpStream
-{ let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let addr : std::net::SocketAddr =
-    listener . local_addr () . unwrap ();
-  let write_end : TcpStream =
-    TcpStream::connect (addr) . unwrap ();
-  write_end }
-
 /// Add (viewRequests editableView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request an editable view.
 /// Subscribees are UnrestrictedVognode children of SubscribeeFolders.
@@ -78,7 +68,8 @@ async fn save_buffer_for_hidden_subscriptions_test (
   graph       : &InRustGraphHandle,
   views_state : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let mut stream : TcpStream = mk_test_tcp_stream ();
+  let (mut stream, _read_end) : (TcpStream, TcpStream) =
+    mk_test_tcp_stream_pair ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
     buffer, config, tantivy, graph,
@@ -411,7 +402,8 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       ) . await?;
     let edited : String =
       extended_subscribee_edit_view (&extended, "delete");
-    let mut stream : TcpStream = mk_test_tcp_stream ();
+    let (mut stream, _read_end) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer (
       &mut stream, &edited, config, tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
@@ -787,7 +779,8 @@ async fn test_subscribee_and_filter_folders (
       let mut views_state : ViewsState = ViewsState {
         open_views            : OpenViews::new (),
         graph_straddle        : None,};
-      let mut stream : TcpStream = mk_test_tcp_stream ();
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
           &modified_view, &config, tantivy, &graph,
@@ -856,7 +849,8 @@ async fn test_hidden_within_but_none_without (
       let mut views_state : ViewsState = ViewsState {
         open_views            : OpenViews::new (),
         graph_straddle        : None,};
-      let mut stream : TcpStream = mk_test_tcp_stream ();
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
           &modified_view, &config, tantivy, &graph,
@@ -1082,7 +1076,8 @@ async fn test_hidden_without_but_none_within (
       let mut views_state : ViewsState = ViewsState {
         open_views            : OpenViews::new (),
         graph_straddle        : None,};
-      let mut stream : TcpStream = mk_test_tcp_stream ();
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
         &modified_view, &config, tantivy, &graph,
@@ -1126,7 +1121,8 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
           &ID ("R" . to_string()) )?;
     let edited : String =
       add_e11_to_hiddenoutside_folder (&initial_view);
-    let mut stream : TcpStream = mk_test_tcp_stream ();
+    let (mut stream, _read_end) : (TcpStream, TcpStream) =
+      mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer (
       &mut stream, &edited, config, tantivy, &graph,
       &Err (String::new ()), &mut views_state ) . await ?;
@@ -1218,7 +1214,8 @@ async fn test_overlapping_hidden_within (
       let mut views_state : ViewsState = ViewsState {
         open_views            : OpenViews::new (),
         graph_straddle        : None,};
-      let mut stream : TcpStream = mk_test_tcp_stream ();
+      let (mut stream, _read_end) : (TcpStream, TcpStream) =
+        mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
         &modified_view, &config, tantivy, &graph,

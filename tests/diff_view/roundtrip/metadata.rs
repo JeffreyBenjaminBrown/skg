@@ -1,6 +1,7 @@
 // Each of the diff view's viewnodes renders its metadata, then
 // parses back to the same viewnode.
 
+use crate::git_fixture_helpers::with_facts;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
@@ -27,13 +28,6 @@ fn request_all () -> Option<ReadinessRequest> {
     ready   : true,
     objects : [ DiffObject::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
 
-fn with_facts (
-  kind              : ViewnodeKind,
-  change_facts      : ChangeFacts,
-  readiness_request : Option<ReadinessRequest>,
-) -> Viewnode {
-  Viewnode { change_facts, readiness_request, .. viewnode_of (kind) } }
-
 /// Render 'node', check its metadata against 'expected', parse it
 /// back with its headline and body, and check that the result is
 /// 'node' again.
@@ -59,7 +53,7 @@ fn property (
   change_facts      : ChangeFacts,
   readiness_request : Option<ReadinessRequest>,
 ) -> Viewnode {
-  with_facts ( ViewnodeKind::Property (property),
+  with_facts ( viewnode_of ( ViewnodeKind::Property (property) ),
                change_facts, readiness_request ) }
 
 #[test]
@@ -128,10 +122,10 @@ fn removed_aliases_and_ids_round_trip () {
 fn a_historical_phantom_round_trips () {
   assert_round_trip (
     with_facts (
-      ViewnodeKind::Vognode ( Vognode::Phantom (
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
         Phantom::Historical ( PhantomHistorical {
           skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
-          title : "gone" . into (), body : Some ("its body\n" . into ()) } ))),
+          title : "gone" . into (), body : Some ("its body\n" . into ()) } )))),
       ChangeFacts {
         presence : DiffPresence { node : Some (NodeSign::Minus),
                                   rel  : Some (Sign::Minus) },

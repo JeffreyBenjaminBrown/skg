@@ -91,7 +91,11 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
-  let folder : NodeId = tree . get_mut (r) . unwrap () . append ( viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)) ) . id ();
+  let folder : NodeId =
+    tree . get_mut (r) . unwrap ()
+    . append ( viewnode_of (
+      ViewnodeKind::PartnerFolder (PartnerFolder::Container) ))
+    . id ();
   reconcile_partnerFolder_children (
     folder, &mut tree, PartnerFolder::Container,
     PartnerFolderGoalSource::GraphStraddle (&f . straddle),

@@ -1,8 +1,10 @@
-// Git and stream helpers for the tests over git fixtures (the graph
-// straddle and the diff view) and for other tests that need a gitrepo
-// or a stream pair. Declared once per test target that uses it, in
+// Git, stream and viewnode helpers for the tests over git fixtures
+// (the graph straddle and the diff view) and for other tests that need
+// a gitrepo, a stream pair or a viewnode carrying change facts.
+// Declared once per test target that uses it, in
 // 'tests/grouped_repos.rs', 'tests/grouped_unit.rs',
-// 'tests/grouped_views.rs' and 'tests/grouped_overrides.rs'.
+// 'tests/grouped_views.rs', 'tests/grouped_overrides.rs' and
+// 'tests/grouped_saves.rs'.
 
 use git2::Repository;
 use std::error::Error;
@@ -14,6 +16,7 @@ use skg::test_utils::copy_dir_all;
 use skg::types::misc::SkgrepoName;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::nodes::fs::GraphnodeOnDisk;
+use skg::types::viewnode::{ChangeFacts, ReadinessRequest, Viewnode};
 
 //
 // Git helpers
@@ -84,6 +87,18 @@ pub fn mk_test_tcp_stream_pair ()
   let (read_end, _) =
     listener . accept () . unwrap ();
   (write_end, read_end) }
+
+//
+// Viewnode helpers
+//
+
+/// 'node' with these change facts and this readiness request.
+pub fn with_facts (
+  node              : Viewnode,
+  change_facts      : ChangeFacts,
+  readiness_request : Option<ReadinessRequest>,
+) -> Viewnode {
+  Viewnode { change_facts, readiness_request, .. node } }
 
 //
 // Test setup helper
