@@ -285,7 +285,7 @@ none, (reset-strandeds (RELATION RECORDER MEMBER) ...)."
      `((reset-strandeds ,@(cdr strandeds-review))))))
 
 (defun skg--current-save-point-position ()
-  "WHAT IT DOES: Return point position data that should survive the save redraw:
+  "WHAT IT DOES: Return point position data that should survive the save's rerender:
 - text-line offset: relative to the focused headline
 - column: the character offset of point within its line
 - screen-line offset: relative to the top *visible* line of the window

@@ -84,7 +84,7 @@ do
 end
 
 -- PHASE 2: mark every root, recursively. Each gesture saves, which
--- redraws the buffer, so the roots are found afresh. A root an
+-- rerenders the buffer, so the roots are found afresh. A root an
 -- earlier gesture already readied is skipped: the gesture toggles, so
 -- it would unready it.
 print('=== PHASE 2: Mark everything commit-ready ===')

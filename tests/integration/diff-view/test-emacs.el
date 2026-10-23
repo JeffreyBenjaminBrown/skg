@@ -100,7 +100,7 @@
     (switch-to-buffer buf)
     (setq root-count (length (root-headline-positions)))
     (dotimes (i root-count)
-      ;; Each gesture saves, which redraws the buffer, so find the
+      ;; Each gesture saves, which rerenders the buffer, so find the
       ;; i-th root afresh. A root an earlier gesture already readied
       ;; is skipped: the gesture toggles, so it would unready it.
       (goto-char (nth i (root-headline-positions)))

@@ -21,7 +21,7 @@
 -- The atom protocol is unchanged from the Emacs client: 'folded' on
 -- each headline hidden inside a folded ancestor, 'bodyFolded' on each
 -- visible headline whose body is hidden; both round-trip through the
--- server, are acted on after each redraw, and are stripped from the
+-- server, are acted on after each rerender, and are stripped from the
 -- buffer the user edits.
 
 local compare = require('skg.sexpr.compare')

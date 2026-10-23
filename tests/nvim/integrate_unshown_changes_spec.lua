@@ -43,7 +43,7 @@ describe('skg integrate unshown changes', function ()
     assert.are.equal(0, #requests)
   end)
 
-  it('sends the request on a clean buffer and redraws it', function ()
+  it('sends the request on a clean buffer and rerenders it', function ()
     local requests, notices = {}, {}
     vim.notify = function (text) table.insert(notices, text) end
     server = helpers.connect_to_fake_server(function (line, respond)

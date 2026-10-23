@@ -176,10 +176,6 @@ function M.register_rerender_stream_handlers ()
         log.log('error', 'rerender',
                 'rerender-lock handler error: %s', tostring(err))
       end
-      local retry = M.overPrivateText_challenged and M.overPrivateText_retry or nil
-      M.overPrivateText_retry = nil
-      M.overPrivateText_challenged = false
-      if retry then vim.schedule(retry) end
     end, true)
   state.register_response_handler('rerender-view',
     function (payload_text, response)
@@ -214,6 +210,10 @@ function M.register_rerender_stream_handlers ()
         vim.notify('skg: rerender-done handler error: '
                    .. tostring(err))
       end
+      local retry = M.overPrivateText_challenged and M.overPrivateText_retry or nil
+      M.overPrivateText_retry = nil
+      M.overPrivateText_challenged = false
+      if retry then vim.schedule(retry) end
       local after_empty = M.after_empty_stream
       M.after_empty_stream = nil
       if after_empty then vim.schedule(after_empty) end

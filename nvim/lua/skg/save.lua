@@ -1,7 +1,7 @@
 -- PURPOSE: The save pipeline: ship the buffer to the server, drive
 -- the four-handler response stream (save-lock -> save-relax-lock ->
 -- collateral-view* -> save-result | fork-confirmation), restore
--- point/scroll/folds after the redraw, and run the fork-confirmation
+-- point/scroll/folds after the rerender, and run the fork-confirmation
 -- flow. The Lua port of elisp/skg-request-save.el.
 
 local buffer = require('skg.buffer')
@@ -265,7 +265,7 @@ function M.save_request_string (view_id, position, approved_forks,
   return sexpr.to_string(request) .. '\n'
 end
 
----Point position data that survives the save redraw: the line offset
+---Point position data that survives the save's rerender: the line offset
 ---below the focused headline (stable because that headline rides the
 ---wire as metadata), the byte column within the line, and the screen
 ---line below the window top.

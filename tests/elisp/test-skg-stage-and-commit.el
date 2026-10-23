@@ -88,7 +88,7 @@ when every changed file is ready; \"yes\" resends confirmed."
      (funcall (gethash 'stage-and-commit handlers) 'fake-proc
               "((needs-confirmation . t) (already-staged ((\"/data/public\" \"notes.txt\" \"a b.skg\") (\"/data/private\" \"c.skg\"))) (readiness-summary (ready 3) (changed 3) (foreign 0) (order-only 0) (notEditable 0)) (errors ()) (warnings ()))")
      (should (equal (car (funcall prompts))
-                    "Commit ready. All 3 of 3 changed files are ready. Staged already, so committed too: /data/public (notes.txt, a b.skg); /data/private (c.skg). Type yes to commit anyway: "))
+                    "Commit ready. All 3 of 3 changed files are ready. Already staged, so committed too: /data/public (notes.txt, a b.skg); /data/private (c.skg). Type yes to commit anyway: "))
      (funcall skg--rerender-after-empty-stream)
      (should (string-match-p (regexp-quote "(confirmed . t)")
                              (car (funcall sent)))))))
@@ -101,7 +101,7 @@ when every changed file is ready; \"yes\" resends confirmed."
                   (read "((commits ()) (errors (\"skgrepo private: no git author is configured\")) (warnings ()))"))
                  "Nothing was committed. Errors: skgrepo private: no git author is configured")))
 
-(ert-deftest test-stage-and-commit-redraws-an-emptied-view ()
+(ert-deftest test-stage-and-commit-rerenders-an-emptied-view ()
   "The server writes an empty view as '(content \"\")'; it empties the buffer."
   (with-temp-buffer
     (skg-content-view-mode)

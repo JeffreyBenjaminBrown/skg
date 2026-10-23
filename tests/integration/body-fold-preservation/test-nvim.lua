@@ -87,7 +87,7 @@ local function bfp_build_buffer (name)
     'child body line two',
   }, '\n') .. '\n'
   -- The trailing newline matches the server's rendering convention,
-  -- so the redraw does not change the line count under the snapshot.
+  -- so the rerender does not change the line count under the snapshot.
   return buffer.open_org_buffer_from_text(content, 'skg://bfp-' .. name)
 end
 

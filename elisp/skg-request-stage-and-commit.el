@@ -7,7 +7,7 @@
 ;;; has entries already staged, the server asks for confirmation
 ;;; instead and changes nothing; only the typed word "yes" resends the
 ;;; request confirmed. Every answer is followed by a rerender
-;;; stream, which after a commit redraws the open buffers of the
+;;; stream, which after a commit rerenders the open buffers of the
 ;;; diff view.
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org.
@@ -74,7 +74,7 @@ types exactly \"yes\"."
   "The prompt's clause for ALREADY-STAGED, '((GITREPO PATH...) ...)', or
 the empty string when there is none."
   (if (null already-staged) ""
-    (format ". Staged already, so committed too: %s"
+    (format ". Already staged, so committed too: %s"
             (mapconcat
              (lambda (gitrepo-and-paths)
                (format "%s (%s)"

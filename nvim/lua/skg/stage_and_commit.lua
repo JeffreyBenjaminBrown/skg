@@ -5,7 +5,7 @@
 -- has entries already staged, the server asks for confirmation
 -- instead and changes nothing; only the typed word "yes" resends the
 -- request confirmed. Every answer is followed by a rerender
--- stream, which after a commit redraws the open buffers of the
+-- stream, which after a commit rerenders the open buffers of the
 -- diff view. The Lua port of elisp/skg-request-stage-and-commit.el.
 
 local buffer = require('skg.buffer')
@@ -75,7 +75,7 @@ function M.already_staged_message (already_staged)
     table.insert(gitrepos, string.format('%s (%s)',
       sexpr.atom_text(gitrepo_and_paths[1]), table.concat(paths, ', ')))
   end
-  return '. Staged already, so committed too: '
+  return '. Already staged, so committed too: '
     .. table.concat(gitrepos, '; ')
 end
 

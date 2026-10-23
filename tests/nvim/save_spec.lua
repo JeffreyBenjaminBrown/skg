@@ -185,7 +185,7 @@ describe('skg.save pipeline', function ()
     lock.end_stream()
   end)
 
-  it('round-trips a save: atoms out, redraw in, point restored',
+  it('round-trips a save: atoms out, rerender in, point restored',
      function ()
     local seen_request = nil
     server = helpers.connect_to_fake_server(function (line, respond)
@@ -215,7 +215,7 @@ describe('skg.save pipeline', function ()
     end, 10)
     -- The request went out with the atoms embedded.
     assert.is_truthy(seen_request:find('view_id-save', 1, true))
-    -- The buffer holds the redraw, atoms stripped.
+    -- The buffer holds the rerendered text, atoms stripped.
     local text = table.concat(
       vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
     assert.is_falsy(text:find('focused', 1, true))

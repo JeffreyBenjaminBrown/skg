@@ -4,7 +4,7 @@
 -- editable or appends a root on its own; this command asks the server
 -- to, for the current buffer. The answer carries the readiness
 -- summary, as a save's does, and a rerender stream follows it,
--- carrying the redrawn buffer. The Lua port of
+-- carrying the rerendered buffer. The Lua port of
 -- elisp/skg-request-integrate-unshown-changes.el.
 
 local readiness = require('skg.readiness')

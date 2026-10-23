@@ -5,7 +5,7 @@
 ;;; readiness requests, '(readyRequest OBJECTS)' or '(unreadyRequest
 ;;; OBJECTS)', into headline metadata, then saves. The save consumes
 ;;; them, setting or clearing the marks, and answers with the buffer
-;;; redrawn and the readiness summary.
+;;; rerendered and the readiness summary.
 ;;;
 ;;; The server says which leaves (single changes) a headline names:
 ;;; it writes '(leaves N OBJECT...)' in the headline's '(diff ...)'

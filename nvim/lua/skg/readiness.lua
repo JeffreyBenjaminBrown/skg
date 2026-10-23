@@ -3,7 +3,7 @@
 -- readiness requests, '(readyRequest OBJECTS)' or '(unreadyRequest
 -- OBJECTS)', into headline metadata, then saves. The save consumes
 -- them, setting or clearing the marks, and answers with the buffer
--- redrawn and the readiness summary.
+-- rerendered and the readiness summary.
 -- The Lua port of elisp/skg-readiness.el, which describes how the
 -- '(leaves N OBJECT...)' part of the server's '(diff ...)' form says
 -- which leaves a headline names. Neovim has no prefix argument, so each recursive form is its

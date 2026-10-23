@@ -33,7 +33,7 @@ describe('skg stage and commit', function ()
   end)
 
   ---Answer the first request with NEEDS_CONFIRMATION, the second with
-  ---commits and a redrawn, now empty, view.
+  ---commits and a rerendered, now empty, view.
   local function serve (requests)
     return helpers.connect_to_fake_server(function (line, respond)
       table.insert(requests, line)
@@ -116,7 +116,7 @@ describe('skg stage and commit', function ()
       return #prompts == 2 and lock.stream_in_progress == nil end, 10)
     assert.are.equal(
       'Commit ready. All 3 of 3 changed files are ready.'
-      .. ' Staged already, so committed too: /data/public (notes.txt, a b.skg).'
+      .. ' Already staged, so committed too: /data/public (notes.txt, a b.skg).'
       .. ' Type yes to commit anyway: ',
       prompts[2])
     assert.are.equal(1, #requests, vim.inspect(requests))
