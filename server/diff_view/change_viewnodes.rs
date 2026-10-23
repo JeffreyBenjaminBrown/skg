@@ -118,7 +118,8 @@ pub fn mk_historical_viewnode (
         skgid        : pid . clone (),
         home_skgrepo : before . home_skgrepo . clone (),
         title        : before . title . clone (),
-        body         : before . body . clone () } )))) } ) }
+        body         : before . body . clone (),
+        restoreNode_request : false } )))) } ) }
 
 /// Under 'phantom', the historical phantom of 'pid' standing where
 /// content stands, what it holds: if a nodeMerge acquired it, an "it

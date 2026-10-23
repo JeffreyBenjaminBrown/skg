@@ -79,6 +79,7 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       relRepo_request : u . relRepo_request,
+      restoreRel_request : u . restoreRel_request,
       view_requests  : u . view_requests,
       editability   : u . editability,
     })
@@ -146,6 +147,7 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       relRepo_request : t . relRepo_request,
+      restoreRel_request : t . restoreRel_request,
       view_requests  : t . view_requests,
       editability   : t . editability,
     }
@@ -260,6 +262,7 @@ impl Default for MpUnrestrictedVognode {
       graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),
       relRepo_request : None,
+      restoreRel_request : false,
       view_requests  : HashSet::new(),
       editability    : Editability::Editable {
         body         : None,

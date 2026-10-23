@@ -55,6 +55,8 @@
     "unreadyRequest":                  "nonstandard",
     "delete":                          "nonstandard",
     "merge":                           "nonstandard",
+    "restoreNode":                     "nonstandard",
+    "restoreRel":                      "nonstandard",
     "editRequest_relRepo":             "nonstandard",
     "editRequest_flag":                "nonstandard",
     "viewRequests":                    "nonstandard",

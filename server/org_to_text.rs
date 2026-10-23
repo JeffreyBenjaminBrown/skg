@@ -457,13 +457,18 @@ fn unrestrictedVognode_metadata_to_string (
         return Some ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (skgrepo) ) ); }
+      if unrestrictedVognode . restoreRel_request {
+        return Some ( "(editRequest restoreRel)" . to_string () ); }
       unrestrictedVognode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (skgid) => format! ( "(merge {})", skgid . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
           NodeEditRequest::SetFlag { flag, value } =>
             format! ( "(flag {} {})",
-              flag . wire_name (), value ) };
+              flag . wire_name (), value ),
+          // Parsed into fields outside 'Editability', never kept here.
+          NodeEditRequest::RestoreNode => "restoreNode" . to_string (),
+          NodeEditRequest::RestoreRel  => "restoreRel" . to_string () };
         format! ( "(editRequest {})", edit_str ) } ) }
     fn view_requests ( unrestrictedVognode : & UnrestrictedVognode
                      ) -> Option < String > {
@@ -542,7 +547,8 @@ fn phantomDeleted_metadata_to_string (
   parts . join (" ") }
 
 /// Render metadata for a PhantomHistorical:
-///   (skg [focused] [folded] (historical (id X) (repo S) ...))
+///   (skg [focused] [folded] (historical (id X) (repo S)
+///                                       [(editRequest restoreNode)] ...))
 fn phantomHistorical_metadata_to_string (
   focused         : bool,
   org_folded      : bool,
@@ -560,6 +566,8 @@ fn phantomHistorical_metadata_to_string (
       format! ("(repo {})",
                metadata_value_atom (&historical . home_skgrepo)) ]
     . into_iter ()
+    . chain ( historical . restoreNode_request . then (
+      || "(editRequest restoreNode)" . to_string () ))
     . chain ( change_fact_forms (facts, request) )
     . collect ();
   parts . push ( format! ( "(historical {})", historical_parts . join (" ") ));

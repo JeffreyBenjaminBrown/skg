@@ -230,6 +230,14 @@
 (skg (node (id x) (editRequest (merge y))))
 ---- text: merge:y
 ---- styles: nonstandard*7
+==== diff view: a request to restore a removed membership
+(skg (node (id x) (affectsParent false) writeProtected (editRequest restoreRel) (diff (rel removed))))
+---- text: ⊥☮ restore membership ~-
+---- styles: crucial*2 -*1 nonstandard*18 -*1 nonstandard*2
+==== diff view: a request to restore a deleted node
+(skg (historical (id g) (repo main) (editRequest restoreNode) (diff (node removed) (rel removed))))
+---- text: ☮ restore node ∃- ~-
+---- styles: crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
 ==== diff view: a new member whose node object is ready
 (skg (node (id x) (diff (node added) (rel added) (ready node))))
 ---- text: ∃+✓ ~+

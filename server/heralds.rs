@@ -478,7 +478,11 @@ pub fn herald_rule_table () -> HeraldRule {
         s ("☮"),
         vac ("id"),
         vac ("repo") ]),
-      rule ("historical", change_fact_rules_for_two_objects ()),
+      rule ("historical", [
+        // Its one edit request, beside its change facts.
+        vec! [ rule ("editRequest", vec! [
+          leaf ("restoreNode", "restore node") ]) ],
+        change_fact_rules_for_two_objects () ] . concat ()),
       // A restricted vognode is anonymous and dataless: the bare
       // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
       // non-vognode atoms. Its id/repo would leak hidden content, so
@@ -535,6 +539,7 @@ pub fn herald_rule_table () -> HeraldRule {
           leaf ("delete", "delete"),
           crule ("merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
+          leaf ("restoreRel", "restore membership"),
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]),
           crule_styled_as ("editRequest_flag", "flag", vec! [
@@ -713,6 +718,9 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // are matched literally so its herald can describe the complete state
     // change rather than echoing two context-free arguments.
     "delete", "merge", "flag", "true", "false",
+    // The diff view's restore requests, on a historical phantom and on
+    // a removed membership.
+    "restoreNode", "restoreRel",
   ];
   // Flag-viewnode heralds match every public wire name.  Keeping this derived
   // from the registry makes adding a flag a conformance-checked change.

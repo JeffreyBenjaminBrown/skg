@@ -305,6 +305,10 @@ pub struct PhantomHistorical {
   pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
+  /// True when the user asked, by '(editRequest restoreNode)', that
+  /// the save write the node back as HEAD recorded it. The only edit
+  /// request a phantom carries; consumed after the save.
+  pub restoreNode_request : bool,
 }
 
 /// An anonymous "something from a restricted repo is/was here"
@@ -348,6 +352,12 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   /// A requested skgrepo for this occurrence's binding relationship. Unlike
   /// `viewStats.relRepo`, this is save intent.
   pub relRepo_request : Option<SkgrepoName>,
+  /// True when the user asked, by '(editRequest restoreRel)', that the
+  /// save re-add the relationship to the viewparent that this removed
+  /// member stands for, as HEAD recorded it. Like 'relRepo_request', it
+  /// concerns that relationship rather than the node, so it lives
+  /// outside 'Editability': a write-protected occurrence carries it too.
+  pub restoreRel_request : bool,
 
   pub view_requests : HashSet < ViewRequest >,
   pub editability  : Editability,
@@ -578,6 +588,13 @@ pub enum NodeEditRequest {
   NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
   SetFlag { flag : Flag, value : bool },
+  // The diff view's two restore requests ('docs/diff-view.org',
+  // "Restoring what a change removed"). Neither lives in
+  // 'Editability': a parsed RestoreNode becomes
+  // 'PhantomHistorical::restoreNode_request', a parsed RestoreRel
+  // 'UnrestrictedVognode_Generic::restoreRel_request'.
+  RestoreNode, // write back a node deleted since HEAD
+  RestoreRel,  // re-add a relationship removed since HEAD
 }
 
 /// Which relation's folders a 'Folder' view-request builds. A Folder
@@ -1060,11 +1077,14 @@ impl Viewnode {
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
         restriction . relRepo_request = None;
+        restriction . restoreRel_request = false;
         if let Editability::Editable { edit_request, .. } =
           &mut restriction . editability
         { *edit_request = None; }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         unknown . relRepo_request = None,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
+        historical . restoreNode_request = false,
       ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =>
         *relRepo_request = None,
       _ => {}, }}
@@ -1140,6 +1160,8 @@ impl fmt::Display for NodeEditRequest {
       NodeEditRequest::Delete    => write!(f, "toDelete"),
       NodeEditRequest::SetFlag { flag, value } => write! (
         f, "(flag {} {})", flag . wire_name (), value),
+      NodeEditRequest::RestoreNode => write!(f, "restoreNode"),
+      NodeEditRequest::RestoreRel  => write!(f, "restoreRel"),
     }} }
 
 impl FromStr for NodeEditRequest {
@@ -1149,7 +1171,9 @@ impl FromStr for NodeEditRequest {
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "toDelete" => Ok (NodeEditRequest::Delete),
+      "toDelete"    => Ok (NodeEditRequest::Delete),
+      "restoreNode" => Ok (NodeEditRequest::RestoreNode),
+      "restoreRel"  => Ok (NodeEditRequest::RestoreRel),
       _ => {
         // Try to parse as "merge <id>"
         if let Some (id_str) = s . strip_prefix ("merge ") {
@@ -1218,6 +1242,7 @@ pub fn default_unrestrictedVognode (
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relRepo_request : None,
+    restoreRel_request : false,
     view_requests  : HashSet::new(),
     editability    : Editability::Editable {
       body         : None,

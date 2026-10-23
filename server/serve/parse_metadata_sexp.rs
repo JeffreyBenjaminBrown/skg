@@ -14,7 +14,8 @@
 ///                                 [(contents N)]
 ///                                 [(linksIn N)])]
 ///                         [(editRequest <delete | (merge ID) | (relRepo REPO)
-///                                       | (flag FLAG true|false)>)]
+///                                       | (flag FLAG true|false)
+///                                       | restoreRel>)]
 ///                         [(viewRequests REQUEST...)]
 ///                         [(diff [(node added|removed)]
 ///                                [(rel added|removed)]
@@ -28,8 +29,13 @@
 ///   diff view's properties other than bodyDiff. A changed folder,
 ///   '(KIND changed)', may carry '(diff (ready))' at top level, and
 ///   nothing else in it.
+///   'restoreRel' is valid only on a node carrying '(rel removed)' that
+///   is no role graft: a removed member, or a folder member whose
+///   relationship to the folder's viewparent was removed. It may sit
+///   beside 'writeProtected'.
 ///   The diff view's own viewnodes:
-///     (historical (id ID) (repo REPO) ...)   a historical phantom
+///     (historical (id ID) (repo REPO) [(editRequest restoreNode)] ...)
+///                                            a historical phantom
 ///     (oldText titleAndBody | title | body)  the text at HEAD
 ///     bodyDiff
 ///     (homeSkgrepoMove (old REPO) (new REPO))
@@ -188,6 +194,9 @@ pub fn viewnode_from_metadata (
                              . unwrap_or_else ( || SkgrepoName::from ("")),
               title,
               body,
+              restoreNode_request : matches! (
+                metadata . edit_request,
+                Some (NodeEditRequest::RestoreNode) ),
             } ) )), None, None )
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Vognode (MpVognode::Phantom (
@@ -278,13 +287,19 @@ pub fn viewnode_from_metadata (
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
       // MpUnrestrictedVognode
-      { let editability : Editability =
+      { let restoreRel_request : bool = // lives outside 'Editability'
+          matches! ( metadata . edit_request,
+                     Some (NodeEditRequest::RestoreRel) );
+        let edit_request : Option<NodeEditRequest> =
+          if restoreRel_request { None }
+          else { metadata . edit_request . clone () };
+        let editability : Editability =
           if metadata . writeProtected
           { Editability::WriteProtected }
           else
           { Editability::Editable {
               body,
-              edit_request : metadata . edit_request . clone () } };
+              edit_request : edit_request . clone () } };
         // An edit_request on a write-protected node has nowhere to live
         // (Editability::WriteProtected carries none), so the user's
         // instruction to delete or merge would silently vanish. Emit a
@@ -295,10 +310,11 @@ pub fn viewnode_from_metadata (
         // (A relRepo request is not among these: it belongs to the
         // relationship from the view-parent, so it is the view-parent's
         // instruction. 'writeProtected_relRepo_request_errors' checks
-        // that some editable node collects it.)
+        // that some editable node collects it. Nor is a restoreRel
+        // request, which likewise concerns that relationship.)
         let error : Option<BufferValidationError> =
           if     metadata . writeProtected
-              && metadata . edit_request . is_some ()
+              && edit_request . is_some ()
           { metadata . skgid . clone ()
             . map ( |skgid| BufferValidationError::EditRequestOnWriteProtectedOccurrence (
                       skgid, headline . clone () )) }
@@ -312,6 +328,7 @@ pub fn viewnode_from_metadata (
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
+            restoreRel_request,
             view_requests    : metadata . view_requests . clone (),
             editability, };
         let node_kind : MpViewnodeKind =
@@ -451,6 +468,9 @@ pub fn parse_metadata_to_viewnodemd (
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
             parse_editrequest_sexp (
               &items[1..], &mut request_metadata ) ?;
+            if let Some (message) = misplaced_restore_request_message (
+                 &request_metadata . edit_request, false ) {
+              return Err (message); }
             if request_metadata . edit_request . is_some () {
               return Err ( "Only Alias may carry a top-level editRequest relRepo"
                            . to_string () ); }
@@ -593,7 +613,68 @@ pub fn parse_metadata_to_viewnodemd (
                        | Property::ChangesetMarker { .. } )) )
   { return Err ( "A top-level diff is valid only on alias, id and flag properties, the diff view's properties other than bodyDiff, and changed folders"
                  . to_string () ); }
+  check_where_the_edit_request_sits (&result) ?;
   Ok (result) }
+
+/// What the parser says to a restoreRel on a historical phantom.
+pub const RESTORE_REL_ON_A_DELETED_NODE : &str =
+  "This node is deleted; restore it first (skg-restore-deleted-node)";
+/// What the parser says to a restoreNode anywhere but on a historical
+/// phantom.
+pub const RESTORE_NODE_ON_A_NODE_NOT_DELETED : &str =
+  "Only a node deleted since HEAD can be restored; restoreNode belongs on a historical phantom (skg-restore-deleted-node)";
+/// What the parser says to a restoreRel anywhere but on a removed
+/// membership.
+pub const RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP : &str =
+  "Only a removed membership can be restored; restoreRel belongs on a removed member, or on a folder member carrying (rel removed) (skg-restore-removed-membership)";
+
+/// The refusal of a restore request on a headline that cannot carry
+/// it, given whether the headline is a historical phantom; None for
+/// any other request.
+fn misplaced_restore_request_message (
+  request       : &Option<NodeEditRequest>,
+  is_historical : bool,
+) -> Option<String> {
+  match request {
+    Some (NodeEditRequest::RestoreNode) =>
+      Some ( RESTORE_NODE_ON_A_NODE_NOT_DELETED . to_string () ),
+    Some (NodeEditRequest::RestoreRel) if is_historical =>
+      Some ( RESTORE_REL_ON_A_DELETED_NODE . to_string () ),
+    Some (NodeEditRequest::RestoreRel) =>
+      Some ( RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP . to_string () ),
+    _ => None, } }
+
+/// A phantom carries no edit request but a historical phantom's
+/// restoreNode; restoreRel sits only on an unrestricted vognode that
+/// carries '(rel removed)' and is no role graft. The other requests
+/// keep the places their own checks give them.
+fn check_where_the_edit_request_sits (
+  metadata : &ViewnodeMetadata,
+) -> Result<(), String> {
+  let is_phantom : bool =
+    metadata . is_deleted_node || metadata . is_historical_node;
+  let is_unrestricted_vognode : bool =
+    metadata . non_vognode . is_none ()
+    && ! is_phantom
+    && ! metadata . is_dead_viewnode
+    && ! metadata . is_restricted_node
+    && metadata . unknown_node_skgid . is_none ();
+  match &metadata . edit_request {
+    Some (NodeEditRequest::RestoreNode) if metadata . is_historical_node =>
+      Ok (( )),
+    Some (NodeEditRequest::RestoreRel)
+      if is_unrestricted_vognode
+      && metadata . birth == Birth::Unremarkable
+      && metadata . change_facts . change . rel == Some (Existence::Removed) =>
+      Ok (( )),
+    request @ Some (NodeEditRequest::RestoreNode | NodeEditRequest::RestoreRel) =>
+      Err ( misplaced_restore_request_message (
+        request, metadata . is_historical_node )
+            . expect ("a restore request") ),
+    Some (_) if is_phantom =>
+      Err ( "A deleted node accepts no edit request but restoreNode, on a historical phantom"
+            . to_string () ),
+    _ => Ok (( )), } }
 
 /// The folder a bare folder atom names.
 fn folder_kind_of_atom (
@@ -731,6 +812,9 @@ fn parse_unknownnode_sexp (
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
             parse_editrequest_sexp (
               &subitems[1..], &mut request_metadata ) ?;
+            if let Some (message) = misplaced_restore_request_message (
+                 &request_metadata . edit_request, false ) {
+              return Err (message); }
             if request_metadata . edit_request . is_some () {
               return Err ( "Unknown supports only an editRequest relRepo"
                            . to_string () ); }
@@ -814,6 +898,16 @@ fn parse_deleted_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . home_skgrepo = Some ( SkgrepoName::from (value)); },
+          "editRequest" => {
+            // Where a phantom's request may sit is checked once the
+            // whole metadata is read ('check_where_the_edit_request_sits').
+            if metadata . edit_request . is_some () {
+              return Err ( "node editRequest may appear only once"
+                           . to_string () ); }
+            parse_editrequest_sexp ( &subitems[1..], metadata ) ?;
+            if metadata . relRepo_request . is_some () {
+              return Err ( "A deleted node accepts no edit request but restoreNode, on a historical phantom"
+                           . to_string () ); }},
           "diff" =>
             parse_diff_form ( &subitems[1..], metadata ) ?,
           _ => { return Err ( format! ( "Unknown deleted key: {}",
@@ -922,6 +1016,10 @@ fn parse_editrequest_sexp (
           atom_to_string (element) ?;
         match bare_value . as_str () {
           "delete" => metadata . edit_request = Some (NodeEditRequest::Delete),
+          "restoreNode" =>
+            metadata . edit_request = Some (NodeEditRequest::RestoreNode),
+          "restoreRel" =>
+            metadata . edit_request = Some (NodeEditRequest::RestoreRel),
           _ => {
             return Err ( format! ( "Unknown editRequest value: {}",
                                     bare_value )); }} },
