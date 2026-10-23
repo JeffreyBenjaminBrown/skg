@@ -972,7 +972,7 @@ a change of that node: its old text, its home skgrepo move, its
 changeset markers, its "it acquired" folder, its changed folders, its
 removed members, and, under a member, the relRepo move of the
 member's relationship. A rerender keeps a change viewnode the shallow
-model subtree still produces and detaches the rest.
+model subtree still produces and converts the rest ([[*the one rule: convert, then prune][the one rule]]).
 
 *** per-visit step
 
@@ -1004,11 +1004,11 @@ a shallow model subtree.
 *** managed child
 
 A child viewnode that a reconciler matches against what it should
-show, and so may convert ([[*the one rule: convert, then prune][the one rule]]); the older reconciler's
-predicates say which ('complete_managed_children'), and its
-[[*owner][owner]] is that reconciler. The diff view's reconciler detaches a
-managed child with nothing of the user's below it, and converts one
-under which something of the user's stands.
+show, and so may convert ([[*the one rule: convert, then prune][the one rule]]); its [[*owner][owner]] is that
+reconciler. The older reconciler's predicates say which children it
+manages ('complete_managed_children'); the diff view's reconciler
+manages the children it owns, of the kinds the model of each call
+concerns, since it runs several models under one parent.
 
 *** the one rule: convert, then prune
 
@@ -1030,6 +1030,16 @@ viewnodes (and childless deleted phantoms and empty write-protected
 folders), never a view root. A viewnode nobody owns -- one the user
 typed or pasted -- is never converted, so it holds its ancestors
 alive: whatever stands below a converted child survives under it.
+
+The diff view's reconciler converts by the same function, and first
+converts what was made below the stale child for the same model
+('convert_unwarranted_subtree' in
+'server/diff_view/shallow_model_subtree.rs'): postorder, every
+viewnode below it but the user's and the content reconciler's (which a
+parked vognode keeps, as the older reconciler's does), so that a
+folder's members go with the folder and a member's role tree with the
+member. A viewnode left holding only childless dead viewnodes is
+converted as a leaf.
 
 A converted copy is the one duplicate shape the save accepts: under
 an editable parent two editable copies of a node are refused, and so
@@ -1058,14 +1068,10 @@ A member of a content list is owned by the content reconciler and a
 member of a folder by that folder's reconciler, whoever typed it,
 since membership is a fact of the graph that its reconciler
 maintains. The owner is recorded per [[*view id, vid][view id]] in the view's state
-('ViewIdRecord'), never inferred from a viewnode's shape.
-
-*** the user's viewnode
-
-A viewnode neither reconciler created ('is_the_users_viewnode'): an
-unrestricted vognode born 'Unremarkable', carrying no sign, and not a
-member of the folder it stands in. Its reconciler leaves it where it
-stands.
+('ViewIdRecord'), never inferred from a viewnode's shape. In the diff view a member that stops being one, because its
+relationship is in the before-graph only or its viewparent became a
+historical phantom, becomes the diff view's reconciler's, which shows
+it as removed.
 
 *** match key
 

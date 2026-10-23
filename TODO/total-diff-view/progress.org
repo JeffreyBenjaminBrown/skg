@@ -3390,3 +3390,78 @@ its container leaves l gone and m parked write-protected with mc a
 non-member, and that buffer saves; x's containerFolder parks b with
 the note when b drops x, readopts the same viewnode (same vid) when b
 contains x again, with one b in the folder, and the buffer saves.
+** Slice 5: deviations
+*** the owner lookup, and a kind selector beside it
+'reconcile_children_with_shallowModelSubtree' takes the calling
+reconciler's 'Owner' in place of the managed predicate: it manages
+only children with that owner, and gives it to what it creates
+('append_copy_of_subtree' takes the owner too). One reconciler runs
+several models under one editable node (the change viewnodes, the
+removed members, a member's relRepo move), so each call also passes a
+kind selector saying which of its own children that model concerns
+('is_front_change_viewnode' is now such a selector; the removed
+members' call selects unrestricted vognodes and historical phantoms).
+The selectors test kind, not authorship; below a kept child every
+keyed child with the owner is managed.
+*** what is converted below a stale child
+'convert_unwarranted_subtree' ('shallow_model_subtree.rs') replaces
+the detach and 'detach_the_servers_below': postorder, every child of a
+viewnode being converted is converted too, except the user's and the
+content reconciler's, which stay (a parked vognode keeps its content,
+as the older reconciler's does). A folder's members, which are its
+folder reconciler's, go with the folder, which is what makes "the
+changed folder is gone" hold; a viewnode holding only childless dead
+viewnodes is converted as a leaf, so a stale child with nothing of
+the user's below is pruned whole.
+*** the member role trees are the role-tree attach's
+Slice 1 gave the role trees under a changed folder's members to the
+diff view's reconciler. They are now 'Owner::RoleTreeAttach', and
+'attach_memberRoleTrees_under_straddle_folder_members' reconciles only
+them, so the folder's visit and the member's own visit no longer
+reconcile each other's viewnodes. That settles the problem entry of
+c1's old text replaced on every save; the test
+('a_change_shown_only_in_a_container_folder_becomes_editable_there')
+now compares the buffers with their view ids. A historical role graft
+under an editable folder member was likewise remade at every visit.
+*** members that change owner
+'align_content_members_with_straddle' gives a member it sets aside
+to the diff view's reconciler, and counts every unrestricted vognode
+that reconciler owns as a removed member (so a converted, parked one
+is adopted back as a member when its relationship returns), in place
+of 'is_unrestricted_removed_member' there. A historical phantom's visit
+gives the content reconciler's children under it to the diff view's
+reconciler ('claim_children_of_the_content_reconciler'), so its old
+content adopts the former member. That settles the problem entry of
+the former member shown twice: 'a_deleted_then_restored_node_keeps_the_folding_of_its_subtree'
+again asserts cy2 directly under the phantom, once, and no longer
+drops a duplicate. 'is_unrestricted_removed_member' stays where it
+reads the encoding outside the reconciler ('child_data.rs',
+'pruned_change_view.rs').
+*** a name that would lie
+'detach_change_viewnodes' (named in the plan's code map) converts now,
+and is 'convert_change_viewnodes'.
+*** the fixture
+'commit_leftovers' ('tests/pruned_change_view/fixtures/') is
+'removed_partners' plus p (contains b, both states), hm (both) and h
+(contains hm, HEAD only), the throwaway run's fixture. It is a fixture
+of its own rather than an extension of 'removed_partners', whose
+tests would all have moved (b goes under p).
+*** tests
+'tests/pruned_change_view/after_a_commit.rs': the commit's rerender
+(the parked x with xc and its view id, the childless x under b gone,
+h a deleted root holding nothing, no folder left, the stage-and-commit
+check, and the committed buffer saves back to itself), a note under
+the editable removed member, a note under the write-protected one
+(same view id). 'note', 'parent_line_of' and 'saved_and_rerendered'
+moved from 'users_notes.rs' to 'common.rs'. The existing 'users_notes'
+tests passed unchanged.
+*** verification
+nextest 894 passed (one collision in a full run, passing alone); Emacs
+382; Neovim 359 specs in 31 files, none failed. Integration: every
+test passed but 'import-md-and-org', which fails at baseline. Over TCP
+on a scratch gitrepo instance of 'commit_leftovers'
+('tests/results/17-slice5/verify/'): the "all changes" buffer saves
+back byte-identical; with a note under the removed x, stage-and-commit
+rerenders x under e as a write-protected non-member holding the note
+and xc, h as a deleted root, no folder or fact left; that buffer saves
+back byte-identical.

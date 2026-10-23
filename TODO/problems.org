@@ -3,35 +3,6 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* Problems noticed while keeping kept children in place (2026-10-23)
-** A deleted node's former member shows twice under its historical phantom
-  In 'a_deleted_then_restored_node_keeps_the_folding_of_its_subtree'
-  ('tests/pruned_change_view/folding.rs', the 'sets' fixture), cy1 is
-  deleted from the diff view while its member cy2 stands under it.
-  The rerender makes cy1 a historical phantom holding two lines for
-  cy2: the old content its visit creates (a removed member,
-  '(affectsParent false)' with '(presence node~ rel-)'), and the
-  former member, which 'is_the_users_viewnode' takes for the user's
-  (an unremarkable unrestricted vognode with no relationship fact),
-  so the diff view's reconciler does not manage it. When the user
-  restores cy1, both become members ('align_content_members_with_straddle')
-  and the content reconciler keeps the first as the duplicate's
-  survivor. Since the old content is created first (slice 3 of
-  'TODO/total-diff-view/17_plan.org'), that is the old content, and
-  the former member's fold state is lost; the test now drops the
-  duplicate before restoring. Slice 5 replaces the shape test with
-  the owner table; whether that settles this is to be checked there.
-* Problems noticed while giving viewnodes view ids (2026-10-23)
-** The diff view replaces a folder member's old text on every save
-  With view ids the replacement shows: saving unchanged the buffer of
-  'a_change_shown_only_in_a_container_folder_becomes_editable_there'
-  ('tests/pruned_change_view/recomputed_sets.rs') gives c1's old text,
-  under m's container folder, a new vid each time. Probably
-  'attach_memberRoleTrees_under_straddle_folder_members'
-  ('server/diff_view/partner_folders.rs') reconciles c1's children
-  against a model of its role trees alone, detaches the old text as
-  stale, and c1's own visit makes it again. Slice 5 of
-  'TODO/total-diff-view/17_plan.org' rewrites that reconciler.
 * Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
 ** Repo moves do graph logic in the client
 The Emacs client computes which relationships a repo move strands, from

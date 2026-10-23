@@ -356,3 +356,47 @@ pub fn assert_lines_in_order (
       Some (at) => rest = &rest [ at + line . len () .. ],
       None => panic! ( "expected, in order, {:?}; missing {:?} in\n{}",
                        lines, line, buffer ), }}}
+
+/// A new headline of the user's that affects no parent, 'stars' deep.
+/// It names no skgrepo: it inherits that of its nearest unrestricted
+/// ancestor, through a phantom or a folder.
+pub fn note (
+  stars : usize,
+  title : &str,
+) -> String {
+  format! ( "{} (skg (node (affectsParent false))) {}",
+            "*" . repeat (stars), title ) }
+
+/// Save 'buffer', then save what the save rendered: both without errors,
+/// and the second rendering the same as the first. Returns it.
+pub fn saved_and_rerendered (
+  f      : &mut Fixture,
+  buffer : &str,
+) -> Result<String, Box<dyn Error>> {
+  let first : SaveResponse = save (f, buffer) ?;
+  assert! ( first . errors . is_empty (),
+            "the save must succeed, got {:?}\n{}", first . errors, buffer );
+  let second : SaveResponse = save (f, &first . saved_view) ?;
+  assert! ( second . errors . is_empty (),
+            "the second save must succeed, got {:?}\n{}",
+            second . errors, first . saved_view );
+  assert_eq! ( second . saved_view, first . saved_view,
+               "a rerender keeps what the first rendered" );
+  Ok (second . saved_view) }
+
+/// The headline of the parent of the one line whose title is 'title'.
+pub fn parent_line_of (
+  buffer : &str,
+  title  : &str,
+) -> String {
+  let headlines : Vec<&str> =
+    buffer . lines () . filter ( |line| line . starts_with ('*') ) . collect ();
+  let suffix : String = format! (" {}", title);
+  let matching : Vec<usize> = (0 .. headlines . len ())
+    . filter ( |&i| headlines [i] . ends_with (&suffix) ) . collect ();
+  assert_eq! ( matching . len (), 1, "one headline titled {:?} in\n{}", title, buffer );
+  let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
+  let at : usize = matching [0];
+  without_vids ( headlines [.. at] . iter () . rev ()
+    . find ( |line| depth (line) + 1 == depth (headlines [at]) )
+    . unwrap_or_else ( || panic! ( "{:?} has no parent in\n{}", title, buffer )) ) }

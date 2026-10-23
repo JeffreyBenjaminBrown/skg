@@ -34,3 +34,5 @@ mod users_notes;
 mod view_ids;
 #[path = "pruned_change_view/order.rs"]
 mod order;
+#[path = "pruned_change_view/after_a_commit.rs"]
+mod after_a_commit;

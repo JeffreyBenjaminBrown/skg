@@ -10,59 +10,14 @@
 
 use skg::metadata_canon::without_vids;
 use crate::pruned_change_view::common::{
-  assert_lines_in_order, insert_after_line_starting, open_all_changes_buffer,
-  rerendered_view_content, save, send_stage_and_commit_request, with_fixture};
-use crate::git_fixture::Fixture;
+  assert_lines_in_order, insert_after_line_starting, note, open_all_changes_buffer,
+  parent_line_of, rerendered_view_content, saved_and_rerendered,
+  send_stage_and_commit_request, with_fixture};
 
-use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 
 use std::error::Error;
-
-/// A new headline of the user's that affects no parent, 'stars' deep.
-/// It names no skgrepo: it inherits that of its nearest unrestricted
-/// ancestor, through a phantom or a folder.
-fn note (
-  stars : usize,
-  title : &str,
-) -> String {
-  format! ( "{} (skg (node (affectsParent false))) {}",
-            "*" . repeat (stars), title ) }
-
-/// Save 'buffer', then save what the save rendered: both without errors,
-/// and the second rendering the same as the first. Returns it.
-fn saved_and_rerendered (
-  f      : &mut Fixture,
-  buffer : &str,
-) -> Result<String, Box<dyn Error>> {
-  let first : SaveResponse = save (f, buffer) ?;
-  assert! ( first . errors . is_empty (),
-            "the save must succeed, got {:?}\n{}", first . errors, buffer );
-  let second : SaveResponse = save (f, &first . saved_view) ?;
-  assert! ( second . errors . is_empty (),
-            "the second save must succeed, got {:?}\n{}",
-            second . errors, first . saved_view );
-  assert_eq! ( second . saved_view, first . saved_view,
-               "a rerender keeps what the first rendered" );
-  Ok (second . saved_view) }
-
-/// The headline of the parent of the one line whose title is 'title'.
-fn parent_line_of (
-  buffer : &str,
-  title  : &str,
-) -> String {
-  let headlines : Vec<&str> =
-    buffer . lines () . filter ( |line| line . starts_with ('*') ) . collect ();
-  let suffix : String = format! (" {}", title);
-  let matching : Vec<usize> = (0 .. headlines . len ())
-    . filter ( |&i| headlines [i] . ends_with (&suffix) ) . collect ();
-  assert_eq! ( matching . len (), 1, "one headline titled {:?} in\n{}", title, buffer );
-  let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
-  let at : usize = matching [0];
-  without_vids ( headlines [.. at] . iter () . rev ()
-    . find ( |line| depth (line) + 1 == depth (headlines [at]) )
-    . unwrap_or_else ( || panic! ( "{:?} has no parent in\n{}", title, buffer )) ) }
 
 const MEMBER_A : &str = "**** (skg (node (id a) (repo main) writeProtected";
 const GRAFT_P  : &str =

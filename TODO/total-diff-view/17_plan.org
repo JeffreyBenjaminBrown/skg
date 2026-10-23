@@ -1009,7 +1009,7 @@ prepass, hidden content, orphaned folders, the one rule in the
 docs, the tests. Run all four suites. This slice is the plan's
 largest; the agent commits it in several commits, the validators
 and the convert function first.
-** TODO Slice 5: convert, then prune in the diff view
+** DONE Slice 5: convert, then prune in the diff view
 The diff view's reconciler, the owner lookup in place of the
 shape predicates, the historical phantom's old content, the
 commit paragraph, the extended fixture and its tests. Run all
