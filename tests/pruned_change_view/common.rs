@@ -223,14 +223,30 @@ pub fn integrate_unshown_changes (
   Ok (( rerendered_view_content (&response), not_editable )) }
 
 /// Retitle 'node' to 'title' by saving a content view of it, as
-/// another buffer would. Returns the "all changes" buffer as its
-/// client then holds it: 'buffer', or its collateral rerendering if
-/// the save sent one.
+/// another buffer would; see 'edit_in_a_content_view'.
 pub fn retitle_in_a_content_view (
   f      : &mut Fixture,
   node   : &str,
   title  : &str,
   buffer : &str,
+) -> Result<String, Box<dyn Error>> {
+  edit_in_a_content_view ( f, node, buffer, |text : &str| {
+    let root_line : &str = text . lines () . next () . unwrap ();
+    text . replacen (
+      root_line,
+      &format! ( "{} {}", &root_line [ .. root_line . rfind (' ') . unwrap () ],
+                 title ),
+      1 ) } ) }
+
+/// Save a content view of 'node', its text as 'edit' makes it, as
+/// another buffer would; the save must succeed. Returns the "all
+/// changes" buffer as its client then holds it: 'buffer', or its
+/// collateral rerendering if the save sent one.
+pub fn edit_in_a_content_view (
+  f      : &mut Fixture,
+  node   : &str,
+  buffer : &str,
+  edit   : impl Fn (&str) -> String,
 ) -> Result<String, Box<dyn Error>> {
   let viewforest_id : ViewforestId =
     ViewforestId::ContentView ( format! ("content-view-of-{}", node) );
@@ -238,12 +254,7 @@ pub fn retitle_in_a_content_view (
     multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from (node) ] ) ?;
   f . views_state . open_views . register_view (
     &f . graph . load_full (), viewforest_id . clone (), tree, &pids );
-  let root_line : &str = text . lines () . next () . unwrap ();
-  let edited : String = text . replacen (
-    root_line,
-    &format! ( "{} {}", &root_line [ .. root_line . rfind (' ') . unwrap () ],
-               title ),
-    1 );
+  let edited : String = edit (&text);
   let (mut stream, mut read_end) : (TcpStream, TcpStream) =
     mk_test_tcp_stream_pair ();
   let response : SaveResponse = block_on (
@@ -251,12 +262,13 @@ pub fn retitle_in_a_content_view (
       &mut stream, &edited, &f . config, &f . tantivy, &f . graph,
       &Ok (viewforest_id), &mut f . views_state )) ?;
   assert! ( response . errors . is_empty (),
-            "the content view must save, got {:?}", response . errors );
+            "the content view must save, got {:?}\n{}", response . errors, edited );
   drop (stream);
   let mut streamed : String = String::new ();
   read_end . read_to_string (&mut streamed) ?;
   Ok ( collateral_view_content (&streamed)
        . unwrap_or_else ( || buffer . to_string () )) }
+
 /// The content of the first rerendered view in 'response'.
 pub fn rerendered_view_content (
   response : &str,
