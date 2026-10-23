@@ -25,8 +25,38 @@ use std::str::from_utf8;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-static SNAPSHOT_CACHE : OnceLock<Mutex<HashMap<String, GraphSnapshot>>> =
+static SNAPSHOT_CACHE : OnceLock<Mutex<GitSnapshotCache>> =
   OnceLock::new ();
+
+/// The snapshot of the current owned HEADs, under the key it was read
+/// for, or nothing. A snapshot read for a new key replaces it, since
+/// once a HEAD moves the snapshot of the old one is not read again.
+#[derive(Default)]
+struct GitSnapshotCache {
+  key_and_snapshot : Option<(String, GraphSnapshot)>,
+}
+
+impl GitSnapshotCache {
+  fn get (
+    &self,
+    key : &str,
+  ) -> Option<&GraphSnapshot> {
+    self . key_and_snapshot . as_ref ()
+      . filter ( |(cached_key, _)| cached_key == key )
+      . map ( |(_, git_snapshot)| git_snapshot ) }
+
+  fn keep_only (
+    &mut self,
+    key          : String,
+    git_snapshot : GraphSnapshot,
+  ) {
+    self . key_and_snapshot = Some ((key, git_snapshot)); }
+
+  fn clear (
+    &mut self,
+  ) {
+    self . key_and_snapshot = None; }
+}
 
 /// The before endpoint of the graph straddle: every owned skgrepo at
 /// HEAD, every foreign skgrepo at its worktree. The live graph reads
@@ -140,11 +170,11 @@ fn git_snapshot_from_cache_or_read (
     . lock ()
     . map_err ( |e| format! (
       "Git snapshot cache lock failed: {}", e )) ?
-    . insert (key, git_snapshot . clone ());
+    . keep_only (key, git_snapshot . clone ());
   Ok (git_snapshot)
 }
 
-/// Empty the snapshot cache, so the next read of each snapshot reads
+/// Empty the snapshot cache, so the next read of a snapshot reads
 /// disk. A key names HEAD commits only, so an entry that read a
 /// worktree (the foreign skgrepos of 'read_owned_head_graph_snapshot_maybe_cached')
 /// can be stale under its key; a rebuild of the session-lifetime
@@ -159,8 +189,8 @@ pub fn forget_cached_git_snapshots (
   Ok (( )) }
 
 fn git_snapshot_cache (
-) -> &'static Mutex<HashMap<String, GraphSnapshot>> {
-  SNAPSHOT_CACHE . get_or_init ( || Mutex::new (HashMap::new ()) )
+) -> &'static Mutex<GitSnapshotCache> {
+  SNAPSHOT_CACHE . get_or_init ( || Mutex::new (GitSnapshotCache::default ()) )
 }
 
 /// The skgrepo's '.skg' files that differ between HEAD and the
@@ -410,3 +440,7 @@ pub(crate) fn parse_blob_node (
             node_fs . into_complete_as_single_section (
               skgrepo_name . clone () ) )
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/git_snapshot_cache.rs"]
+mod tests;
