@@ -3824,3 +3824,55 @@ git fixture's two skgrepos) covers a save, a folder request and
 a switch to "public" and back. It requests a folder, not a role
 tree, since slice 4 removes '(roleTree ...)'. The unknown-ID
 test is in 'tests/viewnode_ids.rs'. The Rust count is now 908.
+** Slice 2: deviations
+*** matching widened, stale conversion still by owner
+'reconcile_children_with_shallowModelSubtree' matches every child
+its selector admits, whoever drew it, and the reconciler owns each
+child it adopts, as 'complete_managed_children_in_viewforest' does.
+A selected child whose key the model lacks is still converted only
+when the caller owns it: without that, a note of the user's under a
+node, which no model wants, would be converted as stale. Slice 6
+replaces the owner test with change facts and kind.
+*** two selectors exclude members
+The removed-member reconciler and the member role-tree attach
+select no member ('is_unrestrictedVognode_and_member'), so that a
+content member is never adopted as a removed member or as a graft.
+The other selectors were already narrow enough.
+*** a pasted copy of a member stays a non-member
+The alignment counts any non-member whose ID is in the
+before-list as set aside, as the plan says; one whose ID is in the
+after-list becomes the member only when no member of that node
+stands there, and only the first such. That is the content
+reconciler's own adoption ('adopt_nonMember_children_that_are_content').
+Counting every such non-member a member would make a pasted
+write-protected copy beside the member a second member, which the
+content reconciler would then entombstone, though the save accepts
+that copy.
+*** property folders: unmarked at the node, refreshed at the folder
+At the per-visit step a property folder is a candidate only when
+the model has its kind (its list changed). Any other, under an
+editable or a write-protected occurrence, is unmarked
+('unmark_property_folders_except'): its lost aliases and IDs are
+converted and its other entries lose their change facts. A
+property folder's own visit in the diff view is skipped only while
+an entry carries a '(rel ...)' part; otherwise the ordinary
+reconciler refreshes it from the live graph. So a changed folder
+the diff view drew also stays, plain, after its change ends, as
+the plan's "never pruned by the diff view" says.
+*** the tests
+'tests/pruned_change_view/adoption_by_key.rs', with three small
+fixtures ('requested_alias_folder', 'graft_beside_removed_member',
+'copy_beside_removed_member'); the copies of a graft use
+'users_notes'. Each fails on the code before this slice. The
+pasted copy is the review's first variant: pasted beside the
+member, which a content view then drops. The graft test draws its
+graft with '(roleTree container)', which slice 4 removes; slice 4
+rewrites or drops it. 'retitle_in_a_content_view' now calls a new
+'edit_in_a_content_view'. The Rust count is 913.
+*** the spurious repair warning remains, now traced
+The first save of a diff buffer after HEAD changes can still warn
+"Repaired containerFolder under node x: restored 1 member(s)". A
+partner folder that 'changed_partner_folders' creates empty during
+the saved view's completion is filled at its own visit, and
+'push_repair_warnings' reports the members it creates as restored.
+It is outside this slice; the graft test checks the save after.

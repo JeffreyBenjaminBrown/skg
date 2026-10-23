@@ -145,8 +145,9 @@ and it changes completion so:
   graph facts;
 - no default partner folders and no hidden-in-subscribee folder are
   created; folders appear only where something changed;
-- the property folders (alias, ID, flags) are reconciled by the
-  per-visit step from the straddle, not from the live graph;
+- a property folder (alias, ID, flags) whose list changed is
+  reconciled by the per-visit step from the straddle; any other is
+  refreshed from the live graph at its own visit, as in every view;
 - a partner folder shows the union of the straddle;
 - a deleted phantom whose node the before-graph has becomes its
   historical phantom, and a historical phantom in content position
@@ -234,12 +235,22 @@ graft whose relationship to its viewparent (the one its birth names)
 is in the before-graph only carries '(rel removed)', and a gesture on
 it names that relationship.
 *** aliases, IDs and flags
-The alias, ID and flags folders, shown only when their list changed,
+The alias, ID and flags folders, drawn when their list changed,
 hold the union of the two lists in the order of their interleaved
 diff, each entry tagged '(rel added)' (+) or '(rel removed)' (-),
 its existence in the list. A lost alias or ID is its own kind,
 'Property::RemovedAlias' or 'Property::RemovedID', which the save never
 reads. Each entry is one leaf.
+
+A property folder is matched by its kind among all the children of
+its node, so a folder the user requested becomes the changed one
+when its list changes. It stays until the user deletes it: marked
+changed while its list differs between the graphs, and unmarked
+after ('unmark_property_folders_except' in
+'server/diff_view/changes.rs' converts its lost entries and clears
+the rest's change facts), when its own visit refreshes it from the
+live graph, as in every view. The diff view never converts a
+property folder as stale.
 *** home skgrepo and relRepo moves
 A home skgrepo move is one property under the node, "⌂ -OLD +NEW",
 one leaf. A relRepo move is a property under the member whose
@@ -266,13 +277,18 @@ resolves its ID to (so one shown by an extra ID matches its node), an
 unknown phantom by its raw ID, a historical phantom by its ID at HEAD
 ('skgid_a_folder_child_stands_for', which the partner-folder
 reconciler and the save's check of a write-protected occurrence read
-too); any other child by its kind (a folder entry by its entry);
-within one parent each key appears at most once. A matched child is
-kept, with its fold state, and its kind and facts are updated in
-place: a member that loses its relationship becomes a removed member
-and back, a deleted phantom becomes a historical phantom and back. A
-child the shallow model subtree lacks is converted, never detached
-(next section); what only the shallow model subtree has is created.
+too); any other child by its kind (a folder entry by its entry). A
+key is matched among all the children of the viewnode, whoever drew
+them. A matched child is adopted: kept, with its fold state, and its
+kind and facts are updated in place: a member that loses its
+relationship becomes a removed member and back, a deleted phantom
+becomes a historical phantom and back, a graft or a copy the user
+pasted becomes the removed member of its node. A second child of a
+matched key is a duplicate: of the copies the editable one is
+adopted, else the first in buffer order, and each other is converted
+by the one rule, its subtree staying under it. A child the shallow
+model subtree lacks is converted, never detached (next section);
+what only the shallow model subtree has is created.
 "Produced by the shallow model subtree" is defined over the union of the two
 graphs, so a viewnode is converted only when what it stands for is in
 neither graph. The member role trees under a changed folder's members
@@ -319,16 +335,25 @@ the content reconciler puts non-members ahead of members. The
 containerward walk visits a node's containers in ID order, so a first
 render is the same every time.
 
-Each reconciler manages only the children it owns ('docs/glossary.org',
-"owner"), as the view's record of owners says; a viewnode the user
-typed or pasted is nobody's, and stays where it stands. Under an
-editable node the content members are the content reconciler's, and
-the change viewnodes and removed members the diff view's reconciler's;
-a member that the straddle sets aside becomes the latter's, and so do
-the former members under a historical phantom, whose old content
-adopts them. The member role trees under a changed folder's members
-are the role-tree attach's, so the folder's visit and the member's
-own visit never reconcile each other's viewnodes. A role graft's
+The diff view's reconciler matches a key among all the children of
+a node, whoever drew them, and owns every child it adopts; it
+converts a stale child only when it owns it ('docs/glossary.org',
+"owner"), as the view's record of owners says, so a viewnode the
+user typed or pasted that no model wants is nobody's, and stays
+where it stands. Under an editable node the content members are the
+content reconciler's, and the change viewnodes and removed members
+the diff view's reconciler's; a member that the straddle sets aside
+becomes the latter's, as does any non-member whose relationship to
+the node is only in the before-graph (a graft, or a copy the user
+pasted), and so do the former members under a historical phantom,
+whose old content adopts them. Before the content reconciler runs,
+the first non-member of a node in the after-graph's content list
+becomes its member when no member of that node stands there
+('align_content_members_with_straddle'). The member role trees
+under a changed folder's members are the role-tree attach's; it
+matches every child of the member but its members, and converts
+only what it owns, so it leaves the member's own visit's viewnodes
+alone. A role graft's
 birth is written into its metadata as '(birth roleGraft ROLENAME)'
 and read back by the parser ('Birth::RoleGraft'), so it survives a
 save, and the clients, which rewrite metadata structurally and strip

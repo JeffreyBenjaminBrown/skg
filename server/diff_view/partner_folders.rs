@@ -123,11 +123,13 @@ fn straddle_goal_item (
 /// Each member role tree is built afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
 /// its kind) at each level, so that a member role tree that stays
-/// keeps its viewnodes, where they stand, and their fold state. The
-/// member role tree is the role-tree attach's ('Owner::RoleTreeAttach'),
-/// so this reconciles nothing else the member holds: what the user
-/// added stays where it stands, and what the member's own visit adds
-/// (its old text, its removed members) is that visit's.
+/// keeps its viewnodes, where they stand, and their fold state. Every
+/// child of the member but its members is matched, whoever drew it, so
+/// a graft the user copied is a duplicate, converted by the one rule.
+/// Of the rest, the attach converts only what it owns
+/// ('Owner::RoleTreeAttach'): what the user added stays where it
+/// stands, and what the member's own visit adds (its old text, its
+/// removed members) is that visit's.
 fn attach_memberRoleTrees_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -166,7 +168,9 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
       tag_before_only_role_grafts (&mut model, straddle); }
     reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
-      Owner::RoleTreeAttach, &|_| true, &|_| true ) ?; }
+      Owner::RoleTreeAttach,
+      &|viewnode| ! viewnode . is_unrestrictedVognode_and_member (),
+      &|_| true ) ?; }
   Ok (( )) }
 
 /// Tag each role graft in 'model' whose relationship to its viewparent

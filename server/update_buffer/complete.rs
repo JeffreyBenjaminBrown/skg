@@ -325,8 +325,8 @@ fn dispatch_node_update (
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
     // In a diff view, 'diffView_visit_before_extension' has finished
-    // a property folder's visit: the node's visit fills its alias, ID
-    // and flags folders from the graph straddle.
+    // a changed property folder's visit: the node's visit filled it
+    // from the graph straddle. Any other is refreshed here.
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,

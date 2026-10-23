@@ -827,9 +827,10 @@ convert it
 reconciler finds the children it manages by predicates on their
 kind and membership ('complete_managed_children'), and records
 itself as the owner of each member it keeps; the diff view's
-reconciler reads the view's record of owners, and manages the
-children it owns of the kinds the model of each call concerns,
-since it runs several models under one parent.
+reconciler matches every child of the kinds the model of each call
+concerns, since it runs several models under one parent, whoever
+drew it, and owns each it adopts, but converts a stale child only
+when the view's record of owners says it owns it.
 
 *** key, match key
 
@@ -841,7 +842,10 @@ viewnode, its kind. In the older reconciler it is the key of a
 goal item ('Orderkey' in 'complete_managed_children'). The diff
 view's reconciler calls it the *match key* ('MatchKey'), and
 matches an unknown phantom by its raw ID and a historical phantom
-by its ID at HEAD.
+by its ID at HEAD. It matches a key among all the children of a
+node, whoever drew them: a child of a key its model has is
+adopted, and a second child of that key is a duplicate, converted
+by [[*the one rule: convert, then prune][the one rule]].
 
 *** owner
 
@@ -858,7 +862,8 @@ its reconciler maintains. The owner is recorded per
 never inferred from a viewnode's shape. In the diff view a member
 that stops being one, because its relationship is in the
 before-graph only or its viewparent became a historical phantom,
-becomes the diff view's reconciler's, which shows it as removed.
+becomes the diff view's reconciler's, which shows it as removed;
+so does any child the diff view's reconciler adopts.
 
 *** the one rule: convert, then prune
 
@@ -880,9 +885,10 @@ After every completion the postorder *prune*
 'server/update_buffer/complete.rs') removes the childless dead
 viewnodes (and childless deleted phantoms and empty
 write-protected folders), never a view root. A viewnode nobody
-owns -- one the user typed or pasted -- is never converted, so it
-holds its ancestors alive: whatever stands below a converted
-child survives under it.
+owns -- one the user typed or pasted -- is never converted as
+stale, so it holds its ancestors alive: whatever stands below a
+converted child survives under it. It is converted as a duplicate
+when a reconciler adopts another copy of its key.
 
 The diff view's reconciler converts by the same function, and
 first converts what was made below the stale child for the same

@@ -911,7 +911,7 @@ entry; the comment. Run all four suites.
 The renames in server, tests and docs by script; unknown IDs
 dropped; the switch's prepass and the requested folder; the
 stability test; the glossary entries. Run all four suites.
-** TODO Slice 2: adoption by key among all siblings
+** DONE Slice 2: adoption by key among all siblings
 The candidate filter, the alignment of content members, the
 duplicate clause in the diff view and the attach, property
 folders by kind and refreshed and kept, the five tests. Run all

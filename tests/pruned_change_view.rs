@@ -38,3 +38,5 @@ mod order;
 mod after_a_commit;
 #[path = "pruned_change_view/restore.rs"]
 mod restore;
+#[path = "pruned_change_view/adoption_by_key.rs"]
+mod adoption_by_key;

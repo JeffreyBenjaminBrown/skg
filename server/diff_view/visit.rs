@@ -8,9 +8,10 @@
 //!   straddle before the content reconciler runs
 //!   ('align_content_members_with_straddle');
 //! - content is shown without override substitution;
-//! - the property folders are skipped at their own visits: the
-//!   per-visit step reconciles the alias, ID and flags folders from
-//!   the straddle;
+//! - a changed property folder is skipped at its own visit, since the
+//!   per-visit step reconciled it with the union of the straddle; any
+//!   other property folder is refreshed from the after-graph there, as
+//!   in every view;
 //! - a deleted phantom whose node the before-graph has becomes its
 //!   historical phantom, and each historical phantom's visit adds
 //!   its old content ('process_historical_phantom_visit');
@@ -85,10 +86,12 @@ pub enum NormalNodeUpdate {
 }
 
 /// The diff view's part of a visit, before the node extends: outside
-/// the diff view, nothing but the ordinary settings. In it, a
-/// property folder's visit is done (the per-visit step reconciles it);
-/// a historical phantom adds its old content, and is then visited as
-/// an editable vognode only if its node is back.
+/// the diff view, nothing but the ordinary settings. In it, a changed
+/// property folder's visit is done (the per-visit step reconciled it),
+/// and any other property folder is visited as in every view, so that
+/// one the user requested stays fresh; a historical phantom adds its
+/// old content, and is then visited as an editable vognode only if its
+/// node is back.
 pub fn diffView_visit_before_extension<'a> (
   tree                       : &mut Tree<Viewnode>,
   treeid                     : NodeId,
@@ -107,7 +110,8 @@ pub fn diffView_visit_before_extension<'a> (
       diffView_u                          : None,
       straddle_to_align_with              : None, } )); };
   let visit_as_unrestrictedVognode : bool = match kind {
-    ViewnodeKind::PropertyFolder (_) =>
+    ViewnodeKind::PropertyFolder (_)
+      if property_folder_is_changed (tree, treeid) =>
       return Ok (DiffViewVisit::Done),
     // A historical phantom where content stands adds its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {
@@ -157,6 +161,18 @@ pub fn diffView_visit_after_extension (
         ! nodes_before_completion . contains (&treeid),
         editable_before_completion ) ?, }
   Ok (( )) }
+
+/// Whether the property folder at 'treeid' shows a change: some entry
+/// carries a '(rel ...)' part, as the per-visit step leaves on the
+/// entries of the union, and removes from a folder whose list no longer
+/// differs between the graphs.
+fn property_folder_is_changed (
+  tree   : &Tree<Viewnode>,
+  treeid : NodeId,
+) -> bool {
+  tree . get (treeid) . is_some_and ( |folder|
+    folder . children () . any ( |entry|
+      entry . value () . change_facts . change . rel . is_some () )) }
 
 impl<'a> VisitSettings<'a> {
   /// Whether this extension of 'pid' is charged to the node budget (see

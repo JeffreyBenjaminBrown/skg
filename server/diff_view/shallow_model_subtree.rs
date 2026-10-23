@@ -7,11 +7,15 @@
 //! not is converted by the one rule ('convert_unwarranted_child'), with
 //! what the diff view made below it ('convert_unwarranted_subtree');
 //! what only it has is copied in, after the child that precedes it in
-//! the shallow model subtree. A reconciler manages only the children
-//! it owns ('Owner'), as the view's record of owners says. A viewnode
-//! that stands for a graphnode is matched by the ID it stands for, any
-//! other by its kind (and a folder entry by the entry): within one
-//! parent each key appears at most once.
+//! the shallow model subtree. A viewnode that stands for a graphnode is
+//! matched by the ID it stands for, any other by its kind (and a folder
+//! entry by the entry), among all the children of the parent, whoever
+//! drew them ('docs/glossary.org', "key, match key"): a child of a key
+//! the model has is adopted, and a second child of a matched key is a
+//! duplicate, converted by the one rule.
+//! A stale child is converted only when the reconciler owns it
+//! ('Owner', as the view's record of owners says); what another drew
+//! stays where it stands.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -22,7 +26,7 @@ use crate::types::viewnode::{
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, convert_unwarranted_child};
 
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashSet;
 use std::error::Error;
 
@@ -78,22 +82,25 @@ fn property_kind (
     Property::ChangesetMarker { kind, .. } =>
       format! ("changesetMarker {:?}", kind), }}
 
-/// Under 'parent', make the children that 'owner' owns and 'selects'
-/// selects match the children of 'model_parent' in 'model'. 'owner' is
-/// the calling reconciler: it owns every child it creates, and
-/// manages no child another owns (the user's, or another
-/// reconciler's, such as a content list's members, which are the
-/// content reconciler's); 'selects' says, by kind, which of its own
-/// children this model concerns, where one reconciler runs several
-/// models under one parent. A kept child stays where it stands; a
-/// created one goes after the kept or created child that precedes it
-/// in the shallow model subtree, or first when none does
-/// ('place_created_children_after_their_model_predecessors'). A child
-/// the model lacks is converted ('convert_unwarranted_subtree'). A
-/// kept child whose model twin 'descend' selects has its own children
-/// reconciled the same way, every keyed child 'owner' owns managed.
-/// Returns the kept and created children, in the shallow model
-/// subtree's order. 'graph' is the live graph ('match_key').
+/// Under 'parent', make the children that 'selects' selects match the
+/// children of 'model_parent' in 'model'. 'selects' says, by kind,
+/// which children this model concerns, where one reconciler runs
+/// several models under one parent; it is matched against every child
+/// it selects, whoever drew it. 'owner' is the calling reconciler: it
+/// owns every child it creates or adopts. Of several selected children
+/// of a key the model has, the editable one is adopted, else the first
+/// in buffer order; the others are duplicates, each converted by the
+/// one rule ('convert_unwarranted_child') with its subtree where it
+/// stands. A kept child stays where it stands; a created one goes
+/// after the kept or created child that precedes it in the shallow
+/// model subtree, or first when none does
+/// ('place_created_children_after_their_model_predecessors'). A
+/// selected child whose key the model lacks is converted
+/// ('convert_unwarranted_subtree') when 'owner' owns it, and stays as
+/// it is otherwise. A kept child whose model twin 'descend' selects has
+/// its own children reconciled the same way, every keyed child
+/// selected. Returns the kept and created children, in the shallow
+/// model subtree's order. 'graph' is the live graph ('match_key').
 pub fn reconcile_children_with_shallowModelSubtree (
   tree         : &mut Tree<Viewnode>,
   parent       : NodeId,
@@ -104,12 +111,11 @@ pub fn reconcile_children_with_shallowModelSubtree (
   selects      : &dyn Fn (&Viewnode) -> bool,
   descend      : &dyn Fn (&Viewnode) -> bool,
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
-  let mut unmatched : Vec<(NodeId, MatchKey)> =
+  let candidates : Vec<(NodeId, MatchKey)> =
     tree . get (parent)
     . ok_or ("reconcile_children_with_shallowModelSubtree: parent not found") ?
     . children ()
-    . filter ( |child| child . value () . owner == owner
-                       && selects ( child . value () ))
+    . filter ( |child| selects ( child . value () ))
     . filter_map ( |child| match_key ( child . value (), graph )
                    . map ( |key| (child . id (), key) ))
     . collect ();
@@ -117,6 +123,7 @@ pub fn reconcile_children_with_shallowModelSubtree (
     model . get (model_parent)
     . ok_or ("reconcile_children_with_shallowModelSubtree: model parent not found") ?
     . children () . map ( |child| child . id () ) . collect ();
+  let mut taken : HashSet<NodeId> = HashSet::new (); // adopted, or duplicates
   let mut result : Vec<NodeId> = Vec::new ();
   let mut created : HashSet<NodeId> = HashSet::new ();
   for model_child in model_children {
@@ -124,13 +131,20 @@ pub fn reconcile_children_with_shallowModelSubtree (
       model . get (model_child) . unwrap () . value ();
     let key : MatchKey = match_key (model_viewnode, graph)
       . ok_or ("reconcile_children_with_shallowModelSubtree: a model viewnode has no match key") ?;
-    let matched : Option<usize> =
-      unmatched . iter () . position ( |(_, existing)| *existing == key );
-    match matched {
-      Some (index) => {
-        let (existing, _) : (NodeId, MatchKey) = unmatched . remove (index);
-        adopt_model_facts (
-          tree . get_mut (existing) . unwrap () . value (), model_viewnode );
+    let copies : Vec<NodeId> =
+      candidates . iter ()
+      . filter ( |(child, existing)| *existing == key && ! taken . contains (child) )
+      . map ( |(child, _)| *child )
+      . collect ();
+    taken . extend ( copies . iter () . copied () );
+    match adopted_copy (tree, &copies) {
+      Some (existing) => {
+        for duplicate in copies . iter () . filter ( |copy| **copy != existing ) {
+          convert_duplicate (tree, *duplicate) ?; }
+        { let mut existing_mut : NodeMut<Viewnode> = tree . get_mut (existing) . unwrap ();
+          let viewnode : &mut Viewnode = existing_mut . value ();
+          adopt_model_facts (viewnode, model_viewnode);
+          viewnode . owner = owner; }
         if descend (model_viewnode) {
           reconcile_children_with_shallowModelSubtree (
             tree, existing, model, model_child, graph, owner, &|_| true,
@@ -141,11 +155,37 @@ pub fn reconcile_children_with_shallowModelSubtree (
           append_copy_of_subtree (tree, parent, model, model_child, owner) ?;
         created . insert (copy);
         result . push (copy); }, }}
-  for (stale, _) in unmatched {
-    convert_unwarranted_subtree (tree, stale) ?; }
+  for (stale, _) in candidates {
+    if ! taken . contains (&stale)
+       && tree . get (stale) . unwrap () . value () . owner == owner {
+      convert_unwarranted_subtree (tree, stale) ?; }}
   place_created_children_after_their_model_predecessors (
     tree, parent, &result, &created ) ?;
   Ok (result) }
+
+/// Of the copies of one key, in buffer order, the one a reconciler
+/// adopts: the editable one, else the first.
+fn adopted_copy (
+  tree   : &Tree<Viewnode>,
+  copies : &[NodeId],
+) -> Option<NodeId> {
+  copies . iter ()
+    . find ( |copy| tree . get (**copy) . unwrap () . value ()
+                    . editable_skgid () . is_some () )
+    . or ( copies . first () )
+    . copied () }
+
+/// Convert an extra copy of an adopted key by the one rule's duplicate
+/// clause: retained write-protected when it has a subtree, which stays
+/// under it, a tombstone when it has none.
+fn convert_duplicate (
+  tree      : &mut Tree<Viewnode>,
+  duplicate : NodeId,
+) -> Result<Conversion, Box<dyn Error>> {
+  let is_leaf : bool =
+    tree . get (duplicate) . ok_or ("convert_duplicate: node not found") ?
+    . children () . next () . is_none ();
+  convert_unwarranted_child (tree, duplicate, is_leaf) }
 
 /// Convert 'node', a child the model no longer warrants, by the one
 /// rule ('convert_unwarranted_child'), and, first, what was made below

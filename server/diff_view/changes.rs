@@ -58,11 +58,13 @@ use crate::types::viewnode::{
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
+use crate::update_buffer::util::convert_unwarranted_child;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::hash::Hash;
+use std::mem::discriminant;
 
 /// The folders of a node's recorders (its in-set changed when one
 /// was added or removed), then those of the relationships it records
@@ -136,13 +138,16 @@ impl ChangedAspects {
 /// the content list first, as in every view (and each folder's
 /// members at the folder's own visit); then this step runs the diff
 /// view's, 'reconcile_children_with_shallowModelSubtree', over the change
-/// viewnodes, the removed members and what stands below them, each
-/// managing only what it owns ('Owner'). What the user added
-/// survives, under a stale child too: both convert every stale child
-/// they own ('convert_unwarranted_child') and detach nothing. What
-/// this step keeps stays where it stands; what it creates goes after
-/// what precedes it here: the change viewnodes ahead of the markers, then the
-/// changed partner folders, then the markers.
+/// viewnodes, the removed members and what stands below them, matching
+/// by key whoever drew a child. What the user added survives, under a
+/// stale child too: both convert only the stale children they own
+/// ('convert_unwarranted_child') and detach nothing. A property folder
+/// the step's model lacks is never converted: it is unmarked
+/// ('unmark_property_folders_except'), and its own visit refreshes it
+/// from the after-graph. What this step keeps stays where it stands;
+/// what it creates goes after what precedes it here: the change
+/// viewnodes ahead of the markers, then the changed partner folders,
+/// then the markers.
 /// 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
 /// its body's fold state come from C. 'editable_before_completion'
@@ -169,6 +174,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     // What an earlier visit added here while it was editable goes, and
     // the members it still holds are tagged as they stand now.
     convert_change_viewnodes (tree, treeid, straddle) ?;
+    unmark_property_folders_except (tree, treeid, &[]) ?;
     tag_content_members (tree, treeid, straddle, &content, None) ?;
     return Ok (( )); }
   let sets : &PrunedChangeViewSets =
@@ -190,10 +196,20 @@ pub(crate) fn process_unrestrictedVognode_changes (
   let children_before : HashSet<NodeId> =
     tree . get (treeid) . unwrap () . children ()
     . map ( |child| child . id () ) . collect ();
+  let model_property_folders : Vec<ViewnodeKind> = // the folders that changed
+    model . root () . children ()
+    . filter ( |child| matches! ( child . value () . kind,
+                                  ViewnodeKind::PropertyFolder (_) ))
+    . map ( |child| child . value () . kind . clone () ) . collect ();
   let fronts : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    Owner::DiffViewReconciler, &is_front_change_viewnode,
+    Owner::DiffViewReconciler,
+    &|viewnode| is_front_change_viewnode (viewnode)
+      && ( ! matches! ( viewnode . kind, ViewnodeKind::PropertyFolder (_) )
+           || model_property_folders . iter () . any ( |kind|
+                same_property_folder_kind (kind, &viewnode . kind) )),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
+  unmark_property_folders_except (tree, treeid, &fronts) ?;
   let partner_folders : Vec<NodeId> =
     if in_c { changed_partner_folders (tree, treeid, &aspects) }
     else { Vec::new () };
@@ -232,14 +248,16 @@ fn tag_root (
 
 /// Before the content reconciler runs at an editable node's visit,
 /// align its members with the straddle, so that the reconciler keeps
-/// each viewnode instead of creating another: a member, a removed
-/// member (any unrestricted vognode the diff view's reconciler owns,
-/// converted or not) or a historical phantom whose relationship is in
-/// the after-graph is a member; a member whose relationship is only in
-/// the before-graph is set aside (nonMember), and so stops
-/// being the content reconciler's and becomes the diff view's
-/// reconciler's, whose step after the content reconciler finds it and
-/// shows it as removed.
+/// each viewnode instead of creating another: a historical phantom
+/// whose relationship is in the after-graph is a member, and so is the
+/// first non-member of a node in the after-graph's list when no member
+/// of that node stands there (a removed member whose relationship
+/// returned, or a copy the user pasted, whoever drew it); a member, or
+/// any non-member, whose relationship is only in the before-graph is
+/// set aside (nonMember), and so becomes the diff view's reconciler's,
+/// whose step after the content reconciler finds it and shows it as
+/// removed. So a copy the user pasted is set aside as the removed
+/// member, not doubled by it.
 pub(crate) fn align_content_members_with_straddle (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -255,22 +273,26 @@ pub(crate) fn align_content_members_with_straddle (
   let children : Vec<NodeId> =
     tree . get (treeid) . unwrap () . children ()
     . map ( |child| child . id () ) . collect ();
+  let mut nodes_with_a_member : HashSet<ID> =
+    tree . get (treeid) . unwrap () . children ()
+    . filter_map ( |child| match &child . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if t . membership == Membership::Member => Some ( t . skgid . clone () ),
+      _ => None, } )
+    . collect ();
   for child in children {
     let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
     let viewnode : &mut Viewnode = child_mut . value ();
-    let member_or_removed : bool = // not a viewnode the user set aside
-      viewnode . owner == Owner::DiffViewReconciler
-      || matches! ( &viewnode . kind,
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . membership == Membership::Member );
     let mut set_aside : bool = false;
     let returned : Option<Viewnode> = match &mut viewnode . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if member_or_removed => {
-        if after_set . contains (&t . skgid) {
-          t . membership = Membership::Member; }
-        else if removed . contains (&t . skgid) {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+        if removed . contains (&t . skgid) {
           t . membership = Membership::NonMember;
           set_aside = true; }
+        else if t . membership == Membership::NonMember
+                && after_set . contains (&t . skgid)
+                && nodes_with_a_member . insert ( t . skgid . clone () ) {
+          t . membership = Membership::Member; }
         None },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
         if after_set . contains (&h . skgid) =>
@@ -441,7 +463,7 @@ fn is_front_change_viewnode (
 
 /// Convert what this step adds under an editable node: its change
 /// viewnodes, its removed members and the historical phantoms of its
-/// deleted ones.
+/// deleted ones. Its property folders stay, for the caller to unmark.
 fn convert_change_viewnodes (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -451,11 +473,58 @@ fn convert_change_viewnodes (
   reconcile_children_with_shallowModelSubtree (
     tree, treeid, &empty, empty . root () . id (), &straddle . after,
     Owner::DiffViewReconciler,
-    &|viewnode| is_front_change_viewnode (viewnode)
+    &|viewnode| ( is_front_change_viewnode (viewnode)
+                  && ! matches! ( viewnode . kind, ViewnodeKind::PropertyFolder (_) ))
       || matches! ( &viewnode . kind,
         ViewnodeKind::Vognode (
           Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) )),
     &|_| false ) ?;
+  Ok (( )) }
+
+/// Whether two kinds are property folders of one kind, whatever
+/// their flags.
+fn same_property_folder_kind (
+  a : &ViewnodeKind,
+  b : &ViewnodeKind,
+) -> bool {
+  match (a, b) {
+    ( ViewnodeKind::PropertyFolder (a), ViewnodeKind::PropertyFolder (b) ) =>
+      discriminant (a) == discriminant (b),
+    _ => false, }}
+
+/// Unmark every property folder under 'treeid' but those in 'kept'
+/// (the changed ones, which the per-visit step just reconciled with
+/// the union of the straddle): a lost alias or ID it holds is
+/// converted ('convert_unwarranted_child'), and every other entry
+/// loses its change facts. The folder stays, whoever drew it, until
+/// the user deletes it; its own visit refreshes it from the
+/// after-graph ('diffView_visit_before_extension').
+fn unmark_property_folders_except (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+  kept   : &[NodeId],
+) -> Result<(), Box<dyn Error>> {
+  let entries : Vec<NodeId> =
+    tree . get (treeid)
+    . ok_or ("unmark_property_folders_except: node not found") ?
+    . children ()
+    . filter ( |child| matches! ( child . value () . kind,
+                                  ViewnodeKind::PropertyFolder (_) )
+                       && ! kept . contains (&child . id ()) )
+    . flat_map ( |folder| folder . children () . map ( |entry| entry . id () ))
+    . collect ();
+  for entry in entries {
+    let lost : bool = {
+      let mut entry_mut : NodeMut<Viewnode> = tree . get_mut (entry) . unwrap ();
+      let viewnode : &mut Viewnode = entry_mut . value ();
+      viewnode . change_facts = ChangeFacts::default ();
+      matches! ( viewnode . kind,
+        ViewnodeKind::Property (
+          Property::RemovedAlias { .. } | Property::RemovedID { .. } )) };
+    if lost {
+      let is_leaf : bool =
+        tree . get (entry) . unwrap () . children () . next () . is_none ();
+      convert_unwarranted_child (tree, entry, is_leaf) ?; }}
   Ok (( )) }
 
 /// The shallow model subtree of what an editable node holds ahead of its
@@ -612,7 +681,8 @@ fn reconcile_removed_content_members (
     Owner::DiffViewReconciler,
     &|viewnode| matches! ( &viewnode . kind,
       ViewnodeKind::Vognode (
-        Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) )),
+        Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) ))
+      && ! viewnode . is_unrestrictedVognode_and_member (),
     &|_| false ) ?;
   let member_treeids : HashMap<ID, NodeId> =
     tree . get (treeid) . unwrap () . children ()
