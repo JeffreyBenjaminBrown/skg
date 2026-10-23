@@ -34,3 +34,6 @@ mod pruned_change_view;
 
 #[path = "diff_view.rs"]
 mod diff_view;
+
+#[path = "viewnode_id_stability.rs"]
+mod viewnode_id_stability;

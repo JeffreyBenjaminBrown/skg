@@ -3770,3 +3770,57 @@ and a comment, were edited by hand.
 'GitSnapshotCache' holds one key and its snapshot; its unit
 test ('tests/unit/git_snapshot_cache.rs') exercises the struct,
 not the process-wide static.
+** Slice 1: deviations
+*** test files renamed with the names
+'tests/view_ids.rs' (and its fixtures folder),
+'tests/new/messages_name_view_ids.rs' and
+'tests/pruned_change_view/view_ids.rs' are now
+'viewnode_ids.rs', 'messages_name_viewnode_ids.rs' and
+'viewnode_ids.rs'; slice 9's test file is the second. The
+integration helpers are 'skg-test-without-viewnode-ids' and
+'without_viewnode_ids'.
+*** what the script renamed and what it left
+'tests/results/plan19-slice1/rename_viewnode_ids.py' lexes Rust
+into code, strings and comments, renames identifiers in code
+and quoted names, and words in prose. It converts every '(vid '
+anywhere, more than the plan's 281 literals.
+**** two locals named 'vid' held a skgid
+In 'root_skgids_from_viewforest' and
+'skgids_that_can_have_graphnodestats'; they are 'root_skgid'
+and 'skgid' now (by hand, before the script).
+**** 'view_id_text' kept
+In 'reconcile_idFolder_children' it names an ID entry's text,
+not a view id. Slice 12's grep may list it.
+**** "view ID" for the buffer left in prose
+Lowercase "view id" always meant the viewnode and became
+"viewnode ID". Capitalized "view ID", in server comments and
+the save envelope's error strings, means the buffer, as in the
+clients' prose, and stays. Three lowercase comments that meant
+the buffer say "viewforest id".
+*** unknown viewnode IDs: where they are dropped
+'ViewnodeIdRecord' gained 'known_viewnode_ids', the viewnode
+IDs of the forest as last rendered or registered. A separate
+method, 'drop_unknown_viewnode_ids_in_parsed_viewforest', runs
+just before 'set_owners_in_parsed_viewforest' at both its sites
+(the save and the search enrichment), so slice 6 can remove the
+owner lookup alone.
+**** consequences
+Messages made before that point (the parse, the save's
+validation) can still name a headline by a hand-typed unknown
+viewnode ID. A save under a view that is not registered drops
+every viewnode ID; 'tests/partner_folder_warnings.rs' now saves
+as a registered view, so its warning names the folder's ID.
+*** the switch's prepass: what "restricted leaves" covers
+A restricted vognode leaf, a property leaf of a restricted
+vognode, a dead viewnode leaf, and a folder this prune empties;
+a folder empty before the switch stays, and so does every
+unrestricted folder member, write-protected or not. A requested
+containers folder whose members are all restricted goes with
+them; the completion would prune it empty anyway.
+'tests/unit/repo_switch.rs' pins the rule.
+*** the stability test
+'tests/viewnode_id_stability.rs' (in 'grouped_repos', for the
+git fixture's two skgrepos) covers a save, a folder request and
+a switch to "public" and back. It requests a folder, not a role
+tree, since slice 4 removes '(roleTree ...)'. The unknown-ID
+test is in 'tests/viewnode_ids.rs'. The Rust count is now 908.

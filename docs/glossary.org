@@ -200,7 +200,9 @@ they are never stranded.
 *** view, buffer, viewforest
 
 A *view* is what the server tracks for one open window onto the graph:
-a content view or a search view, identified by its 'ViewId'. A
+a content view or a search view, identified by its *viewforest id*
+('ViewforestId' in 'server/types/views_state.rs'; on the wire the
+key =view-id=, which the clients call the buffer's view ID). A
 content view may have several roots; the request that opens one today
 asks for a single root, so only the request is "single-root". A
 *buffer* is the editor's container for one view (an Emacs or Neovim
@@ -730,19 +732,23 @@ times in one buffer. Facts that depend on the position (viewStats such
 as =cycle=, the displayed relRepo, =overridesHere=; and the birth) belong
 to the occurrence; graphStats belong to the graphnode.
 
-*** view id, vid
+*** viewnode ID, vnid
 
-A *view id* identifies one viewnode within one buffer, for the life of
-the buffer: the atom =(vid X)= that ends every viewnode's metadata
-('docs/api-and-formats.org', "The metadata headers"). "vid" is the
-wire's word and the field's name ('Viewnode::vid'); prose, names and
-messages say "view id". The view gives one to each viewnode that lacks
-one at the end of a completion and never reuses one, so a vid that
-reappears after a cut and paste names the same viewnode moved. The
-view's 'ViewIdRecord' ('server/types/views_state.rs') holds the counter
-and the owner of each viewnode a reconciler made. A view id is not a
-view's 'ViewId' (see "view, buffer, viewforest"), which names the whole
-buffer.
+A *viewnode ID* identifies one viewnode within one buffer, for the
+life of the buffer: the atom =(vnid X)= that ends every viewnode's
+metadata ('docs/api-and-formats.org', "The metadata headers"). "vnid"
+is the wire's word; code says 'ViewnodeId' and 'viewnode_id', and
+prose and messages say "viewnode ID". The view gives one to each
+viewnode that lacks one at the end of a completion and never reuses
+one, so a viewnode ID that reappears after a cut and paste names the
+same viewnode moved. A parsed headline carrying a viewnode ID the
+view does not know (typed by hand, or brought back by an old copy of
+the buffer's text) loses it and gets a fresh one. A skgrepo-set
+switch keeps the viewnode ID of everything the restriction does not
+hide. The view's 'ViewnodeIdRecord' ('server/types/views_state.rs')
+holds the counter, the viewnode IDs the forest holds, and the owner of
+each viewnode a reconciler made. A viewnode ID is not a viewforest id
+(see "view, buffer, viewforest"), which names the whole buffer.
 
 *** editable, write-protected
 
@@ -848,7 +854,7 @@ view's roots). A member of a content list is owned by the content
 reconciler and a member of a folder by that folder's reconciler,
 whoever typed it, since membership is a fact of the graph that
 its reconciler maintains. The owner is recorded per
-[[*view id, vid][view id]] in the view's state ('ViewIdRecord'),
+[[*viewnode ID, vnid][viewnode ID]] in the view's state ('ViewnodeIdRecord'),
 never inferred from a viewnode's shape. In the diff view a member
 that stops being one, because its relationship is in the
 before-graph only or its viewparent became a historical phantom,

@@ -907,7 +907,7 @@ The atom, the two-valued type, the herald rule and the
 regenerated rules fixture, both clients' editors and member
 tests, the test literals by script, the docs; the cache's one
 entry; the comment. Run all four suites.
-** TODO Slice 1: viewnode IDs
+** DONE Slice 1: viewnode IDs
 The renames in server, tests and docs by script; unknown IDs
 dropped; the switch's prepass and the requested folder; the
 stability test; the glossary entries. Run all four suites.

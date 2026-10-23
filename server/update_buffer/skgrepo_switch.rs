@@ -4,20 +4,18 @@
 /// RestrictedVognode, and every deleted or unknown phantom whose
 /// relationship or node a now-restricted skgrepo records (a deleted
 /// phantom's home skgrepo; an unknown phantom's relRepo, or, when it
-/// has none, its recorder's home) into a dead viewnode, then prune (DFS postorder, so emptied parents prune
-/// in the same sweep) every:
+/// has none, its recorder's home) into a dead viewnode, then prune (DFS
+/// postorder, so emptied parents prune in the same sweep) the leaves
+/// the restriction hides, and only those:
 /// - RestrictedVognode leaf;
 /// - Property leaf whose owning vognode (grandparent) is restricted;
-/// - write-protected partner without children (child of a PartnerFolder), unrestricted or
-///   restricted: a write-protected partner defines nothing, and
-///   completion regenerates current membership afterward;
-/// - empty PropertyFolder or PartnerFolder;
-/// - DeadViewnode leaf.
-/// What survives includes unrestricted nodes, restricted nodes with
-/// surviving children (the retained case), and editable partners
-/// (the user may be mid-edit inside them).  Completion (run with folder
-/// creation enabled) then rebuilds folders and members for the new
-/// skgrepo restriction.
+/// - DeadViewnode leaf;
+/// - PropertyFolder or PartnerFolder emptied by this prune (one that
+///   was empty before it stays).
+/// Everything else stays as it was, with its viewnode ID: folders and
+/// their members, write-protected or not, the completion (run with
+/// folder creation enabled) then refreshes under the new skgrepo
+/// restriction, as it refreshes them at a save.
 
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::SkgrepoName;
@@ -114,6 +112,7 @@ fn prune_children_postorder (
     tree . get (node)
     . ok_or ("prune_children_postorder: node not found") ?
     . children () . map ( |c| c . id () ) . collect ();
+  let had_children : bool = ! child_skgids . is_empty ();
   for child in child_skgids {
     if prune_children_postorder (tree, child) ? {
       let had_focus : bool =
@@ -123,22 +122,18 @@ fn prune_children_postorder (
         tree . get_mut (node) . unwrap ()
           . value () . focused = true; }
       tree . get_mut (child) . unwrap () . detach (); }}
-  should_prune (tree, node) }
+  should_prune (tree, node, had_children) }
 
 fn should_prune (
-  tree : &Tree<Viewnode>,
-  node : NodeId,
+  tree         : &Tree<Viewnode>,
+  node         : NodeId,
+  had_children : bool, // before this prune
 ) -> Result<bool, Box<dyn Error>> {
   let node_ref : NodeRef<Viewnode> =
     tree . get (node)
     . ok_or ("should_prune: node not found") ?;
   let is_leaf : bool =
     ! node_ref . has_children ();
-  let affects_parent_partnerFolder : bool =
-    node_ref . parent ()
-    . map ( |p| matches! ( &p . value () . kind,
-                           ViewnodeKind::PartnerFolder (_) ))
-    . unwrap_or (false);
   let grandaffects_parent_restricted : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
@@ -150,8 +145,6 @@ fn should_prune (
       is_leaf,
     ViewnodeKind::Property (_) =>
       is_leaf && grandaffects_parent_restricted,
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      is_leaf && affects_parent_partnerFolder && t . is_writeProtected (),
     ViewnodeKind::PropertyFolder (PropertyFolder::ID)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
@@ -167,10 +160,11 @@ fn should_prune (
       | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired)
       | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
       | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
-      is_leaf, // empty folder (children, if any, were pruned first)
+      is_leaf && had_children, // emptied: its children were pruned first
     ViewnodeKind::DeadViewnode =>
       is_leaf,
-    ViewnodeKind::Vognode (Vognode::Phantom (_))
+    ViewnodeKind::Vognode (Vognode::Unrestricted (_))
+      | ViewnodeKind::Vognode (Vognode::Phantom (_))
       | ViewnodeKind::BufferRoot =>
       false, } ) }
 

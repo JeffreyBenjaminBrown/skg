@@ -572,7 +572,8 @@ pub fn rerender_view (
       context . skgrepo_restriction,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune
-      // removed the folders, and the new set decides which defaults return.
+      // removed the folders the restriction emptied, and a newly allowed
+      // skgrepo may warrant a default folder the buffer lacks.
       options . create_partnerFolders,
       options . substitute_existing_content_overrides,
       warning_sink,

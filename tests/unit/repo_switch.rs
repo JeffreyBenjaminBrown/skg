@@ -53,35 +53,42 @@ fn conversion_and_retention () {
     t . get (kept) . unwrap () . children () . count () == 1,
     "the unrestricted child survives under the retained node" ); }
 
-// All write-protected partners without children are pruned, unrestricted and restricted
-// alike, and the emptied folder goes with them; an editable partner
-// survives.
+// Only what the restriction hides is pruned: a now-restricted
+// childless partner goes, and a folder that loses its last member with
+// it; an unrestricted write-protected partner stays, and so does its
+// folder, and a folder that was empty before the switch.
 #[test]
 fn partners_and_folders_prune () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let recorder : NodeId = t . get_mut (root) . unwrap ()
     . append (def ("recorder", "public")) . id ();
-  let emptied_folder : NodeId = t . get_mut (recorder) . unwrap ()
+  let kept_folder : NodeId = t . get_mut (recorder) . unwrap ()
     . append (folder (PartnerFolder::Subscriber)) . id ();
+  let kept_member : NodeId = t . get_mut (kept_folder) . unwrap ()
+    . append (writeProtected ("unrestricted-member", "public")) . id ();
+  let gone_member : NodeId = t . get_mut (kept_folder) . unwrap ()
+    . append (writeProtected ("restricted-member", "private")) . id ();
+  let emptied_folder : NodeId = t . get_mut (recorder) . unwrap ()
+    . append (folder (PartnerFolder::Container)) . id ();
   t . get_mut (emptied_folder) . unwrap ()
-    . append (writeProtected ("unrestricted-member", "public"));
-  t . get_mut (emptied_folder) . unwrap ()
-    . append (writeProtected ("restricted-member", "private"));
-  let surviving_folder : NodeId = t . get_mut (recorder) . unwrap ()
+    . append (writeProtected ("restricted-container", "private"));
+  let empty_folder : NodeId = t . get_mut (recorder) . unwrap ()
     . append (folder (PartnerFolder::Subscribee)) . id ();
-  t . get_mut (surviving_folder) . unwrap ()
-    . append (def ("editable-partner", "public"));
   convert_and_prune_for_skgrepo_switch (
     &mut t, &restriction_public ()) . unwrap ();
-  assert! ( t . get (emptied_folder)
-              . map ( |n| n . parent () . is_none () )
-              . unwrap_or (true),
-    "a folder emptied by partner pruning is itself pruned" );
-  assert! ( t . get (surviving_folder)
-              . map ( |n| n . parent () . is_some () )
-              . unwrap_or (false),
-    "a folder holding a editable partner survives" ); }
+  let is_attached = |node : NodeId| -> bool {
+    t . get (node) . map ( |n| n . parent () . is_some () ) . unwrap_or (false) };
+  assert! ( is_attached (kept_member),
+    "an unrestricted write-protected partner stays" );
+  assert! ( ! is_attached (gone_member),
+    "a childless now-restricted partner is pruned" );
+  assert! ( is_attached (kept_folder),
+    "a folder holding an unrestricted partner stays" );
+  assert! ( ! is_attached (emptied_folder),
+    "a folder emptied by the prune is itself pruned" );
+  assert! ( is_attached (empty_folder),
+    "a folder that was empty before the switch stays" ); }
 
 // Pruning a focused subtree transfers focus to the surviving parent.
 #[test]

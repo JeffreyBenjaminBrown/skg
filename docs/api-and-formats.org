@@ -182,17 +182,17 @@ So far there are these endpoints:
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
-       A message about one headline names its view id (see "The
-       metadata headers") after the node's ID, as =(view id X)=, and
-       an error's Org form gains a line =- view id: X=. A message
-       about several occurrences of a node lists their view ids:
-       =(view ids X, Y)=, and the line =- view ids: X, Y=. A headline
-       without a view id (one the user typed or copied, not yet
-       saved) is named by its title instead, =headline "TITLE"=; no
-       message invents a view id. An error in a headline's metadata
-       ends by naming that headline the same way. A repair warning
-       names the repaired folder's view id, one warning per folder
-       occurrence.
+       A message about one headline names its viewnode ID (see "The
+       metadata headers") after the node's ID, as =(viewnode ID X)=,
+       and an error's Org form gains a line =- viewnode ID: X=. A
+       message about several occurrences of a node lists their
+       viewnode IDs: =(viewnode IDs X, Y)=, and the line =- viewnode
+       IDs: X, Y=. A headline without a viewnode ID (one the user
+       typed or copied, not yet saved) is named by its title instead,
+       =headline "TITLE"=; no message invents a viewnode ID. An error
+       in a headline's metadata ends by naming that headline the same
+       way. A repair warning names the repaired folder's viewnode ID,
+       one warning per folder occurrence.
        When the saved buffer is one of the diff view's, the response
        ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
@@ -224,7 +224,7 @@ So far there are these endpoints:
     fingerprints. A save that stops for a confirmation (strandeds,
     Hoist, forks) or fails consumes none, and leaves them in the
     buffer. A request that names no current change is dropped, with
-    the warning =The readiness request on "HEADLINE" (view id X)
+    the warning =The readiness request on "HEADLINE" (viewnode ID X)
     names no current change; it was dropped.=, which names an untitled
     headline by its kind (=the subscribeeFolder=).
   - A write-protected occurrence saves nothing of its own, so a save is
@@ -1334,20 +1334,24 @@ in-memory types those keys correspond to are in
 =PropertyFolder=, =Property=, =PartnerFolder=, and the diff view's
 =ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
 
-Every viewnode's metadata ends with its view id, =(vid X)=, where X
-is one or more lowercase letters and digits: =(skg (node (id 1) (repo
-main)) (vid 0a))=. It identifies the viewnode within its buffer for the
+Every viewnode's metadata ends with its viewnode ID, =(vnid X)=, where
+X is one or more lowercase letters and digits: =(skg (node (id 1) (repo
+main)) (vnid 0a))=. It identifies the viewnode within its buffer for the
 life of the buffer. The server assigns one, from the view's counter in
 base 36 (two characters at least, skipping any spelled like a number,
 such as =05= or =1e5=), to every viewnode that lacks one at the end of a
 completion, and never reassigns or reuses one: a headline keeps the
-vid it carried through a save and a rerender, and through a cut and
-paste. A headline typed without one gets one; of two headlines
-carrying one vid, the first in buffer order keeps it and the second (a
-copy) gets a fresh one. The clients show nothing for it and save it
-back untouched. The view's record of its vids, with the counter and
-which reconciler made each viewnode, is 'ViewIdRecord' in
-=server/types/views_state.rs=.
+viewnode ID it carried through a save and a rerender, through a cut
+and paste, and through a skgrepo-set switch that does not hide it. A
+headline typed without one gets one; of two headlines carrying one
+viewnode ID, the first in buffer order keeps it and the second (a copy)
+gets a fresh one; a headline carrying one the view does not know
+(typed by hand, or brought back by an old copy of the buffer's text)
+gets a fresh one too, and the counter does not move past it. The
+clients show nothing for it and save it back untouched. The view's
+record of its viewnode IDs, with the counter, the viewnode IDs the
+forest holds and which reconciler made each viewnode, is
+'ViewnodeIdRecord' in =server/types/views_state.rs=.
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode=, whose rule table is
@@ -1362,7 +1366,7 @@ remains the established bare non-vognode atom:
 =hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
-A dead viewnode is written =(skg deadViewnode (vid X))=: it has
+A dead viewnode is written =(skg deadViewnode (vnid X))=: it has
 no ID, no facts and no title (the parser discards text typed on
 its line), and holds only what stands below it. A reconciler
 makes one of a child the graph no longer warrants, and the prune
@@ -1466,7 +1470,7 @@ the marks of the change-forest leaves its headline names, at their
 current fingerprints. A save that stops for a confirmation (strandeds,
 Hoist, forks) or fails consumes none, and leaves them in the buffer. A
 request that names no current change is dropped, with the warning =The
-readiness request on "HEADLINE" (view id X) names no current change; it
+readiness request on "HEADLINE" (viewnode ID X) names no current change; it
 was dropped.= See "Save buffer" above.
 **** One gesture on a modified node marks its file, on a write-protected occurrence too
 On a modified node (=(properties changed)=), =C-c r r= names every leaf the node
