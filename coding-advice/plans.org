@@ -119,3 +119,11 @@ this plan's code coin or reuse, and does its code cite anything under
 citations in code each entered through one plan and spread through
 the next; both are cheap to catch per plan and expensive to catch at
 the end. The full post-mortem method is in 'code-reviews.org'.
+
+* Mark planned fixes in TODO/problems.org
+When a plan, or a settled discussion that a plan will follow,
+decides how an entry of 'TODO/problems.org' will be fixed, prefix
+the entry's headline with 'FIX PLANNED: ' and leave it in place;
+when the fix lands, move the entry to 'TODO/DONE/problems.org' as
+that file's header says. The prefix tells a reader which problems
+are already spoken for.

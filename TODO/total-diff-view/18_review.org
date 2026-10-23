@@ -1,22 +1,25 @@
 #+title: Review of the view-ids run (2026-10-23)
 #+TODO: TODO ONGOING | DONE
 
-* TODO [Claude] Verdict
+* DONE [Claude] Verdict
 The run did what '17_plan.org' asked. Eleven slices landed in 29
 commits between 04:43 and 08:24 UTC, each agent ending with its
 slice DONE and the tree clean, and no agent stopped for a
 question. Every suite was green at the end of every slice that
 ran it, and my own run of the four suites on the final tree is in
 "Results". Three fixes went beyond the plan's list, each sound
-and each recorded: a save refused when the budget write-protected
-a node with members, a readiness request on a role graft naming
-the wrong relationship, and an ID folder losing a parked note.
-The two bugs the research found are closed with tests. What needs
-your decision is under "Decide"; the largest item is a name: the
-plan's "view id" collides with 'ViewId', which already names a
-whole buffer, and the agents wrote 'vid' in names where the plan
-said "view id".
+and each recorded. The two bugs the research found are closed
+with tests.
 
+The review then went further than a review. Your questions led to
+'18_1_birth-and-ownership.org', and its answer undoes part of
+what plan 17 built: with every role tree drawn as a folder, the
+two records plan 17 introduced or kept, the owner of a viewnode
+and the birth of a graft, can both go, and a retained copy keeps
+the editability it had. The discussion below is kept as it
+happened; what it superseded is marked OBSOLETE where it stands,
+and every decision still open is marked TODO. The settled whole
+is at the end, under "What the next plan holds".
 * What I checked myself
 ** The launches
 I launched each slice when the previous one's headline read DONE
@@ -86,7 +89,7 @@ between them.
 Each item is a choice an agent made where the plan left room, or
 a fact it found; all are recorded in 'progress.org' under "View
 ids and the one rule".
-** Slice 0
+** DONE Slice 0
 The budget-spent path refused a save once the test asked it to
 ('MemberChildOfWriteProtectedOccurrence' for three nodes), so the
 path now converts the members as the repeat-occurrence path does.
@@ -95,11 +98,58 @@ inheritance walk does; Neovim has no automatic prompt, and its
 docs said otherwise, so they were fixed. 'remove_id_folders'
 deadens a folder holding anything but ID entries instead of
 detaching it.
-*** TODO jeff : shouldn't neovim have the prompt?
-*** TODO I don't understand this.
+*** jeff : shouldn't neovim have the prompt?
+**** [Claude] yes, through orgmode's insert-heading action
+The Emacs prompt fires as advice after org's insert-heading
+command (C-RET), not on typed text. It asks for an owned skgrepo
+(no question when you own one) and writes '(skg (node (repo R)))'
+on the headline. Neovim has the same picker and the same writer
+('populate_minimal_node_metadata', reached by '<localleader>ss'
+on a headline without metadata) but no hook, because its code
+says that vim users type headlines rather than call a command.
+The client does drive nvim-orgmode's actions elsewhere (it calls
+'todo_next_state'), and orgmode has
+'org_insert_heading_respect_content' and 'org_meta_return', so
+the same seam exists: wrap those two actions and ask when the new
+headline cannot inherit, with the Emacs test's four cases. A
+headline typed by hand gets no prompt in either client, and its
+save says "Node has no repo" until a repo is set. I would add the
+hook as a small item of the next plan and drop the deviation from
+'nvim-client-deviations.org'.
+***** DONE jeff : agreed
+*** I don't understand this.
 What about the three members makes them worth deadening?
 Why is Emacs walking the outline?
-** Slice 1
+**** [Claude] nothing is deadened, and why the walk
+The review's "converts" misled you; nothing is deadened. The
+budget is the number of editable extensions one completion may
+make ('initial_node_limit' in the config). Once it is spent,
+every later occurrence but a root is left write-protected. A
+write-protected occurrence writes nothing of its content, so the
+save refuses one that has a member child, since that child claims
+a relationship its parent cannot save
+('MemberChildOfWriteProtectedOccurrence').
+
+The three nodes in the
+test's refusal were the write-protected parents 12, 121 and 122,
+not members. The fix makes each member child of a budget-spent
+occurrence a non-member, '(affectsParent false)', which the
+repeat-occurrence path and the write-protect request already did;
+the children keep their title, ID, subtree and editability. So
+the view shows the same nodes, as notes under a write-protected
+parent rather than as its content.
+
+Emacs walks the outline to decide whether to ask you for a
+skgrepo. A new headline without a repo gets one at save time from
+the nearest unrestricted ancestor; the server's walk passes
+through phantoms and folders and stops, finding none, at a
+restricted node, a dead viewnode, a property or the top. Before
+slice 0 the client asked only at level one, so a headline typed
+below a restricted node or a dead viewnode got no prompt, and its
+save failed with "Node has no repo". Now the client's walk
+mirrors the server's, and it asks exactly when the save could not
+inherit.
+** DONE Slice 1
 Vids are assigned at the end of 'finish_viewforest', since root
 role trees are added after the prune. Vids that would read as
 numbers ('05', '1e5') are skipped, because the sexp readers turn
@@ -108,25 +158,203 @@ them into numbers; the first vid is '0a' and two characters give
 each pass. A reconciler owns the members it keeps, not only the
 ones it creates. No expected literal changed: 85 assertions read
 their buffers through 'without_vids'.
-*** TODO jeff : I don't understand.
+*** DONE jeff : I don't understand.
 What is doing the skipping?
 VIDs should be stable for a given viewnode across renderings;
 each rerendering should only have to assign new viewnode ids,
 not all of them.
-** Slice 2
+**** DONE [Claude] what skips, and how stable the vids are
+The skipping is the server's, in 'take_next_vid'
+('server/types/views_state.rs'). It draws the next counter value
+as a base-36 string, and if Rust's float parser accepts that
+string it draws again. Over the alphabet of digits and lowercase
+letters that drops the all-digit strings ('05', '10'), the forms
+digits-e-digits ('1e5'), and 'inf', 'nan' and 'infinity'. The
+reason is the readers. An agent ran all three: the Rust sexp
+crate, Emacs's 'read' and the Neovim parser each turn '05' into
+the number 5 and '1e5' into 100000, so a vid spelled that way
+would come back from the client respelled. 'inf' and 'nan' matter
+to the Rust reader alone, and would first come up at counters
+24,171 and 30,191. Two characters give 1,296 strings, of which
+the 100 all-digit ones are skipped, so 1,196 vids; the first is
+'0a' and the first three-character one is '10a'.
+
+Your rule holds, and a throwaway test ran it. Over a content view
+with ten viewnodes: a typed child saved gets the old maximum plus
+one, and every other vid is kept; a folder request, a role-tree
+request and the rerender-all request keep every vid and give
+fresh ones only to what they add; deleting a subtree retires its
+vids, and the next new child does not reuse them, since the
+counter never decreases. A copy of a headline keeps the vid on
+the copy that comes first in buffer order and gives the other a
+fresh one.
+
+Two exceptions came out of the probes. First, the skgrepo-set
+switch: its prepass prunes childless write-protected folder
+members and emptied folders even when the switch does not touch
+them, and the completion redraws them as new viewnodes, so a
+subscribee folder and its member came back with fresh vids after
+a switch to 'public' and again after the switch back. The same
+run found two faults beside the vids. A containers folder the
+user had requested vanished at the switch and was not redrawn.
+And after the switch back, the anonymous placeholder that had
+stood for the private node stayed, still holding its public
+child, while the node and that child were drawn again beside it,
+so the child appears twice. Second, the parse accepts whatever
+vid the text carries: a hand-typed '(vid zz)' is kept and moves
+the counter to 1,296, and saving an old copy of the buffer's text
+brings retired vids back. I would have the parser drop a vid the
+record does not know, so that the headline gets a fresh one. The
+switch's faults and this one are in 'TODO/problems.org', with a
+sixth finding of the run: copies of a write-protected role graft
+are not merged, since the role-tree attach runs no duplicate
+check.
+***** DONE jeff : please list every change you see that we should do arising from this
+****** DONE [Claude] the changes, one headline each
+******* DONE The parser drops a vid the record does not know
+A hand-typed vid, or one brought back by an old copy of the
+buffer's text, is dropped at parse, so that the headline gets a
+fresh one at the next render and the counter never jumps.
+******* DONE The switch prunes only what the restriction removes
+Its prepass prunes childless write-protected folder members and
+emptied folders the switch does not touch, and the completion
+redraws them with fresh vids. It should remove restricted leaves
+only, and leave the rest standing with their vids.
+******* DONE The switch keeps a requested folder
+The containers folder you had asked for vanished at the switch
+and was not redrawn. It should stay, refreshed under the new
+restriction.
+******* OBSOLETE: The switch back revives the placeholder
+Skipped by your call in '18_1': it is not very little code, and
+switching a buffer to private and back is not important. The
+entry in 'TODO/problems.org' stays open, unplanned.
+The anonymous placeholder kept its vid and its subtree through
+the switch, so when the restriction lifts it should become the
+unrestricted occurrence again, in place, rather than a copy being
+drawn beside it.
+******* DONE Copies of a role graft merge
+The role-tree attach runs no duplicate check, so copies of a
+write-protected graft all stay. Under '18_1' the attach goes with
+foldering, and adoption by key among all siblings covers the
+case: a second child of a matched key is the rule's duplicate.
+******* DONE The wire atom becomes 'vnid'
+Your item under "Decide", folded there.
+******* DONE A comment, and a test
+The comment on the skip says that Emacs reads 'inf' as a number;
+only the Rust reader does. And the stability the throwaway test
+showed deserves a test of its own, across a save, a request and a
+switch.
+***** DONE jeff : maybe we should dedup more aggressively
+What if we did the following?
+Among any set of viewforest siblings,
+the same graphnode ID could only show up once.
+If one of them is definitive, it would be the winner.
+The content of any other occurrence among those siblings
+already has affectsParent=False,
+so it could safely be moved to the winner.
+
+The same rule could hold on relPartner folders, I think.
+
+Merging would not need to be applied for ID or alias folders:
+Even if there's only one ID folder,
+if it's write-protected, its IDs should all be view-demoted
+(detached, or deadened if they have subtrees),
+and any other subtrees left in place but their roots
+would be affectsParent=False (that is, they would not
+affect the folder).
+I don't know how an ID or alias folder would actually achieve
+write-protected status,
+but it seems good to know how to handle that.
+****** DONE [Claude] yes to the rule, in its adoption form
+Answered in '18_1_birth-and-ownership.org', with every read of
+birth and of owner and every place two siblings can stand for one
+node. In short: matching by key among all siblings, whoever drew
+them, fixes every duplicate the probes found but the restricted
+placeholder, which has no ID; a second child of a matched key is
+the one rule's duplicate. Moving the loser's content under the
+winner raises questions (which copy wins, the collected ID, the
+loser's vid and requests, members arriving under a graft) that
+adoption never has to ask, so I would take the adoption form. The
+ID and alias folders need nothing new: no folder can be
+write-protected today, and a stale entry with a subtree already
+becomes a titleless holder.
+** DONE Slice 2
 'HeadlineName' (a view id, else a title) names a headline in
 every message of the three groups. A copied headline loses its
 vid before it becomes a viewnode. "Multiple editable view
 requests" and "Multiple fork requests" come once per ID listing
 every occurrence, where they came once per extra occurrence.
 Three messages outside the plan's list name their headline too.
-*** TODO is HeadlineName user-facing?
+*** DONE is HeadlineName user-facing?
 If it's user-facing, we should always present the title if present,
 and always present the viewnode id.
 If it's not user-facing, the viewnode id seems strictly better,
 unelss some viewnodes don't have viewnode IDs --
 but all should have them, no?
-** Slice 3
+**** DONE [Claude] yes: show both, and a way to find a vid
+It is user-facing: every message that carries one reaches the
+save-error buffer or the warnings, and none goes only to a log.
+Today it is one or the other, the vid when the headline has one,
+else the title. Four of the fourteen validation errors print the
+title beside it; the other ten print the node's ID beside it.
+Every rendered viewnode has a vid. A headline has none exactly
+when you typed or copied it since the last render, because vids
+are assigned at the end of a completion, after every save-time
+message is produced; and a save that fails does not rerender, so
+the headline still has none at the next attempt. A buffer
+rendered before plan 17 has none either.
+
+So your rule is the right one, with one more fact in view: the
+vid is invisible in the buffer unless heralds are off ('C-c v
+h'), since its herald rule is vacuous, and no client command
+looks one up. I would have every message print the title when
+there is one and the vid when there is one, in that order, as
+'"T" (vid 0g)'; a folder or a dead viewnode, which has no title,
+prints its kind and the vid; a typed headline prints its title
+and "not yet saved". And I would give each client a command that
+jumps to the headline carrying a given vid, so that a message's
+vid leads somewhere without turning heralds off. One slice of the
+next plan, with the message tests updated.
+***** DONE jeff
+Let's present those to the user as org text:
+#+begin_example
+  * <title>
+  ** graphnode id: <ID>
+  ** viewnode ID: <ID>
+  To find this viewnode, run 'C-c g v RET <ID>'
+  ('C-c g v' runs 'skg-goto-viewnode-id'),
+  or just search the buffer text for "vid <ID>".
+#+end_example
+The VIDs should be (as they are) invisible while heralds are on.
+
+If a warnings or error buffer has multiple messages,
+each message should be under a separate headline
+(maybe this is already true), of which the nodes it mentions
+should be subheadlines.
+
+On the three cases you describe,
+ending with "not yet saved": I agree.
+****** DONE [Claude] folded: headlines for messages and nodes
+Today the clients already put each message under its own
+headline, '** message' under '* errors' or '* warnings', and the
+server's validation errors come as '** Error N' with the names as
+list lines ("- view id: X"). The fold: every message is a
+headline whose text is the message; every viewnode it names is a
+subheadline under it, with the lines you give, "graphnode ID",
+"viewnode ID" and the hint; a typed headline's subheadline says
+"not yet saved" in place of the viewnode ID. That is one change
+in 'HeadlineName' (an org subtree instead of a list line) and in
+the clients' message buffers.
+
+Two facts in favor of your hint. 'C-c g' is already the goto
+prefix ('C-c g RET', 'C-c g i'), so 'C-c g v' fits, and
+'<localleader>gv' in Neovim. And a search for the atom works with
+heralds on in both clients: Emacs hides the sexp under an
+overlay's display string, which leaves the text searchable, and
+Neovim conceals it, which '/' sees through; neither client makes
+it invisible. The command is still worth having, since a search
+lands on hidden text.
+** DONE Slice 3
 The lists whose order the save writes (the content list, the
 alias folder, the subscribee, overridden and hidden-outside
 folders) still follow the goal's order, because a collateral view
@@ -137,8 +365,8 @@ anchor slot each visit, since the content reconciler sorts
 non-members first. A new fixture 'two_containers' pins the walk.
 The agent found that a deleted node's former child appeared twice
 under its phantom; slice 5's owner hand-overs fixed it.
-*** TODO jeff : all seems good
-** Slice 4
+*** DONE jeff : all seems good
+** DONE Slice 4
 The generic reconciler takes a preferred copy (the editable one,
 else the first) and a converter. A phantom or a restricted
 vognode with a subtree becomes dead, since only an unrestricted
@@ -146,41 +374,365 @@ vognode can be a write-protected non-member. The hidden-content
 stats use the distances from where the kept node stands. The
 prune is public for one test. The role graft's lost birth comes
 from the birth check, which is right, so it stays.
-*** TODO jeff
+*** jeff
 Please draw an example
 And when you say "uses the distances", uses them for what?
 What does it mean for the prune to be public?
 What is the birth check, and why does a role graft lose it?
-** Slice 5
-The reconciler takes the caller's owner and a kind selector per
-model, since one reconciler runs several models under one node.
-Under a stale child everything is converted except the user's and
-the content reconciler's viewnodes. The role trees under a
-changed folder's members belong to the role-tree attach, which
-also made c1's old text keep its vid across saves. The commit
-tests use a fixture of their own, 'commit_leftovers'.
-*** TODO jeff
-What's a kind selector?
-What is c1?
-** Slice 6
-'DiffChange { node, rel, properties }' with 'Existence'; the
-graft readiness fix; grafts get '(rel removed)' only; the
-order-only marker carries '(ready all)'; a folder's '(diff ...)'
-holds only '(ready)', and a bare top-level '(ready)' on a folder
-is refused. 'Presence::diff_sign' keeps its name.
-*** TODO jeff : Always use complete sentences, please.
-** Slice 7
+**** DONE [Claude] three examples, and the three answers
+The lines below are heralded, as you would see them. A herald in
+parentheses gives a child's relationship to its parent where that
+is not plain containment: 'Ca' says the child contains its
+parent, 'Cb' its grandparent. The lines come from slice 4's
+capture over TCP of the tests' own scenarios.
+***** OBSOLETE in part: the words, and m's write-protection
+The three examples show the code as slice 4 left it, and the
+words are slice 4's. Under '18_1' "parked" is "retained", "dead
+viewnode" is "tombstone", "deadened" is "entombstoned", and a
+retained copy keeps the editability it had: m would stay editable
+under k, and mc would stay its content rather than become a note.
+***** DONE A stale branch is parked; a stale leaf vanishes
+Let k contain l and m, and m contain mc. The view of k:
+#+begin_example
+  * k
+  ** ☮ (Ca) kk
+  ** l
+  ** m
+  *** mc
+#+end_example
+Another view saves k without l and m. The collateral rerender:
+#+begin_example
+  * k
+  ** ☮ (Ca) kk
+  ** ⊥☮ m
+  *** ⊥ mc
+#+end_example
+l, a leaf, became a dead viewnode, and the prune removed it
+before rendering. m, holding mc, became a write-protected
+non-member: its metadata gained '(affectsParent false)' and
+'writeProtected', lost its change facts, and kept its vid, '0d';
+its member mc became a non-member. Saving the buffer is accepted.
+****** DONE jeff : Why does m become write-protected?
+******* OBSOLETE: so that it holds no editable claim
+Superseded in '18_1': you asked the question again there, and I
+conceded. The claim is kept safe by the editability walk
+preferring a member to a non-member, and write-protecting m costs
+mc its membership. The argument as I gave it:
+k no longer contains m, so this occurrence of m stands where the
+graph does not put it. Left editable, it would be the buffer's
+one editable occurrence of m, and the occurrence where m is
+content now, in this or a collateral view, could not be; the
+second throwaway run before the plan saw exactly that, a kept
+stale copy "still editable" and the claim stolen. An editable
+occurrence is also extended, which costs budget. Write-protected,
+the copy is a holder: it keeps its title and ID so that it can be
+adopted back, saves nothing of its own, and mc under it is a
+note.
+****** DONE jeff : rather than 'parked' let's say 'retained 'stale'
+******* DONE [Claude] read as a verb and an adjective
+I read "retained" as the verb for what the one rule does to a
+stale vognode with a subtree (a retained child: write-protected,
+non-member, its subtree kept), and "stale" as the adjective for a
+child the graph no longer warrants, which the glossary already
+uses. Both would replace "parked" in the rewrite of the
+definitions you have put on hold. Say if you meant one word.
+******** DONE Jeff : that's good, two words
+***** DONE A parked folder member is adopted back
+In a new example, suppose x's containers folder lists a and b,
+and you typed a note under b. Then b stops containing x. The view
+of x:
+#+begin_example
+  * x
+  ** ☮ These contain it.
+  *** ☮ (Cb) a
+  *** ⊥☮ b
+  **** ⊥ a note under b
+#+end_example
+When b contains x again, the same viewnode (vid '0i') is the
+member again, '☮ (Cb) b', with your note still under it; no
+second b is drawn.
+****** DONE Jeff : This is the plan, right?
+You used present tense again, but here you're talking about
+the future, yes? If so, seems good.
+******* DONE [Claude] no, this is the code as it stands
+Slice 4 built the adoption of a retained folder member, and the
+lines above were captured over TCP from the code after it. The
+plan keeps it; what the plan changes about this example is only
+the word "parked".
+******** DONE jeff : is it problematic?
+It seems right to me.
+********* DONE [Claude] no; it is right, and the plan keeps it
+***** DONE A phantom with a subtree is deadened
+In a third example, let u be a public node under which stand
+two deleted phantoms of private nodes, q and q2, and under q2 a
+public note qc:
+#+begin_example
+  * u
+  ** DELETED q secret title
+  ** DELETED q2 secret title
+  *** ⊥ qc
+#+end_example
+After the skgrepo-set switch to 'public':
+#+begin_example
+  * u
+  ** DELETED
+  *** ⊥ qc
+#+end_example
+q, a leaf, was deadened and pruned. q2, holding qc, is a
+titleless dead viewnode, '(skg deadViewnode)', whose line reads
+only DELETED; nothing of either title or body remains.
+****** DONE jeff : the same result would obtain
+even if qc had been a member of q2, right?
+******* DONE [Claude] yes
+Under a tombstone, membership means nothing: a tombstone has no
+node for a child to be content of, so qc would stand under it the
+same way whether it had been a member of q2 or a note.
+***** DONE The distances
+The '(rels ...)' stats on a headline count, for each relation,
+the related nodes on each side and say which ancestors are among
+them, by generation; the herald turns a generation into a letter
+('a' the viewparent, 'b' the grandparent), so '(contains (in 1
+(ancestors 1)))' reads "aC": the parent is the one container. A
+member inside the hidden folder is contained by the subscribee
+two generations up and hidden by the subscriber four up, which is
+what the plan said to copy. The kept hidden member stands one
+level higher, directly under the subscribee, so from there the
+subscribee is one generation up and the subscriber three. Slice 4
+counted from where the node stands, so its herald reads "aC" and
+"cH"; with the plan's numbers the letters would have pointed at
+the wrong ancestors.
+***** DONE The public prune
+'prune_self_deletable_when_empty' was a private function and is
+'pub' now, so that one test can call it. Rust tests under
+'tests/' are crates of their own, which see only public items.
+The test runs the alias folder's reconciler alone and then the
+prune, to show that a stale alias is converted to a dead viewnode
+and removed by the prune rather than detached by the reconciler,
+as it was before.
+***** The birth check
+A role graft's birth, '(birth roleGraft container)', records why
+it was drawn, and gives it the low letter in its herald. The
+birth check runs in every completion: for each child born a role
+graft it asks the graph whether the relationship is real, and if
+not it resets the birth to unremarkable. When b stops containing
+x, the graft b is stale; it has a subtree, so it is parked, and
+the convert keeps its birth. The birth check then resets it,
+since b no longer contains x. That is right. The loss is that
+when b contains x again, the relationship returns but the birth
+does not, so b's letter is no longer drawn low like its
+siblings'. It is cosmetic, and 'TODO/DONE/problems.org' records
+it.
+****** DONE I wonder whether birth was a bad idea.
+What are all the situations in which it is used?
+We redraw the heralds at ever render anyway, so the user
+will see if a containment relationship disappears.
+******* OBSOLETE: not bad: the diff view needs it
+Superseded in '18_1': with every partner drawn in a folder of its
+role, position answers every read of birth, and birth goes in the
+last slices of the next plan. The argument as I gave it:
+Every read is listed in '18_1_birth-and-ownership.org'. The
+heralds could do without it, as you say. What cannot is the diff
+view, which asks a graft which relationship it stands for, with
+its direction, to key its leaves, its readiness and restore
+requests and its before-only sign; a before-only graft has no
+relationship in the live graph, and two nodes may have two. The
+birth is also what keeps a before-only graft from counting as a
+removed member, which the view may make editable and the clients
+would offer 'restoreRel' on. I recommend it stays, with three
+small fixes listed there.
+** DONE Slice 5
+Slice 5 brought the rule to the diff view's reconciler. Three
+things it did deserve a word.
+*** Several models under one node
+Under one editable node the diff view's reconciler runs several
+models one after another: the front change viewnodes (old text,
+the home-skgrepo move, the changeset markers, the changed
+property folders), then the removed members and historical
+phantoms, then a member's relRepo move. Each run selects the
+children it concerns by their kind, so that the removed-members
+run does not take the old text for a stale child and convert it.
+Each run also converts only the children the diff view or the
+role-tree attach drew, which plan 17's owner records; the next
+plan would replace the owner by the child's kind and change
+facts, and the selection by kind would remain.
+*** The role trees under a changed folder's members
+The role tree the attach hangs under a member of a changed folder
+is reconciled by key at each save, so that its viewnodes keep
+their vids. The test's graph, in one skgrepo, at both HEAD
+and the worktree:
+#+begin_example
+  * c1
+  ** m
+  *** a
+  * c2
+  ** m
+#+end_example
+The three containments hold in HEAD and in the worktree alike.
+Since HEAD, a's body has changed, and c1 is retitled "c1
+retitled" after the buffer opens. The "all changes" buffer has
+one root, m, since a's change is the only one under a root; c1
+and c2 appear only as members of m's containers folder. After the
+command that makes c1 editable there, the buffer reads:
+#+begin_example
+  * m
+  ** M a
+  ** ☮ These contain it.
+  *** (Cb) M c1 retitled
+  **** old title c1
+  **** (aC) m
+  *** ☮ (Cb) c2
+#+end_example
+The old-title viewnode under c1 is "c1's old text". Before slice
+5 it got a new vid at every save, because the children under a
+folder member were drawn afresh each time; now a save returns
+this buffer unchanged, every vid kept.
+**** DONE jeff : The line "**** (aC) m" doesn't seem right.
+Are you planning to draw each node in the containerward roletree
+editable? I think that will be too cluttered.
+All roletrees except the default contentward ones
+should be entirely write-protected.
+The first layer of roletree nodes under a folder
+can still emit commit-readiness instructions.
+***** [Claude] agreed: role trees entirely write-protected
+The buffer above is the code as it stands. Plan 15 made a change
+that is shown only as a folder member editable there, on the
+command that integrates unshown changes, so that it could be
+edited and marked without a root being added; that is where c1's
+content m comes from. Under your rule the folder member would
+stay write-protected, '☮ (Cb) M c1 retitled', with nothing under
+it, and the readiness gesture would still work on it, as it does
+on every folder member today; the chain below the first layer
+carries no change facts, so no gesture lands there. To edit c1
+you would open it, or the command would append c1 as a root,
+which is what a change "not editable here" would then mean. I
+would have the command append the root; say if you would rather
+it did nothing. Folded into the closing section.
+****** DONE jeff : better to append, as you say
+*** A fixture for commits
+The tests of what a commit leaves use a fixture of their own,
+'commit_leftovers'.
+** DONE Slice 6
+The wire's change fact is 'DiffChange { node, rel, properties }',
+and 'Existence { Added, Removed }' replaces 'Sign' and
+'NodeSign'. A readiness request on a role graft now names the
+relationship of the graft's birth role. Before, it named the
+viewparent's content relationship, which a graft does not have,
+so a removed graft could never show ready. A before-only role
+graft carries '(rel removed)' only; a graft whose relationship is
+new shows nothing. The order-only marker carries '(ready all)',
+though it lists no leaves. A folder's '(diff ...)' holds only an
+objectless '(ready)', and a bare top-level '(ready)' on a folder
+is refused. 'Presence::diff_sign' keeps its name, since the plan
+names it, and returns an 'Existence'.
+*** DONE jeff : "a graft whose relationship is new shows nothing"
+seems wrong, no? Shouldn't it show "rel added"?
+Or is there a good reason for the asymmetry?
+**** OBSOLETE: no good reason; it should show it
+Superseded in '18_1': under foldering a graft's partners hang
+under it as non-members carrying no change facts, and only a
+folder's members show change, so neither sign is drawn there. The
+argument as I gave it:
+The asymmetry has no reason but the plan's words, which named
+only the before-only graft because that was the case we
+discussed. Nothing technical stands in the way: the function that
+tags grafts already asks the straddle for each relationship's
+presence and keeps only the before-only ones, hard-coding
+"removed", where one call to 'diff_sign' would give both signs;
+and the graft's '(leaves ...)' fact already lists 'rel' for an
+added relationship, so today such a graft lists a leaf it shows
+no sign for. I would tag after-only grafts '(rel added)', rename
+the function for both cases, and add the test. Next plan.
+*** DONE jeff : what's a Presence?
+It seems dangerously similar to an Existence.
+**** DONE [Claude] the union walk's three values; drop the type
+'Presence { Both, OnlyBefore, OnlyAfter }' says which graphs of
+the straddle hold a node or a relationship; the union walk
+produces one for every item of the union of the two graphs.
+'Existence { Added, Removed }' is the change, and
+'Presence::diff_sign' maps one to the other, 'Both' to none. So
+the two are one fact seen twice, and the plan retired the word
+"presence" everywhere but here. I would finish the retirement:
+the union walk yields 'Option<Existence>' for each item, 'Both'
+being 'None', and 'Presence' goes. About fifty uses, mechanical.
+Next plan.
+** DONE Slice 7
 The two requests are booleans beside 'Editability', not variants
 in it. 'restoreRel' is refused on a before-only role graft, which
 the plan's list did not name. The straddle is built only when the
-buffer carries a restore request. Three drop reasons beyond the
-plan's: a node that exists already, a link, a relationship
-recorded in a skgrepo you do not own. The glossary's 'toDelete'
-became 'delete'.
-*** TODO jeff
+buffer carries a restore request. Five drop reasons go beyond the
+plan's two, and a sixth is defensive; they are listed under your
+question below. The glossary's 'toDelete' became 'delete'.
+*** DONE jeff
 "straddle is built only when ...": Isn't there *always* a straddle?
 What is a drop reason? What is being dropped, in each case?
-** Slices 8 to 10
+**** DONE [Claude] not always a straddle; what a drop is
+There is not always a straddle. It lives in a slot per
+connection, built when a diff-view buffer is first requested and
+brought up to date after that; a connection that has opened only
+content views has none. Building one reads every owned skgrepo's
+HEAD tree and builds and validates a whole graph of HEAD (cached
+by HEAD's identity), and it refuses when an owned skgrepo has no
+gitrepo or no commit. So the save path builds or refreshes it
+only when it needs HEAD: before slice 7, for readiness requests
+and for the rerender of a diff-view buffer; since slice 7, also
+when the buffer carries a restore request. Building it on every
+save would break saving for anyone without git.
+
+***** DONE A dropped request
+contributes no instruction to the save; the
+rest of the save proceeds, a warning names the request and why,
+and the request is cleared from the headline as every edit
+request is.
+
+The reasons with what would go wrong
+if the request were instead honored:
+****** The plan's two
+A 'restoreRel' on a headline that stands for no relationship to
+its viewparent, such as a member of an acquisition folder: there
+is nothing to write. A 'restoreRel' whose relationship has a
+deleted node at one end: writing it would leave a dangling
+reference, which would show as an unknown phantom; the warning
+says to restore the node first.
+****** Five more, found while writing it
+A 'restoreNode' whose node exists: after a retried save, or when
+the node was acquired since, so that its ID is an extra ID of the
+acquirer; copying HEAD's file would overwrite the live node, or
+put two nodes on one ID. A 'restoreNode' where HEAD has no such
+node: nothing to copy. A 'restoreRel' on a link: the relationship
+lives in the mentioner's text, and there is no list to write. A
+'restoreRel' naming no relationship HEAD records: there is no
+recorder or relRepo to restore from. A relationship that HEAD
+recorded in a skgrepo you do not own, whether requested directly
+or as an in-link of a restored node: writing it would edit a
+foreign skgrepo, which the save refuses everywhere else.
+****** One defensive
+A recorder that is gone from the live graph though it was
+expected to exist after the save. I could not construct the case
+by reading; the warning says "its recorder is gone".
+****** DONE jeff : these all seem good
+***** DONE jeff : Does it reread the whole repo for every readiness request?
+That seems unacceptably slow.
+****** DONE [Claude] no; a throwaway test timed it
+It rereads HEAD only when HEAD has moved. While HEAD stands, a
+save checks each owned skgrepo's HEAD commit (one open of its
+gitrepo, a tenth of a millisecond) and pairs the standing HEAD
+graph with the new live graph, which costs no reading at all;
+what it then pays is the change forest, computed in memory over
+both graphs. An agent timed the real handlers on a release build
+with two owned skgrepos. At 2,000 nodes: a save with a readiness
+request 4 ms, the same as any save while a diff view is open,
+since the diff view is rerendered as a collateral view; the first
+build of the straddle 36 ms; a request after an external commit
+35 ms. At 20,000 nodes: 20 ms, 400 ms and 370 ms, against 240 ms
+to load the live graph at startup. A commit made through skg
+rebuilds the straddle inside the commit, so a request after it
+pays nothing extra. Two things worth a note: closing the last
+diff view empties the slot, so the next request rebuilds HEAD's
+graph from the cached snapshot (10 ms and 135 ms); and the
+snapshot cache is never evicted, so a long session holds one HEAD
+snapshot per commit it has seen. The report is
+'tests/results/review18/throwaway-straddle/report.md'.
+** DONE Slices 8 to 10
 "changed members" in the filter and acquired folders' phrase
 became "changed memberships". The glossary moved "owner", "the
 one rule" and "dead viewnode" out of the diff-view section too,
@@ -190,7 +742,7 @@ rule".
 
 * Decide
 Each item is a recommendation; say yes, or say otherwise.
-** [Claude] "view id" collides with 'ViewId'
+** DONE [Claude] "view id" collides with 'ViewId'
 And 'vid' is in the names. 'ViewId' names a whole buffer, and the
 clients call that a "view id" too. The agents also wrote 'Vid',
 'take_next_vid', 'folder_vid', 'without_vids', 'VID_ATOM' and
@@ -201,17 +753,70 @@ the wire and in names, so that 'Vid' and 'without_vids' read as
 abbreviations of the right thing and 'ViewId' keeps the buffer.
 The glossary entry and the messages ("view id X") would follow. I
 recommend it.
-*** TODO jeff
+*** jeff
 On the wire, vid.
 In code and prose, viewnode id and viewtree id.
-** [Claude] 'Owner::User' and two non-reconciler owners
+**** [Claude] folded; one word to settle
+The wire keeps '(vid X)'. Code and prose say "viewnode id", and
+the buffer's identifier becomes a "viewtree id". The one word to
+settle is "viewtree". The glossary's entry "view, buffer,
+viewforest" says "say 'viewforest' rather than 'viewtree' or
+'forest'", because a buffer may hold several roots. So either the
+new name is "viewforest id", or that sentence goes and "viewtree"
+returns. I would follow the glossary and say "viewforest id",
+unless you prefer to retire "viewforest".
+
+An agent counted what the rename touches. The new thing: the type
+'Vid' (35 uses in 'server/', 27 in 'tests/'), the field
+'Viewnode::vid' with its locals (92 and 322), and about thirty
+derived names, the largest 'without_vids' (104 uses: the test
+helper that strips the atom before a comparison), then
+'folder_vid', 'vid_atom', 'VID_ATOM', 'take_next_vid' and some
+twenty test names. 'ViewIdRecord', 'view_id_record',
+'assign_view_ids_and_record_owners' and 'view_id_suffix' also
+mean the viewnode, and the message texts say "view id X". The
+buffer's identifier: 'ViewId' (130 uses in 'server/', 161 in
+'tests/'), the 'view_id' family (272 and 345, in both senses),
+the clients' 'skg-view-id' and 'skg_view_id' families (137 and
+121) and their prose "view ID". The docs mix the senses:
+'api-and-formats.org' says "view ID" for the buffer thirteen
+times and "view id" for the viewnode twelve times.
+
+Two things I would leave. The wire's key for the buffer,
+'view-id', stays as 'vid' does: both clients speak it, and it
+appears in 4,376 integration-test lines, mostly as the names of
+tests. The atom '(vid X)' stays in 281 test literals, which is
+why the rename costs little: only identifiers and prose move. The
+rename is mechanical and makes one slice of the next plan, with
+the glossary entry "view id, vid" renamed "viewnode id, vid" and
+the entry "view, buffer, viewforest" naming the buffer's id.
+***** OBSOLETE: the wire keeps '(vid X)'
+You changed the atom to '(vnid X)' below, and "viewforest id"
+won.
+***** DONE jeff : agreed, viewforest is better
+***** DONE jeff : let's change vid to vnid in the wire
+Otherwise vid and view-id could be confused.
+(Facing the user we plan to say "viewnode ID", right?)
+****** DONE [Claude] folded: '(vnid X)' on the wire
+The atom becomes '(vnid X)'. Facing the user the word is
+"viewnode ID", with the capitals the clients already use for
+"view ID"; in code it is 'viewnode_id' and 'ViewnodeId'; the
+buffer's key 'view-id' on the wire stays, and its code name
+becomes 'ViewforestId'. The atom's rename touches the parser and
+printer, 'VID_ATOM', the vacuous herald rule and the regenerated
+rules fixture, the two integration-test helpers that strip the
+atom, 281 test literals (one script) and four doc examples.
+** DONE OBSOLETE: 'Owner::User' and two non-reconciler owners
+Superseded in '18_1': the owner goes, so there is no entry to
+widen. Your reply below, the glossary's split into a user-facing
+and a technical section, stands. The item as it was:
 The glossary says nobody owns what the user typed; the enum says
 'Owner::User'. 'RoleTreeAttach' and 'StubRoots' own what those
 passes draw, and neither is a reconciler. I would keep the enum
 and widen the entry: an owner is the pass that drew the viewnode
 (a reconciler, the role-tree attach or the stub roots), or the
 user.
-*** TODO jeff : sure, but
+*** jeff : sure, but
 let's divide the glossary into two top-level sections,
 one called 'user-facing' and the other 'technical'.
 Hopefully a user never has to know about reconcilers,
@@ -223,14 +828,38 @@ subsections, like "diff view". That's fine.
 The user-facing section should precede the other,
 and the body of the other should explain that users
 almost certainly don't have to read it.
-** [Claude] Repair names that say removed
+**** [Claude] folded: the sketch of the split
+An agent labeled the 97 entries. By its count 52 are words a user
+meets in the clients, the heralds, a message or a user doc, and
+45 are ours: reconciler, owner, key, straddle, union walk, change
+forest, the save's intents, Tantivy's words. Nine entries hold
+both and would split, one half per section, the user's half
+saying what is seen and the technical half how: "view, buffer,
+viewforest", "PartnerFolder" (the folder kinds for the user, the
+policy vocabulary and its two technical subsections for us),
+"graphnode, viewnode, vognode", "merge", "view completion,
+extend, render, rerender", "mark, fingerprint, readiness",
+"prominent", "relation, relationship, recorder" and "the one
+rule", whose effect shows in warnings. The diff view gets a
+subsection in both halves, as you say. Tantivy's entries go under
+the technical section, except "no search matching" and "flags
+folder", which the user meets. The technical section's body would
+say that a user almost certainly need not read it.
+
+Nothing outside the glossary links to a headline by org anchor,
+and the sixteen links inside it name headlines, not sections, so
+moving entries breaks none; renaming one breaks its links, which
+the slice would follow. Five doc citations of the section name
+"Terms of the diff view" would be updated. One slice of the next
+plan.
+** DONE [Claude] Repair names that say removed
 They count conversions. 'RepairKind::RemovedStaleLeaf' and
 'RemovedDuplicate' now count a leaf made dead, and the warnings
 say "removed". A dead leaf is gone before rendering, so the word
 is true of what the user sees; I would leave the warnings and
 rename the variants 'ConvertedStaleLeaf' and 'ConvertedDuplicate'
 in the next housekeeping slice.
-*** TODO jeff : this seems actually a good place for 'deadened' or 'demoted'
+*** DONE jeff : this seems actually a good place for 'deadened' or 'demoted'
 If these conversions are always from a vognode to dead,
 then "deadened"; if they are broader but always, uh, downward,
 then "demoted".
@@ -242,72 +871,406 @@ It will deserve a glossary entry.
 
 "Deadened" might be triggering for some coders;
 if it applies but you can think of a softer term, that'd be cool.
-** [Claude] Words the code uses without an entry
-"parked", "adopt", "claim" and "set aside" for what conversion
-and adoption do, and 'HeadlineName'; the synonyms "deaden", "dead
-leaf", "unwarranted" and "managed"; "convert" in
-'convert_now_restricted_vognodes', which is not the one rule;
-"Existence" for both the enum and the change-forest aspects;
-'RestoredMember', a repair, beside the restore requests. I would
-add "parked" and "adopt" to the glossary as the names of the two
-conversions' outcomes, replace the rest with the glossary's
-words, and rename the switch's function and 'RestoredMember'
-('ReinstatedMember').
-*** TODO jeff : please define each here
-under a headline, grouping (in a common headline) synonyms if any.
-** [Claude] Should a role graft accept 'restoreRel'?
+**** DONE [Claude] "deadened" fits both; "demote" is org's word
+An agent traced both counts to one recorder,
+'complete_managed_children'. 'RemovedStaleLeaf' and
+'RemovedDuplicate' count only children that
+'convert_unwarranted_child' made a childless dead viewnode, which
+the prune removes in the same completion; a child parked instead
+goes to the third count, 'MadeNonMember'. So "deadened" is exact
+for both, and "removed" is what the user sees. I would rename the
+two variants 'DeadenedStaleLeaf' and 'DeadenedDuplicate' and
+leave the warning texts, which describe the effect. "Demote" I
+would not use: we retired "promote" and "demote" in '07_1'
+because org-mode's promote and demote change a headline's level,
+which is what an org user hears. The third variant is the one
+that misnames. 'MadeNonMember' and its text "made N child(ren)
+non-members" also count a non-vognode with a subtree that became
+a dead viewnode holding it, which is no non-member. I would
+rename it 'Parked', with the text "parked N child(ren), which are
+not members", once "park" has its entry below.
+
+A softer word than "deaden". The outside word for exactly this
+thing is "tombstone": a marker left where a deleted item stood,
+so that what depends on its place keeps working, as in databases
+and hash tables. It fits a dead viewnode down to the herald
+"DELETED", and gives a verb, "tombstoned". Renaming would touch
+'DeadViewnode' and the wire atom 'deadViewnode' (about 160 uses
+in 'server/' and 'tests/', 36 of them the atom), "dead viewnode"
+in the docs (14) and "deaden" (33). I know no softer word that is
+also exact; "hollow" describes the viewnode, which has no title,
+no ID and no facts, but not the act. I would keep "dead" and
+"deaden" unless you want the outside word, in which case
+"tombstone" is the one to take.
+***** DONE OBSOLETE: the names 'Deadened...' and 'Parked'
+With "tombstone" and "retained" the variants are
+'EntombstonedStaleLeaf', 'EntombstonedDuplicate' and 'Retained';
+folded below.
+***** DONE jeff : tombstone is almost perfect
+The only problem is it's confusible with a noun.
+So when using it as a verb, let's say Entombstone.
+(That is admittedly awkward, and it's tempting to say Entomb,
+but that would imply the thing entombed is still in there,
+when in fact it's not recoverable in any obvious way.)
+****** DONE [Claude] folded: tombstone, entombstone
+The noun "tombstone" replaces "dead viewnode", the verb
+"entombstone" replaces "deaden", and "a childless tombstone"
+replaces "dead leaf"; the herald stays DELETED. In code,
+'DeadViewnode' becomes 'Tombstone', the wire atom 'deadViewnode'
+becomes 'tombstone', the two repair variants become
+'EntombstonedStaleLeaf' and 'EntombstonedDuplicate', and
+'MadeNonMember' becomes 'Retained'. One fact for the record:
+databases use the bare noun as the verb ("tombstoned rows"), so
+"tombstoned" would be understood too; I fold "entombstone" as you
+chose it.
+** DONE [Claude] terms to settle
+Rewritten after '18_1', as you asked there. Each word has a
+headline; synonyms share one; the words the discussion retired
+are marked OBSOLETE and kept.
+*** DONE non-member, retain as non-member
+A *non-member* is a vognode child that takes no part in the
+membership its viewparent represents: a note under a node, a
+removed member of the diff view, a container in the containerward
+chain. Its headline says so, today with '(affectsParent false)'
+and under the next plan with the bare atom 'nonMember', where a
+member's says nothing; the save reads nothing about the parent
+from it. To *retain as non-member* a stale vognode with a subtree
+is what the rule does instead of detaching it: it stays in place
+as a non-member with its title, ID, subtree and the editability
+it had, so that the content reconciler can adopt it back when its
+membership returns. The extra copies of a duplicate are retained
+write-protected, since the save refuses two editable occurrences
+of one node. A removed member is the one non-member that carries
+change facts, and so the one that may carry a commit-readiness
+marker or a 'restoreRel' request.
+**** DONE jeff : better than retain
+let's spell it out: retain as nonmember
+***** DONE [Claude] folded: "retain as non-member"
+The verb is "retain as non-member", spelled out each time; the
+glossary hyphenates "non-member" in prose, and the atom is
+'nonMember'. The headline and the rule's name below say it.
+**** OBSOLETE: parked, set aside
+"Parked" was slice 4's word for a retained copy, always
+write-protected; "set aside" was the diff view's for making a
+removed member a non-member. Both go; the glossary says "a note
+the user leaves in a folder" for the third thing "parked" meant.
+*** DONE adopt
+A reconciler *adopts* a child when a key its model has is already
+among the node's children, whoever drew the child: it takes that
+child as the item's viewnode instead of drawing a second, keeping
+its fold state and subtree. The content reconciler does it today
+('adopt_nonMember_children_that_are_content'), and the folder
+reconcilers since plan 17; under the next plan every reconciler
+adopts by key among all siblings, and a second child of a matched
+key is the rule's duplicate. Three other uses of the verb are
+ordinary English and stay: a new node adopting a clone's skgrepo,
+the client adopting a buffer under its viewforest id, and
+'adopt_model_facts', which gives an existing viewnode a model's
+kind and change facts and would be renamed 'give_model_facts_to'.
+*** DONE editability claim
+An *editability claim* is the record, in the editable map, that
+one occurrence of a node is the editable one, so that no other
+occurrence in the buffer may be; only an editable occurrence
+claims. The map is rebuilt in a breadth-first walk at every
+completion, and under the next plan the walk prefers a member to
+a non-member among occurrences that carry no request, so that a
+retained copy never takes the claim from the node's member. The
+other uses of "claim" are ordinary English and stay.
+**** DONE jeff : let's say "editability claim"
+because "editable claim" sounds like the claim itself is editable
+***** [Claude] folded: "editability claim"
+*** DONE messages name a headline
+A message names each viewnode it concerns as a subheadline of its
+own: the title when there is one, the graphnode ID, and the
+viewnode ID with the hint to 'skg-goto-viewnode-id', or "not yet
+saved" for a headline typed since the last render. 'HeadlineName'
+is the type behind it, and needs no entry of its own.
+*** DONE tombstone, entombstone
+A *tombstone* is a viewnode with no title, no ID and no change
+facts, shown as DELETED, left where a viewnode the graph no
+longer warrants stood and holding that viewnode's children; the
+save discards anything typed on its line. To *entombstone* a
+viewnode is to make it one. A childless tombstone is removed by
+the prune before the buffer is rendered, so the user never sees
+one. In code 'Tombstone' replaces 'DeadViewnode', and on the wire
+'tombstone' replaces 'deadViewnode'.
+**** OBSOLETE: dead viewnode, deaden, dead leaf
+The words plan 17 used for the same three things.
+*** DONE warrant, unwarranted, stale
+The graph *warrants* a child when the model a reconciler builds
+from the graph has an item with the child's key. An *unwarranted*
+child is one it does not: a *stale* child, whose key the model
+lost, or the extra copy of a duplicate. The glossary's entry for
+the rule defines them; "warrant" joins its headline so that it
+can be found.
+*** DONE retain as non-member or tombstone, then prune
+The rule's name, in place of "the one rule" and "convert, then
+prune": a reconciler never detaches; a stale vognode with a
+subtree is retained as non-member, everything else stale is
+entombstoned, and
+after every completion a postorder prune removes childless
+tombstones. The skgrepo-set switch's
+'convert_now_restricted_vognodes' is a different thing: it
+replaces an unrestricted vognode whose home skgrepo left the
+restriction with the anonymous restricted placeholder, keeping
+its children; it would be renamed
+'anonymize_now_restricted_vognodes'.
+**** DONE jeff : "retain as nonmember or tombstone, then prune"
+This contradicts something I said earlier a little bit,
+but I realize "retain as tombstone"
+means the same as "entombstone", so this is better.
+***** DONE [Claude] folded: the rule's name
+"Retain as non-member or tombstone, then prune": the headline
+above and the closing section say it, and "entombstone" stays the
+verb for the second half.
+**** OBSOLETE: convert
+Plan 17's verb for the two conversions together.
+*** DONE existence
+Existence is the aspect of a node or a relationship that the diff
+view can report changed. 'Existence { Added, Removed }' says
+which way it changed, and 'NodeAspect::Existence' and
+'RelationshipAspect::Existence' name the aspect in a
+change-forest leaf; one word for one aspect and its direction,
+and no rename. The glossary's "the three kinds of change" is its
+entry.
+*** DONE RestoredMember, reinstated
+'RestoredMember' counts the members a write-protected folder's
+reconciler re-created because the buffer lacked a child for a
+goal item, after the user deleted the headline; the warning says
+"restored N member(s)". Beside the diff view's restore requests,
+which restore a deleted node or membership to the graph,
+"restored" is the wrong word for putting a headline back; the
+variant would be 'ReinstatedMember' and its text "reinstated".
+**** DONE jeff : agreed
+*** DONE OBSOLETE: managed, owned
+Owners go in the next plan. "Managed child" stays as the word for
+the children a reconciler matches against its goal, found by kind
+and position.
+** DONE OBSOLETE: Should a role graft accept 'restoreRel'?
+Superseded in '18_1': under foldering no graft stands outside a
+folder; a before-only partner is a folder member, which accepts
+'restoreRel' since plan 17, and a chain node carries no change
+facts. Your "agreed" below concerned the item as it was:
 A before-only role graft carries '(rel removed)' since slice 6
 and stands for a real relationship HEAD recorded, so the request
 is meaningful there; slice 7 refused it because the plan's list
 did not name it. I would accept it, one small change with a test.
-*** TODO jeff : agreed
-** [Claude] The deferred branch of 'apply_editability_rule'
-write-protects a
-node without converting its member children, the shape the budget
-path had before slice 0 fixed it; it should get the same
-conversion and a test.
-** [Claude] A user-requested alias folder in a
-diff-view buffer is now left alone, so a second alias folder
-could appear beside it when the node's aliases also changed;
-untested, and worth a test.
-*** TODO jeff : Crud. Remind me why we track who owns viewnodes?
-** [Claude] The metadata editor on a historical phantom
+*** jeff : agreed
+** DONE [Claude] The deferred branch of 'apply_editability_rule'
+The deferred branch write-protects a node without converting its
+member children. That is the shape the budget path had before
+slice 0 fixed it, and a throwaway test confirmed it. When two
+occurrences of a node both carry an editable request, the one met
+later in the walk is deferred and write-protected; the rerendered
+buffer showed that occurrence write-protected with its four
+members still members, and saving it unchanged was refused with
+'MemberChildOfWriteProtectedOccurrence'. The fix is one call,
+'make_member_children_nonMembers', in the deferred path, and the
+test's buffer is its test. I recommend it for the next plan. You
+left this item without a reply, so it is marked for you again.
+*** DONE jeff : what is the deferred branch?
+**** [Claude] where a second editable request yields
+Each completion rebuilds the editable map in a breadth-first walk
+of the buffer. When the walk reaches an occurrence carrying an
+editable-view request, and an earlier occurrence of the same node
+has already been made editable by a request of its own ("final"),
+the later request is dropped, the occurrence is write-protected,
+and the walk moves on. The code calls that outcome "deferred",
+though nothing is deferred: the request yields to the earlier
+claim and is gone. The branch's fault is that it write-protects
+without making the occurrence's members non-members, which the
+save then refuses. The fix is the one call, and I would rename
+the outcome 'Yielded' while there.
+***** DONE jeff : agreed on the fix, but
+what would Yielded represent?
+****** [Claude] what the walk says about one occurrence
+'apply_editability_rule' returns, for each occurrence that
+carries an editable request, one of two outcomes: 'MadeFinal',
+this occurrence is now the node's editable one, or the other,
+another occurrence already holds the claim, so this one is left
+write-protected and its request dropped. "Yielded" names the
+second: the occurrence yielded the claim to the one met first. If
+you prefer the claim's side of it, 'ClaimHeldElsewhere' says the
+same from there.
+******* DONE jeff : yes, better ClaimedElsewhere
+** DONE [Claude] A requested alias folder beside a changed one
+A user-requested alias folder in a diff-view buffer is left
+alone, so a second alias folder can appear beside it when the
+node's aliases also change. A throwaway test confirmed it; the
+result is under your question below.
+*** jeff : Crud. Remind me why we track who owns viewnodes?
+**** [Claude] owners say what to convert, keys what to match
+We track owners so that a reconciler converts only what it drew.
+Before plan 17 the diff view's reconciler inferred "mine" from
+shape (birth, sign, membership), and the throwaway run before the
+plan showed it deadening drawn content as if it were yours, and
+keeping a stale graft as if it were yours forever. With the owner
+recorded, the content reconciler never touches a marker, the diff
+view's reconciler never touches your note, and what nobody drew
+holds its ancestors alive. Here the owner did its job: the diff
+view's reconciler left the folder you asked for alone.
+
+The fault is in the other question, which owners were never meant
+to answer: which existing child stands for an item of the model.
+A throwaway test ran the case. When the aliases folder exists
+first and the node's aliases then change, the rerender shows two:
+yours, '(skg aliasFolder)', listing the old aliases, and the
+reconciler's, '(skg (aliasFolder changed))', listing the new.
+Saving the buffer unchanged is refused, "AliasFolder must be
+unique among its siblings", once per folder. The reverse order is
+fine, since the request adds no folder where one exists. The
+cause is that the diff view's reconciler matches a property
+folder among the children it owns only
+('shallow_model_subtree.rs'), where it matches a partner folder
+by kind alone, whoever drew it; the containers folder in the same
+test became '(containerFolder changed)' in both orders. A second
+fault came with it. In the diff view a property folder you asked
+for is never refreshed, since its visit returns at once, so in a
+collateral rerender your folder kept the old list, and deleting
+the changed folder to clear the error saved that old list back,
+losing the new alias without a word.
+
+The fix would make property folders behave as partner folders do.
+The reconciler matches by kind, so that the one folder becomes
+the changed one; it refreshes the folder from the after-graph on
+every visit, as a content view does; and when the aliases stop
+differing, a folder you asked for stays and one the diff view
+drew is pruned, which the owner tells apart. That is about thirty
+lines and a test for each property folder kind, since IDs and
+flags take the same path. Both faults are in 'TODO/problems.org'.
+The review's note that the requested folder is owned by
+'Owner::User' was wrong: the request makes it the content
+reconciler's.
+***** OBSOLETE in part: the owner's part
+Owners go ('18_1'). The fix stands with one change: a property
+folder in a diff-view buffer is matched by kind among all
+siblings and refreshed from the after-graph at every visit, and
+when the change ends a folder marked changed is entombstoned and
+pruned with its entries, whoever asked for it, since nothing but
+the owner could tell; you would request it again.
+***** Jeff : would my "dedup more aggressively"
+solve these problems and allow us to ditch both birth and (this concept of) ownership?
+****** OBSOLETE: the duplicates yes; the two records no
+Superseded by '18_1' itself: with foldering, both records go. The
+answer as I first gave it:
+'18_1_birth-and-ownership.org' has the full answer. The dedup
+solves the duplicates, because they all come from the diff view
+matching among the children it owns instead of among all
+siblings. It does not answer the one question owners are read
+for: under a stale child after a commit, a retained removed
+member, a graft whose birth was cleared and a write-protected
+copy you pasted have the same shape, and the owner is what lets
+the first two go and yours stay. Ownership can go only if the
+server's leftovers under a stale child stay until you delete
+them; I recommend keeping it, read for that question alone, and
+asking again after the next plan. Birth stays for the reason
+above.
+******* DONE jeff : sure
+** DONE [Claude] The metadata editor on a historical phantom
 It fills in no 'editRequest' field there, so cycling to
 'restoreNode' needs the field typed first; the editor should
 offer the field on a historical phantom.
-*** TODO jeff : is this a wider problem?
+*** jeff : is this a wider problem?
 That is, are there metadata fields that don't and ought to exist
 in other situations?
-** [Claude] Save-written lists follow the goal's order
+**** [Claude] yes: the editor knows one kind's fields
+An agent read both editors against the parser. The editor has no
+table of fields per kind. It turns the headline's sexp into an
+org tree, and only for an unrestricted node does it fill in
+missing fields ('writeProtected', 'affectsParent', 'birth',
+'editRequest', 'viewRequests'), each at a default that the apply
+strips again. Every other kind shows only the fields the headline
+already carries. So a historical phantom shows no 'editRequest',
+and its cycler, which finds the field by the parent headline, has
+nothing to cycle until the field is typed. The gaps the
+comparison found are the same in Emacs and Neovim. The historical
+phantom lacks 'editRequest', and its cycle begins at "none
+(default)", which no strip step removes for a phantom, so
+applying that writes a value the server refuses. The deleted and
+unknown phantoms, the alias and the diff-view properties lack
+their readiness request, though the readiness commands cover
+that. The 'editRequest' cycle lacks '(relRepo R)' and '(flag F
+BOOL)'. The 'viewRequests' cycle lacks 'fork', 'flags', '(folder
+K)' and '(roleTree K)'. Two offers go the other way: a
+write-protected occurrence is offered 'delete' and 'merge', which
+the server refuses there, and 'birth' is offered with a default
+value where the server accepts only '(birth roleGraft ROLE)'.
+
+The fix is one table per client, from headline kind to the fields
+a user may set, with their defaults and cycles, driving the
+fill-in and the strip step for every kind. I would make it one
+slice of the next plan, with tests that open the editor on each
+kind.
+***** DONE jeff : better yet just one table
+that both clients read.
+There's already precedent for this --
+I think there's a table somewhere that everything
+(including the server) reads the graph schema from.
+I don't feel strongly about the table's format --
+CSV, JSON, whatever.
+****** DONE [Claude] folded: one table, as 'relations.json'
+The precedent is 'shared/relations.json', the node-node relations
+read by both clients and checked against the server's enum by a
+conformance test; 'shared/herald-styles.json' is read the same
+way. The metadata fields would be a third file beside them,
+'shared/metadata-fields.json': for each headline kind, the fields
+a user may set, their defaults and the values their cycles run
+through. Both clients would read it for the fill-in, the strip
+step and the cyclers, and a server test would check the parser
+against it, as the relations test does.
+** DONE [Claude] Save-written lists follow the goal's order
 Slice 3 widened the plan's one exception (the content list) to
 the alias folder and the editable partner folders, for the reason
 under "Know"; a collateral view would otherwise write a stale
 order back. I agree, and the docs say so; confirm.
-*** TODO jeff
+*** jeff
 I wrote "all seems good" under your description of Sliec 3 above,
 but I don't recognize these issues there.
+**** [Claude] the same item; your note above settles it
+The "Know" entry for slice 3 and this item describe one change.
+The plan exempted only the content list from the standing order,
+and slice 3 exempted every list whose order the save writes, for
+the reason both give. "Know" states it; this item asked you to
+confirm it. Your "all seems good" there does, so I count this
+decided.
 * Sound: departures I checked and agree with, no action needed
+** OBSOLETE in part: three of these
+The owner table under "The vid pass" and "The diff view" goes
+with the owner in the next plan; "deadened" under "The
+conversion" is "entombstoned"; the retained copy's
+write-protection there is undone. The departures were sound for
+plan 17 as written.
 ** The vid pass and the counter
-After 'finish_viewforest', skipping number-like vids, the table
-rebuilt each pass, a kept member its reconciler's.
+Vids are assigned after 'finish_viewforest', since root role
+trees are added after the prune. Number-like vids are skipped.
+The owner table is rebuilt each pass, and a kept member belongs
+to its reconciler. The throwaway test under "Slice 1" confirmed
+that the vids are stable across saves and requests.
 ** The messages
-'HeadlineName'; one error per ID for the several-occurrence
-messages; copies losing their vid at parse.
+Each message names its headline by a 'HeadlineName'. The
+several-occurrence messages come once per ID. A copied headline
+loses its vid at parse. How the name should read is the question
+under "Slice 2".
 ** The conversion
-The preferred copy; phantoms and restricted vognodes with a
-subtree deadened; the hidden-content stats at true distances; the
-prune public; the removed member still moved to its slot.
+The reconciler keeps the preferred copy. A phantom or a
+restricted vognode with a subtree is deadened. The hidden-content
+stats are measured from where the kept node stands. The prune is
+public for one test. A removed member is still moved to its slot
+each visit.
 ** The diff view
-The owner plus a kind selector; the role trees as the attach's;
-the separate fixture; the commit paragraph.
+The reconciler takes the caller's owner and a kind selector. The
+role trees belong to the role-tree attach. The commit tests have
+a fixture of their own, and the docs have the paragraph on what a
+commit leaves.
 ** The wire and the restores
-'DiffChange' and 'Existence'; the graft readiness fix; the
-order-only marker; the booleans beside 'Editability'; the
-straddle built on demand; the extra drop reasons; the refusal
-texts.
+'DiffChange' and 'Existence' are the types. The graft readiness
+fix is right. The order-only marker carries '(ready all)'. The
+two restore requests are booleans beside 'Editability'. The
+straddle is built on demand. The five extra drop reasons and the
+refusal texts are right.
 ** The docs
-The moved entries, the corrected "birth", the citations removed.
-
+The three entries moved, "birth" was corrected, and the dead
+citations were removed.
 * The two-question check
 Slice 10's agent answered both questions over the range
 ('tests/results/17-slice10/report.org').
@@ -351,3 +1314,158 @@ scripts), 'tests/results/review18/' (this review's logs) and
 ** The branch
 'total-diff-view', 29 commits ahead of 'a9f82177', not pushed by
 me.
+* DONE [Claude] What the next plan holds, as settled
+Everything below is decided in this document or in '18_1', in the
+order the plan would take it, so that the suites stay green at
+every step: the behavior first, the removal of birth and of the
+owner table last. A headline marked TODO is a point you have not
+yet decided.
+** Foldering, with the containerward chain
+Every role tree is drawn as a folder whose members stand in the
+named relationship to the folder's parent; a vognode child of a
+vognode means content or nothing. The root's automatic
+containerward tree becomes a containers folder; under a
+container-folder member its containers hang directly, as
+non-members carrying no change facts, and so on up, and nothing
+converts a chain node later. Eight of the nine 'C-c p' commands
+become folder requests, and the mentionedward one goes, since no
+folder exists for that role; the search buffer draws folders
+under each hit. Only a folder's members show change.
+*** DONE [Claude] The mentioned role: a folder, or no command?
+No folder exists for it today, and the glossary calls one silly.
+**** DONE jeff : no command
+*** A folder drawn for a change stays until you delete it
+A property folder, say the aliases folder of a node, appears in a
+diff-view buffer either because you asked for it or because the
+node's aliases differ between HEAD and the worktree, in which
+case the diff view draws it marked changed, '(aliasFolder
+changed)', its entries carrying the added and removed aliases.
+The change is over when HEAD and the worktree agree on the
+aliases again, after a commit or after the edits are undone.
+Today the owner says which folder to keep then: yours stays, the
+diff view's goes. Without owners the two look alike, and you
+chose, below, that every property folder once drawn stays until
+you delete it: the diff view marks it changed while its property
+differs and unmarks it after, and never prunes it.
+**** DONE jeff : no, let's keep it
+Brevity is important, yes, but avoiding confusion is more important yet.
+** Role trees entirely write-protected
+Every role tree but the contentward one is write-protected
+throughout: a folder's members and the chain below them. A folder
+member still takes a readiness gesture, as today; a chain node
+carries no change facts and takes none. The command that
+integrates unshown changes no longer makes a folder member
+editable in place.
+*** That command appends such a change as a root
+A change shown only as a write-protected folder member counts as
+not editable here, and the command appends its node as a root, as
+it does for a change shown nowhere.
+** 'nonMember'
+The bare atom replaces '(affectsParent false)'; 'na' goes, and a
+root prints nothing; the type becomes two-valued; the clients'
+editor cycle and member test follow.
+** Adoption, not merge
+Every reconciler matches by key among all siblings, whoever drew
+them; a second child of a matched key is the rule's duplicate,
+converted by the duplicate clause, which the diff view's
+reconciler and the attach run too. No subtree moves. Property
+folders in a diff-view buffer are matched by kind and refreshed
+at every visit.
+** DONE [Claude] Copies retained as non-members keep editability
+A retained copy keeps the editability it had, and its content
+stays content when it is editable; a duplicate's extra copies are
+write-protected; the editability walk prefers a member to a
+non-member among occurrences without a request. This undoes slice
+4's write-protection of every retained copy.
+*** DONE jeff : yes
+** Conversion by kind and change facts; owners removed last
+The diff view converts a stale child by its kind and change facts
+at the completion that finds it stale, recursing into descendants
+that carry change facts or are change viewnodes by kind. Then no
+read of the owner remains, and 'Owner', the table, the hand-overs
+and 'set_owners_in_parsed_viewforest' go; the vids stay.
+** Birth removed last
+Position answers every read: a folder member's relationship is
+the folder's; 'is_unrestricted_removed_member' and the
+'restoreRel' guards in the parser and the clients read position;
+the herald's low letter follows the parent's kind; the birth
+check, the attach's walk and 'adopt_model_facts''s birth go. The
+atom leaves the wire.
+** The rule's name and the new words
+"Retain as non-member or tombstone, then prune"; "retain as
+non-member", "tombstone", "entombstone", "editability claim",
+"reinstated"; 'Tombstone' and the atom 'tombstone';
+'EntombstonedStaleLeaf', 'EntombstonedDuplicate', 'Retained',
+'ReinstatedMember'; 'anonymize_now_restricted_vognodes';
+'give_model_facts_to'. In prose, "change facts" is never
+shortened, and a "commit-readiness marker" is named in full.
+** Viewnode IDs
+The wire atom is '(vnid X)'; the user reads "viewnode ID"; code
+says 'ViewnodeId' and 'viewnode_id'; the buffer's 'ViewId'
+becomes 'ViewforestId', its wire key 'view-id' unchanged. The
+parser drops a vnid the record does not know. The switch keeps
+untouched members' vnids and a requested folder. A test pins
+stability across a save, a request and a switch.
+** Messages
+Every message is a headline; every viewnode it names is a
+subheadline with its graphnode ID, its viewnode ID or "not yet
+saved", and the hint; 'skg-goto-viewnode-id' on 'C-c g v' and
+'<localleader>gv'.
+** DONE [Claude] Two renames in the diff view and the walk
+'Presence' goes, the union walk yielding 'Option<Existence>'; the
+editability outcome 'Deferred' becomes 'ClaimedElsewhere', with
+the one call that makes such an occurrence's members non-members.
+** The glossary
+Split into a user-facing section and a technical one, the
+user-facing first; the definitions above; "warrant" in the rule's
+headline; the mixed entries split in two.
+** The clients
+Neovim asks for a skgrepo through orgmode's insert-heading
+actions, as Emacs does through org's.
+*** The metadata editor: one shared table
+'shared/metadata-fields.json', beside 'relations.json': for each
+headline kind the fields a user may set, their defaults and their
+cycles; both clients read it for the fill-in, the strip step and
+the cyclers, and a server conformance test checks the parser
+against it. Tests open the editor on each kind.
+** Problems the plan closes
+The entries marked 'FIX PLANNED' in 'TODO/problems.org': the
+switch's fresh vnids and lost folder, the parser's unknown vnids,
+the duplicated property folder, the deferred branch, the role
+graft copies, the second child drawn beside another pass's, the
+adopted graft's birth, the reused member's missing tree, the
+root's doubled tree, and the metadata editor. The placeholder's
+revival is skipped by your call.
+*** DONE [Claude] The HEAD snapshot cache keeps the current HEAD
+Described under your question below; you said to evict. The cache
+keeps the current HEAD's snapshot and drops the rest, one line
+and a test; the entry in 'TODO/problems.org' is marked planned.
+**** DONE jeff : please describe that cache
+What's it for? Why would we want to evict it?
+***** [Claude] what it holds, and why one entry is enough
+The diff view's before-graph is HEAD's graph. To build it the
+server reads every owned skgrepo's files as they stand at HEAD,
+out of git, parses them, and composes a snapshot; at 20,000 nodes
+that read costs about a tenth of a second per skgrepo. The cache,
+'read_owned_head_graph_snapshot_maybe_cached', keeps each such
+snapshot keyed by the HEAD it came from, so that when the
+straddle has to be built again for the same HEAD, as when you
+close the last diff view and later open one, the git read is
+skipped and only the graph is rebuilt from the snapshot. Nothing
+removes an entry but the rebuild of the session's stores, so a
+long session that commits often holds one snapshot per HEAD it
+has seen, each the whole parsed content of your owned skgrepos,
+though only the current HEAD's is ever used again. Evicting all
+but the current one costs nothing and bounds the memory to one
+snapshot.
+****** DONE jeff : yes, evict
+** [Claude] One plan, with the renames riding in it?
+'18_1' proposes this as plan 19, larger than the housekeeping we
+were collecting, with the review's renames and the glossary work
+as its last slices.
+*** DONE jeff : yes, one
+** What stays
+The vids and their stability; the three kinds of change on the
+wire; restore requests on folder members and removed members; the
+save-written lists following the goal's order; the Neovim prompt
+as agreed; and the rule's shape, which never detaches.

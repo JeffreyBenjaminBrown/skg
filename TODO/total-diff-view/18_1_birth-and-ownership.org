@@ -1,0 +1,646 @@
+#+title: Can birth and ownership go? (2026-10-23)
+#+TODO: TODO ONGOING | DONE
+
+This document answers three questions you asked in
+'18_review.org': whether birth was a bad idea and where it is
+used; whether a stronger dedup among siblings would solve the
+duplicate problems; and whether it would let both birth and
+ownership go. An Opus agent listed every read of birth and of
+owner in 'server/' and every place where two siblings can stand
+for one node; a throwaway test ran the four claims that were only
+read. The reports are under 'tests/results/review18/'.
+
+* Terms
+** birth
+A viewnode's *birth* says why it was drawn: unremarkable, or as a
+role graft of one role, written '(birth roleGraft container)' on
+the wire. The *birth check*, run at every render, asks the graph
+whether the relationship still holds, and clears the birth if
+not.
+** owner
+A viewnode's *owner* is the pass that drew it (a reconciler, the
+role-tree attach, the stub roots) or the user. It lives in memory
+per buffer, keyed by vid, and never on the wire; a headline whose
+vid the table does not know is the user's.
+** key, warrant, match
+A reconciler's model lists items by *key*: a node ID for a
+member or a removed member, an alias text, a folder kind. The
+graph *warrants* a child when the model has its key. To *match*
+is to pair a model item with an existing child of its key.
+** adoption and merge
+Your proposal is a *merge*: among siblings, one occurrence of a
+node wins, and the content of the others moves under it. The
+weaker form, an *adoption*, the code already has in two places:
+a reconciler whose model has a key takes the existing child of
+that key, whoever drew it, instead of creating a second; a second
+child of a key already matched is the one rule's duplicate.
+** foldering, and the chain
+To *folder* a role tree is to draw every partner as a member of a
+folder of its role, never as a graft directly under a vognode.
+The *chain* is the containerward tree's shape today: under a
+node its containers, under each of those its containers, up to
+the roots, with no folder between the levels.
+* DONE What birth is read for
+** DONE The relationship a graft stands for
+The diff view asks 'relationship_to_viewparent' what relationship
+a headline stands for. A graft gets the relationship of its
+birth's role, with its direction; a vognode without a birth gets
+"the parent contains it". That key feeds the graft's '(leaves
+...)' and '(ready ...)' parts, a readiness request on it, the
+tagging of a before-only graft, and a restore request on it. The
+graph cannot always give the key back: a before-only graft has no
+relationship in the live graph, and two nodes may have two
+relationships at once (contains and subscribesTo; an override
+drawn in both directions in the search buffer), where the graph
+does not say which one the graft is.
+*** Jeff : Maybe we could get this all from position.
+When we draw the containerward role grafts,
+we draw them under a folder labeled containerward, right?
+So each child of that folder represents the child
+containing the folder's parent.
+
+Descendents deeper than the folder's children
+would not stand for single determinate relationships,
+so we would not be able to request restoring those relationships,
+but that's fine.
+
+Vognode children of a viewnode
+represent the containment relationship,
+unless they have affectsParent=False.
+
+There might be special user-facing functions for drawing
+non-foldered roletrees. Those should probably go.
+Contentward trees should be the only nonfoldered trees.
+**** [Claude] yes, with one correction and one choice
+The correction: the containerward grafts stand under no folder
+today. Every fresh content view hangs the root's whole
+containerward tree directly under the root, which is the '** ☮
+(Ca) kk' of the review's first example, and the nine 'C-c p'
+commands ('skg-show-containerward-tree' and its siblings) draw a
+path of grafts directly under the node; only the '(folder
+containers)' request and the diff view's changed folders draw
+folders. So foldering changes the most common view rather than
+describing it. There is also no folder for the "mentioned" role,
+which the glossary calls silly; foldering adds one or drops that
+command.
+
+With that, your scheme holds at the first level as you say: a
+vognode child of a folder is the folder's partner of the folder's
+parent, in the direction the folder's role implies, and a vognode
+child of a vognode is its content unless marked a non-member.
+What that retires is under "The answer" below.
+
+The choice is the deeper levels. Today a graft's own partners
+hang under it with no folder, and under a mentioner graft two
+roles are mixed, its mentioners and its containers, told apart by
+birth alone. Fully foldered, every level is a folder and every
+relationship is determinate, and a chain of five containers costs
+ten lines instead of five. With one exception for the
+containerward chain, a container's containers hang directly under
+it, as today; then a note typed there reads as a container unless
+something marks the difference, which the member flag could: a
+member child of a chain node is its container and a non-member a
+note, since under a write-protected node a member can mean
+nothing else. I would take the exception with the flag; the
+staircase would double the height of every content view's root.
+***** jeff : agreed
+Let's not recurse the folders in a roleforest;
+just ensure the whole roleforest is rooted at a folder
+that names the relationship from its children to its parent.
+*** Jeff : affectsParent=False should be renamed nonMember.
+When it's absent, it is assumed the thing is a member.
+**** [Claude] folded, and 'na' can go with it
+Today the key is absent for a member, '(affectsParent false)' for
+a non-member, and '(affectsParent na)' on a root. The bare atom
+'nonMember' replaces the second, and the third can go: the two
+places that read 'na' both turn a root the user has moved under a
+parent into a member, which is what the absent atom means anyway,
+so a root prints nothing. In code the three-valued type becomes a
+two-valued one. The rename touches the parser, the printer and
+the '⊥' herald rule, the clients' editor cycle ("true (default)",
+"false", "na") and their member test, 313 mentions in 'server/',
+254 test literals (165 'false', 89 'na'), and fourteen lines of
+docs; the glossary's "non-member" entry already uses the word.
+One mechanical slice.
+** DONE Telling a graft from a removed member
+'is_unrestricted_removed_member' requires an unremarkable birth.
+Without that test a before-only graft, which is also a
+write-protected non-member carrying '(rel removed)', would count
+as a removed content occurrence, which the pruned change view may
+make editable; and the parser and both clients, which refuse
+'restoreRel' on a graft by its birth, would offer it there.
+*** Jeff : foldering solves this too, no?
+**** [Claude] yes
+Once every partner stands in a folder of its role, a removed
+container is a member of the container folder carrying '(rel
+removed)', and a removed content member is a vognode child of a
+vognode carrying the same; the parent's kind tells them apart,
+and no graft stands outside a folder to be mistaken for either.
+** DONE The low letter
+'birth_facts' gives a graft the herald stat that styles one
+letter of its herald low. The ancestor flags, computed from the
+graph at each render, show the relationship anyway, as you say;
+only the styling would go, and a node with two relationships to
+its parent would then show both as its reason.
+*** jeff : This too can come from position, I think.
+It is a more important fact than birth:
+not "how this got here", but
+"what this node's existence under this ancestry represents".
+The user could infer it just from the ancestry,
+but it's nice to have the herald.
+The cases:
+#+begin_example
+  * parent is vognode : content
+  * parent is content folder : content
+  * parent is container folder : container
+  * etc. for most things
+  * parent is subscribee-as-such : content
+  * parent is hidesIn/hidesOut folder : hidden
+    (to ancestor c/b respectively)
+#+end_example
+**** [Claude] agreed; the stats already carry it
+The herald's ancestor flags ('aC', 'Ca', 'cH') are computed from
+the graph at every render, so the relationship a child stands for
+is already shown whenever it holds; birth adds only the low
+styling of one letter. Under foldering the rule for that styling
+becomes your table: the letter to lower is the one the parent's
+kind names, with the direction the folder implies (a child of the
+container folder contains the folder's parent), and a non-member
+child of a vognode lowers none.
+** DONE The birth check
+It keeps a typed or stale birth honest. Nothing else validates
+one: the save never reads a birth, and the parser accepts any
+known role.
+*** Jeff : if no birth, no problem here
+** DONE The containerward attach
+*** Jeff : I understood this.
+A role tree starts at one node and follows one role away from it:
+under the node stand the nodes that play the role toward it,
+under each of those the nodes that play the role toward them, and
+so on. The server draws such trees in two ways. For the container
+role on a view's root it draws the whole tree at once,
+breadth-first to a depth of twenty, every node a write-protected
+non-member born of the container role. For every other request it
+draws a path: it follows single partners until the chain branches
+or cycles, draws the branch layer or the cycle node, and stops; a
+longer tree needs another request lower down. Where a node on the
+path already has a child of the wanted ID, that child is reused,
+whatever it is, and no birth is stamped on it.
+
+The attach is a third step, for every role but container: under
+each graft the path just drew, it hangs that graft's own
+containerward tree, so that a mentioner is shown among its
+containers. To find the grafts it walks the whole subtree under
+the node for children born of the role.
+*** That walk is where birth is read, and it has three faults.
+**** DONE Jeff : I did not understand any of these three faults.
+And what do you mean when you say "was run"?
+What was run, when? Are you talking about tests now,
+or something that happens at runtime?
+***** [Claude] "run" is a throwaway test; the faults below
+"Run" means that an agent wrote a throwaway test, a test outside
+the suites that builds a small git fixture, drives the real
+server code through its handlers and prints the buffers, and ran
+it once to see what the code does; "read" means that I traced the
+code and did not run it. The reports and sources are under
+'tests/results/review18/', and the suites never see them. I say
+which is which because you asked, after the review before this
+one, that a traced claim be confirmed by a test where it can be.
+The three faults are rewritten below.
+**** DONE It extends grafts it did not just draw
+The attach looks for the grafts to extend by walking the whole
+subtree under the node you made the request on, taking every
+headline born of the role. So it also takes grafts that earlier
+requests drew deeper down, and hangs their containers under them
+again; and it takes any headline you pasted from elsewhere that
+still carries the atom, treating it as a graft. Read, not run.
+***** Jeff : this is a bug you see how to fix?
+If so, what's the fix?
+****** [Claude] a fix now; none needed under foldering
+Today's fix is small: the functions that draw the path already
+know which grafts they created, so they would return those
+treeids, and the attach would extend those alone instead of
+searching the subtree for anything born of the role. Under
+foldering the walk goes altogether: a partner is a member of its
+folder, and its own partners are drawn under it when asked, so
+nothing is ever searched for by birth.
+**** DONE A reused child gets no containers
+When the path wants to draw partner p under node n, and n already
+has a child of p's ID, say a content member, it reuses that child
+instead of drawing a graft, and stamps no birth on it. The attach
+then does not recognize it, so p's containers are never hung
+under it. Run for the mentioner role: a contains m, and m links
+to a; a request for a's mentioners leaves m a plain member with
+its own container not drawn, where the same request with m not a
+member grafts m and draws its container under it.
+***** Jeff : the fix here seems simple
+Don't reuse them for a different reason.
+If we're attaching a mentioner, we attach it under a mentioner
+folder, so it won't get merged with content-as-such.
+****** [Claude] agreed; the folder ends the collision
+The reuse exists because a graft and a content member stand in
+the same place, directly under the node, so one child of an ID
+has to serve both. With the mentioner drawn as a member of a
+mentioner folder, the folder has no content children to collide
+with, and the member's own containers hang under it.
+**** DONE A container request on a root draws the tree twice
+A containerward request on a root of the view goes through a
+separate function, the one that draws the whole tree
+breadth-first, and it prepends a fresh tree with no check for one
+already there. So a second request on a root, or your own after
+the automatic one, draws the whole tree again beside the first,
+and the save keeps both. Run.
+***** Why is it treated differently?
+And do you mean view-root or graph-root?
+****** [Claude] a view root; and the comment's two reasons
+I mean a root of the buffer's viewforest, not a node without
+containers. Every fresh content view asks for its root's
+containerward tree, and the code routes a root's request to the
+function that draws the whole tree breadth-first because, as its
+comment says, the path engine "would merge it into existing
+content and panic on a cyclic root": the engine reuses children
+by ID, so under a root with content it would hang the chain on a
+content member, and a root that contains itself through a cycle
+breaks its path walk. Under foldering the two algorithms become
+one: a containers folder on the root, its members drawn as any
+folder's are, and the chain under each.
+** DONE Three places that touch it without reading it
+The convert keeps a retained child's birth. 'adopt_model_facts'
+copies the model's birth over the buffer's, which undoes a reset.
+And the content reconciler may adopt a graft as a member, whose
+birth survives when its claim still holds, so that a member would
+carry a graft's herald and relationship key. The last was run: in
+a content view the adopted member keeps '(birth roleGraft
+container)' and the graft's herald, and in a diff view it shows
+'(rel added)' with no leaves count, since its key is the graft's
+relationship.
+*** jeff : if no birth, no problem here
+* What owners are read for
+** DONE jeff : Does foldering solve these problems too?
+I found the below completely unreadable;
+I will try if you say foldering doesn't solve these.
+*** [Claude] not by itself; with one more rule, yes
+Foldering does not touch what owners do, but it changes what is
+left for them to do, and the section below is rewritten with that
+in mind. Owners are read for two things. The first, choosing
+which siblings a reconciler may match, is where the duplicates
+come from, and the fix is to match by key among all siblings,
+foldering or not. The second, choosing which stale children to
+convert, is needed only because a converted child loses the
+change facts that said what it was; every change viewnode carries
+its kind or its change facts in the buffer text until the
+completion at which it goes stale, so the decision can be made
+from those at that moment, as the folder reconciler already does.
+What foldering adds is that nothing the server draws under a
+vognode is then left unmarked. So with foldering, matching by key
+and conversion by kind and change facts, owners go.
+**** jeff : agreed
+** What they decide, in plain terms
+An owner is read in the diff view alone; the content reconciler,
+the folder reconcilers and the role-tree attach stamp it and
+never look at it. The diff view reads it twice. First, when it
+matches its model against the children of a node, it considers
+only the children it owns. Second, when a child it owns has no
+item in the model, it converts the child; and under a stale child
+it converts everything it or the attach drew, leaving yours and
+the content reconciler's alone.
+** The first read causes the duplicates
+A child another pass drew is never matched, so the diff view
+draws a second one. Four cases were run. The alias folder you
+asked for gets a changed one beside it. A containerward graft
+under a root that once contained the node now containing it gets
+a removed member of that node beside it, and the graft is tagged
+'(rel removed)' though what it stands for holds in both graphs.
+Your write-protected copy of a removed node gets the removed
+member beside it, or, when both stood there before the drop, both
+come to read as removed members. The role trees under a folder's
+member are drawn again beside yours. Matching by key among all
+siblings, as the other reconcilers do, removes all four.
+** The second read is needed only after a conversion
+A removed member carries '(rel removed)' in the buffer text from
+the render that drew it until the completion that finds it stale,
+and a phantom, a changeset marker or an old text is known by its
+kind; the agent traced the parse and the rerenders and found
+nothing that strips those change facts before the reconcilers
+run, and the folder reconciler already converts by that shape. So
+at the moment of conversion the child says what it is. Only after
+the conversion, when its change facts are cleared, do a retained
+removed member, a graft whose birth was cleared and a
+write-protected copy you pasted become one shape, and nothing
+needs to convert them again: a retained child is a note from then
+on, and a childless one was pruned at once. The one place that
+read the owner on later completions was the subtree under a stale
+child, which it converted recursively by owner; by change facts
+it would convert the descendants that carry change facts or are
+change viewnodes by kind, and leave the rest, which is what the
+owner rule did.
+** What foldering adds
+Without foldering one thing under a vognode still needs an owner
+or a birth to be recognized: a graft drawn directly under it,
+which after the birth check clears its birth is a plain
+write-protected non-member. With every partner in a folder,
+nothing the server draws under a vognode is unmarked: folders by
+kind, removed members by change facts, phantoms, changeset
+markers and old text by kind. Then the owner table can go, and
+the vids keep their other jobs: identity across renders, the
+messages, fold state.
+* Where two siblings can stand for one node today
+** A copied headline
+The save refuses two editable copies and two members under one
+parent, and accepts a write-protected non-member copy. The
+reconciler keeps the editable copy, else the first, and converts
+the rest.
+** A graft beside a removed member, and your copy beside one
+Both come from the owner filter above.
+** A folder beside a changed one
+A duplicate by kind, not by ID; the save refuses it. The same
+filter.
+** The restricted placeholder beside its redrawn node
+After a switch back, run in the vids probe. The placeholder has
+no ID, so no key and no validator sees it; a dedup by ID cannot
+either.
+** An overrider shown twice, rightly
+A shown overrider may stand twice under one parent, once for each
+original it overrides; the content check counts collected IDs for
+that reason. A dedup by a node's own ID would merge the two
+wrongly.
+** The defining folders
+The subscribee and overridden folders have no duplicate check;
+duplicates are dropped silently when the save emits them.
+
+* What a merge rule would have to decide
+** Which copy wins
+The code's nearest word is "defining", the editable occurrence.
+With no editable copy a tie-break is needed, and a
+write-protected member must beat a non-member graft, or the save
+drops the membership, since the content list and the editable
+folders are read from the buffer.
+** What the key is
+The collected ID, not the node's own, for the overrider's sake.
+Restricted vognodes have none. Phantoms have IDs: may a phantom
+lose to a live occurrence?
+** What the loser loses
+Its vid is retired; its readiness and edit requests, its focus
+and fold state are lost or must move.
+** What happens to the loser's children
+Under a write-protected loser they are non-members; under an
+editable loser they are members, and the convert makes children
+non-members without write-protecting them, so editable
+non-members can arrive under an editable winner. Copies of the
+winner's members collide, so the merge recurses. Your notes
+change position. A graft loser under a member winner loses its
+role; a member loser under a graft winner loses the membership
+unless the member always wins.
+** Where it runs
+After the parse it would silently change what the save writes. At
+each visit, before that node's reconcilers, is the natural place;
+the prune is too late. It must also run for collateral views and
+rerender-all, which re-complete a stored forest.
+
+* TODO [Claude] The answer
+Your foldering note changed it. The first version of this section
+kept both records; this one lets both go, in an order that keeps
+the suites green at every step.
+** DONE The duplicates: your rule, in the adoption form
+A reconciler matches by key among all siblings, whoever drew
+them, as the content and folder reconcilers already do; a child
+of a key the model has is adopted, and a second child of a
+matched key is the one rule's duplicate, which the diff view's
+reconciler and the attach would convert as the older reconciler
+does. That fixes every duplicate above but the restricted
+placeholder, which needs the switch fix. The merge form answers
+questions the adoption form never has to ask, and I would not
+take it.
+*** jeff : what is the restricted placeholder problem and the switch fix?
+**** [Claude] the placeholder, and its fix
+When you switch the skgrepo restriction to 'public', a private
+node in the view becomes an anonymous placeholder,
+'restrictedNode', with no title and no ID; it keeps its vid and
+holds its public children. The throwaway run of the vids found
+that when you switch back to 'all' the placeholder stays where it
+was and the node is drawn again beside it, with the same child
+under both, so the child shows twice. No rule by key can merge
+them, because the placeholder has no ID. The fix, planned in
+'TODO/problems.org', is that the switch back turns the
+placeholder into the unrestricted occurrence again in place,
+since the view's record still knows, by its vid, which node it
+stood for.
+***** jeff : if this is at all complex, skip it
+I don't mind the duplication.
+Being able to go into private mode and then public mode
+on a buffer is not important.
+But if it's very little code, sure.
+****** [Claude] skipped: it is not very little code
+It is not very little. The placeholder drops the node's ID on
+purpose, so a revival would need the ID remembered in memory per
+vid for a kind that today has none, a pass over the view at the
+switch back, and a test. The entry in 'TODO/problems.org' has
+lost its "FIX PLANNED" and carries your call. The switch's two
+other faults, the fresh vids for untouched folder members and the
+requested folder that vanishes, happen on the switch itself and
+stay planned.
+** DONE Birth: it goes, once every partner stands in a folder
+Foldering gives every read of birth a positional answer. The
+relationship a folder member stands for is the folder's, with its
+direction. A removed container is a folder member with '(rel
+removed)' and a removed content member a vognode child with the
+same, so the parent's kind tells them apart, and the 'restoreRel'
+guard in the parser and the clients reads position instead of the
+atom. The herald's low letter follows the parent's kind. The
+birth check, the attach's walk, and the three places that touch
+birth without reading it all go. The deeper levels are the
+chain, as you decided, its nodes non-members that carry no
+change facts.
+The search buffer draws folders under each hit instead of mixed
+grafts. The atom leaves the wire; 'birth roleGraft' stands in 61
+test files and the nine 'C-c p' commands become folder requests.
+** DONE Ownership: it goes, with key matching and change facts
+As the section above says: the diff view matches by key among all
+siblings and converts a stale child by its kind and change facts
+at the completion that finds it stale, recursing into descendants
+that carry change facts or are change viewnodes by kind. Then no
+read of the owner remains, and the table, 'Owner', the hand-overs
+and 'set_owners_in_parsed_viewforest' go. The vids stay.
+** DONE The order of work
+First the behavior, while birth and the owner table still exist
+and the suites still pass: foldering with the chain rule,
+'nonMember' in place of '(affectsParent false)', matching by key
+among siblings, and conversion by kind and change facts in the
+diff view, each with its tests. Then the removal of birth and of
+the owner table as the last slices, when nothing reads them. That
+is a plan of its own, larger than the housekeeping we were
+collecting; I would make it plan 19 and let the review's renames
+ride in it, since the glossary rewrite you put on hold follows
+the words this plan settles.
+
+* Open questions
+** DONE [Claude] Foldering: fully, or with the chain?
+Fully foldered, every level is a folder; with the chain, a
+container's containers hang directly under it and the member flag
+marks them. I recommended the chain with the flag; you took the
+chain without it, below.
+*** jeff : chain yes, not fully foldering, but elaborate on the flag
+(I haven't read this file completely.)
+
+Are you saying that in this case:
+#+begin_example
+  * x
+  ** these contain it
+  *** (Cb) y
+  **** (Ca) z
+#+end_example
+z would be marked a 'member' of y, and that membership would mean
+'z contains y'?
+**** [Claude] yes; the flag means the folder's relation
+Yes: z would be a member of y, and that membership would mean "z
+contains y". The flag already means "this child takes part in the
+membership its viewparent represents", in the type's own words:
+under a vognode the parent's content, under a folder the folder's
+relation. The chain rule would extend it one step. Under a node
+that stands in a role folder's subtree, the membership
+represented is the folder's relation again, so a member under y,
+where y is a member of x's containers folder, is a container of
+y, and a non-member there is a note. The folder names the
+relation once, at the root of the forest, as you say, and the
+flag carries it down. Two things would follow. The save would
+ignore those memberships, as it ignores the members of a
+write-protected folder, whose relationship is edited from the
+other side; today it refuses a member under a write-protected
+occurrence because membership there could only mean content, and
+that refusal would hold outside role folders only. And the herald
+needs nothing new: z already shows "Ca" from the graph, and the
+low letter would follow the folder above.
+***** Jeff : I disagree about the flag.
+Being a vognode child of a vognode should have one meaning:
+content. This means z in the example above would be a nonmember
+of y. The commit-readiness markers don't have to understand it;
+let's just say a nonmember can't have commit-readiness markers.
+****** [Claude] folded, with one exception to settle
+Folded: a vognode child of a vognode is content or a non-member,
+and z is a non-member of y, carrying no flag, no change facts and
+no commit-readiness markers. What follows: the chain is drawn
+from the live graph and extended on request, and nothing converts
+a chain child later, since a stale container and a note under y
+have one shape; a stale container stays, its herald no longer
+showing "Ca", until you delete it. In the diff view the deeper
+grafts under a changed folder's member lose their '(rel removed)'
+sign; only the folder's members show change, which is what you
+accepted above.
+
+The exception is the removed member. Today a content member whose
+relationship is only in HEAD is drawn as a non-member of its
+parent, '⊥☮', carrying '(rel removed)', and the commit-readiness
+marker and the 'restoreRel' request live on it; "a non-member
+cannot carry commit-readiness markers" would end both. I would
+word the rule as "a non-member carries a commit-readiness marker
+only when it carries change facts", which keeps the removed
+member and excludes every chain child, since none carries change
+facts. Say if you would rather draw removed members somewhere
+else, such as a folder of removed content.
+******* jeff : agreed, but
+the language seems to be abbreviating dangerously:
+Unless it's clear we're talking about commit-readiness,
+"marker" is ambiguous.
+And "change facts" is so short that we might as well never
+shorten it to "facts".
+******** [Claude] folded: the rule in full words
+The rule reads: a non-member carries a commit-readiness marker
+only when it carries change facts. I have written "change facts"
+in full and "commit-readiness marker" wherever this document had
+shortened them, and the rule is in my notes for the glossary
+rewrite and for what I write from now on; "changeset marker" is
+the other thing a bare "marker" could mean.
+** DONE [Claude] Adoption, not merge?
+Today three reconcilers match a model against a node's children
+in three ways. The content reconciler takes any non-member child
+whose ID is in the node's content list as the member for that ID
+('adopt_nonMember_children_that_are_content'), whoever drew it,
+instead of drawing a second; the folder reconcilers do the same
+for a folder's goal since plan 17. The diff view's reconciler
+matches only among the children it owns, so when another pass
+drew a child of the same key it draws a second one; the four
+duplicates run in this review all come from that. When a
+reconciler finds two children of one key among the ones it
+matches, the older reconciler keeps the editable copy, else the
+first, and converts the rest; the diff view's reconciler and the
+attach run no such check.
+
+Two options for the future. (1) Under adoption, every reconciler
+would match by key among all siblings, whoever drew them, and a
+second child of a matched key would be a duplicate, converted by
+the rule the older reconciler has; nothing would move. (2) Under
+a merge, your proposal, one occurrence of a node among siblings
+would win and the content of the others would move under it,
+which raises the questions listed under "What a merge rule would
+have to decide": which copy wins when none is editable, the
+collected ID, the loser's vid and requests, members arriving
+under a graft. I recommend adoption.
+*** jeff : remember to keep the tenses straight
+It sounds like you're talking about a conditional future in the present tense.
+*** jeff : sure, adoption
+** [Claude] Birth and the owner table go last?
+After foldering, 'nonMember', matching by key and conversion by
+change facts have landed with their tests.
+*** jeff : sure, whatever
+** [Claude] 'nonMember' as a bare atom, and 'na' dropped?
+*** jeff : yes
+** jeff : 'entombstone, then prune'
+That seems good.
+'Entombstone' will require a gloss.
+*** [Claude] half the rule; a name for both halves
+The rule has two conversions. A stale vognode with a subtree is
+retained, as a write-protected non-member that keeps its title
+and ID so that its membership can return; everything else stale,
+a leaf or a non-vognode, is entombstoned; then the prune removes
+childless tombstones. "Entombstone, then prune" names the second
+half and would mislead about the first. "Retain or entombstone,
+then prune" is exact and long; "convert, then prune" covers both
+with "convert" glossed as the two. I would take the long exact
+name, since it is read more often than written. Both words get
+their glossary entries in the rewrite you have put on hold.
+**** jeff : where "retain" means "retain as a nonmember"?
+***** [Claude] yes: retained as a write-protected non-member
+Yes. To retain a stale vognode is to keep it in place as a
+write-protected non-member with its title, ID and subtree, so
+that the content reconciler can adopt it back when its membership
+returns. The glossary entry for "retain" would say so.
+****** Why write-protect it?
+If it was already WP, sure, but if it was editable,
+I don't see any gain from WPing it.
+******* [Claude] you are right for a stale copy
+For a stale member there is no gain that a better rule would not
+give. The reason I gave was the editable claim: a buffer holds
+one editable occurrence of a node, the walk that assigns it is
+breadth-first, and the second throwaway run before plan 17 saw a
+stale copy, met first, keep the claim while the node's real
+member, met later, was write-protected. But that is a fault of
+the walk, cured by letting a member occurrence win over a
+non-member one when neither carries a request; a retained copy
+would then never steal the claim. And write-protecting has a cost
+I understated: a write-protected occurrence may hold no members,
+so m's content under it becomes notes, '⊥ mc', though m still
+contains mc. Retained editable, m keeps its content as content,
+and you can go on editing m where it stands, as a note under k.
+
+The gain is real in one case, the extra copy of a duplicate. The
+save refuses two editable occurrences of one node, so when a
+member and a copy stand under one parent the copy must be
+write-protected. So the rule for the plan: a retained copy keeps
+the editability it had, its content stays content when it is
+editable and becomes notes when it is not; the extra copies of a
+duplicate are write-protected; and the editability walk prefers a
+member to a non-member among occurrences without a request. That
+changes what slice 4 built, which write-protects every retained
+copy, and its tests; "retain" then means "keep in place as a
+non-member", with nothing said about write-protection.
+******** TODO jeff : perfect
+Then what we called "the one rule" becomes
+"retain as nonmember or entombstone, then prune", yes?
+** Jeff : please mark the new problems in problems.org
+for which we have plans with a 'FIX PLANNED' prefix,
+and add to coding-advice/ that others should do the same.
+*** [Claude] done: eleven entries marked, one left
+Eleven of the twelve entries of this review carry 'FIX PLANNED: '
+now; the HEAD snapshot cache that is never evicted has no plan
+yet. The file's own header says when to add the prefix, and
+'coding-advice/plans.org' has a section on it.

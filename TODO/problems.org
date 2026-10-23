@@ -3,6 +3,125 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+  When a plan or a settled discussion decides how an entry will be
+  fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
+  until the fix lands; then move it as above.
+* Problems found while reviewing the view-ids run (2026-10-23)
+  Each was run by a throwaway test; the reports are under
+  'tests/results/review18/'. The decisions are in
+  'TODO/total-diff-view/18_review.org'.
+** FIX PLANNED: A skgrepo-set switch redraws untouched folder members with fresh vids
+  The switch's prepass ('server/update_buffer/skgrepo_switch.rs')
+  prunes childless write-protected folder members and emptied folders
+  even when the switch does not touch them, and the completion redraws
+  them as new viewnodes. In the probe a public subscribee folder and
+  its member came back with fresh vids after a switch to 'public' and
+  again after the switch back, so vids are not stable across a switch.
+  The same switch dropped a containers folder the user had requested,
+  and did not redraw it. Report:
+  'tests/results/review18/throwaway-vids/report.md', case 4.
+** After a switch back, the restricted placeholder stays beside its node
+  Switching to 'public' turned the private node s into the anonymous
+  'restrictedNode' placeholder, still holding its public child s1.
+  Switching back to 'all' left the placeholder where it was and drew s
+  again beside it, with s1 under it, so s1 appears twice. The
+  placeholder has no ID, so no reconciler matches it to s; under the
+  one rule it should be converted (a restricted vognode with a subtree
+  becomes a dead viewnode) or, better, become s again. Same report,
+  case 4.
+  Jeff (2026-10-23): not worth fixing unless it is very little code,
+  and it is not: the placeholder drops the node's ID on purpose, so a
+  revival needs the ID remembered per vid, a pass at the switch back
+  and a test. Left open; no fix planned.
+** FIX PLANNED: A requested property folder in a diff-view buffer is duplicated
+  When a user-requested aliases folder exists first and the node's
+  aliases then change, the diff view's reconciler draws a second,
+  '(aliasFolder changed)', beside it, because it matches property
+  folders among the children it owns only
+  ('server/diff_view/shallow_model_subtree.rs'), where it matches
+  partner folders by kind alone. Saving the buffer unchanged is
+  refused ("AliasFolder must be unique among its siblings"). Besides,
+  a property folder the user requested in a diff-view buffer is never
+  refreshed (its visit returns at once, 'server/diff_view/visit.rs'),
+  so in a collateral rerender it keeps the old list, and deleting the
+  changed folder to clear the error saves the old list back, losing
+  the new alias silently. IDs and flags folders take the same path.
+  Report: 'tests/results/review18/throwaway-folders/report.md', P1.
+** FIX PLANNED: The deferred branch of 'apply_editability_rule' leaves members
+  When an occurrence's editable request is deferred because another
+  occurrence of the node went final earlier in the walk, the branch
+  ('server/to_org/extend/editable.rs') write-protects it without
+  making its member children non-members, the shape the budget path
+  had before plan 17's slice 0. Saving the rerendered buffer unchanged
+  is refused with 'MemberChildOfWriteProtectedOccurrence'. The fix is
+  one call, 'make_member_children_nonMembers', in that path. Same
+  report, P2.
+** FIX PLANNED: The parser accepts any vid the text carries
+  A hand-typed '(vid zz)' is kept and moves the buffer's counter to
+  1,296, and saving an old copy of the buffer's text brings retired
+  vids back, though the server itself never reuses one. The parser
+  could drop a vid the view's record does not know, so that the
+  headline gets a fresh one. Report:
+  'tests/results/review18/throwaway-vids/report.md', cases 6 and 7.
+** FIX PLANNED: Copies of a write-protected role graft are not merged
+  Copying the headline of a write-protected role graft and saving
+  leaves every copy in the buffer (three in the probe), where the one
+  rule would convert the extra copies of a duplicate under a
+  reconciler. The role-tree attach is not a reconciler and runs no
+  duplicate check. Same report, case 5.
+** FIX PLANNED: The diff view draws a second child when another pass drew the key
+  The diff view's reconciler takes as candidates only the children it
+  owns ('server/diff_view/shallow_model_subtree.rs'), so a key another
+  pass drew is never matched. Run: a containerward graft of x under r,
+  when HEAD then says r contained x, gets a removed member x beside
+  it, and the graft itself is tagged '(rel removed)' though x contains
+  r in both graphs; a user's write-protected copy of y under p, when p
+  stops containing y, gets the removed member beside it (or both come
+  to read as removed members). Also a spurious warning on the first
+  save after HEAD changes, "Repaired containerFolder under node x:
+  restored 1 member(s)", cause not traced. The fix is matching by key
+  among all siblings; see '18_1_birth-and-ownership.org'. Report:
+  'tests/results/review18/throwaway-grafts/report.md', C1 and C2.
+** FIX PLANNED: A graft adopted as content keeps its graft birth
+  When x comes to contain c while c is drawn under x as a
+  containerward graft, the content reconciler adopts the graft as the
+  member ('adopt_nonMember_children_that_are_content'), and the member
+  keeps '(birth roleGraft container)' and the graft's herald; in a
+  diff view it shows '(rel added)' with no leaves count, since its
+  relationship key is still the graft's. Run; same report, C3.
+** FIX PLANNED: A reused member gets no birth, so its role tree is not drawn
+  The role-tree attach reuses any child of the wanted ID
+  ('find_child_by_skgid'), without stamping a birth, and the walk that
+  hangs the next level of a role tree collects only nodes born of the
+  role ('server/to_org/extend/role_tree.rs'). Run for the mentioner
+  role: a mentioner that is also a member is left a plain member and
+  its own container is not drawn; the container role is unaffected,
+  since that walk never runs for it. Same report, C4.
+** FIX PLANNED: A containerward request on a root duplicates the whole tree
+  'fulfill_root_containerward_requests' ('server/update_buffer.rs')
+  prepends a fresh containerward tree with no check for one already
+  there, so a second request on a root draws the whole tree a second
+  time beside the first, and unchanged saves keep the duplicate. Run;
+  same report, C4.
+** FIX PLANNED: The HEAD snapshot cache is never evicted
+  'read_owned_head_graph_snapshot_maybe_cached' caches one whole HEAD
+  snapshot per HEAD identity and nothing evicts it but the
+  session-store rebuild, so a long session holds a snapshot for every
+  commit it has seen. Besides, 'with_after' carries the foreign-change
+  count forward without recounting, so the readiness summary's count
+  refreshes only when HEAD moves or the slot is emptied. Read;
+  'tests/results/review18/throwaway-straddle/report.md'.
+** FIX PLANNED: The metadata editor fills in fields for unrestricted nodes only
+  Both clients' editors fill in missing fields only for an
+  unrestricted node; every other kind shows what the headline carries,
+  so a historical phantom offers no 'editRequest' to cycle to
+  'restoreNode', and its cycle starts at "none (default)", which no
+  strip step removes for a phantom, so applying it writes a value the
+  server refuses. The 'editRequest' cycle lacks '(relRepo R)' and
+  '(flag F BOOL)'; the 'viewRequests' cycle lacks 'fork', 'flags',
+  '(folder K)' and '(roleTree K)'; a write-protected occurrence is
+  offered 'delete' and 'merge', which the server refuses there.
+  Details in '18_review.org' under "Decide".
 * Problems noticed while fixing repo moves over repeated nodes (2026-10-07)
 ** Repo moves do graph logic in the client
 The Emacs client computes which relationships a repo move strands, from
