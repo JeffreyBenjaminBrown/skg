@@ -3644,3 +3644,56 @@ comes back empty.
 Over TCP, a scratch instance of the 'fork' fixture
 ('tests/results/17-slice8/verify/') wrote "leak-shaped contains
 membership: ..." into its 'telescope-warnings.org' and served P's view.
+** Slice 9: deviations
+*** more entries moved than the plan names
+The preamble of "Terms of the diff view" now says its terms mean
+nothing outside the diff view, so besides "reconciler" and
+"managed child", the entries that the older reconciler and the
+folders share moved to "Terms and abbreviations specific to Skg"
+with them: "owner", "the one rule: convert, then prune" and "dead
+viewnode". "match key" (the diff view's) and the plan's "key"
+became one entry, "key, match key", beside them; the older
+reconciler's name for it is 'Orderkey'.
+*** "membership" has an entry
+Slice 10 checks that each coined term has a glossary entry; the
+plan's definition of "membership" joined "relation, relationship,
+recorder, member, membership, partner".
+*** "birth" said what the owner table does now
+The glossary's "birth" and the API doc's role-graft paragraph
+said the diff view tells a graft from a node the user added by
+its birth. Since slice 5 the owner record does that; the diff
+view reads the birth for the relationship a graft stands for.
+Both say so now.
+*** the API doc
+Its "Diff view" section said a rerender removes what the shallow
+model subtree lacks; it says converted and pruned now. "Metadata
+of the diff view" counts the restore requests among the save's
+inputs. The dead viewnode's form, '(skg deadViewnode (vid X))',
+was documented nowhere there; "The metadata headers" has a
+paragraph on it.
+*** the diff-view doc
+The commit paragraph said twice that a deleted root stays as a
+deleted phantom; once now. The paragraph restating the convert
+rule in "What a reconciler keeps" was cut to what the glossary's
+statement lacks. "One encoding of a removed relationship" called
+'is_unrestricted_removed_member' the encoding's one reader; the
+parser's restore check ('check_where_the_edit_request_sits')
+reads it too. The opening names C-c s for the restore requests.
+*** already done by earlier slices
+The problem entries of 2026-10-22 and 2026-10-23 were in
+'TODO/DONE/problems.org' with their closing lines (slices 3, 4
+and 5); none remained in 'TODO/problems.org'. Both COMMANDS files
+already listed the two keys this plan added (C-c s n and C-c s l,
+slice 7). "The user's viewnode", "stale-member rule" and the
+entries on the signs and the diff object were done by slices 4 to
+6.
+*** verification
+No code changed. Each name the new text cites was grepped against
+'server/', 'elisp/' and 'nvim/' and found
+('tests/results/17-slice9/term-grep.txt'): the functions at the
+files cited, 'Owner' with 'RoleTreeAttach' and 'StubRoots',
+'Orderkey', 'MatchKey', 'ViewIdRecord', 'DeadViewnode' and its
+atom, 'nodes_editable_in_diffView', 'initial_node_limit' in
+'editable.rs', the two restore atoms, commands and keys, and the
+words "non-member", "membership", "extension", "restore request",
+"dead viewnode", "managed child" and "reconciler".

@@ -418,10 +418,12 @@ So far there are these endpoints:
     its =folded= and =bodyFolded=, its kind and facts updated in place
     (a member that loses its relationship becomes a removed member, a
     deleted node a historical phantom, and back); one it does not is
-    removed; the rest is created. The server sets a fold state only on
-    a viewnode it creates: a context node's body starts folded. A
-    root stays until the buffer is closed; a root whose node a commit
-    deleted is shown as a deleted phantom.
+    converted, and pruned once it holds nothing (the glossary's
+    "the one rule: convert, then prune"); the rest is created.
+    The server sets a fold state only on a viewnode it creates: a
+    context node's body starts folded. A root stays until the
+    buffer is closed; a root whose node a commit deleted is shown
+    as a deleted phantom.
   - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
     (=pruned_change_view.rs=, =changes.rs=).
 
@@ -846,9 +848,9 @@ its viewparent (e.g. =container= for a containerward role tree,
 =(affectsParent false)= and =(birth roleGraft ROLENAME)=, and its =(rels
 ...)= carries a birth fact naming its role's relation (see "Stats
 metadata" below). The parser reads =birth= back, so a role graft is
-still one after a save; the diff view relies on that to tell a graft
-from a node the user added (=docs/diff-view.org=, "What a reconciler
-keeps"). The roles are the nine
+still one after a save; the diff view reads from it which
+relationship a graft stands for (=docs/diff-view.org=, "the
+in-folders and out-folders"). The roles are the nine
 in =PARTNER_ROLE_VOCAB= (=server/dbs/in_rust_graph/relation_accessors.rs=).
 A role graft's herald is not a fixed glyph: the clients render its
 semantic relation and ancestor facts, e.g. an =overrider= role graft
@@ -1364,13 +1366,21 @@ remains the established bare non-vognode atom:
 =hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
+A dead viewnode is written =(skg deadViewnode (vid X))=: it has
+no ID, no facts and no title (the parser discards text typed on
+its line), and holds only what stands below it. A reconciler
+makes one of a child the graph no longer warrants, and the prune
+removes it once it is childless (the glossary's "dead viewnode"
+and "the one rule: convert, then prune"). Herald "DELETED".
+
 ** Metadata of the diff view
 
 The buffers of the diff view (see "Diff view") show
 changes with the forms below. All are display facts except the
-readiness requests, which the save consumes; saving a buffer reads
-none of the new viewnodes, which are save-inert. The glossary's "Terms
-of the diff view" defines the vocabulary.
+readiness requests and the restore edit requests, which the save
+consumes; saving a buffer reads none of the new viewnodes, which
+are save-inert, but for a historical phantom's restore request.
+The glossary's "Terms of the diff view" defines the vocabulary.
 
 *** Facts and requests: =(diff ...)=
 A headline's facts of the diff view and its readiness request form

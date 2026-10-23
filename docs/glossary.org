@@ -86,7 +86,7 @@ releasing it; search asks whether to include or exclude such telescopes.
 Approval to display the text does not authorize *Hoist*, the separate
 repair that moves the selected title and body to home.
 
-*** relation, relationship, recorder, member, partner
+*** relation, relationship, recorder, member, membership, partner
 
 As in TypeDB, a *relation* is a kind of relationship: =contains=,
 =linksTo=, =subscribesTo=, =hidesFromSubs=, =overrides=. Each names
@@ -105,6 +105,9 @@ is a *member* of the recorder's list. Either end is the other's
 *partner*. In a view, a folder's children are *members* too: entries of
 one monomorphic list, usually all partners on the same side of some
 relation with the folder's viewparent.
+
+A *membership* is the relationship that causes a node to be drawn
+as a member of a list or folder; the member is the node.
 
 The node that has an ID, as its PID or as an extra ID, is that ID's
 *carrier*. (Not "owner": the user *owns* skgrepos.)
@@ -757,6 +760,21 @@ editable with =skg-set-editable= (=C-c s d=), which writes a
 content subtree), which writes a =writeProtectedView= or
 =writeProtectedSubtreeView= view request.
 
+*** non-member
+
+A viewnode that takes no part in the membership its viewparent
+represents: its metadata says '(affectsParent false)', where a
+member's omits the atom ('docs/api-and-formats.org', "Content
+view"). Under a vognode a non-member is not in the content list,
+and in a folder it is not one of the folder's members, so a save
+neither adds nor removes a relationship for it; what it shows of
+its own node is saved or not by its editability, as at any
+occurrence. A role graft is a non-member, and so are a removed
+member, every vognode child of a write-protected occurrence, a
+note the user parks in a folder, and what
+[[*the one rule: convert, then prune][the one rule]] makes of a
+stale vognode with a subtree.
+
 *** editability rule, editable map
 
 The *editability rule* decides, at each occurrence view completion
@@ -770,21 +788,136 @@ cascade and the node budget.
 
 *** view completion, extend, render, rerender
 
-*View completion* extends a viewforest: it adds viewnodes to one that
-stands ('complete_viewforest'). The server *renders* a viewforest when
-it produces its org text ('server/org_to_text.rs'); a *rerender* is the
-request that recompletes a view and sends its text. Org folding keeps
-the words "fold" and "unfold".
+*View completion* extends a viewforest: it adds viewnodes to one
+that stands ('complete_viewforest'). Extending is countable: an
+*extension* is one editable vognode's content list, drawn whole,
+and is what the node budget counts ('initial_node_limit'; a
+folder fills its members without spending any). The module
+comment of 'server/to_org/extend/editable.rs' states the budget.
+The server *renders* a viewforest when it produces its org text
+('server/org_to_text.rs'); a *rerender* is the request that
+recompletes a view and sends its text. Org folding keeps the
+words "fold" and "unfold".
+
+*** reconciler
+
+One of the two functions that bring an editable node's children
+in line with what they should be: the older one
+('complete_managed_children'), which reconciles the content list
+and each folder's members in every view, and the diff view's
+('reconcile_children_with_shallowModelSubtree'), which reconciles
+the change viewnodes, the removed members and what stands below
+them with a shallow model subtree. Both obey
+[[*the one rule: convert, then prune][the one rule]].
+
+*** managed child
+
+A child viewnode is managed by the reconciler that owns it (its
+[[*owner][owner]]): that reconciler matches the child by its
+[[*key, match key][key]] against what it should show, and may
+convert it
+([[*the one rule: convert, then prune][the one rule]]). The older
+reconciler finds the children it manages by predicates on their
+kind and membership ('complete_managed_children'), and records
+itself as the owner of each member it keeps; the diff view's
+reconciler reads the view's record of owners, and manages the
+children it owns of the kinds the model of each call concerns,
+since it runs several models under one parent.
+
+*** key, match key
+
+A child's *key* is what a reconciler matches it by: for an
+occurrence of a graphnode, the node's ID as the live graph
+resolves it (so one shown by an extra ID matches its node); for
+an entry of a property folder, the entry itself; for any other
+viewnode, its kind. In the older reconciler it is the key of a
+goal item ('Orderkey' in 'complete_managed_children'). The diff
+view's reconciler calls it the *match key* ('MatchKey'), and
+matches an unknown phantom by its raw ID and a historical phantom
+by its ID at HEAD.
+
+*** owner
+
+The reconciler that created a viewnode, or nobody when the user
+typed or pasted it ('Owner' in 'server/types/viewnode.rs'): the
+content reconciler, a folder's reconciler (one per folder kind),
+the role-tree attach (which grafts a role tree under its origin),
+the diff view's reconciler, or the stub roots (which make a
+view's roots). A member of a content list is owned by the content
+reconciler and a member of a folder by that folder's reconciler,
+whoever typed it, since membership is a fact of the graph that
+its reconciler maintains. The owner is recorded per
+[[*view id, vid][view id]] in the view's state ('ViewIdRecord'),
+never inferred from a viewnode's shape. In the diff view a member
+that stops being one, because its relationship is in the
+before-graph only or its viewparent became a historical phantom,
+becomes the diff view's reconciler's, which shows it as removed.
+
+*** the one rule: convert, then prune
+
+A reconciler never detaches a child. A child it manages that the
+graph no longer warrants -- a stale child, whose key the
+reconciler's model lacks, or an extra copy of a key a sibling has
+-- is *converted* ('convert_unwarranted_child' in
+'server/update_buffer/util.rs'): an unrestricted vognode with a
+subtree becomes a write-protected [[*non-member][non-member]],
+which keeps its title, ID and birth, loses its change facts,
+holds no member (its members become non-members) and no editable
+claim, and can be adopted back when its membership returns; a
+leaf, and any viewnode of another kind (a phantom, a restricted
+vognode, a property, a folder), becomes a
+[[*dead viewnode][dead viewnode]]. Of several copies of one key,
+the one kept as the member is the editable one, else the first.
+After every completion the postorder *prune*
+('prune_self_deletable_when_empty' in
+'server/update_buffer/complete.rs') removes the childless dead
+viewnodes (and childless deleted phantoms and empty
+write-protected folders), never a view root. A viewnode nobody
+owns -- one the user typed or pasted -- is never converted, so it
+holds its ancestors alive: whatever stands below a converted
+child survives under it.
+
+The diff view's reconciler converts by the same function, and
+first converts what was made below the stale child for the same
+model ('convert_unwarranted_subtree' in
+'server/diff_view/shallow_model_subtree.rs'): postorder, every
+viewnode below it but those nobody owns and the content
+reconciler's (which a parked vognode keeps, as the older
+reconciler's does), so that a folder's members go with the folder
+and a member's role tree with the member. A viewnode left holding
+only childless dead viewnodes is converted as a leaf.
+
+A converted copy is the one duplicate shape the save accepts:
+under an editable parent two editable copies of a node are
+refused, and so are two members, in a content list or a folder.
+
+The orphaned folder ('deaden_generalized_orphan_folder') and the
+skgrepo-set switch ('convert_and_prune_for_skgrepo_switch')
+convert by the same rule: a member of a folder whose viewparent
+died, and a deleted or unknown phantom that a now restricted
+skgrepo records.
+
+*** dead viewnode
+
+A viewnode ('ViewnodeKind::DeadViewnode', '(skg deadViewnode)')
+with no title, ID, facts or key, which only holds what stands
+below it. It is what the one rule makes of an unwarranted leaf or
+non-vognode. The prune removes it once it is childless; the
+parser discards text typed on its line; its member children
+become non-members ('mark_orphans_under_dead_parents_false');
+every folder accepts one among its children.
 
 *** birth
 
-Why a generated occurrence was created under its parent ('Birth' in
-'server/types/viewnode.rs'): either unremarkable, or a role graft naming
-its role. It is view history, used for display and stale-relation
-validation, never by save extraction. The =(rels ...)= form renders it as
-=(birth ...)= facts. A role graft's birth is also written into its
-metadata as =(birth roleGraft ROLENAME)= and read back, so it survives a
-save; the diff view tells a graft from a node the user added by it.
+Why a generated occurrence was created under its parent ('Birth'
+in 'server/types/viewnode.rs'): either unremarkable, or a role
+graft naming its role. It is view history, used for display,
+stale-relation validation and the diff view, never by save
+extraction. The =(rels ...)= form renders it as =(birth ...)=
+facts. A role graft's birth is also written into its metadata as
+=(birth roleGraft ROLENAME)= and read back, so it survives a
+save; the diff view reads from it which relationship a graft
+stands for.
 
 *** phantom
 
@@ -818,7 +951,8 @@ Headline is a term from org-mode. It refers to a line that begins with some aste
 
 ** Terms of the diff view
 
-'docs/diff-view.org' describes the diff view; these are its terms.
+'docs/diff-view.org' describes the diff view; these are its
+terms, and they mean nothing outside it.
 
 *** diff view
 
@@ -972,17 +1106,17 @@ content position holds its old content under it.
 
 *** removed member, former member
 
-A *removed member* is an unrestricted vognode, a non-member, with the
-fact '(rel removed)': its node survives, but its relationship to its
-viewparent exists in the before-graph only. It is encoded so in
-content, in a partner folder and in a historical phantom's old content
-alike. In content position it follows the editability rule as a
-member does: editable at its node's first occurrence in level order,
-write-protected at a later one. A
-*former member* is any viewnode standing for such a before-only
-relationship, historical phantoms included. These phrases, like
-"stale member" and "new member", name the node by its membership's
-fate.
+A *removed member* is an unrestricted vognode, a
+[[*non-member][non-member]], with the fact '(rel removed)': its
+node survives, but its relationship to its viewparent exists in
+the before-graph only. It is encoded so in content, in a partner
+folder and in a historical phantom's old content alike. In
+content position it follows the editability rule as a member
+does: editable at its node's first occurrence in level order,
+write-protected at a later one. A *former member* is any viewnode
+standing for such a before-only relationship, historical phantoms
+included. These phrases, like "stale member" and "new member",
+name the node by its membership's fate.
 
 *** change viewnode
 
@@ -1009,94 +1143,6 @@ It is shallow: it includes other vognodes but not what their own
 visits add. A folder's goal list ('FolderGoalItem'), the input of the
 folder reconciler, is a flat list of what each member should be, not
 a tree.
-
-*** reconciler
-
-One of the two functions that bring an editable node's children in
-line with what they should be: the older one
-('complete_managed_children'), which reconciles the content list and
-each folder's members, and the diff view's
-('reconcile_children_with_shallowModelSubtree'), which reconciles the
-change viewnodes, the removed members and what stands below them with
-a shallow model subtree.
-
-*** managed child
-
-A child viewnode that a reconciler matches against what it should
-show, and so may convert ([[*the one rule: convert, then prune][the one rule]]); its [[*owner][owner]] is that
-reconciler. The older reconciler's predicates say which children it
-manages ('complete_managed_children'); the diff view's reconciler
-manages the children it owns, of the kinds the model of each call
-concerns, since it runs several models under one parent.
-
-*** the one rule: convert, then prune
-
-A reconciler never detaches a child. A child it manages that the
-graph no longer warrants -- a stale child, whose key the reconciler's
-model lacks, or an extra copy of a key a sibling has -- is converted
-('convert_unwarranted_child' in 'server/update_buffer/util.rs'): an
-unrestricted vognode with a subtree becomes a write-protected
-non-member, which keeps its title, ID and birth, loses its change
-facts, holds no member (its members become non-members) and no
-editable claim, and can be adopted back when its membership returns;
-a leaf, and any viewnode of another kind (a phantom, a restricted
-vognode, a property, a folder), becomes a [[*dead viewnode][dead viewnode]]. Of several
-copies of one key, the one kept as the member is the editable one,
-else the first. After every completion the postorder prune
-('prune_self_deletable_when_empty' in
-'server/update_buffer/complete.rs') removes the childless dead
-viewnodes (and childless deleted phantoms and empty write-protected
-folders), never a view root. A viewnode nobody owns -- one the user
-typed or pasted -- is never converted, so it holds its ancestors
-alive: whatever stands below a converted child survives under it.
-
-The diff view's reconciler converts by the same function, and first
-converts what was made below the stale child for the same model
-('convert_unwarranted_subtree' in
-'server/diff_view/shallow_model_subtree.rs'): postorder, every
-viewnode below it but the user's and the content reconciler's (which a
-parked vognode keeps, as the older reconciler's does), so that a
-folder's members go with the folder and a member's role tree with the
-member. A viewnode left holding only childless dead viewnodes is
-converted as a leaf.
-
-A converted copy is the one duplicate shape the save accepts: under
-an editable parent two editable copies of a node are refused, and so
-are two members, in a content list or a folder.
-
-The orphaned folder ('deaden_generalized_orphan_folder') and the
-skgrepo-set switch ('convert_and_prune_for_skgrepo_switch') convert by
-the same rule: a member of a folder whose viewparent died, and a
-deleted or unknown phantom that a now restricted skgrepo records.
-
-*** dead viewnode
-
-A viewnode ('ViewnodeKind::DeadViewnode', '(skg deadViewnode)') with
-no title, ID, facts or match key, which only holds what stands below
-it. It is what the one rule makes of an unwarranted leaf or
-non-vognode. The prune removes it once it is childless; the parser
-discards text typed on its line; its member children become
-non-members ('mark_orphans_under_dead_parents_false'); every folder
-accepts one among its children.
-
-*** owner
-
-The reconciler that created a viewnode, or nobody (the user) when
-the user typed or pasted it ('Owner' in 'server/types/viewnode.rs').
-A member of a content list is owned by the content reconciler and a
-member of a folder by that folder's reconciler, whoever typed it,
-since membership is a fact of the graph that its reconciler
-maintains. The owner is recorded per [[*view id, vid][view id]] in the view's state
-('ViewIdRecord'), never inferred from a viewnode's shape. In the diff view a member that stops being one, because its
-relationship is in the before-graph only or its viewparent became a
-historical phantom, becomes the diff view's reconciler's, which shows
-it as removed.
-
-*** match key
-
-What identifies a viewnode among its siblings for the diff view's
-reconciler ('MatchKey'): the ID it stands for, or, for one that
-stands for no graphnode, its kind.
 
 *** old text
 
@@ -1161,24 +1207,21 @@ by a hand or another tool. Stage-and-commit asks for confirmation
 before committing a gitrepo that has one, and the git-commit then
 includes it.
 
-*** editable in the diff view, visible in the diff view
+*** editable in the diff view
 
-A buffer makes a node's changes *editable* when it holds an editable
-occurrence of the node, wherever it sits, or the node's historical
-phantom in content position ('nodes_editable_in_diffView'). A change
-is *visible* when the buffer shows it, which at a write-protected
-occurrence means the node's three kinds of change and what they name
-(its relationship, its existence, or its file as a whole), and nothing
-else of the node. A change can be neither.
+A buffer *makes a node's changes editable* when it holds an
+editable occurrence of the node, wherever it sits, or the node's
+historical phantom in content position
+('nodes_editable_in_diffView'). The change-forest leaves those
+nodes record are the changes editable in the buffer.
 
 *** changes not editable in the view
 
-A buffer *makes a node's changes editable* when it holds an editable
-occurrence of the node, wherever that sits, or the node's historical
-phantom in content position. The change-forest leaves those nodes
-record are the changes editable in the buffer; the rest are the
-*changes not editable in the view*, which the readiness summary
-counts. A save never makes them editable; C-c r u integrates them.
+The change-forest leaves recorded by the nodes whose changes a
+buffer does not
+[[*editable in the diff view][make editable]] are the *changes
+not editable in the view*, which the readiness summary counts. A
+save never makes them editable; C-c r u integrates them.
 
 *** readiness request, readiness gesture
 
@@ -1189,6 +1232,19 @@ edits succeed, to set or clear the marks of a headline's leaves. A
 *readiness gesture* is a gesture (C-c r r, C-c r h and their
 recursive forms) that writes readiness requests on one or many
 headlines, then saves.
+
+*** restore request
+
+Either of the two edit requests that undo a removal in the diff
+view. '(editRequest restoreNode)', on a historical phantom,
+writes its node back as HEAD had it, in-links included;
+'(editRequest restoreRel)', on a removed membership (a removed
+member in content position, or a member of a partner folder
+carrying '(rel removed)'), re-adds that one relationship as HEAD
+recorded it. C-c s n ('skg-restore-deleted-node') and C-c s l
+('skg-restore-removed-membership') write them, and a save applies
+and consumes them as it does every edit request
+('docs/diff-view.org', "Restoring what a change removed").
 
 *** change headline
 

@@ -9,11 +9,14 @@ each one commit-ready, and commit everything at once. C-c v d
 
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
 D, change-forest leaf, mark, changeset marker, ...) is the glossary's "Terms of the
-diff view" ('docs/glossary.org'). The wire forms are the API doc's
+diff view" ('docs/glossary.org'); the reconcilers' words (owner,
+key, the one rule, dead viewnode, non-member) are among its terms
+specific to Skg. The wire forms are the API doc's
 "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
 heralds are 'docs/heralds.org', "Diff heralds". The commands are
-both COMMANDS files, under C-c v d and C-c r. The server's code is
+both COMMANDS files, under C-c v d and C-c r, and the two restore
+requests under C-c s. The server's code is
 'server/diff_view/' (its 'mod.rs' lists the files), over the graph
 straddle of 'server/graph_straddle/'.
 
@@ -283,10 +286,9 @@ A root stays until the buffer is closed, whatever becomes of the
 changes under it. A commit is an ordinary rerender: the roots stand
 as plain context with their change viewnodes gone, and a root whose
 node the commit deleted is shown as a deleted phantom. A removed
-member that held content, or any change viewnode that held something
-of the user's, stays as a write-protected non-member or a dead
-viewnode holding it, as a root the commit deleted stays as a deleted
-phantom.
+member that held content, or any change viewnode that held
+something of the user's, stays as a write-protected non-member or
+a dead viewnode holding it.
 ** What a reconciler keeps
 Two reconcilers run at an editable node's visit. The older one,
 'complete_managed_children' ('server/update_buffer/util.rs'),
@@ -335,21 +337,15 @@ trees are extended over the union of the straddle, a graft's birth is
 validated against either graph of the straddle, not only the live
 one.
 
-A stale child, one a reconciler manages but would no longer show, is
-converted by one function both call ('convert_unwarranted_child' in
-'server/update_buffer/util.rs'): an unrestricted vognode with a
-subtree becomes a write-protected non-member occurrence of its node,
-with its diff facts cleared; anything else becomes a dead viewnode,
-so that the orphan pass keeps what is under it. The older reconciler
-converts every stale child, and every extra copy of a member, and
-never looks below the children it manages. The diff view's
-reconciler converts, with the stale child, what was made below it for
-the same model ('convert_unwarranted_subtree'): every viewnode below
-it but the user's and the content reconciler's, so that a folder's
-members go with the folder; a viewnode left holding only childless
-dead viewnodes is converted as a leaf, and the prune removes the lot
-(a deleted node's phantom, once the deletion is committed, is deadened
-holding the user's note but not its old content).
+Both convert a stale child by one function
+('convert_unwarranted_child'), as the glossary's statement of the
+one rule says. The older reconciler never looks below the
+children it manages; the diff view's converts, with the stale
+child, what was made below it for the same model
+('convert_unwarranted_subtree'), and the prune removes what holds
+nothing of the user's (a deleted node's phantom, once the
+deletion is committed, is deadened holding the user's note but
+not its old content).
 
 So a note the user adds under a member of a changed folder, under a
 historical phantom, in the "it acquired" folder or under a removed
@@ -389,8 +385,9 @@ viewparent exists in the before-graph only. That is the one encoding
 of a removed relationship, wherever it stands: in content, in a
 partner folder, and in a historical phantom's old content
 ('mk_removed_member_viewnode', 'FolderGoalShape::Removed').
-'is_unrestricted_removed_member' is its one reader, and tests nothing
-about editability. Since a removed member is never a member, the
+'is_unrestricted_removed_member' reads it, and tests nothing
+about editability; the parser's check of where a restore request
+sits reads it too ('check_where_the_edit_request_sits'). Since a removed member is never a member, the
 save's check of a write-protected occurrence's folders counts only
 members.
 

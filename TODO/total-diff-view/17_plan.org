@@ -1027,7 +1027,7 @@ the tests. Run all four suites.
 The thirty-one and the two, the glossary sentence, the closing
 grep. Run the Rust suite and the integration suite (three
 fixtures regenerate).
-** TODO Slice 9: the glossary and the docs
+** DONE Slice 9: the glossary and the docs
 The glossary's changes, the two docs read end to end, the
 commands listed, the problem entries moved. No code; run nothing
 but a grep for each term it adds against the code.
