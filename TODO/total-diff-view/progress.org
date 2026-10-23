@@ -3697,3 +3697,23 @@ atom, 'nodes_editable_in_diffView', 'initial_node_limit' in
 'editable.rs', the two restore atoms, commands and keys, and the
 words "non-member", "membership", "extension", "restore request",
 "dead viewnode", "managed child" and "reconciler".
+** Slice 10: deviations
+*** the report is not committed
+It is 'tests/results/17-slice10/report.org', beside the three survey
+files it rests on; 'tests/results/' is ignored. The commit message
+lists what the report leaves for the reviewer.
+*** fixes beyond the retired-word list
+Besides "stale-member rule" ('FolderPolicy''s comment), the check
+fixed "sign" and "presence" for the change kinds in two test files
+(one test renamed in each), "the folder's owner" for its viewparent
+in both COMMANDS files, the glossary's "Not 'owner'" aside, the
+parse error "vid may appear only once", one dangling section
+citation ("repo sets"), and the citations of closed notes under
+'TODO/DONE/' ('plan_v2', 'review-2', "fork-fixes", a 'MAYBE-BUG'
+file name). The two citations of 'TODO/' that remain, in
+'docs/README.org' and 'docs/nvim-client-deviations.org', look
+intended and are listed, not removed.
+*** verification
+nextest 908 passed. The three save-lock integration files changed
+only in their header comments and pass a syntax check; the Emacs,
+Neovim and integration suites were not run.

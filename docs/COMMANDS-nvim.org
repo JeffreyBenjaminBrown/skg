@@ -497,7 +497,7 @@ afterward to apply it. See "Restoring what a change removed" in
 [[./diff-view.org][the diff view's docs]].
 *** <localleader>sl : :SkgRestoreRemovedMembership
 In a buffer of the diff view, on a removed member, or on a member of
-a partner folder whose relationship to the folder's owner was removed
+a partner folder whose relationship to the folder's viewparent was removed
 (=~-=), editable or write-protected, requests that the save re-add that
 one relationship as HEAD recorded it. The headline shows =restore
 membership= until the save. On a historical phantom it refuses with

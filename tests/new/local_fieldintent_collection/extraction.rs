@@ -623,7 +623,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
 #[test]
 fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
 ) {
-  // At-most-one-writer-per-ID (plan_v2 §6.1): even though the subscribee
+  // At-most-one-writer-per-ID: even though the subscribee
   // here is editable with visible content, its subscriber instance is
   // write-protected, so no hide/unhide edits are inferred for the subscriber
   // -- those belong only to the SubscribeeFolder under the editable

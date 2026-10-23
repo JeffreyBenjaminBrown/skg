@@ -500,7 +500,7 @@ afterward to apply it. See "Restoring what a change removed" in
 [[./diff-view.org][the diff view's docs]].
 *** C-c s l : skg-restore-removed-membership
 In a buffer of the diff view, on a removed member, or on a member of
-a partner folder whose relationship to the folder's owner was removed
+a partner folder whose relationship to the folder's viewparent was removed
 (=~-=), editable or write-protected, requests that the save re-add that
 one relationship as HEAD recorded it. The headline shows =restore
 membership= until the save. On a historical phantom it refuses with
@@ -605,8 +605,7 @@ This is the gesture for republicizing a subtree's relationship
 relationships after 'skg-set-repo-recursive' moved its nodes to a more
 public skgrepo: the sticky rule keeps each relationship at its old, more
 private skgrepo, so the contains relationships stay behind until explicitly
-moved to the new default (see
-=MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org=).
+moved to the new default.
 
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.

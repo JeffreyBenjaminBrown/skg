@@ -109,7 +109,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     other => panic! ("surviving extra-id relationship must be Unknown, got {other:?}"), }
 }
 
-// review-2 §2.1 regression: a content goal id present only as a
+// Regression: a content goal id present only as a
 // affectsParent=false child must still get ChildData pre-fetched.
 // complete_content_children counts only affectsParent=true Unrestricted children as
 // "already present", so a non-member same-id child is sent to the create

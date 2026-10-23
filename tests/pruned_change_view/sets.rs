@@ -84,7 +84,7 @@ fn an_in_changed_only_change_is_shown_under_its_new_container (
 /// relationship exists in one graph only (each a node of some graph).
 /// No fixture changes a mention, the in-half's other source.
 #[test]
-fn c_is_the_recorders_and_the_members_of_presence_changed_relationship_leaves (
+fn c_is_the_recorders_and_the_members_of_existence_changed_relationship_leaves (
 ) -> Result<(), Box<dyn Error>> {
   let fixtures : [(&str, &[&str], &[&str]); 11] = [
     ("buffers",            &["public", "private"], &[]),

@@ -1,6 +1,5 @@
--- Integration test for the save-lock lifecycle (plan_v2 section
--- 20.2a), nvim client. The Lua mirror of test-emacs.el in this
--- directory.
+-- Integration test for the save-lock lifecycle, nvim client. The
+-- Lua mirror of test-emacs.el in this directory.
 --
 -- Opens three overlapping views, edits and saves one, and asserts
 -- that the truly-non-collateral view becomes editable once the save

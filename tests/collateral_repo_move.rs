@@ -97,7 +97,7 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
 
       let mut reader : BufReader<TcpStream> =
         BufReader::new (read_end);
-      // The stream now also carries a save-relax-lock message (plan_v2 §8.1)
+      // The stream now also carries a save-relax-lock message
       // before the collateral-view(s); select the collateral-view by its
       // response-type.
       let collateral_msgs : Vec<String> =

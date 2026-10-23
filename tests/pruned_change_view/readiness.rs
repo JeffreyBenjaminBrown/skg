@@ -322,12 +322,13 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
     assert! ( ! without_vids (&saved) . contains ("(deleted (id flg)"), "{}", saved );
     Ok (( )) }) }
 
-/// A node in both graphs that records a leaf is modified: its sign is
-/// '~' (herald 'M'), and its leaves fact lists 'all', every leaf it
-/// records. cy2, retitled, stands as a root and, write-protected, in
-/// cy1's content, an unchanged relationship. One request naming
-/// 'all' on the write-protected image marks its file: both images
-/// then show '(ready all)', and its old text shows ready.
+/// A node in both graphs that records a leaf is modified: its change is
+/// '(properties changed)' (herald 'M'), and its leaves fact lists
+/// 'all', every leaf it records. cy2, retitled, stands as a root
+/// and, write-protected, in cy1's content, an unchanged
+/// relationship. One request naming 'all' on the write-protected
+/// image marks its file: both images then show '(ready all)', and
+/// its old text shows ready.
 #[test]
 fn a_modified_node_lists_all_and_one_mark_readies_its_file (
 ) -> Result<(), Box<dyn Error>> {
@@ -373,7 +374,7 @@ fn a_modified_node_in_a_new_relationship_lists_rel_and_all (
       "lo is modified, in a new relationship:\n{}", saved );
     Ok (( )) }) }
 
-/// A new node is signed and counted as before: its existence and its
+/// A new node is tagged and counted as before: its existence and its
 /// relationship, one leaf each.
 #[test]
 fn a_new_node_lists_node_and_rel (
@@ -389,10 +390,10 @@ fn a_new_node_lists_node_and_rel (
       "the new child is new, in a new relationship:\n{}", saved );
     Ok (( )) }) }
 
-/// A root is signed at its own visit, as a member is at its
+/// A root is tagged at its own visit, as a member is at its
 /// viewparent's: txt, retitled, is a modified root.
 #[test]
-fn a_modified_root_carries_its_sign (
+fn a_modified_root_carries_its_change (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;

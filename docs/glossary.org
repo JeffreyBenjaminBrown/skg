@@ -110,7 +110,8 @@ A *membership* is the relationship that causes a node to be drawn
 as a member of a list or folder; the member is the node.
 
 The node that has an ID, as its PID or as an extra ID, is that ID's
-*carrier*. (Not "owner": the user *owns* skgrepos.)
+*carrier*. (Not "owner": the user *owns* skgrepos, and a
+viewnode's [[*owner][owner]] is a reconciler.)
 
 *** privacy order and relRepo
 

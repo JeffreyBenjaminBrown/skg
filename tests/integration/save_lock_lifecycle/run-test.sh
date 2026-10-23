@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Integration test for the save-lock lifecycle (plan_v2 §20.2a).
+# Integration test for the save-lock lifecycle.
 # This script:
 # - Backs up and resets test data (a.skg, b.skg, solo.skg) to a clean state
 # - Starts an independent skg server with test config

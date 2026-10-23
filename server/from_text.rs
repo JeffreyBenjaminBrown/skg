@@ -185,7 +185,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       &viewforest, & new_with_inherited_skgrepo, config ) };
   let explicit_child_skgrepo : HashMap<ID, SkgrepoName> = {
     // A clone skgrepo the user already specified, via explicit owned
-    // skgrepos on the forked node's new children (fork-fixes Case 2):
+    // skgrepos on the forked node's new children:
     // the confirmation flow shows it as settled instead of asking.
     let new_with_explicit_skgrepo : HashSet<ID> =
       enrichment . new_nodes

@@ -1,4 +1,4 @@
-;;; Integration test for the save-lock lifecycle (plan_v2 §20.2a).
+;;; Integration test for the save-lock lifecycle.
 ;;;
 ;;; Opens three overlapping views, edits and saves one, and asserts that the
 ;;; truly-non-collateral view becomes editable once the save stream settles --

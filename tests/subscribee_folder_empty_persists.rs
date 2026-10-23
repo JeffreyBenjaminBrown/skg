@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_views -E 'test(subscribee_folder_empty_persists::)'
 //
-// plan_v2 §3.4/§6.7 exception: an *empty* SubscribeeFolder is preserved, not
+// An exception to the prune: an *empty* SubscribeeFolder is preserved, not
 // self-deleted. It is the editable interface onto the origin's outgoing
 // subscriptions; if it vanished when emptied, the user would lose the place to
 // add one back.
@@ -85,7 +85,7 @@ async fn empty_subscribee_folder_persists_impl (
     response . errors );
   Ok (( )) }
 
-// Contrast (plan_v2 §3.4/§6.8): an empty *write-protected* PartnerFolder -- here a
+// Contrast: an empty *write-protected* PartnerFolder -- here a
 // subscriberFolder -- is removed by the postorder prune sweep, because (unlike the
 // SubscribeeFolder) it is not an editable interface; an emptied one is just noise.
 async fn test_empty_subscriber_folder_is_removed (

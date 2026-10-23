@@ -481,7 +481,7 @@ pub fn parse_metadata_to_viewnodemd (
               request_metadata . relRepo_request; },
           "vid" => {
             if result . vid . is_some () {
-              return Err ( "vid may appear only once" . to_string () ); }
+              return Err ( "a view id may appear only once" . to_string () ); }
             result . vid = Some ( Vid::parse (
               & single_argument (&first, &items[1..]) ? ) ? ); },
           "diff" => {

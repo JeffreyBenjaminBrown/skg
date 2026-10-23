@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(idempotence::)'
 //
-// plan_v2 §15: completion is a fixpoint. Re-rendering an already-rendered buffer,
+// Completion is a fixpoint. Re-rendering an already-rendered buffer,
 // with no edits and an unchanged graph, must yield byte-identical output. This is
 // the property the whole local-update refactor rests on (order-robust, no
 // accumulating drift across saves), so it deserves a regression guard.

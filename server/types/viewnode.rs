@@ -198,7 +198,7 @@ pub enum ViewnodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Unrestricted   (UnrestrictedVognode),
-  Restricted (RestrictedVognode), // From a skgrepo that is restricted (see "repo sets").
+  Restricted (RestrictedVognode), // From a skgrepo that is restricted (see 'docs/api-and-formats.org', "skgrepo-sets").
   Phantom  (Phantom),
 }
 
@@ -558,12 +558,11 @@ pub enum PartnerFolder {
 /// 'PartnerFolder::policy' rather than matching on folder variants, so the
 /// policies cannot drift apart per file.
 ///
-/// STALE-MEMBER RULE (uniform; decided 2026-06-10, superseding the
-/// discard policy once planned for the filter folders in
-/// the glossary's "write-protected set"): during
-/// reconciliation, a stale member that is a leaf is deleted, and one
-/// with children is made a non-member (affectsParent=false), whatever the
-/// policy. The policies differ in:
+/// Every policy obeys the one rule (the glossary's "the one rule:
+/// convert, then prune"): during reconciliation a stale member is
+/// converted, a leaf to a dead viewnode the prune removes, one with
+/// children to a write-protected non-member (affectsParent=false).
+/// The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('EditableSet' and 'EditableFilter'),
 /// - where the goal list comes from ('EditableSet' and 'WriteProtectedSet'
