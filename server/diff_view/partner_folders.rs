@@ -9,9 +9,7 @@
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
-use crate::diff_view::shallow_model_subtree::{
-  is_the_diffViews_viewnode,
-  reconcile_children_with_shallowModelSubtree};
+use crate::diff_view::shallow_model_subtree::reconcile_children_with_shallowModelSubtree;
 use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
@@ -26,7 +24,8 @@ use crate::to_org::extend::role_tree::{
 use crate::types::env::RuntimeGeneration;
 use crate::types::git::NodeSign;
 use crate::types::misc::ID;
-use crate::types::viewnode::{DiffPresence, FolderPolicy, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{
+  DiffPresence, FolderPolicy, Owner, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_vid_of, push_repair_warnings, view_order_preserving_goal_list};
 use crate::update_buffer::util::RepairSummary;
@@ -124,8 +123,11 @@ fn straddle_goal_item (
 /// move. Each member role tree is built afresh in a scratch tree and
 /// reconciled with what the member holds, by skgid (and the move by
 /// its kind) at each level, so that a member role tree that stays
-/// keeps its viewnodes, where they stand, and their fold state; what
-/// the user added under the member stays where it stands.
+/// keeps its viewnodes, where they stand, and their fold state. The
+/// member role tree is the role-tree attach's ('Owner::RoleTreeAttach'),
+/// so this reconciles nothing else the member holds: what the user
+/// added stays where it stands, and what the member's own visit adds
+/// (its old text, its removed members) is that visit's.
 fn attach_memberRoleTrees_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -163,6 +165,5 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
           &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }}
     reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
-      &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
-      &|_| true ) ?; }
+      Owner::RoleTreeAttach, &|_| true, &|_| true ) ?; }
   Ok (( )) }

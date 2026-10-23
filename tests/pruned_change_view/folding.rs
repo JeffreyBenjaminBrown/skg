@@ -8,9 +8,8 @@
 use skg::metadata_canon::without_vids;
 use crate::git_fixture::{edit_line, save_cleanly};
 use crate::pruned_change_view::common::{
-  all_changes_view, assert_lines_in_order, open_all_changes_buffer, rerendered_view_content,
-  retitle_in_a_content_view, send_stage_and_commit_request, with_fixture,
-  without_subtree_starting};
+  all_changes_view, open_all_changes_buffer, rerendered_view_content,
+  retitle_in_a_content_view, send_stage_and_commit_request, with_fixture};
 
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
@@ -193,12 +192,14 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
         |line| line . replacen ("(node (id cy1)", "(node (id cy1) (editRequest delete)", 1) ),
       "*** (skg (node (id cy2)", "folded" );
     let deleted : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
-    // cy1 is historical where it stood, its subtree folded as it was
-    // (below its old content, which the phantom's visit creates first).
-    assert_lines_in_order ( &deleted, &[
-      "** (skg bodyFolded (historical (id cy1) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) cy1\n",
-      "*** (skg folded (node (id cy2)",
-      "\n* (skg (node (id ln)" ] );
+    assert! ( without_vids (&deleted) . contains (
+      "** (skg bodyFolded (historical (id cy1) (repo main) (diff (presence node- rel-) (leaves 2 node rel)))) cy1\n\
+       *** (skg folded (node (id cy2)" ),
+      "cy1 is historical where it stood, its subtree folded as it was:\n{}", deleted );
+    assert_eq! ( deleted . lines ()
+                 . filter ( |line| line . starts_with ("*** ") && line . contains ("(id cy2)") )
+                 . count (), 1,
+      "the former member is the phantom's old content, not beside it:\n{}", deleted );
     let restoring : String = edit_line (
       &deleted, "** (skg bodyFolded (historical (id cy1)",
       |_| "** (skg bodyFolded (node (id cy1) (repo main))) cy1" . to_string () );
@@ -206,10 +207,6 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       &restoring, "*** (skg folded (node (id cy2)",
       |_| "*** (skg folded (node (id cy2) (repo main) writeProtected)) cy2, retitled"
           . to_string () );
-    // The phantom's old content duplicates the former member
-    // ('TODO/problems.org'); the restored cy1 would keep the first.
-    let restoring : String = without_subtree_starting (
-      &restoring, "*** (skg (node (id cy2) (repo main) (affectsParent false)" );
     let restored : String = save_cleanly (f, &all_changes_view (), &restoring) ? . saved_view;
     assert! ( without_vids (&restored) . contains ("** (skg bodyFolded (node (id cy1)")
               && without_vids (&restored) . contains ("*** (skg folded (node (id cy2)")

@@ -4,24 +4,24 @@
 //! The shallow model subtree is built in a scratch tree. Each existing
 //! viewnode it also produces is kept where it stands, with its fold
 //! state, and its kind and facts are updated in place; each it does
-//! not is detached, unless something the user added stands below it,
-//! in which case it is converted ('convert_unwarranted_child', the
-//! rule the older reconciler obeys); what only it has is copied in, after the child that
-//! precedes it in the shallow model subtree. A viewnode that stands
-//! for a graphnode is matched by the ID it stands for, any other by
-//! its kind (and a folder entry by the entry): within one parent each
-//! key appears at most once.
+//! not is converted by the one rule ('convert_unwarranted_child'), with
+//! what the diff view made below it ('convert_unwarranted_subtree');
+//! what only it has is copied in, after the child that precedes it in
+//! the shallow model subtree. A reconciler manages only the children
+//! it owns ('Owner'), as the view's record of owners says. A viewnode
+//! that stands for a graphnode is matched by the ID it stands for, any
+//! other by its kind (and a folder entry by the entry): within one
+//! parent each key appears at most once.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
-use crate::types::git::{NodeSign, Sign};
+use crate::types::git::Sign;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, DiffPresence, Owner, Property, PropertyFolder,
+  AffectsParent, Birth, ChangeFacts, Owner, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
-use crate::update_buffer::util::{
-  convert_unwarranted_child, detach_viewnode_transferring_focus};
+use crate::update_buffer::util::{Conversion, convert_unwarranted_child};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashSet;
@@ -79,30 +79,38 @@ fn property_kind (
     Property::ChangesetMarker { kind, .. } =>
       format! ("changesetMarker {:?}", kind), }}
 
-/// Under 'parent', make the children that 'managed' selects match
-/// the children of 'model_parent' in 'model'. A kept child stays
-/// where it stands; a created one goes after the kept or created
-/// child that precedes it in the shallow model subtree, or first when
-/// none does ('place_created_children_after_their_model_predecessors').
-/// A kept child whose model twin 'descend' selects has its own
-/// children reconciled the same way, every keyed child but the user's
-/// managed ('is_the_diffViews_viewnode'). Returns the kept and created
-/// children, in the shallow model subtree's order. 'graph' is the
-/// live graph ('match_key').
+/// Under 'parent', make the children that 'owner' owns and 'selects'
+/// selects match the children of 'model_parent' in 'model'. 'owner' is
+/// the calling reconciler: it owns every child it creates, and
+/// manages no child another owns (the user's, or another
+/// reconciler's, such as a content list's members, which are the
+/// content reconciler's); 'selects' says, by kind, which of its own
+/// children this model concerns, where one reconciler runs several
+/// models under one parent. A kept child stays where it stands; a
+/// created one goes after the kept or created child that precedes it
+/// in the shallow model subtree, or first when none does
+/// ('place_created_children_after_their_model_predecessors'). A child
+/// the model lacks is converted ('convert_unwarranted_subtree'). A
+/// kept child whose model twin 'descend' selects has its own children
+/// reconciled the same way, every keyed child 'owner' owns managed.
+/// Returns the kept and created children, in the shallow model
+/// subtree's order. 'graph' is the live graph ('match_key').
 pub fn reconcile_children_with_shallowModelSubtree (
   tree         : &mut Tree<Viewnode>,
   parent       : NodeId,
   model        : &Tree<Viewnode>,
   model_parent : NodeId,
   graph        : &InRustGraph,
-  managed      : &dyn Fn (&Viewnode) -> bool,
+  owner        : Owner,
+  selects      : &dyn Fn (&Viewnode) -> bool,
   descend      : &dyn Fn (&Viewnode) -> bool,
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
   let mut unmatched : Vec<(NodeId, MatchKey)> =
     tree . get (parent)
     . ok_or ("reconcile_children_with_shallowModelSubtree: parent not found") ?
     . children ()
-    . filter ( |child| managed ( child . value () ))
+    . filter ( |child| child . value () . owner == owner
+                       && selects ( child . value () ))
     . filter_map ( |child| match_key ( child . value (), graph )
                    . map ( |key| (child . id (), key) ))
     . collect ();
@@ -125,99 +133,49 @@ pub fn reconcile_children_with_shallowModelSubtree (
         adopt_model_facts (
           tree . get_mut (existing) . unwrap () . value (), model_viewnode );
         if descend (model_viewnode) {
-          let parent_is_a_folder : bool =
-            is_folder ( tree . get (existing) . unwrap () . value () );
           reconcile_children_with_shallowModelSubtree (
-            tree, existing, model, model_child, graph,
-            &|viewnode| is_the_diffViews_viewnode (viewnode, parent_is_a_folder, graph),
+            tree, existing, model, model_child, graph, owner, &|_| true,
             descend ) ?; }
         result . push (existing); },
       None => {
         let copy : NodeId =
-          append_copy_of_subtree (tree, parent, model, model_child) ?;
+          append_copy_of_subtree (tree, parent, model, model_child, owner) ?;
         created . insert (copy);
         result . push (copy); }, }}
   for (stale, _) in unmatched {
-    let holds_users : bool = holds_the_users ( tree . get (stale) . unwrap () );
-    if holds_users {
-      convert_unwarranted_child (tree, stale, false) ?;
-      detach_the_servers_below (tree, stale) ?;
-    } else {
-      detach_viewnode_transferring_focus (tree, stale) ?; }}
+    convert_unwarranted_subtree (tree, stale) ?; }
   place_created_children_after_their_model_predecessors (
     tree, parent, &result, &created ) ?;
   Ok (result) }
 
-/// Below a stale viewnode kept for what the user added under it,
-/// detach what the diff view added there that holds nothing of the
-/// user's, as it would have been with the viewnode.
-fn detach_the_servers_below (
+/// Convert 'node', a child the model no longer warrants, by the one
+/// rule ('convert_unwarranted_child'), and, first, what was made below
+/// it for the same model: postorder, every child of a viewnode being
+/// converted is converted too, except the user's and the content
+/// reconciler's, which stay where they stand (a parked vognode keeps
+/// its content, as the older reconciler's does). So a folder's members
+/// go with the folder, and a member's role tree with the member. A
+/// viewnode holding nothing but childless dead viewnodes is converted
+/// as a leaf, so the prune that ends the completion removes the lot.
+/// Detaches nothing.
+pub fn convert_unwarranted_subtree (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  let (parent_is_a_folder, children) : (bool, Vec<NodeId>) = {
-    let node_ref : NodeRef<Viewnode> = tree . get (node)
-      . ok_or ("detach_the_servers_below: node not found") ?;
-    ( is_folder ( node_ref . value () ),
-      node_ref . children () . map ( |child| child . id () ) . collect () ) };
-  for child in children {
-    let (users, holds_users) : (bool, bool) = {
-      let child_ref : NodeRef<Viewnode> = tree . get (child) . unwrap ();
-      ( is_the_users_viewnode ( child_ref . value (), parent_is_a_folder ),
-        holds_the_users (child_ref) ) };
-    if users { continue; }
-    if holds_users { detach_the_servers_below (tree, child) ?; }
-    else { detach_viewnode_transferring_focus (tree, child) ?; }}
-  Ok (( )) }
-
-/// Whether a viewnode below what the diff view added is the user's:
-/// an unrestricted vognode born 'Unremarkable' that carries no
-/// '(presence ...)' sign and is not a member of the folder it stands in
-/// ('parent_is_a_folder'). A role graft ('Birth::RoleGraft', which a
-/// buffer carries back), a removed member and a folder's member are
-/// the server's, as is every viewnode of another kind. The sign '~'
-/// does not count: it says the node is modified, wherever it stands,
-/// and nothing about who put it there.
-pub fn is_the_users_viewnode (
-  viewnode           : &Viewnode,
-  parent_is_a_folder : bool,
-) -> bool {
-  let presence : DiffPresence = viewnode . change_facts . presence;
-  matches! ( &viewnode . kind,
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if t . birth == Birth::Unremarkable
-         && matches! ( presence . node, None | Some (NodeSign::Modified) )
-         && presence . rel . is_none ()
-         && ! ( parent_is_a_folder && t . affectsParent == AffectsParent::True )) }
-
-/// What the diff view's reconciler manages below what it added,
-/// where it descends and under a member of a changed folder or a
-/// historical phantom: every viewnode with a match key except the
-/// user's, which stays where it stands. 'parent_is_a_folder' is
-/// whether its parent is a folder.
-pub fn is_the_diffViews_viewnode (
-  viewnode           : &Viewnode,
-  parent_is_a_folder : bool,
-  graph              : &InRustGraph,
-) -> bool {
-  match_key (viewnode, graph) . is_some ()
-  && ! is_the_users_viewnode (viewnode, parent_is_a_folder) }
-
-/// Whether something of the user's ('is_the_users_viewnode') stands
-/// anywhere below 'node'.
-pub fn holds_the_users (
-  node : NodeRef<Viewnode>,
-) -> bool {
-  node . descendants () . skip (1)
-    . any ( |below| is_the_users_viewnode (
-      below . value (),
-      below . parent () . is_some_and ( |parent| is_folder ( parent . value () )) )) }
-
-fn is_folder (
-  viewnode : &Viewnode,
-) -> bool {
-  matches! ( viewnode . kind,
-    ViewnodeKind::PartnerFolder (_) | ViewnodeKind::PropertyFolder (_) ) }
+) -> Result<Conversion, Box<dyn Error>> {
+  let children : Vec<(NodeId, Owner)> =
+    tree . get (node) . ok_or ("convert_unwarranted_subtree: node not found") ?
+    . children () . map ( |child| (child . id (), child . value () . owner) )
+    . collect ();
+  let mut holds_something : bool = false;
+  for (child, child_owner) in children {
+    let stays : bool =
+      matches! ( child_owner, Owner::User | Owner::ContentReconciler );
+    let conversion : Conversion =
+      if stays { Conversion::Parked }
+      else { convert_unwarranted_subtree (tree, child) ? };
+    if conversion == Conversion::Parked { holds_something = true; }}
+  convert_unwarranted_child (tree, node, ! holds_something) ?;
+  Ok ( if holds_something { Conversion::Parked } else { Conversion::DeadLeaf } ) }
 
 /// Give 'existing' the kind and facts of 'model', keeping its fold
 /// state and focus. Of the facts, it takes the presence, and its
@@ -247,23 +205,23 @@ pub fn adopt_model_facts (
       existing . readiness_request = model . readiness_request . clone (); }, }}
 
 /// Append under 'parent' a copy of the subtree of 'model' at
-/// 'model_node', every viewnode of it the diff view's reconciler's.
+/// 'model_node', every viewnode of it 'owner''s.
 pub fn append_copy_of_subtree (
   tree       : &mut Tree<Viewnode>,
   parent     : NodeId,
   model      : &Tree<Viewnode>,
   model_node : NodeId,
+  owner      : Owner,
 ) -> Result<NodeId, Box<dyn Error>> {
   let model_ref : NodeRef<Viewnode> = model . get (model_node)
     . ok_or ("append_copy_of_subtree: model node not found") ?;
   let copy : NodeId =
     tree . get_mut (parent) . ok_or ("append_copy_of_subtree: parent not found") ?
-    . append ( Viewnode { owner : Owner::DiffViewReconciler,
-                          .. model_ref . value () . clone () } ) . id ();
+    . append ( Viewnode { owner, .. model_ref . value () . clone () } ) . id ();
   let model_children : Vec<NodeId> =
     model_ref . children () . map ( |child| child . id () ) . collect ();
   for model_child in model_children {
-    append_copy_of_subtree (tree, copy, model, model_child) ?; }
+    append_copy_of_subtree (tree, copy, model, model_child, owner) ?; }
   Ok (copy) }
 
 /// A removed member: a viewnode the diff view made as a non-member

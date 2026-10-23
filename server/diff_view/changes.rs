@@ -41,8 +41,7 @@ use crate::diff_view::change_viewnodes::{
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_homeSkgrepoMove_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::shallow_model_subtree::{
-  adopt_model_facts, is_the_diffViews_viewnode,
-  is_unrestricted_removed_member, reconcile_children_with_shallowModelSubtree};
+  adopt_model_facts, reconcile_children_with_shallowModelSubtree};
 use crate::types::git::Sign;
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
@@ -54,7 +53,7 @@ use crate::types::tree::moves::{
   place_created_children_after_their_model_predecessors};
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
-  AffectsParent, Birth, ChangeFacts, ChangesetMarkerKind, DiffPresence,
+  AffectsParent, ChangeFacts, ChangesetMarkerKind, DiffPresence,
   Editability, Owner, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
@@ -137,13 +136,12 @@ impl ChangedAspects {
 /// the content list first, as in every view (and each folder's
 /// members at the folder's own visit); then this step runs the diff
 /// view's, 'reconcile_children_with_shallowModelSubtree', over the change
-/// viewnodes, the removed members and what stands below them. What
-/// the user added survives, under a stale child too: the older
-/// reconciler converts every stale child ('convert_unwarranted_child'),
-/// and this one converts a stale child holding something of the
-/// user's and detaches the rest. What this step keeps
-/// stays where it stands; what it creates goes after what precedes
-/// it here: the change viewnodes ahead of the markers, then the
+/// viewnodes, the removed members and what stands below them, each
+/// managing only what it owns ('Owner'). What the user added
+/// survives, under a stale child too: both convert every stale child
+/// they own ('convert_unwarranted_child') and detach nothing. What
+/// this step keeps stays where it stands; what it creates goes after
+/// what precedes it here: the change viewnodes ahead of the markers, then the
 /// changed partner folders, then the markers.
 /// 'created_in_this_completion' is whether
 /// view completion created the viewnode at 'treeid': only then does
@@ -170,7 +168,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
   if ! editable {
     // What an earlier visit added here while it was editable goes, and
     // the members it still holds are tagged as they stand now.
-    detach_change_viewnodes (tree, treeid, straddle) ?;
+    convert_change_viewnodes (tree, treeid, straddle) ?;
     tag_content_members (tree, treeid, straddle, &content, None) ?;
     return Ok (( )); }
   let sets : &PrunedChangeViewSets =
@@ -194,7 +192,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     . map ( |child| child . id () ) . collect ();
   let fronts : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    &is_front_change_viewnode,
+    Owner::DiffViewReconciler, &is_front_change_viewnode,
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   let partner_folders : Vec<NodeId> =
     if in_c { changed_partner_folders (tree, treeid, &aspects) }
@@ -234,10 +232,13 @@ fn sign_root (
 /// Before the content reconciler runs at an editable node's visit,
 /// align its members with the straddle, so that the reconciler keeps
 /// each viewnode instead of creating another: a member, a removed
-/// member or a historical phantom whose relationship is in the
-/// after-graph is a member; a member whose relationship is only in
-/// the before-graph is set aside (affectsParent false), where the
-/// step after the reconciler finds it and shows it as removed.
+/// member (any unrestricted vognode the diff view's reconciler owns,
+/// converted or not) or a historical phantom whose relationship is in
+/// the after-graph is a member; a member whose relationship is only in
+/// the before-graph is set aside (affectsParent false), and so stops
+/// being the content reconciler's and becomes the diff view's
+/// reconciler's, whose step after the content reconciler finds it and
+/// shows it as removed.
 pub(crate) fn align_content_members_with_straddle (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -257,16 +258,18 @@ pub(crate) fn align_content_members_with_straddle (
     let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
     let viewnode : &mut Viewnode = child_mut . value ();
     let member_or_removed : bool = // not a viewnode the user set aside
-      is_unrestricted_removed_member (viewnode)
+      viewnode . owner == Owner::DiffViewReconciler
       || matches! ( &viewnode . kind,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . affectsParent == AffectsParent::True );
+    let mut set_aside : bool = false;
     let returned : Option<Viewnode> = match &mut viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if member_or_removed => {
         if after_set . contains (&t . skgid) {
           t . affectsParent = AffectsParent::True; }
         else if removed . contains (&t . skgid) {
-          t . affectsParent = AffectsParent::False; }
+          t . affectsParent = AffectsParent::False;
+          set_aside = true; }
         None },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
         if after_set . contains (&h . skgid) =>
@@ -275,6 +278,8 @@ pub(crate) fn align_content_members_with_straddle (
             h . skgid . clone (), node . home_skgrepo . clone (),
             node . title . clone (), node . body . clone () )),
       _ => None, };
+    if set_aside {
+      viewnode . owner = Owner::DiffViewReconciler; }
     if let Some (member) = returned {
       viewnode . replace_kind (member . kind); }}
   Ok (( )) }
@@ -297,7 +302,10 @@ pub(crate) enum HistoricalPhantomVisit {
 /// deletion since committed) a deleted phantom. A removed member of
 /// its old content is created editable when its node is in U of the
 /// buffer being completed ('prunedChangeView_sets_of_buffer'); one that
-/// stands already keeps its editability ('adopt_model_facts').
+/// stands already keeps its editability ('adopt_model_facts'). A
+/// historical phantom has no content list, so the content reconciler's
+/// former members under it are the diff view's reconciler's, and its
+/// old content adopts them.
 pub(crate) fn process_historical_phantom_visit (
   tree                 : &mut Tree<Viewnode>,
   treeid               : NodeId,
@@ -321,6 +329,7 @@ pub(crate) fn process_historical_phantom_visit (
           skgid . clone (), node . home_skgrepo . clone (),
           node . title . clone (), node . body . clone () ) . kind );
       return Ok (HistoricalPhantomVisit::RootIsLive); }}
+  claim_children_of_the_content_reconciler (tree, treeid) ?;
   let Some (model_phantom) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, None) else {
       // In neither graph.
@@ -337,8 +346,7 @@ pub(crate) fn process_historical_phantom_visit (
       let empty : Tree<Viewnode> = Tree::new (model_root ());
       reconcile_children_with_shallowModelSubtree (
         tree, treeid, &empty, empty . root () . id (), &straddle . after,
-        &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
-        &|_| false ) ?;
+        Owner::DiffViewReconciler, &|_| true, &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
     adopt_model_facts (
@@ -357,9 +365,26 @@ pub(crate) fn process_historical_phantom_visit (
       & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
   reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    &|viewnode| is_the_diffViews_viewnode (viewnode, false, &straddle . after),
+    Owner::DiffViewReconciler, &|_| true,
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   Ok (HistoricalPhantomVisit::Done) }
+
+/// Make the children of 'treeid' that the content reconciler owns the
+/// diff view's reconciler's.
+fn claim_children_of_the_content_reconciler (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+) -> Result<(), Box<dyn Error>> {
+  let children : Vec<NodeId> =
+    tree . get (treeid)
+    . ok_or ("claim_children_of_the_content_reconciler: node not found") ?
+    . children () . map ( |child| child . id () ) . collect ();
+  for child in children {
+    let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
+    let viewnode : &mut Viewnode = child_mut . value ();
+    if viewnode . owner == Owner::ContentReconciler {
+      viewnode . owner = Owner::DiffViewReconciler; }}
+  Ok (( )) }
 
 /// When a save deleted the node of the deleted phantom at 'treeid'
 /// and the straddle holds it as only-before, it becomes the node's
@@ -399,10 +424,10 @@ fn model_root (
 ) -> Viewnode {
   viewforest_root_viewnode () }
 
-/// The change viewnodes an editable node holds ahead of its content.
-/// Partner folders other than the derived "it acquired" folder are not
-/// among them: one the user requested may be among a node's folders,
-/// so such a folder is never detached.
+/// Of the diff view's viewnodes, those an editable node holds ahead of
+/// its content: its change viewnodes. Partner folders other than the
+/// derived "it acquired" folder are not among them: the node's own
+/// visit finds or makes them, and their own visits reconcile them.
 fn is_front_change_viewnode (
   viewnode : &Viewnode,
 ) -> bool {
@@ -413,8 +438,10 @@ fn is_front_change_viewnode (
     | ViewnodeKind::PropertyFolder (_)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ) }
 
-/// Detach what this step adds under an editable node.
-fn detach_change_viewnodes (
+/// Convert what this step adds under an editable node: its change
+/// viewnodes, its removed members and the historical phantoms of its
+/// deleted ones.
+fn convert_change_viewnodes (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   straddle : &GraphStraddle,
@@ -422,10 +449,11 @@ fn detach_change_viewnodes (
   let empty : Tree<Viewnode> = Tree::new (model_root ());
   reconcile_children_with_shallowModelSubtree (
     tree, treeid, &empty, empty . root () . id (), &straddle . after,
+    Owner::DiffViewReconciler,
     &|viewnode| is_front_change_viewnode (viewnode)
-      || is_unrestricted_removed_member (viewnode)
       || matches! ( &viewnode . kind,
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) ),
+        ViewnodeKind::Vognode (
+          Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) )),
     &|_| false ) ?;
   Ok (( )) }
 
@@ -540,6 +568,7 @@ fn tag_content_members (
       model . root_mut () . append (moved); }
     reconcile_children_with_shallowModelSubtree ( // a new move goes first
       tree, member, &model, model . root () . id (), &straddle . after,
+      Owner::DiffViewReconciler,
       &|viewnode| matches! ( &viewnode . kind,
         ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
       &|_| false ) ?; }
@@ -565,8 +594,6 @@ fn reconcile_removed_content_members (
   u        : &BTreeSet<ID>,
 ) -> Result<(), Box<dyn Error>> {
   let plan : Vec<(ID, Option<ID>)> = removal_plan (straddle, pid);
-  let removed : HashSet<ID> =
-    plan . iter () . map ( |(removed, _)| removed . clone () ) . collect ();
   let mut model : Tree<Viewnode> = Tree::new (model_root ());
   let mut anchors : Vec<Option<ID>> = Vec::new ();
   for (removed, anchor) in plan {
@@ -582,14 +609,10 @@ fn reconcile_removed_content_members (
       anchors . push (anchor); }}
   let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    &|viewnode| match &viewnode . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        is_unrestricted_removed_member (viewnode)
-        || ( t . affectsParent == AffectsParent::False
-             && t . birth == Birth::Unremarkable
-             && removed . contains (&t . skgid) ),
-      _ => false, },
+    Owner::DiffViewReconciler,
+    &|viewnode| matches! ( &viewnode . kind,
+      ViewnodeKind::Vognode (
+        Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) )),
     &|_| false ) ?;
   let member_treeids : HashMap<ID, NodeId> =
     tree . get (treeid) . unwrap () . children ()

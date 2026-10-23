@@ -454,8 +454,8 @@ fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
     assert_eq! ( root_ids (&shown), vec! [ "m" ], "{}", shown );
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
-    assert_eq! ( without_vids (&again . saved_view), without_vids (&shown),
-                 "c1 stays editable" );
+    assert_eq! ( again . saved_view, shown,
+                 "c1 stays editable, and every viewnode keeps its view id" );
     Ok (( )) }) }
 
 /// Once the command made c1 editable in m's container folder, a save
