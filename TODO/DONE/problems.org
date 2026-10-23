@@ -1,3 +1,25 @@
+* A containerward role tree orders its branches at random (2026-10-22; fixed 2026-10-23)
+   'full_containerward_role_tree'
+   ('server/dbs/in_rust_graph/containerward_role_tree.rs') iterates the
+   'HashSet' its 'partners_of' returns, so the branches of a node with
+   two or more containers come in an order that varies from call to
+   call. In the diff view a folder member's containerward tree is
+   reconciled in the order of each new walk
+   ('attach_memberRoleTrees_under_straddle_folder_members' arranges the
+   kept children in that order), so such a tree can reorder at any
+   rerender, and a buffer then does not save back to itself. Seen
+   while building slice 5's fixture: with b also containing c in
+   'tests/pcsvf/fixtures/removed_partners', c's containers b and d
+   under x's container folder came in either order from run to run,
+   and "integrate unshown changes" followed by a save reordered them.
+   The fixture avoids the case. Not checked whether the live-graph
+   views, which walk the same function ('containers_in_inRustGraph'),
+   keep the standing order. A fix is probably to sort the containers
+   in the walk.
+   Fixed 2026-10-23 in slice 3 of [[file:../total-diff-view/17_plan.org][the TDV plan of view ids and the one rule]]:
+   the walk visits containers in ID order, and no reconciler moves a
+   child it keeps, so a first render is the same every time and a
+   buffer saves back to itself ('tests/pruned_change_view/order.rs').
 * A multiply-contained node reached only through a removed container is editable nowhere (2026-10-20; fixed 2026-10-22)
   In a fixture where a, b and c contain x at HEAD and b alone then
   drops x (nothing else changes; 'tests/pcsvf/fixtures/removed_partners'

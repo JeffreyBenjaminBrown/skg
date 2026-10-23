@@ -350,12 +350,15 @@ PartnerFolder is extended as editable. A subscribee-as-such also gets its
 nonempty =hiddenInSubscribeeFolder=; this is the filter specific to how that
 subscriber sees the subscribee.
 
-*Non-member children jump above the members.*  A non-member
-child parked inside any folder is reordered above the
-generated members on save (=complete_managed_children= moves
-unmanaged children to the front).  This is deliberate, not a bug: the
-membership is generated and ordered, so a note you park inside a folder is
-kept but visibly separated from the live membership.
+*A write-protected folder's children stay where they stand.*  Its
+reconciler moves no child it keeps, a non-member parked inside it
+included, and puts a member it creates right after the member that
+precedes it in the folder's goal list (=KeptChildOrder::Unmoved= in
+=complete_managed_children=; see "What a reconciler keeps" in
+=docs/diff-view.org=).  The alias folder and the editable folders,
+whose order the save writes, follow the graph's order instead
+(=KeptChildOrder::FollowsGoal=): a non-member parked in one of them
+goes above the members, which follow the graph's order.
 
 *** role tree, role graft, and the -ward adjectives
 A *role tree* is extended under a node, its origin, by following one

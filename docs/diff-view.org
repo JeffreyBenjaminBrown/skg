@@ -278,13 +278,30 @@ viewnodes, the removed members and what the diff view adds below
 them. Both obey one rule: a reconciler detaches only what it created, and
 what the user added survives.
 
+Neither moves a child it keeps. A child it creates goes right after
+the kept or created child that precedes it in its model, or first
+when none does ('place_created_children_after_their_model_predecessors'
+in 'server/types/tree/moves.rs'; 'KeptChildOrder::Unmoved' in
+'complete_managed_children'). So a buffer saves back to itself, and an
+order the user gives a role tree or a write-protected folder stands.
+There are two exceptions. A list whose order is a graph fact the save
+writes -- the content of a node, the alias folder and the editable
+partner folders -- follows the graph's order
+('KeptChildOrder::FollowsGoal'), so that a view other than the one
+saved follows a reorder saved elsewhere; in the view saved the two
+orders agree. And a removed member of a content list is moved to its
+slot at every visit ("Removed members and the LCS placement"), since
+the content reconciler puts non-members ahead of members. The
+containerward walk visits a node's containers in ID order, so a first
+render is the same every time.
+
 Below what the diff view added -- where its reconciler descends, under
 a member of a changed folder (around the member role tree) and under a
 historical phantom -- an unrestricted vognode born 'Unremarkable' that
 carries no '(presence ...)' fact and is not the member of the folder it
 stands in is the user's ('is_the_users_viewnode' in
 'server/diff_view/shallow_model_subtree.rs'). Its reconciler leaves it where
-it stands, ahead of what it adds there. A role graft is the server's:
+it stands. A role graft is the server's:
 its birth is written into its metadata as '(birth roleGraft ROLENAME)'
 and read back by the parser ('Birth::RoleGraft'), so it survives a
 save, and the clients, which rewrite metadata structurally and strip
@@ -325,9 +342,11 @@ reorder shows nothing; the longest common subsequence of the two
 lists only places a removed entry: immediately before the next
 surviving member of the old order, or last
 ('phantom_insertion_plan', 'compute_interleaved_diff'). Content and
-the alias, ID and flags folders are placed this way, each removed
-member moved, not recreated, to its slot at every visit, after the
-content reconciler has reordered the children.
+the alias, ID and flags folders are placed this way. In content each
+removed member is moved, not recreated, to its slot at every visit,
+after the content reconciler has reordered the children; in a folder
+a removed entry is placed in its slot when it is created, and then
+stays where it stands, as every kept child does.
 
 The partner folders over the straddle place their removed
 members the same way, since 'GraphStraddle::partners' gives the

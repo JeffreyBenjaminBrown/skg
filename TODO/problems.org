@@ -3,6 +3,24 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems noticed while keeping kept children in place (2026-10-23)
+** A deleted node's former member shows twice under its historical phantom
+  In 'a_deleted_then_restored_node_keeps_the_folding_of_its_subtree'
+  ('tests/pruned_change_view/folding.rs', the 'sets' fixture), cy1 is
+  deleted from the diff view while its member cy2 stands under it.
+  The rerender makes cy1 a historical phantom holding two lines for
+  cy2: the old content its visit creates (a removed member,
+  '(affectsParent false)' with '(presence node~ rel-)'), and the
+  former member, which 'is_the_users_viewnode' takes for the user's
+  (an unremarkable unrestricted vognode with no relationship fact),
+  so the diff view's reconciler does not manage it. When the user
+  restores cy1, both become members ('align_content_members_with_straddle')
+  and the content reconciler keeps the first as the duplicate's
+  survivor. Since the old content is created first (slice 3 of
+  'TODO/total-diff-view/17_plan.org'), that is the old content, and
+  the former member's fold state is lost; the test now drops the
+  duplicate before restoring. Slice 5 replaces the shape test with
+  the owner table; whether that settles this is to be checked there.
 * Problems noticed while giving viewnodes view ids (2026-10-23)
 ** The diff view replaces a folder member's old text on every save
   With view ids the replacement shows: saving unchanged the buffer of
@@ -817,26 +835,6 @@ gap too. Details, options and questions:
    accessors during traversal.  Retain insertion-time relationship gating as
    defence-in-depth, and add hidden-sibling-fork and mixed-visibility
    diamond regressions.
-* Problems found while executing slice 5 of TODO/total-diff-view/15_plan.org (2026-10-22)
-** A containerward role tree orders its branches at random
-   'full_containerward_role_tree'
-   ('server/dbs/in_rust_graph/containerward_role_tree.rs') iterates the
-   'HashSet' its 'partners_of' returns, so the branches of a node with
-   two or more containers come in an order that varies from call to
-   call. In the diff view a folder member's containerward tree is
-   reconciled in the order of each new walk
-   ('attach_memberRoleTrees_under_straddle_folder_members' arranges the
-   kept children in that order), so such a tree can reorder at any
-   rerender, and a buffer then does not save back to itself. Seen
-   while building slice 5's fixture: with b also containing c in
-   'tests/pcsvf/fixtures/removed_partners', c's containers b and d
-   under x's container folder came in either order from run to run,
-   and "integrate unshown changes" followed by a save reordered them.
-   The fixture avoids the case. Not checked whether the live-graph
-   views, which walk the same function ('containers_in_inRustGraph'),
-   keep the standing order. A fix is probably to sort the containers
-   in the walk.
-
 * Problems found while researching whether detaching is critical (2026-10-23)
   Found by throwaway tests, whose reports and sources are under
   'tests/results/review16/throwaway3/' (git-ignored); the research is

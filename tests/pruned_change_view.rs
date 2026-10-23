@@ -32,3 +32,5 @@ mod partner_folder_check;
 mod users_notes;
 #[path = "pruned_change_view/view_ids.rs"]
 mod view_ids;
+#[path = "pruned_change_view/order.rs"]
+mod order;

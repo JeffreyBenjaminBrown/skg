@@ -999,7 +999,7 @@ tests, the docs. Run all four suites.
 The three groups of messages, the parser's headline context, the
 tests per group, the docs that quote a message. Run the Rust
 suite and the integration suite.
-** TODO Slice 3: kept children keep their order
+** DONE Slice 3: kept children keep their order
 The reconcilers, the sorted walk, the sorted lock list, the
 tests, the problem entry moved. Run all four suites.
 ** TODO Slice 4: convert, then prune

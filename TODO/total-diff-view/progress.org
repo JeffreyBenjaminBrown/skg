@@ -3230,3 +3230,74 @@ instance: an edit request on a write-protected occurrence is refused
 with "- view id: 0b"; text typed on an alias folder warns "Headline
 text on a aliasFolder (view id 0c)"; a copied editable root is
 refused with "- occurrences: view id 0b, headline \"two\"".
+** Slice 3: deviations
+*** the lists whose order the save writes still follow the graph
+'complete_managed_children' takes a 'KeptChildOrder'
+('server/update_buffer/util.rs'). 'Unmoved' is the rule: kept and
+unmanaged children stay, a created one goes after its predecessor in
+the goal list or first. 'FollowsGoal' is the old behavior (unmanaged
+first, managed in goal order), and is passed for the content list,
+as the plan's exception says, and also for the alias folder and the
+editable partner folders (subscribee, overridden, hiddenOutside). The
+plan's reason for the content exception -- after a save the buffer's
+order is the graph's -- holds only for the view saved. A collateral
+view (or "rerender all views") re-completes its stored forest, so
+with 'Unmoved' it would keep the order it had before a reorder saved
+elsewhere, and saving it would write the old order back. That holds
+for every list whose order the save writes, so all of them follow
+the goal. The ID and flags folders and the write-protected partner
+folders take 'Unmoved'; the docs say a write-protected set's order is
+view-local, which is now true of a parked non-member too.
+*** a removed content member is still moved to its slot
+'reconcile_removed_content_members' still moves every removed member
+to the slot 'phantom_insertion_plan' gives it, kept ones too: the plan
+names only the 'arrange_*' and 'move_to_first_child' calls, and the
+content reconciler ('order_children_as_non_vognodes_then_ignored_then_content')
+puts non-members ahead of members at every visit, so a kept removed
+member left in place would drift to the top. 'docs/diff-view.org'
+says so in "What a reconciler keeps".
+*** one placement helper
+'place_created_children_after_their_model_predecessors'
+('server/types/tree/moves.rs') replaces 'arrange_first_children' and
+'arrange_last_children', which nothing else used.
+'reconcile_children_with_shallowModelSubtree' calls it for what it
+creates; the front step calls it again over the change viewnodes, the
+changed partner folders and the markers, with every child that was
+not there before the step counted as created; 'complete_managed_children'
+calls it in 'Unmoved'.
+*** the walk is sorted where it is iterated
+'full_containerward_role_tree' sorts the containers its 'partners_of'
+returns before walking them. 'union_partner_ids' still returns a
+'HashSet', the type every 'PartnersOf' returns; its only consumers
+iterate it sorted (this walk, and the path walk, which sorts branches
+already), so sorting it there would change nothing.
+*** a test adapted: the old content under a historical phantom comes first
+In 'a_deleted_then_restored_node_keeps_the_folding_of_its_subtree'
+the deleted cy1's old content (a removed member cy2) is created with
+no kept predecessor, so it now stands first, above the former member
+cy2 that 'is_the_users_viewnode' leaves alone. The assertion now reads
+the lines in order, and the test drops the duplicate before restoring,
+since the restore keeps the first of the two and the folded one is
+the second. The duplicate is recorded in 'TODO/problems.org'.
+*** the tests
+'tests/pruned_change_view/order.rs' over a new fixture
+'two_containers' (c, in x's changed container folder, has the two
+containers b and d): the buffer saves back unchanged five times as
+it stands and five times after "integrate unshown changes"; branches
+the user swapped stay swapped through a save; the first renders of
+'two_containers' and 'removed_partners' are the same ten times over.
+Against the old code the 'two_containers' tests fail and the
+'removed_partners' one passes (its walks have no two-way branch).
+'a_member_added_elsewhere_follows_the_kept_ones'
+('tests/partner_folder_order.rs', the fixture gains u): a
+subscriberFolder reordered with a parked note keeps both, and a
+subscriber added from u's view appears after the kept members, the
+note still last. Unit tests: 'placing_created_children_moves_no_kept_one',
+'kept_children_stay_unless_the_order_follows_the_goal'.
+*** verification
+nextest 889 passed; Emacs 382; Neovim 359 specs in 31 files, none
+failed. Integration: every test passed but 'import-md-and-org', which
+fails at baseline. Over TCP on a scratch instance: n's
+subscriberFolder, its members swapped to t, r and a non-member note
+typed after them, saves back in that order with the note last, and
+the result saves back byte-identical.
