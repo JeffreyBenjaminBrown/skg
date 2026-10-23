@@ -3,7 +3,7 @@
 //! A write-protected occurrence emits nothing at save extraction, so each is
 //! judged by the graph alone: it must say what the graph says.
 
-use crate::types::errors::BufferValidationError;
+use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::git::Sign;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
@@ -45,13 +45,15 @@ pub fn errors_for_writeProtected_occurrences (
           node, occurrence, &graphnode, graph, config, skgrepo_restriction );
       if ! differences . is_empty () {
         errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid   : occurrence . skgid . clone (),
-          title   : graphnode . title . clone (),
-          changes : differences, }); }}
+          skgid    : occurrence . skgid . clone (),
+          title    : graphnode . title . clone (),
+          changes  : differences,
+          headline : node . value () . headline_name (), }); }}
     if node . children () . any ( |child| is_member (child . value ()) ) {
       errors . push (BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-        skgid : occurrence . skgid . clone (),
-        title : occurrence . title . clone (), }); }}
+        skgid    : occurrence . skgid . clone (),
+        title    : occurrence . title . clone (),
+        headline : node . value () . headline_name (), }); }}
   errors }
 
 /// What the occurrence says that the graph does not.
@@ -194,8 +196,9 @@ struct FlagsFolderSurface {
 
 #[derive(Clone, Debug)]
 struct LocatedFlagsSurface {
-  recorder_skgid : ID,
-  folders        : Vec<FlagsFolderSurface>,
+  recorder_skgid    : ID,
+  recorder_headline : HeadlineName,
+  folders           : Vec<FlagsFolderSurface>,
 }
 
 fn flags_surfaces_in (forest : &ViewForest) -> Vec<LocatedFlagsSurface> {
@@ -230,7 +233,8 @@ fn collect_flags_surfaces (
           viewnodes, other_children }) })
       . collect ();
     result . push (LocatedFlagsSurface {
-      recorder_skgid : recorder . skgid . clone (),
+      recorder_skgid    : recorder . skgid . clone (),
+      recorder_headline : node . value () . headline_name (),
       folders, }); }
   for child in node . children () {
     collect_flags_surfaces (child, result); }
@@ -264,7 +268,8 @@ fn flags_surface_errors_against_graph (
         recorder_skgid : node . pid . clone (),
         recorder_title : node . title . clone (),
         changes        : flags_surface_changes (
-          &expected, &surface . folders), }); }
+          &expected, &surface . folders),
+        headline       : surface . recorder_headline . clone (), }); }
   }
   errors
 }
@@ -438,7 +443,7 @@ mod tests {
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-        skgid, title }] if skgid == &ID::from ("recorder") && title == "recorder"),
+        skgid, title, .. }] if skgid == &ID::from ("recorder") && title == "recorder"),
       "{:?}", errors);
     assert! (errors [0] . to_string () . contains ("C-c s d"), "{}", errors [0]);
   }
@@ -473,7 +478,7 @@ mod tests {
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, title, changes }] if skgid == &ID::from ("recorder")
+        skgid, title, changes, .. }] if skgid == &ID::from ("recorder")
           && title == "recorder"
           && changes == &vec! ["title \"changed\" differs from the graph's \"recorder\"" . to_string ()]),
       "{:?}", errors);
@@ -734,7 +739,7 @@ mod tests {
       "}) . unwrap ();
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, title, changes }] if skgid == &ID::from ("recorder")
+        skgid, title, changes, .. }] if skgid == &ID::from ("recorder")
           && title == "recorder" && changes == &vec!["added body text" . to_string ()]));
   }
 
@@ -750,7 +755,7 @@ mod tests {
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::FlagsSurfaceEdited {
-        recorder_skgid, recorder_title, changes }]
+        recorder_skgid, recorder_title, changes, .. }]
       if recorder_skgid == &ID::from ("recorder")
         && recorder_title == "recorder"
         && changes . iter () . any (|c| c . contains ("added wasOverloaded"))

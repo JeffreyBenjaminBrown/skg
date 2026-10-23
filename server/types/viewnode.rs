@@ -6,6 +6,7 @@
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
+use super::errors::HeadlineName;
 use super::git::{NodeSign, Sign};
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
@@ -1054,6 +1055,10 @@ impl Viewnode {
         | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
         "",
     }}
+
+  /// What a message calls this headline: its view id, else its title.
+  pub fn headline_name (&self) -> HeadlineName {
+    HeadlineName::of ( self . vid . as_ref (), self . title () ) }
 
   /// Reasonable for both UnrestrictedVognodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {

@@ -6,11 +6,12 @@
 ///   silently, because their repairs do not correspond to edits the
 ///   user just made); delivered through 'SaveResponse.warnings'.
 /// The warnings are rendered to strings late
-/// ('render_completion_warnings'), ColRepairs batched per (folder,
-/// recorder).
+/// ('render_completion_warnings'), ColRepairs batched per folder
+/// occurrence.
 
+use crate::types::errors::view_id_suffix;
 use crate::types::misc::ID;
-use crate::types::viewnode::PartnerFolder;
+use crate::types::viewnode::{PartnerFolder, Vid};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RepairKind {
@@ -25,32 +26,36 @@ pub enum CompletionWarning {
   FolderRepair {
     folder      : PartnerFolder,
     recorder : ID, // the node the folder belongs to (its UnrestrictedVognode parent)
+    folder_vid : Option<Vid>, // the folder's view id; None for a folder the user typed
     repair   : RepairKind,
     children : Vec<ID>,
   },
 }
 
-/// ColRepairs render one string per (folder, recorder) pair, in
-/// first-appearance order, summarizing every repair to that folder.
+/// ColRepairs render one string per folder occurrence (a folder kind,
+/// recorder and view id), in first-appearance order, summarizing
+/// every repair to that occurrence.
 pub fn render_completion_warnings (
   warnings : &[CompletionWarning],
 ) -> Vec<String> {
   let mut rendered : Vec<String> = Vec::new ();
   { // the ColRepairs, batched
-    let mut group_order : Vec<(PartnerFolder, ID)> = Vec::new ();
+    let mut group_order : Vec<(PartnerFolder, ID, Option<Vid>)> = Vec::new ();
     for w in warnings {
-      let CompletionWarning::FolderRepair { folder, recorder, .. } = w;
-      let key : (PartnerFolder, ID) =
-        ( *folder, recorder . clone () );
+      let CompletionWarning::FolderRepair { folder, recorder, folder_vid, .. } = w;
+      let key : (PartnerFolder, ID, Option<Vid>) =
+        ( *folder, recorder . clone (), folder_vid . clone () );
       if ! group_order . contains (&key) {
         group_order . push (key); } }
-    for (folder, recorder) in &group_order {
+    for (folder, recorder, folder_vid) in &group_order {
       let mut segments : Vec<String> = Vec::new ();
       let mut any_restored : bool = false;
       for w in warnings {
         let CompletionWarning::FolderRepair {
-          folder : w_folder, recorder : w_recorder, repair, children } = w;
-        if w_folder != folder || w_recorder != recorder { continue; }
+          folder : w_folder, recorder : w_recorder,
+          folder_vid : w_folder_vid, repair, children } = w;
+        if w_folder != folder || w_recorder != recorder
+          || w_folder_vid != folder_vid { continue; }
         if children . is_empty () { continue; }
         let skgids : String =
           children . iter ()
@@ -75,8 +80,9 @@ pub fn render_completion_warnings (
           " (A write-protected folder's membership is edited from the other side of the relationship, not by editing the folder.)"
         } else { "" };
       rendered . push (
-        format! ( "Repaired {} under node {}: {}.{}",
+        format! ( "Repaired {}{} under node {}: {}.{}",
                   folder . repr_in_client (),
+                  view_id_suffix ( folder_vid . as_ref () ),
                   recorder . 0,
                   segments . join ("; "),
                   explainer )); }}

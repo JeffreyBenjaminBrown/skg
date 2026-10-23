@@ -16,7 +16,7 @@ use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::update_from_and_rerender_buffer_test;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::types::errors::{BufferValidationError, SaveError};
+use skg::types::errors::{BufferValidationError, HeadlineName, SaveError};
 use skg::types::misc::ID;
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::{DiffViewBufferKind, ViewId};
@@ -146,7 +146,7 @@ fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
     assert! ( matches! (
       &errors [..],
       [ BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-          skgid, title } ]
+          skgid, title, headline : HeadlineName::ViewId (_) } ]
       if *skgid == ID::from ("n") && title == "n" ),
       "{:?}", errors );
     assert! ( errors [0] . to_string () . contains (
@@ -388,7 +388,7 @@ fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
       f, &with_folder ("*** (skg idFolder)\n**** (skg id) ctx\n**** (skg id) ctx-too") );
     assert! ( matches! (
       &errors [..],
-      [ BufferValidationError::IDFolder_Edited (recorder, _, _) ]
+      [ BufferValidationError::IDFolder_Edited (recorder, _, _, _) ]
       if *recorder == ID::from ("ctx") ),
       "{:?}", errors );
     let errors : Vec<BufferValidationError> = refusal_errors (

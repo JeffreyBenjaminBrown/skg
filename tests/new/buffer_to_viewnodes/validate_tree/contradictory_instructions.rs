@@ -41,8 +41,8 @@ fn test_find_inconsistent_toDelete_instructions() {
   let (inconsistent_skgids, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
   assert_eq!(inconsistent_skgids . len(), 2, "Should find exactly 2 conflicting IDs");
-  assert!(inconsistent_skgids . contains(&ID::from ("conflict1")), "Should include conflict1 ID");
-  assert!(inconsistent_skgids . contains(&ID::from ("conflict2")), "Should include conflict2 ID");
+  assert!(inconsistent_skgids . iter () . any ( |(skgid, _)| skgid == &ID::from ("conflict1")), "Should include conflict1 ID");
+  assert!(inconsistent_skgids . iter () . any ( |(skgid, _)| skgid == &ID::from ("conflict2")), "Should include conflict2 ID");
 
   // Test case with nodes that have no IDs (should be skipped)
   let input_no_skgids: &str =
@@ -94,14 +94,14 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
         find_buffer_errors_for_saving(&viewforest, config)?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
-        . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))
+        . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_, _)))
         . collect();
 
       assert_eq!(multiple_defining_errors . len(), 1,
                  "Should find exactly 1 Multiple_Defining_Viewnodes error for the problematic ID");
 
       // Check that the error points to the correct ID
-      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid) = multiple_defining_errors[0] {
+      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid, _) = multiple_defining_errors[0] {
         assert_eq!(skgid . 0, "duplicate",
                    "Multiple_Defining_Viewnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }

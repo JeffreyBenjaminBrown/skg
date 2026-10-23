@@ -259,7 +259,7 @@ async fn explicit_fork_on_unknown_node_errors (
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
-        BufferValidationError::ForkRequestOnUnknownNode (_) )),
+        BufferValidationError::ForkRequestOnUnknownNode (_, _) )),
         "expected ForkRequestOnUnknownNode, got {:?}", errors ); }
     other => panic! (
       "expected ForkRequestOnUnknownNode, got {:?}", other ), }

@@ -122,7 +122,7 @@ async fn test_new_headline_at_top_level_is_refused (
   let errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (&viewforest, config) ?;
   assert! ( errors . iter () . any ( |error| matches! (
-              error, BufferValidationError::LocalStructureViolation (message, _)
+              error, BufferValidationError::LocalStructureViolation (message, _, _)
               if message == "UnrestrictedVognode must have a repo that exists in the config." )),
             "{:?}", errors );
   Ok (( )) }

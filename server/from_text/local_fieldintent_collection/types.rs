@@ -9,6 +9,7 @@
 /// and they become NodeInstruction *instructions* only after downstream
 /// resolution and disk supplementation.
 
+use crate::types::errors::{HeadlineName, name_headlines};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use std::collections::HashMap;
@@ -40,6 +41,7 @@ pub enum LocalContext {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DefiningFolderRecorder {
   pub skgid              : ID,
+  pub headline        : HeadlineName, // the recorder's occurrence, which emits the folder's fieldIntents
   pub is_editable     : bool, // True iff the recorder is Unrestricted and editable.
   pub is_saveEligible : bool, // True iff the recorder is editable, Unrestricted, carries no Delete request, and is not in subscribee-as-such position.
 }
@@ -109,8 +111,9 @@ pub struct HiddenOutsideEdit {
 /// title/body edits in that position are forbidden.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SubscribeeTextClaim {
-  pub title : String,
-  pub body  : Option<String>,
+  pub title    : String,
+  pub body     : Option<String>,
+  pub headline : HeadlineName, // the occurrence claiming them
 }
 
 /// This accumulates the fieldIntents aimed at one ID. It is a slot
@@ -139,6 +142,7 @@ pub struct FieldIntentsForOneId {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CollectedFieldIntents {
   pub order           : Vec<ID>, // This holds the IDs in first-emission order.
+  pub exclusive_emitters : HashMap<ID, Vec<HeadlineName>>, // For each ID, the occurrences that emitted an exclusive fieldIntent for it, in emission order, for the conflict messages.
   pub lowerable_order : Vec<ID>, // This holds the IDs in first save-or-delete-emission order. It is a subset of 'order': an ID whose entry holds only signals appears in 'order' alone. Lowering uses this, so that an ID first seen as (say) a subscribee-as-such is saved at the position of its editable instance.
   pub by_pid          : HashMap<ID, FieldIntentsForOneId>,
 }
@@ -179,12 +183,29 @@ impl CollectedFieldIntents {
   ///   when duplicate occurrences of an ID emit them separately;
   /// - 'visibility' and 'text_claims' coexist with anything,
   ///   including 'delete' (resolution ignores deleted subscribers).
+  /// An error lists the view ids of the occurrences that emitted
+  /// exclusive fieldIntents for the ID, 'emitter' (the occurrence
+  /// emitting this one) among them.
   #[allow(non_snake_case)]
   pub fn instructionMerge_fieldIntent (
     &mut self,
-    target : ID,
-    intent : FieldIntent,
+    emitter : &HeadlineName,
+    target  : ID,
+    intent  : FieldIntent,
   ) -> Result<(), String> {
+    if ! matches! ( intent,
+                    FieldIntent::SubscribeeVisibility (_)
+                    | FieldIntent::HiddenOutsideEdit (_)
+                    | FieldIntent::SubscribeeTextClaim (_) )
+    { let emitters : &mut Vec<HeadlineName> =
+        self . exclusive_emitters . entry (target . clone ())
+        . or_default ();
+      if ! emitters . contains (emitter) {
+        emitters . push (emitter . clone ()); }}
+    let emitters : &[HeadlineName] = // for the error messages
+      self . exclusive_emitters . get (&target)
+      . map ( Vec::as_slice )
+      . unwrap_or ( &[] );
     let entry : &mut FieldIntentsForOneId = {
       if ! self . by_pid . contains_key (&target) {
         self . order . push (target . clone()); }
@@ -203,10 +224,10 @@ impl CollectedFieldIntents {
       FieldIntent::Delete { skgrepo } => {
         if entry . some_nondelete_exclusive_slot_is_filled() {
           return Err ( format!(
-            "Cannot have both Delete and Save for same ID: {}",
-            target )); }
+            "Cannot have both Delete and Save for same ID: {} ({})",
+            target, name_headlines (emitters) )); }
         fill_exclusive_slot (
-          &mut entry . home_skgrepo, skgrepo, "repo", &target) ?;
+          &mut entry . home_skgrepo, skgrepo, "repo", &target, emitters) ?;
         if ! entry . delete {
           entry . delete = true;
           self . lowerable_order . push (target); }
@@ -214,50 +235,50 @@ impl CollectedFieldIntents {
       _ => {
         if entry . delete {
           return Err ( format!(
-            "Cannot have both Delete and Save for same ID: {}",
-            target )); }
+            "Cannot have both Delete and Save for same ID: {} ({})",
+            target, name_headlines (emitters) )); }
         match intent {
           FieldIntent::SetTitleAndBody { skgrepo, title, body } => {
             fill_exclusive_slot (
-              &mut entry . home_skgrepo, skgrepo, "repo", &target) ?;
+              &mut entry . home_skgrepo, skgrepo, "repo", &target, emitters) ?;
             let was_empty : bool =
               entry . title_and_body . is_none();
             fill_exclusive_slot (
               &mut entry . title_and_body, (title, body),
-              "title/body", &target) ?;
+              "title/body", &target, emitters) ?;
             if was_empty {
               self . lowerable_order . push (target); }
             Ok (( )) },
           FieldIntent::SetContains (members) =>
             fill_exclusive_slot (
-              &mut entry . contains, members, "contains", &target),
+              &mut entry . contains, members, "contains", &target, emitters),
           FieldIntent::SetAliases (texts) =>
             fill_exclusive_slot (
-              &mut entry . aliases, texts, "aliases", &target),
+              &mut entry . aliases, texts, "aliases", &target, emitters),
           FieldIntent::SetSubscribesTo (members) =>
             fill_exclusive_slot (
               &mut entry . subscribesTo, members,
-              "subscribesTo", &target),
+              "subscribesTo", &target, emitters),
           FieldIntent::SetOverrides (members) =>
             fill_exclusive_slot (
               &mut entry . overrides, members,
-              "overrides", &target),
+              "overrides", &target, emitters),
           FieldIntent::NodeMerge { acquiree } => {
             if entry . flag . is_some() {
               return Err ( format!(
-                "Cannot combine nodeMerge and flag requests for ID {}",
-                target )); }
+                "Cannot combine nodeMerge and flag requests for ID {} ({})",
+                target, name_headlines (emitters) )); }
             fill_exclusive_slot (
               &mut entry . node_merge, acquiree,
-              "nodeMerge acquiree", &target) },
+              "nodeMerge acquiree", &target, emitters) },
           FieldIntent::SetFlag { flag, value } => {
             if entry . node_merge . is_some() {
               return Err ( format!(
-                "Cannot combine nodeMerge and flag requests for ID {}",
-                target )); }
+                "Cannot combine nodeMerge and flag requests for ID {} ({})",
+                target, name_headlines (emitters) )); }
             fill_exclusive_slot (
               &mut entry . flag, (flag, value),
-              "flag", &target) },
+              "flag", &target, emitters) },
           FieldIntent::Delete { .. }
             | FieldIntent::SubscribeeVisibility (_)
             | FieldIntent::HiddenOutsideEdit (_)
@@ -267,10 +288,11 @@ impl CollectedFieldIntents {
 
 /// See 'instructionMerge_fieldIntent' for the rules this enforces.
 fn fill_exclusive_slot<T : PartialEq + std::fmt::Debug> (
-  slot    : &mut Option<T>,
-  payload : T,
-  label   : &str,
-  target  : &ID,
+  slot     : &mut Option<T>,
+  payload  : T,
+  label    : &str,
+  target   : &ID,
+  emitters : &[HeadlineName], // the occurrences emitting for 'target'
 ) -> Result<(), String> {
   match slot {
     None => {
@@ -280,5 +302,5 @@ fn fill_exclusive_slot<T : PartialEq + std::fmt::Debug> (
       Ok (( )), // An equal payload is a silent no-op.
     Some (occupant) =>
       Err ( format!(
-        "Conflicting {} intents for ID {} (should have been precluded by validation): {:?} vs {:?}",
-        label, target, occupant, payload )), }}
+        "Conflicting {} intents for ID {} ({}; should have been precluded by validation): {:?} vs {:?}",
+        label, target, name_headlines (emitters), occupant, payload )), }}

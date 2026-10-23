@@ -30,6 +30,6 @@ pub fn validate_text_claims (
       if claim . title != from_disk . title
         || claim . body != from_disk . body
       { return Err (Box::new (BufferValidationError::Other (
-          format!( "Cannot edit title/body for node {} in subscribee-as-such position. View the node as itself to edit title/body.",
-                    pid )) )); }}}
+          format!( "Cannot edit title/body for node {} ({}) in subscribee-as-such position. View the node as itself to edit title/body.",
+                    pid, claim . headline )) )); }}}
   Ok (( )) }

@@ -47,6 +47,7 @@ use crate::from_text::local_fieldintent_collection::predicates::{
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
   HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
+use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -89,6 +90,7 @@ fn visit (
           // subscribee-as-such position, so their title edits bounce
           // via text claims instead of silently becoming real edits.
           skgid               : p . skgid() . clone(),
+          headline            : node_ref . value () . headline_name (),
           is_editable    : false,
           is_saveEligible : false } ),
         None, collected),
@@ -143,17 +145,20 @@ fn visit_unrestricted_vognode (
     is_editable
     && ! has_delete_request
     && subscribee_as_such_context . is_none();
+  let headline : HeadlineName = node_ref . value () . headline_name ();
   if is_editable {
     // Emission happens only inside this block, because an
     // write-protected vognode emits nothing.
     match subscribee_as_such_context {
       Some (( subscriber, subscriber_is_editable )) => {
         collected . instructionMerge_fieldIntent (
+          &headline,
           t . skgid . clone(),
           FieldIntent::SubscribeeTextClaim (
             SubscribeeTextClaim {
-              title : t . title . clone(),
-              body  : t . body() . cloned() } )) ?;
+              title    : t . title . clone(),
+              body     : t . body() . cloned(),
+              headline : headline . clone () } )) ?;
         if subscriber_is_editable {
           // The at-most-one-writer-per-ID guard: only the
           // SubscribeeFolder under the editable instance of a
@@ -162,6 +167,7 @@ fn visit_unrestricted_vognode (
           // SubscribeeFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           collected . instructionMerge_fieldIntent (
+            &headline,
             subscriber . clone(),
             FieldIntent::SubscribeeVisibility (
               SubscribeeVisibility {
@@ -174,17 +180,20 @@ fn visit_unrestricted_vognode (
       None => {
         if has_delete_request {
           collected . instructionMerge_fieldIntent (
+            &headline,
             t . skgid . clone(),
             FieldIntent::Delete {
               skgrepo : t . home_skgrepo . clone() } ) ?;
         } else {
           collected . instructionMerge_fieldIntent (
+            &headline,
             t . skgid . clone(),
             FieldIntent::SetTitleAndBody {
               skgrepo : t . home_skgrepo . clone(),
               title   : t . title . clone(),
               body    : t . body() . cloned() } ) ?;
           collected . instructionMerge_fieldIntent (
+            &headline,
             t . skgid . clone(),
             // This is always emitted, even if empty: an editable
             // node's content is always Specified.
@@ -193,12 +202,14 @@ fn visit_unrestricted_vognode (
           if let Some (NodeEditRequest::NodeMerge (acquiree)) =
             t . edit_request()
           { collected . instructionMerge_fieldIntent (
+              &headline,
               t . skgid . clone(),
               FieldIntent::NodeMerge {
                 acquiree : acquiree . clone() } ) ?; }
           if let Some (NodeEditRequest::SetFlag { flag, value }) =
             t . edit_request()
           { collected . instructionMerge_fieldIntent (
+              &headline,
               t . skgid . clone(),
               FieldIntent::SetFlag {
                 flag : *flag, value : *value } ) ?; }}},}}
@@ -206,6 +217,7 @@ fn visit_unrestricted_vognode (
     node_ref,
     Some ( DefiningFolderRecorder {
       skgid               : t . skgid . clone(),
+      headline,
       is_editable,
       is_saveEligible } ),
     if is_saveEligible { Some (t . skgid . clone()) } else { None },
@@ -281,6 +293,7 @@ fn visit_aliasFolder (
       // lowers to Unspecified, while a present-but-empty folder emits
       // Specified(vec![]).
       collected . instructionMerge_fieldIntent (
+        &recorder . headline,
         recorder . skgid . clone(),
         FieldIntent::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
@@ -295,6 +308,7 @@ fn visit_subscribee_folder (
     LocalContext::UnderDefiningFolder (recorder) => {
       if recorder . is_saveEligible {
         collected . instructionMerge_fieldIntent (
+          &recorder . headline,
           recorder . skgid . clone(),
           FieldIntent::SetSubscribesTo (
             subscribeeFolder_members (node_ref) )) ?; }
@@ -348,6 +362,7 @@ fn visit_hiddenOutside_folder (
             members . push (unknown . skgid . clone ()); },
           _ => {}, }}
       collected . instructionMerge_fieldIntent (
+        &node_ref . value () . headline_name (),
         subscriber . clone(),
         FieldIntent::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
@@ -362,6 +377,7 @@ fn visit_overridden_folder (
   if let LocalContext::UnderDefiningFolder (recorder) = context {
     if recorder . is_saveEligible {
       collected . instructionMerge_fieldIntent (
+        &recorder . headline,
         recorder . skgid . clone(),
         FieldIntent::SetOverrides (
           partnerFolder_members (node_ref) )) ?; }}

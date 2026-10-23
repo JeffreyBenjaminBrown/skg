@@ -6,6 +6,7 @@ use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestri
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Property, PropertyFolder};
 use crate::types::viewnode::ChangesetMarkerKind;
+use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_graphnode::{
   generation_includes_only,
@@ -18,11 +19,13 @@ use ego_tree::{Tree, NodeId};
 use std::collections::HashSet;
 
 /// Error from local structure validation.
-/// Contains the error message and the ID of the nearest UnrestrictedVognode ancestor.
+/// Contains the error message, the ID of the nearest UnrestrictedVognode ancestor,
+/// and the name of the headline in violation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalStructureError {
-  pub message : String,
-  pub skgid      : ID,
+  pub message  : String,
+  pub skgid    : ID,
+  pub headline : HeadlineName,
 }
 
 pub fn validate_local_structure (
@@ -34,6 +37,7 @@ pub fn validate_local_structure (
     else { return Err(LocalStructureError {
       message: "node not found" . to_string(),
       skgid: ID::from ("<unknown>"),
+      headline: HeadlineName::Title (String::new ()),
     }); };
 
   let errors : Vec<String> =
@@ -103,6 +107,7 @@ pub fn validate_local_structure (
     Err(LocalStructureError {
       message: errors . join ("; "),
       skgid,
+      headline: node_ref . value () . headline_name (),
     } ) }}
 
 fn validate_alias (

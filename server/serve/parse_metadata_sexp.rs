@@ -39,7 +39,7 @@
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
-use crate::types::errors::BufferValidationError;
+use crate::types::errors::{BufferValidationError, HeadlineName, view_id_suffix};
 use crate::types::nodes::complete::Flag;
 use crate::types::git::{NodeSign, Sign};
 use crate::types::viewnode::{
@@ -148,6 +148,8 @@ pub fn viewnode_from_metadata (
   title    : String,
   body     : Option < String >,
 ) -> ( MpViewnode, Option < BufferValidationError >, Option < String > ) {
+  let headline : HeadlineName =
+    HeadlineName::of ( metadata . vid . as_ref (), &title );
   let (kind, error, warning)
     : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_skgid {
@@ -159,17 +161,17 @@ pub fn viewnode_from_metadata (
                 relRepo_request : metadata . unknown_relRepo_request . clone (),
               } ) )),
           if body . is_some () || ! title . is_empty () {
-            Some ( BufferValidationError::Other (
-              "Unknown phantom content cannot be edited" . to_string () ))
+            Some ( BufferValidationError::Other ( format! (
+              "Unknown phantom content cannot be edited ({})", headline )))
           } else { None },
           None )
       } else if metadata . is_restricted_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
           || ! title . is_empty () {
-            Some ( BufferValidationError::Other (
-              "Restricted vognode content cannot be edited"
-              . to_string () ))
+            Some ( BufferValidationError::Other ( format! (
+              "Restricted vognode content cannot be edited ({})",
+              headline )))
           } else { None };
         ( MpViewnodeKind::Vognode (
             MpVognode::Restricted ( RestrictedVognode ) ),
@@ -210,7 +212,8 @@ pub fn viewnode_from_metadata (
              && ! carries_text {
             Some ( BufferValidationError::Body_of_NonVognode (
               title . clone (),
-              maybeplaced_kind_error_label (non_vognode) ))
+              maybeplaced_kind_error_label (non_vognode),
+              headline . clone () ))
           } else { None };
         let folder_title_warning : Option<String> =
           if ! title . is_empty ()
@@ -219,8 +222,9 @@ pub fn viewnode_from_metadata (
                           MpViewnodeKind::PropertyFolder (_)
                           | MpViewnodeKind::PartnerFolder (_) )
           { Some ( format! (
-              "Headline text on a {} is not saved; discarded: {:?}",
+              "Headline text on a {}{} is not saved; discarded: {:?}",
               maybeplaced_kind_error_label (non_vognode),
+              view_id_suffix ( metadata . vid . as_ref () ),
               title )) }
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
@@ -295,7 +299,8 @@ pub fn viewnode_from_metadata (
           if     metadata . writeProtected
               && metadata . edit_request . is_some ()
           { metadata . skgid . clone ()
-            . map ( BufferValidationError::EditRequestOnWriteProtectedOccurrence ) }
+            . map ( |skgid| BufferValidationError::EditRequestOnWriteProtectedOccurrence (
+                      skgid, headline . clone () )) }
           else { None };
         let t : MpUnrestrictedVognode = MpUnrestrictedVognode {
             title,

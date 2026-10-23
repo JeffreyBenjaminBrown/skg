@@ -32,6 +32,7 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
+use crate::types::errors::view_id_suffix;
 use crate::types::git::NodeSign;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
@@ -77,7 +78,8 @@ pub fn consume_readiness_requests (
 pub struct RequestedReadiness {
   pub ready    : bool,
   pub named    : NamedLeaves,
-  /// The headline, for warnings.
+  /// What a warning calls the headline: its title, or for an
+  /// untitled one its kind, then its view id if it has one.
   pub headline : String,
 }
 
@@ -98,8 +100,24 @@ pub fn readiness_requests_in_viewforest (
       Some ( RequestedReadiness {
         ready    : request . ready,
         named,
-        headline : node . value () . title () . to_string (), } ) } )
+        headline : readiness_request_headline (node . value ()), } ) } )
     . collect () }
+
+/// '"TITLE" (view id X)', or for an untitled headline (a folder, a
+/// marker) 'the KIND (view id X)'; without the view id when the
+/// headline has none.
+fn readiness_request_headline (
+  viewnode : &Viewnode,
+) -> String {
+  let title : &str = viewnode . title ();
+  let what : String =
+    if ! title . is_empty () { format! ("{:?}", title) }
+    else { format! ( "the {}", match &viewnode . kind {
+      ViewnodeKind::PartnerFolder (folder)  => folder . repr_in_client (),
+      ViewnodeKind::PropertyFolder (folder) => folder . repr_in_client (),
+      ViewnodeKind::Property (property)     => property . repr_in_client (),
+      _                                     => "untitled headline", } ) };
+  format! ( "{}{}", what, view_id_suffix ( viewnode . vid . as_ref () )) }
 
 /// What a request on a viewnode names.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -356,7 +374,7 @@ pub fn apply_readiness_requests (
     let keys : Vec<LeafKey> = keys_in_forest (&request . named, forest);
     if keys . is_empty () {
       warnings . push ( format! (
-        "The readiness request on \"{}\" names no current change; it was dropped.",
+        "The readiness request on {} names no current change; it was dropped.",
         request . headline ));
       continue; }
     for key in keys {

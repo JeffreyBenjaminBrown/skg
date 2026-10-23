@@ -305,7 +305,7 @@ pub fn nodeMerge_pairs (
 pub fn lower_collected_fieldIntents (
   collected : CollectedFieldIntents,
 ) -> Result<LoweringOutput, String> {
-  let CollectedFieldIntents { order, lowerable_order, mut by_pid }
+  let CollectedFieldIntents { order, lowerable_order, mut by_pid, .. }
     = collected;
   let visibility : Vec<(ID, SubscribeeVisibility)> = {
     // The signals are extracted across all entries, in

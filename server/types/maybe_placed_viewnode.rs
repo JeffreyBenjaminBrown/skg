@@ -5,6 +5,7 @@
 /// after validation, converted to placed types.
 
 pub use super::viewnode::MpUnrestrictedVognode;
+use super::errors::{HeadlineName, view_id_suffix};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
@@ -116,11 +117,14 @@ impl TryFrom<MpViewnode> for Viewnode {
   type Error = String;
 
   fn try_from(u: MpViewnode) -> Result<Self, Self::Error> {
+    let kind : ViewnodeKind = // a refusal names the headline's view id, if any
+      ViewnodeKind::try_from (u . kind) . map_err (
+        |e| format! ( "{}{}", e, view_id_suffix ( u . vid . as_ref () ))) ?;
     Ok(Viewnode {
       focused           : u . focused,
       org_folded        : u . org_folded,
       org_body_folded   : u . org_body_folded,
-      kind              : ViewnodeKind::try_from(u . kind)?,
+      kind,
       change_facts      : u . change_facts,
       readiness_request : u . readiness_request,
       vid               : u . vid,
@@ -300,6 +304,10 @@ impl MpViewnode {
         | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         "", }}
+
+  /// What a message calls this headline: its view id, else its title.
+  pub fn headline_name (&self) -> HeadlineName {
+    HeadlineName::of ( self . vid . as_ref (), self . title () ) }
 
   /// A distinguishable label for error messages.
   pub fn error_label (&self) -> String {

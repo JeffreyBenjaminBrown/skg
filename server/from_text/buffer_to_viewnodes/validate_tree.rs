@@ -11,13 +11,13 @@ use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
-use crate::types::errors::BufferValidationError;
+use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use super::local;
 use ego_tree::iter::Edge;
 use ego_tree::{NodeId, NodeRef};
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
@@ -56,12 +56,12 @@ pub fn find_buffer_errors_for_saving_in_graph (
          problematic_defining_skgids) =
       find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
-      for skgid in ambiguous_deletion_skgids {
+      for (skgid, headlines) in ambiguous_deletion_skgids {
         errors . push (
-          BufferValidationError::AmbiguousDeletion (skgid)); }
-      for skgid in problematic_defining_skgids {
+          BufferValidationError::AmbiguousDeletion (skgid, headlines)); }
+      for (skgid, headlines) in problematic_defining_skgids {
         errors . push(
-          BufferValidationError::Multiple_Defining_Viewnodes (skgid)); }} }
+          BufferValidationError::Multiple_Defining_Viewnodes (skgid, headlines)); }} }
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =
@@ -92,7 +92,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
                  viewforest, node_ref . id(), config) {
             errors . push(
               BufferValidationError::LocalStructureViolation(
-                e . message, e . skgid )); }
+                e . message, e . skgid, e . headline )); }
           Ok(( )) }); }}
   Ok (errors) }
 
@@ -134,12 +134,12 @@ fn idFolder_membership_errors (
                       MpViewnodeKind::PropertyFolder (PropertyFolder::ID) )
         => node_ref,
       _ => continue };
-    let recorder : ID =
+    let (recorder, recorder_headline) : (ID, HeadlineName) =
       match node_ref . parent ()
-        . map ( |p| &p . value () . kind ) {
-        Some (MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)))
+        . map ( |p| (p . value (), &p . value () . kind) ) {
+        Some ((parent, MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))))
           => match &t . skgid {
-              Some (skgid) => skgid . clone (),
+              Some (skgid) => (skgid . clone (), parent . headline_name ()),
               None      => continue },
         _ => continue };
     let mut buffer_skgids : Vec<ID> =
@@ -156,14 +156,14 @@ fn idFolder_membership_errors (
     match real_skgids {
       None =>
         errors . push ( BufferValidationError::IDFolder_Edited (
-          recorder, buffer_skgids, Vec::new () )),
+          recorder, buffer_skgids, Vec::new (), recorder_headline )),
       Some (real) => {
         let mut real_sorted : Vec<ID> = real . clone ();
         real_sorted . sort ();
         buffer_skgids . sort ();
         if buffer_skgids != real_sorted {
           errors . push ( BufferValidationError::IDFolder_Edited (
-            recorder, buffer_skgids, real )); }}, }}
+            recorder, buffer_skgids, real, recorder_headline )); }}, }}
   Ok (( )) }
 
 /// Tamper validation for the '(overridesHere N)' fact
@@ -214,7 +214,8 @@ fn overridesHere_fact_errors (
         Some (resolve_override (config, graph, None, &original) . effective);
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
-          carrier, original, effective )); }}}
+          carrier, original, effective,
+          node_ref . value () . headline_name () )); }}}
 
 /// For each node carrying a Fork view request (the explicit
 /// 'skg-fork-node' gesture):
@@ -234,27 +235,23 @@ fn validate_fork_view_requests (
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
 ) {
-  let mut ids_with_requests : HashSet<ID> = HashSet::new ();
-  for edge in viewforest . root () . traverse () {
-    let Edge::Open (node_ref) = edge else { continue; };
-    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
-      & node_ref . value () . kind else { continue; };
-    if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
-    let Some (skgid) = & t . skgid else { continue; }; // enrichment gives every node a pid
-    if ! ids_with_requests . insert (skgid . clone ()) {
+  for (skgid, headlines) in
+    occurrences_requesting (viewforest, &ViewRequest::Fork)
+  { if headlines . len () > 1 {
       errors . push (
-        BufferValidationError::ForkRequestMultiple (skgid . clone ()) );
+        BufferValidationError::ForkRequestMultiple (
+          skgid . clone (), headlines . clone () )); }
+    if graph . pid_of (&skgid) . is_none () {
+      // Not in the graph: an unsaved headline cannot be forked.
+      errors . push (
+        BufferValidationError::ForkRequestOnUnknownNode (
+          skgid, headlines [0] . clone () ));
       continue; }
-    if graph . pid_of (skgid) . is_none () {
-        // Not in the graph: an unsaved headline cannot be forked.
-        errors . push (
-          BufferValidationError::ForkRequestOnUnknownNode (skgid . clone ()) );
-        continue; }
-      if let Some (existing) =
-        existing_owned_overrider_of (config, graph, skgid) {
-        errors . push (
-          BufferValidationError::ForkAlreadyExists (
-            skgid . clone (), existing )); }} }
+    if let Some (existing) =
+      existing_owned_overrider_of (config, graph, &skgid) {
+      errors . push (
+        BufferValidationError::ForkAlreadyExists (
+          skgid, existing )); }} }
 
 fn validate_view_roots (
   viewforest : &MpViewForest,
@@ -286,8 +283,11 @@ fn validate_editable_view_requests (
   viewforest : &MpViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
-  let mut ids_with_requests : HashSet<ID> =
-    HashSet::new();
+  for (skgid, headlines) in
+    occurrences_requesting (viewforest, &ViewRequest::Editable)
+  { if headlines . len () > 1
+    { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
+        skgid, headlines )); }}
   for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &MpViewnode =
@@ -299,13 +299,38 @@ fn validate_editable_view_requests (
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Editable)
         { if let Some (skgid) = &t . skgid {
-          if ! ids_with_requests . insert(skgid . clone())
-          { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
-            skgid . clone() )); }
           if t . view_requests . contains (&ViewRequest::WriteProtected)
              || t . view_requests . contains (&ViewRequest::WriteProtectedSubtree)
           { errors . push( BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence(
-            skgid . clone() )); }} }}} }}
+            skgid . clone(), viewnode . headline_name () )); }} }}} }}
+
+/// For each ID some Unrestricted occurrence of which carries
+/// 'request', in buffer order of first appearance: the names of those
+/// occurrences, in buffer order. An occurrence without an ID is
+/// skipped (enrichment gives every node a pid).
+fn occurrences_requesting (
+  viewforest : &MpViewForest,
+  request    : &ViewRequest,
+) -> Vec<(ID, Vec<HeadlineName>)> {
+  let mut skgids_in_order : Vec<ID> = Vec::new ();
+  let mut headlines_by_skgid : HashMap<ID, Vec<HeadlineName>> =
+    HashMap::new ();
+  for edge in viewforest . root () . traverse () {
+    let Edge::Open (node_ref) = edge else { continue; };
+    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+      & node_ref . value () . kind else { continue; };
+    if ! t . view_requests . contains (request) { continue; }
+    let Some (skgid) = & t . skgid else { continue; };
+    if ! headlines_by_skgid . contains_key (skgid) {
+      skgids_in_order . push (skgid . clone ()); }
+    headlines_by_skgid . entry (skgid . clone ()) . or_default ()
+      . push (node_ref . value () . headline_name ()); }
+  skgids_in_order . into_iter ()
+    . map ( |skgid| {
+      let headlines : Vec<HeadlineName> =
+        headlines_by_skgid . remove (&skgid) . unwrap_or_default ();
+      (skgid, headlines) } )
+    . collect () }
 
 /// A relRepo request describes the relationship from a node's view-parent
 /// to the node, so it is an instruction of the view-parent's, not of the
@@ -328,10 +353,12 @@ fn writeProtected_relRepo_request_errors (
     if t . is_writeProtected ()
        && t . relRepo_request . is_some ()
        && ! relRepo_request_is_collected (node_ref, t)
-    { errors . push ( BufferValidationError::Other ( format! (
-        "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
+    { let headline : HeadlineName = node_ref . value () . headline_name ();
+      errors . push ( BufferValidationError::Other ( format! (
+        "relRepo request on write-protected node {} ({}) that no editable node collects:\n{}- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
         t . skgid . as_ref () . map ( |skgid| skgid . 0 . as_str () )
-          . unwrap_or ("(no ID)") ))); }} }
+          . unwrap_or ("(no ID)"),
+        headline, headline . org_line () ))); }} }
 
 /// Whether save reads the relRepo request on this Unrestricted node:
 /// the node is a member of its view-parent, and the relationship's

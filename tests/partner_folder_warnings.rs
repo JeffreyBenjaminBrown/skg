@@ -25,6 +25,7 @@ use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{SaveError, BufferValidationError};
+use skg::metadata_canon::vid_atom_of;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
@@ -127,7 +128,15 @@ async fn write_protected_folder_repairs_warn_impl (
     . unwrap_or_else (
       || panic! ( "no subscriberFolder repair warning in {:?}",
                   response . warnings ));
-  assert! ( warning . contains ("under node n"), "{}", warning );
+  { // The warning names the folder's view id.
+    let folder_vid : &str =
+      vid_atom_of ( line_containing (&complete_buffer, "subscriberFolder") )
+      . expect ("the rendered folder has a vid")
+      . trim_start_matches ("(vid ") . trim_end_matches (')');
+    assert! ( warning . contains ( &format! (
+                "Repaired subscriberFolder (view id {}) under node n",
+                folder_vid )),
+              "{}", warning ); }
   assert! ( warning . contains ("restored 1 member(s): r"),
             "{}", warning );
   assert! ( warning . contains ("made 1 child(ren) non-members, since they are not members: x"),

@@ -145,7 +145,7 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     panic! ("expected BufferValidationErrors, got {:?}", save_error); };
   assert! (matches! (&errors[..],
     [BufferValidationError::EditedWriteProtectedOccurrence {
-      skgid, title, changes }] if skgid == &ID::from ("2")
+      skgid, title, changes, .. }] if skgid == &ID::from ("2")
         && title == "2" && changes . iter () . any (|c| c . contains ("title"))));
   Ok (( ))
 }

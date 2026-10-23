@@ -209,7 +209,7 @@ async fn test_find_buffer_errors_for_saving (
 
       // Collect LocalStructureViolation errors for checks below
       let local_errors: Vec<&BufferValidationError> = errors . iter()
-        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _, _)))
         . collect();
 
       // AliasFolder children must be Aliases (bad_child is an UnrestrictedVognode child of AliasFolder)
@@ -218,7 +218,7 @@ async fn test_find_buffer_errors_for_saving (
         let aliasfolder_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(
-            e, BufferValidationError::LocalStructureViolation(msg, _)
+            e, BufferValidationError::LocalStructureViolation(msg, _, _)
             if aliasfolder_children_re . is_match (msg)))
           . collect();
         assert_eq!(aliasfolder_children_errors . len(), 1,
@@ -228,7 +228,7 @@ async fn test_find_buffer_errors_for_saving (
       { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children") . unwrap();
         let alias_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
-          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                                if alias_children_re . is_match (msg)))
           . collect();
         assert_eq!(alias_children_errors . len(), 1,
@@ -241,7 +241,7 @@ async fn test_find_buffer_errors_for_saving (
         let alias_parent_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(
-            e, BufferValidationError::LocalStructureViolation(msg, _)
+            e, BufferValidationError::LocalStructureViolation(msg, _, _)
             if alias_parent_re . is_match (msg)))
           . collect();
         assert_eq!(alias_parent_errors . len(), 3,
@@ -249,22 +249,22 @@ async fn test_find_buffer_errors_for_saving (
 
       // AmbiguousDeletion
       { let ambiguous_deletion_errors: Vec<&BufferValidationError> = errors . iter()
-          . filter(|e| matches!(e, BufferValidationError::AmbiguousDeletion (_)))
+          . filter(|e| matches!(e, BufferValidationError::AmbiguousDeletion (_, _)))
           . collect();
         assert_eq!(ambiguous_deletion_errors . len(), 1,
                    "Should find 1 AmbiguousDeletion error");
-        if let BufferValidationError::AmbiguousDeletion (skgid)
+        if let BufferValidationError::AmbiguousDeletion (skgid, _)
           = ambiguous_deletion_errors[0] {
           assert_eq!(skgid . 0, "conflict",
                      "AmbiguousDeletion error should come from conflicting ID"); }}
 
       // Multiple_Defining_Viewnodes
       { let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
-          . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))
+          . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_, _)))
           . collect();
         assert_eq!(multiple_defining_errors . len(), 1,
                    "Should find 1 Multiple_Defining_Viewnodes error");
-        if let BufferValidationError::Multiple_Defining_Viewnodes (skgid)
+        if let BufferValidationError::Multiple_Defining_Viewnodes (skgid, _)
           = multiple_defining_errors[0] {
           assert_eq!(skgid . 0, "conflict",
                      "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
@@ -273,7 +273,7 @@ async fn test_find_buffer_errors_for_saving (
       { let skgrepo_re = Regex::new(r"(?i)must.*repo") . unwrap();
         let skgrepo_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
-          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+          . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                                if skgrepo_re . is_match (msg)))
           . collect();
         assert_eq!(skgrepo_errors . len(), 2,
@@ -281,16 +281,16 @@ async fn test_find_buffer_errors_for_saving (
 
       // Body_of_NonVognode (from parsing phase)
       { let body_of_non_vognode_errors: Vec<&BufferValidationError> = errors . iter()
-          . filter(|e| matches!(e, BufferValidationError::Body_of_NonVognode(_, _)))
+          . filter(|e| matches!(e, BufferValidationError::Body_of_NonVognode(_, _, _)))
           . collect();
         assert_eq!(body_of_non_vognode_errors . len(), 2,
                    "Should find 2 Body_of_NonVognode errors");
         assert!(body_of_non_vognode_errors . iter() . any(|e| {
-          matches!(e, BufferValidationError::Body_of_NonVognode(title, kind)
+          matches!(e, BufferValidationError::Body_of_NonVognode(title, kind, _)
                    if title == "AliasFolder with body problem" && kind == "aliasFolder")
         }), "Should find Body_of_NonVognode error for aliasFolder");
         assert!(body_of_non_vognode_errors . iter() . any(|e| {
-          matches!(e, BufferValidationError::Body_of_NonVognode(title, kind)
+          matches!(e, BufferValidationError::Body_of_NonVognode(title, kind, _)
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_NonVognode error for alias"); }
 
@@ -310,8 +310,7 @@ async fn test_find_buffer_errors_for_saving (
         let unrestrictedVognode_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
         . filter( |e| matches!( e,
-                                BufferValidationError::LocalStructureViolation(
-                                  msg, _)
+                                BufferValidationError::LocalStructureViolation(msg, _, _)
                                if unrestrictedVognode_children_re . is_match (msg)))
           . collect();
         assert_eq!(unrestrictedVognode_children_errors . len(), 1,
@@ -384,7 +383,7 @@ async fn test_multiple_aliasfolders_in_children (
       // Both AliasFolder siblings report the error (each has a sibling AliasFolder)
       let unique_sibling_re = Regex::new(r"(?i)aliasFolder.*unique.*siblings") . unwrap();
       let multiple_aliasfolders_errors: Vec<&BufferValidationError> = errors . iter()
-        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                              if unique_sibling_re . is_match (msg)))
         . collect();
 
@@ -413,14 +412,14 @@ async fn test_duplicated_content_error (
       let dup_children_re =
         Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
       let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
-        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                              if dup_children_re . is_match (msg)))
         . collect();
 
       assert_eq!(duplicated_content_errors . len(), 1,
                  "Should find exactly 1 duplicate children error");
 
-      if let BufferValidationError::LocalStructureViolation(_, skgid) = duplicated_content_errors[0] {
+      if let BufferValidationError::LocalStructureViolation(_, skgid, _) = duplicated_content_errors[0] {
         assert_eq!(skgid . 0, "root",
                    "Duplicate error should be reported at the parent node (root)");
       }
@@ -475,7 +474,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
       let dup_children_re =
         Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
       let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
-        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+        . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                              if dup_children_re . is_match (msg)))
         . collect();
 
@@ -504,13 +503,13 @@ async fn test_root_without_skgrepo_validation (
       let skgrepo_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(
           |e| matches!(e,
-                       BufferValidationError::LocalStructureViolation(msg, _)
+                       BufferValidationError::LocalStructureViolation(msg, _, _)
                        if skgrepo_re . is_match (msg)))
         . collect();
       assert_eq!(skgrepo_errors . len(), 1,
                  "Should find 1 repo validation error");
 
-      if let BufferValidationError::LocalStructureViolation(_, skgid)
+      if let BufferValidationError::LocalStructureViolation(_, skgid, _)
         = skgrepo_errors[0]
       { assert_eq!(skgid . 0, "root2",
                    "Repo error should be for root2"); }
@@ -537,7 +536,7 @@ async fn test_nonexistent_skgrepo_validation (
           errors . iter()
           . filter(
             |e| matches!(e,
-                         BufferValidationError::LocalStructureViolation(msg, _)
+                         BufferValidationError::LocalStructureViolation(msg, _, _)
                          if skgrepo_re . is_match (msg)))
           . collect();
 
@@ -547,7 +546,7 @@ async fn test_nonexistent_skgrepo_validation (
         { // Check first error (child1, with skgrepo 'nonexistent')
           let found_child_error: bool =
             nonexistent_skgrepo_errors . iter() . any(|e| {
-              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid)
+              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid, _)
                        if skgrepo_re . is_match (msg) && skgid . 0 == "child1") });
           assert!(found_child_error,
                   "Should find repo error for child1"); }
@@ -555,7 +554,7 @@ async fn test_nonexistent_skgrepo_validation (
         { // Check second error (root2, with skgrepo 'invalid_repo')
           let found_root_error: bool =
             nonexistent_skgrepo_errors . iter() . any(|e| {
-              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid)
+              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid, _)
                        if skgrepo_re . is_match (msg) && skgid . 0 == "root2") });
           assert!(found_root_error,
                   "Should find repo error for root2"); }}
@@ -581,12 +580,12 @@ async fn test_empty_title_rejected_for_editable_node (
         errors . iter()
         . filter(
           |e| matches!(e,
-                       BufferValidationError::LocalStructureViolation(msg, _)
+                       BufferValidationError::LocalStructureViolation(msg, _, _)
                        if empty_title_re . is_match (msg)))
         . collect();
       assert_eq!(empty_title_errors . len(), 1,
                  "Should find 1 empty title error");
-      if let BufferValidationError::LocalStructureViolation(_, skgid)
+      if let BufferValidationError::LocalStructureViolation(_, skgid, _)
         = empty_title_errors[0]
       { assert_eq!(skgid . 0, "no-title",
                    "Empty title error should be for no-title"); }
@@ -612,7 +611,7 @@ async fn test_empty_title_allowed_for_writeProtected_and_delete (
         errors . iter()
         . filter(
           |e| matches!(e,
-                       BufferValidationError::LocalStructureViolation(msg, _)
+                       BufferValidationError::LocalStructureViolation(msg, _, _)
                        if empty_title_re . is_match (msg)))
         . collect();
       assert_eq!(empty_title_errors . len(), 0,
@@ -661,7 +660,7 @@ async fn test_two_editable_view_requests_for_one_node_are_rejected (
           &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
-          e, BufferValidationError::MultipleEditableViewRequestsForSameId (skgid)
+          e, BufferValidationError::MultipleEditableViewRequestsForSameId (skgid, _)
             if skgid . 0 == "parent" ))
         . collect ();
       assert_eq! ( hits . len (), 1,
@@ -687,7 +686,7 @@ async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected 
             config ) ?;
         assert! ( matches! (
           &errors [..],
-          [ BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid) ]
+          [ BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid, _) ]
             if skgid . 0 == "parent" ),
           "{}: {:?}", request, errors );
         let moving : String = format! (
@@ -719,7 +718,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid)
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, _)
          if skgid . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching . len (), 1,
@@ -738,7 +737,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid)
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, _)
          if skgid . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching2 . len (), 1,
@@ -755,7 +754,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_editable) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
-    matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_)) ),
+    matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_, _)) ),
     "(editRequest delete) on a editable node must not trigger EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
     parsing_errors3 );
 }

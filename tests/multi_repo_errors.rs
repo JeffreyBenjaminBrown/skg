@@ -51,14 +51,14 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
       let skgrepo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
-            |e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
+            |e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                          if skgrepo_re . is_match (msg)))
           . collect() );
       assert_eq!(skgrepo_errors . len(), 2,
                  "Expected 2 repo validation errors (pub-1 and dub-1)");
       let skgids: Vec<&str> = skgrepo_errors . iter()
         . filter_map(|e| {
-          if let BufferValidationError::LocalStructureViolation(_, skgid) = e {
+          if let BufferValidationError::LocalStructureViolation(_, skgid, _) = e {
             Some(skgid . 0 . as_str())
           } else { None } })
         . collect();
@@ -68,11 +68,11 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
-            |e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))
+            |e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_, _)))
           . collect() );
       assert_eq!(multiple_defining_errors . len(), 1,
                  "Expected exactly 1 Multiple_Defining_Viewnodes error for priv-1");
-      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid) = multiple_defining_errors[0] {
+      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid, _) = multiple_defining_errors[0] {
         assert_eq!(skgid . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
     assert_eq!(errors . len(), 3,

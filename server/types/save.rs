@@ -1,6 +1,6 @@
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Graphnode;
-use super::errors::{SaveError, BufferValidationError};
+use super::errors::{SaveError, BufferValidationError, headline_names_org_line};
 
 
 /////////////////
@@ -161,31 +161,31 @@ fn format_buffer_validation_error (
   error : &BufferValidationError
 ) -> String {
   match error {
-    BufferValidationError::Body_of_NonVognode(title, kind) => {
-      format!("{} node has a body (not allowed):\n- Title: {}\n",
-              kind, title) },
-    BufferValidationError::IDFolder_Edited(recorder, buffer_skgids, real_skgids) => {
+    BufferValidationError::Body_of_NonVognode(title, kind, headline) => {
+      format!("{} node has a body (not allowed):\n- Title: {}\n{}",
+              kind, title, headline . org_line ()) },
+    BufferValidationError::IDFolder_Edited(recorder, buffer_skgids, real_skgids, headline) => {
       let fmt_skgids = |skgids : &Vec<ID>| -> String {
         skgids . iter() . map(|i| i . 0 . as_str())
           . collect::<Vec<&str>>() . join(", ") };
       if real_skgids . is_empty() {
-        format!("Node {} is not in the graph, so it cannot carry an idFolder:\n- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
-                recorder . 0, fmt_skgids(buffer_skgids))
+        format!("Node {} is not in the graph, so it cannot carry an idFolder:\n{}- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
+                recorder . 0, headline . org_line (), fmt_skgids(buffer_skgids))
       } else {
-        format!("The idFolder under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
-                recorder . 0, fmt_skgids(buffer_skgids), fmt_skgids(real_skgids)) }},
-    BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) => {
+        format!("The idFolder under node {} was edited; saving would not honor that, so the save was aborted:\n{}- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
+                recorder . 0, headline . org_line (), fmt_skgids(buffer_skgids), fmt_skgids(real_skgids)) }},
+    BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) => {
       let fmt_opt = |skgid : &Option<ID>| -> String {
         skgid . as_ref () . map ( |i| i . 0 . clone () )
           . unwrap_or_else ( || "<none>" . to_string () ) };
-      format!("Invalid (overridesHere ...) fact; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the fact: {}\n- the original the fact claims it stands for: {}\n- what the server would show in place of that original: {}\n- The fact looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
-              fmt_opt (carrier), original . 0, fmt_opt (effective)) },
-    BufferValidationError::Multiple_Defining_Viewnodes (skgid) => {
-      format!("ID has multiple defining containers:\n- ID: {}\n",
-              skgid . 0) },
-    BufferValidationError::AmbiguousDeletion (skgid) => {
-      format!("ID has ambiguous deletion instructions:\n- ID: {}\n",
-              skgid . 0) },
+      format!("Invalid (overridesHere ...) fact; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the fact: {}\n{}- the original the fact claims it stands for: {}\n- what the server would show in place of that original: {}\n- The fact looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
+              fmt_opt (carrier), headline . org_line (), original . 0, fmt_opt (effective)) },
+    BufferValidationError::Multiple_Defining_Viewnodes (skgid, headlines) => {
+      format!("ID has multiple defining containers:\n- ID: {}\n{}",
+              skgid . 0, headline_names_org_line (headlines)) },
+    BufferValidationError::AmbiguousDeletion (skgid, headlines) => {
+      format!("ID has ambiguous deletion instructions:\n- ID: {}\n{}",
+              skgid . 0, headline_names_org_line (headlines)) },
     BufferValidationError::DuplicatedContent (skgid) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
               skgid . 0) },
@@ -216,41 +216,41 @@ fn format_buffer_validation_error (
     BufferValidationError::ForkSkgrepoNotOwned(skgid, skgrepo) => {
       format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",
               skgid . 0, skgrepo) },
-    BufferValidationError::ForkRequestOnUnknownNode(skgid) => {
-      format!("Cannot fork an unsaved node:\n- Node: {}\n- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
-              skgid . 0) },
-    BufferValidationError::ForkRequestMultiple(skgid) => {
-      format!("Multiple fork requests for the same node:\n- Node: {}\n- At most one fork request per node is allowed.\n",
-              skgid . 0) },
+    BufferValidationError::ForkRequestOnUnknownNode(skgid, headline) => {
+      format!("Cannot fork an unsaved node:\n- Node: {}\n{}- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
+              skgid . 0, headline . org_line ()) },
+    BufferValidationError::ForkRequestMultiple(skgid, headlines) => {
+      format!("Multiple fork requests for the same node:\n- Node: {}\n{}- At most one fork request per node is allowed.\n",
+              skgid . 0, headline_names_org_line (headlines)) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
-    BufferValidationError::MultipleEditableViewRequestsForSameId (skgid) => {
-      format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",
-              skgid . 0) },
-    BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid) => {
-      format!("Contradictory view requests on one occurrence:\n- ID: {}\n- It requests both write-protection and an editable view.\n- To move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).\n",
-              skgid . 0) },
+    BufferValidationError::MultipleEditableViewRequestsForSameId (skgid, headlines) => {
+      format!("Multiple editable view requests for the same ID:\n- ID: {}\n{}- At most one editable view request per ID is allowed.\n",
+              skgid . 0, headline_names_org_line (headlines)) },
+    BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid, headline) => {
+      format!("Contradictory view requests on one occurrence:\n- ID: {}\n{}- It requests both write-protection and an editable view.\n- To move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).\n",
+              skgid . 0, headline . org_line ()) },
     BufferValidationError::EmptyTitle(skgid) => {
       format!("Node has an empty title:\n- ID: {}\n- Every editable node must have a non-empty title.\n",
               skgid . 0) },
-    BufferValidationError::LocalStructureViolation(msg, skgid) => {
-      format!("Local structure violation:\n- ID: {}\n- {}\n",
-              skgid . 0, msg) },
-    BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid) => {
-      format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a editable view of it first (C-c g RET).\n",
-              skgid . 0) },
+    BufferValidationError::LocalStructureViolation(msg, skgid, headline) => {
+      format!("Local structure violation:\n- ID: {}\n{}- {}\n",
+              skgid . 0, headline . org_line (), msg) },
+    BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, headline) => {
+      format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n{}- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a editable view of it first (C-c g RET).\n",
+              skgid . 0, headline . org_line ()) },
     BufferValidationError::EditedWriteProtectedOccurrence {
-      skgid, title, changes } => {
-      format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s d).\n",
-              skgid . 0, title, changes . join ("; ")) },
+      skgid, title, changes, headline } => {
+      format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n{}- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s d).\n",
+              skgid . 0, title, headline . org_line (), changes . join ("; ")) },
     BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-      skgid, title } => {
-      format!("A child typed under the write-protected occurrence of {} ({}) cannot become its content.\n- Request an editable occurrence of it (C-c s d), or mark the child as not affecting its parent.\n",
-              title, skgid . 0) },
+      skgid, title, headline } => {
+      format!("A child typed under the write-protected occurrence of {} ({}) cannot become its content.\n{}- Request an editable occurrence of it (C-c s d), or mark the child as not affecting its parent.\n",
+              title, skgid . 0, headline . org_line ()) },
     BufferValidationError::FlagsSurfaceEdited {
-      recorder_skgid, recorder_title, changes } => {
-      format!("Edited server-owned flags surface:\n- Recorder ID: {}\n- Recorder title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
-              recorder_skgid . 0, recorder_title, changes . join ("; ")) },
+      recorder_skgid, recorder_title, changes, headline } => {
+      format!("Edited server-owned flags surface:\n- Recorder ID: {}\n- Recorder title: {}\n{}- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
+              recorder_skgid . 0, recorder_title, headline . org_line (), changes . join ("; ")) },
     BufferValidationError::FlagEditOnForeignNode (skgid, skgrepo) => {
       format!("Cannot change a flag on a foreign node:\n- ID: {}\n- Repo: {}\n- Flag changes never create an implicit fork. Visit an owned node instead.\n",
               skgid . 0, skgrepo) },

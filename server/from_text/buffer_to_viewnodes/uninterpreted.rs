@@ -2,7 +2,7 @@
 /// I *believe* the tests constrain its behavior sufficiently.
 
 use crate::types::sexp::find_sexp_end;
-use crate::types::errors::BufferValidationError;
+use crate::types::errors::{BufferValidationError, HeadlineName, view_id_suffix};
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::tree::forest::MpViewForest;
@@ -10,6 +10,7 @@ use crate::types::viewnode::Vid;
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use regex::Regex;
+use sexp::{Atom, Sexp};
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
@@ -72,18 +73,21 @@ pub fn org_to_uninterpreted_viewforest(
     let viewforest_root_treeid: NodeId =
       viewforest . internal_root_skgid ();
     viewforest_root_treeid } ];
-  for viewnode_line_col in & {
+  for viewnode_line_col in &mut {
     let viewnode_line_cols: Vec<ViewnodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
     viewnode_line_cols } {
-    let (level, mut viewnode, error_opt, warning_opt)
+    if let Some (metadata) = &mut viewnode_line_col . headline . 1 {
+      if let Some (vid) = &metadata . vid {
+        // Of two headlines with one vid, the first in buffer order
+        // keeps it; the second is a copy, and will get a fresh one.
+        // (Dropped before the headline becomes a viewnode, so that no
+        // message names the copy by the original's vid.)
+        if ! vids_seen . insert (vid . clone ()) {
+          metadata . vid = None; }}}
+    let (level, viewnode, error_opt, warning_opt)
       : (usize, MpViewnode, Option<BufferValidationError>, Option<String>)
       = linecol_to_viewnode (viewnode_line_col)?;
-    if let Some (vid) = &viewnode . vid {
-      // Of two headlines with one vid, the first in buffer order
-      // keeps it; the second is a copy, and will get a fresh one.
-      if ! vids_seen . insert (vid . clone ()) {
-        viewnode . vid = None; }}
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
     if let Some (warning) = warning_opt {
@@ -97,8 +101,10 @@ pub fn org_to_uninterpreted_viewforest(
     // because the internal forest root is at level 0.
     if treeid_stack . len() < level {
       return Err(format!(
-        "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
-        viewnode . error_label(), level, level - 1)); }
+        "Node \"{}\"{} at level {} jumps too far between levels (no valid parent at level {}).",
+        viewnode . error_label(),
+        view_id_suffix ( viewnode . vid . as_ref () ),
+        level, level - 1)); }
     treeid_stack . push( {
       let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
       let new_treeid: NodeId = {
@@ -202,12 +208,13 @@ fn linecol_to_viewnode(
     error_opt . or_else ( || if body_on_writeProtected {
       Some (match metadata . skgid . clone () {
         Some (skgid) => BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid   : skgid,
-          title   : title . clone (),
-          changes : vec!["added body text" . to_string ()], },
-        None => BufferValidationError::Other (
-          "A write-protected node has body text, which saving would discard. Add an ID and edit a editable occurrence instead."
-          . to_string ()), })
+          skgid    : skgid,
+          title    : title . clone (),
+          changes  : vec!["added body text" . to_string ()],
+          headline : viewnode . headline_name (), },
+        None => BufferValidationError::Other ( format! (
+          "A write-protected node ({}) has body text, which saving would discard. Add an ID and edit a editable occurrence instead.",
+          viewnode . headline_name () )), })
     } else { None } );
   Ok ( ( level, viewnode, error_opt, warning_opt ) ) }
 
@@ -237,21 +244,28 @@ pub fn headline_to_triple (
         // Extract the s-expression substring
         let sexp_str: &str = &remainder[..sexp_end];
 
+        // The title is everything after the s-expression
+        let title: String =
+          remainder[sexp_end..] . trim() . to_string();
+
         // Verify it's valid by attempting to parse it
-        if let Err (e) = sexp::parse (sexp_str) {
-          return Err(format!("Invalid s-expression syntax: {}", e));
-        }
+        let parsed_sexp : Sexp = match sexp::parse (sexp_str) {
+          Ok (parsed_sexp) => parsed_sexp,
+          Err (e) => return Err(format!(
+            "Invalid s-expression syntax: {} ({})",
+            e, HeadlineName::Title (title))), };
 
         // Parse the metadata from the s-expression
         let metadata: Option<ViewnodeMetadata> =
           match parse_metadata_to_viewnodemd (sexp_str) {
             Ok (parsed_metadata) => Some (parsed_metadata),
-            Err (e) => return Err (e), // Invalid metadata with specific error
+            Err (e) => // Invalid metadata with specific error
+              return Err (format! (
+                "{} ({})", e,
+                HeadlineName::of (
+                  vid_written_in_metadata (&parsed_sexp) . as_ref (),
+                  &title ))),
           };
-
-        // The title is everything after the s-expression
-        let title: String =
-          remainder[sexp_end..] . trim() . to_string();
 
         return Ok((level, metadata, title));
       } else {
@@ -268,3 +282,17 @@ pub fn headline_to_triple (
     // This is a bit of a hack, but maintains backward compatibility
     Err("__NOT_A_HEADLINE__" . to_string())
   }}
+
+/// The view id a headline's '(skg ...)' sexp carries, read without
+/// parsing the rest of it, so that an error in the rest can name the
+/// headline. None if it carries none, or one that is malformed.
+fn vid_written_in_metadata (
+  metadata_sexp : &Sexp,
+) -> Option<Vid> {
+  let Sexp::List (elements) = metadata_sexp else { return None; };
+  elements . iter () . find_map ( |element| match element {
+    Sexp::List (pair) => match pair . as_slice () {
+      [ Sexp::Atom (Atom::S (key)), Sexp::Atom (Atom::S (value)) ]
+        if key == "vid" => Vid::parse (value) . ok (),
+      _ => None },
+    _ => None } ) }

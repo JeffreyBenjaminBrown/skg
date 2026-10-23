@@ -7,6 +7,7 @@ use ego_tree::Tree;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
+use skg::types::errors::HeadlineName;
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
   SubscribeeVisibility };
@@ -125,8 +126,9 @@ fn subscribee_as_such_emits_claim_and_visibility () {
     assert_eq!(
       e . text_claims,
       vec![ SubscribeeTextClaim {
-        title : "e" . to_string(),
-        body  : Some ("Subscribee body" . to_string()) } ]); }
+        title    : "e" . to_string(),
+        body     : Some ("Subscribee body" . to_string()),
+        headline : HeadlineName::Title ("e" . to_string ()) } ]); }
   { let subscriber : &FieldIntentsForOneId = entry (&collected, "subscriber");
     assert_eq!(
       subscriber . visibility,
@@ -257,8 +259,9 @@ fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility
   assert_eq!(
     entry (&collected, "e") . text_claims,
     vec![ SubscribeeTextClaim {
-      title : "e" . to_string(),
-      body  : None } ]);
+      title    : "e" . to_string(),
+      body     : None,
+      headline : HeadlineName::Title ("e" . to_string ()) } ]);
   assert!( collected . by_pid . get (&ID::from ("subscriber")) . is_none(),
            "no visibility intent reaches a write-protected subscriber" ); }
 

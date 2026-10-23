@@ -1,6 +1,7 @@
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::errors::HeadlineName;
 use crate::types::misc::ID;
 
 use ego_tree::{Tree,NodeRef};
@@ -32,26 +33,31 @@ enum WhetherToDelete {
 /// Builds a map from IDs to sets of WhetherToDelete.
 /// After traversing the tree, reports every key (ID)
 /// for which the associated value (set) has size 2.
-/// Also builds a map from IDs to count of defining containers. */
+/// Also builds a map from IDs to the defining containers' names.
+/// Each reported ID comes with the names of its defining
+/// containers, in buffer order. */
 pub fn find_inconsistent_instructions(
   viewforest: &Tree<MpViewnode>
-) -> (Vec<ID>, // IDs with inconsistent deletions across nodes
-      Vec<ID>) // IDs with multiple defining nodes
-{ let (id_toDelete_instructions, id_to_definer_count) =
+) -> (Vec<(ID, Vec<HeadlineName>)>, // IDs with inconsistent deletions across nodes
+      Vec<(ID, Vec<HeadlineName>)>) // IDs with multiple defining nodes
+{ let (id_toDelete_instructions, mut id_to_definers) =
     collect_instructions (viewforest);
-  let mut inconsistent_deletion_skgids: Vec<ID> = Vec::new();
-  let mut problematic_defining_skgids: Vec<ID> = Vec::new();
+  let mut inconsistent_deletion_skgids: Vec<(ID, Vec<HeadlineName>)> = Vec::new();
+  let mut problematic_defining_skgids: Vec<(ID, Vec<HeadlineName>)> = Vec::new();
   { // filter to problematic instructions
     { // Collect inconsistent deletion instructions
       for (skgid, delete_set) in id_toDelete_instructions {
         if delete_set . len() == 2 {
           // Size 2 means both Delete and DoNotDelete are present.
-          inconsistent_deletion_skgids . push (skgid); }} }
+          let definers : Vec<HeadlineName> =
+            id_to_definers . get (&skgid) . cloned ()
+            . unwrap_or_default ();
+          inconsistent_deletion_skgids . push ((skgid, definers)); }} }
     { // Collect multiple defining containers
-      for (skgid, count) in id_to_definer_count {
-        if count > 1 {
+      for (skgid, definers) in id_to_definers . drain () {
+        if definers . len () > 1 {
           // Multiple defining containers for this ID
-          problematic_defining_skgids . push (skgid); }} }}
+          problematic_defining_skgids . push ((skgid, definers)); }} }}
   ( inconsistent_deletion_skgids,
     problematic_defining_skgids ) }
 
@@ -59,14 +65,14 @@ pub fn find_inconsistent_instructions(
 fn collect_instructions(
   viewforest: &Tree<MpViewnode>
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
-      HashMap<ID, usize>) { // defining containers
+      HashMap<ID, Vec<HeadlineName>>) { // defining containers
 
   fn collect_instructions_rec(
     node_ref: NodeRef<MpViewnode>,
     id_toDelete_instructions: &mut
       HashMap<ID, HashSet<WhetherToDelete>>,
-    id_defining_count: &mut
-      HashMap<ID, usize>
+    id_definers: &mut
+      HashMap<ID, Vec<HeadlineName>>
   ) {
     let viewnode : &MpViewnode = node_ref . value();
     if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
@@ -82,23 +88,24 @@ fn collect_instructions(
             . entry(skgid . clone())
             . or_insert_with (HashSet::new)
             . insert (delete_instruction);
-          *id_defining_count . entry(skgid . clone())
-            // increment the count for this defining container
-            . or_insert (0) += 1; }}}
+          id_definers . entry(skgid . clone())
+            // record this defining container
+            . or_default ()
+            . push (viewnode . headline_name ()); }}}
     for child in node_ref . children() { // recurse
       collect_instructions_rec(
         child,
         id_toDelete_instructions,
-        id_defining_count); }} // end of inner function definition
+        id_definers); }} // end of inner function definition
 
   let mut id_toDelete_instructions
     : HashMap<ID, HashSet<WhetherToDelete>>
     = HashMap::new();
-  let mut id_to_definer_count
-    : HashMap<ID, usize>
+  let mut id_to_definers
+    : HashMap<ID, Vec<HeadlineName>>
     = HashMap::new();
   collect_instructions_rec(
     viewforest . root(),
     &mut id_toDelete_instructions,
-    &mut id_to_definer_count);
-  (id_toDelete_instructions, id_to_definer_count) }
+    &mut id_to_definers);
+  (id_toDelete_instructions, id_to_definers) }

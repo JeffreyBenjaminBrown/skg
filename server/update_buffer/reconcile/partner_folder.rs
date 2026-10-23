@@ -17,7 +17,7 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{FolderPolicy, PartnerFolder, Viewnode};
+use crate::types::viewnode::{FolderPolicy, PartnerFolder, Vid, Viewnode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -120,7 +120,9 @@ pub fn reconcile_partnerFolder_children (
     // whatever the user saved. Write-protected folders warn (when there is a
     // sink, i.e. when this completion serves the just-saved view).
     if let Some (sink) = warning_sink {
-      push_repair_warnings (sink, kind, &viewparent_pid, summary); }}
+      push_repair_warnings (
+        sink, kind, &viewparent_pid,
+        folder_vid_of (tree, node) . as_ref (), summary ); }}
   Ok (( )) }
 
 /// The members a folder of this kind under the viewparent should hold,
@@ -182,6 +184,7 @@ pub fn push_repair_warnings (
   sink    : &mut Vec<CompletionWarning>,
   folder     : PartnerFolder,
   recorder   : &ID,
+  folder_vid : Option<&Vid>,
   summary : RepairSummary<ID>,
 ) {
   let categories : [ (RepairKind, Vec<ID>); 4 ] = [
@@ -194,8 +197,16 @@ pub fn push_repair_warnings (
       sink . push ( CompletionWarning::FolderRepair {
         folder,
         recorder : recorder . clone (),
+        folder_vid : folder_vid . cloned (),
         repair,
         children } ); }}}
+
+/// The view id of the folder at 'node', for its repair warnings.
+pub fn folder_vid_of (
+  tree : &Tree<Viewnode>,
+  node : NodeId,
+) -> Option<Vid> {
+  tree . get (node) . and_then ( |folder| folder . value () . vid . clone () ) }
 
 /// The effective goal list for a FolderPolicy::WriteProtectedSet folder:
 /// the folder's existing members (the children for which
