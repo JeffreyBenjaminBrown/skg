@@ -56,7 +56,7 @@ pub(crate) struct CompletionContext<'a> {
   /// True only for a de-novo (initial) render driven through
   /// view completion. When set, each fresh editable node gets its default
   /// PartnerFolders created at its visit, the way
-  /// build_node_branch_minus_content does at node birth.
+  /// build_node_branch_minus_content does when it builds a node.
   /// False for post-save rerender, where existing PartnerFolders round-trip
   /// from the saved buffer. A node made editable by a request still gets its
   /// defaults independently of this flag.
@@ -554,12 +554,12 @@ pub fn prune_self_deletable_when_empty (
       None => continue };
     let has_children : bool =
       node . children () . next () . is_some ();
-    let affects_parent_buffer_root : bool =
+    let parent_is_buffer_root : bool =
       node . parent ()
       . map ( |p| matches! ( &p . value () . kind,
                              ViewnodeKind::BufferRoot ) )
       . unwrap_or (false);
-    if ! has_children && ! affects_parent_buffer_root {
+    if ! has_children && ! parent_is_buffer_root {
       detach_viewnode_transferring_focus (tree, treeid) ?; }
   }
   Ok (( )) }

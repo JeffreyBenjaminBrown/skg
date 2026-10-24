@@ -78,14 +78,14 @@ pub fn type_and_parent_type_consistent_with_subscribee (
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
   let is_unrestrictedVognode_and_member : bool =
     node_ref . value () . is_unrestrictedVognode_and_member ();
-  let affects_parent_subscribeeFolder : bool =
+  let parent_is_subscribeeFolder : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
               ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
   Ok ( is_unrestrictedVognode_and_member
-       && affects_parent_subscribeeFolder ) }
+       && parent_is_subscribeeFolder ) }
 
 /// If appropriate, prepend a SubscribeeFolder child containing:
 /// - for each subscribee, a write-protected Subscribee child

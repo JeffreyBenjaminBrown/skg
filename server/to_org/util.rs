@@ -307,7 +307,7 @@ pub fn mark_view_roots_as_members (
 /// invariant that the prepared graph swap-in has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
-pub fn validate_affectsParent_relationships (
+pub fn validate_membership_claims (
   viewforest : &mut Tree<Viewnode>,
   graph  : &InRustGraph,
 ) {
@@ -328,14 +328,14 @@ pub fn validate_affectsParent_relationships (
           ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
           // A non-UnrestrictedVognode parent (BufferRoot, a property or folder, Deleted, Tombstone) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
-      let affects_parent_claim_ok : bool = match child_tn . membership {
+      let member_claim_ok : bool = match child_tn . membership {
         Membership::Member => {
           if parent_tn . is_writeProtected () {
             child_contained_by_parent (graph, &child_tn . skgid, &parent_tn . skgid)
           } else { // The editable parent *defines* content, so cannot be incorrect.
             true }}
         Membership::NonMember => true, };
-      if ! affects_parent_claim_ok { to_independent . push ( child_ref . id () ); }}}
+      if ! member_claim_ok { to_independent . push ( child_ref . id () ); }}}
   for skgid in to_independent {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
@@ -357,7 +357,7 @@ pub fn validate_affectsParent_relationships (
 /// - parent is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   member; membership is correct -> leave. (A folder whose own ancestry broke is
 ///   entombstoned first, and then this pass catches its members.)
-/// - parent is an Unrestricted vognode: handled by validate_affectsParent_relationships.
+/// - parent is an Unrestricted vognode: handled by validate_membership_claims.
 /// - parent is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_as_members.
 /// Belt-and-suspenders: most such children are already made non-members during the BFS
@@ -371,17 +371,17 @@ pub fn mark_orphans_under_dead_parents_false (
   let mut targets : Vec<NodeId> = Vec::new ();
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
-      let is_affected_normal : bool =
+      let is_unrestricted_member : bool =
         matches! ( & child_ref . value () . kind,
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if t . membership == Membership::Member );
-      if ! is_affected_normal { continue; }
-      let affects_parent_non_container : bool =
+      if ! is_unrestricted_member { continue; }
+      let parent_is_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
             ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
               | ViewnodeKind::Tombstone ) );
-      if affects_parent_non_container { targets . push ( child_ref . id () ); }}}
+      if parent_is_non_container { targets . push ( child_ref . id () ); }}}
   for skgid in targets {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
@@ -585,4 +585,4 @@ where T: AsMut<Viewnode>,
 
 #[cfg(test)]
 #[path = "../../tests/unit/to_org_util.rs"]
-mod validate_affectsParent_relationships_tests;
+mod validate_membership_claims_tests;

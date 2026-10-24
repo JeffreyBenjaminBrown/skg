@@ -204,7 +204,8 @@ pub fn convert_unwarranted_subtree (
   convert_unwarranted_subtree_taking_along (
     tree, node, Unwarranted::Stale, &goes_with_a_stale_viewparent ) }
 
-/// Convert 'node', unwarranted as 'unwarranted' says, by the one rule
+/// Convert 'node', unwarranted as 'unwarranted' says, by the rule
+/// 'retain as non-member or tombstone, then prune'
 /// ('convert_unwarranted_child'), and, first, postorder, every child
 /// of a viewnode being converted that 'goes_with' says goes with it,
 /// each as stale. The rest stay where they stand and keep 'node'

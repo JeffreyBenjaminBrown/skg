@@ -77,7 +77,7 @@ pub enum BufferValidationError {
     skgid    : ID,
     title    : String,
     headline : HeadlineName,
-  }, // A write-protected occurrence has a child that affects its parent, but a write-protected occurrence cannot write its content.
+  }, // A write-protected occurrence has a member child, but a write-protected occurrence cannot write its content.
   FlagsSurfaceEdited {
     recorder_skgid : ID,
     recorder_title : String,

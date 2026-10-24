@@ -443,7 +443,7 @@ fn is_overridden_shown_raw (
   graph_snap : &Arc<InRustGraph>,
 ) -> Result<bool, Box<dyn Error>> {
   let in_raw_position : bool = {
-    let affects_parent_raw_showing_folder : bool =
+    let parent_is_raw_showing_folder : bool =
       read_at_ancestor_in_tree( tree, node, 1,
         |vn : &Viewnode| match &vn . kind {
           ViewnodeKind::PartnerFolder (pc)
@@ -458,7 +458,7 @@ fn is_overridden_shown_raw (
         |vn : &Viewnode| matches!( &vn . kind,
           ViewnodeKind::BufferRoot ))
       . unwrap_or (false);
-    affects_parent_raw_showing_folder || is_view_root };
+    parent_is_raw_showing_folder || is_view_root };
   if ! in_raw_position { return Ok (false); }
   let (skgid, has_overridesHere) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
@@ -485,12 +485,12 @@ fn is_subscribee (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => t . membership == Membership::Member,
         _ => false } ) ?;
-  let affects_parent_subscribeeFolder : bool =
+  let parent_is_subscribeeFolder : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &Viewnode| matches!( &vn . kind,
         ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
-  Ok( is_member_of_parent && affects_parent_subscribeeFolder ) }
+  Ok( is_member_of_parent && parent_is_subscribeeFolder ) }
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
 /// in order. For a subscribee-as-such (the glossary's "subscribee as such") it is contains minus what the

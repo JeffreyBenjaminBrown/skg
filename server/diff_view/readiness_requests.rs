@@ -155,7 +155,7 @@ fn leaves_named_at (
       // The change-forest leaf of an entry in a folder belongs to the
       // folder's viewparent; the diff view's properties hang
       // under their node.
-      let owner_of_folder = || -> Option<ID> {
+      let pid_of_folders_viewparent = || -> Option<ID> {
         Some ( pid_of ( &grandparent_pid (node) ? )) };
       let parent : NodeRef<Viewnode> = node . parent () ?;
       let parent_pid = || -> Option<ID> {
@@ -163,15 +163,15 @@ fn leaves_named_at (
       match property {
         Property::Alias { text, .. } | Property::RemovedAlias { text, .. } =>
           leaves . push ( LeafKey::Node {
-            pid : owner_of_folder () ?,
+            pid : pid_of_folders_viewparent () ?,
             aspect : NodeAspect::Alias (text . clone ()) } ),
         Property::ID { skgid, .. } | Property::RemovedID { skgid, .. } =>
           leaves . push ( LeafKey::Node {
-            pid : owner_of_folder () ?,
+            pid : pid_of_folders_viewparent () ?,
             aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
         Property::Flag { flag, .. } =>
           leaves . push ( LeafKey::Node {
-            pid : owner_of_folder () ?,
+            pid : pid_of_folders_viewparent () ?,
             aspect : NodeAspect::Flag (*flag) } ),
         Property::OldText { .. } =>
           leaves . push ( LeafKey::Node {

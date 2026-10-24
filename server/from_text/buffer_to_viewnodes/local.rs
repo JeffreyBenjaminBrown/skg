@@ -715,7 +715,7 @@ fn mp_is_in_containerward_chain (
 
 fn cannot_be_child_of_vognode (
   node : &MpViewnode,
-  affects_parent_subscribee_as_such : bool,
+  parent_is_subscribee_as_such : bool,
 ) -> bool {
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
@@ -723,7 +723,7 @@ fn cannot_be_child_of_vognode (
       Property::Alias { .. } | Property::ID { .. } | Property::Flag { .. }
       | Property::RemovedAlias { .. } | Property::RemovedID { .. }) |
     MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
-  || ( ! affects_parent_subscribee_as_such
+  || ( ! parent_is_subscribee_as_such
        // validate_hiddenin requires a vognode parent; a
        // subscribee-as-such is the position that warrants one.
        && matches!(&node . kind,

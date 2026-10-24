@@ -143,13 +143,13 @@ fn make_alias_if_appropriate(
   if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
     = &node . value() . kind
   { // It is a real, normal vognode.
-    let affects_parent_aliasFolder : bool =
+    let parent_is_aliasFolder : bool =
       node . parent()
       . map(|mut p|
             matches!(&p . value() . kind,
                      MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
       . unwrap_or (false);
-    if affects_parent_aliasFolder { // Make it an Alias.
+    if parent_is_aliasFolder { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
       let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         : &MpViewnodeKind

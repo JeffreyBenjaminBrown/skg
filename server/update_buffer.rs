@@ -51,7 +51,7 @@ use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdReco
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_as_members, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
+use crate::to_org::util::{mark_view_roots_as_members, validate_membership_claims, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{FolderRelation, Property, Vognode, PropertyFolder, ViewRequest};
@@ -626,7 +626,7 @@ pub fn finish_viewforest (
   mark_orphans_under_dead_parents_false ( viewforest );
   // Correct any membership claims whose claimed relation to the parent doesn't
   // hold in the captured graph.
-  validate_affectsParent_relationships ( viewforest, graph );
+  validate_membership_claims ( viewforest, graph );
   let ( container_to_contents, content_to_containers ) =
     match skgrepo_restriction {
       Some (restriction) =>

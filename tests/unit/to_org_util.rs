@@ -112,7 +112,7 @@ fn a_members_claim_holds_through_a_merged_extra_id () {
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               Membership::Member) ) . id ();
 
-  validate_affectsParent_relationships (&mut viewforest, &graph);
+  validate_membership_claims (&mut viewforest, &graph);
 
   assert_eq! (membership_if_normal (&viewforest, c_treeid), Membership::Member,
     "An extra_id-aliased member should still satisfy the claim");
@@ -135,7 +135,7 @@ fn contentof_writeProtected_parent_false_claim_flipped () {
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               Membership::Member) ) . id ();
 
-  validate_affectsParent_relationships (&mut viewforest, &graph);
+  validate_membership_claims (&mut viewforest, &graph);
 
   assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember);
 }
@@ -158,7 +158,7 @@ fn contentof_editable_parent_skipped () {
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               Membership::Member) ) . id ();
 
-  validate_affectsParent_relationships (&mut viewforest, &graph);
+  validate_membership_claims (&mut viewforest, &graph);
 
   assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::Member,
     "Editable parent: Container claim is never flipped here");
@@ -180,7 +180,7 @@ fn independent_always_preserved () {
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               Membership::NonMember) ) . id ();
 
-  validate_affectsParent_relationships (&mut viewforest, &graph);
+  validate_membership_claims (&mut viewforest, &graph);
 
   assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember);
 }
@@ -213,7 +213,7 @@ fn moved_contentof_writeProtected_parent_relationship_holds_preserved () {
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               Membership::Member) ) . id ();
 
-  validate_affectsParent_relationships (&mut viewforest, &graph);
+  validate_membership_claims (&mut viewforest, &graph);
 
   assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::Member,
     "Moved container: writeProtected p_new actually contains C — keep");
@@ -236,7 +236,7 @@ fn moved_contentof_writeProtected_parent_relationship_broken_flipped () {
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               Membership::Member) ) . id ();
 
-  validate_affectsParent_relationships (&mut viewforest, &graph);
+  validate_membership_claims (&mut viewforest, &graph);
 
   assert_eq! (membership_if_normal (&viewforest, c_skgid), Membership::NonMember,
     "Moved container: writeProtected p_new doesn't contain C — flip");

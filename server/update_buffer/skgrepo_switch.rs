@@ -134,7 +134,7 @@ fn should_prune (
     . ok_or ("should_prune: node not found") ?;
   let is_leaf : bool =
     ! node_ref . has_children ();
-  let grandaffects_parent_restricted : bool =
+  let grandparent_is_restricted : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
     . map ( |gp| matches! ( &gp . value () . kind,
@@ -144,7 +144,7 @@ fn should_prune (
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       is_leaf,
     ViewnodeKind::Property (_) =>
-      is_leaf && grandaffects_parent_restricted,
+      is_leaf && grandparent_is_restricted,
     ViewnodeKind::PropertyFolder (PropertyFolder::ID)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
