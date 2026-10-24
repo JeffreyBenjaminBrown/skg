@@ -920,7 +920,7 @@ four suites.
 The convert function's two branches, the editability walk's
 preference and 'ClaimedElsewhere' with its fix, the tests. Run
 all four suites.
-** TODO Slice 4: every role tree is a folder, on the server
+** DONE Slice 4: every role tree is a folder, on the server
 The containers folder with the chain on every root and under
 every containers-folder member, the role-tree request and engine
 removed, the search buffer's three folders, the member role trees

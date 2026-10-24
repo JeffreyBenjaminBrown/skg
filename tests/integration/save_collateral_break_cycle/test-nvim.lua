@@ -128,8 +128,9 @@ local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, 'Buffer skg://a was created')
 assert_headline_structure(buf_a,
   { { 1, 'member', 'a' },
-    { 2, 'container', 'b' },
-    { 3, 'container', 'a' },
+    { 3, 'member', 'b' },     -- in a's containers folder
+    { 4, 'container', 'a' },  -- its chain
+    { 5, 'container', 'b' },
     { 2, 'member', 'b' },
     { 3, 'member', 'a' } },
   'phase 1: buffer A initial')
@@ -140,8 +141,9 @@ local buf_b = T.wait_for_buffer('skg://b')
 T.check(buf_b, 'Buffer skg://b was created')
 assert_headline_structure(buf_b,
   { { 1, 'member', 'b' },
-    { 2, 'container', 'a' },
-    { 3, 'container', 'b' },
+    { 3, 'member', 'a' },     -- in b's containers folder
+    { 4, 'container', 'b' },  -- its chain
+    { 5, 'container', 'a' },
     { 2, 'member', 'a' },
     { 3, 'member', 'b' } },
   'phase 2: buffer B initial')
@@ -163,9 +165,12 @@ print('Buffer A content after collateral update: '
       .. T.buffer_text(buf_a))
 assert_headline_structure(buf_a,
   { { 1, 'member', 'a' },
-    -- was container; corrected after b dropped a:
-    { 2, 'nonMember', 'b' },
-    { 3, 'container', 'a' },
+    -- b no longer contains a: the stale member is retained as a
+    -- non-member in a's containers folder, with its chain, whose
+    -- last b no longer contains its viewparent.
+    { 3, 'nonMember', 'b' },
+    { 4, 'container', 'a' },
+    { 5, 'nonMember', 'b' },
     { 2, 'member', 'b' } },
   'phase 4: buffer A after collateral update')
 

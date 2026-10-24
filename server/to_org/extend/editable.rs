@@ -54,7 +54,6 @@
 
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::extend::aliases::build_and_integrate_aliases_view_then_drop_request;
-use crate::to_org::extend::role_tree::build_and_integrate_role_tree_then_drop_request;
 use crate::to_org::extend::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::extend::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, make_member_children_nonMembers, unrestrictedVognode_in_tree_is_writeProtected };
@@ -87,14 +86,6 @@ pub fn execute_view_requests (
       ViewRequest::Folder (rel) => {
         build_and_integrate_folder_then_drop_request (
           viewforest, treeid, graph, rel, config, errors,
-          skgrepo_restriction ) ?; },
-      ViewRequest::RoleTree (role) => {
-        // Relation-generic: every partner role routes through the one
-        // role-tree engine (container, mentioner, and the seven new
-        // roles alike). A view-root's container request is handled
-        // separately (finish_viewforest) and removed before this pass.
-        build_and_integrate_role_tree_then_drop_request (
-          viewforest, treeid, graph, role, config, errors,
           skgrepo_restriction ) ?; },
       ViewRequest::Flags => {
         build_and_integrate_flags_then_drop_request (

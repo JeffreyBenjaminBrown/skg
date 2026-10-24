@@ -30,8 +30,9 @@
     (assert-headline-structure
      buf
      '((1 member "a")
-       (2 container "b")
-       (3 container "a")
+       (3 member "b")         ; in a's containers folder
+       (4 container "a")      ; its chain
+       (5 container "b")
        (2 member     "b")
        (3 member     "a"))
      "phase 1: buffer A initial")))
@@ -49,8 +50,9 @@
     (assert-headline-structure
      buf
      '((1 member "b")
-       (2 container "a")
-       (3 container "b")
+       (3 member "a")         ; in b's containers folder
+       (4 container "b")      ; its chain
+       (5 container "a")
        (2 member     "a")
        (3 member     "b"))
      "phase 2: buffer B initial")))
@@ -82,8 +84,12 @@
     (assert-headline-structure
      buf
      '((1 member "a")
-       (2 nonMember "b")  ;; was container; corrected after b dropped a
-       (3 container "a")
+       ;; b no longer contains a: the stale member is retained as a
+       ;; non-member in a's containers folder, with its chain, whose
+       ;; last b no longer contains its viewparent.
+       (3 nonMember "b")
+       (4 container "a")
+       (5 nonMember "b")
        (2 member     "b"))
      "phase 4: buffer A after collateral update")))
 

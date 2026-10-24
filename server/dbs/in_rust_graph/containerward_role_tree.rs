@@ -1,8 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::paths::PartnersOf;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::misc::ID;
+
+/// The partners playing 'role' toward a node, as a function, so that
+/// the containerward role tree can walk the live graph
+/// ('containers_in_inRustGraph') or the union of a graph straddle
+/// ('GraphStraddle::partners').
+pub type PartnersOf<'a> = &'a dyn Fn (&ID, RelationRole) -> HashSet<ID>;
 
 /// A node in the full containerward role tree.
 ///

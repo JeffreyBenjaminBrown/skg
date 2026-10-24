@@ -1,11 +1,11 @@
--- Integration test: search enrichment (background containerward paths +
+-- Integration test: search enrichment (background partner folders +
 -- graphnodestats), nvim client. The Lua mirror of test-emacs.el in this
 -- directory.
 --
 -- Searches for "bravo" (matches leaf-b).
--- Phase 1: search results appear immediately (no paths).
--- Phase 2: after background enrichment, the buffer should contain
--- the containerward path from leaf-b to container-a
+-- Phase 1: search results appear immediately (no folders).
+-- Phase 2: after background enrichment, the buffer should show
+-- leaf-b's containers folder, folded, holding container-a
 -- (i.e. "container alpha" appears in the buffer).
 -- Phase 3: the enriched leaf-b line carries node relationship stats.
 
@@ -74,6 +74,24 @@ if not found then
     .. 'Buffer content:\n%s', content))
 end
 assert_leaf_b_root_is_content(buf, 'enriched search results')
+do -- leaf-b's first child is its folded containers folder, holding container-a.
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local root = nil
+  for index, line in ipairs(lines) do
+    if line:sub(1, #'* (skg (node (id leaf-b)') == '* (skg (node (id leaf-b)' then
+      root = index
+      break
+    end
+  end
+  T.check(root
+          and lines[root + 1]:sub(1, #'** (skg folded containerFolder')
+              == '** (skg folded containerFolder'
+          and lines[root + 2]:find(
+                '*** (skg (node (id container-a) (repo "Mr Cheese") writeProtected ',
+                1, true) == 1,
+          "leaf-b's folded containers folder holds container-a. Buffer content:\n"
+          .. T.buffer_text(buf))
+end
 print('containerward path enrichment arrived')
 
 -- PHASE 3: verify node relationship stats in enriched results. leaf-b

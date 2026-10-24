@@ -119,7 +119,7 @@ pub struct SearchEnrichmentPayload {
 
 /// Provides two responses, one fast and one slow.
 /// The slower one is 'enriched'
-/// with containerward role trees and graphnodestats at each search hit,
+/// with partner folders and graphnodestats at each search hit,
 /// and is processed in the background -- the user need not await it.
 ///
 /// Every 'search-results' is eventually followed by exactly one
@@ -593,13 +593,12 @@ pub fn group_matches_by_skgid (
 /// Forest structure: each root is a search result, with AliasFolder +
 /// Alias children if aliases matched.
 /// The result ids to drop from the top level because an owned
-/// result recursively overrides them: they will reappear as
-/// overriddenward role-graft descendants of that owned result
-/// (the API doc's "Text search"). A
+/// result recursively overrides them; those it overrides directly
+/// reappear in its overridden folder (the API doc's "Text search"). A
 /// foreign overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
 /// the node it overrides. Reachability follows relRepo-visible
-/// outbound overrides, matching what the role graft will actually show.
+/// outbound overrides.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
 /// owned overrider that matched the query but ranks past the
 /// display limit could suppress its target without itself being shown

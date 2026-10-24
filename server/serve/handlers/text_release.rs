@@ -150,7 +150,7 @@ pub fn challenge_response (
 }
 
 /// Replace overPrivateText unrestricted nodes with text-free restricted vognodes. Search
-/// exclusion uses this after enrichment so role-tree and override grafting
+/// exclusion uses this after enrichment so the partner folders it draws
 /// cannot broaden the choice made before the Tantivy query.
 pub fn exclude_overPrivateText_nodes_from_viewforest (
   viewforest : &mut Tree<Viewnode>,

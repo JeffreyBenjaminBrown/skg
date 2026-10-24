@@ -106,9 +106,8 @@ impl RelationRole {
 }
 
 //
-// The partner-role vocabulary: ROLENAME <-> RelationRole <-> role tree
-// triple <-> glyph. The single source of truth shared by the request
-// layer ('(roleTree ROLENAME)'), the role-tree engine, and the birth herald.
+// The partner-role vocabulary: ROLENAME <-> RelationRole <-> glyph.
+// The single source of truth for the birth herald.
 //
 
 impl RelationRole {
@@ -149,7 +148,7 @@ impl RelationRole {
                    position : BinaryRolePosition::Second };
 
   /// The single ROLENAME token naming this partner role in the wire
-  /// grammar ('(roleTree ROLENAME)', '(birth roleGraft ROLENAME)').
+  /// grammar ('(birth roleGraft ROLENAME)').
   /// Panics for a role absent from PARTNER_ROLE_VOCAB (only
   /// 'Contains, Second' -- "content", never a path/birth role).
   pub fn rolename (
@@ -176,26 +175,11 @@ impl RelationRole {
       . find ( |(_, role, _)| *role == self )
       . map ( |(_, _, glyph)| *glyph )
       . expect ( "RelationRole::glyph: role absent from PARTNER_ROLE_VOCAB" ) }
-
-  /// The '(relation, input_role, output_role)' triple the role tree
-  /// engine consumes: output_role is this (partner) role, input_role
-  /// is the origin's (opposite) role.
-  pub fn role_tree_triple (
-    self,
-  ) -> (&'static str, &'static str, &'static str) {
-    let (first, second) : (&'static str, &'static str) =
-      self . relation . roles ();
-    let relation : &'static str = self . relation . relation_name ();
-    match self . position {
-      BinaryRolePosition::First  => (relation, second, first),
-      BinaryRolePosition::Second => (relation, first, second), } }
 }
 
-/// Each row is (ROLENAME, RelationRole, glyph). The role-tree triple is
-/// derived from the RelationRole ('RelationRole::role_tree_triple'), so
-/// it is not stored here. A folder is named by its relation (spanning both
-/// roles); a path and a birth are named by the one role the grafted
-/// partner plays. 'Contains, Second' is absent (see the consts above).
+/// Each row is (ROLENAME, RelationRole, glyph). A folder is named by
+/// its relation (spanning both roles); a birth is named by the one
+/// role the grafted partner plays. 'Contains, Second' is absent (see the consts above).
 pub const PARTNER_ROLE_VOCAB
   : &[ (&'static str, RelationRole, &'static str) ] = &[
   ("container",  RelationRole::CONTAINER,   "}"),
@@ -622,38 +606,25 @@ mod tests {
     file_names . sort ();
     assert_eq! ( enum_names, file_names ); }
 
-  /// Every PARTNER_ROLE_VOCAB row round-trips ROLENAME <-> RelationRole,
-  /// resolves a glyph, and yields the expected role-tree triple.
+  /// Every PARTNER_ROLE_VOCAB row round-trips ROLENAME <-> RelationRole
+  /// and resolves a glyph.
   #[test]
-  fn partner_role_vocab_round_trips_and_derives_triples () {
-    // (rolename, RelationRole, glyph, (relation, input_role, output_role))
-    let expected : [(&str, RelationRole, &str,
-                     (&str, &str, &str)); 9] = [
-      ("container",  RelationRole::CONTAINER,   "}",
-       ("contains", "content", "container")),
-      ("mentioner", RelationRole::MENTIONER, "←",
-       ("linksTo",  "mentioned", "mentioner")),
-      ("mentioned",   RelationRole::MENTIONED,   "→",
-       ("linksTo",  "mentioner", "mentioned")),
-      ("overrider",  RelationRole::OVERRIDER,   "Op",
-       ("overrides",         "overridden", "overrider")),
-      ("overridden", RelationRole::OVERRIDDEN,  "pO",
-       ("overrides",         "overrider", "overridden")),
-      ("hider",      RelationRole::HIDER,       "Hp",
-       ("hidesFromSubs",                "hidden", "hider")),
-      ("hidden",     RelationRole::HIDDEN,      "pH",
-       ("hidesFromSubs",                "hider", "hidden")),
-      ("subscriber", RelationRole::SUBSCRIBER,  "Sp",
-       ("subscribesTo",  "subscribee", "subscriber")),
-      ("subscribee", RelationRole::SUBSCRIBEE,  "pS",
-       ("subscribesTo",  "subscriber", "subscribee")),
+  fn partner_role_vocab_round_trips () {
+    let expected : [(&str, RelationRole, &str); 9] = [
+      ("container",  RelationRole::CONTAINER,   "}"),
+      ("mentioner",  RelationRole::MENTIONER,   "←"),
+      ("mentioned",  RelationRole::MENTIONED,   "→"),
+      ("overrider",  RelationRole::OVERRIDER,   "Op"),
+      ("overridden", RelationRole::OVERRIDDEN,  "pO"),
+      ("hider",      RelationRole::HIDER,       "Hp"),
+      ("hidden",     RelationRole::HIDDEN,      "pH"),
+      ("subscriber", RelationRole::SUBSCRIBER,  "Sp"),
+      ("subscribee", RelationRole::SUBSCRIBEE,  "pS"),
     ];
-    for (name, role, glyph, triple) in expected {
+    for (name, role, glyph) in expected {
       assert_eq! ( role . rolename (), name );
       assert_eq! ( RelationRole::from_rolename (name), Some (role) );
-      assert_eq! ( role . glyph (), glyph );
-      assert_eq! ( role . role_tree_triple (), triple,
-        "wrong role-tree triple for {}", name ); } }
+      assert_eq! ( role . glyph (), glyph ); } }
 
   #[test]
   fn from_rolename_rejects_unknown_and_the_absent_content_role () {

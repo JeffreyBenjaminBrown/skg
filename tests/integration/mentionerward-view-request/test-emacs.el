@@ -1,4 +1,4 @@
-;;; Integration test for mentionerward-view request functionality
+;;; Integration test for the mentioners folder request
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -43,7 +43,7 @@ LINE-NUMBER is zero-based."
       (forward-line line-number)
       (setq integration-test-phase
             (format "requesting-mentionerward-view-line-%d" line-number))
-      (skg-show-mentionerward-tree) ;; this also saves the buffer
+      (skg-show-folderOf-mentioners) ;; this also saves the buffer
       (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
@@ -80,10 +80,11 @@ LINE-NUMBER is zero-based."
         (expected-changed
          (concat "* (skg (node (id 1) (repo main) (rels (contains (out 2))))) 1\n"
                  "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n"
-                 "*** (skg (node (id l-11) (repo main) nonMember (birth roleGraft mentioner) writeProtected (rels (linksTo (out 1 (ancestors 1))) (birth (linksTo out 1))))) [[id:11][a link to 11]]\n"
+                 "*** (skg mentionerFolder)\n"
+                 "**** (skg (node (id l-11) (repo main) writeProtected (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2))))) [[id:11][a link to 11]]\n"
                  "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
-        (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))
+        (expected-with-link (concat "* 1\n** 11\n**** [[id:11][a link to 11]]\n** 12\n")))
 
     (setq integration-test-phase "testing-line-0")
     (skg-mentionerward--verify-view 0 expected-line0 expected-no-link)

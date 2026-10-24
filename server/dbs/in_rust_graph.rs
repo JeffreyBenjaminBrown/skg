@@ -10,7 +10,6 @@
 pub mod complete_validation;
 pub mod containerward_role_tree;
 pub mod id_resolution;
-pub mod paths;
 pub mod query;
 pub mod stats;
 pub mod internal_index_validation;

@@ -1,9 +1,8 @@
 ;;; Integration test: opening a content view of `child', whose
-;;; parent contains it, should render the buffer with `parent'
-;;; prepended as the first child of `child' (Birth::ContainsParent
-;;; write-protected). Because `child' is contained in the graph, the
-;;; view-root is born as container; that default is implicit in
-;;; emitted metadata.
+;;; parent contains it, should render the buffer with `child''s
+;;; containers folder as its first child, holding `parent',
+;;; write-protected. The view-root itself is a member, which emitted
+;;; metadata leaves implicit.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../../../elisp/skg-test-utils.el")
@@ -24,7 +23,7 @@
     buf))
 
 (defun verify-ancestry-prepended (buf)
-  (message "=== PHASE 2: Verifying parent prepended as first child ===")
+  (message "=== PHASE 2: Verifying the containers folder holding parent ===")
   (with-current-buffer buf
     (let ((text (buffer-string)))
       (message "Buffer:\n%s" text)
@@ -43,13 +42,15 @@
         (when (string-match-p "nonMember writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
+      (unless (string-match-p "^\\* (skg (node (id child).*\n\\*\\* (skg containerFolder" text)
+        (fail "the root's first child is not its containers folder; buffer:\n%s" text))
       (let ((line (and (string-match
-                        "^\\*\\* (skg (node (id parent).*$" text)
+                        "^\\*\\*\\* (skg (node (id parent).*$" text)
                        (match-string 0 text))))
         (unless line
-          (fail "no level-2 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
-          (fail "parent is not nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); line: %S" line))
+          (fail "no level-3 headline for parent; buffer:\n%s" text))
+        (unless (string-match-p "(id parent) (repo main) writeProtected (rels (contains (out 1 (ancestors 2))) (birth (contains out 2)))" line)
+          (fail "parent is not a write-protected member of the folder; line: %S" line))
         (unless (string-match-p " writeProtected\\b" line)
           (fail "parent is not writeProtected; line: %S" line))))))
 

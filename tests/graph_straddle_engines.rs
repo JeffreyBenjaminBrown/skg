@@ -1,16 +1,15 @@
 // cargo nextest run --test grouped_repos -E 'test(graph_straddle_engines::)'
 //
-// The partner-folder reconciler and the role-tree engine, run over the
+// The partner-folder reconciler and the containerward chain, run over the
 // union of a graph straddle instead of the live graph. The straddle is built
 // in memory: before, c1 and c2 contain r; after, c1 and c3 do, and c2
 // is gone.
 
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::types::GraphStraddle;
-use skg::to_org::extend::role_tree::{
-  RoleTreePartners, build_and_integrate_role_tree_with_skgrepo_set};
+use skg::to_org::extend::containerward_chain::{
+  ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -112,7 +111,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
   Ok (( )) }
 
 #[test]
-fn the_role_tree_engine_walks_a_graph_straddles_union (
+fn the_containerward_chain_walks_a_graph_straddles_union (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
   let child_ids = |tree : &Tree<Viewnode>, node : NodeId| -> Vec<String> {
@@ -123,14 +122,14 @@ fn the_role_tree_engine_walks_a_graph_straddles_union (
     ids };
   { // Over the live graph: the containers now.
     let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
-    build_and_integrate_role_tree_with_skgrepo_set (
-      &mut tree, r, &f . runtime . graph, RelationRole::CONTAINER,
-      &f . runtime . config, None, RoleTreePartners::LiveGraph ) ?;
+    attach_containerward_chains_under_members (
+      &mut tree, &[r], &f . runtime . graph,
+      &f . runtime . config, None, ContainerwardChainPartners::LiveGraph ) ?;
     assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c3" ] ); }
   { // Over the straddle: the containers in either graph.
     let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
-    build_and_integrate_role_tree_with_skgrepo_set (
-      &mut tree, r, &f . runtime . graph, RelationRole::CONTAINER,
-      &f . runtime . config, None, RoleTreePartners::GraphStraddle (&f . straddle) ) ?;
+    attach_containerward_chains_under_members (
+      &mut tree, &[r], &f . runtime . graph,
+      &f . runtime . config, None, ContainerwardChainPartners::GraphStraddle (&f . straddle) ) ?;
     assert_eq! ( child_ids (&tree, r), vec! [ "c1", "c2", "c3" ] ); }
   Ok (( )) }

@@ -306,7 +306,7 @@ fn handle_emacs (
         || e . kind () == std::io::ErrorKind::TimedOut =>
       { // Idle timeout — if enrichment is ready, ask Emacs
         // for a buffer snapshot of the search buffer so we can integrate
-        // role trees without losing user edits.
+        // the partner folders without losing user edits.
         if ! buffer_snapshot_requested {
           if let Ok (guard) = enrichment_slot . try_lock () {
             if guard . is_some () {
@@ -327,7 +327,7 @@ fn handle_emacs (
   tracing::info!(peer = %peer, "Emacs disconnected"); }
 
 /// Handle the buffer snapshot that Emacs sent back.
-/// Parses the buffer text, inserts role trees, sets graphnodestats,
+/// Parses the buffer text, inserts the partner folders, sets graphnodestats,
 /// and sends the enriched result to Emacs.
 /// Always sends exactly one 'search-enrichment', because that is what
 /// releases the client's stream guard. If enrichment fails, it has no

@@ -87,7 +87,7 @@ pub enum TcpToClient {
   CollateralView, // One streamed collateral-view update during save. Sent per-view between SaveLock and SaveResult.
   CloseView,
   SearchResults, // computed fast
-  SearchEnrichment, // replaces SearchResults, once it's computed. Includes containerward role trees and graphnodestats.
+  SearchEnrichment, // replaces SearchResults, once it's computed. Includes each hit's partner folders and graphnodestats.
   RequestSnapshot, // Asks Emacs for a snapshot of one buffer (the search buffer matching the given terms), so that Rust can integrate enrichment data into the user's current edits.
   GetFilePath,
   HeraldRules,

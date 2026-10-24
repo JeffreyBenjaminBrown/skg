@@ -26,7 +26,7 @@ local function strip_all_metadata (text)
   local result = {}
   for _, line in ipairs(vim.split(text, '\n')) do
     local stars = line:match('^(%*+) ')
-    local title = line:match('(%S+)$')
+    local title = line:match('%) ([^ )]+)$') -- none on a folder's line
     if stars and title then
       table.insert(result, stars .. ' ' .. title .. '\n')
     end
@@ -75,10 +75,10 @@ print('Created new buffer without node 0')
 vim.api.nvim_win_set_cursor(0, { 3, 0 })
 print('Positioned on node 12 (line 3)')
 
--- PHASE 3: request the containerward view for node 12.
-print('=== PHASE 3: Requesting containerward view for node 12 ===')
-print('Calling view_requests.show_containerward_tree...')
-view_requests.show_containerward_tree() -- this also saves the buffer
+-- PHASE 3: request the containers folder of node 12.
+print('=== PHASE 3: Requesting the containers folder of node 12 ===')
+print('Calling view_requests.show_folderOf_containers...')
+view_requests.show_folderOf_containers() -- this also saves the buffer
 T.wait_for_response()
 
 -- PHASE 4: verify the result structure.
@@ -88,18 +88,19 @@ local stripped_buffer_content = strip_all_metadata(buffer_content)
 local expected_without_metadata =
   '* 1\n'
   .. '** 11\n'
-  .. '** 12\n'  -- role tree was requested here
-  .. '*** 1\n'  -- its first element
-  .. '**** 0\n' -- its second element
+  .. '** 12\n'    -- the folder was requested here
+  .. '**** 1\n'   -- in its containers folder
+  .. '***** 0\n'  -- the chain under 1
   .. '*** 121\n'
   .. '** 13\n'
 local expected =
   '* (skg (node (id 1) (repo main) (rels (contains (in 1) (out 3))))) 1\n'
   .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11\n'
   .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12\n'
-  .. '*** (skg (node (id 1) (repo main) nonMember (birth roleGraft container) writeProtected'
-     .. ' (rels (contains (in 1) (out 3 (ancestors 1))) (birth (contains out 1))) (viewStats cycle))) 1\n'
-  .. '**** (skg (node (id 0) (repo main) nonMember (birth roleGraft container) writeProtected'
+  .. '*** (skg containerFolder)\n'
+  .. '**** (skg (node (id 1) (repo main) writeProtected'
+     .. ' (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle))) 1\n'
+  .. '***** (skg (node (id 0) (repo main) nonMember (birth roleGraft container) writeProtected'
      .. ' (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))))) 0\n'
   .. '*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121\n'
   .. '** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13\n'
@@ -114,7 +115,7 @@ T.check(T.without_viewnode_ids(buffer_content) == expected,
         'buffer-content matches expected (with metadata)')
 T.check(stripped_buffer_content == expected_without_metadata,
         'stripped buffer-content matches expected structure; '
-        .. 'containerward path [1, 0] was correctly integrated '
-        .. 'under node 12')
+        .. 'the containers folder of node 12 holds 1, '
+        .. 'with the chain [0] under it')
 
 T.pass('PASS: Integration test successful!')

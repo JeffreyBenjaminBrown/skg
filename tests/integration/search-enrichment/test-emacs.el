@@ -1,9 +1,9 @@
-;;; Integration test: search enrichment (background containerward paths + graphnodestats)
+;;; Integration test: search enrichment (background partner folders + graphnodestats)
 ;;;
 ;;; Searches for "bravo" (matches leaf-b).
-;;; Phase 1: search results appear immediately (no paths).
-;;; Phase 2: after background enrichment, the buffer should contain
-;;; the containerward path from leaf-b to container-a
+;;; Phase 1: search results appear immediately (no folders).
+;;; Phase 2: after background enrichment, the buffer should show
+;;; leaf-b's containers folder, folded, holding container-a
 ;;; (i.e. "container alpha" appears in the buffer).
 
 (load-file "../../../elisp/skg-init.el")
@@ -89,6 +89,12 @@
       (assert-leaf-b-root-is-content
        content
        "enriched search results")
+      (unless (string-match-p
+               "^\\* (skg (node (id leaf-b).*\n\\*\\* (skg folded containerFolder.*\n\\*\\*\\* (skg (node (id container-a) (repo \"Mr Cheese\") writeProtected "
+               content)
+        (message "✗ FAIL: leaf-b's folded containers folder does not hold container-a")
+        (message "Buffer content:\n%s" content)
+        (kill-emacs 1))
       (message "✓ containerward path enrichment arrived")
       ;; Phase 3: verify node relationship stats in enriched results.
       ;; leaf-b has one container (its inserted containerward ancestor),

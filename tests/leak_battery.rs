@@ -28,7 +28,8 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
-use skg::to_org::extend::role_tree::build_and_integrate_containerward_role_tree_with_skgrepo_set;
+use skg::to_org::extend::containerward_chain::{
+  ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
@@ -135,8 +136,8 @@ fn inbound_containerward_data_hides_N_at_public (
         "under 'all' N's containment of C is visible inbound: {:?}",
         inbound_all );
 
-      // Rendered role tree: C's containerward path must truncate
-      // before N at "public" (N is grafted at "all").
+      // Rendered chain: C's containerward chain must stop before N
+      // at "public" (N is shown at "all").
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
@@ -145,17 +146,18 @@ fn inbound_containerward_data_hides_N_at_public (
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_skgid : NodeId = first_child_skgid (&viewforest);
-        build_and_integrate_containerward_role_tree_with_skgrepo_set (
-          &mut viewforest, c_skgid, &graph, config, Some (&public) ) ?;
+        attach_containerward_chains_under_members (
+          &mut viewforest, &[c_skgid], &graph, config, Some (&public),
+          ContainerwardChainPartners::LiveGraph ) ?;
         let ancestors : BTreeSet<ID> = true_child_skgids (&viewforest, c_skgid);
         assert! (
           ! ancestors . contains (&ID::from ("N")),
-          "rendered containerward role tree must not graft N at \
+          "the rendered containerward chain must not show N at \
            public: {:?}", ancestors );
         let rendered : String = viewforest_to_string (&viewforest, config)?;
         assert! (
           ! rendered . contains ("leak-battery-N"),
-          "N's title must not leak via the rendered role tree at \
+          "N's title must not leak via the rendered chain at \
            public: {}", rendered );
       }
       {
@@ -163,12 +165,13 @@ fn inbound_containerward_data_hides_N_at_public (
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_skgid : NodeId = first_child_skgid (&viewforest);
-        build_and_integrate_containerward_role_tree_with_skgrepo_set (
-          &mut viewforest, c_skgid, &graph, config, Some (&all) ) ?;
+        attach_containerward_chains_under_members (
+          &mut viewforest, &[c_skgid], &graph, config, Some (&all),
+          ContainerwardChainPartners::LiveGraph ) ?;
         let ancestors : BTreeSet<ID> = true_child_skgids (&viewforest, c_skgid);
         assert! (
           ancestors . contains (&ID::from ("N")),
-          "under 'all' the rendered containerward role grafts \
+          "under 'all' the rendered containerward chain shows \
            N: {:?}", ancestors );
       }
       Ok (( )) } )) }

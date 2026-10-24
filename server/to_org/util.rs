@@ -327,9 +327,9 @@ pub fn validate_affectsParent_relationships (
 /// 'validate_affectsParent_relationships', where in a buffer of the
 /// diff view ('before_graph' the straddle's before-graph) a role
 /// graft's claim also holds when its relationship is in the
-/// before-graph: the diff view extends member role trees over the
-/// union of the straddle, and a graft keeps the birth that tells it
-/// from what the user added.
+/// before-graph: the diff view walks the containerward chain over the
+/// union of the straddle, and a chain node keeps the birth that tells
+/// it from what the user added.
 pub fn validate_affectsParent_relationships_in_straddle (
   viewforest   : &mut Tree<Viewnode>,
   graph        : &InRustGraph,

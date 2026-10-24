@@ -653,10 +653,10 @@ extension applies neither the recorder's hides nor substitution to
 its immediate children.
 
 An ordinary single-root visit always opens the requested node itself,
-shown raw. In enriched search results, each result has an overrideward
-view-subtree containing its visible override relatives in both
+shown raw. In enriched search results, each result shows its override
+folders, holding its visible direct override relatives in both
 directions. Override facts also appear in explicitly requested override
-folders and role trees.
+folders.
 
 *** "subscribee as such"
 

@@ -174,8 +174,9 @@ local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, 'Buffer skg://a was created')
 assert_headline_structure(buf_a,
   { { 1, 'member', 'a' },
-    { 2, 'container', 'b' },
-    { 3, 'container', 'a' },
+    { 3, 'member', 'b' },     -- in a's containers folder
+    { 4, 'container', 'a' },  -- its chain
+    { 5, 'container', 'b' },
     { 2, 'member', 'b' },
     { 3, 'member', 'a' } },
   'phase 1: buffer A initial')
@@ -186,8 +187,9 @@ local buf_b = T.wait_for_buffer('skg://b')
 T.check(buf_b, 'Buffer skg://b was created')
 assert_headline_structure(buf_b,
   { { 1, 'member', 'b' },
-    { 2, 'container', 'a' },
-    { 3, 'container', 'b' },
+    { 3, 'member', 'a' },     -- in b's containers folder
+    { 4, 'container', 'b' },  -- its chain
+    { 5, 'container', 'a' },
     { 2, 'member', 'a' },
     { 3, 'member', 'b' } },
   'phase 2: buffer B initial')
@@ -195,26 +197,30 @@ assert_headline_structure(buf_b,
 print("=== PHASE 3: Edit a's title, add child c, save ===")
 assert_headline_titles(buf_b,
   { { 1, 'member', 'b' },
-    { 2, 'container', 'a' },
-    { 3, 'container', 'b' },
+    { 2, 'member', '' },      -- b's containers folder
+    { 3, 'member', 'a' },
+    { 4, 'container', 'b' },
+    { 5, 'container', 'a' },
     { 2, 'member', 'a' },
     { 3, 'member', 'b' } },
   'phase 3: buffer B before edit')
 vim.api.nvim_set_current_buf(buf_b)
-do -- Change a's title on line 4 (the editable a): replace the
+do -- Change a's title on line 6 (the editable a): replace the
    -- trailing "a" with a longer title.
-  local line4 = vim.api.nvim_buf_get_lines(buf_b, 3, 4, false)[1]
-  local new_line4 = line4:sub(1, #line4 - 1)
+  local line6 = vim.api.nvim_buf_get_lines(buf_b, 5, 6, false)[1]
+  local new_line6 = line6:sub(1, #line6 - 1)
                     .. 'Node a was given this longer title'
-  vim.api.nvim_buf_set_lines(buf_b, 3, 4, false, { new_line4 })
+  vim.api.nvim_buf_set_lines(buf_b, 5, 6, false, { new_line6 })
 end
 -- Add a new child of a with no metadata.
 vim.api.nvim_buf_set_lines(buf_b, -1, -1, false, { '*** c' })
 print('Buffer B after edit: ' .. T.buffer_text(buf_b))
 assert_headline_titles(buf_b,
   { { 1, 'member', 'b' },
-    { 2, 'container', 'a' },
-    { 3, 'container', 'b' },
+    { 2, 'member', '' },
+    { 3, 'member', 'a' },
+    { 4, 'container', 'b' },
+    { 5, 'container', 'a' },
     { 2, 'member', 'Node a was given this longer title' },
     { 3, 'member', 'b' },
     { 3, 'member', 'c' } },
@@ -226,15 +232,17 @@ print('=== PHASE 4: Verify buffer B after save ===')
 T.check(vim.api.nvim_buf_is_valid(buf_b), 'Buffer B still exists')
 assert_headline_titles(buf_b,
   { { 1, 'member', 'b' },
-    { 2, 'container', 'Node a was given this longer title' },
-    { 3, 'container', 'b' },
+    { 2, 'member', '' },
+    { 3, 'member', 'Node a was given this longer title' },
+    { 4, 'container', 'b' },
+    { 5, 'container', 'Node a was given this longer title' },
     { 2, 'member', 'Node a was given this longer title' },
     { 3, 'member', 'b' },
     { 3, 'member', 'c' } },
   'phase 4: buffer B after save')
 do -- The line for c should now have its title and a server id.
-  local line6 = vim.api.nvim_buf_get_lines(buf_b, 5, 6, false)[1]
-  local split = metadata.split_as_stars_metadata_title(line6 or '')
+  local line8 = vim.api.nvim_buf_get_lines(buf_b, 7, 8, false)[1]
+  local split = metadata.split_as_stars_metadata_title(line8 or '')
   T.check(split and split.title == 'c', string.format(
     'phase 4: line for c had title %s, expected "c"',
     split and split.title or 'nil'))
@@ -253,8 +261,10 @@ T.check(vim.api.nvim_buf_is_valid(buf_a), 'Buffer A still exists')
 print('Buffer A content: ' .. T.buffer_text(buf_a))
 assert_headline_titles(buf_a,
   { { 1, 'member', 'Node a was given this longer title' },
-    { 2, 'container', 'b' },
-    { 3, 'container', 'Node a was given this longer title' },
+    { 2, 'member', '' },
+    { 3, 'member', 'b' },
+    { 4, 'container', 'Node a was given this longer title' },
+    { 5, 'container', 'b' },
     { 2, 'member', 'b' },
     { 3, 'member', 'Node a was given this longer title' },
     { 2, 'member', 'c' } },

@@ -6,7 +6,6 @@ use indoc::indoc;
 use ego_tree::{NodeId, Tree};
 
 use skg::dbs::init::wipe_then_init_tantivy_db;
-use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use skg::dbs::in_rust_graph::stats::AllGraphnodeStats;
@@ -16,8 +15,6 @@ use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::{
   SkgrepoRestriction,
   SkgrepoSetName,
-  filter_path_to_unrestricted_skgrepos_for_test,
-  filter_branches_to_unrestricted_skgrepos_for_test,
   run_with_skgrepo_set_test_db};
 use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::to_org::render::content_view::multi_root_view;
@@ -26,9 +23,8 @@ use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
-use skg::to_org::extend::role_tree::{
-  build_and_integrate_containerward_role_tree_with_skgrepo_set,
-  integrate_path_that_might_branch_or_cycle_with_skgrepo_set};
+use skg::to_org::extend::containerward_chain::{
+  ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
@@ -36,7 +32,6 @@ use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
-  Birth,
   Viewnode,
   ViewnodeKind,
   viewforest_root_viewnode};
@@ -76,11 +71,8 @@ fn all_tests
       s . reset ("restricted_repo_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_skgrepo_search_and_save_work_together_end_to_end (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("containerward_extension_truncates_before_restricted_container", fixtures) ?;
-      containerward_extension_truncates_before_restricted_container (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
-      mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks (
+      s . reset ("the_containerward_chain_stops_before_a_restricted_container", fixtures) ?;
+      the_containerward_chain_stops_before_a_restricted_container (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("stale_restricted_placeholders_under_folders_save_without_error", fixtures) ?;
       stale_restricted_placeholders_under_folders_save_without_error (
@@ -579,59 +571,7 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
         "restricted save should still write unrestricted-repo edits" );
       Ok (( )) }
 
-#[test]
-fn backward_path_truncates_before_first_restricted_node (
-) -> Result<(), Box<dyn Error>> {
-  let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
-  let restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (
-      &config,
-      SkgrepoSetName::from ("public"))?;
-  let graph = graph_handle_from_config (&config)? . load_full ();
-  let path : Vec<ID> =
-    vec![
-      ID::from ("active-container"),
-      ID::from ("private-container"),
-      ID::from ("active-root-after-private") ];
-  assert_eq! (
-    filter_path_to_unrestricted_skgrepos_for_test (&graph, &config, &restriction, path)?,
-    vec![ID::from ("active-container")],
-    "mid-path filtering should keep exactly the unrestricted prefix \
-     and stop before the first restricted node" );
-  Ok (( )) }
-
-#[test]
-fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
-) -> Result<(), Box<dyn Error>> {
-  let config =
-    load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
-  let restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (
-      &config,
-      SkgrepoSetName::from ("public"))?;
-  let graph = graph_handle_from_config (&config)? . load_full ();
-  let mixed_branches : BTreeSet<ID> =
-    BTreeSet::from ([
-      ID::from ("active-fork-branch"),
-      ID::from ("private-fork-branch")]);
-  assert_eq! (
-    filter_branches_to_unrestricted_skgrepos_for_test (
-      &graph, &config, &restriction, mixed_branches)?,
-    BTreeSet::from ([ID::from ("active-fork-branch")]),
-    "partially restricted forks should render only unrestricted branches" );
-  let restricted_branches : BTreeSet<ID> =
-    BTreeSet::from ([
-      ID::from ("private-fork-branch"),
-      ID::from ("private-other-branch")]);
-  assert! (
-    filter_branches_to_unrestricted_skgrepos_for_test (
-      &graph, &config, &restriction, restricted_branches)?
-    . is_empty (),
-    "fully restricted forks should not render an empty fork folder" );
-  Ok (( )) }
-
-async fn containerward_extension_truncates_before_restricted_container (
+async fn the_containerward_chain_stops_before_a_restricted_container (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -645,19 +585,20 @@ async fn containerward_extension_truncates_before_restricted_container (
           * (skg (node (id child-for-backpath) (repo public))) child-for-backpath
         "})?;
       let child_skgid : NodeId = first_child_skgid (&viewforest);
-      build_and_integrate_containerward_role_tree_with_skgrepo_set (
+      attach_containerward_chains_under_members (
         &mut viewforest,
-        child_skgid,
+        &[child_skgid],
         &graph,
         config,
-        Some (&restriction)) ?;
+        Some (&restriction),
+        ContainerwardChainPartners::LiveGraph ) ?;
       let child_children : BTreeSet<ID> =
         true_child_skgids (&viewforest, child_skgid);
       assert_eq! (
         child_children,
         BTreeSet::from ([ID::from ("active-container")]),
-        "containerward extension should keep the unrestricted prefix and \
-         truncate before the restricted container" );
+        "the containerward chain should keep the unrestricted prefix and \
+         stop before the restricted container" );
       let rendered : String =
         viewforest_to_string (&viewforest, config)?;
       assert! (
@@ -669,64 +610,6 @@ async fn containerward_extension_truncates_before_restricted_container (
         ! rendered . contains ("active-root-after-private"),
         "nodes beyond the first restricted container should be unreachable: {}",
         rendered );
-      Ok (( )) }
-
-async fn mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks (
-  config : &SkgConfig,
-  _tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-      let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
-      let restriction : SkgrepoRestriction =
-        SkgrepoRestriction::named (
-          &config,
-          SkgrepoSetName::from ("public"))?;
-      let mut viewforest : Tree<Viewnode> =
-        viewforest_from_org (indoc! {"
-          * (skg (node (id child-with-fork) (repo public))) child-with-fork
-        "})?;
-      let child_skgid : NodeId = first_child_skgid (&viewforest);
-      integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
-        &mut viewforest,
-        child_skgid,
-        Vec::new (),
-        HashSet::from ([
-          ID::from ("active-fork-branch"),
-          ID::from ("private-fork-branch"),
-          ID::from ("private-other-branch")]),
-        HashSet::new (),
-        &graph,
-        config,
-        Birth::RoleGraft (RelationRole::MENTIONER),
-        Some (&restriction)) ?;
-      assert_eq! (
-        true_child_skgids (&viewforest, child_skgid),
-        BTreeSet::from ([ID::from ("active-fork-branch")]),
-        "mentionerward fork extension should retain unrestricted branches \
-         independently and omit restricted branches" );
-
-      let mut empty_fork_viewforest : Tree<Viewnode> =
-        viewforest_from_org (indoc! {"
-          * (skg (node (id child-with-fork) (repo public))) child-with-fork
-        "})?;
-      let empty_fork_child_skgid : NodeId =
-        first_child_skgid (&empty_fork_viewforest);
-      integrate_path_that_might_branch_or_cycle_with_skgrepo_set (
-        &mut empty_fork_viewforest,
-        empty_fork_child_skgid,
-        Vec::new (),
-        HashSet::from ([
-          ID::from ("private-fork-branch"),
-          ID::from ("private-other-branch")]),
-        HashSet::new (),
-        &graph,
-        config,
-        Birth::RoleGraft (RelationRole::MENTIONER),
-        Some (&restriction)) ?;
-      assert! (
-        true_child_skgids (&empty_fork_viewforest, empty_fork_child_skgid)
-        . is_empty (),
-        "all-restricted mentionerward forks should not leave children or \
-         empty fork folders" );
       Ok (( )) }
 
 #[test]

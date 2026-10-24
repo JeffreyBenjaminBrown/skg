@@ -1025,7 +1025,7 @@ fn parse_editrequest_sexp (
 /// Each request is either a bare atom ('editableView',
 /// 'writeProtectedView', 'writeProtectedSubtreeView', 'fork',
 /// 'flags'), or a nested
-/// '(folder RELNAME)' / '(roleTree ROLENAME)' form.
+/// '(folder RELNAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
   requests : &mut HashSet<ViewRequest>
@@ -1049,15 +1049,11 @@ fn parse_viewrequests_sexp (
             FolderRelation::from_relname (&arg)
               . ok_or_else ( || format! (
                 "Invalid folder relname: {}", arg )) ?),
-          "roleTree" => ViewRequest::RoleTree (
-            RelationRole::from_rolename (&arg)
-              . ok_or_else ( || format! (
-                "Invalid path rolename: {}", arg )) ?),
           _ => return Err ( format! (
             "Unknown view request form: ({} ...)", head )), } },
       _ => return Err (
         "Unexpected element in viewRequests (expected 'editableView' \
-         or '(folder ...)' / '(roleTree ...)')" . to_string () ), };
+         or '(folder ...)')" . to_string () ), };
     requests . insert (request); }
   Ok (( )) }
 

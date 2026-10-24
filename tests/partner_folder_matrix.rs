@@ -373,96 +373,43 @@ fn relationship_matrix
       omission_scenarios (&mut fails, config) . await ?;
       folder_request_scenarios (
         &mut fails, config, tantivy, &graph) . await ?;
-      path_request_scenarios (
+      roleTree_request_is_refused (
         &mut fails, config, tantivy, &graph) . await ?;
 
       fails . finish () } )) }
 
 //////////////////////////////////////////////////////////////
-// The Path view-request, '(viewRequests (roleTree ROLENAME))': graft the
-// partners playing ROLENAME toward the node as inverted write-protected
-// children with a '(birth roleGraft ROLENAME)' fact. One generic
-// role-tree engine serves all nine roles; these cover the seven new
-// ones (the container/mentioner roles keep their own golden tests).
-// An absent relation field stays MSV::Unspecified on save, so these
-// saves never disturb the graph the path then reads.
+// No role-tree request: a partner stands only in a partner folder of
+// its role, which a folder request draws ('folder_request_scenarios').
+// The server refuses '(viewRequests (roleTree ROLENAME))' as an
+// unknown view request, for every ROLENAME.
 //////////////////////////////////////////////////////////////
 
-async fn path_request_scenarios (
+async fn roleTree_request_is_refused (
   fails : &mut Fails,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  let req = | recorder : &str, role : &str, title : &str | -> String {
-    format! (
-      "* (skg (node (id {}) (repo public) (viewRequests (roleTree {})))) {}\n",
-      recorder, role, title ) };
-  // Each row: (scenario, recorder, role, partner-id, birth-span-fragment).
-  // Since uniform-heralds, the grafted partner no longer carries the
-  // old (birth roleGraft ROLE) fact nor a parent-relative viewStat;
-  // instead its relationship to its viewparent (the origin) shows as the
-  // birth (black-on-white) token inside its (rels ...) spans.
-  // E.g. the 'overridden' partner is overridden by the origin -> its
-  // parent (a) overrides it -> token "aO", rendered as the ancestor
-  // letter 'a' (yellow) then the birth 'O' (white). The 'overrider'
-  // partner overrides its parent among others -> "O2a". The birth token's
-  // spans appear consecutively inside (rels ...) on the partner's line.
-  // Each row's 5th field is the semantic relationship the grafted
-  // partner has to the origin (its viewparent, generation 1), which is
-  // its birth. The direction (in vs out) distinguishes e.g.
-  // overridden (the origin overrides it) from overrider (it overrides
-  // the origin, among others).
-  let sharing : [(&str, &str, &str, &str, &str); 6] = [
-    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "(overrides (in 1 (ancestors 1)))"),
-    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "(overrides (out 2 (ancestors 1)))"),
-    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "(subscribesTo (in 1 (ancestors 1)))"),
-    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "(subscribesTo (out 3 (ancestors 1)))"),
-    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "(hidesFromSubs (in 1 (ancestors 1)))"),
-    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "(hidesFromSubs (out 2 (ancestors 1)))"),
-  ];
-  for (s, recorder, role, partner, birth_rel) in sharing {
-    let _ = role;
-    let resp : SaveResponse = save (
-      &req (recorder, role, recorder), // title == recorder (matches its disk title)
-      config, tantivy, graph) . await ?;
-    if ! resp . errors . is_empty () {
-      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view,
-                           &format! ("(id {})", partner) );
-    // The matching birth relationship, on the grafted partner's own line.
-    match resp . saved_view . lines ()
-            . find ( |l| l . contains (&format! ("(id {})", partner)) ) {
-      Some (line) => if ! line . contains (birth_rel) {
-        fails . record (s, format! (
-          "partner {} missing birth relation {:?}: {}",
-          partner, birth_rel, line )); },
-      None => {}, // already recorded by want_contains above
-    } }
-  { // (roleTree mentioned) on a node whose title carries [[id:pathLink-dst]]:
-    // the dest node is grafted. (mentioner is the existing mentionerward
-    // golden; this is its mirror.)
-    let s : &str = "path/mentioned";
-    let resp : SaveResponse = save (
-      &req ("pathLink-src", "mentioned", "[[id:pathLink-dst][to dst]]"),
-      config, tantivy, graph) . await ?;
-    if ! resp . errors . is_empty () {
-      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
-    // The grafted dest is born of a single inbound link (from the
-    // origin), no outbound.
-    fails . want_contains (
-      s, &resp . saved_view, "(linksTo (in 1 (ancestors 1) (substantive 0)))" ); }
-  { // Self-referential fixture: a node that links to itself. A
-    // non-container path role is cycle-guarded and needs no view-root
-    // special-case (unlike containerward) -- the build must not panic,
-    // and the node reappears as its own grafted dest.
-    let s : &str = "path/self-referential-no-special-case";
-    let resp : SaveResponse = save (
-      &req ("pathSelf", "mentioned", "[[id:pathSelf][to self]]"),
-      config, tantivy, graph) . await ?;
-    if ! resp . errors . is_empty () {
-      fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(id pathSelf)"); }
+  for role in [ "container", "mentioner", "mentioned", "overridden",
+                "subscriber" ] {
+    let s : String = format! ("roleTree/{}", role);
+    let buffer : String = format! (
+      "* (skg (node (id wOvr-owner) (repo public) (viewRequests (roleTree {})))) wOvr-owner\n",
+      role );
+    match save (&buffer, config, tantivy, graph) . await {
+      Ok (resp) if resp . errors . is_empty () =>
+        fails . record (&s, format! (
+          "expected a refusal, got the view:\n{}", resp . saved_view )),
+      Ok (resp) if ! resp . errors . iter () . any ( |error|
+          error . contains ("Unknown view request form: (roleTree ...)") ) =>
+        fails . record (&s, format! (
+          "expected an unknown-request refusal, got {:?}", resp . errors )),
+      Ok (_) => {},
+      Err (error) if ! error . to_string () . contains (
+          "Unknown view request form: (roleTree ...)") =>
+        fails . record (&s, format! (
+          "expected an unknown-request refusal, got {}", error )),
+      Err (_) => {}, }}
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////

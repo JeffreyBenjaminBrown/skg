@@ -27,7 +27,7 @@ if not view then
 end
 T.check(view, 'no content view buffer was created')
 
-print('=== PHASE 2: Verifying parent prepended as first child ===')
+print('=== PHASE 2: Verifying the containers folder holding parent ===')
 local text = T.buffer_text(view)
 print('Buffer:\n' .. text)
 local lines = vim.api.nvim_buf_get_lines(view, 0, -1, false)
@@ -57,7 +57,11 @@ T.check(not root_line:find(
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 
-local parent_headline_prefix = '** (skg (node (id parent)'
+T.check(lines[2] and lines[2]:sub(1, #'** (skg containerFolder') == '** (skg containerFolder',
+  string.format(
+    "the root's first child is not its containers folder; buffer:\n%s", text))
+
+local parent_headline_prefix = '*** (skg (node (id parent)'
 local parent_line = nil
 for _, line in ipairs(lines) do
   if line:sub(1, #parent_headline_prefix) == parent_headline_prefix then
@@ -66,12 +70,12 @@ for _, line in ipairs(lines) do
   end
 end
 T.check(parent_line, string.format(
-  'no level-2 headline for parent; buffer:\n%s', text))
+  'no level-3 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    'nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true) ~= nil,
+    '(id parent) (repo main) writeProtected (rels (contains (out 1 (ancestors 2))) (birth (contains out 2)))', 1, true) ~= nil,
   string.format(
-    'parent is not nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); '
+    'parent is not a write-protected member of the folder; '
     .. 'line: %s', parent_line))
 T.check(parent_line:find(' writeProtected%f[%A]') ~= nil,
   string.format('parent is not writeProtected; line: %s', parent_line))

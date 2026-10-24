@@ -29,7 +29,7 @@ When you "edit" a note N that you don't own, what actually happens is you gain a
 
 Because nodes in Skg are represented as flat files, N' duplicates very little data. For instance, if N consisted of two big branches, then the file representing N would only contain some text and two nodes. If you changed their order, you would have to duplicate N (with its text and its two nodes), but you would not have to duplicate anything inside either branch.
 
-The overrides relationship is what makes Skg show N' wherever N would appear as recursive content. Opening a fresh view of N (say, by following a link) still opens raw N; search enrichment and explicit override folders or paths expose N'.
+The overrides relationship is what makes Skg show N' wherever N would appear as recursive content. Opening a fresh view of N (say, by following a link) still opens raw N; the override folders, in search results or requested, expose N'.
 
 When new content appears in N, it will appear in your N' as "unintegrated subscribed content" (which you can proceed to integrate if you like). If you delete the subscription, this stops being true. You can also subscribe N' to other nodes apart from N.
 

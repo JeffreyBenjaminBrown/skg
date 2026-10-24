@@ -67,41 +67,6 @@ impl SkgrepoRestriction {
       None          => false } ) }
 }
 
-pub fn filter_path_to_unrestricted_skgrepos_for_test (
-  graph  : &InRustGraph,
-  config : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-  path   : Vec<ID>,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  let mut result : Vec<ID> = Vec::new ();
-  for skgid in path {
-    let skgrepo : SkgrepoName =
-      match find_skgrepo_with_optional_tantivy (
-        graph, &skgid, None, config ) {
-        Some (skgrepo) => skgrepo,
-        None => break };
-    if restriction . contains_skgrepo (&skgrepo) {
-      result . push (skgid);
-    } else {
-      break; }}
-  Ok (result) }
-
-pub fn filter_branches_to_unrestricted_skgrepos_for_test (
-  graph    : &InRustGraph,
-  config   : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-  branches : BTreeSet<ID>,
-) -> Result<BTreeSet<ID>, Box<dyn Error>> {
-  let mut result : BTreeSet<ID> = BTreeSet::new ();
-  for skgid in branches {
-    if let Some (skgrepo) =
-      find_skgrepo_with_optional_tantivy (
-        graph, &skgid, None, config )
-    {
-      if restriction . contains_skgrepo (&skgrepo) {
-        result . insert (skgid); }}}
-  Ok (result) }
-
 /// Refuses unless the restriction is 'all'. 'what' is the refused
 /// command, as the subject of the refusal ("The diff view").
 pub fn require_skgrepo_set_all (

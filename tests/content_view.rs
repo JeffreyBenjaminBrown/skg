@@ -6,9 +6,6 @@ use std::error::Error;
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_stores;
-use skg::dbs::in_rust_graph::paths::path_containerward_to_first_nonlinearity;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::misc::{ID, SkgConfig};
 
 
@@ -18,10 +15,6 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-content-view",
     |s| Box::pin ( async move {
-      s . reset ("run_path_and_root_tests (a mess of stuff)",
-                 "tests/content_view/fixtures") ?;
-      run_path_and_root_tests (
-        &s . config ) . await ?;
       s . reset ("test_multi_root_view_logic",
                  "tests/content_view/fixtures-2") ?;
       test_multi_root_view_logic (
@@ -43,71 +36,6 @@ fn all_tests
       test_limit_with_multiple_sibling_groups (
         &s . config ) . await ?;
       Ok (( )) } )) }
-
-async fn run_path_and_root_tests (
-  config : &SkgConfig,
-
-) -> Result<(), Box<dyn std::error::Error>> {
-  let graph = InRustGraph::from_graphnodes (
-    &read_all_skg_files_from_skgrepos (config)?);
-
-  // Test the path from node "4" to the root container
-  match path_containerward_to_first_nonlinearity (
-    &graph,
-    & ID("4" . to_string() )
-  ) {
-    Ok(r) => { assert_eq!(
-      r.path,
-      vec![
-        ID ( "2" . to_string() ),
-        ID ( "1" . to_string() ) ],
-      "Unexpected path to root container from node '4'.");
-    }, Err (e) => {
-      panic!("Error finding path to root container: {}", e); } }
-
-  match path_containerward_to_first_nonlinearity (
-    &graph,
-    & ID("4" . to_string() )
-  ) {
-    Ok(r) => { assert_eq!(
-      r.path . last () . cloned (),
-      Some ( ID ( "1" . to_string() ) ),
-      "Root of node '4' should be 1." ) },
-    Err (e) => { panic!(
-      "Error finding root container from id {}", e); } }
-
-  // Test the path "to root" from node "cycle-3".
-  // (1 contains 2 contains 3 contains 1.)
-  match path_containerward_to_first_nonlinearity (
-    &graph,
-    & ID("cycle-3" . to_string() )
-  ) {
-    Ok(r) => { assert_eq!(
-      r.path,
-      vec![
-        ID ( "cycle-2" . to_string() ),
-        ID ( "cycle-1" . to_string() ) ],
-      "Unexpected path to \"root container\" from node 'cycle-3'.");
-    }, Err (e) => {
-      panic!("Error finding path to root container: {}", e); } }
-
-  // Test the path "to root" from node "cycle-1".
-  // (1 contains 2 contains 3 contains 1.)
-  match path_containerward_to_first_nonlinearity (
-    &graph,
-    & ID("cycle-1" . to_string() )
-  ) {
-    Ok(r) => { assert_eq!(
-      r.path,
-      vec![
-        ID ( "cycle-3" . to_string() ),
-        ID ( "cycle-2" . to_string() ),
-      ],
-      "Unexpected path to \"root container\" from node 'cycle-1'.");
-    }, Err (e) => {
-      panic!("Error finding path to root container: {}", e); } }
-
-  Ok (( )) }
 
 async fn test_multi_root_view_logic (
   config : &SkgConfig,

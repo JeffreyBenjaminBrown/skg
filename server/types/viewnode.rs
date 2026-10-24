@@ -36,11 +36,10 @@ pub enum Membership {
 /// This is view history used for display and stale-relation validation,
 /// not save extraction.
 ///
-/// A 'RoleGraft(role)' node was grafted by the role-tree engine as an
-/// role-tree partner; the RelationRole names the role that partner plays
-/// toward its viewparent (the origin) -- e.g. 'CONTAINER' for a
-/// containerward ancestor, 'MENTIONER' for a node that links to the
-/// origin. The role determines the wire ROLENAME and the herald glyph
+/// A 'RoleGraft(role)' node was drawn as a partner playing that role
+/// toward its viewparent: a node of the containerward chain
+/// ('to_org/extend/containerward_chain.rs') is born of 'CONTAINER'.
+/// The role determines the wire ROLENAME and the herald glyph
 /// (see PARTNER_ROLE_VOCAB).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Birth {
@@ -644,7 +643,6 @@ impl FolderRelation {
 /// Requests for viewbranches related to a node.
 /// Multiple view requests can be unrestricted simultaneously.
 /// - 'Folder(rel)' builds both folders of the relation, populated from the graph.
-/// - 'RoleTree(role)' builds the role tree for that one partner role.
 /// - 'Editable' makes the (write-protected) node editable.
 /// - 'WriteProtected' makes the (editable) node write-protected,
 ///   and its direct unrestricted children non-members.
@@ -656,7 +654,6 @@ impl FolderRelation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
   Folder (FolderRelation),
-  RoleTree (RelationRole),
   Flags,
   Editable,
   WriteProtected,
@@ -964,13 +961,13 @@ impl ReadinessRequest {
 
 impl ViewRequest {
   /// The match-position atoms the server can emit inside
-  /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
-  /// '(folder ...)' / '(roleTree ...)' forms are value-position (echoed by the
+  /// '(viewRequests ...)'. The RELNAME argument of the
+  /// '(folder ...)' form is value-position (echoed by the
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
-  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 6] =
-    [ "folder", "roleTree", "flags", "editableView",
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 5] =
+    [ "folder", "flags", "editableView",
       "writeProtectedView", "writeProtectedSubtreeView" ];
 }
 
@@ -1190,7 +1187,6 @@ impl fmt::Display for ViewRequest {
   ) -> fmt::Result {
     match self {
       ViewRequest::Folder  (rel)  => write! (f, "(folder {})",  rel  . relname  ()),
-      ViewRequest::RoleTree (role) => write! (f, "(roleTree {})", role . rolename ()),
       ViewRequest::Flags   => write! (f, "flags"),
       ViewRequest::Editable    => write! (f, "editableView"),
       ViewRequest::WriteProtected        => write! (f, "writeProtectedView"),

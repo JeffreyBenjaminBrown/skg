@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Integration test: opening a content view of a node that is itself
-# contained by another node prepends the containerward role tree as
-# the first children of the view-root, and the server's response
+# contained by another node shows its containers folder as the first
+# child of the view-root, and the server's response
 # carries an `info` field that surfaces a minibuffer notice.
 
 set -e

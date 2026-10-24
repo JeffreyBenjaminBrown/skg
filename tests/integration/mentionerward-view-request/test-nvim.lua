@@ -1,4 +1,4 @@
--- Integration test for skg mentionerward-view request functionality,
+-- Integration test for the mentioners folder request,
 -- nvim client. The Lua mirror of test-emacs.el in this directory.
 --
 -- Unlike most view tests, the base buffer here is authored locally
@@ -37,7 +37,7 @@ end
 
 ---Reset the scratch view buffer to base_buffer_text under a fresh
 ---view ID, position the cursor at LINE_NUMBER (0-based, like the
----elisp), request the mentionerward view (auto-saves), and return the
+---elisp), request the mentioners folder (auto-saves), and return the
 ---resulting full buffer text. Port of
 ---skg-mentionerward--request-on-line.
 ---@param line_number integer
@@ -49,7 +49,7 @@ local function request_on_line (line_number)
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-mentionerward-view-line-%d', line_number))
-  view_requests.show_mentionerward_tree() -- auto-saves
+  view_requests.show_folderOf_mentioners() -- auto-saves
   T.check(T.wait_for_response(),
           string.format('mentionerward view response arrived for line %d',
                         line_number))
@@ -88,12 +88,13 @@ local expected_changed =
   '* (skg (node (id 1) (repo main)'
   .. ' (rels (contains (out 2))))) 1\n'
   .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n'
-  .. '*** (skg (node (id l-11) (repo main) nonMember'
-  .. ' (birth roleGraft mentioner) writeProtected (rels (linksTo (out 1 (ancestors 1))) (birth (linksTo out 1))))) [[id:11][a link to 11]]\n'
+  .. '*** (skg mentionerFolder)\n'
+  .. '**** (skg (node (id l-11) (repo main) writeProtected'
+  .. ' (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2))))) [[id:11][a link to 11]]\n'
   .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'
 local expected_with_link =
-  '* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n'
+  '* 1\n** 11\n*** \n**** [[id:11][a link to 11]]\n** 12\n' -- '*** ' the folder
 
 verify_view(0, expected_line0, expected_no_link)
 verify_view(1, expected_changed, expected_with_link)

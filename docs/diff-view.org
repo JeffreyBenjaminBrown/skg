@@ -479,8 +479,10 @@ C-c r u ('skg-diffView-integrate-unshown-changes'; Neovim
 "integrate unshown changes". The server brings the straddle up to
 date and recomputes the buffer's sets. Every node of U without an
 editable occurrence becomes editable (its body read from the live
-graph) at its first content occurrence in level order, else at its
-first partner-folder occurrence ('ensure_editableOccurrences_exist').
+graph) at its first content occurrence in level order
+('ensure_editableOccurrences_exist'); a node shown only as a
+write-protected folder member counts as shown nowhere, since a
+folder's members stay write-protected.
 The walk for content occurrences counts a removed member under an
 unrestricted vognode or a historical phantom as a content occurrence,
 and passes through a historical phantom in content position into its

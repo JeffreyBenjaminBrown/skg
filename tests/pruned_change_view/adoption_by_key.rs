@@ -149,21 +149,27 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
                  vec! [ "*** (skg alias) xa2" . to_string () ], "{}", committed );
     assert_saves_back_cleanly (f, &committed) }) }
 
-/// A containerward graft of x under r, when HEAD comes to say that r
-/// contained x, is adopted as the removed member: x stands under r
-/// once.
+/// A write-protected non-member x that the user put under r, when
+/// HEAD comes to say that r contained x, is adopted as the removed
+/// member: x stands under r once.
 #[test]
-fn a_graft_beside_a_removed_member_of_its_node_is_adopted (
+fn a_note_of_a_node_becomes_its_removed_member (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("graft_beside_removed_member", &["main"], |f| {
     let member_r : &str = "** (skg (node (id r)";
     let buffer : String = open_all_changes_buffer (f) ?;
-    let grafted : String = saved ( f, &edit_line ( &buffer, member_r, |line|
-      line . replacen ( "(repo main)",
-                        "(repo main) (viewRequests (roleTree container))", 1 ))) ?;
-    assert_one_child_with (&grafted, member_r, "(node (id x) (repo main) nonMember (birth roleGraft container)");
+    let noted : String = { // x typed as r's first child, after r's body
+      let mut lines : Vec<&str> = buffer . lines () . collect ();
+      let r_index : usize = lines . iter ()
+        . position ( |line| line . starts_with (member_r) )
+        . expect ("r is shown");
+      let after_r_body : usize = r_index + 1 + lines [ r_index + 1 .. ] . iter ()
+        . take_while ( |line| ! line . starts_with ('*') ) . count ();
+      lines . insert ( after_r_body, "*** (skg (node (id x) nonMember writeProtected)) x" );
+      saved ( f, &( lines . join ("\n") + "\n" )) ? };
+    assert_one_child_with (&noted, member_r, "(node (id x) (repo main) nonMember writeProtected");
     rewrite_head (f, "r", "pid: r\ntitle: r\nbody: old\ncontains:\n- x\n") ?;
-    let after_head : String = saved (f, &grafted) ?;
+    let after_head : String = saved (f, &noted) ?;
     assert_one_child_with (&after_head, member_r, "(node (id x)");
     assert_one_child_with (&after_head, member_r, "(diff (rel removed) (leaves 1 rel))");
     assert_saves_back_cleanly (f, &after_head) }) }

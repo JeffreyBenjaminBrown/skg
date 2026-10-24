@@ -193,7 +193,7 @@ fn convert_duplicate (
 /// converted is converted too, except the user's and the content
 /// reconciler's, which stay where they stand (a parked vognode keeps
 /// its content, as the older reconciler's does). So a folder's members
-/// go with the folder, and a member's role tree with the member. A
+/// go with the folder, and a member's chain with the member. A
 /// viewnode holding nothing but childless dead viewnodes is converted
 /// as a leaf, so the prune that ends the completion removes the lot.
 /// Detaches nothing.

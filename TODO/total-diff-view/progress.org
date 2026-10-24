@@ -3939,3 +3939,78 @@ checked to fail with the preference disabled.
 editability, e11 its content) and two tests of 'after_a_commit'
 (the retained x under e stays editable, xc its member). The Rust
 count is 915.
+** Slice 4: deviations
+*** the root's folder is drawn by a folder request
+'render_initial_view' puts '(folder containers)' on each root,
+which the root's visit fulfils like any other request, so the
+folder and its chain are drawn inside the completion.
+'fulfill_root_containerward_requests' and the roots' exception
+in 'extract_view_requests' went. The chain is built in
+'server/to_org/extend/containerward_chain.rs'.
+*** each member walks its own chain
+A member's chain is its own containerward role tree, as the
+pruned change view drew it already; the folder's viewparent is
+not counted as met. So over a cycle a and b, the view of a shows
+b in the folder, under it a, under that b as the leaf.
+*** a chain is drawn only with its folder
+'add_containers_folder_with_chains' draws chains only when it
+adds the folder. A member the live folder reconciler adds later
+carries none. The diff view's attach still reconciles the chain
+at every visit, over the straddle.
+*** chain nodes keep their birth and owner
+A chain node is born 'RoleGraft (CONTAINER)' and owned by
+'RoleTreeAttach', as the attach's grafts were, so the herald and
+the relRepo gating stay as they were until slices 6 and 7.
+'mk_writeProtected_from_viewnode' stays for the same reason.
+*** what counts as a chain node
+'is_in_containerward_chain': a non-member vognode under a member
+of a containers folder, or under another chain node. A note the
+user puts under such a member counts too. It names no
+change-forest leaf, so it shows neither leaves nor readiness, and
+a gesture on it is dropped without a warning.
+*** a moved relationship still shows under any member
+Under a member of a non-container folder the diff view still
+hangs its relRepo move, and nothing else.
+*** the search buffer shows direct override relatives
+The overrider and overridden folders hold direct relatives only,
+so a node a hit overrides only through another (G, under F) is no
+longer shown; suppression is unchanged. The three folders are
+prepended, before any alias folder. 'docs/override.org',
+'docs/api-and-formats.org' ("Text search") and the glossary's
+override entry say so.
+*** more went with the engine
+'server/dbs/in_rust_graph/paths.rs' ('PartnersOf' moved to
+'containerward_role_tree.rs'), 'RelationRole::role_tree_triple',
+and the two path filters of 'skgrepo_sets.rs' with their tests.
+The herald rule 'roleTree' went; its rendering cases now use
+'(folder containers)' and 'flags'.
+*** tests
+'tests/containerward_chain.rs' (a root's folder, a diamond, a
+cycle, the request on a content member and on a chain node);
+'tests/rebuild/attach_containerward_chain.rs' replaces the path
+tests; 'tests/rebuild/mentionerward_role_tree.rs' and the
+mentionerward fork test of 'repo_sets.rs' went with no folder to
+test. The matrix's path scenarios became one refusal check. A
+new fixture 'subscribee_member' pins that a non-container
+member holds nothing. The graft-adoption test types a note of x
+under r instead of requesting a role tree. The two folder-member
+tests of 'recomputed_sets.rs' now see c1 appended as a root.
+The Rust count is 914.
+**** integration
+Beyond the plan's four, the two save_collateral tests (both
+clients) see the root's folder: their expected structures and
+line positions moved. In 'save_collateral_break_cycle', the
+stale b is retained as a non-member in a's folder with its
+chain.
+*** docs left to slice 5
+'docs/diff-view.org' on a changed folder's members, the glossary
+entry for role trees, 'docs/api-and-formats.org' on
+'(roleTree ...)'. This slice fixed what slice 5 does not list:
+the integrate command in 'docs/diff-view.org',
+'docs/override.org' (its role-tree section went), the search
+enrichment, and one line of 'docs/data-model-skg-extensions.org'.
+*** verification
+Rust 914 passed; Emacs 387 passed; Neovim 31 spec files passed;
+integration 34 of 35, under Emacs and again under Neovim
+('SKG_TEST_CLIENT=nvim'), 'import-md-and-org' failing as at
+baseline.

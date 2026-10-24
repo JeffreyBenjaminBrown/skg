@@ -32,8 +32,9 @@
     (assert-headline-structure
      buf
      '((1 member "a")
-       (2 container "b")
-       (3 container "a")
+       (3 member "b")         ; in a's containers folder
+       (4 container "a")      ; its chain
+       (5 container "b")
        (2 member     "b")
        (3 member     "a"))
      "phase 1: buffer A initial")))
@@ -51,8 +52,9 @@
     (assert-headline-structure
      buf
      '((1 member "b")
-       (2 container "a")
-       (3 container "b")
+       (3 member "a")         ; in b's containers folder
+       (4 container "b")      ; its chain
+       (5 container "a")
        (2 member     "a")
        (3 member     "b"))
      "phase 2: buffer B initial")))
@@ -66,16 +68,18 @@
     (assert-headline-titles
      buf
      '((1 member "b")
-       (2 container "a")
-       (3 container "b")
+       (2 member "")          ; b's containers folder
+       (3 member "a")
+       (4 container "b")
+       (5 container "a")
        (2 member     "a")
        (3 member     "b"))
      "phase 3: buffer B before edit")
     (with-current-buffer buf
-      ;; Change a's title on line 4 (the editable a):
+      ;; Change a's title on line 6 (the editable a):
       ;; replace trailing "a" with new title.
       (goto-char (point-min))
-      (forward-line 3)
+      (forward-line 5)
       (end-of-line)
       (delete-char -1)
       (insert "Node a was given this longer title")
@@ -87,8 +91,10 @@
     (assert-headline-titles
      buf
      '((1 member "b")
-       (2 container "a")
-       (3 container "b")
+       (2 member "")
+       (3 member "a")
+       (4 container "b")
+       (5 container "a")
        (2 member     "Node a was given this longer title")
        (3 member     "b")
        (3 member     "c"))
@@ -108,15 +114,17 @@
     (assert-headline-titles
      buf
      '((1 member "b")
-       (2 container "Node a was given this longer title")
-       (3 container "b")
+       (2 member "")
+       (3 member "Node a was given this longer title")
+       (4 container "b")
+       (5 container "Node a was given this longer title")
        (2 member     "Node a was given this longer title")
        (3 member     "b")
        (3 member     "c"))
      "phase 4: buffer B after save")
     (with-current-buffer buf ;; Verify the line for c has its title and an ID
       (goto-char (point-min))
-      (forward-line 5)
+      (forward-line 7)
       (let* ((line (buffer-substring-no-properties
                     (line-beginning-position) (line-end-position)))
              (parts (skg-split-as-stars-metadata-title line))
@@ -151,8 +159,10 @@ and the new child c."
     (assert-headline-titles
      buf
      '((1 member "Node a was given this longer title")
-       (2 container "b")
-       (3 container "Node a was given this longer title")
+       (2 member "")
+       (3 member "b")
+       (4 container "Node a was given this longer title")
+       (5 container "b")
        (2 member     "b")
        (3 member     "Node a was given this longer title")
        (2 member     "c"))

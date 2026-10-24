@@ -80,20 +80,22 @@ So far there are these endpoints:
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with =(("content" "TERMS"))= — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with =((request . "snapshot response") (terms . "TERMS"))\n= followed by =Content-Length: N\r\n\r\n<buffer text>= — the current buffer contents, dirty or not. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the buffer snapshot, inserts containerward role tree,
-       overrideward view-subtrees, and graphnodestats, and sends LP
+    3. Rust parses the buffer snapshot, inserts each hit's partner
+       folders and graphnodestats, and sends LP
        response-type "search-enrichment" with =(("terms" "TERMS")
        ("content" "ORG") ("warnings" (...)))=. Emacs replaces the
        buffer and exits readonly.
     - Enrichment uses the same skgrepo restriction as the original
-      search. Containerward role tree truncates before restricted
+      search. The containerward chain stops before restricted
       containers.
-    - Each result's overrideward view-subtree contains its visible
-      override relatives in both directions: what it overrides and what
-      overrides it. Each direction is recursive and cycle-guarded. These
-      nodes are write-protected non-content descendants. A matching node
+    - Under each result hang, folded, its containers folder, whose
+      members carry the containerward chain; its overrider folder,
+      the visible nodes that override it; and its overridden folder,
+      the visible nodes it overrides. A folder with no member is not
+      drawn. The members are write-protected. A matching node
       recursively overridden by an owned result is suppressed at the
-      top level because it reappears in that result's subtree.
+      top level; if the owned result overrides it directly, it
+      reappears in that result's overridden folder.
 
 ** Single-root content view from ID
   - Request: =((request . "single root content view")
@@ -115,8 +117,8 @@ So far there are these endpoints:
     is an overridden node shown raw, its immediate children are also shown
     raw (one level); substitution resumes at the grandchildren. See
     "Override substitution" below. Override facts can be inspected in
-    search results' overrideward view-subtrees and in explicitly requested
-    override folders and role trees.
+    search results' override folders and in explicitly requested
+    override folders.
 
 ** Save buffer
   - Request: First =((request . "save buffer") (view-id . "VIEW_ID") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n=, then one UTF-8 length-prefixed S-expression envelope:

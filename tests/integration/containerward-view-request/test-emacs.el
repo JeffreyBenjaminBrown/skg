@@ -1,9 +1,9 @@
-;;; Integration test for containerward-view request functionality
+;;; Integration test for the containers folder request
 ;;; This script tests:
 ;;; 1. Creating initial buffer structure and saving to establish relationships
 ;;; 2. Creating new buffer without root node
-;;; 3. Adding containerward-view request to node 12
-;;; 4. Verifying containerward path [1, 0] is integrated under node 12
+;;; 3. Requesting node 12's containers folder
+;;; 4. Verifying the folder holds 1, with the containerward chain [0] under it
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -27,7 +27,8 @@
                      (line-beginning-position)
                      (line-end-position))))
           ;; Extract stars and title from each line
-          (when (string-match "^\\(\\*+\\) .*?\\([^ ]+\\)$" line)
+          ;; A headline without a title (a folder) is skipped.
+          (when (string-match "^\\(\\*+\\) .*) \\([^ )]+\\)$" line)
             (let ((stars (match-string 1 line))
                   (title (match-string 2 line)))
               (setq result (concat result stars " " title "\n")))))
@@ -85,12 +86,12 @@
         (setq integration-test-phase "new-buffer-created")))))
 
 (defun test-request-containerward-view ()
-  "Call skg-show-containerward-tree on node 12."
-  (message "=== PHASE 3: Requesting containerward view for node 12 ===")
+  "Call skg-show-folderOf-containers on node 12."
+  (message "=== PHASE 3: Requesting the containers folder of node 12 ===")
 
   (with-current-buffer "*skg-content-view*"
-    (message "Calling skg-show-containerward-tree...")
-    (skg-show-containerward-tree) ;; this also saves the buffer
+    (message "Calling skg-show-folderOf-containers...")
+    (skg-show-folderOf-containers) ;; this also saves the buffer
 
     ;; Wait for response
     (skg-test-wait-for-response)
@@ -110,17 +111,18 @@
             ;; It's easier to read this way, without metadata.
             (concat "* 1\n"
                     "** 11\n"
-                    "** 12\n" ;; role tree was requested here
-                    "*** 1\n" ;; its first element
-                    "**** 0\n" ;; its second element
+                    "** 12\n" ;; the folder was requested here
+                    "**** 1\n" ;; in its containers folder
+                    "***** 0\n" ;; the chain under 1
                     "*** 121\n"
                     "** 13\n"))
            (expected
             (concat "* (skg (node (id 1) (repo main) (rels (contains (in 1) (out 3))))) 1\n"
                     "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11\n"
                     "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12\n"
-                    "*** (skg (node (id 1) (repo main) nonMember (birth roleGraft container) writeProtected (rels (contains (in 1) (out 3 (ancestors 1))) (birth (contains out 1))) (viewStats cycle))) 1\n"
-                    "**** (skg (node (id 0) (repo main) nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))))) 0\n"
+                    "*** (skg containerFolder)\n"
+                    "**** (skg (node (id 1) (repo main) writeProtected (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle))) 1\n"
+                    "***** (skg (node (id 0) (repo main) nonMember (birth roleGraft container) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))))) 0\n"
                     "*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121\n"
                     "** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13\n")))
 
@@ -136,13 +138,13 @@
             (if (string= stripped-buffer-content expected-without-metadata)
                 (progn
                   (message "✓ PASS: Stripped buffer-content matches expected structure")
-                  (message "✓ PASS: Containerward path [1, 0] was correctly integrated under node 12"))
+                  (message "✓ PASS: The containers folder of node 12 holds 1, with the chain [0] under it"))
               (progn
                 (message "✗ FAIL: Stripped buffer-content does not match expected without metadata")
                 (kill-emacs 1))))
         (progn
           (message "✗ FAIL: Buffer-Content does not match expected (with metadata)")
-          (message "Expected containerward path [1, 0] under node 12")
+          (message "Expected the containers folder of node 12 to hold 1, with the chain [0]")
           (kill-emacs 1))))))
 
 (defun run-all-tests ()
