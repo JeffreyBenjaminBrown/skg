@@ -13,13 +13,13 @@ It sidesteps how a view is first drawn and how save instructions
 are extracted from a buffer, with one exception that the reader
 needs: the first drawing of a view runs the same completion over
 a stub forest, so "how a saved view is completed" and "how a view
-is drawn" are one mechanism with two entrances. The report also
-skips the search buffer, which no completion visits until its
-next save.
+is drawn" are one mechanism with two entrances. The search buffer
+is included: it is the one buffer the server draws without the
+walk, and a save of it runs the walk like any other.
 ** How I checked it
 I read the pipeline ('server/update_buffer.rs'), the visit
 dispatch ('server/update_buffer/complete.rs') and the diff view's
-switch ('server/diff_view/visit.rs', 'completion.rs') myself.
+hooks ('server/diff_view/visit.rs', 'completion.rs') myself.
 Three Opus agents read the rest and reported function by
 function: the folders, the content reconciler with the
 editability walk, and the diff view's step. Every claim here was
@@ -29,9 +29,9 @@ I would check before relying on them", each marked as traced, not
 run.
 ** The glossary comes first
 You said you remember little of the vocabulary. The glossary is
-the second section, and the rest of the report uses its words. It
-points out synonyms, because the code has several words for most
-things.
+a document of its own, 'glossary.org' beside this one, and this
+report uses its words. It points out synonyms, because the code
+has several words for most things.
 
 * The short version
 A completion is one breadth-first walk over the viewforest. Each
@@ -50,9 +50,12 @@ else a tombstone, and a prune at the end removes the childless
 tombstones and empty write-protected folders. After the prune, a
 tail marks roots, corrects memberships, computes statistics,
 applies the skgrepo restriction, assigns viewnode IDs and
-renders. The diff view runs the same walk with a switch set,
+renders. The diff view runs the same walk in diff-view mode,
 which adds a step at the end of each ordinary node's visit and
-makes the folders read the union of HEAD and the worktree.
+makes the folders read the union of HEAD and the worktree. The
+search buffer is the exception to the first sentence: the server
+draws it by hand, in two phases, and the walk first touches it
+when the user saves it.
 ** The rules, as the code states them
 Each of these is enforced somewhere in the code. The later
 sections say where; the section "Where the boundaries blur" says
@@ -92,7 +95,7 @@ diff view moves its removed members to their slots.
 Under every member of a partner folder but the two acquisition
 folders hang its containers, write-protected non-members, and
 theirs, to the roots.
-*** The diff view is the same walk with a switch
+*** The diff view is the same walk in diff-view mode
 Over the straddle the folders show the union of the two graphs,
 and each editable node's visit ends with a step that adds the
 node's change viewnodes.
@@ -101,543 +104,9 @@ Roots become members, members under dead parents become
 non-members, claims a write-protected parent does not support are
 flipped, stats are computed, the restriction is applied, viewnode
 IDs are assigned, and the text is rendered.
-
-* Glossary
-** How to read it
-Each entry gives the word as this report uses it, the code's name
-for it in single apostrophes, and any other words the code or the
-docs use for the same thing. The official glossary is
-'docs/glossary.org'; where this one differs, this one describes
-the code and that one the intent. Terms are grouped: the tree,
-membership and editability, the reconciler vocabulary, the graph
-side, requests, and the renders. A list of synonyms and a list of
-names that mislead close the section.
-** The tree
-*** viewforest, viewnode
-A *viewforest* is the server's tree of one buffer. Its nodes are
-*viewnodes* ('Viewnode' in 'server/types/viewnode.rs'), each of a
-*kind* ('ViewnodeKind'). The tree's invisible root is the *buffer
-root* ('BufferRoot'); its children are the buffer's *roots*, also
-called *view roots*.
-*** viewparent, viewchild, subtree, leaf
-Positions in the viewforest, as against parents and children in
-the graph. A *leaf* here is a viewnode with no viewchildren (the
-code says "view-leaf"); a *branch* is one with some. "Subtree"
-means a viewnode with everything under it.
-*** occurrence
-One viewnode standing for a given graphnode. A buffer may hold
-several occurrences of one node; the code also says *copy* and,
-for a second one met on the walk, *repeat*.
-*** vognode
-A viewnode that stands for a graphnode ('Vognode'). Three kinds:
-*unrestricted* ('Vognode::Unrestricted', payload
-'UnrestrictedVognode', the ordinary node the view shows),
-*restricted* ('Vognode::Restricted', an anonymous placeholder for
-a node in a skgrepo the restriction hides), and *phantom*. The
-code often says just "Unrestricted" for the first.
-*** phantom
-A vognode for a node that is not a current member of the graph
-('Phantom'). *Deleted* ('Phantom::Deleted'): this save deleted
-it; it keeps its last title and body. *Historical*
-('Phantom::Historical'): only the diff view; HEAD has the node,
-the worktree lacks it; shows HEAD's text. *Unknown*
-('Phantom::Unknown'): an ID some list names that no node answers
-to; the docs call the ID *dangling* and the viewnode a
-*placeholder*. Phantoms are save-inert.
-*** non-vognode
-Every other viewnode: a folder, a property, a tombstone, the
-buffer root. They describe their viewparent rather than stand for
-a node.
-*** folder
-An org headline that groups viewnodes. A *partner folder*
-('ViewnodeKind::PartnerFolder', twelve kinds named by their wire
-atom: 'containerFolder', 'subscriberFolder', and so on) holds the
-viewparent's partners in one relationship role. A *property
-folder* ('ViewnodeKind::PropertyFolder': 'Alias', 'ID', 'Flags')
-holds entries describing the viewparent itself. "Col" is a
-retired word for folder.
-*** member of a folder, entry of a folder
-A viewnode standing in a folder for one of the folder's goal
-items. A partner folder has *members* (vognodes); a property
-folder has *entries* ('Property::Alias', 'Property::ID',
-'Property::Flag'). The code's 'FolderGoalItem' is one goal entry
-of a partner folder, with a 'FolderGoalShape': 'Member',
-'Removed' or 'Historical'.
-*** folder policy
-'PartnerFolder::policy' gives each kind a 'FolderPolicy':
-*EditableSet* ('subscribeeFolder', 'overriddenFolder': the save
-writes its membership), *EditableFilter*
-('hiddenOutsideOfSubscribeeFolder'), *WriteProtectedSet* (the
-inbound folders, 'hiddenFolder', the two acquisition folders) and
-*WriteProtectedFilter* ('hiddenInSubscribeeFolder'). "In-folders"
-and "out-folders" ('IN_FOLDERS', 'OUT_FOLDERS' in
-'server/diff_view/changes.rs') are the folders of the node's
-recorders and of the relationships it records.
-*** the two filter folders, the two acquisition folders
-The *filter folders* are 'hiddenInSubscribeeFolder' and
-'hiddenOutsideOfSubscribeeFolder', whose membership is derived
-from hide state. The *acquisition folders* are the diff view's
-'acquiredByFolder' and 'acquiredFolder', recording a nodeMerge;
-they carry no chain and have no member role.
-*** property
-A non-vognode leaf under a node or in a property folder
-('ViewnodeKind::Property'): an alias, an ID, a flag, the old
-text, a body diff, a home-skgrepo move, a relRepo move, a
-changeset marker, or a removed alias or ID.
-*** tombstone
-A viewnode with no title, ID or change facts, shown DELETED
-('ViewnodeKind::Tombstone', atom 'tombstone'). It stands where an
-unwarranted viewnode stood and holds that viewnode's children. To
-*entombstone* a viewnode is to make it one. Not to be confused
-with a *deleted phantom*, which keeps its node's text.
-*** the containerward chain, chain node
-Under each member of a partner folder hang its containers as
-write-protected non-members, under those theirs, up to the roots
-or 'max_roleTree_depth'
-('server/to_org/extend/containerward_chain.rs'). The nodes so
-drawn are *chain nodes*; a node met again on the walk is drawn
-once more as a leaf ('ContainerwardRoleTree::Repeated'). A chain
-node's metadata says nothing of it; it is known by position
-('is_in_containerward_chain') or by shape
-('is_drawn_chain_node'). The docs' *role tree* is the tree the
-walk computes; "graft" is the retired word for a chain node.
-*** fold state, focus
-Per viewnode: 'org_folded', 'org_body_folded', 'focused'. A
-reconciler keeps them on any viewnode it keeps; the server sets a
-fold state only on a viewnode it creates.
-*** viewnode ID, viewforest ID
-A *viewnode ID* ('ViewnodeId', wire atom 'vnid') names one
-viewnode for the buffer's lifetime; the view's 'ViewnodeIdRecord'
-knows them and assigns new ones at the end of every completion.
-The *viewforest ID* ('ViewforestId') names the buffer. "View ID"
-in older prose means the latter.
-*** metadata, change facts, display fact
-The *metadata* is the s-expression on a headline. *Change facts*
-('ChangeFacts') are what the diff view records on a viewnode: the
-three kinds of change, the leaves a request may name, the ready
-objects. They are *display facts*: the view derives them and a
-save reads nothing from them. Never shortened to "facts".
-** Membership and editability
-*** member, non-member
-A child that *takes part in its viewparent's membership*, so that
-the save reads it as part of the relationship the position
-implies (content under a node, a partner in a folder), is a
-*member*; one merely drawn there is a *non-member*. In code the
-field is 'membership : Membership' with 'Member' and 'NonMember';
-the wire atom is 'nonMember'. Retired words for the same thing:
-"indep" (still in 'mark_erroneous_content_children_as_indep'),
-"ignored" and "parentIgnored" (still in comments in
-'content.rs'), "affectsParent false", and "orphan" for a member
-whose parent died, which the tail makes a non-member.
-*** editable, write-protected
-An *editable* occurrence is the one the save reads the node's
-text and content from; every other occurrence is
-*write-protected* ('Editability::Editable',
-'Editability::WriteProtected'; 'is_writeProtected'). Herald ☮.
-*** editability claim, editable map
-The record, in the *editable map* ('EditableMap' in
-'server/to_org/util.rs'), that one occurrence is the node's
-editable one. A claim is *Final* ('Finalizable::Final') when an
-editable-view request made it, *Tentative* otherwise. The map is
-built empty at every completion; only an editable occurrence
-claims. "Visited" is the map's parameter name.
-*** editability rule, first wins, yield, take the claim
-The rule that decides, at each occurrence the walk reaches,
-whether it is editable. *First wins*: a later occurrence of a
-claimed node is write-protected
-('make_writeProtected_if_repeat_then_extend_editable_map'). A
-non-member that holds a Tentative claim *yields* it to an
-editable member met later, and is write-protected with its
-content subtree ('take_claim_from_tentative_nonMember'); the
-member *takes the claim*. 'EditabilityOutcome::ClaimedElsewhere'
-and 'MadeFinal' are the two outcomes at an occurrence that
-carries a request.
-*** editable-view request, EVR, the cascade
-'ViewRequest::Editable', the request of C-c s d: make this
-occurrence editable and Final, and extend its content editable.
-The code abbreviates it *EVR*. A Final occurrence hands the
-request to each of its member content children at its visit; that
-is the
-*cascade*.
-*** node budget, extension
-The *node budget* ('CompletionContext::node_budget', starting at
-'initial_node_limit') counts *extensions*: one editable node's
-content list, drawn whole. When it reaches zero, every later
-occurrence but a root is left write-protected. A folder fills its
-members for free.
-*** write-protect request
-'ViewRequest::WriteProtected' (C-c s w) and
-'WriteProtectedSubtree' (C-c s W): make this occurrence
-write-protected, alone or with its content subtree.
-*** clobber
-To reset a write-protected occurrence's title and home skgrepo
-from the graph ('makeWriteProtectedAndClobber' in
-'server/to_org/util.rs', 'clobberWriteProtectedViewnode' in
-'server/to_org/complete/contents.rs'). The write-protected path
-of the content extension does only this.
-*** settled, cascade (the flags)
-Two booleans the ordinary node's visit passes to the content
-extension: *settled* says the editability rule already ran for
-this occurrence; *cascade* says it is Final and should hand the
-request down.
-** The reconciler vocabulary
-*** completion, view completion, complete
-*View completion* is the whole walk ('complete_viewforest'). The
-verb "complete" also names the older reconciler
-('complete_managed_children', 'complete_content_children'), which
-does not walk anything: it brings one node's managed children in
-line with a goal list.
-*** visit, node update, dispatch
-A *visit* is what happens to one viewnode when the walk dequeues
-it ('dispatch_node_update', the code's "node update"). To
-*dispatch* is to pick the visit's rule by the viewnode's kind.
-*** reconcile, reconciler
-To *reconcile* children against a goal is to keep the matched,
-create the missing and convert the rest. The docs recognise two
-*reconcilers*: *the older one*, 'complete_managed_children'
-('server/update_buffer/util.rs'), which the content list and
-every folder use, and *the diff view's*,
-'reconcile_children_with_shallowModelSubtree'
-('server/diff_view/shallow_model_subtree.rs'), which the diff
-view's step and the chain use. This report calls them the
-*goal-list reconciler* and the *shallow-model reconciler*. Every
-function named 'reconcile_*_children' wraps one of the two.
-*** refresh
-A word of comments and docs, not of function names: to refresh a
-property folder or a node's text is to re-read it from the live
-graph ('sync_unrestrictedVognode_from_disk', the alias, ID and
-flags reconcilers). It is reconciliation with a trivial selector.
-*** extend, fill, draw, build and integrate
-To *extend* a view is to draw more of it. A folder *fills* its
-members. The de novo helpers *build and integrate*
-('build_and_integrate_folder', 'build_and_integrate_aliases',
-'build_and_integrate_flags'): they create a folder by hand,
-without a reconciler, when a request asks for one. This report
-calls them the *fillers*.
-*** goal list, goal item, orderkey
-The *goal list* is what the graph says the children should be:
-for content, the node's 'contains' in file order; for a folder,
-its partners in one role. A *goal item* is one element
-('FolderGoalItem' for folders); the goal-list reconciler calls
-the item's key its
-*orderkey* ('Orderkey'), a misleading name: it is the key, not an
-order.
-*** model, shallow model subtree
-The diff view's form of a goal: a scratch tree of what the
-viewnode should hold, *shallow* because it holds other vognodes
-but not what their own visits add. The *model children* are its
-entries; a created child goes after its *model predecessor*.
-*** managed child, selector
-A reconciler *manages* the children its *selector* admits (the
-'selects' parameter of the shallow-model reconciler; the closure
-over kind and membership in the goal-list one). Unmanaged
-children are left where they stand. The shallow-model reconciler
-has a second predicate, 'converts_when_stale', for which selected
-children it may convert when stale; the docs say the reconciler
-*owns* those. Selected but not owned is possible there.
-*** key, match key, collected skgid, what a child stands for
-A child's *key* is what it is matched by: for an occurrence, the
-node's ID as the live graph resolves it (an extra ID collapses to
-its pid); for a property entry, the entry; for anything else, its
-kind. Names for the same idea: 'match_key' and 'MatchKey' in the
-shallow-model reconciler, 'Orderkey' in the goal-list one,
-'collected_skgid' (the original's ID when an overrider is shown
-in its place), and 'skgid_a_folder_child_stands_for', the folder
-reconciler's selector and key in one.
-*** adopt
-To *adopt* a child is to keep one already standing for a goal
-entry instead of creating another, with its viewnode ID and fold
-state. Three functions do it:
-'adopt_nonMember_children_that_are_content' (content),
-'mark_goal_children_as_folder_members' (folders), 'adopted_copy'
-(the shallow-model reconciler). The docs also say "matched" and
-"kept" for the same event.
-*** warrant, stale, duplicate, unwarranted, invalid
-The graph *warrants* a child when the goal has its key. A *stale*
-child's key is gone; a *duplicate* is a second child of a matched
-key. Both are *unwarranted* ('Unwarranted::Stale',
-'Unwarranted::Duplicate'); the goal-list reconciler's local name
-for stale is 'invalid_skgids', and the docs say *extra copy* for
-a duplicate.
-*** convert
-To *convert* an unwarranted child is to apply the one rule
-('convert_unwarranted_child'): retain as non-member if it is an
-unrestricted vognode with a subtree, else entombstone. Variants:
-'convert_unwarranted_subtree' and
-'convert_unwarranted_subtree_taking_along' (the diff view's,
-which first converts what was made below the child for the same
-model), 'convert_unwarranted_member_with_its_chain' (a folder's),
-'convert_duplicate', 'convert_change_viewnodes',
-'convert_nonmember_unknown_children_to_tombstones',
-'convert_now_restricted_phantoms'.
-*** retain as non-member
-The outcome of converting an unrestricted vognode that holds
-something: it stays, as a non-member, with its title, ID, subtree
-and the editability it had, and loses its change facts
-('Conversion::Retained'). A duplicate is also write-protected.
-"Parked" is the retired word.
-*** taking along, goes with
-What the diff view's conversion converts below a stale child
-before converting the child: the diff view's own viewnodes, a
-folder's members, drawn chain nodes
-('goes_with_a_stale_viewparent'). A note the user typed does not
-go with; it keeps the child retained.
-*** prune, self-deletable
-The *prune* ('prune_self_deletable_when_empty') is the one place
-a viewnode is detached during completion: postorder, every
-childless viewnode of a *self-deletable* kind
-('is_self_deletable_when_empty': tombstone, deleted phantom, the
-write-protected partner folders, the two filter folders, the ID
-folder), never a root. The code also says *sweep*. Nothing
-deletes itself; the name is figurative.
-*** reinstated, created
-A goal entry with no child is *created*; for a write-protected
-folder the warning calls that member *reinstated*
-('RepairKind::ReinstatedMember'), since the user must have
-deleted its headline.
-*** repair, repair summary, completion warning, warning sink
-A *repair* is any conversion or creation in a write-protected
-folder, counted in a 'RepairSummary' (created, retained,
-entombstoned stale, entombstoned duplicates) and reported as a
-'CompletionWarning::FolderRepair' through the *warning sink*,
-which only the just-saved view has.
-*** kept child order
-'KeptChildOrder::Unmoved': kept children stay, created ones go
-after their model predecessor. 'KeptChildOrder::FollowsGoal':
-non-members and converted children first, then members in goal
-order. The latter is for lists whose order the save writes.
-*** normalize
-'normalize_relationship_backed_content_unknowns' and its folder
-twin: a member whose node vanished while the relationship still
-names its ID becomes an unknown phantom, before the reconciler
-would otherwise entombstone or recreate it.
-*** erroneous content children
-The content reconciler's name for member children whose key is
-not in the goal ('mark_erroneous_content_children_as_indep');
-they are made non-members. By the time it runs, the goal-list
-reconciler has converted them already.
-*** generalized orphan, required ancestry, dispose
-A folder is a *generalized orphan* when some ancestor in its
-*required ancestry* (a table per folder kind, 'required_ancestry'
-in 'server/update_buffer/ancestry.rs') is of the wrong kind,
-typically because the node died. Such a folder is entombstoned at
-its visit and its children are *disposed*
-('dispose_orphaned_folder_child'): a member is converted, a
-nested folder is left to die at its own visit. The comments call
-this
-*death-leafward*. A *dead parent* is a deleted phantom or a
-tombstone.
-*** deletion preflight, deleted by this save
-The first thing an ordinary node's visit does: if this save
-deleted the node ('deleted_by_this_save_pids'), the occurrence
-becomes a deleted phantom and the visit ends.
-*** align
-The diff view's pass at an editable node, before the content
-reconciler, ('align_content_members_with_straddle'): make members
-whose relationship the worktree dropped non-members, adopt a
-non-member standing for a content node, and turn a historical
-phantom whose node is back into an editable member, so that the
-content reconciler keeps each viewnode.
-*** the per-visit step, change viewnode, front
-The *per-visit step* ('process_unrestrictedVognode_changes', "the
-step") is what the diff view adds at the end of an editable
-node's visit. A *change viewnode* is one it adds: old text, a
-move, a changeset marker, a changed folder, a removed member.
-The *fronts* ('is_front_change_viewnode') are the change
-viewnodes that stand ahead of the content.
-*** tag, unmark
-To *tag* a member is to set its change facts
-('tag_content_members', 'tag_root'); to *unmark* a property
-folder is to clear the change facts of its entries
-('unmark_property_folders_except').
-*** removed member
-A non-member unrestricted vognode carrying '(rel removed)': the
-one encoding of a relationship that HEAD has and the worktree
-lacks ('is_unrestricted_removed_member'). The docs also say
-*former member*. It counts as a member for the editability claim.
-*** fresh node, default folders
-A *fresh node* is one the completion creates; on a de novo render
-('create_partnerFolders_for_fresh_nodes') or at an editable-view
-request, it gets its *default folders*: a subscribee folder when
-it subscribes, and the hidden-outside folder that goes with one.
-*** override substitution, raw, shown raw
-When a node is overridden, a content view shows the overrider in
-its place (*substitution*), recording the original in
-'overridesHere'. A node shown as itself is *raw*; it is *shown
-raw* in a write-protected folder, an overridden folder, or at a
-root ('is_overridden_shown_raw'). The diff view substitutes
-nothing.
-** The graph side
-*** graph, in-Rust graph, graph snapshot, live graph
-The *in-Rust graph* ('InRustGraph') is the index of the worktree.
-A completion reads one *snapshot* of it ('graph_snap'), taken
-once per save. Docs say *live graph* and the diff view says
-*after-graph* for the same thing: the worktree.
-*** HEAD, before-graph, straddle, union
-The *before-graph* is the in-Rust graph built from each owned
-skgrepo at HEAD. The *graph straddle* ('GraphStraddle { before,
-after }') holds both; its *union walk* answers questions over
-their union, each node and relationship with its *existence*:
-'Added' (only after), 'Removed' (only before), none (both).
-*** the three kinds of change, node change
-A node's existence, its other properties ('(properties changed)',
-herald M), and its relationship to the viewparent
-('GraphStraddle::node_change'). A phantom never carries
-'(properties changed)'.
-*** change-forest leaf, aspect
-The unit of readiness: one changed aspect of one node or
-relationship. 'ChangedAspects' groups the leaves that mention a
-node; the step reads them to decide what to draw for a node in C.
-*** C, R, U, D, content origin
-The pruned change view's sets
-('prunedChangeView_sets_of_buffer') are four: *C* the changed
-nodes, *R* the roots' ancestors on the containerward walk, *U*
-the editable set (C, the walk, R), *D* the roots in order, each a
-*content origin*. The order-only buffer's sets are empty.
-*** pid, skgid, extra ID, resolve, unresolved
-A node's primary ID is its *pid*; it may carry *extra IDs*, which
-*resolve* to the pid through the graph ('pid_of'). An ID that
-resolves to nothing is *unresolved*; the docs say *dangling*. A
-*raw* ID is one before resolution.
-*** recorder, partner, member role
-A relationship is recorded in one node's file, its *recorder*;
-the other node is its *member*. A *partner* ('Partner') is the
-other end of a relationship from a given node, with its existence
-and relRepo. A folder's *member role* ('relation_member_role')
-says which role its members play.
-*** relRepo, home skgrepo
-A relationship's *relRepo* is the skgrepo that records it; a
-node's *home skgrepo* is the one holding its file. A *move* of
-either is a change viewnode.
-*** skgrepo restriction, gated, omit
-The *skgrepo restriction* ('SkgrepoRestriction', chosen by the
-skgrepo-set switch) hides nodes whose home is outside the chosen
-set. Accessors ending in '_gated' drop what it hides;
-'omit_restricted_members' drops them from a goal list. A
-restricted node already shown survives as a restricted vognode.
-** Requests
-*** view request, edit request
-A *view request* ('ViewRequest': 'Editable', 'WriteProtected',
-'WriteProtectedSubtree', 'Folder', 'Flags', 'Fork') asks
-completion to draw or change something and is consumed when
-fulfilled. An
-*edit request* ('(editRequest ...)', the restore requests, the
-readiness request) asks the save to change the graph or the
-store; 'consume_edit_requests_after_save' clears them all before
-completion.
-*** readiness request, gesture, restore request
-A *readiness request* marks change-forest leaves ready; a
-*restore request* ('restoreNode', 'restoreRel') asks the save to
-undo a deletion. Completion reads neither; it reads the store's
-marks back as change facts.
-** The renders
-*** de novo render, stub
-The first drawing of a content view ('render_initial_view'): a
-*stub viewforest* of one root per requested node, each a plain
-editable vognode with a '(folder containers)' request, completed
-by the same walk with default folders on. The diff view's first
-drawing completes a stub over the straddle
-('complete_viewforest_with_graph_straddle').
-*** rerender, saved view, collateral view
-A *rerender* ('rerender_view') recompletes a standing viewforest.
-After a save, the *saved view* is the buffer the user saved,
-rerendered from its parse; a *collateral view* is any other open
-view the save touched, rerendered from the server's copy.
-*** rerender-all, skgrepo-set switch, prepass
-*Rerender-all* recompletes every open view. The *skgrepo-set
-switch* does the same after a *prepass*
-('convert_and_prune_for_skgrepo_switch') that converts now-hidden
-nodes and prunes what that empties.
-*** the contexts
-'RerenderAfterSaveContext' carries what the save established (the
-graph snapshot, the deleted sets, the straddle slot).
-'CompletionContext' carries one walk's state (editable map,
-budget, flags, sink, straddle). 'RerenderOptions' carries what
-differs between the renders.
-*** the tail, finish
-'finish_viewforest': what runs after the walk and the prune for
-every render, through the rendering of the text.
-*** stats, heralds
-'graphnodestats' are facts about a node from the graph (how many
-containers, and so on); 'viewnodestats' are facts about a
-viewnode's position (cycle, herald strings). Both are display
-facts set by the tail.
-** Synonyms and near-synonyms
-*** words for "bring in line with the graph"
-complete, reconcile, refresh, fill, extend, build and integrate,
-sync, clobber, normalize, align. They differ in scope, not in
-kind: every one computes what should be there and changes what
-is.
-*** words for "non-member"
-non-member, 'nonMember', 'NonMember', indep, ignored,
-parentIgnored, affectsParent false, orphan (when under a dead
-parent). All one flag.
-*** words for "the goal"
-goal list, goal items, model, shallow model subtree, "what it
-should hold", contains list (for content), partners (for a
-folder).
-*** words for "the key"
-key, match key, orderkey, collected skgid, the ID a child stands
-for, resolved ID, pid.
-*** words for "keep a child that is already there"
-adopt, match, keep, take, reuse. The docs settle on "adopt".
-*** words for "a child nobody wants"
-stale, invalid, unwarranted, extra copy, duplicate, erroneous
-content child, orphan, dead.
-*** words for the two outcomes
-retained as non-member, 'Retained', parked (retired); tombstone,
-entombstoned, 'ChildlessTombstone'; and for a vognode the save
-deleted, deleted phantom, "deletednode"
-('mutate_unrestrictedVognode_to_deletednode').
-*** words for the graphs
-live graph, after-graph, worktree, graph snap, 'runtime.graph',
-'straddle.after'; HEAD, before-graph, 'straddle.before'.
-*** words for the walk and its unit
-completion, view completion, BFS, level order; visit, node
-update, step (only the diff view's addition at the end of a
-visit).
-*** words that are NOT synonyms, though they look it
-"deleted phantom" and "tombstone" (the first keeps the node's
-text, the second nothing); "removed member" and "deleted node"
-(the relationship went, or the node went); "reinstated" and
-"adopted" (drawn anew, or taken back); "changeset marker" and
-"commit-readiness marker"; "selected" and "owned" in the
-shallow-model reconciler; "chain node by position" and "by
-shape".
-** Names that mislead
-*** 'complete_managed_children'
-A reconciler, not a completion. 'complete_content_children'
-likewise.
-*** 'reconcile_content_children' and its caller
-The caller is 'extend_true_content_at_unrestrictedVognode'. The
-first computes the goal and calls the reconciler; the second is
-the whole content visit, write protection and clobber included.
-"True content" means content as against folders.
-*** 'mark_erroneous_content_children_as_indep' and a twin
-The twin is 'mark_orphans_under_dead_parents_false'. Both make
-members non-members; "indep" and "false" are retired names for
-'nonMember'.
-*** 'mark_view_roots_as_members'
-Clears the 'nonMember' mark on roots; a root is a member of
-nothing (your point under '20_review.org').
-*** 'validate_membership_claims'
-Validates nothing it reports; it silently flips claims a
-write-protected parent does not support.
-*** 'make_writeProtected_if_repeat_then_extend_editable_map'
-Also takes the claim from a tentative non-member and makes a
-write-protected occurrence's children non-members.
-*** 'is_self_deletable_when_empty'
-Nothing deletes itself; the prune does.
-*** 'Orderkey'
-The key, not an order.
-*** 'server/to_org/complete/contents.rs'
-Holds only the clobber of a write-protected viewnode.
-*** 'ChildData', 'build_child_data'
-The facts needed to create or reshape one folder member, read
-from the live graph and disk, preferring an existing sibling's
-title.
-*** 'death-leafward'
-The ancestry check: a folder dies when an ancestor did.
+*** Every buffer but one is drawn by the walk
+The search buffer is drawn by hand in two phases, with a tail of
+its own, and meets the walk at its first save.
 
 * The pipeline, from parsed buffer to text
 ** What arrives
@@ -726,6 +195,9 @@ present but dropped. The same walk and tail.
 *** the diff view's first render
 A stub over the straddle; 'CompletionContext::for_diffView': no
 default folders, no restriction, no sink.
+*** the search buffer, in two phases
+Drawn by hand, not by the walk, and completed at its first save;
+see "The search buffer" below.
 
 * One visit
 ** The order of a visit
@@ -734,13 +206,14 @@ default folders, no restriction, no sink.
 'folder_is_generalized_orphan': if some required ancestor is of
 the wrong kind, 'entombstone_generalized_orphan_folder' disposes
 the children and entombstones the folder, and the visit ends.
-*** the diff view's switch before the extension
-'diffView_visit_before_extension' returns the visit's settings.
-Outside the diff view they are constant. Inside: a changed
+*** the diff view's hook before the extension
+'diffView_visit_before_extension' reads the completion mode. In
+a content view it does nothing. In diff-view mode: a changed
 property folder's visit is already done; a historical phantom
 adds its old content, and is visited as a node only if its node
-is back; every other visit gets the diff view's settings (folders
-over the straddle, no substitution, no default folders).
+is back. What else the mode changes (folders over the straddle,
+no substitution, no default folders) each visit asks of the mode
+itself, through its methods.
 *** then by kind
 An unrestricted vognode: the ordinary node's visit. The
 subscribee folder in a content view: its own reconciler. The two
@@ -978,10 +451,19 @@ folder is filled by the step and skipped at its own visit; an
 unchanged one is refreshed here.
 
 * The diff view's part
-** The switch
-'CompletionContext::straddle' is the switch; read at the two hook
-points in 'server/diff_view/visit.rs'. The buffer's U is read
-from the pruned change view's sets at every visit.
+** The mode
+'CompletionContext::mode' is a 'CompletionMode'
+('server/update_buffer/completion_mode.rs'): 'ContentView', or
+'DiffView { straddle, buffer_kind }'. The two hooks in
+'server/diff_view/visit.rs' match on it, and each visit asks it
+what the mode allows: substitution, default folders, the
+subscribee folder's own reconciler, the budget charge, the
+alignment. The buffer's U is read from the pruned change view's
+sets at every visit that charges the budget. Until commit
+'7d79a925' the mode was two option fields, called the switch,
+and the same choice stood again in 'PartnerFolderGoalSource' and
+in three constant fields of 'VisitSettings'; the enum replaced
+all three.
 ** Before the extension: the alignment
 At an editable node, over its children in buffer order, creating,
 moving and refolding nothing: an unrestricted child whose
@@ -1068,6 +550,113 @@ from the store. Every reconciler that rematches a viewnode clears
 them first. The restore flags are read by the save, never by
 completion.
 
+* The search buffer
+The search buffer is the one buffer the walk does not build. The
+server draws it by hand, in two phases, and registers it as a
+view ('ViewforestId::SearchView', shown to the client as
+"search:TERMS"), so that every later render treats it like any
+other view: a save of it, a collateral rerender, rerender-all and
+the skgrepo-set switch all run the walk over it.
+** Phase 1: the hits
+'handle_text_search_request'
+('server/serve/handlers/text_search.rs:133'). The index is
+queried; matches are grouped by node, scored, and filtered to the
+restriction. A hit that an owned hit overrides, directly or
+through a chain of overrides, is suppressed at the top level
+('suppressed_result_skgids'); a foreign overrider suppresses
+nothing. 'build_search_viewforest' then appends one root per hit,
+in score order, up to the display limit: a write-protected
+unrestricted vognode whose title is the best-matching title or
+alias from the index ('mk_writeProtected_viewnode', membership
+'Member'). When several titles or aliases of one node matched,
+the others go into an alias folder built by hand under the root.
+Viewnode IDs are assigned from a fresh record, the forest is
+rendered and registered (a prior search view of the same terms is
+replaced), and the text is sent as 'search-results'. No
+completion runs.
+** Phase 2: the enrichment
+'spawn_enrichment_thread' computes, in the background, the
+containerward role tree of every hit (one walk per hit,
+'containerward_role_trees_by_skgid_from_skgids') and the graph
+stats of the hits, their chain nodes and the members of their
+override folders. The server then asks the client for a snapshot
+of the search buffer, dirty or not, and
+'enrich_search_buffer_snapshot' ('server/serve.rs:379') works on
+that text: it parses it, drops unknown viewnode IDs, and
+'insert_partner_folders_into_search_view'
+('render_enriched_search_buffer.rs:23') prepends under each hit,
+folded, its overridden folder, its overrider folder and its
+containers folder, each only when it has a member. The override
+folders hold the direct relatives, read from the live graph with
+their titles. The containers folder's members and their chain are
+drawn by a drawer of its own ('insert_containerward_tree'), with
+titles from the search index and the skgrepo "search" as a
+fallback when the index lacks the node, and with its own relRepo
+and skgrepo gating. An empty containers folder is detached by
+hand. Then the enrichment runs a tail of its own: graph stats
+from the prefetch, 'mark_view_roots_as_members', viewnode stats,
+the restriction, the exclusion of overPrivateText nodes when the
+user declined them, the text-release decision, viewnode IDs, the
+render, and the view's update. The passes for orphans and
+membership claims do not run.
+** What a save does to it
+The client saves a search buffer as it saves any skg buffer,
+under its viewforest ID, and the server runs the saved-view
+pipeline over it. So the first completion of a search buffer
+happens at its first save, or when it is collateral to another
+save, or at rerender-all or a skgrepo-set switch. At that
+completion each root is a write-protected unrestricted vognode,
+so its visit takes the clobber path, and the title from the index
+gives way to the graph's. The hand-built alias folder is
+refreshed from the node's aliases, so it comes to hold all of
+them, not the matching ones. The containers and overrider folders
+are reconciled by the generic reconciler over the live graph,
+their members adopted by key and kept where they stand
+('Unmoved'). The chain under each member is reconciled, so a
+chain node titled from the index takes the graph's title
+('give_model_facts_to'). The overridden folder, an EditableSet,
+follows the graph's order. An empty folder of a self-deletable
+kind is pruned. Whether the save reads the overridden folder's
+membership under a write-protected root is save extraction,
+outside this report; it is the one place where the search buffer
+puts an editable interface under a write-protected node. Nothing
+of this was run; it follows from the reconcilers described above,
+applied to the shapes phase 2 leaves.
+** Where it departs from the rules
+*** it is built without the walk
+Both phases construct the forest by hand; the walk's goal lists,
+selectors and conversions play no part until the first save.
+*** its roots are write-protected members
+A content view's roots are editable. A hit is a write-protected
+root with membership 'Member'; a root prints no membership
+anyway.
+*** it has its own chain drawer and its own gating
+'insert_containerward_tree' stands beside
+'attach_containerward_chains_under_members', with separate
+relRepo and skgrepo checks, and titles from the index.
+*** it has its own tail
+The enrichment repeats five of the tail's eight steps by hand and
+skips the orphan and claim passes.
+*** it has its own prune
+An empty containers folder is detached by hand; the override
+folders are not drawn when empty.
+*** its alias folder shows matches, not aliases
+Until the first save refreshes it.
+*** suppression and the display limit are search-only inputs
+No other buffer drops a root because another root overrides it.
+** What one set of rules for every buffer would need
+The walk already draws a content view from a stub forest of roots
+with a '(folder containers)' request each. The search buffer
+would fit the same shape: phase 1 would append one
+write-protected root per hit, with folder requests for
+containers, overriders and overridden, and phase 2 would complete
+that stub by the walk and 'finish_viewforest' instead of its own
+drawers and tail. The search-specific parts would shrink to three
+inputs: the order of the hits, the suppression, and which title
+the hit shows. The two-phase protocol could stay as it is, since
+phase 2 would still run after the snapshot. This paragraph is a
+proposal, not a description.
+
 * What becomes of a child nobody wants
 One place for the outcomes, as the code decides them.
 ** a stale member holding something
@@ -1093,7 +682,7 @@ generalized orphans; its members become non-members in the tail.
 ** a folder whose ancestor died
 Entombstoned at its visit; members converted, nested folders left
 to die at theirs.
-** a now-restricted node, at a switch
+** a now-restricted node, at a skgrepo-set switch
 A restricted vognode; a leaf one pruned by the prepass.
 ** a note the user typed
 Never converted as stale by any reconciler; converted as a
@@ -1168,7 +757,10 @@ the first; both place created children after their model
 predecessor. The fillers are a third interface for the same work:
 build a folder by hand when a request asks, and the next visit
 reconciles it anyway. So the boundary is between three interfaces
-to one rule, and the vocabulary follows the interfaces.
+to one rule, and the vocabulary follows the interfaces. The
+search buffer's enrichment is a fourth interface: it draws
+folders, a chain and a tail by hand, and the walk reconciles them
+at the first save.
 ** The same decision in more than one place
 Each item cites where. These were read by the agents and checked
 against the code they cite; none was run.
@@ -1229,6 +821,15 @@ The filler ('folder_request.rs:91'), the search buffer by hand
 its own restriction logic), the pruned change view's empty stub
 folder ('pruned_change_view.rs:369'), and the generic reconciler
 at every rerender.
+*** the tail is written twice
+'finish_viewforest' ('update_buffer.rs:615') and the enrichment's
+own sequence ('serve.rs:412'), which skips the orphan and claim
+passes.
+*** the chain is drawn by two drawers
+'attach_containerward_chains_under_members'
+('containerward_chain.rs:66') and 'insert_containerward_tree'
+('render_enriched_search_buffer.rs:132'), each with its own
+restriction gating and its own source of titles.
 *** the subscribee folder has two reconcilers
 'subscribee_folder.rs' in content views, the generic one over the
 straddle; only the first ensures the hidden-outside folder.
@@ -1325,10 +926,10 @@ converted as stale when the container goes (noted in
 'reconcile_hiddenIn_folders' ('partner_folder/mod.rs:305').
 
 * What I did not check
-The search buffer's enrichment beyond noting that no completion
-visits it. The save extraction and the parse. The heralds and
-stats beyond what they set. Any of this at the TCP surface. The
-observations above, by running them. If you want the report
-confirmed before you plan on it, the throwaway-test method from
-'20_review.org' applies: one standalone crate, one case per
-observation.
+The search buffer's first save at the TCP surface: what its
+folders become is read from the reconcilers, not run. The save
+extraction and the parse. The heralds and stats beyond what they
+set. Any of this at the TCP surface. The observations above, by
+running them. If you want the report confirmed before you plan on
+it, the throwaway-test method from '20_review.org' applies: one
+standalone crate, one case per observation.
