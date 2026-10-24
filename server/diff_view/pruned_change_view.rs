@@ -8,8 +8,8 @@
 //! reaches containerward inside U. The view extends contentward from
 //! each d in D: a node in U is shown editable with its whole content
 //! list, a member outside U is a write-protected member shown without
-//! its content. View completion extends the viewforest, its
-//! 'straddle' set ('process_unrestrictedVognode_changes').
+//! its content. View completion extends the viewforest in diff-view
+//! mode ('process_unrestrictedVognode_changes').
 //!
 //! The merges and skgrepo-changes buffers render pruned change views over
 //! subsets of C ('prunedChangeView_sets_for_merges',

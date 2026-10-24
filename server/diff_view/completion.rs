@@ -19,6 +19,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::DiffViewBufferKind;
 use crate::update_buffer::complete::{
   CompletionContext, complete_appended_roots, complete_viewforest};
+use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::NodeId;
 use std::collections::BTreeSet;
@@ -46,12 +47,20 @@ impl DiffViewRerender {
     &self,
   ) -> DiffViewBufferKind {
     self . diffView_buffer_kind }
+
+  /// The completion mode of the rerender: diff-view mode, this buffer
+  /// over this straddle.
+  pub fn completion_mode (
+    &self,
+  ) -> CompletionMode<'_> {
+    CompletionMode::DiffView { straddle    : self . straddle (),
+                               buffer_kind : self . diffView_buffer_kind } }
 }
 
 /// Complete a stub viewforest of the diff view
 /// ('server/diff_view/pruned_change_view.rs'), the buffer of kind
-/// 'diffView_buffer_kind' over 'straddle': view completion with
-/// 'straddle' set, which shows the union of the straddle's content, the change
+/// 'diffView_buffer_kind' over 'straddle': view completion in
+/// diff-view mode, which shows the union of the straddle's content, the change
 /// folders and markers, and the former members. It creates no
 /// default partner folders, spends no node budget (only an
 /// editable-view request spends it, and a first rendering carries

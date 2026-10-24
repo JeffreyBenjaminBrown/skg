@@ -18,6 +18,7 @@ pub mod ancestry;
 pub mod skgrepo_switch;
 pub mod warnings;
 pub mod complete;
+pub mod completion_mode;
 pub mod reconcile;
 pub mod graphnodestats;
 pub mod util;
@@ -29,6 +30,7 @@ pub use graphnodestats::{
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_viewforest, CompletionContext};
+use completion_mode::CompletionMode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::completion::{
@@ -545,10 +547,9 @@ pub fn rerender_view (
       &mut context . graph_straddle, &context . runtime,
       options . diffView_buffer, options . integrate_unshown_changes,
       viewforest ) ?;
-  let straddle : Option<&GraphStraddle> =
-    diffView_rerender . as_ref () . map ( |rerender| rerender . straddle () );
-  let diffView_buffer_kind : Option<DiffViewBufferKind> =
-    diffView_rerender . as_ref () . map ( |rerender| rerender . diffView_buffer_kind () );
+  let mode : CompletionMode = // diff-view mode exactly when the view is a buffer of the diff view
+    diffView_rerender . as_ref ()
+    . map_or ( CompletionMode::ContentView, DiffViewRerender::completion_mode );
   { tracing::debug!("rerender_view: starting complete_viewforest");
     let nodes_before_completion : HashSet<NodeId> =
       viewforest . nodes () . map ( |node| node . id () ) . collect ();
@@ -572,8 +573,7 @@ pub fn rerender_view (
       options . create_partnerFolders,
       options . substitute_existing_content_overrides,
       warning_sink,
-      straddle,
-      diffView_buffer_kind,
+      mode,
       &nodes_before_completion,
       &editable_before_completion );
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(

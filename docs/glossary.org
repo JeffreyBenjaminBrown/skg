@@ -1420,8 +1420,8 @@ How the diff view ('docs/diff-view.org') is computed.
 
 Which of the four buffers of the diff view a buffer is
 ('DiffViewBufferKind'). A buffer of the diff view is rendered over the
-graph straddle; the straddle and the buffer kind are separate fields
-of the completion context.
+graph straddle; the straddle and the buffer kind are the two parts
+of the completion context's diff-view mode ('CompletionMode::DiffView').
 
 **** graph straddle, before-graph, after-graph
 

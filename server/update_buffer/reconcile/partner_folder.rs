@@ -2,7 +2,6 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::partner_folders::reconcile_partnerFolder_children_from_graph_straddle;
 use crate::diff_view::shallow_model_subtree::reconcile_children_with_shallowModelSubtree;
-use crate::graph_straddle::types::GraphStraddle;
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
@@ -22,25 +21,17 @@ use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
 use crate::types::viewnode::{FolderPolicy, PartnerFolder, Property, ViewnodeId, Viewnode, ViewnodeKind};
+use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
-/// Where a partner folder's goal list comes from.
-#[derive(Clone, Copy)]
-pub enum PartnerFolderGoalSource<'a> {
-  /// The live graph.
-  LiveGraph,
-  /// The union of a graph straddle: the members of either graph, each
-  /// tagged with the change of its node and of its relationship.
-  GraphStraddle (&'a GraphStraddle),
-}
-
 /// Reconciles one PartnerFolder (a folder is a collecting non-vognode)
 /// from a node in the viewforest with the current in-Rust graph snapshot's data
-/// about that node, or with a graph straddle's ('goal_source';
+/// about that node in a content view, or, in diff-view mode, with the
+/// union of the mode's graph straddle ('mode';
 /// 'diff_view/partner_folders.rs').
 /// Makes the folder's UnrestrictedVognode children that are members match a goal list,
 /// preserving reusable children and creating missing ones,
@@ -49,7 +40,7 @@ pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
-  goal_source  : PartnerFolderGoalSource,
+  mode         : CompletionMode,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
@@ -67,7 +58,7 @@ pub fn reconcile_partnerFolder_children (
     return Err (format!(
       "{} called for PartnerFolder {:?}, which has no relation member role",
       kind . caller_label (), kind) . into ()); };
-  if let PartnerFolderGoalSource::GraphStraddle (straddle) = goal_source {
+  if let CompletionMode::DiffView { straddle, .. } = mode {
     return reconcile_partnerFolder_children_from_graph_straddle (
       node, tree, kind, straddle, &viewparent_pid, member_role, runtime,
       deleted_by_this_save_extra_ids, warning_sink ); }

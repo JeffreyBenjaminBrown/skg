@@ -16,8 +16,9 @@ use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::viewnode::{
   DiffChange, Existence, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
-use skg::update_buffer::reconcile::partner_folder::{
-  PartnerFolderGoalSource, reconcile_partnerFolder_children};
+use skg::types::views_state::DiffViewBufferKind;
+use skg::update_buffer::completion_mode::CompletionMode;
+use skg::update_buffer::reconcile::partner_folder::reconcile_partnerFolder_children;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
@@ -96,7 +97,9 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     . id ();
   reconcile_partnerFolder_children (
     folder, &mut tree, PartnerFolder::Container,
-    PartnerFolderGoalSource::GraphStraddle (&f . straddle),
+    // The folder reconciler reads no buffer kind.
+    CompletionMode::DiffView { straddle    : &f . straddle,
+                               buffer_kind : DiffViewBufferKind::AllChanges },
     &f . runtime, &f . runtime . graph,
     &HashMap::new (), None, None ) ?;
   let both : DiffChange = DiffChange::default ();
