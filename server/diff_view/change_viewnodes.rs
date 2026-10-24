@@ -7,7 +7,7 @@
 //! readiness is read from the store where they are placed.
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
@@ -144,12 +144,12 @@ pub fn append_historical_phantom_content (
     tree . get_mut (folder) ? . append (acquirer_viewnode); }
   for partner in straddle . partners (pid, RelationRole::CONTENT) {
     let member : Option<Viewnode> =
-      match straddle . node_presence (&partner . id) {
-        Some (Presence::OnlyBefore) =>
-          mk_historical_viewnode (straddle, &partner . id, Some (Existence::Removed)),
-        Some (_) => mk_removed_member_viewnode (straddle, &partner . id, u),
-        None => Some ( mk_member_viewnode (
-          straddle, &partner . id, Some (Existence::Removed) )), };
+      if straddle . node_existence (&partner . id) == Some (Existence::Removed) {
+        mk_historical_viewnode (straddle, &partner . id, Some (Existence::Removed))
+      } else if straddle . node_in_either_graph (&partner . id) {
+        mk_removed_member_viewnode (straddle, &partner . id, u)
+      } else { Some ( mk_member_viewnode (
+                 straddle, &partner . id, Some (Existence::Removed) )) };
     if let Some (member) = member {
       tree . get_mut (phantom) ? . append (member); }}
   Some (( )) }

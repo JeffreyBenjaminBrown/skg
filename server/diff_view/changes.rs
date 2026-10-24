@@ -32,7 +32,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
-use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::diff_view::pruned_change_view::{
@@ -405,13 +405,13 @@ pub(crate) fn deleted_phantom_becomes_historical (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           Some ( t . skgid . clone () ),
         _ => None, } )) };
-  if straddle . node_presence (&skgid) != Some (Presence::OnlyBefore) {
+  if straddle . node_existence (&skgid) != Some (Existence::Removed) {
     return Ok (false); }
   let rel : Option<Existence> = // its relationship to a viewparent that contained it
     parent_pid . and_then ( |parent_pid|
       straddle . partners (&parent_pid, RelationRole::CONTENT) . into_iter ()
       . find ( |partner| partner . id == skgid )
-      . and_then ( |partner| partner . presence . diff_sign () ));
+      . and_then ( |partner| partner . existence ));
   let Some (historical) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, rel) else { return Ok (false); };
   let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid) . unwrap ();
@@ -598,7 +598,7 @@ fn tag_content_members (
           // write-protected node) is tagged too, but never recreated.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
           viewnode . change_facts . change = straddle . node_change (
-            &t . skgid, partner . and_then ( |p| p . presence . diff_sign () ));
+            &t . skgid, partner . and_then ( |p| p . existence ));
           if t . membership == Membership::Member
              && u_and_editable . is_some_and ( |(u, writable)|
             ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
@@ -608,7 +608,7 @@ fn tag_content_members (
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
           viewnode . change_facts . change . rel =
             by_id . get (&unknown . skgid)
-            . and_then ( |p| p . presence . diff_sign () ); },
+            . and_then ( |p| p . existence ); },
         _ => continue, }}
     let mut model : Tree<Viewnode> = Tree::new (model_root ());
     if let Some (moved) = moved {
@@ -644,13 +644,13 @@ fn reconcile_removed_content_members (
   let mut model : Tree<Viewnode> = Tree::new (model_root ());
   let mut anchors : Vec<Option<ID>> = Vec::new ();
   for (removed, anchor) in plan {
-    let removed_viewnode : Option<Viewnode> = match straddle . node_presence (&removed) {
-      Some (Presence::OnlyBefore) =>
-        mk_historical_viewnode (straddle, &removed, Some (Existence::Removed)),
-      Some (_) => Some (
-        mk_removed_member_viewnode (straddle, &removed, u)
-        . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? ),
-      None => None, };
+    let removed_viewnode : Option<Viewnode> =
+      if straddle . node_existence (&removed) == Some (Existence::Removed) {
+        mk_historical_viewnode (straddle, &removed, Some (Existence::Removed))
+      } else if straddle . node_in_either_graph (&removed) {
+        Some ( mk_removed_member_viewnode (straddle, &removed, u)
+               . ok_or ("reconcile_removed_content_members: a surviving member is not in the after-graph") ? )
+      } else { None };
     if let Some (removed_viewnode) = removed_viewnode {
       model . root_mut () . append (removed_viewnode);
       anchors . push (anchor); }}

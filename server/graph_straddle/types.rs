@@ -2,8 +2,8 @@
 //! the straddle itself, with the sets it computes once per straddle
 //! (C, the change-forest leaves) and the diff view's cache of each
 //! buffer's pruned change view sets ('PrunedChangeViewCache'), which it
-//! keeps but does not read; the presence of a node or relationship in
-//! its two graphs; a node's own changes ('NodeChanges'); a partner over
+//! keeps but does not read; the existence change of a node or
+//! relationship across its two graphs; a node's own changes ('NodeChanges'); a partner over
 //! the union of the two graphs ('Partner'); and the two halves of C
 //! ('ChangedPids').
 
@@ -40,14 +40,6 @@ pub struct GraphStraddle {
   pub(crate) prunedChangeView_cache : PrunedChangeViewCache,
 }
 
-/// Which graphs of the straddle hold a node or a relationship.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Presence {
-  Both,
-  OnlyBefore,
-  OnlyAfter,
-}
-
 /// The changes to a node present in both graphs that its own files
 /// record, other than its relationships (see 'GraphStraddle::partners').
 /// Gained items are in the after-graph's order, lost ones in the
@@ -70,7 +62,8 @@ pub struct NodeChanges {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Partner {
   pub id             : ID,
-  pub presence       : Presence,
+  /// The relationship's existence change; None when both graphs hold it.
+  pub existence      : Option<Existence>,
   pub relRepo_before : Option<SkgrepoName>,
   pub relRepo_after  : Option<SkgrepoName>,
 }
@@ -112,29 +105,18 @@ impl GraphStraddle {
     self . change_leaves () . order_only_pids () }
 }
 
-impl Presence {
-  /// None when in neither graph.
-  pub fn from_membership (
-    in_before : bool,
-    in_after  : bool,
-  ) -> Option<Presence> {
-    match (in_before, in_after) {
-      (true,  true)  => Some (Presence::Both),
-      (true,  false) => Some (Presence::OnlyBefore),
-      (false, true)  => Some (Presence::OnlyAfter),
-      (false, false) => None, } }
-
-  /// The existence change this presence shows in a '(diff ...)'
-  /// form: added for only after, removed for only before, none for
-  /// both.
-  pub fn diff_sign (
-    self,
-  ) -> Option<Existence> {
-    match self {
-      Presence::Both       => None,
-      Presence::OnlyBefore => Some (Existence::Removed),
-      Presence::OnlyAfter  => Some (Existence::Added), } }
-}
+/// The existence change of an item of the union of the straddle's
+/// two graphs, as a '(diff ...)' form shows it: added when only the
+/// after-graph holds it, removed when only the before-graph does,
+/// None when both do (or neither).
+pub fn existence_across_straddle (
+  in_before : bool,
+  in_after  : bool,
+) -> Option<Existence> {
+  match (in_before, in_after) {
+    (true,  false) => Some (Existence::Removed),
+    (false, true)  => Some (Existence::Added),
+    _              => None, } }
 
 impl NodeChanges {
   pub fn text_changed (
@@ -153,13 +135,13 @@ impl Partner {
   pub fn relRepo_moved (
     &self,
   ) -> bool {
-    self . presence == Presence::Both
+    self . existence . is_none ()
       && self . relRepo_before != self . relRepo_after }
 
   pub fn changed (
     &self,
   ) -> bool {
-    self . presence != Presence::Both || self . relRepo_moved () }
+    self . existence . is_some () || self . relRepo_moved () }
 }
 
 impl ChangedPids {

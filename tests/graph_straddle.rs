@@ -11,13 +11,14 @@ use skg::dbs::in_rust_graph::relation_accessors::{
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::graph_straddle::build::current_graph_straddle_in_slot;
-use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
+use skg::graph_straddle::types::{GraphStraddle, Partner};
 use skg::serve::ViewsState;
 use skg::serve::handlers::rebuild_session_lifetime_stores::rebuild_session_lifetime_stores_in_place;
 use skg::test_utils::{copy_dir_all, graph_handle_from_config, skg_env_from_parts};
 use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::views_state::OpenViews;
+use skg::types::viewnode::Existence;
 
 use git2::Repository;
 use std::collections::BTreeSet;
@@ -58,13 +59,13 @@ fn ids (
 
 fn partner (
   partner_id     : &str,
-  presence       : Presence,
+  existence      : Option<Existence>,
   relRepo_before : Option<&str>,
   relRepo_after  : Option<&str>,
 ) -> Partner {
   Partner {
     id             : id (partner_id),
-    presence,
+    existence,
     relRepo_before : relRepo_before . map (SkgrepoName::from),
     relRepo_after  : relRepo_after  . map (SkgrepoName::from), } }
 
@@ -73,19 +74,19 @@ fn removed_containers_are_reachable_from_the_deleted_node () {
   // D is deleted. K survives without it; K2 is deleted too.
   let (_f, straddle) : (Fixture, GraphStraddle) =
     one_skgrepo_straddle ("deleted_node");
-  assert_eq! ( straddle . node_presence (&id ("D")),
-               Some (Presence::OnlyBefore) );
-  assert_eq! ( straddle . node_presence (&id ("K2")),
-               Some (Presence::OnlyBefore) );
-  assert_eq! ( straddle . node_presence (&id ("nonexistent")), None );
+  assert_eq! ( straddle . node_existence (&id ("D")),
+               Some (Existence::Removed) );
+  assert_eq! ( straddle . node_existence (&id ("K2")),
+               Some (Existence::Removed) );
+  assert! ( ! straddle . node_in_either_graph (&id ("nonexistent")) );
   assert_eq! (
     straddle . partners (&id ("D"), RelationRole::CONTAINER),
-    vec! [ partner ("K",  Presence::OnlyBefore, Some ("main"), None),
-           partner ("K2", Presence::OnlyBefore, Some ("main"), None) ] );
+    vec! [ partner ("K",  Some (Existence::Removed), Some ("main"), None),
+           partner ("K2", Some (Existence::Removed), Some ("main"), None) ] );
   assert_eq! ( // the removed member where it stood, before E
     straddle . partners (&id ("K"), CONTENT),
-    vec! [ partner ("D", Presence::OnlyBefore, Some ("main"), None),
-           partner ("E", Presence::Both, Some ("main"), Some ("main")) ] );
+    vec! [ partner ("D", Some (Existence::Removed), Some ("main"), None),
+           partner ("E", None, Some ("main"), Some ("main")) ] );
   assert_eq! ( straddle . changed_pids () . out_changed, ids (&["D", "K", "K2"]) );
   assert_eq! ( straddle . changed_pids () . in_changed,   ids (&["D"]) ); }
 
@@ -97,12 +98,12 @@ fn a_relRepo_only_change_is_reported_from_both_ends () {
     "relRepo_move", OwnedSkgrepos::Named (&["public", "private"]), &[] );
   let straddle : GraphStraddle = graph_straddle (&f) . unwrap ();
   let moved : Partner =
-    partner ("C", Presence::Both, Some ("public"), Some ("private"));
+    partner ("C", None, Some ("public"), Some ("private"));
   assert_eq! ( straddle . partners (&id ("N"), CONTENT), vec! [moved] );
   assert! ( straddle . partners (&id ("N"), CONTENT) [0] . relRepo_moved () );
   assert_eq! (
     straddle . partners (&id ("C"), RelationRole::CONTAINER),
-    vec! [ partner ("N", Presence::Both, Some ("public"), Some ("private")) ] );
+    vec! [ partner ("N", None, Some ("public"), Some ("private")) ] );
   assert! ( straddle . node_changes (&id ("N")) . is_empty () );
   // N's file records the move; C's set of containers is unchanged.
   assert_eq! ( straddle . changed_pids () . out_changed, ids (&["N"]) );
@@ -121,8 +122,8 @@ fn changed_pids_splits_out_changed_and_in_changed () {
                ids (&["A", "New", "X", "Y"]) );
   assert! ( straddle . node_changes (&id ("X")) . title_changed );
   assert! ( ! straddle . node_changes (&id ("X")) . body_changed );
-  assert_eq! ( straddle . node_presence (&id ("New")),
-               Some (Presence::OnlyAfter) ); }
+  assert_eq! ( straddle . node_existence (&id ("New")),
+               Some (Existence::Added) ); }
 
 #[test]
 fn a_duplicate_id_at_head_refuses () {
@@ -139,7 +140,7 @@ fn a_foreign_skgrepo_needs_no_gitrepo_and_contributes_no_change () {
   let f : Fixture = case_fixture (
     "foreign_skgrepo", OwnedSkgrepos::Named (&["main"]), &["foreign"] );
   let straddle : GraphStraddle = graph_straddle (&f) . unwrap ();
-  assert_eq! ( straddle . node_presence (&id ("F")), Some (Presence::Both) );
+  assert! ( straddle . node_in_both_graphs (&id ("F")) );
   assert_eq! ( straddle . changed_pids () . all (), ids (&[]) ); }
 
 #[test]
@@ -227,8 +228,8 @@ fn a_nodeMerge_since_head_puts_the_acquirers_container_in_c () {
                straddle . after  . get (&id ("P")) );
   assert_eq! (
     straddle . partners (&id ("P"), CONTENT),
-    vec! [ partner ("b", Presence::OnlyBefore, Some ("main"), None),
-           partner ("a", Presence::OnlyAfter,  None, Some ("main")) ] );
+    vec! [ partner ("b", Some (Existence::Removed), Some ("main"), None),
+           partner ("a", Some (Existence::Added),  None, Some ("main")) ] );
   assert_eq! ( straddle . change_leaves () . leaves_under (&id ("P")) . len (), 2 );
   assert_eq! ( straddle . changed_pids () . out_changed, ids (&["P", "a", "b"]) );
   assert_eq! ( straddle . changed_pids () . in_changed,  ids (&["a", "b"]) ); }

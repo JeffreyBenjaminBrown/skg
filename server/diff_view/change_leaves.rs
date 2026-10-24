@@ -11,7 +11,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   RelationRole, RelationshipKey};
-use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, NodeChanges, Partner};
 use crate::graph_straddle::union_walk::ROLES_OF_LISTED_MEMBERS;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::serve::util::format_string_list_sexp;
@@ -200,7 +200,7 @@ impl ChangeLeaves {
       differing . into_iter ()
       . filter ( |pid|
         ! leaves_by_recorder . contains_key (pid)
-        && straddle . node_presence (pid) == Some (Presence::Both) )
+        && straddle . node_in_both_graphs (pid) )
       . collect ();
     let order_only_files : BTreeSet<ChangedFile> =
       order_only_pids . iter ()
@@ -212,7 +212,7 @@ impl ChangeLeaves {
       leaves_by_recorder . keys ()
       . flat_map ( |recorder|
         straddle . partners (recorder, RelationRole::MENTIONED) )
-      . filter ( |partner| partner . presence != Presence::Both )
+      . filter ( |partner| partner . existence . is_some () )
       . map ( |partner| partner . id )
       . collect ();
     ChangeLeaves { leaves_by_recorder, index, index_by_member, order_only_pids,
@@ -502,7 +502,7 @@ fn relationship_leaves (
       aspect } };
   let file_in = |skgrepo : &SkgrepoName| -> ChangedFile {
     ChangedFile { skgrepo : skgrepo . clone (), pid : recorder . clone () } };
-  if partner . presence != Presence::Both {
+  if partner . existence . is_some () {
     let relRepo : &SkgrepoName =
       partner . relRepo_after . as_ref ()
       . or (partner . relRepo_before . as_ref ())

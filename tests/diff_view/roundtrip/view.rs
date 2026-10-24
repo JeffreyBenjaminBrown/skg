@@ -18,7 +18,7 @@ use crate::git_fixture::{
 
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
-use skg::graph_straddle::types::{GraphStraddle, Partner, Presence};
+use skg::graph_straddle::types::{GraphStraddle, Partner};
 use skg::org_to_text::viewforest_tree_to_string;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
@@ -117,7 +117,7 @@ fn buffer_with_every_new_viewnode (
         skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("main"),
                                          new : SkgrepoName::from ("elsewhere") } } )) );
     b_mut . append ( mk_relRepo_move_viewnode ( &Partner {
-      id : ID::from ("b"), presence : Presence::Both,
+      id : ID::from ("b"), existence : None,
       relRepo_before : Some (SkgrepoName::from ("main")),
       relRepo_after  : Some (SkgrepoName::from ("elsewhere")) } )
       . expect ("the relationship moved") ); }

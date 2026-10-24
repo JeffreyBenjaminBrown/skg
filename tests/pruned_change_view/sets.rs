@@ -112,7 +112,7 @@ fn c_is_the_recorders_and_the_members_of_existence_changed_relationship_leaves (
             relationship, aspect : RelationshipAspect::Existence } =>
             Some ( relationship . member . clone () ),
           _ => None, } )
-        . filter ( |member| straddle . node_presence (member) . is_some () )
+        . filter ( |member| straddle . node_in_either_graph (member) )
         . collect ();
       assert! ( leaves . mentioner_sets_changed () . is_empty (), "{}", case );
       assert! ( ! recorders . is_empty (), "{}", case );

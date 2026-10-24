@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
 use crate::diff_view::shallow_model_subtree::reconcile_children_with_shallowModelSubtree;
-use crate::graph_straddle::types::{GraphStraddle, Partner, Presence};
+use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
@@ -24,7 +24,7 @@ use crate::to_org::extend::containerward_chain::{
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  DiffChange, FolderPolicy, PartnerFolder, Property, Viewnode,
+  DiffChange, Existence, FolderPolicy, PartnerFolder, Property, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_viewnode_id_of, push_repair_warnings, view_order_preserving_goal_list};
@@ -98,16 +98,17 @@ fn straddle_goal_item (
   partner      : &Partner,
   editable_set : bool,
 ) -> Option<FolderGoalItem> {
-  let node_presence : Option<Presence> = straddle . node_presence (&partner . id);
   let change : DiffChange = // as a content member's
-    straddle . node_change ( &partner . id, partner . presence . diff_sign () );
-  let shape : FolderGoalShape = match node_presence {
-    Some (Presence::OnlyBefore) => FolderGoalShape::Historical (
-      mk_historical_viewnode (straddle, &partner . id, change . rel) ? ),
-    _ if partner . presence == Presence::OnlyBefore => {
-      if editable_set { node_presence ?; } // dangling
-      FolderGoalShape::Removed },
-    _ => FolderGoalShape::Member, };
+    straddle . node_change ( &partner . id, partner . existence );
+  let shape : FolderGoalShape =
+    if change . node == Some (Existence::Removed) {
+      FolderGoalShape::Historical (
+        mk_historical_viewnode (straddle, &partner . id, change . rel) ? )
+    } else if partner . existence == Some (Existence::Removed) {
+      if editable_set && ! straddle . node_in_either_graph (&partner . id) {
+        return None; } // dangling
+      FolderGoalShape::Removed
+    } else { FolderGoalShape::Member };
   Some ( FolderGoalItem {
     skgid : partner . id . clone (), change : Some (change), shape } ) }
 

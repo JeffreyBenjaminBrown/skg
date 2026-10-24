@@ -13,7 +13,8 @@ use crate::dbs::in_rust_graph::relation_accessors::{
   NodeRelation, RelationRole};
 use crate::diff_view::change_leaves::ChangeLeaves;
 use crate::graph_straddle::types::{
-  ChangedPids, GraphStraddle, NodeChanges, Partner, Presence};
+  ChangedPids, GraphStraddle, NodeChanges, Partner,
+  existence_across_straddle};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -33,15 +34,6 @@ pub(crate) const ROLES_OF_LISTED_MEMBERS : [RelationRole; 4] = [
   RelationRole::OVERRIDDEN, ];
 
 impl GraphStraddle {
-  /// Which graphs hold a node with this primary ID; None if neither.
-  pub fn node_presence (
-    &self,
-    pid : &ID,
-  ) -> Option<Presence> {
-    Presence::from_membership (
-      self . before . nodes . contains_key (pid),
-      self . after  . nodes . contains_key (pid) ) }
-
   /// The node's existence change as the diff view shows it: added
   /// when only the after-graph has it, removed when only the
   /// before-graph does, else none.
@@ -49,7 +41,25 @@ impl GraphStraddle {
     &self,
     pid : &ID,
   ) -> Option<Existence> {
-    self . node_presence (pid) ? . diff_sign () }
+    existence_across_straddle (
+      self . before . nodes . contains_key (pid),
+      self . after  . nodes . contains_key (pid) ) }
+
+  /// Whether both graphs hold a node with this primary ID.
+  pub fn node_in_both_graphs (
+    &self,
+    pid : &ID,
+  ) -> bool {
+    self . before . nodes . contains_key (pid)
+    && self . after . nodes . contains_key (pid) }
+
+  /// Whether either graph holds a node with this primary ID.
+  pub fn node_in_either_graph (
+    &self,
+    pid : &ID,
+  ) -> bool {
+    self . before . nodes . contains_key (pid)
+    || self . after . nodes . contains_key (pid) }
 
   /// Whether the node's other properties changed, as the diff view
   /// shows it ('(properties changed)', herald M): both graphs have it
@@ -61,7 +71,7 @@ impl GraphStraddle {
     &self,
     pid : &ID,
   ) -> bool {
-    self . node_presence (pid) == Some (Presence::Both)
+    self . node_in_both_graphs (pid)
     && ! self . change_leaves () . leaves_under (pid) . is_empty () }
 
   /// The change a vognode standing for the node shows, from
@@ -77,7 +87,7 @@ impl GraphStraddle {
                  properties : self . node_properties_changed (pid) } }
 
   /// Empty unless the node is in both graphs: a created or deleted
-  /// node's change is its existence ('node_presence').
+  /// node's change is its existence ('node_existence').
   pub fn node_changes (
     &self,
     pid : &ID,
@@ -119,9 +129,8 @@ impl GraphStraddle {
         let relRepo_after : Option<SkgrepoName> =
           after_relRepos . get (&id) . map ( |r| (*r) . clone () );
         Partner {
-          presence : Presence::from_membership (
-            relRepo_before . is_some (), relRepo_after . is_some () )
-            . expect ("a partner comes from one graph or the other"),
+          existence : existence_across_straddle (
+            relRepo_before . is_some (), relRepo_after . is_some () ),
           id,
           relRepo_before,
           relRepo_after, }} )
@@ -134,7 +143,7 @@ impl GraphStraddle {
     &self,
     pid : &ID,
   ) -> Option<ID> {
-    if self . node_presence (pid) != Some (Presence::OnlyBefore) {
+    if self . node_existence (pid) != Some (Existence::Removed) {
       return None; }
     self . after . pid_of (pid) }
 
@@ -146,8 +155,8 @@ impl GraphStraddle {
   ) -> Vec<ID> {
     self . after . get (pid)
       . map ( |node| node . extra_ids . iter ()
-              . filter ( |extra_id| self . node_presence (extra_id)
-                                    == Some (Presence::OnlyBefore) )
+              . filter ( |extra_id| self . node_existence (extra_id)
+                                    == Some (Existence::Removed) )
               . cloned ()
               . collect () )
       . unwrap_or_default () }
@@ -172,7 +181,7 @@ impl GraphStraddle {
     let in_changed : BTreeSet<ID> =
       leaves . members_of_relationships_in_one_graph ()
       . chain ( leaves . mentioner_sets_changed () )
-      . filter ( |member| self . node_presence (member) . is_some () )
+      . filter ( |member| self . node_in_either_graph (member) )
       . cloned ()
       . collect ();
     ChangedPids { out_changed, in_changed } }
