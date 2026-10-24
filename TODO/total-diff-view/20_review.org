@@ -1,0 +1,503 @@
+#+title: Review of the folders-and-two-records run (2026-10-24)
+#+TODO: TODO ONGOING | DONE
+
+* DONE [Claude] Verdict
+The run did what '19_plan.org' asked, with one slice added on
+your decision while it ran. Fourteen slices landed in 40 commits
+between 22:34 and 03:33 UTC, each agent ending with its slice
+DONE and the tree clean, and no agent stopped for a question.
+Every suite is green on the final tree, every slice-final commit
+builds without a warning, and the commit rule held. The two
+records are gone, every role tree is a folder with the chain
+under its members, and the words are the settled ones. The review
+found one regression, which the first item under "Decide"
+describes with its one-condition fix: a removed member drawn
+under an editable folder member is refused 'restoreRel' as if it
+were a chain node, and after one save nothing in the buffer can
+restore it. The rest of "Decide" is the agents' choices where the
+plan left room, each with my recommendation, and what comes next.
+
+* DONE What I checked myself
+** The launches
+I launched each slice when the previous one's headline read DONE
+and 'git status' showed nothing but your '.gitignore', and I
+wrote each agent's closing report to
+'run-logs/19_plan/slice-N.txt'. Slice 11 was added to the plan
+while slice 10 ran, on your decision about the chain, and
+committed before slice 11 was launched; no agent saw the plan
+change mid-slice.
+** The central code
+I read 'convert_unwarranted_child'
+('server/update_buffer/util.rs'): a stale vognode with a subtree
+is retained as non-member and keeps its editability, its members
+made non-members only when it is write-protected, a duplicate's
+extra copy write-protected whatever it was, everything else
+entombstoned. I read 'is_diffView_change_viewnode',
+'goes_with_a_stale_viewparent' and
+'convert_unwarranted_subtree_taking_along'
+('server/diff_view/shallow_model_subtree.rs'): the diff view
+converts by kind and change facts, '(rel removed)' being the one
+fact that marks a vognode as its own, and takes along a stale
+child's folder members and drawn chain nodes. I read
+'take_claim_from_tentative_nonMember' and
+'counts_as_member_for_the_claim'
+('server/to_org/extend/editable.rs'): an editable member takes
+the claim from a tentative non-member that is not its ancestor,
+and a removed member counts as a member. I read the chain
+module's doc and 'is_in_containerward_chain'
+('server/to_org/extend/containerward_chain.rs'): the test climbs
+through non-member vognodes to a member of a chain-carrying
+folder, and does not ask whether the member is write-protected,
+which is the question under "Decide". I read
+'HeadlineName::org_subheadline' ('server/types/errors.rs') and
+the head of 'shared/metadata-fields.json'. Each does what the
+plan's Agreed behavior says, with the deviations the agents
+recorded.
+** The suites and the builds
+A Sonnet agent ran the four suites on the final tree, built each
+slice's last commit for warnings, checked the commit rule and
+timed the slices; its logs are under 'tests/results/review20/'.
+** Three throwaway probes
+An Opus agent ran the three claims the executing agents had only
+read: a pasted write-protected copy under a folder member once
+stale (slice 6), a stale folder member with and without a note
+under it (slice 11), and 'restoreRel' on a removed member under a
+subscribee extended as editable (slice 11). The results are under
+"Decide", and the report is
+'tests/results/review20/throwaway/report.md'.
+
+* DONE Results
+** The four suites on the final tree
+| suite       | passed              |            failed |
+|-------------+---------------------+-------------------|
+| nextest     | 910                 |                 0 |
+| emacs       | 394                 |                 0 |
+| nvim        | 377 specs, 32 files |                 0 |
+| integration | 34 of 35            | import-md-and-org |
+The integration failure is the baseline one. Logs:
+'tests/results/review20/' ('nextest.log', 'emacs-tests.log',
+'nvim-tests.log', 'integration-tests.log').
+** Every slice's last commit builds without a warning
+'cargo check --all-targets' at each of the fourteen slice-final
+commits (dacbcaf9, c5426c5c, de73f8a8, f0397627, cddd6ad5,
+68b7c17c, 22b18755, 663a4bba, b1a17794, 74c61e3b, 7aefd53b,
+898d4b94, ecfb7fd3, 69427827) compiled with zero warnings
+('checks-summary.txt').
+** The commit rule
+Exactly fourteen commits touch '19_plan.org', one per slice, each
+the last of its slice, none a docs-only fragment; the 39 slice
+commits' subjects all start with "Slice N of
+TODO/total-diff-view/19_plan.org", and the fortieth is the plan
+commit that added slice 11 ('commits.txt').
+** Durations, launched to DONE, in minutes
+| slice | min | slice | min | slice | min |
+|-------+-----+-------+-----+-------+-----|
+|     0 |  18 |     5 |   7 |    10 |  37 |
+|     1 |  21 |     6 |  21 |    11 |  25 |
+|     2 |  20 |     7 |  23 |    12 |  18 |
+|     3 |  18 |     8 |  17 |    13 |  12 |
+|     4 |  39 |     9 |  22 | total | 297 |
+The run went from 22:34 to 03:33 UTC, about five hours.
+** Counts
+Rust tests: 908 at the plan's commit, 910 at HEAD; Emacs tests
+387 and 394; Neovim 377 specs in 32 files. Files changed in the
+range: 373 (84 under 'server/', 14 'elisp/', 12 'nvim/', 242
+'tests/', 11 'docs/', 2 'shared/', 8 other), 12,099 insertions
+and 9,213 deletions. The fourteen agents used about 3.97 million
+tokens between them.
+
+* TODO Know: what the run did beyond the plan's words
+Each item is a choice an agent made where the plan left room, or
+a fact it found; all are recorded in 'progress.org' under
+"Folders, retention, and the two records".
+** Slice 0
+The type is 'Membership { Member, NonMember }', its field
+'membership'. 'mark_view_roots_parent_na' became
+'mark_view_roots_as_members' rather than going, so that a
+non-member moved up to a root prints nothing. The editors show
+'nonMember' as they show 'writeProtected', "false (default)" or
+"true", stripped to the bare atom. The herald style key is
+'nonMember'. Nine Rust tests that found the root by its
+'(affectsParent na)' now insert their request after the buffer's
+first '(node '. The conversion covered 194 'false' and 98 'na',
+more than the plan counted, since sources and fixtures were
+converted too. The cache is a single-entry struct with a unit
+test.
+*** TODO Jeff
+**** mark_view_roots_as_members : smells bad
+We can't be saying they are members when they aren't.
+Explain the justification for it in more detail?
+**** Membership {Member, NonMember} smells awkward
+Didn't we say a membership was something biger than that --
+like, it included the relationship type?
+Why is this not simply a boolean called isMember?
+**** nonMember should be the orthogonal sign
+not the peace sign -- it should show as affects not its parent,
+not you can't edit this.
+** Slice 1
+Three test files were renamed with the identifiers; two locals
+named 'vid' held a skgid and are named for it; "view ID" for the
+buffer stays in server comments and the save envelope's strings.
+Unknown viewnode IDs are dropped after the parse, by
+'drop_unknown_viewnode_ids_in_parsed_viewforest' before the
+record is consulted, so a validation error can still name a
+headline by a hand-typed unknown ID, and a save from a view that
+is not registered loses every viewnode ID. The switch's prepass
+removes restricted leaves, property leaves under a restricted
+node, tombstone leaves, and the folders that removal empties; a
+requested containers folder whose every member becomes restricted
+is still removed. The stability test is
+'tests/viewnode_id_stability.rs'.
+*** TODO jeff
+**** "view ID" must go
+It's either a viewnode ID or a viewforest ID.
+"view ID" is ambiguous.
+**** what are "the folders that removal empties"?
+What is removal here?
+** Slice 2
+The reconciler matches every child, whoever drew it, and still
+converted a stale child only if it owned it until slice 6. The
+removed-member reconciler and the chain attach never consider
+members. A pasted copy beside a member becomes the member only
+when no member of that node stands there. A property folder whose
+list no longer differs is unmarked at its node's step, never
+converted, and refreshed from the live graph at its own visit.
+The spurious "Repaired containerFolder" warning on the first save
+after HEAD changes was traced but not fixed.
+*** TODO Jeff
+**** What does "The removed-member reconciler and the chain attach never consider members" mean?
+What is the "chain attach"? What is "a removed-member reconciler"?
+**** "A pasted copy beside a member becomes the member only when no member of that node stands there."
+Please draw an example.
+**** Do you see how to fix the spurious warning?
+Why does it arise?
+** Slice 3
+'convert_unwarranted_child' is told whether the child is stale or
+a duplicate. The member preference lives in
+'take_claim_from_tentative_nonMember', not in
+'apply_editability_rule', which runs only for an occurrence that
+carries a request; only an editable member takes the claim, and a
+removed member counts as a member, since 'docs/diff-view.org'
+gives removed members a member's editability. A non-member yields
+with its whole content subtree, never when it is an ancestor of
+the member. The pasted write-protected copy test passes on the
+old code too; the yield test fails with the preference off.
+*** TODO jeff : "never when it is an ancestor of the member"
+Please elaborate.
+** Slice 4
+A fresh view puts a '(folder containers)' request on each root,
+and the folder and its chain are drawn during the completion;
+'fulfill_root_containerward_requests' is gone. Chains are walked
+per member, so over a cycle the view of a shows b in the folder,
+a under it, and b again as the repeat. Chain nodes kept their
+birth and owner until slices 6 and 7. A chain node is recognised
+by position, so a note typed under a folder member counted as
+one, and a readiness gesture on a chain node is dropped silently.
+The search buffer's override folders show direct relatives only.
+The engine took 'paths.rs', 'role_tree_triple', two path filters,
+the 'roleTree' herald rule and two fixture sets with it. Two
+integration tests beyond the plan's four changed, the
+'save_collateral' pair. Docs beyond slice 5's list were fixed
+here.
+*** TODO jeff
+**** "Chains are walked per member" seems wrong.
+Each chain should start at the folder's parent,
+not at one of its children.
+But then that first, obvious itemshould then be stripped
+from each chain before it is grafted into the folder.
+**** "a note typed under a folder member counted as one"
+Please draw a picture.
+**** "a readiness gesture on a chain node is dropped silently"
+You mean on an interior one, not a child of the folder
+but a deeper descendent, right?
+From a child of the folder it should work.
+**** "The search buffer's override folders show direct relatives only."
+Is this a change? Please draw before and after.
+**** "The engine took ... with it."
+What do you mean?
+** JEFF RESUME HERE : Slice 5
+Both 'p' prefixes went with the commands, and the keybinding
+tests check that nothing is bound under them. Beyond the plan's
+list, 'docs/heralds.org' lost 'req:roleTree' and
+'docs/sharing-model.org' one mention. The glossary's entry became
+"role tree, the containerward chain, and the -ward adjectives".
+** Slice 6
+The reconciler takes a predicate from its caller instead of an
+owner; the diff view's steps use 'is_diffView_change_viewnode';
+on a vognode only '(rel removed)' marks it as the diff view's,
+since counting any change fact would convert the tagged content
+children under a write-protected node. The chain attach
+recognises a chain node by shape ('is_drawn_chain_node').
+'goes_with_a_stale_viewparent' takes the diff view's own
+viewnodes, a folder's members and the chain nodes; leaving a
+changed folder behind as a tombstone holding its members is ruled
+out by an existing test. 'FolderKind' went with 'Owner'. A
+throwaway probe showed a chain node made stale by a save
+converted and pruned, and a note typed under it keeping it.
+** Slice 7
+'is_unrestricted_removed_member' reads membership and '(rel
+removed)', not position, since the folder reconciler reads
+removed members under a partner folder. The parser checks '(rel
+removed)' alone; the save's local structure check refuses
+'restoreRel' anywhere but under a partner folder or as a
+non-member under a vognode that is not a chain node, and both
+clients check the same by the parent headline. The birth check's
+straddle variant and 'PARTNER_ROLE_VOCAB' went with the birth. A
+chain node shows no low letter, which changed one integration
+test and two herald rendering cases.
+** Slice 8
+Names containing "dead" or "parked" were renamed with them, but
+'mark_orphans_under_dead_parents_false' keeps its name since its
+dead parent may be a deleted phantom. The two entombstoned
+repairs keep their "removed N member(s)" text. 'node_presence'
+became 'node_in_both_graphs' and 'node_in_either_graph'. The
+glossary had seven links to the renamed headline, not sixteen.
+** Slice 9
+The clients still write each message's '** ' line; the server
+writes the rest as org, each named headline a '***' subheadline
+below the message's own lines. The save refusal's banner lost its
+star. A subheadline reads the title or "(untitled)", then
+"graphnode ID", then "viewnode ID ... To find it: C-c g v X" or
+"not yet saved". A metadata parse error now names the node too.
+One message stays on one line: a save refused for another dirty
+view's invalid metadata lists that view's errors inline.
+** Slice 10
+The table lists the restricted node, the tombstone and the buffer
+root with no fields, so the test covers every kind; the unknown
+phantom and the alias take a relRepo edit request; 'flag' needs
+an editable node. Merge, relRepo, flag and folder prompt for
+their arguments when cycled to. The modules are
+'skg-metadata-fields.el' and 'metadata_fields.lua'. Neovim's
+prompt wraps nvim-orgmode's insert-heading actions and acts only
+on a new empty headline; nvim-orgmode's own
+insert-heading-respect-content misplaces stars in a buffer named
+'skg://', recorded in 'TODO/problems.org'. The Emacs kind reader
+skips the 'bodyFolded' marker.
+** Slice 11
+The chain hangs under the members of all ten partner folders but
+the two acquisition folders; only a real member carries it. The
+chain step runs after any partner folder's reconciler, from one
+place in 'complete.rs', and a containers folder request now adds
+the folder alone, its visit drawing the chains. Beyond the plan:
+a stale or duplicate folder member goes together with its chain,
+which returned 'save_collateral_break_cycle' to its pre-slice-4
+outcome. The search buffer's folders carry no chain. Members of a
+hidden-in-subscribee folder show their subscribee again as a
+chain node marked as a cycle.
+** Slice 12
+The glossary's two sections are "Terms a user meets" and "Terms
+of the implementation", each with a diff-view subsection; the
+rule's headline is "retain as non-member or tombstone, then
+prune; warrant, stale, duplicate". Every code name the glossary
+cites (146) was grepped and found; every glossary link and every
+citation of a glossary headline resolves. Eleven planned problems
+moved to 'TODO/DONE/problems.org', two with leftovers reopened.
+Found while reading the docs: Emacs's relRepo info request sends
+a nil recorder, two texts say a bare "repo", Neovim has no
+counterpart for 'C-c s r', 'C-c s R', 'C-c v b' and 'C-c v R',
+and the bindings that work outside content views are undocumented
+in both COMMANDS files.
+** Slice 13
+Eighteen listed names come back empty. Kept with reasons: the
+birth fact inside '(rels ...)' and the herald's birth letter,
+live code slice 7 kept; the refused inputs in two tests;
+'max_roleTree_depth', a config key;
+'mark_orphans_under_dead_parents_false'. Fixed beyond the list:
+'validate_affectsParent_relationships' became
+'validate_membership_claims', eight locals spelled
+'affects_parent_X' now say what they meant, two broken citations
+and two README mentions of the old atom.
+* TODO Decide
+Each item is a recommendation; say yes, or say otherwise.
+** TODO [Claude] A regression: 'restoreRel' refused in a folder
+'is_in_containerward_chain' climbs through non-member vognodes to
+a member of a chain-carrying folder and does not ask whether that
+member is write-protected, so a non-member under a subscribee
+extended as editable counts as in the chain, and 'restoreRel' is
+refused there. A throwaway probe confirmed the concern as a
+regression. In the all-changes buffer, with the subscribee
+folder's member t made editable, u, a removed member of t, is
+drawn under it as a non-member carrying '(rel removed)', and
+'restoreRel' on it is refused as a chain node, while the same
+request on u under the root t is accepted; after one unchanged
+save the root's u is gone, its changes having moved to the
+editable occurrence, so nothing in the buffer can then restore
+u's membership. The cause is 'restoreRel_stands_where_it_may'
+('local.rs'), whose chain test reads position alone and ignores
+change facts; both clients' guards do the same. The fix is one
+condition in three places, a non-member carrying '(rel removed)'
+being a removed member wherever it stands, with the probe's case
+as the test. I would run it now, as a slice 14, if you say so.
+** TODO [Claude] A removed member counts as a member
+Slice 3 read the plan's "a member" as including a removed member
+of the diff view, because 'docs/diff-view.org' gives removed
+members a member's editability and the literal reading would have
+moved the claim away from them and flipped eight diff-view tests.
+The choice is one line ('counts_as_member_for_the_claim'). I
+would keep it.
+** TODO [Claude] A gesture on a chain node is dropped silently
+A chain node takes no commit-readiness marker, as decided; today
+a gesture on one does nothing and says nothing. I would have the
+save warn, "a chain node takes no commit-readiness marker", one
+line and a test.
+** TODO [Claude] Search override folders show one level
+The old chains under a hit showed overriders of overriders; the
+folders show one level, and a request on a member shows the next.
+I would keep it.
+** TODO [Claude] What a stale child takes with it
+Without owners the diff view takes along, with a stale child, its
+folder members and its drawn chain nodes, and leaves the rest.
+Two behaviours differ from the owner rule: a folder you requested
+under a stale child goes with it, which I would keep, since a
+folder under a stale child is clutter you can request again; and
+a write-protected copy you paste under a folder member reads as a
+chain node. A throwaway probe confirmed it: a pasted childless
+copy under a folder member is converted and pruned at the first
+save, while the same copy with a note under it is kept as a
+write-protected non-member holding the note, and the same copy
+pasted under a content member stays where it is. I would keep
+this: the childless copy is a shell, and anything you type under
+it keeps it.
+** TODO [Claude] A stale folder member goes with its chain
+Slice 11 made a stale or duplicate folder member go together with
+its chain, beyond the plan, because the chain is the server's and
+every stale member with a container would otherwise have lingered
+as a non-member; it touches the folder reconcilers the plan's
+"What stays" left alone. A throwaway probe confirmed it and
+showed the note cases right: a stale member with nothing but its
+chain goes with the chain; a stale member with a note under it is
+kept as a write-protected non-member holding the note, its chain
+gone; a note under a chain node keeps that node and the member
+above it; a duplicate in a stored view behaves the same. I would
+keep it.
+** TODO [Claude] The hidden-in folder repeats the subscribee
+Under the hidden-in-subscribee folder, each member's chain begins
+with the subscribee two levels up, shown as a cycle. The rule
+says every partner folder's member carries the chain; here the
+first chain node repeats the grandparent. I would exempt the two
+filter folders, hidden-in and hidden-outside, whose members are
+the subscribee's own content; one flag per kind
+('members_carry_containerward_chain').
+** TODO [Claude] 'is_in_containerward_chain' three times
+The chain test is written once over the viewforest, once over the
+parsed tree ('mp_is_in_containerward_chain', 'local.rs') and once
+in each client's 'restoreRel' guard. The parsed twin forces the
+second; the clients' guards could instead trust the server's
+refusal, which already names the headline. I would drop the two
+client checks in the next housekeeping and leave the parsed twin
+until the twin struct merges.
+** TODO [Claude] Unknown viewnode IDs are dropped after the parse
+A hand-typed viewnode ID can still be named by a validation error
+before the drop, and a save from a view that is not registered
+loses every viewnode ID. Registered views are the norm, and the
+messages name the headline's title beside the ID. I would leave
+it.
+** TODO [Claude] The spurious "reinstated" warning
+Slice 2 traced it: on the first save after HEAD changes, the
+containers folder's reconciler counts a member it finds as one it
+reinstated. It is reopened in 'TODO/problems.org' and worth one
+small fix with a test in the next housekeeping.
+** TODO [Claude] Four findings of the docs reading
+Emacs's relRepo info request always sends a nil recorder (it
+reads ':owner' from a plist that has ':recorder'), a bug to fix;
+two texts still say a bare "repo"; Neovim has no counterpart for
+'C-c s r', 'C-c s R', 'C-c v b' and 'C-c v R'; and the bindings
+that work outside content views are undocumented in both COMMANDS
+files. I would fix the first with a test now and list the other
+three for the next plan.
+** TODO [Claude] nvim-orgmode misplaces stars in 'skg://' buffers
+Its insert-heading-respect-content action cannot find the
+headline in a buffer so named and puts extra stars before the
+line; 'meta_return' works. Recorded in 'TODO/problems.org'; the
+prompt itself works through both actions. I would leave it to
+nvim-orgmode and document the one working binding.
+** TODO [Claude] The word "birth" in the herald fact
+'(rels ... (birth (REL SIDE GEN)))' and the herald's low letter
+keep the word, 347 hits in 35 files, since the fact is live code
+the plan kept; its meaning is now "the relation the folder names,
+in the direction the role implies". The word still says "why it
+was drawn", which is true. I would keep it.
+** TODO [Claude] What comes next
+Every plan of the diff view is run, and the behavior has stopped
+changing. Two steps follow: a housekeeping plan for the small
+fixes above, and the post-mortem of the whole by the method of
+'coding-advice/code-reviews.org', each question one agent, which
+I would run before the merge to 'main'.
+* Sound: departures I checked and agree with, no action needed
+** 'nonMember'
+The two-valued type's name, the roots marked members, the editor
+showing the atom as it shows 'writeProtected', the style key.
+** Viewnode IDs
+The renamed test files, the two locals that held skgids, "view
+ID" kept for the buffer in prose, the switch's prepass removing
+restricted and tombstone leaves and the folders they empty, the
+stability test's folder request.
+** Adoption and retention
+Members left out of the removed-member and chain selectors; a
+pasted copy becoming the member only when none stands there;
+property folders unmarked at the node and refreshed at their own
+visit; the convert function told why; only an editable member
+taking the claim; a non-member never yielding to a descendant.
+** Foldering
+The root's request fulfilled in the completion; chains walked per
+member; a chain drawn with its folder; the engine's dependents
+removed; both prefixes gone; the glossary entry rewritten.
+** The two records
+The predicate passed by the caller; '(rel removed)' as the one
+fact; a chain node by shape; the removed-member predicate reading
+no position; the save checking 'restoreRel' by position; the role
+vocabulary gone with the birth.
+** The renames and the messages
+The names kept for a reason; the texts the entombstoned repairs
+keep; the two graph checks in place of 'node_presence'; the
+clients writing the '** ' line; the banner's star; the parse
+error naming the node.
+** The table, the prompt, the glossary
+The kinds and fields beyond the list; 'flag' for editable nodes
+only; the prompt acting on a new empty headline; the two
+subsections' names; the extra entries for the two full-word
+terms; the citations fixed.
+
+* The two-question check
+Slice 13's agent answered both questions over the range
+('tests/results/plan19-slice13/report.org').
+** Vocabulary
+Eighteen of the retired names come back empty; every term the
+plan coins has a glossary entry. "birth" survives in the herald
+fact, "owner" only for skgrepo ownership and the relRepo
+request's wire field, "view id" only for the buffer, 'roleTree'
+in the config key and in a test of the refused request,
+'Presence' and 'Deferred' as English, and "editable claim" in the
+glossary's own ban. The agent renamed
+'validate_affectsParent_relationships' to
+'validate_membership_claims' and eight locals that spelled
+"affects parent" for "parent is".
+** Citations
+No code under 'server/', 'elisp/', 'nvim/' or 'tests/' cites a
+document under 'TODO/'; 'bash/run-plan-slices.sh' cites the plan
+it runs, and two docs point to TODO notes. Of about 310 section
+citations, two were broken and are fixed.
+
+* Housekeeping
+** DONE The commit rule was followed
+Fourteen commits touch '19_plan.org', one per slice, each the
+last commit of its slice, each carrying the slice's docs and its
+progress notes; see "Results" for the check.
+** How this run was launched
+Through the Agent tool from my session, as for plans 13, 15 and
+17: one fresh Opus 5.5 agent per slice at high effort, given the
+runner's prompt word for word plus a note on your '.gitignore', a
+note on the suites and a request for a closing report, launched
+when the previous slice's headline read DONE and the tree was
+clean. Slice 11 was added and committed between slices 10 and 11.
+The launches and completions are in
+'run-logs/19_plan/sessions.log', the reports in
+'run-logs/19_plan/slice-N.txt'.
+** The run's own files
+'tests/results/plan19-slice*/' (the agents' logs and scripts),
+'tests/results/review20/' (this review's logs and probes) and
+'run-logs/19_plan/' are untracked and git-ignored or under
+'run-logs/'. Your '.gitignore' change is still uncommitted.
+** The branch
+'total-diff-view', 40 commits ahead of 'fc368779', the
+plan's own commit, not pushed by me.
