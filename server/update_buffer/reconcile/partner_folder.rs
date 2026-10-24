@@ -189,10 +189,10 @@ pub fn push_repair_warnings (
   summary : RepairSummary<ID>,
 ) {
   let categories : [ (RepairKind, Vec<ID>); 4 ] = [
-    (RepairKind::RestoredMember,   summary . created),
-    (RepairKind::MadeNonMember,    summary . made_nonMembers),
-    (RepairKind::RemovedStaleLeaf, summary . deleted_stale),
-    (RepairKind::RemovedDuplicate, summary . deleted_duplicates) ];
+    (RepairKind::ReinstatedMember,   summary . created),
+    (RepairKind::Retained,    summary . retained),
+    (RepairKind::EntombstonedStaleLeaf, summary . entombstoned_stale),
+    (RepairKind::EntombstonedDuplicate, summary . entombstoned_duplicates) ];
   for (repair, children) in categories {
     if ! children . is_empty () {
       sink . push ( CompletionWarning::FolderRepair {

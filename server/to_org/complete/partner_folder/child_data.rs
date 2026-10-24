@@ -27,7 +27,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::diff_view::shallow_model_subtree::{
-  adopt_model_facts, is_unrestricted_removed_member};
+  give_model_facts_to, is_unrestricted_removed_member};
 use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, Membership, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
@@ -323,7 +323,7 @@ fn apply_goal_shapes (
         if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
           t . membership = Membership::NonMember;
           t . write_protect (); }},
-      _ => adopt_model_facts (
+      _ => give_model_facts_to (
         viewnode, &viewnode_of_goal_item (item, child_data, label) ? ), }
     if let Some (change) = item . change {
       viewnode . change_facts . change = change; }}

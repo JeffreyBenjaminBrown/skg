@@ -118,27 +118,26 @@ pub fn detach_viewnode_transferring_focus (
 
 /// What 'complete_managed_children' changed while reconciling: the
 /// orderkeys it created, those of the stale or duplicate children it
-/// retained as non-members or converted to tombstones holding
-/// something, and those of the stale and duplicate children
-/// it converted to childless tombstones, which the prune that ends
-/// the completion removes. Callers that warn about repairs to
+/// retained as non-members or entombstoned holding something, and
+/// those of the stale and duplicate children it made childless
+/// tombstones, which the prune that ends the completion removes. Callers that warn about repairs to
 /// write-protected folders consume this ('CompletionWarning'); other
 /// callers ignore it.
 #[derive(Debug)]
 pub struct RepairSummary<Orderkey> {
   pub created            : Vec<Orderkey>,
-  pub made_nonMembers    : Vec<Orderkey>,
-  pub deleted_stale      : Vec<Orderkey>,
-  pub deleted_duplicates : Vec<Orderkey>,
+  pub retained    : Vec<Orderkey>,
+  pub entombstoned_stale      : Vec<Orderkey>,
+  pub entombstoned_duplicates : Vec<Orderkey>,
 }
 
 impl<Orderkey> RepairSummary<Orderkey> {
   fn new () -> RepairSummary<Orderkey> {
     RepairSummary {
       created            : Vec::new (),
-      made_nonMembers    : Vec::new (),
-      deleted_stale      : Vec::new (),
-      deleted_duplicates : Vec::new (), }}
+      retained    : Vec::new (),
+      entombstoned_stale      : Vec::new (),
+      entombstoned_duplicates : Vec::new (), }}
 }
 
 /// What 'convert_unwarranted_child' made of a child.
@@ -148,7 +147,7 @@ pub enum Conversion {
   ChildlessTombstone,
   /// A vognode retained as non-member, or a tombstone holding
   /// children: either stays in the buffer.
-  Parked,
+  Retained,
 }
 
 /// Why a reconciler converts a child ('convert_unwarranted_child').
@@ -179,20 +178,20 @@ pub enum KeptChildOrder {
   FollowsGoal,
 }
 
-/// The one rule ('docs/glossary.org', "the one rule: convert, then
-/// prune"): a child the graph no longer warrants (a stale child, or an
-/// extra copy of a duplicate) is converted, never detached. An
-/// unrestricted vognode with a subtree ('is_leaf' false) is retained
-/// as non-member: it keeps its title and ID, and loses its
-/// change facts and readiness request. A stale one keeps its
+/// Retain as non-member or tombstone, then prune ('docs/glossary.org',
+/// "retain as non-member or tombstone, then prune"): a child the graph
+/// no longer warrants (a stale child, or an extra copy of a duplicate)
+/// is converted, never detached. An unrestricted vognode with a
+/// subtree ('is_leaf' false) is retained as non-member: it keeps its
+/// title and ID, and loses its change facts and readiness request. A stale one keeps its
 /// editability: an editable one keeps its members, while a
 /// write-protected one's members become non-members, since a
 /// write-protected occurrence holds no member. An extra copy of a
 /// duplicate is write-protected whatever it was, its members made
 /// non-members, since the save refuses two editable occurrences of
 /// one node. Any other child -- a leaf, a non-vognode, a phantom or a
-/// restricted vognode -- becomes a tombstone, which the prune
-/// that ends the completion removes once it is childless
+/// restricted vognode -- is entombstoned, and the prune that ends the
+/// completion removes the tombstone once it is childless
 /// ('prune_self_deletable_when_empty'), so that whatever stands below
 /// it survives.
 pub fn convert_unwarranted_child (
@@ -220,10 +219,10 @@ pub fn convert_unwarranted_child (
   if let Some (writeProtected) = retained_writeProtected {
     if writeProtected {
       make_member_children_nonMembers (tree, child) ?; }
-    return Ok (Conversion::Parked); }
+    return Ok (Conversion::Retained); }
   let has_children : bool =
     tree . get (child) . unwrap () . children () . next () . is_some ();
-  Ok ( if has_children { Conversion::Parked } else { Conversion::ChildlessTombstone } ) }
+  Ok ( if has_children { Conversion::Retained } else { Conversion::ChildlessTombstone } ) }
 
 /// Viewnode-specialized version of complete_managed_children.
 /// See that one's description for more info.
@@ -282,7 +281,8 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///   unmanaged and the converted ones, in their order), then the
 ///   members in goal_list order.
 /// - Returns a RepairSummary: which children it created, which it
-///   parked, and which it converted to childless tombstones.
+///   retained (as non-members, or as tombstones holding something),
+///   and which it made childless tombstones.
 pub fn complete_managed_children
 <Node, Orderkey, Managed, View, PreferredCopy, ConvertUnwarranted> (
   tree                : &mut Tree<Node>,
@@ -340,12 +340,12 @@ where
   let mut summary : RepairSummary<Orderkey> = RepairSummary::new();
   for ( treeid, orderkey ) in duplicate_skgids {
     match convert_unwarranted ( tree, treeid, Unwarranted::Duplicate ) ? {
-      Conversion::ChildlessTombstone => summary . deleted_duplicates . push (orderkey),
-      Conversion::Parked   => summary . made_nonMembers    . push (orderkey), }}
+      Conversion::ChildlessTombstone => summary . entombstoned_duplicates . push (orderkey),
+      Conversion::Retained   => summary . retained    . push (orderkey), }}
   for ( treeid, orderkey ) in invalid_skgids {
     match convert_unwarranted ( tree, treeid, Unwarranted::Stale ) ? {
-      Conversion::ChildlessTombstone => summary . deleted_stale   . push (orderkey),
-      Conversion::Parked   => summary . made_nonMembers . push (orderkey), }}
+      Conversion::ChildlessTombstone => summary . entombstoned_stale   . push (orderkey),
+      Conversion::Retained   => summary . retained . push (orderkey), }}
   let kept_members : HashSet<NodeId> =
     orderkey_to_treeid . values () . copied () . collect ();
   let other_children : Vec<NodeId> = // the unmanaged and the converted

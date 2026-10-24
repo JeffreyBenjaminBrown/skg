@@ -15,10 +15,10 @@ use crate::types::viewnode::{PartnerFolder, ViewnodeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RepairKind {
-  RestoredMember,    // a generated member was missing from the buffer; completion restored it
-  MadeNonMember,     // a child claiming membership was not a real member; the child, a branch, was made a non-member (nonMember)
-  RemovedStaleLeaf,  // a child claiming membership was not a real member and had no subtree; it was removed
-  RemovedDuplicate,  // a member appeared more than once; the duplicate was removed
+  ReinstatedMember,      // a generated member was missing from the buffer; completion reinstated it
+  Retained,              // a child claiming membership was not a real member; the child, a branch, was retained as non-member (nonMember)
+  EntombstonedStaleLeaf, // a child claiming membership was not a real member and had no subtree; it was entombstoned, and the prune removed it
+  EntombstonedDuplicate, // a member appeared more than once; the duplicate was entombstoned, and the prune removed it
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,7 +49,7 @@ pub fn render_completion_warnings (
         group_order . push (key); } }
     for (folder, recorder, folder_viewnode_id) in &group_order {
       let mut segments : Vec<String> = Vec::new ();
-      let mut any_restored : bool = false;
+      let mut any_reinstated : bool = false;
       for w in warnings {
         let CompletionWarning::FolderRepair {
           folder : w_folder, recorder : w_recorder,
@@ -64,19 +64,19 @@ pub fn render_completion_warnings (
           . join (", ");
         let n : usize = children . len ();
         segments . push ( match repair {
-          RepairKind::RestoredMember => {
-            any_restored = true;
-            format! ("restored {} member(s): {}", n, skgids) },
-          RepairKind::MadeNonMember =>
-            format! ("made {} child(ren) non-members, since they are not members: {}",
+          RepairKind::ReinstatedMember => {
+            any_reinstated = true;
+            format! ("reinstated {} member(s): {}", n, skgids) },
+          RepairKind::Retained =>
+            format! ("retained {} child(ren) as non-members, since they are not members: {}",
                      n, skgids),
-          RepairKind::RemovedStaleLeaf =>
+          RepairKind::EntombstonedStaleLeaf =>
             format! ("removed {} stale member(s): {}", n, skgids),
-          RepairKind::RemovedDuplicate =>
+          RepairKind::EntombstonedDuplicate =>
             format! ("removed {} duplicate member(s): {}", n, skgids),
         } ); }
       let explainer : &str =
-        if any_restored {
+        if any_reinstated {
           " (A write-protected folder's membership is edited from the other side of the relationship, not by editing the folder.)"
         } else { "" };
       rendered . push (

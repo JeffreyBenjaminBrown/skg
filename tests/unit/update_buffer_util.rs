@@ -65,16 +65,16 @@ fn an_unwarranted_child_is_converted_never_detached () {
     viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) )) . id ();
   assert_eq! ( convert_unwarranted_child (
                  &mut t, branch, false, Unwarranted::Stale ) . unwrap (),
-               Conversion::Parked );
+               Conversion::Retained );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, editable_branch, false, Unwarranted::Stale ) . unwrap (),
-               Conversion::Parked );
+               Conversion::Retained );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, vognode_leaf, true, Unwarranted::Stale ) . unwrap (),
                Conversion::ChildlessTombstone );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, folder, false, Unwarranted::Stale ) . unwrap (),
-               Conversion::Parked );
+               Conversion::Retained );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, childless, true, Unwarranted::Stale ) . unwrap (),
                Conversion::ChildlessTombstone );
@@ -115,7 +115,7 @@ fn an_extra_copy_of_a_duplicate_is_writeProtected () {
                            "ec" . into (), None )) . id ();
   assert_eq! ( convert_unwarranted_child (
                  &mut t, copy, false, Unwarranted::Duplicate ) . unwrap (),
-               Conversion::Parked );
+               Conversion::Retained );
   let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) =
     &t . get (copy) . unwrap () . value () . kind
     else { panic! ("the copy stays an unrestricted vognode") };

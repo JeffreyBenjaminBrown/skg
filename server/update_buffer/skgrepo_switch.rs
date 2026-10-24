@@ -33,12 +33,12 @@ pub fn convert_and_prune_for_skgrepo_switch (
 ) -> Result<(), Box<dyn Error>> {
   // The phantoms first, while their recorders are still unrestricted.
   convert_now_restricted_phantoms (tree, restriction);
-  convert_now_restricted_vognodes (tree, restriction);
+  anonymize_now_restricted_vognodes (tree, restriction);
   let root : NodeId = tree . root () . id ();
   prune_children_postorder (tree, root) ?;
   Ok (( )) }
 
-fn convert_now_restricted_vognodes (
+fn anonymize_now_restricted_vognodes (
   tree   : &mut Tree<Viewnode>,
   restriction : &SkgrepoRestriction,
 ) {

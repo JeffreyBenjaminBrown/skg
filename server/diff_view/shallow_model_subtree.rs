@@ -143,7 +143,7 @@ pub fn reconcile_children_with_shallowModelSubtree (
         for duplicate in copies . iter () . filter ( |copy| **copy != existing ) {
           convert_duplicate (tree, *duplicate) ?; }
         { let mut existing_mut : NodeMut<Viewnode> = tree . get_mut (existing) . unwrap ();
-          adopt_model_facts (existing_mut . value (), model_viewnode); }
+          give_model_facts_to (existing_mut . value (), model_viewnode); }
         if descend (model_viewnode) {
           reconcile_children_with_shallowModelSubtree (
             tree, existing, model, model_child, graph, converts_when_stale,
@@ -210,10 +210,10 @@ pub fn convert_unwarranted_subtree (
   for (child, goes) in children {
     let conversion : Conversion =
       if goes { convert_unwarranted_subtree (tree, child) ? }
-      else { Conversion::Parked };
-    if conversion == Conversion::Parked { holds_something = true; }}
+      else { Conversion::Retained };
+    if conversion == Conversion::Retained { holds_something = true; }}
   convert_unwarranted_child (tree, node, ! holds_something, Unwarranted::Stale) ?;
-  Ok ( if holds_something { Conversion::Parked } else { Conversion::ChildlessTombstone } ) }
+  Ok ( if holds_something { Conversion::Retained } else { Conversion::ChildlessTombstone } ) }
 
 /// Whether the diff view's reconciler drew 'node', known by its kind
 /// and its change facts as they stand at the completion that finds it
@@ -267,7 +267,7 @@ fn goes_with_a_stale_viewparent (
 /// completion to set. An unrestricted vognode keeps what the view
 /// decides about it (its view requests, its stats, its readiness
 /// request), and becomes write-protected when the model one is.
-pub fn adopt_model_facts (
+pub fn give_model_facts_to (
   existing : &mut Viewnode,
   model    : &Viewnode,
 ) {

@@ -5,14 +5,14 @@
 // SaveResponse.warnings says what was repaired
 // ('docs/sharing-model.org', "The write-protected folders: who
 // subscribes to, overrides, or hides this node"):
-// - a deleted generated member is restored, with a warning that
+// - a deleted generated member is reinstated, with a warning that
 //   explains membership is edited from the other side;
-// - a child parked as a member with a subtree, though not
-//   a member, is made a non-member nonMember, with a warning.
+// - a child placed as a member with a subtree, though not
+//   a member, is retained as non-member, with a warning.
 //
 // Fixture: r and t subscribe to n; the test explicitly asks for n's
-// subscription folders. x is an unrelated node the test parks inside that
-// folder.
+// subscription folders. x is an unrelated node the test places inside
+// that folder.
 
 use std::error::Error;
 use std::net::TcpStream;
@@ -143,9 +143,9 @@ async fn write_protected_folder_repairs_warn_impl (
                 "Repaired subscriberFolder (viewnode ID {}) under node n",
                 folder_viewnode_id )),
               "{}", warning ); }
-  assert! ( warning . contains ("restored 1 member(s): r"),
+  assert! ( warning . contains ("reinstated 1 member(s): r"),
             "{}", warning );
-  assert! ( warning . contains ("made 1 child(ren) non-members, since they are not members: x"),
+  assert! ( warning . contains ("retained 1 child(ren) as non-members, since they are not members: x"),
             "{}", warning );
   assert! ( warning . contains ("edited from the other side"),
             "{}", warning );

@@ -42,7 +42,7 @@ use crate::diff_view::change_viewnodes::{
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_homeSkgrepoMove_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::shallow_model_subtree::{
-  adopt_model_facts, is_diffView_change_viewnode,
+  give_model_facts_to, is_diffView_change_viewnode,
   reconcile_children_with_shallowModelSubtree};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
@@ -321,7 +321,7 @@ pub(crate) enum HistoricalPhantomVisit {
 /// deletion since committed) a deleted phantom. A removed member of
 /// its old content is created editable when its node is in U of the
 /// buffer being completed ('prunedChangeView_sets_of_buffer'); one that
-/// stands already keeps its editability ('adopt_model_facts'). A
+/// stands already keeps its editability ('give_model_facts_to'). A
 /// historical phantom has no content list, so its old content adopts
 /// the content reconciler's former members under it, and converts the
 /// rest of them ('is_diffView_change_viewnode').
@@ -367,7 +367,7 @@ pub(crate) fn process_historical_phantom_visit (
         &is_diffView_change_viewnode, &|_| true, &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
-    adopt_model_facts (
+    give_model_facts_to (
       tree . get_mut (treeid) . unwrap () . value (), &model_phantom ); }
   if ! in_content_position { return Ok (HistoricalPhantomVisit::Done); }
   let standing_above_itself : bool =

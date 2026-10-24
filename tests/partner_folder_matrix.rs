@@ -183,7 +183,7 @@ struct FolderSpec {
   recorder : &'static str,
   member_a : &'static str, // sorts before member_b
   member_b : &'static str,
-  intruder : &'static str, // a public non-member to park in the folder
+  intruder : &'static str, // a public non-member to place in the folder
 }
 
 const WRITE_PROTECTED_FOLDERS : [FolderSpec; 6] = [
@@ -311,13 +311,13 @@ async fn write_protected_delete (
   fails . want_contains (
     &scenario, &resp . saved_view,
     &format! ("(id {})", spec . member_a) );
-  // ... with a restoration warning.
+  // ... with a reinstatement warning.
   if ! resp . warnings . iter () . any ( |w|
       w . contains (&format! ("Repaired {}", spec . atom))
-      && w . contains ("restored")
+      && w . contains ("reinstated")
       && w . contains (spec . member_a) ) {
     fails . record (&scenario, format! (
-      "expected a restored-member warning naming {}: {:?}",
+      "expected a reinstated-member warning naming {}: {:?}",
       spec . member_a, resp . warnings )); }
   Ok (( )) }
 
