@@ -195,6 +195,8 @@ function M.configure_view_buffer (buf, view_id)
   vim.bo[buf].indentexpr = ''
   vim.bo[buf].autoindent = false
   heralds.enable(buf)
+  -- Ask for a skgrepo after org's insert-heading actions.
+  require('skg.metadata_edit').wrap_org_insert_heading_actions()
   require('skg.link_annotations').enable(buf)
   require('skg.keymaps').attach_content_view(buf)
   do -- The skg fold model, on every window that shows this buffer.

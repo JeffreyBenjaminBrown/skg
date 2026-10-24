@@ -6,6 +6,19 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 19, slice 10 (2026-10-24)
+** nvim-orgmode's insert-heading-respect-content breaks in a view
+  nvim-orgmode's 'insert_heading_respect_content' (default
+  '<prefix>ih') finds the headline at point by loading the buffer's
+  file by name; a content view is named 'skg://...', so it finds
+  none, takes the line for plain text and puts stars before it:
+  '* (skg (node ...)) x' becomes '* * (skg (node ...)) x'.
+  'meta_return' finds headlines by treesitter and works. The
+  skgrepo prompt that wraps both
+  ('wrap_org_insert_heading_actions', 'nvim/lua/skg/metadata_edit.lua')
+  acts only on a new empty headline, so it leaves such a line alone;
+  its test names its buffer like an org file. Found by a probe in
+  'tests/results/plan19-slice10/probe_orgmode.lua'.
 * Problems found while reviewing the view-ids run (2026-10-23)
   Each was run by a throwaway test; the reports are under
   'tests/results/review18/'. The decisions are in

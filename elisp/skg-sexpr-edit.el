@@ -270,15 +270,15 @@ walk ends at a restricted vognode, a tombstone or a property."
 
 (defun skg--headline-kind-at-point ()
   "The kind of the headline at point, as the symbol that heads its
-metadata after the markers 'focused' and 'folded' (node, deleted,
-restrictedNode, aliasFolder, alias ...), or nil for a headline without
-metadata."
+metadata after the markers 'focused', 'folded' and 'bodyFolded'
+(node, deleted, restrictedNode, aliasFolder, alias ...), or nil for a
+headline without metadata."
   (let* (( split (skg-split-as-stars-metadata-title
                   (skg-get-current-headline-text)) )
          ( metadata-str (and split (cadr split)) ))
     (when (and metadata-str (not (string-empty-p metadata-str)))
       (let (( kind (seq-find (lambda (form)
-                               (not (memq form '(focused folded))))
+                               (not (memq form '(focused folded bodyFolded))))
                              (cdr (read metadata-str))) ))
         (if (consp kind) (car kind) kind)))))
 

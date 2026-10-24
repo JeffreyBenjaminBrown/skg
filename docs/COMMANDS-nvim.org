@@ -703,8 +703,11 @@ Every node needs a skgrepo.
 A headline inherits one from the nearest node above it,
 passing through folders and phantoms;
 a root, or a headline below a restricted vognode, a tombstone
-or a property, needs its skgrepo chosen explicitly
-('<localleader>ss' on the new headline prompts for one).
+or a property, needs its skgrepo chosen explicitly.
+nvim-orgmode's insert-heading actions (org_meta_return and
+org_insert_heading_respect_content) prompt for it when the new
+headline cannot inherit one; '<localleader>ss' on a headline
+typed by hand does the same.
 Save validation catches a node whose skgrepo is missing.
 *** <localleader>vh : :SkgHeraldsToggle
 This command toggles it.
@@ -735,7 +738,16 @@ this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) applies
 the edited tree back into the source headline; ':bd!' cancels;
 S-Left / S-Right cycle a field's value (writeProtected, nonMember,
-editRequest, skgrepo, ...).
+editRequest, viewRequests, skgrepo, ...).
+Each field a user may set on the headline's kind is shown,
+at its default when it is absent, and cycles through the values
+that kind takes, as 'shared/metadata-fields.json' lists them:
+a write-protected node is offered no delete, merge or flag request,
+a removed member is also offered restoreRel,
+a historical phantom restoreNode.
+A value that needs more (merge's target, relRepo's skgrepo,
+a flag and its value, a folder's relation) prompts for it.
+A field left at its default is dropped when the edit is applied.
 It's easy to edit this way.
 Note that some properties don't make sense to edit,
 like the count of how many contents it has.

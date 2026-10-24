@@ -2,21 +2,15 @@
 -- temporary buffer: ':w' (or <localleader>cc) applies the edited tree
 -- back into the source headline; killing the buffer cancels;
 -- S-left/S-right cycle field values, as 'shared/metadata-fields.json'
--- says for the headline's kind (skg.sexpr.metadata_fields). The Lua
--- port of elisp/skg-sexpr-edit.el and
--- skg-sexpr-edit/skg-sexpr-cycling.el.
+-- says for the headline's kind (skg.sexpr.metadata_fields). Also asks
+-- for a skgrepo after org's insert-heading actions when the new
+-- headline cannot inherit one. The Lua port of elisp/skg-sexpr-edit.el
+-- and skg-sexpr-edit/skg-sexpr-cycling.el.
 --
 -- DEVIATION: the elisp made the display-only title group read-only
 -- with text properties; nvim has no per-range read-only text, so
 -- title edits are simply discarded at apply (the strip step drops
 -- the title group whatever it holds).
---
--- DEVIATION: the elisp advised org-insert-heading-respect-content so
--- a fresh headline that cannot inherit a skgrepo prompted for one. vim users type
--- headlines rather than calling an insert-heading command, so there
--- is no equivalent seam; the quick path is <localleader>ss on the new
--- headline (which populates minimal metadata), or <localleader>vm for
--- the full metadata view.
 
 local bijection = require('skg.sexpr.org_bijection')
 local config = require('skg.config')
@@ -330,6 +324,92 @@ function M.cycle (direction)
     end
   else
     error(string.format("Field '%s' is not cycleable", parent))
+  end
+end
+
+-- ── a skgrepo for a new headline ───────────────────────────────────
+
+---Atoms in '(skg ...)' that precede a headline's kind and are not it.
+local markers = { focused = true, folded = true, bodyFolded = true }
+
+---The kind of the headline at LINE_NUMBER, as the atom that heads its
+---metadata after the markers (node, deleted, restrictedNode,
+---aliasFolder, alias ...), or nil for a headline without metadata.
+---Mirrors skg--headline-kind-at-point.
+---@param line_number integer
+---@return string|nil
+function M.headline_kind_atom (line_number)
+  local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
+  if not sexpr.is_list(sexp) then return nil end
+  for i = 2, #sexp do
+    local form = sexp[i]
+    local atom = sexpr.atom_text(sexpr.is_list(form) and form[1] or form)
+    if not markers[atom] then return atom end
+  end
+  return nil
+end
+
+---Whether the save can give the headline at LINE_NUMBER a skgrepo by
+---inheritance, as the server's walk rootward decides
+---('skgrepo_of_nearest_unrestricted_ancestor'): it passes through
+---phantoms and folders, and through headlines without metadata, which
+---inherit the same way; the first other ancestor must be an
+---unrestricted vognode. A root cannot inherit, nor can a headline
+---whose walk ends at a restricted vognode, a tombstone or a property.
+---Mirrors skg--headline-can-inherit-skgrepo-p.
+---@param line_number integer
+---@return boolean
+function M.headline_can_inherit_skgrepo_p (line_number)
+  local line = line_number
+  while true do
+    local level = metadata.outline_level(line)
+    line = level and metadata.parent_headline_line(line, level)
+    if not line then return false end
+    local kind = M.headline_kind_atom(line)
+    if kind == 'node' then return true end
+    if not (kind == nil
+            or kind == 'deleted' or kind == 'unknown'
+            or kind == 'historical'
+            or kind:match('Folder$')) then
+      return false end
+  end
+end
+
+---After one of org's insert-heading actions, give the new headline a
+---skgrepo if it cannot inherit one. Acts only in a content view, on a
+---new, empty headline, when M.headline_can_inherit_skgrepo_p says no.
+---Routes through metadata.set_repo, which on a metadata-less headline
+---prompts for an owned skgrepo (picker.prompt_for_owned_repo, no
+---prompt when only one is owned) and writes minimal node metadata
+---(metadata.populate_minimal_node_metadata) -- the quick path, no edit
+---buffer. (The full metadata view is reserved for an explicit
+---<localleader>vm.) Mirrors skg-sexp-edit--after-insert-headline.
+function M.after_insert_headline ()
+  if vim.b.skg_content_view ~= true then return end
+  local line = metadata.current_line_number()
+  if not metadata.line_text(line):match('^%*+%s*$') then return end
+  if M.headline_can_inherit_skgrepo_p(line) then return end
+  metadata.set_repo()
+end
+
+---Wrap nvim-orgmode's insert-heading actions,
+---'org_insert_heading_respect_content' and 'org_meta_return', so that
+---each runs M.after_insert_headline after it: the analog of the elisp
+---advice on org-insert-heading-respect-content. The wrap is on the
+---class, so it reaches every buffer. Idempotent; a no-op without
+---nvim-orgmode.
+function M.wrap_org_insert_heading_actions ()
+  local ok, org_mappings = pcall(require, 'orgmode.org.mappings')
+  if not ok or org_mappings.skg_wraps_insert_heading then return end
+  org_mappings.skg_wraps_insert_heading = true
+  for _, method in ipairs({ 'insert_heading_respect_content',
+                            'meta_return' }) do
+    local original = org_mappings[method]
+    org_mappings[method] = function (...)
+      local result = original(...)
+      M.after_insert_headline()
+      return result
+    end
   end
 end
 

@@ -154,6 +154,8 @@ restricted vognode or a tombstone."
                    nil)
                   ("* (skg (node (id x) (repo public))) x\n** (skg (deleted (id d) (repo public))) d\n*** (skg (node (id y) (repo public))) y\n"
                    nil)
+                  ("* (skg (node (id x) (repo public))) x\n** (skg bodyFolded (node (id m) (repo public))) m\n*** (skg (node (id y) (repo public))) y\n"
+                   nil)
                   ("* (skg (node (id x) (repo public))) x\n** (skg restrictedNode)\n*** (skg (node (id y) (repo public))) y\n"
                    t)
                   ("* (skg (node (id x) (repo public))) x\n** (skg tombstone)\n*** (skg (node (id y) (repo public))) y\n"

@@ -32,14 +32,6 @@
   as in Emacs; the 'C-?' show-all-skgrepos helper key inside the prompt
   is dropped (terminals rarely deliver C-?); ':SkgViewRepoList'
   shows the same list.
-- There is no automatic skgrepo prompt when a brand-new headline that
-  cannot inherit a skgrepo (a root, or one below a restricted vognode,
-  a tombstone or a property) is created: Emacs hooked its
-  insert-heading command, and
-  vim users simply type headlines, so there is no seam to hook. The
-  quick path is '<localleader>ss' on the new headline (populates
-  minimal metadata, prompting for the skgrepo), or '<localleader>vm'
-  for the full metadata view.
 
 * Buffer locking (necessary: nvim has no overlay modification hooks)
 - A buffer locked during a save/rerender stream rejects edits with

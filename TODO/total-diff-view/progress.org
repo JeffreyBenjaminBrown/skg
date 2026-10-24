@@ -4357,3 +4357,101 @@ by its subheadlines, the banner without a star.
 Rust 903 passed; Emacs 391 passed; Neovim 31 spec files passed;
 integration 34 of 35 under Emacs and again under Neovim,
 'import-md-and-org' failing as at baseline.
+** Slice 10: deviations
+*** the table's shape
+'shared/metadata-fields.json' gives each kind its 'atoms' (how
+the editors and the test know it), 'fields_at' ('form', inside
+the kind's list, or 'top', beside its atom in '(skg ...)') and
+'fields'. A field has a 'shape' ('atom', 'one' or 'some'), a
+'default' and 'values'; a value may carry 'when' ('editable' or
+'removedMember') and 'arguments' (each 'of' an id or a skgrepo,
+or 'one_of' a list). Its comments say so for a reader of the
+file.
+**** kinds beyond the plan's list
+The restricted node, the tombstone and the buffer root are
+listed, with no fields, so the conformance test can check that
+the table names every kind atom the parser reads.
+**** fields beyond the plan's list
+The unknown phantom and the alias take '(editRequest (relRepo
+R))', the alias beside its atom. The parser accepts both, and
+the test refuses a table that leaves out what parses.
+*** flag is offered only to an editable node
+The plan names delete and merge; the parser refuses a flag
+request beside 'writeProtected' too (an edit request on a
+write-protected occurrence), so 'flag' is 'when editable'.
+relRepo and restoreRel stay offered beside 'writeProtected'.
+*** what decides the conditions
+'editable' is read from the edit buffer: a value is offered
+unless the buffer sets writeProtected to true, so toggling it in
+the editor changes the offer. 'removedMember' is read from the
+source headline's metadata, as before; where the headline
+stands is still checked by the save and the guards (slice 7).
+*** values with arguments
+merge, relRepo, flag and the folder view request prompt for
+their arguments when cycled to, and the line reads 'VALUE
+ARG...'; the strip step writes such a line as the list, and
+reads a link typed as an id as its id. The folder request joins
+the viewRequests cycle, as the plan lists it. The editors kept
+their prompts' wording generic ('merge: ID (or paste a link)').
+*** the modules renamed
+They no longer concern unrestricted nodes alone:
+'skg-unrestrictedNode-defaults.el' is 'skg-metadata-fields.el',
+'unrestrictednode_defaults.lua' is 'metadata_fields.lua', their
+tests likewise. 'skg-unrestrictedNode-sexp-p' and the Lua
+'unrestrictedNode_sexp_p' there went: the editors use the ones
+in 'skg-metadata.el' and 'skg.metadata'.
+*** where the fill-in puts the fields
+In a form, as before for a node: id, repo, the fields in the
+table's order, then the rest. Beside the atom (the alias), the
+rest leads, since it holds the markers and the atom, and the
+fields follow. A kind with no fields is left as it reads. The
+display-only title group is still shown for a node only.
+*** the cyclers read the kind stored at opening
+Both editors keep the kind when they open ('skg-sexp-edit--kind',
+'vim.b.skg_edit_kind_atom', its first atom, since a buffer
+variable holds a copy) and the strip step and the cyclers read
+it. A Neovim test that cycled in a hand-built edit buffer now
+sets the atom as the editor does.
+*** Neovim's prompt
+**** how it wraps the actions
+'wrap_org_insert_heading_actions' ('metadata_edit.lua') replaces
+'insert_heading_respect_content' and 'meta_return' on
+nvim-orgmode's 'OrgMappings' class, so every buffer's actions
+are wrapped; it is idempotent and runs from
+'configure_view_buffer', not at plugin load, since nvim-orgmode
+may load lazily.
+**** it acts only on a new empty headline
+Beyond the Emacs conditions, the line must be stars alone.
+nvim-orgmode's 'insert_heading_respect_content' cannot find the
+headline in a buffer named 'skg://...' and stars the line
+instead ('TODO/problems.org'); the condition keeps the prompt
+off such a line. 'meta_return' works in a view.
+**** the test loads nvim-orgmode itself
+The harness's child nvims have plenary on their runtimepath but
+not the other packpath plugins, so
+'tests/nvim/insert_heading_prompt_spec.lua' appends nvim-orgmode
+and its parser from beside plenary; the other specs still run
+without them. Its buffers are named like org files.
+*** the Emacs kind reader skips bodyFolded
+'skg--headline-kind-at-point' skipped 'focused' and 'folded'
+only, but the server writes 'bodyFolded' before the kind, so a
+body-folded ancestor stopped the inheritance walk and the prompt
+fired needlessly. It skips 'bodyFolded' now, as the Lua port
+does, and both prompt tests hold a body-folded ancestor.
+*** tests
+'tests/metadata_fields_table.rs' (grouped_unit, five tests):
+every kind atom; every offered value parses under its
+conditions and no others; nothing not offered parses; the
+values name every edit and view request, the flags and the
+relations; each node value parses to what it names. Broken
+tables were tried by hand and caught. Emacs: the module's tests
+converted, with new ones for other kinds, arguments and
+conditions; the restore-cycle test replaced by two that open the
+editor on each kind and cycle to values with arguments. Neovim
+mirrors both, and 'insert_heading_prompt_spec.lua' runs the four
+cases of the Emacs test under each action, and a buffer that is
+no view.
+*** verification
+Rust 908 passed; Emacs 394 passed; Neovim 32 spec files (377
+specs) passed; the repo-cycling integration test under Emacs and
+Neovim, since it drives the editor.

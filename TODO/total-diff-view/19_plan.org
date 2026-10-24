@@ -948,7 +948,7 @@ the test literals by script. Run all four suites.
 'HeadlineName', the validation errors and the warnings, both
 clients' message buffers and goto commands, the tests, the docs.
 Run all four suites.
-** TODO Slice 10: one shared table, and Neovim's prompt
+** DONE Slice 10: one shared table, and Neovim's prompt
 The table, the conformance test, both editors, the Neovim prompt
 and its test, the deviations doc. Run the Rust, Emacs and Neovim
 suites.

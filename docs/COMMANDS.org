@@ -762,6 +762,17 @@ When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one item per line.
 It's easy to edit this way.
+Each field a user may set on the headline's kind is shown,
+at its default when it is absent, and S-left / S-right cycle
+it through the values that kind takes,
+as 'shared/metadata-fields.json' lists them:
+a write-protected node is offered no delete, merge or flag request,
+a removed member is also offered restoreRel,
+a historical phantom restoreNode.
+A value that needs more (merge's target, relRepo's skgrepo,
+a flag and its value, a folder's relation) prompts for it.
+A field left at its default is dropped when the edit is applied
+(C-c C-c).
 Note that some properties don't make sense to edit,
 like the count of how many contents it has.
 (If you want to change how much content a node has,
