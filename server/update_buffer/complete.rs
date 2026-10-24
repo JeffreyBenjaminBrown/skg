@@ -26,7 +26,9 @@ use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest}
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
-use super::reconcile::partner_folder::reconcile_partnerFolder_children;
+use super::reconcile::partner_folder::{
+  PartnerFolderGoalSource, reconcile_containerward_chains_under_folder_members,
+  reconcile_partnerFolder_children};
 use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
 use super::reconcile::content::{
   extend_true_content_at_unrestrictedVognode, mutate_unrestrictedVognode_to_deletednode};
@@ -353,6 +355,17 @@ fn dispatch_node_update (
       // Deleted, Historical, Tombstone, Property leaves and BufferRoot.
       // The prune sweep handles empty/dead nodes.
     } }
+  if let ViewnodeKind::PartnerFolder (folder_kind) = &kind {
+    // In a content view, each member of the folder carries its
+    // containerward chain. Over the straddle, the diff view's folder
+    // reconciler reconciled the chains already; the two filter folders,
+    // which the diff view does not draw, carry none there.
+    if folder_kind . members_carry_containerward_chain ()
+      && matches! ( settings . partnerFolder_goal_source,
+                    PartnerFolderGoalSource::LiveGraph )
+    { reconcile_containerward_chains_under_folder_members (
+        tree, treeid, context . graph_snap, &context . runtime . config,
+        context . skgrepo_restriction ) ?; }}
   Ok(( )) }
 
 /// The Unrestricted-node visit: settle the Finalizable state

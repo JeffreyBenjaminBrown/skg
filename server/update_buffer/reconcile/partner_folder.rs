@@ -1,6 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::partner_folders::reconcile_partnerFolder_children_from_graph_straddle;
+use crate::diff_view::shallow_model_subtree::reconcile_children_with_shallowModelSubtree;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
@@ -9,6 +10,9 @@ use crate::to_org::complete::partner_folder::child_data::{
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
   skgid_a_folder_child_stands_for,
 };
+use crate::to_org::extend::containerward_chain::{
+  ContainerwardChainPartners, attach_containerward_chains_under_members,
+  is_drawn_chain_node};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
@@ -17,7 +21,7 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{FolderPolicy, PartnerFolder, ViewnodeId, Viewnode};
+use crate::types::viewnode::{FolderPolicy, PartnerFolder, Property, ViewnodeId, Viewnode, ViewnodeKind};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -125,6 +129,78 @@ pub fn reconcile_partnerFolder_children (
       push_repair_warnings (
         sink, kind, &viewparent_pid,
         folder_viewnode_id_of (tree, node) . as_ref (), summary ); }}
+  Ok (( )) }
+
+/// In a content view, under each member of 'folder', a partner folder
+/// whose members carry the containerward chain, reconcile the member's
+/// chain with the live graph ('reconcile_containerward_chain_under_member').
+/// Run at every visit of such a folder, after its reconciler, so that a
+/// member the reconciler added gets its chain, and a chain that stays
+/// keeps its viewnodes, where they stand, and their fold state. A
+/// non-member in the folder (one retained as non-member, a note) is
+/// left as it stands, and so is what stands under it.
+pub fn reconcile_containerward_chains_under_folder_members (
+  tree                : &mut Tree<Viewnode>,
+  folder              : NodeId,
+  graph               : &InRustGraph,
+  config              : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Result<(), Box<dyn Error>> {
+  let members : Vec<NodeId> =
+    tree . get (folder)
+    . ok_or ("reconcile_containerward_chains_under_folder_members: folder not found") ?
+    . children ()
+    . filter ( |child| child . value () . is_unrestrictedVognode_and_member () )
+    . map ( |child| child . id () )
+    . collect ();
+  for member in members {
+    reconcile_containerward_chain_under_member (
+      tree, member, Vec::new (), graph, graph, config, skgrepo_restriction,
+      ContainerwardChainPartners::LiveGraph ) ?; }
+  Ok (( )) }
+
+/// Under 'member', an unrestricted vognode in a partner folder, make
+/// what the folder's reconciler hangs there match a shallow model
+/// subtree built afresh: 'other_model_children' (the diff view's
+/// relRepo move), then the member's containerward chain, walked over
+/// 'partners'. Matched by key at each level
+/// ('reconcile_children_with_shallowModelSubtree'), every child of the
+/// member but its members a candidate, whoever drew it, so a chain node
+/// the user copied is a duplicate, converted by the glossary's "retain
+/// as non-member or tombstone, then prune". Of the stale children, this
+/// converts only what it draws, known by its shape: a chain node as the
+/// walk draws it ('is_drawn_chain_node') and a relRepo move. What the
+/// user added stays where it stands, and so does what the member's own
+/// visit adds (its folders; in the diff view its old text and removed
+/// members, which carry change facts). 'graph' builds the viewnodes and
+/// 'key_graph' resolves the match keys ('match_key').
+pub fn reconcile_containerward_chain_under_member (
+  tree                 : &mut Tree<Viewnode>,
+  member               : NodeId,
+  other_model_children : Vec<Viewnode>,
+  graph                : &InRustGraph,
+  key_graph            : &InRustGraph,
+  config               : &SkgConfig,
+  skgrepo_restriction  : Option<&SkgrepoRestriction>,
+  partners             : ContainerwardChainPartners,
+) -> Result<(), Box<dyn Error>> {
+  let mut model : Tree<Viewnode> = // its root stands in for the member
+    Tree::new ( tree . get (member)
+                . ok_or ("reconcile_containerward_chain_under_member: member not found") ?
+                . value () . clone () );
+  let model_member : NodeId = model . root () . id ();
+  for child in other_model_children . into_iter () . rev () {
+    model . root_mut () . prepend (child); }
+  attach_containerward_chains_under_members (
+    &mut model, &[model_member], graph, config, skgrepo_restriction,
+    partners ) ?;
+  reconcile_children_with_shallowModelSubtree (
+    tree, member, &model, model_member, key_graph,
+    &|node| is_drawn_chain_node (node)
+      || matches! ( node . value () . kind,
+                    ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
+    &|viewnode| ! viewnode . is_unrestrictedVognode_and_member (),
+    &|_| true ) ?;
   Ok (( )) }
 
 /// The members a folder of this kind under the viewparent should hold,

@@ -2,14 +2,13 @@
 //! partner-folder reconciler ('update_buffer/reconcile/partner_folder.rs'
 //! holds the live-graph half and dispatches here). A partner folder
 //! over the graph straddle holds the union of its members in
-//! both graphs, each tagged with its change, and under each member of
-//! a containers folder the containerward chain, walked over the union
+//! both graphs, each tagged with its change, and under each member
+//! the containerward chain, walked over the union
 //! ('docs/diff-view.org', "the in-folders and out-folders").
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
   mk_historical_viewnode, mk_relRepo_move_viewnode};
-use crate::diff_view::shallow_model_subtree::reconcile_children_with_shallowModelSubtree;
 use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
@@ -18,16 +17,15 @@ use crate::to_org::complete::partner_folder::child_data::{
   FolderGoalShape,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
-use crate::to_org::extend::containerward_chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members,
-  is_drawn_chain_node};
+use crate::to_org::extend::containerward_chain::ContainerwardChainPartners;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  DiffChange, Existence, FolderPolicy, PartnerFolder, Property, Viewnode,
+  DiffChange, Existence, FolderPolicy, PartnerFolder, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
-  folder_viewnode_id_of, push_repair_warnings, view_order_preserving_goal_list};
+  folder_viewnode_id_of, push_repair_warnings,
+  reconcile_containerward_chain_under_member, view_order_preserving_goal_list};
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::CompletionWarning;
 
@@ -112,23 +110,14 @@ fn straddle_goal_item (
   Some ( FolderGoalItem {
     skgid : partner . id . clone (), change : Some (change), shape } ) }
 
-/// Under each member of a containers folder over the straddle, its
-/// containerward chain, walked over the union of the straddle; under
-/// a member of any other folder, nothing but, where the member's
-/// relationship moved to another skgrepo, that move. In a folder of
-/// the folder viewparent's own relationships, the move is shown only
-/// under the members whose relationship changed. A chain node carries
-/// no change facts. What a member holds is built afresh in a scratch
-/// tree and reconciled with what the member holds, by skgid (and the
-/// move by its kind) at each level, so that a chain that stays keeps
-/// its viewnodes, where they stand, and their fold state. Every child
-/// of the member but its members is matched, whoever drew it, so a
-/// chain node the user copied is a duplicate, converted by the one
-/// rule. Of the rest, this converts only what it draws, known by its
-/// kind: a chain node as the walk draws it ('is_drawn_chain_node') and
-/// a relRepo move. What the user added stays where it stands, and
-/// what the member's own visit adds (its old text, its removed
-/// members), which carries change facts, is that visit's.
+/// Under each member of a folder over the straddle, its containerward
+/// chain, walked over the union of the straddle, and, where the
+/// member's relationship moved to another skgrepo, that move
+/// ('reconcile_containerward_chain_under_member'). In a folder of the
+/// folder viewparent's own relationships, the move is shown only under
+/// the members whose relationship changed. A chain node carries no
+/// change facts. Of the folder's members, a removed member carries its
+/// chain too; a historical phantom and an unknown one carry nothing.
 fn attach_chains_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -138,6 +127,7 @@ fn attach_chains_under_straddle_folder_members (
   partners    : &[Partner],
   runtime     : &RuntimeGeneration,
 ) -> Result<(), Box<dyn Error>> {
+  if ! kind . members_carry_containerward_chain () { return Ok (( )); }
   let by_id : HashMap<&ID, &Partner> =
     partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
   let outbound : bool = ! member_role . is_first_role ();
@@ -150,21 +140,12 @@ fn attach_chains_under_straddle_folder_members (
       _ => None, } )
     . collect ();
   for (member, partner) in members {
-    let mut model : Tree<Viewnode> = // its root stands in for the member
-      Tree::new ( tree . get (member) . unwrap () . value () . clone () );
-    let model_member : NodeId = model . root () . id ();
-    if ! outbound || partner . changed () {
-      if let Some (moved) = mk_relRepo_move_viewnode (partner) {
-        model . root_mut () . prepend (moved); }}
-    if kind == PartnerFolder::Container {
-      attach_containerward_chains_under_members (
-        &mut model, &[model_member], &runtime . graph, &runtime . config, None,
-        ContainerwardChainPartners::GraphStraddle (straddle) ) ?; }
-    reconcile_children_with_shallowModelSubtree (
-      tree, member, &model, model_member, &straddle . after,
-      &|node| is_drawn_chain_node (node)
-        || matches! ( node . value () . kind,
-                      ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
-      &|viewnode| ! viewnode . is_unrestrictedVognode_and_member (),
-      &|_| true ) ?; }
+    let moves : Vec<Viewnode> =
+      if ! outbound || partner . changed () {
+        mk_relRepo_move_viewnode (partner) . into_iter () . collect ()
+      } else { Vec::new () };
+    reconcile_containerward_chain_under_member (
+      tree, member, moves, &runtime . graph, &straddle . after,
+      &runtime . config, None,
+      ContainerwardChainPartners::GraphStraddle (straddle) ) ?; }
   Ok (( )) }

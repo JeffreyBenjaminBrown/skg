@@ -214,6 +214,32 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
       assert_eq! ( skg_files (f) ?, files_before ); }
     Ok (( )) }) }
 
+/// In the 'subscribee_member' fixture, p hangs under sub, the added
+/// member of s1's changed subscriber folder, as sub's containerward
+/// chain. A restoreRel with '(rel removed)' typed beside it there is
+/// refused, as on a chain node under a containers folder's member.
+#[test]
+fn restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("subscribee_member", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let files_before : BTreeMap<String, String> = skg_files (f) ?;
+    let requested : String = edit_line (
+      &buffer,
+      "***** (skg (node (id p) (repo main) nonMember writeProtected",
+      |line : &str| line . replacen (
+        "writeProtected", "writeProtected (editRequest restoreRel) (diff (rel removed))", 1 ));
+    assert_ne! ( requested, buffer );
+    let refusal : String = match save (f, &requested) {
+      Err (e) => match e . downcast_ref::<SaveError> () {
+        Some (save_error) => format_save_error_as_org (save_error),
+        None => e . to_string (), },
+      Ok (response) => format! ( "{:?}", response . errors ), };
+    assert! ( refusal . contains (RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP),
+              "a restoreRel on a chain node should be refused, got {}", refusal );
+    assert_eq! ( skg_files (f) ?, files_before );
+    Ok (( )) }) }
+
 /// A restoreRel stands where it may by position: on a node of the
 /// containerward chain (d, under c in x's containers folder) it is
 /// refused, with or without a '(rel removed)' typed beside it, while

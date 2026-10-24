@@ -1,11 +1,14 @@
 /// PURPOSE: Draw the containerward chain under the members of a
-/// containers folder: under each member, its containers as
-/// write-protected non-members; under each of those, its containers;
-/// and so on breadth-first to 'max_roleTree_depth', up to the roots.
+/// partner folder ('PartnerFolder::members_carry_containerward_chain'):
+/// under each member, its containers as write-protected non-members;
+/// under each of those, its containers; and so on breadth-first to
+/// 'max_roleTree_depth', up to the roots.
 /// A node the walk met before (a cycle or a diamond) is shown once
 /// more, as a leaf ('ContainerwardRoleTree::Repeated').
-/// A chain is drawn when its folder is, and extended by no later
-/// request; a request on a chain node for its containers draws a
+/// The folder's reconciler reconciles each member's chain at every
+/// visit of the folder ('reconcile_containerward_chain_under_member'),
+/// so a member it adds gets its chain; no request extends a chain,
+/// and a request on a chain node for its containers draws a
 /// containers folder under it like any other. A chain node carries no
 /// change facts and takes no commit-readiness marker
 /// ('is_in_containerward_chain').
@@ -18,7 +21,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
-use crate::types::viewnode::{ DiffChange, Membership, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
+use crate::types::viewnode::{ DiffChange, Membership, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -56,27 +59,6 @@ impl ContainerwardChainPartners<'_> {
               . collect () },
           skgids, max_depth ), } }
 }
-
-/// Draw the chain under each unrestricted vognode child of 'folder',
-/// a containers folder: each such child is one of its members.
-pub fn attach_containerward_chains_under_folder_members (
-  tree        : &mut Tree<Viewnode>,
-  folder      : NodeId,
-  graph       : &InRustGraph,
-  config      : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
-  partners    : ContainerwardChainPartners,
-) -> Result<(), Box<dyn Error>> {
-  let members : Vec<NodeId> =
-    tree . get (folder)
-    . ok_or ("attach_containerward_chains_under_folder_members: folder not found") ?
-    . children ()
-    . filter ( |child| matches! ( &child . value () . kind,
-                                  ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ))
-    . map ( |child| child . id () )
-    . collect ();
-  attach_containerward_chains_under_members (
-    tree, &members, graph, config, restriction, partners ) }
 
 /// Draw the chain under each of 'members', each an unrestricted
 /// vognode: its containers' role trees, prepended so that the first
@@ -177,7 +159,9 @@ fn prepend_containerward_chain_node (
               . id () )) }
 
 /// Whether 'node' is a chain node: a non-member vognode under a
-/// member of a containers folder, or under another chain node.
+/// member of a partner folder whose members carry the chain
+/// ('PartnerFolder::members_carry_containerward_chain'), or under
+/// another chain node.
 pub fn is_in_containerward_chain (
   node : NodeRef<Viewnode>,
 ) -> bool {
@@ -193,17 +177,18 @@ pub fn is_in_containerward_chain (
       else { return false; };
     let ViewnodeKind::Vognode (_) = &parent . value () . kind
       else { return false; };
-    let parent_is_a_containers_folder_member : bool =
+    let parent_is_a_chain_carrying_folder_member : bool =
       parent . parent () . is_some_and ( |grandparent| matches! (
         &grandparent . value () . kind,
-        ViewnodeKind::PartnerFolder (PartnerFolder::Container) ));
-    if parent_is_a_containers_folder_member { return true; }
+        ViewnodeKind::PartnerFolder (kind)
+          if kind . members_carry_containerward_chain () ));
+    if parent_is_a_chain_carrying_folder_member { return true; }
     current = parent; }}
 
 /// Whether 'node' is a chain node as the walk draws it: write-protected
 /// (or a phantom or a restricted vognode, for a container it cannot
 /// show), carrying no change facts. So a non-member the user typed
-/// under a containers folder's member, which is editable, is not one,
+/// under a folder's member, which is editable, is not one,
 /// and neither is what that member's own visit adds there (a removed
 /// member, a historical phantom), which carries change facts.
 pub fn is_drawn_chain_node (

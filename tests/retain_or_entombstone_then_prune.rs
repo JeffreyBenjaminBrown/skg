@@ -156,6 +156,26 @@ fn the_line_after (
   lines . get (index + 1) . map ( |line| line . to_string () )
     . unwrap_or_default () }
 
+/// The lines of the subtree under the first line that starts with
+/// 'prefix' and contains 'fragment': those after it that start with
+/// one more asterisk, until one that does not.
+fn the_lines_under (
+  buffer   : &str,
+  prefix   : &str,
+  fragment : &str,
+) -> Vec<String> {
+  let buffer_without_viewnode_ids : String = without_viewnode_ids (buffer);
+  let lines : Vec<&str> = buffer_without_viewnode_ids . lines () . collect ();
+  let index : usize = lines . iter ()
+    . position ( |line| line . starts_with (prefix) && line . contains (fragment) )
+    . unwrap_or_else ( || panic! (
+      "no line starts {:?} with {:?} in:\n{}", prefix, fragment, buffer ));
+  let deeper : String = format! ( "*{}", prefix . trim_end () );
+  lines [ index + 1 .. ] . iter ()
+    . take_while ( |line| line . starts_with (&deeper) )
+    . map ( |line| line . to_string () )
+    . collect () }
+
 fn is_writeProtected_nonMember (line : &str) -> bool {
   line . contains ("nonMember") && line . contains ("writeProtected") }
 
@@ -290,9 +310,10 @@ async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
 
 /// A note typed under b in x's containerFolder. When b stops
 /// containing x, x's view keeps b there as a write-protected non-member
-/// holding the note. When
+/// holding the note; b's chain (p) goes with it. When
 /// b contains x again, the folder adopts the retained b as the member and
-/// creates no second one, and x's view saves.
+/// creates no second one, b gets its chain back, before the note, and
+/// x's view saves.
 async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -341,8 +362,12 @@ async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_re
   assert! ( ! member_b . contains ("nonMember"),
     "the retained b is the member again, and the only b in the folder:\n{}",
     x_after_return );
-  assert! ( the_line_after (x_after_return, "*** ", "(id b)") . contains ("a note under b"),
-    "the note still stands under it:\n{}", x_after_return );
+  let under_b : Vec<String> = the_lines_under (x_after_return, "*** ", "(id b)");
+  assert! ( under_b . len () == 2
+            && under_b [0] . contains ("(id p)")
+            && is_writeProtected_nonMember (&under_b [0])
+            && under_b [1] . contains ("a note under b"),
+    "b's chain is back, and the note still stands under it:\n{}", x_after_return );
   save_view ( x_after_return, &x_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }

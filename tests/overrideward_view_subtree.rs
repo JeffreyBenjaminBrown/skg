@@ -70,7 +70,9 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// override heralds -- U, two levels up, overrides it -- which only
 /// render because the pre-fetch includes the folder members
 /// ('collect_override_folder_member_skgids'). G, which F overrides,
-/// is not shown: only a containers folder's members carry anything.
+/// is not shown: the search buffer's override folders hold direct
+/// relatives only, and only its containers folder's members carry
+/// anything.
 async fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,

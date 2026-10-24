@@ -11,7 +11,8 @@
 // editable folders' membership edits and the restricted-set omission.
 // Scenario failures accumulate: every mismatch is collected and the
 // test fails once at the end, so one broken folder does not mask the
-// rest.
+// rest. The last scenarios check the containerward chain under each
+// folder kind's member.
 //
 // Instead of before.org/after.org file pairs or hand-authored expected
 // buffers, each scenario uses a fixture-local graph, renders de novo, edits
@@ -375,8 +376,89 @@ fn relationship_matrix
         &mut fails, config, tantivy, &graph) . await ?;
       roleTree_request_is_refused (
         &mut fails, config, tantivy, &graph) . await ?;
+      for spec in &CHAIN_FOLDERS {
+        member_carries_its_chain (
+          &mut fails, spec, config, tantivy, &graph) . await ?; }
 
       fails . finish () } )) }
+
+//////////////////////////////////////////////////////////////
+// The containerward chain under every partner folder's member
+// ('docs/glossary.org', "role tree, the containerward chain, and the
+// -ward adjectives"). One subgraph per folder kind: the member m of
+// the owner's folder is contained by chain-c, which chain-cc contains.
+// Under m hang chain-c and, under it, chain-cc, each a
+// write-protected non-member, and the view saves back unchanged.
+//////////////////////////////////////////////////////////////
+
+struct ChainFolderSpec {
+  atom     : &'static str,
+  owner    : &'static str,
+  member   : &'static str,
+  relation : Option<&'static str>, // None: drawn by default
+}
+
+const CHAIN_FOLDERS : [ChainFolderSpec; 8] = [
+  ChainFolderSpec { atom : "subscriberFolder", owner : "chSubr-owner",
+                    member : "chSubr-m", relation : Some ("subscribesTo") },
+  ChainFolderSpec { atom : "subscribeeFolder", owner : "chSube-owner",
+                    member : "chSube-m", relation : None },
+  ChainFolderSpec { atom : "overriderFolder", owner : "chOvrr-owner",
+                    member : "chOvrr-m", relation : Some ("overrides") },
+  ChainFolderSpec { atom : "overriddenFolder", owner : "chOvrd-owner",
+                    member : "chOvrd-m", relation : Some ("overrides") },
+  ChainFolderSpec { atom : "hiderFolder", owner : "chHider-owner",
+                    member : "chHider-m", relation : Some ("hidesFromSubs") },
+  ChainFolderSpec { atom : "hiddenFolder", owner : "chHidden-owner",
+                    member : "chHidden-m", relation : Some ("hidesFromSubs") },
+  ChainFolderSpec { atom : "containerFolder", owner : "chCont-owner",
+                    member : "chCont-m", relation : Some ("containers") },
+  ChainFolderSpec { atom : "mentionerFolder", owner : "chMent-owner",
+                    member : "chMent-m", relation : Some ("mentioners") },
+];
+
+async fn member_carries_its_chain (
+  fails : &mut Fails, spec : &ChainFolderSpec,
+  config : &SkgConfig,
+  tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
+) -> Result<(), Box<dyn Error>> {
+  let scenario : String = format! ("{}/chain", spec . atom);
+  let buf : String = match spec . relation {
+    Some (relation) => render_with_requested_relation_folders (
+      spec . owner, relation, config, tantivy, graph ) . await ?,
+    None => render (spec . owner, config) . await ?, };
+  let buf : String = without_viewnode_ids (&buf);
+  let lines : Vec<&str> = buf . lines () . collect ();
+  let Some (folder_index) : Option<usize> = lines . iter ()
+    . position ( |line| line . contains (&format! ("(skg {}", spec . atom)) )
+    else { fails . record (&scenario, format! ("no {} in:\n{}", spec . atom, buf));
+           return Ok (( )); };
+  let folder_stars : usize = folder_member_stars (&buf, &format! ("(skg {}", spec . atom));
+  let member_fragment : String = format! ("(id {})", spec . member);
+  let Some (member_index) : Option<usize> = lines . iter () . skip (folder_index)
+    . position ( |line| line . contains (&member_fragment) )
+    . map ( |offset| folder_index + offset )
+    else { fails . record (&scenario, format! ("no member {} in:\n{}", spec . member, buf));
+           return Ok (( )); };
+  let chain_line = |offset : usize, skgid : &str| -> bool {
+    lines . get (member_index + offset) . is_some_and ( |line|
+      line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + offset)))
+      && line . contains (&format! ("(id {})", skgid))
+      && line . contains ("nonMember") && line . contains ("writeProtected") ) };
+  if ! ( lines [member_index] . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1)))
+         && chain_line (1, "chain-c") && chain_line (2, "chain-cc") ) {
+    fails . record (&scenario, format! (
+      "{} should hold its chain, chain-c holding chain-cc, each a write-protected non-member:\n{}",
+      spec . member, buf )); }
+  let resp : SaveResponse = save (&buf, config, tantivy, graph) . await ?;
+  if ! resp . errors . is_empty () || ! resp . warnings . is_empty () {
+    fails . record (&scenario, format! (
+      "saving the view back: errors {:?}, warnings {:?}", resp . errors, resp . warnings )); }
+  if without_viewnode_ids (&resp . saved_view) != buf {
+    fails . record (&scenario, format! (
+      "the view should save back unchanged:\n{}\nbecame\n{}",
+      buf, without_viewnode_ids (&resp . saved_view) )); }
+  Ok (( )) }
 
 //////////////////////////////////////////////////////////////
 // No role-tree request: a partner stands only in a partner folder of

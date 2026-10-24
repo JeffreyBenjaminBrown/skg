@@ -687,6 +687,14 @@ impl PartnerFolder {
         => FolderPolicy::EditableFilter,
     } }
 
+  /// Whether each member of a folder of this kind carries its
+  /// containerward chain: every kind whose members are live nodes,
+  /// partners in a role or a filter of one. The diff view's two
+  /// acquisition folders, which record a nodeMerge, do not.
+  pub fn members_carry_containerward_chain (self) -> bool {
+    ! matches! ( self,
+                 PartnerFolder::AcquiredBy | PartnerFolder::Acquired ) }
+
   pub fn repr_in_client (self) -> &'static str {
     match self {
       PartnerFolder::Subscribee                => "subscribeeFolder",

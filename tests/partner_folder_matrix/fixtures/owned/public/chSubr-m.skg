@@ -1,0 +1,4 @@
+pid: chSubr-m
+title: chSubr-m
+subscribesTo:
+- chSubr-owner

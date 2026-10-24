@@ -162,3 +162,62 @@ fn collateral_partner_folder_update_and_warning_scoping
         "a collateral folder change must not warn the saver: {:?}",
         response . warnings );
       Ok (( )) } )) }
+
+/// A member the folder reconciler adds at a later visit gets its
+/// containerward chain. N's view shows S in its subscriberFolder; C
+/// contains T. A save of T's view that makes T subscribe to N
+/// rerenders N's view collaterally, its folder reconciler adding T,
+/// under which hangs T's chain: C, a write-protected non-member.
+#[test]
+fn a_member_added_at_a_later_visit_gets_its_chain
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-collateral-partner-folder-chain",
+    "tests/collateral_partner_folder/fixtures-chain",
+    "/tmp/tantivy-test-collateral-partner-folder-chain",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views        : OpenViews::new (),
+        graph_straddle    : None, };
+      let n_viewforest_id : ViewforestId = ViewforestId::ContentView ("chain-N" . into ());
+      let t_viewforest_id : ViewforestId = ViewforestId::ContentView ("chain-T" . into ());
+      let (n_view, _n_pids, _n_vf) =
+        single_root_view (
+          config, Some (tantivy), &ID::from ("N") ) ?;
+      let (n_response, _) =
+        save_and_read_collateral (
+          &n_view . replacen (
+            "(node ", "(node (viewRequests (folder subscribesTo))", 1 ),
+          &n_viewforest_id, config, tantivy, &graph,
+          &mut views_state ) . await ?;
+      assert! ( n_response . errors . is_empty ()
+                && n_response . saved_view . contains ("(id S)")
+                && ! n_response . saved_view . contains ("(id T)"),
+        "N's subscriberFolder should hold S alone:\n{}",
+        n_response . saved_view );
+      let (response, collateral_views) =
+        save_and_read_collateral (
+          "* (skg (node (id T) (repo main))) T\n\
+           ** (skg subscribeeFolder)\n\
+           *** (skg (node (id N) (repo main) writeProtected)) N\n",
+          &t_viewforest_id, config, tantivy, &graph,
+          &mut views_state ) . await ?;
+      assert! ( response . errors . is_empty (),
+        "T's save should succeed: {:?}", response . errors );
+      let n_collateral : &String = collateral_views . iter ()
+        . find ( |view| view . contains ("subscriberFolder") )
+        . unwrap_or_else ( || panic! (
+          "N's view should be collateral: {:?}", collateral_views ));
+      let lines : Vec<&str> = n_collateral . lines () . collect ();
+      let t_index : usize = lines . iter ()
+        . position ( |line| line . starts_with ("*** ") && line . contains ("(id T)") )
+        . unwrap_or_else ( || panic! (
+          "T should be a member of N's subscriberFolder:\n{}", n_collateral ));
+      let chain_node : &str = lines . get (t_index + 1) . copied () . unwrap_or ("");
+      assert! ( chain_node . starts_with ("**** ") && chain_node . contains ("(id C)")
+                && chain_node . contains ("nonMember")
+                && chain_node . contains ("writeProtected"),
+        "T should hold its chain, C:\n{}", n_collateral );
+      Ok (( )) } )) }

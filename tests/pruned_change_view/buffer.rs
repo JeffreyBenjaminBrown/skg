@@ -305,27 +305,40 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
   Ok (( )) }
 
 /// The 'subscribee_member' fixture (one skgrepo, main): s1
-/// subscribes to s0; since HEAD, sub subscribes to s1. So sub is the
-/// buffer's root, and its changed subscribee folder holds s1, its
-/// relationship added, and nothing under it: of the folders' members,
-/// only a containers folder's hold anything, the containerward chain.
+/// subscribes to s0; since HEAD, sub subscribes to s1; c contains s1
+/// and p contains sub. So the stub roots c and p show s1 and sub, and
+/// s1's changed subscriber folder holds sub, its relationship added,
+/// with sub's containerward chain under it: p, a write-protected
+/// non-member carrying no change facts. Likewise sub's changed
+/// subscribee folder holds s1, with c under it. The buffer saves back
+/// unchanged.
 #[test]
-fn a_member_of_a_changed_subscribee_folder_holds_nothing (
+fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("subscribee_member", &["main"], |f| {
     let buffer : String = without_viewnode_ids (&buffer_of (f) ?);
     let lines : Vec<&str> = buffer . lines () . collect ();
-    let s1_index : usize = lines . iter ()
-      . position ( |line| line . starts_with ("*** (skg (node (id s1) ") )
-      . unwrap_or_else ( || panic! ( "s1 is shown in the folder:\n{}", buffer ));
-    assert! ( lines [ .. s1_index ] . iter () . any ( |line|
-                line . starts_with ("** (skg (subscribeeFolder changed)") ),
-              "{}", buffer );
-    assert! ( lines [s1_index] . contains ("(diff (rel added)"), "{}", buffer );
-    assert! ( lines . get (s1_index + 1) . is_none_or ( |next|
-                ! next . starts_with ("****") ),
-              "nothing hangs under s1:\n{}", buffer );
-    Ok (( )) }) }
+    for (folder, member, chain_node) in [ ("subscriberFolder", "sub", "p"),
+                                          ("subscribeeFolder", "s1", "c") ] {
+      let folder_index : usize = lines . iter ()
+        . position ( |line| line . starts_with (
+          &format! ( "*** (skg ({} changed)", folder )) )
+        . unwrap_or_else ( || panic! ( "a changed {}:\n{}", folder, buffer ));
+      let member_line : &str = lines [folder_index + 1];
+      assert! ( member_line . starts_with (
+                  &format! ( "**** (skg (node (id {}) ", member ))
+                && member_line . contains ("(diff (rel added)"),
+                "{} is the folder's added member:\n{}", member, buffer );
+      let chain_line : &str = lines . get (folder_index + 2) . copied () . unwrap_or ("");
+      assert! ( chain_line . starts_with (
+                  &format! ( "***** (skg (node (id {}) ", chain_node ))
+                && chain_line . contains ("nonMember")
+                && chain_line . contains ("writeProtected")
+                && ! chain_line . contains ("(diff"),
+                "{}'s chain, {}, hangs under it:\n{}", member, chain_node, buffer ); }
+    Ok (( )) }) ?;
+  saves_back_unchanged (
+    "subscribee_member", &["main"], DiffViewBufferKind::AllChanges ) }
 
 /// x is editable as b's removed member, which stands before e's, so
 /// e's removed member x is write-protected, and holds nothing.

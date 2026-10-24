@@ -686,7 +686,8 @@ fn restoreRel_stands_where_it_may (
 
 /// 'is_in_containerward_chain' ('to_org/extend/containerward_chain.rs')
 /// over the parsed tree: a non-member vognode under a member of a
-/// containers folder, or under another such node.
+/// partner folder whose members carry the chain, or under another
+/// such node.
 fn mp_is_in_containerward_chain (
   tree   : &Tree<MpViewnode>,
   treeid : NodeId,
@@ -704,11 +705,12 @@ fn mp_is_in_containerward_chain (
       else { return false; };
     let MpViewnodeKind::Vognode (_) = &parent . value () . kind
       else { return false; };
-    let parent_is_a_containers_folder_member : bool =
+    let parent_is_a_chain_carrying_folder_member : bool =
       parent . parent () . is_some_and ( |grandparent| matches! (
         &grandparent . value () . kind,
-        MpViewnodeKind::PartnerFolder (PartnerFolder::Container) ));
-    if parent_is_a_containers_folder_member { return true; }
+        MpViewnodeKind::PartnerFolder (kind)
+          if kind . members_carry_containerward_chain () ));
+    if parent_is_a_chain_carrying_folder_member { return true; }
     current = parent; }}
 
 fn cannot_be_child_of_vognode (
