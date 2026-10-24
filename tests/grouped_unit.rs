@@ -35,6 +35,9 @@ mod investigate_unknown_node;
 #[path = "init_refusal.rs"]
 mod init_refusal;
 
+#[path = "metadata_fields_table.rs"]
+mod metadata_fields_table;
+
 #[path = "multi_repo_errors.rs"]
 mod multi_skgrepo_errors;
 
