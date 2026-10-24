@@ -4276,3 +4276,84 @@ path, 'subscribee_folder_empty_persists' and
 passed; Neovim 31 spec files passed; integration 34 of 35 under
 Emacs and again under Neovim, 'import-md-and-org' failing as at
 baseline.
+** Slice 9: deviations
+*** who writes the message's '** '
+The clients still give each message its level-2 headline ('** '
+under '* errors' or '* warnings'); the server writes the rest of
+the message as Org text, any headline it names a level-3
+subheadline after the message's own lines
+('with_org_subheadlines', 'server/types/errors.rs'). Moving the
+'** ' to the server would have changed every route that sends an
+errors or warnings list, and the minibuffer uses of those lists
+(readable IDs, unknown-node investigation) would then show the
+stars. The plan's "come from the server as org text in the same
+shape" is read as the subheadlines coming from the server.
+*** the save refusal's banner lost its star
+'format_save_error_as_org' wrote '* NOTHING WAS SAVED', which the
+clients wrapped as '** * NOTHING WAS SAVED', with '** Error N' its
+siblings. The banner is now the message's headline text, so the
+buffer reads '** NOTHING WAS SAVED', then '** Error N', each error's
+subheadlines at level 3 under it, as the plan says.
+*** the subheadline's form
+'*** TITLE', or '*** (untitled)' for a headline without one (a
+folder); then '- graphnode ID: X' when the headline carries a
+graphnode ID (a vognode or phantom; none for a folder or a
+property); then '- viewnode ID: X. To find it: C-c g v X', or '-
+not yet saved'. List items, as the messages' other body lines are.
+The Neovim client already rewrote the chords messages name; 'C-c g
+v' joined its table, so its buffers say '<localleader>gv X'.
+*** 'HeadlineName' is a struct
+'{ title, graphnode_id, viewnode_id }', built by 'HeadlineName::of'
+(three arguments). A metadata parse error reads the graphnode ID
+from the unparsed sexp ('graphnode_id_written_in_metadata', beside
+'viewnode_id_written_in_metadata'), so it names the node too.
+'org_line', 'headline_names_org_line' and 'viewnode_id_suffix' went.
+*** messages reworded to put the headline last
+The warnings that wrote the headline into their sentence ("The
+readiness request on "b" (viewnode ID 0z) names ...", "The
+restoreRel request on gc (viewnode ID 0e) was dropped ...", the
+restoreNode ones, "Repaired subscriberFolder (viewnode ID 0a)
+under node n") now say "A readiness request names no current
+change; it was dropped.", "A restoreRel request was dropped: ...",
+"Repaired subscriberFolder under node n: ...", and name the
+headline below. The readiness warning no longer names an untitled
+headline by its kind; the subheadline says '(untitled)' and the
+viewnode ID finds it. The parse-time errors that named a headline
+inline (unknown phantom or restricted content edited, a body on a
+write-protected node without an ID, a level jump, an s-expression
+syntax error, a relRepo request no editable node collects) and the
+fieldIntent conflicts do the same.
+*** the one-line form kept, for logs and one message
+'HeadlineName' still displays as 'viewnode ID X' or 'headline "T"',
+which 'BufferValidationError''s Display uses. That Display reaches
+the user in one place: a save refused because another dirty view's
+metadata is invalid lists that view's errors on one line
+('save_dependencies'). It stays one line there, since 'C-c g v'
+searches the current buffer, not that view.
+*** the goto command
+'skg-goto-viewnode-id' ('elisp/skg-id-search.el') and
+'goto_viewnode_id' ('nvim/lua/skg/id_search.lua') search headline
+lines for '(vnid X)', so a match in body text does not count, push
+the mark, put point at the headline's start and open the folds
+around it. Emacs binds it in the content-view map only, not the
+report map.
+*** tests
+'tests/new/messages_name_viewnode_ids.rs' asserts the new shape
+(its tests renamed for it); five Rust tests that matched the old
+warning text were adapted (readiness, restore, partner folder
+warnings, completion warnings, the fieldIntent conflict). New
+client tests: the goto command (found under a closed fold and with
+heralds on, not found, the key) and the nesting of a message's
+subheadlines, in Emacs ('test-skg-id-search.el',
+'test-skg-warning-channel.el') and Neovim ('id_search_spec.lua',
+'content_view_spec.lua'). The Emacs count is 391.
+**** verification at the TCP surface
+An isolated server over two nodes: a typed alias folder's text came
+back as a warning ending in '*** typed on a folder' and '- not yet
+saved'; a save with two typed editable copies and a write-protected
+delete request was refused with '** Error N' entries, each followed
+by its subheadlines, the banner without a star.
+*** verification
+Rust 903 passed; Emacs 391 passed; Neovim 31 spec files passed;
+integration 34 of 35 under Emacs and again under Neovim,
+'import-md-and-org' failing as at baseline.

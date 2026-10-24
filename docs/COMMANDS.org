@@ -283,6 +283,13 @@ the first line in that section containing this node's ID.
 Warns if the ID appears multiple times, or if the parent
 appears in multiple sections.
 *** C-c G M   : skg-goto-in-magit-parent-and-close-this
+*** C-c g v   : skg-goto-viewnode-id
+Moves point to the headline carrying a viewnode ID, read from the
+minibuffer. A message names each headline it concerns by its
+viewnode ID, with this command: "To find it: C-c g v X". It finds
+the headline while heralds hide its metadata, and opens the folds
+around it. See =docs/api-and-formats.org=, "How a message names a
+headline".
 ** C-c t : git operations
 *** C-c (g|G) (m|M) : skg-goto-in-magit-*
 These four commands are described elsewhere in this document.

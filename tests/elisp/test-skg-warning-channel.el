@@ -126,3 +126,35 @@
                               (nth 2 shown))))))
 
 (provide 'test-skg-warning-channel)
+
+(defconst test-skg-message-naming-a-headline-error
+  (concat "NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n"
+          "** Error 1\nLocal structure violation:\n- ID: p\n"
+          "*** a stray alias\n- viewnode ID: 0f. To find it: C-c g v 0f\n")
+  "A save refusal as the server writes it, naming one headline.")
+
+(defconst test-skg-message-naming-a-headline-warning
+  (concat "A readiness request names no current change; it was dropped.\n"
+          "*** b\n- graphnode ID: b\n"
+          "- viewnode ID: 0z. To find it: C-c g v 0z\n")
+  "A warning as the server writes it, naming one headline.")
+
+(ert-deftest test-messages-nest-the-headlines-they-name ()
+  "Each message is a level-2 headline of its section, and a headline
+it names is a subheadline of the message, or of its error
+\('docs/api-and-formats.org', \"How a message names a headline\")."
+  (with-temp-buffer
+    (insert (skg-errors-and-warnings-to-org-string
+             (list test-skg-message-naming-a-headline-error)
+             (list test-skg-message-naming-a-headline-warning)))
+    (org-mode)
+    (dolist (case '(("*** a stray alias" . "** Error 1")
+                    ("*** b" . "** A readiness request names no current change")
+                    ("** Error 1" . "* errors")
+                    ("** NOTHING WAS SAVED" . "* errors")))
+      (goto-char (point-min))
+      (search-forward (concat "\n" (car case)))
+      (should (org-up-heading-safe))
+      (should (string-prefix-p (cdr case)
+                               (buffer-substring (point)
+                                                 (line-end-position)))))))

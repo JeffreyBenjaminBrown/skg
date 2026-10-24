@@ -676,7 +676,8 @@ at its index in the recorder's list at HEAD, clamped, in the skgrepo
 that recorded it. A request whose headline stands for no relationship
 (as under an acquisition folder), whose relationship is a link, has a
 deleted node at either end, or is not recorded at HEAD, is dropped with
-a warning naming the viewnode ID.
+a warning naming the headline (=docs/api-and-formats.org=, "How a
+message names a headline").
 ** Both in one save
 The restored nodes come first, then the relationships, so a
 relationship restored in a save may name a node restored in the same

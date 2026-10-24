@@ -305,6 +305,32 @@ function M.goto_by_id (skgid)
   content_view.request_single_root_content_view_from_id(skgid)
 end
 
+---Move the cursor to the headline carrying VIEWNODE_ID, prompting
+---when not given. A message names a headline by its viewnode ID, which
+---the headline's metadata carries as '(vnid X)'. The search reads the
+---buffer text, so it finds the ID while heralds conceal the metadata.
+---Mirrors skg-goto-viewnode-id.
+---@param viewnode_id string|nil
+---@return integer|nil the headline's line (1-based), or nil when no headline carries the ID
+function M.goto_viewnode_id (viewnode_id)
+  viewnode_id = viewnode_id or vim.fn.input('Viewnode ID: ')
+  if viewnode_id == nil then return nil end
+  viewnode_id = vim.trim(viewnode_id)
+  if viewnode_id == '' then return nil end
+  local needle = '(vnid ' .. viewnode_id .. ')'
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  for line_number, line in ipairs(lines) do
+    if line:match('^%*+ %(skg ') and line:find(needle, 1, true) then
+      vim.cmd("normal! m'") -- so that '' returns
+      vim.api.nvim_win_set_cursor(0, { line_number, 0 })
+      vim.cmd('silent! normal! zv') -- open the folds hiding it
+      return line_number
+    end
+  end
+  vim.notify('No headline here carries viewnode ID ' .. viewnode_id)
+  return nil
+end
+
 ---If point is on an [[id:..][label]] link, visit that id.
 function M.visit_link ()
   local hit = M.point_in_link_p()

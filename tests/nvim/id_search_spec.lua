@@ -125,3 +125,55 @@ describe('skg.id_search.replace_links_with_labels', function ()
         'a [[id:1][b]] c [[id:2][d]]'))
   end)
 end)
+
+describe('skg.id_search.goto_viewnode_id', function ()
+  -- Mirrors the test-skg-goto-viewnode-id tests of
+  -- test-skg-id-search.el.
+  local text = table.concat({
+    '* (skg (node (id 1) (repo main)) (vnid 0a)) 1',
+    '** (skg (node (id 2) (repo main)) (vnid 0bc)) 2',
+    '** (skg (node (id 3) (repo main)) (vnid 0b)) 3',
+    'body text mentioning (vnid 0d)',
+    '* (skg (node (id 4) (repo main))) 4 typed',
+    '' }, '\n')
+
+  after_each(function ()
+    pcall(vim.api.nvim_buf_delete,
+          vim.api.nvim_get_current_buf(), { force = true })
+  end)
+
+  it('moves to the headline carrying the ID, opening its fold', function ()
+    buffer_with(text)
+    vim.wo.foldmethod = 'manual'
+    vim.cmd('2,4fold')
+    assert.are_not.equal(-1, vim.fn.foldclosed(3))
+    assert.are.equal(3, id_search.goto_viewnode_id('0b'))
+    assert.are.same({ 3, 0 }, cursor())
+    assert.are.equal(-1, vim.fn.foldclosed(3))
+  end)
+
+  it('stays put when no headline carries the ID', function ()
+    buffer_with(text)
+    vim.api.nvim_win_set_cursor(0, { 5, 2 })
+    for _, absent in ipairs({ '0d', 'zz', '0' }) do
+      assert.is_nil(id_search.goto_viewnode_id(absent))
+      assert.are.same({ 5, 2 }, cursor())
+    end
+  end)
+
+  it("is bound to '<localleader>gv', which messages name for C-c g v",
+     function ()
+    local keymaps = require('skg.keymaps')
+    local by_lhs = {}
+    for _, binding in ipairs(keymaps.content_view_bindings) do
+      by_lhs[binding[1]] = binding[2]
+    end
+    assert.are.equal('GotoViewnodeId', by_lhs['gv'])
+    assert.are.equal('goto_viewnode_id',
+                     keymaps.commands.GotoViewnodeId.fn)
+    assert.are.equal(
+      '- viewnode ID: 0b. To find it: <localleader>gv 0b',
+      require('skg.messages').with_neovim_bindings(
+        '- viewnode ID: 0b. To find it: C-c g v 0b'))
+  end)
+end)

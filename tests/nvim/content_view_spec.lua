@@ -116,4 +116,26 @@ describe('skg.content_view responses', function ()
     assert.is_truthy(text:find('%*%* careful'))
     vim.api.nvim_buf_delete(messages_buf, { force = true })
   end)
+
+  it('nests the headlines a message names under it', function ()
+    -- Mirrors test-messages-nest-the-headlines-they-name.
+    local messages = require('skg.messages')
+    local error_text = 'NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n'
+      .. '** Error 1\nLocal structure violation:\n- ID: p\n'
+      .. '*** a stray alias\n- viewnode ID: 0f. To find it: C-c g v 0f\n'
+    local warning_text = 'A readiness request names no current change; it was dropped.\n'
+      .. '*** b\n- graphnode ID: b\n'
+      .. '- viewnode ID: 0z. To find it: C-c g v 0z\n'
+    assert.are.equal(
+      '* errors\n'
+      .. '** NOTHING WAS SAVED\n\nValidation errors found in buffer.\n\n'
+      .. '** Error 1\nLocal structure violation:\n- ID: p\n'
+      .. '*** a stray alias\n- viewnode ID: 0f. To find it: <localleader>gv 0f\n'
+      .. '\n* warnings\n'
+      .. '** A readiness request names no current change; it was dropped.\n'
+      .. '*** b\n- graphnode ID: b\n'
+      .. '- viewnode ID: 0z. To find it: <localleader>gv 0z\n',
+      messages.errors_and_warnings_to_org_string(
+        { error_text }, { warning_text }))
+  end)
 end)

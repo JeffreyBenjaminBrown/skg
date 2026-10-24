@@ -277,6 +277,13 @@ for landing on a specific line within a status section; neogit
 doesn't, so this variant uses a plain diff buffer instead of a
 neogit view -- same information, different chrome.)
 *** <localleader>GM : :SkgGotoInGitParentAndCloseThis
+*** <localleader>gv : :SkgGotoViewnodeId
+Moves the cursor to the headline carrying a viewnode ID, read from
+the prompt. A message names each headline it concerns by its
+viewnode ID, with this command: "To find it: <localleader>gv X". It
+finds the headline while heralds conceal its metadata, and opens the
+folds around it. See =docs/api-and-formats.org=, "How a message
+names a headline".
 ** <localleader>t : git operations
 *** <localleader> (g|G)(m|M) : :SkgGotoInGit*
 These four commands are described elsewhere in this document.

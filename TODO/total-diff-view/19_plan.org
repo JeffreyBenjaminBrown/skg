@@ -944,7 +944,7 @@ suites.
 The kind and atom, the repairs and functions, 'Presence', the
 words in comments and docs, the glossary headline and its links,
 the test literals by script. Run all four suites.
-** TODO Slice 9: messages name a headline as a subtree
+** DONE Slice 9: messages name a headline as a subtree
 'HeadlineName', the validation errors and the warnings, both
 clients' message buffers and goto commands, the tests, the docs.
 Run all four suites.

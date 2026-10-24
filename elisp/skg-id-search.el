@@ -157,6 +157,36 @@ sides of point are ambiguous: it says so and visits nothing."
   (message "Visiting node: %s" skgid)
   (skg-request-single-root-content-view-from-id skgid))
 
+;; Find a headline by its viewnode ID
+
+(defun skg--viewnode-id-headline-regex (viewnode-id)
+  "Regex matching a headline whose metadata carries (vnid VIEWNODE-ID)."
+  (concat "^\\*+ (skg .*(vnid " (regexp-quote viewnode-id) ")"))
+
+(defun skg-goto-viewnode-id (viewnode-id)
+  "Move point to the headline carrying VIEWNODE-ID, prompting for it.
+A message names a headline by its viewnode ID, which the headline's
+metadata carries as (vnid X). The search reads the buffer text, so it
+finds the ID while heralds hide the metadata. Returns the headline's
+position, or nil (with a message) when no headline carries the ID."
+  (interactive "sViewnode ID: ")
+  (let* (( viewnode-id (string-trim viewnode-id) )
+         ( headline-start
+           (save-excursion
+             (goto-char (point-min))
+             (when (re-search-forward
+                    (skg--viewnode-id-headline-regex viewnode-id) nil t)
+               (line-beginning-position)) )))
+    (if (not headline-start)
+        (progn (message "No headline here carries viewnode ID %s"
+                        viewnode-id)
+               nil)
+      (push-mark)
+      (goto-char headline-start)
+      (when (derived-mode-p 'org-mode)
+        (org-reveal)) ;; open the folds hiding it
+      headline-start)))
+
 (defun skg-goto-and-close-this ()
   "Like `skg-goto', but also kill the buffer it was called from
 once the goto request has been issued."

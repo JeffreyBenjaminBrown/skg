@@ -31,6 +31,7 @@ M.neovim_bindings_of_emacs_chords = {
   ['C-c s w'] = '<localleader>sw',
   ['C-c s s'] = '<localleader>ss',
   ['C-c g RET'] = '<localleader>gg',
+  ['C-c g v'] = '<localleader>gv',
 }
 
 ---MESSAGE with each Emacs chord it names replaced by its Neovim

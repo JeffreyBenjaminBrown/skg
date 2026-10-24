@@ -49,6 +49,8 @@ M.commands = {
                desc = 'Open a view of a literal UUID' },
   GotoByIdAndCloseThis = { module = 'skg.id_search', fn = 'goto_by_id_and_close_this',
                            desc = 'Goto by id, closing the buffer left behind' },
+  GotoViewnodeId = { module = 'skg.id_search', fn = 'goto_viewnode_id',
+                     desc = 'Jump to the headline a message names by its viewnode ID' },
   GotoInGit = { module = 'skg.goto_git', fn = 'goto_in_git',
                 desc = "Open a git status view of the node's file" },
   GotoInGitAndCloseThis = { module = 'skg.goto_git', fn = 'goto_in_git_and_close_this',
@@ -248,6 +250,7 @@ M.content_view_bindings = {
   { 'Gm', 'GotoInGitAndCloseThis' },     -- C-c G m
   { 'gM', 'GotoInGitParent' },           -- C-c g M
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
+  { 'gv', 'GotoViewnodeId' },            -- C-c g v
   { 'la', 'ShowFolderOfAliases' },       -- C-c l a
   { 'lo', 'ShowFolderOfOverrides' },     -- C-c l o
   { 'lh', 'ShowFolderOfHidesFromSubs' }, -- C-c l h

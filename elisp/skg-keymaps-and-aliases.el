@@ -117,7 +117,8 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c g m")   #'skg-goto-in-magit)
     (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
     (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
-    (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
+    (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this)
+    (define-key map (kbd "C-c g v")   #'skg-goto-viewnode-id)) ;; the headline a message names
   (progn;; show folders (C-c l): request a local
     ;; view change the server fulfills on save. Each command auto-saves.
     (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)

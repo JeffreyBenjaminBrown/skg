@@ -184,17 +184,11 @@ So far there are these endpoints:
     4. Final save response:
        =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
-       A message about one headline names its viewnode ID (see "The
-       metadata headers") after the node's ID, as =(viewnode ID X)=,
-       and an error's Org form gains a line =- viewnode ID: X=. A
-       message about several occurrences of a node lists their
-       viewnode IDs: =(viewnode IDs X, Y)=, and the line =- viewnode
-       IDs: X, Y=. A headline without a viewnode ID (one the user
-       typed or copied, not yet saved) is named by its title instead,
-       =headline "TITLE"=; no message invents a viewnode ID. An error
-       in a headline's metadata ends by naming that headline the same
-       way. A repair warning names the repaired folder's viewnode ID,
-       one warning per folder occurrence.
+       Each message names the headlines it concerns as subheadlines
+       (see "How a message names a headline" below). A failed save
+       sends one error, =NOTHING WAS SAVED=, whose validation errors
+       follow as =** Error N= headlines. A repair warning names the
+       repaired folder, one warning per folder occurrence.
        When the saved buffer is one of the diff view's, the response
        ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
@@ -226,9 +220,8 @@ So far there are these endpoints:
     fingerprints. A save that stops for a confirmation (strandeds,
     Hoist, forks) or fails consumes none, and leaves them in the
     buffer. A request that names no current change is dropped, with
-    the warning =The readiness request on "HEADLINE" (viewnode ID X)
-    names no current change; it was dropped.=, which names an untitled
-    headline by its kind (=the subscribeeFolder=).
+    the warning =A readiness request names no current change; it was
+    dropped.=, which names its headline as a subheadline.
   - A write-protected occurrence saves nothing of its own, so a save is
     refused, before anything is written, if one differs from the graph:
     in its title or home skgrepo, in its alias folder or a partner
@@ -352,6 +345,38 @@ So far there are these endpoints:
   - A Rust unit test (=herald_rules_cover_the_emittable_vocabulary=)
     pins the table to the metadata vocabulary the server can emit, in
     both directions. It pins atom coverage only, not presentation.
+
+** How a message names a headline
+Every message in an =errors= or =warnings= list is Org text. Its first
+line is the message's headline text, which both clients write as a
+level-2 headline (=** =) under =* errors= or =* warnings=; the lines
+after it are its body. A message that concerns a headline of the
+buffer names it as a level-3 subheadline, after the message's own
+lines:
+#+begin_example
+** A readiness request names no current change; it was dropped.
+*** b
+- graphnode ID: b
+- viewnode ID: 0z. To find it: C-c g v 0z
+#+end_example
+The subheadline's text is the headline's title, or =(untitled)= for a
+headline without one, such as a folder. Under it comes =- graphnode
+ID: X= when the headline carries a graphnode ID, then =- viewnode ID:
+X= (see "The metadata headers") with the command that finds it, or =-
+not yet saved= for a headline without a viewnode ID: one the user
+typed or copied since the last render. No message invents a viewnode
+ID. A message about several occurrences of a node names each in
+turn. A failed save's validation errors each follow as a =** Error
+N= headline of the one =NOTHING WAS SAVED= message, so their
+subheadlines nest under them; a parse error ends with the headline it
+is in. The command, 'skg-goto-viewnode-id' on =C-c g v= in Emacs and
+=<localleader>gv= in Neovim (which the Neovim client writes in place
+of =C-c g v=), reads a viewnode ID and moves to the headline carrying
+it, while heralds hide it. The subheadline is written by
+'HeadlineName::org_subheadline' (=server/types/errors.rs=). A save
+refused because another view's metadata is invalid lists that view's
+errors on one line, naming each headline by its viewnode ID or title,
+since the command searches the current buffer.
 
 ** Server warnings
   - Request: ((request . "server warnings"))
@@ -1472,9 +1497,9 @@ readiness requests after its graph edits succeed: each sets or clears
 the marks of the change-forest leaves its headline names, at their
 current fingerprints. A save that stops for a confirmation (strandeds,
 Hoist, forks) or fails consumes none, and leaves them in the buffer. A
-request that names no current change is dropped, with the warning =The
-readiness request on "HEADLINE" (viewnode ID X) names no current change; it
-was dropped.= See "Save buffer" above.
+request that names no current change is dropped, with the warning =A
+readiness request names no current change; it was dropped.=, naming its
+headline as a subheadline. See "Save buffer" above.
 **** One gesture on a modified node marks its file, on a write-protected occurrence too
 On a modified node (=(properties changed)=), =C-c r r= names every leaf the node
 records, and its relationship when that changed, so one gesture marks

@@ -398,3 +398,54 @@ the first occurrence of AFTER (or at buffer start), then return
     (should (skg--metadata-sexp-contains-id-p sexp))
     (should (equal (skg--extract-id-from-metadata-sexp sexp) "gone"))
     (should (equal (skg--extract-repo-from-metadata-sexp sexp) "main"))))
+
+;;; Finding a headline by its viewnode ID
+
+(defconst test-skg-goto-viewnode-id-buffer
+  (concat "* (skg (node (id 1) (repo main)) (vnid 0a)) 1\n"
+          "** (skg (node (id 2) (repo main)) (vnid 0bc)) 2\n"
+          "** (skg (node (id 3) (repo main)) (vnid 0b)) 3\n"
+          "body text mentioning (vnid 0d)\n"
+          "* (skg (node (id 4) (repo main))) 4 typed\n")
+  "Test buffer for `skg-goto-viewnode-id'.")
+
+(defun test-skg--line-start-of (text)
+  "Where the line of the current buffer containing TEXT starts."
+  (save-excursion
+    (goto-char (point-min))
+    (search-forward text)
+    (line-beginning-position)))
+
+(ert-deftest test-skg-goto-viewnode-id-finds-the-headline ()
+  "Point moves to the start of the headline carrying the viewnode ID,
+whose folded parent opens; an ID that a longer one begins with is
+not matched by it, and heralds hiding the metadata do not hide it
+from the search."
+  (with-temp-buffer
+    (org-mode)
+    (insert test-skg-goto-viewnode-id-buffer)
+    (skg-test-install-herald-rules)
+    (heralds-minor-mode 1)
+    (goto-char (point-min))
+    (org-cycle) ;; fold the first headline's subtree
+    (let (( target (test-skg--line-start-of "(vnid 0b)) 3") ))
+      (should (equal (skg-goto-viewnode-id "0b") target))
+      (should (equal (point) target))
+      (should-not (invisible-p (point))))))
+
+(ert-deftest test-skg-goto-viewnode-id-without-a-match-stays ()
+  "An ID no headline carries leaves point where it was: a viewnode ID
+in body text does not count."
+  (with-temp-buffer
+    (org-mode)
+    (insert test-skg-goto-viewnode-id-buffer)
+    (goto-char (point-max))
+    (dolist (absent '("0d" "zz" "0"))
+      (should-not (skg-goto-viewnode-id absent))
+      (should (equal (point) (point-max))))))
+
+(ert-deftest test-skg-goto-viewnode-id-keybinding ()
+  "C-c g v finds the headline a message names."
+  (require 'skg-keymaps-and-aliases)
+  (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c g v"))
+              'skg-goto-viewnode-id)))
