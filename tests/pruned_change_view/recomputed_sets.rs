@@ -429,11 +429,13 @@ fn after_a_commit_the_lingering_nodes_remain_editable (
 /// the buffer's one root, and c1 and c2 are shown only as members of
 /// its container folder. c1 changes after the buffer opened. After
 /// the next save it is still write-protected there, its change
-/// counted as not editable. The command makes it editable there, with its
-/// content list (m) under it and its change shown; no root is
-/// appended, and a further save changes nothing.
+/// counted as not editable. The command leaves it write-protected
+/// there, as a folder's member stays, and appends it, an origin
+/// shown nowhere else, as a root after m, editable, with its change
+/// shown and its content list (m) under it. A further save changes
+/// nothing.
 #[test]
-fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
+fn a_change_shown_only_in_a_container_folder_is_appended_as_a_root_by_the_command (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("folder_member", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -444,36 +446,42 @@ fn a_change_shown_only_in_a_container_folder_becomes_editable_there (
               "{}", response . saved_view );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
-    let c1_subtree : Vec<&str> = subtree_starting (&shown, "*** (skg (node (id c1) ");
-    assert! ( ! c1_subtree [0] . contains ("writeProtected"),
-              "c1 must be editable in the container folder:\n{}", shown );
-    assert! ( c1_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText title) (diff (leaves 1))) c1" )
-              && c1_subtree . iter () . any ( |line|
-                   line . starts_with ("**** (skg (node (id m) ") ),
+    let c1_in_the_folder : &str = subtree_starting (&shown, "*** (skg (node (id c1) ") [0];
+    assert! ( c1_in_the_folder . contains ("writeProtected"),
+              "c1 stays write-protected in the container folder:\n{}", shown );
+    assert_eq! ( root_ids (&shown), vec! [ "m", "c1" ], "{}", shown );
+    let c1_root : Vec<&str> = subtree_starting (&shown, "* (skg (node (id c1) ");
+    assert! ( ! c1_root [0] . contains ("writeProtected"),
+              "the root c1 is editable:\n{}", shown );
+    assert! ( c1_root . iter () . any ( |line| without_viewnode_ids (line) == "** (skg (oldText title) (diff (leaves 1))) c1" )
+              && c1_root . iter () . any ( |line|
+                   line . starts_with ("** (skg (node (id m) ") ),
               "c1's change and content must be shown under it:\n{}", shown );
-    assert_eq! ( root_ids (&shown), vec! [ "m" ], "{}", shown );
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
     assert_eq! ( again . saved_view, shown,
-                 "c1 stays editable, and every viewnode keeps its viewnode ID" );
+                 "c1 stays a root, and every viewnode keeps its viewnode ID" );
     Ok (( )) }) }
 
-/// Once the command made c1 editable in m's container folder, a save
-/// that undoes its change takes it out of U; it stays editable there,
-/// as a lingering node does, after that save and a further one.
+/// Once the command appended c1 as a root, a save that undoes its
+/// change takes it out of U; it stays a root, editable, as a
+/// lingering node does, after that save and a further one.
 #[test]
-fn an_editable_container_folder_member_outside_u_stays_editable (
+fn a_root_the_command_appended_stays_once_outside_u (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("folder_member", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let buffer : String = retitle_in_a_content_view (f, "c1", "c1 retitled", &buffer) ?;
     save_cleanly (f, &all_changes_view (), &buffer) ?;
     let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
-    let reverted : String = shown . replacen ("c1 retitled", "c1", 1);
+    let root_line : &str = subtree_starting (&shown, "* (skg (node (id c1) ") [0];
+    let reverted : String = // at the root; the folder's member follows the graph
+      shown . replacen ( root_line, &root_line . replacen ("c1 retitled", "c1", 1), 1 );
     let after : String = save_cleanly (f, &all_changes_view (), &reverted) ? . saved_view;
-    let c1_line : &str = subtree_starting (&after, "*** (skg (node (id c1) ") [0];
+    assert_eq! ( root_ids (&after), vec! [ "m", "c1" ], "{}", after );
+    let c1_line : &str = subtree_starting (&after, "* (skg (node (id c1) ") [0];
     assert! ( c1_line . ends_with (") c1") && ! c1_line . contains ("writeProtected"),
-              "c1 must stay editable in the container folder:\n{}", after );
+              "c1 must stay an editable root:\n{}", after );
     let again : String = save_cleanly (f, &all_changes_view (), &after) ? . saved_view;
     assert_eq! ( again, after );
     Ok (( )) }) }
