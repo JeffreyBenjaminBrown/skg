@@ -4,7 +4,7 @@
 # empty context. The plan, progress.org, git and the auto-memory
 # directory are the memory between slices.
 #
-# Usage: bash/run-plan-slices.sh [FIRST_SLICE] [LAST_SLICE]   (defaults 0 12)
+# Usage: bash/run-plan-slices.sh [FIRST_SLICE] [LAST_SLICE]   (defaults 0 13)
 #   SKG_PLAN_MODEL  (default claude-opus-5-5, i.e. Opus 5.5)  and
 #   SKG_PLAN_EFFORT (default high)  override what is passed to claude.
 # More elaborate:
@@ -35,7 +35,7 @@ LOG_DIR=$PLAN_DIR/run-logs
 MODEL="${SKG_PLAN_MODEL:-claude-opus-5-5}"
 EFFORT="${SKG_PLAN_EFFORT:-high}"
 FIRST="${1:-0}"
-LAST="${2:-12}"
+LAST="${2:-13}"
 mkdir -p "$LOG_DIR"
 
 # Modified tracked files, space-separated; empty on a clean tree. (awk, not

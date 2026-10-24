@@ -48,7 +48,7 @@ over after it, amend that commit ('git commit --amend'; the
 branch is not pushed) rather than adding one.
 
 ** Scope
-Thirteen slices, 0 to 12, in the order they must land, chosen so
+Fourteen slices, 0 to 13, in the order they must land, chosen so
 that every suite passes at the end of every slice: the behavior
 first, the removal of the two records last, the renames after
 them. Slice 0 replaces the non-member atom and makes two small
@@ -61,10 +61,12 @@ clients and the docs. Slice 6 removes the owner record. Slice 7
 removes the birth. Slice 8 renames what the discussion renamed.
 Slice 9 reshapes the messages and adds the command that finds a
 viewnode. Slice 10 gives the metadata editor one shared table and
-Neovim its skgrepo prompt. Slice 11 splits the glossary and reads
-the docs end to end. Slice 12 is the two-question check. The plan
-may be run as one run or as two ('bash/run-plan-slices.sh 0 5',
-then '6 12').
+Neovim its skgrepo prompt. Slice 11, added on 2026-10-24 while
+the run stood at slice 10, hangs the containerward chain under
+every role folder's member. Slice 12 splits the glossary and
+reads the docs end to end. Slice 13 is the two-question check.
+The plan may be run as one run or as two
+('bash/run-plan-slices.sh 0 5', then '6 13').
 
 Slices 0 to 7 edit code that still carries the names slice 8
 retires ('DeadViewnode', "deaden", "parked", 'Presence',
@@ -450,7 +452,7 @@ With no read left, 'Owner', the owner table in 'ViewIdRecord',
 'set_owners_in_parsed_viewforest', 'record_owners_in' and every
 stamp of an owner ('server/' has about thirty) go; the viewnode
 ID assignment stays as it is. The glossary's "owner" entry is
-removed in slice 11; this slice removes the word from code
+removed in slice 12; this slice removes the word from code
 comments and 'docs/diff-view.org'.
 *** Tests
 The commit tests of 'tests/pruned_change_view/after_a_commit.rs'
@@ -586,7 +588,48 @@ leaves 'docs/nvim-client-deviations.org'.
 Editor tests open the editor on each kind in both clients; the
 conformance test; the Neovim prompt's test.
 
-** The glossary and the docs (slice 11)
+** The chain under every role folder's member (slice 11)
+*** The rule
+Under every member of every partner folder whose members are live
+nodes, in content views and in the diff view's changed folders
+alike, the member's containerward chain hangs directly, as it
+hangs under a containers folder's member since slice 4: the
+member's containers as non-members under it, theirs under them,
+breadth-first to 'max_roleTree_depth', every node
+write-protected, a repeated node shown once as a repeat, no
+change facts on any of it. A member's partners in the folder's
+own role are not drawn below it; a request on the member draws
+them as a folder. Under a phantom member, and under the entries
+of a property folder, nothing hangs. This is what the old engine
+did for a graft of every role but container, "shown in its
+container context", and what slice 4 dropped on a reading of the
+discussion that Jeff corrected on 2026-10-24.
+*** Where
+'add_containers_folder_with_chains'
+('server/to_org/extend/folder_request.rs') hangs the chain under
+a containers folder's members at the folder's creation, and
+'attach_chains_under_straddle_folder_members'
+('server/diff_view/partner_folders.rs') under a containers
+folder's members at every visit over the straddle, "under a
+member of any other folder, nothing but ... that move". Both will
+hang it under every partner folder's live members. In content
+views the folder reconciler
+('server/update_buffer/reconcile/partner_folder.rs') will run the
+chain attach at every visit of a folder, reconciling each
+member's chain by key as the diff view does, so that a member the
+reconciler adds later gets its chain and a chain that stays keeps
+its viewnodes and their fold state.
+*** Tests and docs
+One test per partner folder kind in a content view, which
+'tests/partner_folder_matrix.rs' can carry: the member's chain
+present, write-protected, saved back unchanged; one in the diff
+view, a changed subscribers folder's member with its chain; one
+of a member the reconciler adds at a later visit getting its
+chain. The docs that say nothing hangs under another folder's
+member ('docs/api-and-formats.org', 'docs/diff-view.org', the
+glossary's entry on role trees and the chain) are corrected. The
+integration suite runs.
+** The glossary and the docs (slice 12)
 *** The split
 'docs/glossary.org' is divided into two top-level sections, the
 user-facing first, "Terms a user meets" (what is seen in the
@@ -623,7 +666,7 @@ and brought to the code as it then stands. The entries of
 'TODO/problems.org' marked "FIX PLANNED" that this plan closed
 move to the top of 'TODO/DONE/problems.org'.
 
-** The two-question check (slice 12)
+** The two-question check (slice 13)
 One agent answers two questions over the plan's commit range and
 writes the report under 'tests/results/'. First, vocabulary: no
 code, test or doc under 'server/', 'elisp/', 'nvim/', 'tests/' or
@@ -952,25 +995,28 @@ Run all four suites.
 The table, the conformance test, both editors, the Neovim prompt
 and its test, the deviations doc. Run the Rust, Emacs and Neovim
 suites.
-** TODO Slice 11: the glossary and the docs
+** TODO Slice 11: the chain under every role folder's member
+The two attach sites, the folder reconciler's visit, the three
+tests, the docs. Run all four suites.
+** TODO Slice 12: the glossary and the docs
 The split, the entries, the docs read end to end, 'names.org',
 the problem entries moved. No code; run nothing but a grep for
 each term it adds against the code.
-** TODO Slice 12: the two-question check
+** TODO Slice 13: the two-question check
 The report under 'tests/results/', the small fixes, the commit
 message listing the rest.
 
 * Verification and completion
 'cargo nextest run' (through 'bash/nextest.sh'),
 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh' after every slice
-but 11 and 12, one suite at a time; 'bash/integration-tests.sh'
+but 12 and 13, one suite at a time; 'bash/integration-tests.sh'
 after every slice that changes what the server writes into a
-buffer (0, 1, 2, 3, 4, 5, 7, 8, 9), the 'import-md-and-org' test
-failing at baseline as 'TODO/problems.org' records. At the start
-the suites stand at 908 Rust tests, 387 Emacs tests, every Neovim
-spec in 31 files, and 34 of 35 integration tests. After slice 12,
-grep once more for every retired name listed under "The
-two-question check (slice 12)" and for citations of 'TODO/' under
+buffer (0, 1, 2, 3, 4, 5, 7, 8, 9, 11), the 'import-md-and-org'
+test failing at baseline as 'TODO/problems.org' records. At the
+start the suites stand at 908 Rust tests, 387 Emacs tests, every
+Neovim spec in 31 files, and 34 of 35 integration tests. After
+slice 13, grep once more for every retired name listed under "The
+two-question check (slice 13)" and for citations of 'TODO/' under
 'server/', 'elisp/', 'nvim/', 'tests/', 'bash/' and 'docs/'; each
 comes back empty or lists only what this plan keeps. Done when
-all thirteen slices are committed and every suite passes.
+all fourteen slices are committed and every suite passes.
