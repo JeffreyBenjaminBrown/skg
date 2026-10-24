@@ -98,8 +98,10 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
       assert_eq! ( marked_keys (f),
                    [ a_alias () ] . into_iter () . collect () );
       assert! ( response . warnings . iter ()
-                . any ( |w| w . contains (
-                  "The readiness request on \"b\" (viewnode ID 0z) names no current change" )),
-                "the warning names the headline's viewnode ID: {:?}",
+                . any ( |w| w . starts_with (
+                  "A readiness request names no current change" )
+                  && w . ends_with (
+                  "\n*** b\n- graphnode ID: b\n- viewnode ID: 0z. To find it: C-c g v 0z\n" )),
+                "the warning names the headline as a subheadline: {:?}",
                 response . warnings ); }
     Ok (( )) }) }

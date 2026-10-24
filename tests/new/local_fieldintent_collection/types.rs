@@ -12,7 +12,7 @@ use skg::types::nodes::complete::Flag;
 /// The occurrence emitting, for the tests that do not care which.
 fn emitter (
 ) -> HeadlineName {
-  HeadlineName::ViewnodeId ( ViewnodeId ("0a" . to_string ()) ) }
+  HeadlineName::of ( Some (&ViewnodeId ("0a" . to_string ())), None, "" ) }
 
 fn title_intent (
   title : &str,
@@ -150,15 +150,21 @@ fn order_records_first_emission_per_skgid () {
               vec![ID::from ("b"), ID::from ("a")] ); }
 
 #[test]
-fn a_conflict_lists_the_viewnode_ids_of_the_occurrences_emitting () {
+fn a_conflict_names_the_occurrences_emitting_as_subheadlines () {
   let mut acc : CollectedFieldIntents =
     CollectedFieldIntents::new();
-  let first : HeadlineName = HeadlineName::ViewnodeId ( ViewnodeId ("0a" . to_string ()) );
-  let second : HeadlineName = HeadlineName::ViewnodeId ( ViewnodeId ("0c" . to_string ()) );
+  let first : HeadlineName =
+    HeadlineName::of ( Some (&ViewnodeId ("0a" . to_string ())), Some (&ID::from ("a")), "t" );
+  let second : HeadlineName =
+    HeadlineName::of ( Some (&ViewnodeId ("0c" . to_string ())), Some (&ID::from ("a")), "different" );
   acc . instructionMerge_fieldIntent (
     &first, ID::from ("a"), title_intent ("t") ) . unwrap();
   let error : String = acc . instructionMerge_fieldIntent (
     &second, ID::from ("a"), title_intent ("different") ) . unwrap_err();
   assert!( error . starts_with (
-             "Conflicting title/body intents for ID a (viewnode IDs 0a, 0c;" ),
-           "{}", error ); }
+             "Conflicting title/body intents for ID a (should have been precluded" ),
+           "{}", error );
+  assert!( error . ends_with ( concat! (
+             "\n*** t\n- graphnode ID: a\n- viewnode ID: 0a. To find it: C-c g v 0a\n",
+             "*** different\n- graphnode ID: a\n- viewnode ID: 0c. To find it: C-c g v 0c\n" )),
+           "each occurrence emitting is a subheadline: {}", error ); }

@@ -2,9 +2,10 @@
 /// I *believe* the tests constrain its behavior sufficiently.
 
 use crate::types::sexp::find_sexp_end;
-use crate::types::errors::{BufferValidationError, HeadlineName, viewnode_id_suffix};
+use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
+use crate::types::misc::ID;
 use crate::types::tree::forest::MpViewForest;
 use crate::types::viewnode::ViewnodeId;
 
@@ -102,11 +103,11 @@ pub fn org_to_uninterpreted_viewforest(
     // treeid_stack.len() should equal level
     // because the internal forest root is at level 0.
     if treeid_stack . len() < level {
-      return Err(format!(
-        "Node \"{}\"{} at level {} jumps too far between levels (no valid parent at level {}).",
-        viewnode . error_label(),
-        viewnode_id_suffix ( viewnode . viewnode_id . as_ref () ),
-        level, level - 1)); }
+      return Err ( with_org_subheadlines (
+        &format! (
+          "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
+          viewnode . error_label(), level, level - 1),
+        &[ viewnode . headline_name () ] )); }
     treeid_stack . push( {
       let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
       let new_treeid: NodeId = {
@@ -214,9 +215,9 @@ fn linecol_to_viewnode(
           title    : title . clone (),
           changes  : vec!["added body text" . to_string ()],
           headline : viewnode . headline_name (), },
-        None => BufferValidationError::Other ( format! (
-          "A write-protected node ({}) has body text, which saving would discard. Add an ID and edit a editable occurrence instead.",
-          viewnode . headline_name () )), })
+        None => BufferValidationError::Other ( with_org_subheadlines (
+          "A write-protected node has body text, which saving would discard. Add an ID and edit a editable occurrence instead.",
+          &[ viewnode . headline_name () ] )), })
     } else { None } );
   Ok ( ( level, viewnode, error_opt, warning_opt ) ) }
 
@@ -253,20 +254,21 @@ pub fn headline_to_triple (
         // Verify it's valid by attempting to parse it
         let parsed_sexp : Sexp = match sexp::parse (sexp_str) {
           Ok (parsed_sexp) => parsed_sexp,
-          Err (e) => return Err(format!(
-            "Invalid s-expression syntax: {} ({})",
-            e, HeadlineName::Title (title))), };
+          Err (e) => return Err ( with_org_subheadlines (
+            &format! ("Invalid s-expression syntax: {}", e),
+            &[ HeadlineName::of ( None, None, &title ) ] )), };
 
         // Parse the metadata from the s-expression
         let metadata: Option<ViewnodeMetadata> =
           match parse_metadata_to_viewnodemd (sexp_str) {
             Ok (parsed_metadata) => Some (parsed_metadata),
             Err (e) => // Invalid metadata with specific error
-              return Err (format! (
-                "{} ({})", e,
-                HeadlineName::of (
-                  viewnode_id_written_in_metadata (&parsed_sexp) . as_ref (),
-                  &title ))),
+              return Err ( with_org_subheadlines (
+                &e,
+                &[ HeadlineName::of (
+                     viewnode_id_written_in_metadata (&parsed_sexp) . as_ref (),
+                     graphnode_id_written_in_metadata (&parsed_sexp) . as_ref (),
+                     &title ) ] )),
           };
 
         return Ok((level, metadata, title));
@@ -284,6 +286,28 @@ pub fn headline_to_triple (
     // This is a bit of a hack, but maintains backward compatibility
     Err("__NOT_A_HEADLINE__" . to_string())
   }}
+
+/// The graphnode ID a headline's '(skg ...)' sexp carries in its
+/// '(node ...)', '(historical ...)', '(deleted ...)' or '(unknown ...)'
+/// form, read without parsing the rest of it, so that an error in the
+/// rest can name the headline. None if it carries none.
+fn graphnode_id_written_in_metadata (
+  metadata_sexp : &Sexp,
+) -> Option<ID> {
+  let Sexp::List (elements) = metadata_sexp else { return None; };
+  elements . iter () . find_map ( |element| {
+    let Sexp::List (form) = element else { return None; };
+    let [ Sexp::Atom (Atom::S (head)), fields @ .. ] = form . as_slice ()
+      else { return None; };
+    if ! matches! ( head . as_str (),
+                    "node" | "historical" | "deleted" | "unknown" )
+    { return None; }
+    fields . iter () . find_map ( |field| match field {
+      Sexp::List (pair) => match pair . as_slice () {
+        [ Sexp::Atom (Atom::S (key)), Sexp::Atom (Atom::S (value)) ]
+          if key == "id" => Some ( ID::from ( value . as_str () )),
+        _ => None },
+      _ => None } ) } ) }
 
 /// The viewnode ID a headline's '(skg ...)' sexp carries, read without
 /// parsing the rest of it, so that an error in the rest can name the

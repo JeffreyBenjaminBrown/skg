@@ -1043,9 +1043,13 @@ impl Viewnode {
         "",
     }}
 
-  /// What a message calls this headline: its viewnode ID, else its title.
+  /// What a message says of this headline.
   pub fn headline_name (&self) -> HeadlineName {
-    HeadlineName::of ( self . viewnode_id . as_ref (), self . title () ) }
+    let graphnode_id : Option<&ID> = match &self . kind {
+      ViewnodeKind::Vognode (vognode) => vognode . skgid (),
+      _ => None };
+    HeadlineName::of ( self . viewnode_id . as_ref (), graphnode_id,
+                       self . title () ) }
 
   /// Reasonable for both UnrestrictedVognodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {

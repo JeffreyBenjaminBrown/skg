@@ -9,7 +9,7 @@
 /// and they become NodeInstruction *instructions* only after downstream
 /// resolution and disk supplementation.
 
-use crate::types::errors::{HeadlineName, name_headlines};
+use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use std::collections::HashMap;
@@ -223,9 +223,9 @@ impl CollectedFieldIntents {
         Ok (( )) },
       FieldIntent::Delete { skgrepo } => {
         if entry . some_nondelete_exclusive_slot_is_filled() {
-          return Err ( format!(
-            "Cannot have both Delete and Save for same ID: {} ({})",
-            target, name_headlines (emitters) )); }
+          return Err ( with_org_subheadlines (
+            &format! ( "Cannot have both Delete and Save for same ID: {}", target ),
+            emitters )); }
         fill_exclusive_slot (
           &mut entry . home_skgrepo, skgrepo, "repo", &target, emitters) ?;
         if ! entry . delete {
@@ -234,9 +234,9 @@ impl CollectedFieldIntents {
         Ok (( )) },
       _ => {
         if entry . delete {
-          return Err ( format!(
-            "Cannot have both Delete and Save for same ID: {} ({})",
-            target, name_headlines (emitters) )); }
+          return Err ( with_org_subheadlines (
+            &format! ( "Cannot have both Delete and Save for same ID: {}", target ),
+            emitters )); }
         match intent {
           FieldIntent::SetTitleAndBody { skgrepo, title, body } => {
             fill_exclusive_slot (
@@ -265,17 +265,17 @@ impl CollectedFieldIntents {
               "overrides", &target, emitters),
           FieldIntent::NodeMerge { acquiree } => {
             if entry . flag . is_some() {
-              return Err ( format!(
-                "Cannot combine nodeMerge and flag requests for ID {} ({})",
-                target, name_headlines (emitters) )); }
+              return Err ( with_org_subheadlines (
+                &format! ( "Cannot combine nodeMerge and flag requests for ID {}", target ),
+                emitters )); }
             fill_exclusive_slot (
               &mut entry . node_merge, acquiree,
               "nodeMerge acquiree", &target, emitters) },
           FieldIntent::SetFlag { flag, value } => {
             if entry . node_merge . is_some() {
-              return Err ( format!(
-                "Cannot combine nodeMerge and flag requests for ID {} ({})",
-                target, name_headlines (emitters) )); }
+              return Err ( with_org_subheadlines (
+                &format! ( "Cannot combine nodeMerge and flag requests for ID {}", target ),
+                emitters )); }
             fill_exclusive_slot (
               &mut entry . flag, (flag, value),
               "flag", &target, emitters) },
@@ -301,6 +301,8 @@ fn fill_exclusive_slot<T : PartialEq + std::fmt::Debug> (
     Some (occupant) if *occupant == payload =>
       Ok (( )), // An equal payload is a silent no-op.
     Some (occupant) =>
-      Err ( format!(
-        "Conflicting {} intents for ID {} ({}; should have been precluded by validation): {:?} vs {:?}",
-        label, target, name_headlines (emitters), occupant, payload )), }}
+      Err ( with_org_subheadlines (
+        &format! (
+          "Conflicting {} intents for ID {} (should have been precluded by validation): {:?} vs {:?}",
+          label, target, occupant, payload ),
+        emitters )), }}

@@ -11,7 +11,7 @@ use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
-use crate::types::errors::{BufferValidationError, HeadlineName};
+use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
 use contradictory_instructions::find_inconsistent_instructions;
 use super::local;
@@ -354,11 +354,12 @@ fn writeProtected_relRepo_request_errors (
        && t . relRepo_request . is_some ()
        && ! relRepo_request_is_collected (node_ref, t)
     { let headline : HeadlineName = node_ref . value () . headline_name ();
-      errors . push ( BufferValidationError::Other ( format! (
-        "relRepo request on write-protected node {} ({}) that no editable node collects:\n{}- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
-        t . skgid . as_ref () . map ( |skgid| skgid . 0 . as_str () )
-          . unwrap_or ("(no ID)"),
-        headline, headline . org_line () ))); }} }
+      errors . push ( BufferValidationError::Other ( with_org_subheadlines (
+        &format! (
+          "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
+          t . skgid . as_ref () . map ( |skgid| skgid . 0 . as_str () )
+            . unwrap_or ("(no ID)") ),
+        &[ headline ] ))); }} }
 
 /// Whether save reads the relRepo request on this Unrestricted node:
 /// the node is a member of its view-parent, and the relationship's

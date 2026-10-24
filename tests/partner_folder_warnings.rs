@@ -139,9 +139,10 @@ async fn write_protected_folder_repairs_warn_impl (
       viewnode_id_atom_of ( line_containing (&complete_buffer, "subscriberFolder") )
       . expect ("the rendered folder has a viewnode ID")
       . trim_start_matches ("(vnid ") . trim_end_matches (')');
-    assert! ( warning . contains ( &format! (
-                "Repaired subscriberFolder (viewnode ID {}) under node n",
-                folder_viewnode_id )),
+    assert! ( warning . starts_with ("Repaired subscriberFolder under node n")
+              && warning . ends_with ( &format! (
+                "\n*** (untitled)\n- viewnode ID: {}. To find it: C-c g v {}\n",
+                folder_viewnode_id, folder_viewnode_id )),
               "{}", warning ); }
   assert! ( warning . contains ("reinstated 1 member(s): r"),
             "{}", warning );

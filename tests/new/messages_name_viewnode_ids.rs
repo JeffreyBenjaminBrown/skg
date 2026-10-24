@@ -1,10 +1,12 @@
 // cargo nextest run --test grouped_saves -E 'test(messages_name_viewnode_ids::)'
 //
-// A message about one headline names its viewnode ID after the node's ID;
-// a message about several occurrences of a node lists their
-// viewnode IDs; a metadata parse error ends by naming its headline; and a
-// headline without a viewnode ID (typed, or a copy) is named by its
-// title ('docs/api-and-formats.org', "Save buffer").
+// A message names each headline it concerns as an org subheadline
+// under the message's headline: the title, then the graphnode ID, then
+// the viewnode ID with the command that finds it, or "not yet saved"
+// for a headline without one (typed, or a copy). A validation error's
+// subheadlines nest under its '** Error N', after the error's own
+// lines; a parse error and a warning end with theirs
+// ('docs/api-and-formats.org', "How a message names a headline").
 
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
@@ -22,10 +24,26 @@ use std::error::Error;
 const FIXTURES : &str =
   "tests/merge/merge_nodes/fixtures";
 
-fn viewnode_id (
-  text : &str,
+/// The name of a headline titled 'title', showing graphnode 'skgid',
+/// with viewnode ID 'viewnode_id'.
+fn named (
+  title       : &str,
+  skgid       : &str,
+  viewnode_id : &str,
 ) -> HeadlineName {
-  HeadlineName::ViewnodeId ( ViewnodeId (text . to_string ()) ) }
+  HeadlineName::of ( Some ( &ViewnodeId (viewnode_id . to_string ()) ),
+                     Some ( &ID::from (skgid) ),
+                     title ) }
+
+/// The subheadline naming a headline with a graphnode ID and a
+/// viewnode ID.
+fn subheadline (
+  title       : &str,
+  skgid       : &str,
+  viewnode_id : &str,
+) -> String {
+  format! ( "*** {}\n- graphnode ID: {}\n- viewnode ID: {}. To find it: C-c g v {}\n",
+            title, skgid, viewnode_id, viewnode_id ) }
 
 /// The org form a save refusal of 'errors' shows the client.
 fn org_form_of (
@@ -46,7 +64,7 @@ fn parse_errors_and_warnings (
   (errors, warnings) }
 
 #[test]
-fn messages_about_one_headline_name_its_viewnode_id_at_parse_time () {
+fn messages_about_one_headline_name_it_as_a_subheadline_at_parse_time () {
   let (errors, warnings) = parse_errors_and_warnings ( indoc! {"
     * (skg (node (id root) (repo main)) (vnid 0a)) root
     ** (skg (node (id gone) (repo main) writeProtected (editRequest delete)) (vnid 0b)) gone
@@ -54,32 +72,27 @@ fn messages_about_one_headline_name_its_viewnode_id_at_parse_time () {
     *** (skg alias (vnid 0d)) an alias
     with a body
     "} );
-  let edit_request : &BufferValidationError =
-    errors . iter () . find ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (..) ))
-    . expect ("an edit request on a write-protected node");
-  assert_eq! ( edit_request,
-               &BufferValidationError::EditRequestOnWriteProtectedOccurrence (
-                 ID::from ("gone"), viewnode_id ("0b") ));
-  assert! ( edit_request . to_string () . contains (
-              "node ID(\"gone\") (viewnode ID 0b)" ),
-            "{}", edit_request );
-  let body : &BufferValidationError =
-    errors . iter () . find ( |e| matches! (
-      e, BufferValidationError::Body_of_NonVognode (..) ))
-    . expect ("a body on an alias");
-  assert! ( body . to_string () . starts_with (
-              "alias node (viewnode ID 0d) should not have a body" ),
-            "{}", body );
+  assert! ( errors . contains (
+              &BufferValidationError::EditRequestOnWriteProtectedOccurrence (
+                ID::from ("gone"), named ("gone", "gone", "0b") )),
+            "{:?}", errors );
   let org_form : String = org_form_of (&errors);
-  assert! ( org_form . contains ("- viewnode ID: 0b\n"), "{}", org_form );
-  assert! ( org_form . contains ("- viewnode ID: 0d\n"), "{}", org_form );
-  assert! ( warnings . iter () . any ( |w| w . starts_with (
-              "Headline text on a aliasFolder (viewnode ID 0c) is not saved" )),
+  assert! ( org_form . starts_with ("NOTHING WAS SAVED\n"), "{}", org_form );
+  assert! ( org_form . contains ( &format! (
+              "- To delete or merge this node, visit a editable view of it first (C-c g RET).\n{}",
+              subheadline ("gone", "gone", "0b") )),
+            "the subheadline follows the error's own lines:\n{}", org_form );
+  assert! ( org_form . contains (
+              "*** an alias\n- viewnode ID: 0d. To find it: C-c g v 0d\n" ),
+            "an alias carries no graphnode ID:\n{}", org_form );
+  assert! ( warnings . iter () . any ( |w|
+              w . starts_with ( "Headline text on a aliasFolder is not saved" )
+              && w . ends_with (
+                "\n*** typed on a folder\n- viewnode ID: 0c. To find it: C-c g v 0c\n" )),
             "{:?}", warnings ); }
 
 #[test]
-fn messages_about_one_headline_name_its_viewnode_id_at_validation (
+fn messages_about_one_headline_name_it_as_a_subheadline_at_validation (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-messages-name-viewnode-ids-validation", FIXTURES,
@@ -101,20 +114,22 @@ async fn one_headline_at_validation (
       config ) ?;
   assert! ( errors . contains (
               &BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (
-                ID::from ("parent"), viewnode_id ("0e") )),
+                ID::from ("parent"), named ("parent", "parent", "0e") )),
             "{:?}", errors );
   assert! ( errors . iter () . any ( |e| matches! (
-              e, BufferValidationError::LocalStructureViolation (..) )
-              && e . to_string () . starts_with (
-                "Local structure violation at ID ID(\"parent\") (viewnode ID 0f): " )),
+              e, BufferValidationError::LocalStructureViolation (..) )),
             "an alias outside an alias folder: {:?}", errors );
   let org_form : String = org_form_of (&errors);
-  assert! ( org_form . contains ("- viewnode ID: 0e\n"), "{}", org_form );
-  assert! ( org_form . contains ("- viewnode ID: 0f\n"), "{}", org_form );
+  assert! ( org_form . contains ( &format! (
+              "on another (C-c s d).\n{}", subheadline ("parent", "parent", "0e") )),
+            "{}", org_form );
+  assert! ( org_form . contains (
+              "*** a stray alias\n- viewnode ID: 0f. To find it: C-c g v 0f\n" ),
+            "{}", org_form );
   Ok (( )) }
 
 #[test]
-fn messages_about_several_occurrences_list_their_viewnode_ids () {
+fn messages_about_several_occurrences_name_each_as_a_subheadline () {
   let viewforest : MpViewForest =
     org_to_uninterpreted_viewforest ( indoc! {"
       * (skg (node (id a) (repo main)) (vnid 0a)) a
@@ -123,32 +138,36 @@ fn messages_about_several_occurrences_list_their_viewnode_ids () {
   let (ambiguous_deletions, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
   let both : Vec<HeadlineName> =
-    vec! [ viewnode_id ("0a"), viewnode_id ("0b") ];
+    vec! [ named ("a", "a", "0a"), named ("a again", "a", "0b") ];
   assert_eq! ( ambiguous_deletions, vec! [ (ID::from ("a"), both . clone ()) ] );
   assert_eq! ( multiple_definers, vec! [ (ID::from ("a"), both . clone ()) ] );
-  let error : BufferValidationError =
+  let org_form : String = org_form_of ( &[
     BufferValidationError::Multiple_Defining_Viewnodes (
-      ID::from ("a"), both );
-  assert! ( error . to_string () . ends_with ("are editable (viewnode IDs 0a, 0b)"),
-            "{}", error );
-  let org_form : String = org_form_of (&[error]);
-  assert! ( org_form . contains ("- viewnode IDs: 0a, 0b\n"), "{}", org_form ); }
+      ID::from ("a"), both ) ] );
+  assert! ( org_form . contains ( &format! (
+              "** Error 1\nID has multiple defining containers:\n- ID: a\n{}{}",
+              subheadline ("a", "a", "0a"),
+              subheadline ("a again", "a", "0b") )),
+            "{}", org_form ); }
 
 #[test]
-fn a_metadata_parse_error_names_its_headline () {
+fn a_metadata_parse_error_ends_with_its_headline () {
   let with_viewnode_id : String =
     headline_to_triple (
       "* (skg (node (id a) (repo main) (bogus 1)) (vnid 0c)) a" )
     . unwrap_err ();
-  assert! ( with_viewnode_id . ends_with ("(viewnode ID 0c)"), "{}", with_viewnode_id );
+  assert! ( with_viewnode_id . ends_with ( &format! (
+              "\n{}", subheadline ("a", "a", "0c") )),
+            "{}", with_viewnode_id );
   let without_viewnode_id : String =
     headline_to_triple ( "* (skg (node (id a) (repo main) (bogus 1))) a typed" )
     . unwrap_err ();
-  assert! ( without_viewnode_id . ends_with ("(headline \"a typed\")"),
+  assert! ( without_viewnode_id . ends_with (
+              "\n*** a typed\n- graphnode ID: a\n- not yet saved\n" ),
             "{}", without_viewnode_id ); }
 
 #[test]
-fn a_headline_without_a_viewnode_id_is_named_by_its_title () {
+fn a_headline_without_a_viewnode_id_is_not_yet_saved () {
   // The second headline is a copy of the first, so it loses the viewnode ID
   // it carries; the third the user typed.
   let viewforest : MpViewForest =
@@ -160,17 +179,14 @@ fn a_headline_without_a_viewnode_id_is_named_by_its_title () {
   let (_, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
   let names : Vec<HeadlineName> = vec! [
-    viewnode_id ("0a"),
-    HeadlineName::Title ("a copied" . to_string ()),
-    HeadlineName::Title ("a typed" . to_string ()) ];
+    named ("a", "a", "0a"),
+    HeadlineName::of ( None, Some (&ID::from ("a")), "a copied" ),
+    HeadlineName::of ( None, Some (&ID::from ("a")), "a typed" ) ];
   assert_eq! ( multiple_definers, vec! [ (ID::from ("a"), names . clone ()) ] );
-  let error : BufferValidationError =
+  let org_form : String = org_form_of ( &[
     BufferValidationError::Multiple_Defining_Viewnodes (
-      ID::from ("a"), names );
-  assert! ( error . to_string () . ends_with (
-              "(viewnode ID 0a, headline \"a copied\", headline \"a typed\")" ),
-            "{}", error );
-  let org_form : String = org_form_of (&[error]);
-  assert! ( org_form . contains (
-              "- occurrences: viewnode ID 0a, headline \"a copied\", headline \"a typed\"\n" ),
+      ID::from ("a"), names ) ] );
+  assert! ( org_form . contains ( &format! (
+              "{}*** a copied\n- graphnode ID: a\n- not yet saved\n*** a typed\n- graphnode ID: a\n- not yet saved\n",
+              subheadline ("a", "a", "0a") )),
             "{}", org_form ); }

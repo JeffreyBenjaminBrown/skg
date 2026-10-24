@@ -4,13 +4,14 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-/// What a message calls one headline: its viewnode ID, or, for a headline
-/// without one (the user typed it, or copied one, and has not saved),
-/// its title. No message invents a viewnode ID.
+/// What a message says of one headline: its title, the graphnode ID it
+/// carries, and its viewnode ID. A message names it as an org
+/// subheadline ('org_subheadline'). No message invents a viewnode ID.
 #[derive (Debug, Clone, PartialEq, Eq, Hash)]
-pub enum HeadlineName {
-  ViewnodeId (ViewnodeId),
-  Title (String),
+pub struct HeadlineName {
+  pub title        : String, // empty when the headline has none
+  pub graphnode_id : Option<ID>, // None for a folder, a property, a restricted vognode, or a typed headline without one
+  pub viewnode_id  : Option<ViewnodeId>, // None for a headline typed, or copied, since the last render
 }
 
 #[derive (Debug)]
@@ -102,48 +103,74 @@ pub enum BufferValidationError {
 //
 
 impl HeadlineName {
-  /// The viewnode ID when the headline carries one, else the title.
   pub fn of (
-    viewnode_id   : Option<&ViewnodeId>,
-    title : &str,
+    viewnode_id  : Option<&ViewnodeId>,
+    graphnode_id : Option<&ID>,
+    title        : &str,
   ) -> HeadlineName {
-    match viewnode_id {
-      Some (viewnode_id) => HeadlineName::ViewnodeId (viewnode_id . clone ()),
-      None       => HeadlineName::Title (title . to_string ()), }}
+    HeadlineName {
+      title        : title . to_string (),
+      graphnode_id : graphnode_id . cloned (),
+      viewnode_id  : viewnode_id . cloned (), }}
 
-  /// The line naming the headline in a message's org form.
-  pub fn org_line (
+  /// The org subheadline naming this headline under a message's
+  /// headline, which the clients put at level 2 (see
+  /// 'docs/api-and-formats.org', "How a message names a headline"):
+  /// the title (or '(untitled)'), then 'graphnode ID: X' when it
+  /// carries one, then 'viewnode ID: X' with the command that finds
+  /// it, or 'not yet saved'.
+  pub fn org_subheadline (
     &self
   ) -> String {
-    match self {
-      HeadlineName::ViewnodeId (viewnode_id) =>
-        format! ("- viewnode ID: {}\n", viewnode_id),
-      HeadlineName::Title (title) =>
-        format! ("- headline: {:?}\n", title), }}
+    let heading : &str =
+      if self . title . is_empty () { "(untitled)" }
+      else { &self . title };
+    let graphnode_line : String =
+      self . graphnode_id . as_ref ()
+      . map ( |skgid| format! ("- graphnode ID: {}\n", skgid . 0) )
+      . unwrap_or_default ();
+    let viewnode_line : String = match &self . viewnode_id {
+      Some (viewnode_id) => format! (
+        "- viewnode ID: {}. To find it: C-c g v {}\n",
+        viewnode_id, viewnode_id ),
+      None => "- not yet saved\n" . to_string (), };
+    format! ( "*** {}\n{}{}", heading, graphnode_line, viewnode_line ) }
 }
 
 impl fmt::Display for HeadlineName {
-  /// 'viewnode ID X', or 'headline "T"'.
+  /// 'viewnode ID X', or 'headline "T"': for a one-line description,
+  /// as in a log. A message shown to the user names its headlines as
+  /// subheadlines instead ('org_subheadline').
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
-    match self {
-      HeadlineName::ViewnodeId (viewnode_id) =>
+    match &self . viewnode_id {
+      Some (viewnode_id) =>
         write! (f, "viewnode ID {}", viewnode_id),
-      HeadlineName::Title (title) =>
-        write! (f, "headline {:?}", title), }}}
+      None =>
+        write! (f, "headline {:?}", self . title), }}}
 
-/// ' (viewnode ID X)', or nothing for a headline without a viewnode ID: for
-/// a message that already names the headline some other way.
-pub fn viewnode_id_suffix (
-  viewnode_id : Option<&ViewnodeId>,
+/// The subheadlines naming 'names', one after another.
+pub fn org_subheadlines (
+  names : &[HeadlineName],
 ) -> String {
-  viewnode_id . map ( |viewnode_id| format! (" (viewnode ID {})", viewnode_id) )
-    . unwrap_or_default () }
+  names . iter () . map ( HeadlineName::org_subheadline )
+    . collect::<Vec<String>> () . concat () }
 
-/// Several occurrences' names: 'viewnode IDs X, Y' when every one has a
-/// viewnode ID, else each named as 'HeadlineName' names it.
+/// A message's text followed by the subheadlines naming 'names': the
+/// text ends its line, and the subheadlines come after it, so that
+/// nothing of the message falls under one of them.
+pub fn with_org_subheadlines (
+  text  : &str,
+  names : &[HeadlineName],
+) -> String {
+  format! ( "{}\n{}", text . trim_end_matches ('\n'),
+            org_subheadlines (names) ) }
+
+/// Several occurrences' names on one line: 'viewnode IDs X, Y' when
+/// every one has a viewnode ID, else each named as 'HeadlineName'
+/// displays it.
 pub fn name_headlines (
   names : &[HeadlineName],
 ) -> String {
@@ -154,24 +181,14 @@ pub fn name_headlines (
       names . iter () . map ( |name| name . to_string () )
       . collect::<Vec<String>> () . join (", "), }}
 
-/// The line naming several occurrences in a message's org form.
-pub fn headline_names_org_line (
-  names : &[HeadlineName],
-) -> String {
-  match viewnode_ids_of_all (names) {
-    Some (viewnode_ids) => format! ("- viewnode IDs: {}\n", viewnode_ids),
-    None        => format! ("- occurrences: {}\n",
-                            name_headlines (names)), }}
-
-/// The viewnode IDs, comma-separated, if every name is one.
+/// The viewnode IDs, comma-separated, if every name has one.
 fn viewnode_ids_of_all (
   names : &[HeadlineName],
 ) -> Option<String> {
   let viewnode_ids : Vec<&str> =
     names . iter ()
-    . map ( |name| match name {
-      HeadlineName::ViewnodeId (viewnode_id) => Some (viewnode_id . 0 . as_str ()),
-      HeadlineName::Title (_)    => None } )
+    . map ( |name| name . viewnode_id . as_ref ()
+            . map ( |viewnode_id| viewnode_id . 0 . as_str () ))
     . collect::<Option<Vec<&str>>> () ?;
   Some ( viewnode_ids . join (", ") ) }
 
@@ -264,5 +281,46 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::Other (msg) =>
         write!(f, "{}", msg), }} }
+
+impl BufferValidationError {
+  /// The headlines the error concerns, which its org form names as
+  /// subheadlines.
+  pub fn named_headlines (
+    &self
+  ) -> Vec<&HeadlineName> {
+    match self {
+      BufferValidationError::Body_of_NonVognode (_, _, headline)
+        | BufferValidationError::ForkRequestOnUnknownNode (_, headline)
+        | BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (_, headline)
+        | BufferValidationError::LocalStructureViolation (_, _, headline)
+        | BufferValidationError::EditRequestOnWriteProtectedOccurrence (_, headline)
+        | BufferValidationError::EditedWriteProtectedOccurrence { headline, .. }
+        | BufferValidationError::MemberChildOfWriteProtectedOccurrence { headline, .. }
+        | BufferValidationError::FlagsSurfaceEdited { headline, .. }
+        | BufferValidationError::IDFolder_Edited (_, _, _, headline)
+        | BufferValidationError::OverridesHere_Mismatch (_, _, _, headline) =>
+        vec! [ headline ],
+      BufferValidationError::Multiple_Defining_Viewnodes (_, headlines)
+        | BufferValidationError::AmbiguousDeletion (_, headlines)
+        | BufferValidationError::ForkRequestMultiple (_, headlines)
+        | BufferValidationError::MultipleEditableViewRequestsForSameId (_, headlines) =>
+        headlines . iter () . collect (),
+      BufferValidationError::DuplicatedContent (_)
+        | BufferValidationError::ModifiedForeignNode (..)
+        | BufferValidationError::CreatedForeignNode (..)
+        | BufferValidationError::CannotMoveToOrFromForeignSkgrepo (..)
+        | BufferValidationError::CannotMoveAndMergeSimultaneously (_)
+        | BufferValidationError::SkgrepoNotInConfig (..)
+        | BufferValidationError::ForkSkgrepoUnresolved (_)
+        | BufferValidationError::ForkAlreadyExists (..)
+        | BufferValidationError::ForkSkgrepoRestricted (..)
+        | BufferValidationError::ForkSkgrepoNotOwned (..)
+        | BufferValidationError::OverrideInvariantViolation (_)
+        | BufferValidationError::EmptyTitle (_)
+        | BufferValidationError::FlagEditOnForeignNode (..)
+        | BufferValidationError::FlagEditOnUnknownNode (_)
+        | BufferValidationError::Other (_) =>
+        Vec::new (), }}
+}
 
 impl Error for BufferValidationError {}

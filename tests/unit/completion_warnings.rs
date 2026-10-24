@@ -32,15 +32,18 @@ fn warnings_batch_per_folder_and_recorder () {
     render_completion_warnings (&warnings);
   assert_eq! ( rendered . len (), 2,
     "one string per (folder, recorder) pair: {:?}", rendered );
-  assert! ( rendered [0] . contains ("subscriberFolder (viewnode ID 0a) under node n") );
-  assert! ( rendered [0] . contains ("under node n") );
+  assert! ( rendered [0] . contains ("subscriberFolder under node n") );
+  assert! ( rendered [0] . ends_with (
+              "\n*** (untitled)\n- viewnode ID: 0a. To find it: C-c g v 0a\n" ),
+            "the folder is named as a subheadline: {}", rendered [0] );
   assert! ( rendered [0] . contains ("reinstated 2 member(s): r, t") );
   assert! ( rendered [0] . contains ("retained 1 child(ren) as non-members") );
   assert! ( rendered [0] . contains ("edited from the other side"),
     "a restoration explains where membership is edited: {}",
     rendered [0] );
-  assert! ( rendered [1] . contains ("hiderFolder under node m"),
-    "a folder without a viewnode ID is named by its kind alone: {}",
+  assert! ( rendered [1] . contains ("hiderFolder under node m") );
+  assert! ( rendered [1] . ends_with ("\n*** (untitled)\n- not yet saved\n"),
+    "a folder without a viewnode ID is not yet saved: {}",
     rendered [1] );
   assert! ( rendered [1] . contains ("removed 1 duplicate member(s): d") );
   assert! ( ! rendered [1] . contains ("edited from the other side"),

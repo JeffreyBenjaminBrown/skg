@@ -146,7 +146,7 @@ fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
     assert! ( matches! (
       &errors [..],
       [ BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-          skgid, title, headline : HeadlineName::ViewnodeId (_) } ]
+          skgid, title, headline : HeadlineName { viewnode_id : Some (_), .. } } ]
       if *skgid == ID::from ("n") && title == "n" ),
       "{:?}", errors );
     assert! ( errors [0] . to_string () . contains (

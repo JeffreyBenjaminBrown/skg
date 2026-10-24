@@ -9,7 +9,7 @@
 /// ('render_completion_warnings'), ColRepairs batched per folder
 /// occurrence.
 
-use crate::types::errors::viewnode_id_suffix;
+use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::viewnode::{PartnerFolder, ViewnodeId};
 
@@ -79,13 +79,13 @@ pub fn render_completion_warnings (
         if any_reinstated {
           " (A write-protected folder's membership is edited from the other side of the relationship, not by editing the folder.)"
         } else { "" };
-      rendered . push (
-        format! ( "Repaired {}{} under node {}: {}.{}",
-                  folder . repr_in_client (),
-                  viewnode_id_suffix ( folder_viewnode_id . as_ref () ),
-                  recorder . 0,
-                  segments . join ("; "),
-                  explainer )); }}
+      rendered . push ( with_org_subheadlines (
+        &format! ( "Repaired {} under node {}: {}.{}",
+                   folder . repr_in_client (),
+                   recorder . 0,
+                   segments . join ("; "),
+                   explainer ),
+        &[ HeadlineName::of ( folder_viewnode_id . as_ref (), None, "" ) ] )); }}
   rendered }
 
 #[cfg(test)]

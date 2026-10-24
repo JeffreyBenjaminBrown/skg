@@ -24,7 +24,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, RecorderwardRelmap};
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::types::errors::viewnode_id_suffix;
+use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
@@ -80,9 +80,9 @@ pub fn add_restore_instructions (
         relationships . push (relationship); }}}
   for (key, headline) in restoreRel_requests (viewforest, live) {
     let Some (key) : Option<RelationshipKey> = key else {
-      warnings . push ( format! (
-        "The restoreRel request on {} was dropped: that headline stands for no relationship to its viewparent.",
-        headline ));
+      warnings . push ( with_org_subheadlines (
+        "A restoreRel request was dropped: its headline stands for no relationship to its viewparent.",
+        &[ headline ] ));
       continue; };
     let refusal : Option<&str> =
       if key . relation == NodeRelation::LinksTo {
@@ -92,15 +92,16 @@ pub fn add_restore_instructions (
         Some ("has a deleted node at one end; restore it first") }
       else { None };
     if let Some (refusal) = refusal {
-      warnings . push ( format! (
-        "The restoreRel request on {} was dropped: its relationship {}.",
-        headline, refusal ));
+      warnings . push ( with_org_subheadlines (
+        &format! ( "A restoreRel request was dropped: its relationship {}.",
+                   refusal ),
+        &[ headline ] ));
       continue; }
     match relationship_at_head (before, &key) {
       Some (relationship) => relationships . push (relationship),
-      None => warnings . push ( format! (
-        "The restoreRel request on {} names no relationship HEAD records; it was dropped.",
-        headline )), }}
+      None => warnings . push ( with_org_subheadlines (
+        "A restoreRel request names no relationship HEAD records; it was dropped.",
+        &[ headline ] )), }}
   relationships . sort_by_key ( // so that each lands at its index at HEAD
     |relationship| relationship . index );
   for relationship in relationships {
@@ -137,21 +138,20 @@ fn restore_nodes (
       : &ViewnodeKind = &node . value () . kind else { continue; };
     if ! h . restoreNode_request || restored . contains (&h . skgid)
     { continue; }
-    let headline : String = format! ( "{}{}",
-      h . skgid, viewnode_id_suffix ( node . value () . viewnode_id . as_ref () ));
+    let headline : HeadlineName = node . value () . headline_name ();
     let saved_already : bool = instructions . iter () . any (
       |instruction| instruction_skgid (instruction) == &h . skgid );
     let graphnode : Option<Graphnode> =
       graphnode_from_graph (before, &h . skgid);
     match graphnode {
       _ if live . pid_of (&h . skgid) . is_some () || saved_already =>
-        warnings . push ( format! (
-          "The restoreNode request on {} was dropped: that node exists.",
-          headline )),
+        warnings . push ( with_org_subheadlines (
+          "A restoreNode request was dropped: that node exists.",
+          &[ headline ] )),
       None =>
-        warnings . push ( format! (
-          "The restoreNode request on {} was dropped: HEAD has no such node.",
-          headline )),
+        warnings . push ( with_org_subheadlines (
+          "A restoreNode request was dropped: HEAD has no such node.",
+          &[ headline ] )),
       Some (graphnode) => {
         restored . insert (h . skgid . clone ());
         instructions . push (
@@ -223,21 +223,18 @@ fn relation_list (
 
 /// The relationship each restoreRel request in 'viewforest' stands
 /// for (None when its headline stands for none, as under an
-/// acquisition folder), with what a warning calls its headline.
+/// acquisition folder), with its headline, which a warning names.
 fn restoreRel_requests (
   viewforest : &ViewForest,
   live       : &InRustGraph,
-) -> Vec<(Option<RelationshipKey>, String)> {
+) -> Vec<(Option<RelationshipKey>, HeadlineName)> {
   let pid_of = |skgid : &ID| -> ID {
     live . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
   viewforest . root () . descendants ()
     . filter ( |node| matches! ( &node . value () . kind,
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . restoreRel_request ))
     . map ( |node : NodeRef<_>| {
-      let headline : String = format! ( "{}{}",
-        node . value () . unrestricted_skgid () . map ( |skgid| skgid . to_string () )
-          . unwrap_or_default (),
-        viewnode_id_suffix ( node . value () . viewnode_id . as_ref () ));
+      let headline : HeadlineName = node . value () . headline_name ();
       let key : Option<RelationshipKey> =
         vognode_leaf_pid (node . value (), &pid_of)
         . and_then ( |pid| relationship_to_viewparent (

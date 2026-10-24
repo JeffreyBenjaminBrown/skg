@@ -185,13 +185,15 @@ fn a_membership_in_a_deleted_node_is_dropped_with_a_warning (
       &requesting (&buffer, GC_UNDER_G, "restoreRel") ) ?;
     assert_eq! ( files, files_before );
     assert_eq! ( response . warnings . len (), 1, "{:?}", response . warnings );
-    assert! ( response . warnings [0] . starts_with ("The restoreRel request on gc (viewnode ID ")
-              && response . warnings [0] . contains ("deleted node at one end"),
+    assert! ( response . warnings [0] . starts_with ("A restoreRel request was dropped")
+              && response . warnings [0] . contains ("deleted node at one end")
+              && response . warnings [0] . contains (
+                "\n*** gc\n- graphnode ID: gc\n- viewnode ID: "),
               "{:?}", response . warnings );
     Ok (( )) }) }
 
 /// Each request on the wrong kind of headline stops the save with the
-/// parser's message, naming the headline's viewnode ID.
+/// parser's message, naming the headline with its viewnode ID.
 #[test]
 fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Error>> {
   with_fixture ("restore", &["main"], |f| {
@@ -204,7 +206,9 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
       let refusal : String = match save ( f, &requesting (&buffer, prefix, request) ) {
         Err (e) => e . to_string (),
         Ok (response) => format! ( "{:?}", response . errors ), };
-      assert! ( refusal . contains (message) && refusal . contains ("(viewnode ID "),
+      assert! ( refusal . contains (message)
+                && refusal . contains ("- viewnode ID: ")
+                && refusal . contains ("To find it: C-c g v "),
                 "{} on {:?} should be refused with {:?}, got {}",
                 request, prefix, message, refusal );
       assert_eq! ( skg_files (f) ?, files_before ); }

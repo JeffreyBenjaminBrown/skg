@@ -38,7 +38,7 @@ pub fn validate_local_structure (
     else { return Err(LocalStructureError {
       message: "node not found" . to_string(),
       skgid: ID::from ("<unknown>"),
-      headline: HeadlineName::Title (String::new ()),
+      headline: HeadlineName::of ( None, None, "" ),
     }); };
 
   let errors : Vec<String> =

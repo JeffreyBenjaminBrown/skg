@@ -33,7 +33,7 @@ use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::errors::viewnode_id_suffix;
+use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -78,9 +78,8 @@ pub fn consume_readiness_requests (
 pub struct RequestedReadiness {
   pub ready    : bool,
   pub named    : NamedLeaves,
-  /// What a warning calls the headline: its title, or for an
-  /// untitled one its kind, then its viewnode ID if it has one.
-  pub headline : String,
+  /// The headline carrying the request, which a warning names.
+  pub headline : HeadlineName,
 }
 
 /// Every readiness request in the saved buffer, with the leaves it
@@ -100,24 +99,8 @@ pub fn readiness_requests_in_viewforest (
       Some ( RequestedReadiness {
         ready    : request . ready,
         named,
-        headline : readiness_request_headline (node . value ()), } ) } )
+        headline : node . value () . headline_name (), } ) } )
     . collect () }
-
-/// '"TITLE" (viewnode ID X)', or for an untitled headline (a folder, a
-/// marker) 'the KIND (viewnode ID X)'; without the viewnode ID when the
-/// headline has none.
-fn readiness_request_headline (
-  viewnode : &Viewnode,
-) -> String {
-  let title : &str = viewnode . title ();
-  let what : String =
-    if ! title . is_empty () { format! ("{:?}", title) }
-    else { format! ( "the {}", match &viewnode . kind {
-      ViewnodeKind::PartnerFolder (folder)  => folder . repr_in_client (),
-      ViewnodeKind::PropertyFolder (folder) => folder . repr_in_client (),
-      ViewnodeKind::Property (property)     => property . repr_in_client (),
-      _                                     => "untitled headline", } ) };
-  format! ( "{}{}", what, viewnode_id_suffix ( viewnode . viewnode_id . as_ref () )) }
 
 /// What a request on a viewnode names.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -378,9 +361,9 @@ pub fn apply_readiness_requests (
   for request in requests {
     let keys : Vec<LeafKey> = keys_in_forest (&request . named, forest);
     if keys . is_empty () {
-      warnings . push ( format! (
-        "The readiness request on {} names no current change; it was dropped.",
-        request . headline ));
+      warnings . push ( with_org_subheadlines (
+        "A readiness request names no current change; it was dropped.",
+        &[ request . headline . clone () ] ));
       continue; }
     for key in keys {
       if request . ready {

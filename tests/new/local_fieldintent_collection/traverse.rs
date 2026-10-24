@@ -128,7 +128,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       vec![ SubscribeeTextClaim {
         title    : "e" . to_string(),
         body     : Some ("Subscribee body" . to_string()),
-        headline : HeadlineName::Title ("e" . to_string ()) } ]); }
+        headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]); }
   { let subscriber : &FieldIntentsForOneId = entry (&collected, "subscriber");
     assert_eq!(
       subscriber . visibility,
@@ -261,7 +261,7 @@ fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility
     vec![ SubscribeeTextClaim {
       title    : "e" . to_string(),
       body     : None,
-      headline : HeadlineName::Title ("e" . to_string ()) } ]);
+      headline : HeadlineName::of ( None, Some (&ID::from ("e")), "e" ) } ]);
   assert!( collected . by_pid . get (&ID::from ("subscriber")) . is_none(),
            "no visibility intent reaches a write-protected subscriber" ); }
 

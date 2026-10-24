@@ -48,7 +48,7 @@
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
-use crate::types::errors::{BufferValidationError, HeadlineName, viewnode_id_suffix};
+use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, Existence, ReadinessRequest,
@@ -154,7 +154,11 @@ pub fn viewnode_from_metadata (
   body     : Option < String >,
 ) -> ( MpViewnode, Option < BufferValidationError >, Option < String > ) {
   let headline : HeadlineName =
-    HeadlineName::of ( metadata . viewnode_id . as_ref (), &title );
+    HeadlineName::of (
+      metadata . viewnode_id . as_ref (),
+      metadata . skgid . as_ref ()
+        . or ( metadata . unknown_node_skgid . as_ref () ),
+      &title );
   let (kind, error, warning)
     : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_skgid {
@@ -166,17 +170,18 @@ pub fn viewnode_from_metadata (
                 relRepo_request : metadata . unknown_relRepo_request . clone (),
               } ) )),
           if body . is_some () || ! title . is_empty () {
-            Some ( BufferValidationError::Other ( format! (
-              "Unknown phantom content cannot be edited ({})", headline )))
+            Some ( BufferValidationError::Other ( with_org_subheadlines (
+              "Unknown phantom content cannot be edited.",
+              &[ headline . clone () ] )))
           } else { None },
           None )
       } else if metadata . is_restricted_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
           || ! title . is_empty () {
-            Some ( BufferValidationError::Other ( format! (
-              "Restricted vognode content cannot be edited ({})",
-              headline )))
+            Some ( BufferValidationError::Other ( with_org_subheadlines (
+              "Restricted vognode content cannot be edited.",
+              &[ headline . clone () ] )))
           } else { None };
         ( MpViewnodeKind::Vognode (
             MpVognode::Restricted ( RestrictedVognode ) ),
@@ -229,11 +234,11 @@ pub fn viewnode_from_metadata (
             && matches! ( non_vognode,
                           MpViewnodeKind::PropertyFolder (_)
                           | MpViewnodeKind::PartnerFolder (_) )
-          { Some ( format! (
-              "Headline text on a {}{} is not saved; discarded: {:?}",
-              maybeplaced_kind_error_label (non_vognode),
-              viewnode_id_suffix ( metadata . viewnode_id . as_ref () ),
-              title )) }
+          { Some ( with_org_subheadlines (
+              &format! ( "Headline text on a {} is not saved; discarded: {:?}",
+                         maybeplaced_kind_error_label (non_vognode),
+                         title ),
+              &[ headline . clone () ] )) }
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
           // Use headline title for string
