@@ -22,6 +22,7 @@
 //! changes" request, answer with the readiness summary of the buffer
 //! they rerendered ('buffer_readiness_summary_for').
 
+use crate::to_org::extend::containerward_chain::is_in_containerward_chain;
 use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::diff_view::pruned_change_view::nodes_editable_in_diffView;
@@ -133,7 +134,8 @@ pub struct NamedLeaves {
 /// The leaves that a request naming the diff objects 'objects' at
 /// 'node' names. No objects on a vognode means both of its objects
 /// (only 'rel' on an unknown phantom); a property leaf has one object.
-/// None for a viewnode that names no leaf.
+/// None for a viewnode that names no leaf, among them a node of the
+/// containerward chain, which shows no change.
 fn leaves_named_at (
   node    : NodeRef<Viewnode>,
   objects : &BTreeSet<DiffObject>,
@@ -144,6 +146,8 @@ fn leaves_named_at (
   let mut content_relationships_of : Vec<(ID, RelationshipAspect)> =
     Vec::new ();
   match &node . value () . kind {
+    ViewnodeKind::Vognode (_) if is_in_containerward_chain (node) =>
+      return None,
     ViewnodeKind::Vognode (vognode) => {
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
       let is_unknown : bool =

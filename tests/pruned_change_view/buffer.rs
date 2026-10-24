@@ -279,7 +279,7 @@ fn a_removed_container_stands_between_the_kept_ones (
 /// x stands first as b's removed member, so it is editable there,
 /// with its content list (xc) and its container folder: b and e
 /// marked '~-' beside its kept containers a and c, each with its
-/// containerward tree, under c the role graft d, which contained c
+/// containerward chain, under c the chain node d, which contained c
 /// at HEAD only. Its member occurrence under c (d's removed member,
 /// editable too) is write-protected.
 #[test]
@@ -304,6 +304,29 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
   assert_eq! ( editable . len (), 1, "{}", buffer );
   Ok (( )) }
 
+/// The 'subscribee_member' fixture (one skgrepo, main): s1
+/// subscribes to s0; since HEAD, sub subscribes to s1. So sub is the
+/// buffer's root, and its changed subscribee folder holds s1, its
+/// relationship added, and nothing under it: of the folders' members,
+/// only a containers folder's hold anything, the containerward chain.
+#[test]
+fn a_member_of_a_changed_subscribee_folder_holds_nothing (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("subscribee_member", &["main"], |f| {
+    let buffer : String = without_viewnode_ids (&buffer_of (f) ?);
+    let lines : Vec<&str> = buffer . lines () . collect ();
+    let s1_index : usize = lines . iter ()
+      . position ( |line| line . starts_with ("*** (skg (node (id s1) ") )
+      . unwrap_or_else ( || panic! ( "s1 is shown in the folder:\n{}", buffer ));
+    assert! ( lines [ .. s1_index ] . iter () . any ( |line|
+                line . starts_with ("** (skg (subscribeeFolder changed)") ),
+              "{}", buffer );
+    assert! ( lines [s1_index] . contains ("(diff (rel added)"), "{}", buffer );
+    assert! ( lines . get (s1_index + 1) . is_none_or ( |next|
+                ! next . starts_with ("****") ),
+              "nothing hangs under s1:\n{}", buffer );
+    Ok (( )) }) }
+
 /// x is editable as b's removed member, which stands before e's, so
 /// e's removed member x is write-protected, and holds nothing.
 #[test]
@@ -316,7 +339,7 @@ fn a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected (
     "** (skg (node (id x) (repo main) nonMember writeProtected (rels (contains (in 2) (out 1))) (diff (rel removed) (leaves 1 rel)))) x\n* " ] );
   Ok (( )) }
 
-/// The role graft d under c in x's container folder, from a
+/// The chain node d under c in x's container folder, from a
 /// relationship only the before-graph has, keeps its birth through
 /// a save, and is not shown a second time.
 #[test]

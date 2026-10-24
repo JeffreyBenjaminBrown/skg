@@ -101,32 +101,33 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
                 "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
     Ok (( )) }) }
 
-/// A role graft under a folder member whose relationship is only in
-/// the before-graph carries '(rel removed)': d, which contained c at
-/// HEAD only, under c in x's container folder. A gesture on it names
-/// that relationship, so its other image, c as d's removed member,
-/// shows ready too.
+/// A node of the containerward chain carries no change facts and
+/// takes no readiness gesture: d, which contained c at HEAD only,
+/// stands in the chain under c, in x's container folder, with no
+/// '(diff ...)' part. A gesture typed on it names nothing, so c, as
+/// d's removed member, stays unready.
 #[test]
-fn a_gesture_on_a_before_only_role_graft_marks_its_relationship (
+fn a_chain_node_carries_no_change_and_takes_no_gesture (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
+    let chain_node : &str =
+      "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected";
     let marked : String = edit_line (
-      &buffer,
-      "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected",
-      |line| line . replace ( "(diff (rel removed) (leaves 1 rel)))) d",
-                              "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) d" ));
-    assert_ne! ( marked, buffer, "the graft shows its relationship removed:\n{}", buffer );
+      &buffer, chain_node,
+      |line| { assert! ( ! line . contains ("(diff"), "{}", line );
+               format! ( "{} (diff (readyRequest rel)))) d", // inside the node form
+                         line . strip_suffix (")) d") . unwrap () ) } );
+    assert_ne! ( marked, buffer, "the gesture was typed:\n{}", buffer );
     let saved : String = without_viewnode_ids (
       & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
-    for (prefix, ending) in [
-      ( "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected",
-        "(diff (rel removed) (leaves 1 rel) (ready rel)))) d" ),
-      ( "** (skg (node (id c) (repo main) nonMember",
-        "(diff (rel removed) (leaves 1 rel) (ready rel)))) c" ) ] {
-      assert! ( saved . lines () . any ( |line|
-                  line . starts_with (prefix) && line . ends_with (ending) ),
-                "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
+    assert! ( saved . lines () . any ( |line|
+                line . starts_with (chain_node) && ! line . contains ("(diff") ),
+              "the chain node shows no change:\n{}", saved );
+    assert! ( saved . lines () . any ( |line|
+                line . starts_with ("** (skg (node (id c) (repo main) nonMember")
+                && line . ends_with ("(diff (rel removed) (leaves 1 rel)))) c") ),
+              "c, as d's removed member, is not ready:\n{}", saved );
     Ok (( )) }) }
 
 /// Marking a removed alias or a removed ID marks its leaf: ali's lost

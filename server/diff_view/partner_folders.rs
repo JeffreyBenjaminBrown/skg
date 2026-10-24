@@ -2,9 +2,9 @@
 //! partner-folder reconciler ('update_buffer/reconcile/partner_folder.rs'
 //! holds the live-graph half and dispatches here). A partner folder
 //! over the graph straddle holds the union of its members in
-//! both graphs, each tagged with its change, and under each member
-//! its member role tree, extended over the union ('docs/diff-view.org',
-//! "the in-folders and out-folders").
+//! both graphs, each tagged with its change, and under each member of
+//! a containers folder the containerward chain, walked over the union
+//! ('docs/diff-view.org', "the in-folders and out-folders").
 
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::change_viewnodes::{
@@ -18,13 +18,12 @@ use crate::to_org::complete::partner_folder::child_data::{
   FolderGoalShape,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
-use crate::to_org::extend::role_tree::{
-  RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set,
-  build_and_integrate_role_tree_with_skgrepo_set};
+use crate::to_org::extend::containerward_chain::{
+  ContainerwardChainPartners, attach_containerward_chains_under_members};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  Birth, DiffChange, Existence, FolderPolicy, Owner, PartnerFolder, Viewnode,
+  DiffChange, FolderPolicy, Owner, PartnerFolder, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_viewnode_id_of, push_repair_warnings, view_order_preserving_goal_list};
@@ -77,7 +76,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_items, &child_data, &straddle . after,
       deleted_by_this_save_extra_ids ) ?;
-  attach_memberRoleTrees_under_straddle_folder_members (
+  attach_chains_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
   if kind . policy () != FolderPolicy::EditableSet {
     if let Some (sink) = warning_sink {
@@ -111,26 +110,23 @@ fn straddle_goal_item (
   Some ( FolderGoalItem {
     skgid : partner . id . clone (), change : Some (change), shape } ) }
 
-/// Under each member of a folder over the straddle, its member role tree,
-/// extended by the role-tree engine over the union of the straddle: under
-/// a container, its full containerward tree; under any other member,
-/// the role tree of the folder's role, with a full containerward tree
-/// under each graft. In a folder of the folder viewparent's own
-/// relationships, only under the members whose relationship changed.
-/// A member whose relationship moved to another skgrepo gets that
-/// move, and a role graft whose relationship is only in the
-/// before-graph carries '(rel removed)' ('tag_before_only_role_grafts').
-/// Each member role tree is built afresh in a scratch tree and
-/// reconciled with what the member holds, by skgid (and the move by
-/// its kind) at each level, so that a member role tree that stays
-/// keeps its viewnodes, where they stand, and their fold state. Every
-/// child of the member but its members is matched, whoever drew it, so
-/// a graft the user copied is a duplicate, converted by the one rule.
-/// Of the rest, the attach converts only what it owns
+/// Under each member of a containers folder over the straddle, its
+/// containerward chain, walked over the union of the straddle; under
+/// a member of any other folder, nothing but, where the member's
+/// relationship moved to another skgrepo, that move. In a folder of
+/// the folder viewparent's own relationships, the move is shown only
+/// under the members whose relationship changed. A chain node carries
+/// no change facts. What a member holds is built afresh in a scratch
+/// tree and reconciled with what the member holds, by skgid (and the
+/// move by its kind) at each level, so that a chain that stays keeps
+/// its viewnodes, where they stand, and their fold state. Every child
+/// of the member but its members is matched, whoever drew it, so a
+/// chain node the user copied is a duplicate, converted by the one
+/// rule. Of the rest, this converts only what it owns
 /// ('Owner::RoleTreeAttach'): what the user added stays where it
 /// stands, and what the member's own visit adds (its old text, its
 /// removed members) is that visit's.
-fn attach_memberRoleTrees_under_straddle_folder_members (
+fn attach_chains_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
   kind        : PartnerFolder,
@@ -143,7 +139,7 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
     partners . iter () . map ( |partner| (&partner . id, partner) ) . collect ();
   let outbound : bool = ! member_role . is_first_role ();
   let members : Vec<(NodeId, &Partner)> =
-    tree . get (folder) . ok_or ("attach_memberRoleTrees_under_straddle_folder_members: folder not found") ?
+    tree . get (folder) . ok_or ("attach_chains_under_straddle_folder_members: folder not found") ?
     . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
@@ -156,50 +152,14 @@ fn attach_memberRoleTrees_under_straddle_folder_members (
     let model_member : NodeId = model . root () . id ();
     if ! outbound || partner . changed () {
       if let Some (moved) = mk_relRepo_move_viewnode (partner) {
-        model . root_mut () . prepend (moved); }
-      if kind == PartnerFolder::Container {
-        attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-          &mut model, &[model_member], &runtime . graph, &runtime . config, None,
-          RoleTreePartners::GraphStraddle (straddle) ) ?;
-      } else {
-        build_and_integrate_role_tree_with_skgrepo_set (
-          &mut model, model_member, &runtime . graph, member_role,
-          &runtime . config, None, RoleTreePartners::GraphStraddle (straddle) ) ?; }
-      tag_before_only_role_grafts (&mut model, straddle); }
+        model . root_mut () . prepend (moved); }}
+    if kind == PartnerFolder::Container {
+      attach_containerward_chains_under_members (
+        &mut model, &[model_member], &runtime . graph, &runtime . config, None,
+        ContainerwardChainPartners::GraphStraddle (straddle) ) ?; }
     reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
       Owner::RoleTreeAttach,
       &|viewnode| ! viewnode . is_unrestrictedVognode_and_member (),
       &|_| true ) ?; }
   Ok (( )) }
-
-/// Tag each role graft in 'model' whose relationship to its viewparent
-/// (the one its birth names: the graft plays that role toward the
-/// viewparent) is only in the before-graph with '(rel removed)', as a
-/// folder's own members are tagged from the straddle's partners
-/// ('straddle_goal_item'). The role-tree engine walks the union of the
-/// straddle, so such a graft would otherwise look like a relationship
-/// the graph still has.
-fn tag_before_only_role_grafts (
-  model    : &mut Tree<Viewnode>,
-  straddle : &GraphStraddle,
-) {
-  let removed : Vec<NodeId> =
-    model . root () . descendants ()
-    . filter ( |node| {
-      let ViewnodeKind::Vognode (Vognode::Unrestricted (graft)) =
-        &node . value () . kind else { return false; };
-      let Birth::RoleGraft (role) = graft . birth else { return false; };
-      let Some (viewparent_pid) : Option<&ID> =
-        node . parent () . and_then ( |parent| match &parent . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
-          _ => None, } )
-        else { return false; };
-      straddle . partners (viewparent_pid, role) . iter ()
-        . any ( |partner| partner . id == graft . skgid
-                          && partner . presence == Presence::OnlyBefore ) } )
-    . map ( |node| node . id () )
-    . collect ();
-  for graft in removed {
-    model . get_mut (graft) . unwrap () . value ()
-      . change_facts . change . rel = Some (Existence::Removed); }}

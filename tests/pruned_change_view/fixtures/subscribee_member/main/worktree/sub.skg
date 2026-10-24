@@ -1,0 +1,4 @@
+pid: sub
+title: sub
+subscribesTo:
+- s1
