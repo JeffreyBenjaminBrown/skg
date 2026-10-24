@@ -782,8 +782,9 @@ buffer_to_viewnodes/local.rs)."
 
 (defun skg--containerward-chain-node-at-point-p ()
   "Non-nil iff the headline at point is a node of the containerward
-chain: a non-member vognode under a member of a containers folder, or
-under another such node ('is_in_containerward_chain',
+chain: a non-member vognode under a member of a partner folder whose
+members carry the chain (every one but the two acquisition folders),
+or under another such node ('is_in_containerward_chain',
 server/to_org/extend/containerward_chain.rs)."
   (save-excursion
     (catch 'answer
@@ -797,12 +798,15 @@ server/to_org/extend/containerward_chain.rs)."
                        (skg--vognode-sexp-p
                         (skg--metadata-sexp-at-point-or-nil)))
             (throw 'answer nil))
-          (when (eq 'containerFolder
-                    (save-excursion
-                      (and (org-up-heading-safe)
-                           (skg--partner-folder-atom
-                            (skg--metadata-sexp-at-point-or-nil)))))
-            (throw 'answer t)))))))
+          (let ((grandparent-folder
+                 (save-excursion
+                   (and (org-up-heading-safe)
+                        (skg--partner-folder-atom
+                         (skg--metadata-sexp-at-point-or-nil))))))
+            (when (and grandparent-folder
+                       (not (memq grandparent-folder
+                                  '(acquiredByFolder acquiredFolder))))
+              (throw 'answer t))))))))
 
 (defconst skg--partner-folder-atoms
   '(subscribeeFolder subscriberFolder overriddenFolder overriderFolder

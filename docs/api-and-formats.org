@@ -866,7 +866,7 @@ node whose graphnode has a body — one the rendering hides. Herald
 the view regenerates it.
 
 A chain node -- a node of the containerward chain under a member of a
-containers folder, a container of its viewparent (see "View requests"
+partner folder, a container of its viewparent (see "View requests"
 below) -- carries =writeProtected= and =nonMember=, and, being a
 non-member, no birth fact in its =(rels ...)= (see "Stats metadata"
 below). It is known by where it stands, so it is still one after a
@@ -897,14 +897,20 @@ node's heralds.
   build one write-protected folder (=containerFolder=,
   =mentionerFolder=), pruned when empty: the other side of each is the
   node's content, or its links, shown without a folder.
-  Under each member of a =containerFolder= hangs its containerward
-  chain: the member's containers as write-protected non-members, under
-  each of those its containers, breadth-first up to the roots or
+  Under each member of a partner folder of any kind but the diff
+  view's two acquisition folders hangs its containerward chain: the
+  member's containers as write-protected non-members, under each of
+  those its containers, breadth-first up to the roots or
   =max_roleTree_depth=; a container met again on the way is drawn once
-  more as a leaf. A chain is drawn with its folder and extended by no
-  later request; a =(folder containers)= request on a chain node draws
-  a containers folder under it. A fresh content view puts this request
-  on each root. Emitted by the =C-c l= commands.
+  more as a leaf. The member's partners in the folder's own role are
+  not drawn below it; a folder request on the member draws them.
+  Nothing hangs under a phantom member. The folder's reconciler
+  reconciles each member's chain at every completion, so a member it
+  adds later gets its chain and a chain that stays keeps its headlines
+  and their fold state; a stale member's chain goes with it. No request
+  extends a chain; a =(folder containers)= request on a chain node
+  draws a containers folder under it. A fresh content view puts the
+  =containers= request on each root. Emitted by the =C-c l= commands.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
   keeping its shown content, each member of which, there and below,

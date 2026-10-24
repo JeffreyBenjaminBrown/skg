@@ -4455,3 +4455,90 @@ no view.
 Rust 908 passed; Emacs 394 passed; Neovim 32 spec files (377
 specs) passed; the repo-cycling integration test under Emacs and
 Neovim, since it drives the editor.
+** Slice 11: deviations
+*** which folders carry the chain
+Every partner folder but the diff view's two acquisition folders
+('PartnerFolder::members_carry_containerward_chain'): the eight
+relation folders and the two hidden-in filter folders, whose
+members are live nodes too. The acquisition folders record a
+nodeMerge, not a role. Only a folder's unrestricted members carry
+one in a content view; a non-member in the folder (retained, or a
+note) and a phantom carry none. The diff view keeps its old
+selection: every unrestricted child that is a partner in either
+graph, a removed member included.
+*** where the content view runs it
+'dispatch_node_update' ('update_buffer/complete.rs') calls
+'reconcile_containerward_chains_under_folder_members'
+('update_buffer/reconcile/partner_folder.rs') after any partner
+folder's reconciler in a content view, rather than inside each of
+the four reconcilers (the generic one, the subscribee folder's and
+the two filter folders'). Each member's chain is reconciled by
+'reconcile_containerward_chain_under_member' (same file), which the
+diff view's attach now calls too, passing the relRepo move as an
+extra model child. 'add_containers_folder_with_chains' and
+'attach_containerward_chains_under_folder_members' went: a folder
+request only adds the folder, and its visit draws the chains.
+**** the filter folders over the straddle
+The diff view never draws the two filter folders, so over the
+straddle nothing attaches chains under their members.
+*** a stale member's chain goes with it
+Not in the plan. Every folder reconciler converts by
+'reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds',
+which retained any stale member holding children. With a chain
+under every member, every stale member with a container would
+have stayed as a non-member, as slice 4 already let a containers
+folder's member stay. The function now converts a stale or extra
+member together with its drawn chain
+('convert_unwarranted_member_with_its_chain', in
+'child_data.rs', over 'convert_unwarranted_subtree_taking_along'
+in 'shallow_model_subtree.rs'), as the diff view's
+'convert_unwarranted_subtree' does: a member holding only its
+chain is entombstoned and pruned, while one holding a note stays.
+So 'save_collateral_break_cycle' (both clients) is back to its
+pre-slice-4 outcome: b goes from a's containers folder, and the
+empty folder with it.
+*** chain recognition widened, in the clients too
+'is_in_containerward_chain', 'mp_is_in_containerward_chain' and
+both clients' restoreRel guards
+('skg--containerward-chain-node-at-point-p',
+'containerward_chain_node_p') recognise a non-member under any
+chain-carrying folder's member. A non-member the user types under
+a subscribee-as-such extended as editable now counts as in chain
+position, as one under a containers folder's member did.
+*** the search buffer is unchanged
+It is neither a content view nor the diff view, and the plan's
+"Where" does not name it: its overrider and overridden folders'
+members carry no chain.
+*** tests
+'partner_folder_matrix.rs' has one chain scenario per relation
+folder kind (fixtures 'ch*' and 'chain-c', 'chain-cc'): a
+two-level chain, write-protected non-members, the view saved back
+unchanged with no warning.
+'a_member_of_a_changed_subscriber_folder_holds_its_chain'
+replaces 'a_member_of_a_changed_subscribee_folder_holds_nothing'
+in 'pruned_change_view/buffer.rs' (the 'subscribee_member' fixture
+gained containers c and p), and the buffer saves back unchanged.
+'a_member_added_at_a_later_visit_gets_its_chain' in
+'collateral_partner_folder.rs'. Beyond the plan:
+'restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member'
+('restore.rs') and one more refused headline in each client's
+restore test. Adapted: 'hidden_from_subscriptions.rs' (the
+hidden-in members' chains, and its helpers move H's subtree with
+it), and the retained-member test of
+'retain_or_entombstone_then_prune.rs' (b's chain is back when its
+membership returns, before the note). Each new test was seen to
+fail with the change disabled.
+*** docs
+'docs/api-and-formats.org' (the folder request, the chain node),
+'docs/diff-view.org' and the glossary (role tree and chain, a
+changed folder's member, the conversion). The COMMANDS docs say
+nothing false and are left to slice 12; so are the glossary's
+"owner" and "birth" entries, which slice 12 removes.
+*** verification
+Rust 910 passed (an earlier run hit a cleanup flake, "Directory not empty" in
+'none_node_fields_are_noops', passed alone twice); Emacs 394
+passed; Neovim 32 spec files (377 specs) passed; integration 34
+of 35 under Emacs and again under Neovim, 'import-md-and-org'
+failing as at baseline. At the TCP surface, an isolated server
+showed the chain under a subscribee folder's and a requested
+subscriber folder's members, and the view saved back unchanged.

@@ -354,6 +354,12 @@ describe('skg.metadata commands', function ()
         .. '** (skg containerFolder) containers\n'
         .. '*** (skg (node (id c) (repo main) writeProtected)) c\n'
         .. '**** (skg (node (id d) (repo main) nonMember writeProtected'
+        .. ' (diff (rel removed)))) d',
+      -- a node of the chain under another folder's member
+      '* (skg (node (id r) (repo main))) r\n'
+        .. '** (skg subscriberFolder) subscribers\n'
+        .. '*** (skg (node (id s) (repo main) writeProtected)) s\n'
+        .. '**** (skg (node (id d) (repo main) nonMember writeProtected'
         .. ' (diff (rel removed)))) d' }) do
       assert.are.equal('Only a removed membership can be restored',
         refusal_of(headline, metadata.restore_removed_membership))

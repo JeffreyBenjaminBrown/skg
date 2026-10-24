@@ -694,7 +694,8 @@ local function parent_line (line_number)
 end
 
 ---Is the headline at LINE_NUMBER a node of the containerward chain: a
----non-member vognode under a member of a containers folder, or under
+---non-member vognode under a member of a partner folder whose members
+---carry the chain (every one but the two acquisition folders), or under
 ---another such node ('is_in_containerward_chain',
 ---server/to_org/extend/containerward_chain.rs)?
 ---@param line_number integer
@@ -712,10 +713,11 @@ function M.containerward_chain_node_p (line_number)
             and M.vognode_sexp_p(M.metadata_sexp_at_line_or_nil(parent)))
     then return false end
     local grandparent = parent_line(parent)
-    if grandparent
-       and M.partner_folder_atom(
-             M.metadata_sexp_at_line_or_nil(grandparent))
-           == 'containerFolder' then
+    local grandparent_folder = grandparent
+      and M.partner_folder_atom(M.metadata_sexp_at_line_or_nil(grandparent))
+    if grandparent_folder
+       and grandparent_folder ~= 'acquiredByFolder'
+       and grandparent_folder ~= 'acquiredFolder' then
       return true end
     line = parent
   end

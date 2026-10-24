@@ -995,7 +995,7 @@ Run all four suites.
 The table, the conformance test, both editors, the Neovim prompt
 and its test, the deviations doc. Run the Rust, Emacs and Neovim
 suites.
-** TODO Slice 11: the chain under every role folder's member
+** DONE Slice 11: the chain under every role folder's member
 The two attach sites, the folder reconciler's visit, the three
 tests, the docs. Run all four suites.
 ** TODO Slice 12: the glossary and the docs

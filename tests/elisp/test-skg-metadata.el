@@ -679,6 +679,11 @@ the request."
              "* (skg (node (id r) (repo main))) r
 ** (skg containerFolder) containers
 *** (skg (node (id c) (repo main) writeProtected)) c
+**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"
+             ;; a node of the chain under another folder's member
+             "* (skg (node (id r) (repo main))) r
+** (skg subscriberFolder) subscribers
+*** (skg (node (id s) (repo main) writeProtected)) s
 **** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"))
     (should (equal (test-skg--refusal-of
                     headline #'skg-restore-removed-membership)

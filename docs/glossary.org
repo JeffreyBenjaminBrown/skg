@@ -211,7 +211,7 @@ buffer root; say "viewforest" rather than "viewtree" or "forest".
 
 A *viewbranch* is any subtree of a viewforest: a viewnode with all its
 descendants. A view request asks the server to add viewbranches: a
-folder (with, for containers, its chains), the flags folder. A
+folder (with its members' chains), the flags folder. A
 viewbranch may be degenerate,
 with one viewchild or none; compare "branching viewnode".
 
@@ -368,8 +368,8 @@ goes above the members, which follow the graph's order.
 
 *** role tree, the containerward chain, and the -ward adjectives
 A *role tree* is what the view shows of a node's partners in one
-role: the members of the node's partner folder of that role, and, for
-the container role, the containerward chain under each member. A
+role: the members of the node's partner folder of that role, and the
+containerward chain under each member. A
 role, unlike a relation, is directed, so a role tree goes one way.
 Every role tree but the contentward one, which is the node's content,
 is drawn in a folder and is write-protected throughout; a partner
@@ -379,15 +379,23 @@ one; search enrichment draws a containers folder and the two override
 folders under each hit.
 
 The *containerward chain* is the one tree that goes on below a
-folder: under a member of a containers folder hang that member's
-containers, as write-protected non-members, under each of those its
-containers, and so on breadth-first to the roots or to
-'max_roleTree_depth' ('ContainerwardRoleTree'); a container met again
-on the way is drawn once more as a leaf. Its nodes are *chain nodes*.
-A chain is drawn with its folder; a request on a chain node for its
-containers draws a containers folder under it. A chain node carries
-no change facts and takes no commit-readiness marker; a folder's
-member does both.
+folder: under each member of a partner folder (of any kind but the
+diff view's two acquisition folders, in content views and the diff
+view alike) hang that member's containers, as write-protected
+non-members, under each of those its containers, and so on
+breadth-first to the roots or to 'max_roleTree_depth'
+('ContainerwardRoleTree'); a container met again on the way is drawn
+once more as a leaf. Its nodes are *chain nodes*. The member's
+partners in the folder's own role are not drawn below it; a request
+on the member draws them as a folder. Nothing hangs under a phantom
+member, nor under a property folder's entries. The folder's
+reconciler reconciles each member's chain by key at every visit of
+the folder, so a member it adds later gets its chain and a chain that
+stays keeps its viewnodes and their fold state; a stale member's
+chain goes with it. No request extends a chain; a request on a chain
+node for its containers draws a containers folder under it. A chain
+node carries no change facts and takes no commit-readiness marker; a
+folder's member does both.
 
 The adjectives containerward, mentionerward, overriderward,
 overriddenward, and so on name the role a role tree follows: a
@@ -910,7 +918,10 @@ viewnode below it but those nobody owns and the content
 reconciler's (which a vognode retained as non-member keeps, as the older
 reconciler's does), so that a folder's members go with the folder
 and a member's chain with the member. A viewnode left holding
-only childless tombstones is converted as a leaf.
+only childless tombstones is converted as a leaf. A folder's
+reconciler likewise converts a stale or extra member's chain with it
+('convert_unwarranted_member_with_its_chain'), so a member holding
+nothing but its chain goes, and one holding a note stays.
 
 A converted copy is the one duplicate shape the save accepts:
 under an editable parent two editable copies of a node are
@@ -1188,11 +1199,11 @@ holds only '(diff (ready))', when every changed membership is ready.
 
 *** what a changed folder's member holds
 
-Under each member of a changed containers folder the diff view hangs
-the member's containerward chain, walked over both graphs of the
-straddle, so that the user sees where the member sits. Under a member
-of any other changed folder it hangs nothing, but for the move of
-the member's relationship to another skgrepo where that moved.
+Under each member of a changed folder the diff view hangs the
+member's containerward chain, walked over both graphs of the
+straddle, so that the user sees where the member sits, and before
+it, where the member's relationship moved to another skgrepo, that
+move.
 
 *** moved-like-ancestor fact
 
