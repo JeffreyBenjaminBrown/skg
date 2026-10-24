@@ -10,7 +10,7 @@
 // Fixture: r and t both subscribe to n; u subscribes to nothing.  The
 // first test explicitly requests n's subscription folders, whose initial
 // member order is sorted by ID (r, t), then swaps them in the buffer and
-// saves.  The second also parks a note in the folder, then makes u
+// saves.  The second also places a note in the folder, then makes u
 // subscribe to n from a view of u: n's view, rerendered collaterally,
 // keeps every child where it stood and shows u after the kept members
 // ('docs/diff-view.org', "What a reconciler keeps").
@@ -196,18 +196,18 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
       "(node ",
       "(node (viewRequests (folder subscribesTo))", 1 ),
     &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
-  let reordered : String = { // t above r, and a note parked after them
+  let reordered : String = { // t above r, and a note placed after them
     let r_line : &str = line_containing (&n_view, "(id r)");
     let t_line : &str = line_containing (&n_view, "(id t)");
     n_view
       . replace ( r_line, "SWAP_PLACEHOLDER" )
       . replace ( t_line, &format! (
-        "{}\n*** (skg (node nonMember)) a parked note", r_line ))
+        "{}\n*** (skg (node nonMember)) a placed note", r_line ))
       . replace ( "SWAP_PLACEHOLDER", t_line ) };
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &reordered, &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_lines_in_order (
-    &n_view, &[ "(id t)", "(id r)", "a parked note" ],
+    &n_view, &[ "(id t)", "(id r)", "a placed note" ],
     "the note stays below the members" );
   let (u_view, u_pids, u_viewforest) =
     single_root_view (config, Some (tantivy), &ID::from ("u")) ?;
@@ -225,6 +225,6 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     . find ( |view| view . contains ("subscriberFolder") )
     . unwrap_or_else ( || panic! ( "n's view is rerendered: {:?}", collateral_views ));
   assert_lines_in_order (
-    collateral_n, &[ "(id t)", "(id r)", "(id u)", "a parked note" ],
+    collateral_n, &[ "(id t)", "(id r)", "(id u)", "a placed note" ],
     "u follows the kept members, and nothing kept moves" );
   Ok (( )) }

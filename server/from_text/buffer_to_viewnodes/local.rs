@@ -432,7 +432,7 @@ fn validate_acquired_folder (
     tree, treeid, "acquiredFolder",
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))),
-    // An acquiree's phantom, or a note the user parked there.
+    // An acquiree's phantom, or a note the user put there.
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
            || matches!(&node . kind,

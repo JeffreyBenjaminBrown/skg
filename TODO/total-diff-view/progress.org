@@ -4213,3 +4213,66 @@ which classify headlines by their heralds, not by the atom.
 Rust 903 passed; Emacs 387 passed; Neovim 31 spec files passed;
 integration 34 of 35 under Emacs and again under Neovim,
 'import-md-and-org' failing as at baseline.
+** Slice 8: deviations
+*** names beyond the plan's list
+The scripts ('tests/results/plan19-slice8/rename_tombstone.py' and
+'rename_repairs.py') renamed with the kind every name that embedded
+it: 'is_tombstone', 'tombstone_or', 'tombstone_metadata_to_string',
+'convert_nonmember_unknown_children_to_tombstones',
+'entombstone_generalized_orphan_folder', and the tests named for
+them. 'Conversion::DeadLeaf' is 'ChildlessTombstone' and
+'Conversion::Parked' is 'Retained'; the 'RepairSummary' fields are
+'retained', 'entombstoned_stale' and 'entombstoned_duplicates'.
+'mark_orphans_under_dead_parents_false' keeps its name: its "dead
+parent" is a deleted phantom too, not only a tombstone.
+*** the two entombstoned repairs keep their text
+"removed N stale member(s)" and "removed N duplicate member(s)"
+stay: a stale leaf is a childless tombstone, which the prune
+removes, so the user sees it removed. 'tests/partner_folder_matrix.rs'
+now looks for "reinstated".
+*** 'Presence' and the callers that told both graphs from neither
+'existence_across_straddle' ('graph_straddle/types.rs') gives the
+'Option<Existence>'; 'Partner::presence' is 'existence'.
+'node_presence' went: 'node_existence' answers the callers that
+asked for a removed node, and 'node_in_both_graphs' and
+'node_in_either_graph' those that told a node in both graphs from
+one in neither (the properties test, the order-only nodes, C's
+in-half, a dangling folder member, and the removed members, where
+a node in neither graph is drawn differently).
+*** "parked" for what the user placed
+"Retained as non-member" names what a reconciler does, so where
+"parked" meant a note or node the user put somewhere, it is now
+"placed", "put" or "standing"; the test notes say "a placed note",
+and the fixture ID 'parked' in
+'tests/new/local_fieldintent_collection/traverse.rs' is 'hidden'.
+"park point" (moving the cursor) in 'search-make-link' stays, as
+do "one rule" in 'heralds.rs' and 'in_rust_graph.rs', which mean
+something else. 'docs/diff-view.org' called 'leaves_named_at' "the
+one rule"; it says "the single rule".
+*** the test file renamed with the rule
+'tests/convert_then_prune.rs' and its fixtures are
+'tests/retain_or_entombstone_then_prune.rs' and
+'tests/retain_or_entombstone_then_prune/'; its "parked" tests and
+helper are renamed ('is_writeProtected_nonMember').
+*** "role graft"
+The save_collateral integration helpers, both clients, classify a
+"chain node" ('headline--role-of-chain-node-from-rels',
+'role_of_chain_node_from_rels'). The pruned change view's
+'a_role_graft_..._keeps_its_birth_through_a_save' is
+'a_chain_node_under_an_editable_removed_member_keeps_its_place_through_a_save'.
+"graft" alone stays, as the plan uses it. The literal
+'(birth roleGraft container)' in 'the_birth_atom_is_refused' is the
+refused input and stays.
+*** the glossary
+The headline is "retain as non-member or tombstone, then prune";
+seven links cite it, now without a description, so they show the
+headline. The script renamed the entry "dead viewnode" to
+"tombstone", with its one link; slice 11 rewrites the entry. The
+"owner" and "birth" text in the rule's entry is left for slice 11.
+*** verification
+Rust 903 passed (two runs each failed one test on a fixed temp
+path, 'subscribee_folder_empty_persists' and
+'id_folder_outside_diff_view', each passing alone); Emacs 387
+passed; Neovim 31 spec files passed; integration 34 of 35 under
+Emacs and again under Neovim, 'import-md-and-org' failing as at
+baseline.

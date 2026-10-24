@@ -34,7 +34,7 @@
   shows the same list.
 - There is no automatic skgrepo prompt when a brand-new headline that
   cannot inherit a skgrepo (a root, or one below a restricted vognode,
-  a dead viewnode or a property) is created: Emacs hooked its
+  a tombstone or a property) is created: Emacs hooked its
   insert-heading command, and
   vim users simply type headlines, so there is no seam to hook. The
   quick path is '<localleader>ss' on the new headline (populates

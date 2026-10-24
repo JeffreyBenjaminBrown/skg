@@ -27,7 +27,7 @@ use std::error::Error;
 const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) nonMember ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
   "*** (skg (node (id x) (repo main) nonMember writeProtected (rels (contains (in 2) (out 1))";
-const PARKED_X_UNDER_E : &str = // retained as non-member, still editable
+const RETAINED_X_UNDER_E : &str = // retained as non-member, still editable
   "** (skg (node (id x) (repo main) nonMember (rels ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
@@ -76,13 +76,13 @@ fn a_commit_converts_what_the_diff_view_showed (
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b)", REMOVED_X_UNDER_B ]);
     let x_under_e_before : &str = line_starting (&buffer, REMOVED_X_UNDER_E);
     let committed : String = committed (f) ?;
-    let x_under_e : &str = line_starting (&committed, PARKED_X_UNDER_E);
+    let x_under_e : &str = line_starting (&committed, RETAINED_X_UNDER_E);
     assert! ( ! x_under_e . contains ("(diff"), "{}", committed );
     assert_eq! ( viewnode_id_on (x_under_e), viewnode_id_on (x_under_e_before),
                  "the removed member is kept, not made again:\n{}", committed );
     assert_lines_in_order (&committed, &[
       "* (skg (node (id e) (repo main))) e\n",
-      PARKED_X_UNDER_E, ") x\n",
+      RETAINED_X_UNDER_E, ") x\n",
       "*** (skg (node (id xc) (repo main) writeProtected " ]);
     assert_lines_in_order (&committed, &[ // b, under p, holds nothing
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b) ", ") b\n* (skg (node (id s)" ]);
@@ -105,7 +105,7 @@ fn a_commit_converts_what_the_diff_view_showed (
 /// under the converted member, retained as non-member and still
 /// editable.
 #[test]
-fn a_note_under_a_removed_member_survives_under_the_parked_member (
+fn a_note_under_a_removed_member_survives_under_the_retained_member (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("commit_leftovers", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -114,10 +114,10 @@ fn a_note_under_a_removed_member_survives_under_the_parked_member (
                                     &note (3, "a note under x") )) ?;
     let committed : String = committed (f) ?;
     let parent : String = parent_line_of (&committed, "a note under x");
-    assert! ( parent . starts_with (PARKED_X_UNDER_E) && ! parent . contains ("(diff"),
+    assert! ( parent . starts_with (RETAINED_X_UNDER_E) && ! parent . contains ("(diff"),
               "{}", committed );
     assert_lines_in_order (&committed, &[
-      "* (skg (node (id e)", PARKED_X_UNDER_E, " a note under x\n" ]);
+      "* (skg (node (id e)", RETAINED_X_UNDER_E, " a note under x\n" ]);
     Ok (( )) }) }
 
 /// A note typed under a write-protected removed member keeps that
@@ -165,7 +165,7 @@ fn a_pasted_write_protected_copy_under_a_stale_child_stays (
     let copy_after : &str = line_starting (&committed, copy);
     assert_eq! ( viewnode_id_on (copy_after), viewnode_id_on (copy_before),
                  "the copy is kept, not made again:\n{}", committed );
-    assert! ( headline_parent_of (&committed, copy_after) . starts_with (PARKED_X_UNDER_E),
+    assert! ( headline_parent_of (&committed, copy_after) . starts_with (RETAINED_X_UNDER_E),
               "{}", committed );
     Ok (( )) }) }
 

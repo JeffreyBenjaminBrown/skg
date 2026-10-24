@@ -115,7 +115,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       *** (skg (node (id e) (repo main))) e
       Subscribee body
       **** (skg (node (id visible) (repo main))) visible
-      **** (skg (node (id parked) (repo main) nonMember)) parked
+      **** (skg (node (id hidden) (repo main) nonMember)) hidden
       **** (skg (node (id leaving) (repo main) (editRequest delete))) leaving
       "} );
   { let e : &FieldIntentsForOneId = entry (&collected, "e");

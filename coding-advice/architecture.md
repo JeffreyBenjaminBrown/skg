@@ -33,7 +33,7 @@ Viewnodes are not all graphnodes:
 
 ```
 viewnode = vognode | propertyFolder | property | partnerFolder
-         | bufferRoot | deadViewnode
+         | bufferRoot | tombstone
 vognode  = unrestricted | restricted | phantom
 ```
 

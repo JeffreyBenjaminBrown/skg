@@ -290,7 +290,7 @@ fn viewnode_of_goal_item (
 /// keeps what it is (an editable subscribee stays editable), unless
 /// it stood as a historical phantom, and is a member
 /// (a member) even if it stood as a removed member; a
-/// removed member is write-protected and set aside (nonMember).
+/// removed member is write-protected and retained as non-member.
 fn apply_goal_shapes (
   tree           : &mut Tree<Viewnode>,
   folder_node    : NodeId,
@@ -459,7 +459,8 @@ mod tests {
 /// else the first -- becomes a member, keeping its viewnode and fold
 /// state, so that the reconciler matches it and creates no second
 /// member beside it. (Such a non-member is typically one the reconciler
-/// parked when the membership went stale: 'convert_unwarranted_child'.)
+/// retained as non-member when the membership went stale:
+/// 'convert_unwarranted_child'.)
 fn mark_goal_children_as_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder_node : NodeId,

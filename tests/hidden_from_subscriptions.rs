@@ -540,8 +540,9 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
-    // in-view subtree (e11) is a user branch, so the one rule
-    // ('docs/glossary.org') retains the visible occurrence as non-member
+    // in-view subtree (e11) is a user branch, so the glossary's "retain
+    // as non-member or tombstone, then prune" retains the visible
+    // occurrence as non-member
     // rather than deleting it -- chaos-monkey safety: the user may
     // have deliberately placed content there, and we must not lose it. So e1
     // shows twice: once hidden (write-protected), once as a preserved
@@ -554,21 +555,21 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       without_viewnode_ids (collateral) . contains (
         "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (repo foreign) writeProtected"),
       "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
-    let parked_e1 : &str = collateral . lines ()
+    let retained_e1 : &str = collateral . lines ()
       . find ( |line| line . starts_with ("**** (skg (node (id e1)")
                       && line . contains ("nonMember") )
       . unwrap_or_else ( || panic! (
         "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
         collateral ));
-    assert! ( ! parked_e1 . contains ("writeProtected"),
+    assert! ( ! retained_e1 . contains ("writeProtected"),
       "the retained e1 keeps its editability:\n{}", collateral );
     assert! ( collateral . lines ()
                 . any ( |line| line . starts_with ("***** (skg (node (id e11)")
                                && ! line . contains ("nonMember") ),
       "e11 stays the retained e1's content:\n{}", collateral );
-    assert! ( parked_e1 . contains ("(contains (in 1 (ancestors 1))")
-              && parked_e1 . contains ("(hidesFromSubs (in 1 (ancestors 3)))"),
-      "the parked e1 says who contains and who hides it:\n{}", collateral );
+    assert! ( retained_e1 . contains ("(contains (in 1 (ancestors 1))")
+              && retained_e1 . contains ("(hidesFromSubs (in 1 (ancestors 3)))"),
+      "the retained e1 says who contains and who hides it:\n{}", collateral );
 
     Ok (( )) }
 

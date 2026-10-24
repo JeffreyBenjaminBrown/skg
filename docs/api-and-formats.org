@@ -421,7 +421,8 @@ So far there are these endpoints:
     (a member that loses its relationship becomes a removed member, a
     deleted node a historical phantom, and back); one it does not is
     converted, and pruned once it holds nothing (the glossary's
-    "the one rule: convert, then prune"); the rest is created.
+    "retain as non-member or tombstone, then prune"); the rest is
+    created.
     The server sets a fold state only on a viewnode it creates: a
     context node's body starts folded. A root stays until the
     buffer is closed; a root whose node a commit deleted is shown
@@ -742,7 +743,7 @@ one automatically.
        with unrestricted viewchildren is retained, write-protected), a
        deleted phantom whose home skgrepo became restricted, or an
        unknown phantom whose relRepo (else its recorder's home) did,
-       becomes a dead viewnode, pruned unless it holds something, and
+       becomes a tombstone, pruned unless it holds something, and
        PartnerFolders regenerate per the new set, so widening the set
        reveals members and folders.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
@@ -1368,12 +1369,13 @@ remains the established bare non-vognode atom:
 =hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
-A dead viewnode is written =(skg deadViewnode (vnid X))=: it has
+A tombstone is written =(skg tombstone (vnid X))=: it has
 no ID, no facts and no title (the parser discards text typed on
 its line), and holds only what stands below it. A reconciler
 makes one of a child the graph no longer warrants, and the prune
-removes it once it is childless (the glossary's "dead viewnode"
-and "the one rule: convert, then prune"). Herald "DELETED".
+removes it once it is childless (the glossary's "tombstone"
+and "retain as non-member or tombstone, then prune"). Herald
+"DELETED".
 
 ** Metadata of the diff view
 

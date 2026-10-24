@@ -69,7 +69,8 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       tree, node, &goal_items, &context . relRepos, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      // The one rule ('docs/glossary.org'): a HiddenInSubscribeeFolder child
+      // Retain as non-member or tombstone, then prune
+      // ('docs/glossary.org'): a HiddenInSubscribeeFolder child
       // that becomes stale (e.g. the user moved it into the subscribee-as-such,
       // 'unhiding' it) is converted: a leaf -- the common case for hidden
       // members -- to a tombstone the prune removes, one holding a subtree

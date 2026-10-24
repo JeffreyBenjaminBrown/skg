@@ -38,7 +38,7 @@
 /// is an Unrestricted member direct child of a SubscribeeFolder.
 /// A non-member child of a SubscribeeFolder is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
-/// self-writer parked there.
+/// self-writer that stands there as a non-member.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
   unrestricted_child_counts_as_content,

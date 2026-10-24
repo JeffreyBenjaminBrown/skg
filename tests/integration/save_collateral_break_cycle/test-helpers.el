@@ -1,18 +1,17 @@
 ;;; Shared helpers for save_collateral integration tests.
 ;;; Load with (load-file "path/to/test-helpers.el").
 
-(defun headline--role-of-role-graft-from-rels (rels-body)
-  "Classify a role graft from its semantic relationship facts, or nil.
+(defun headline--role-of-chain-node-from-rels (rels-body)
+  "Classify a chain node from its semantic relationship facts, or nil.
 RELS-BODY is the cdr of the (rels ...) form -- a list of relation
-sub-forms like (contains (in ...) (out ...)) and (birth ...). A role
-graft relates outbound to a tracked ancestor: it has a relation with an
-(out ... (ancestors ...)) side. That relation names the role: contains
--> container, linksTo -> mentioner, subscribesTo -> subscribee,
-overrides -> overrider, hidesFromSubs -> hider. Only
-meaningful for a node
-already known to be a role graft nonMember; an ordinary content
-child can carry the same outbound ancestor (e.g. a cycle) yet is not a
-role graft."
+sub-forms like (contains (in ...) (out ...)). A chain node (a
+non-member of the containerward chain) relates outbound to a tracked
+ancestor: it has a relation with an (out ... (ancestors ...)) side.
+That relation names the role: contains -> container, linksTo ->
+mentioner, subscribesTo -> subscribee, overrides -> overrider,
+hidesFromSubs -> hider. Only meaningful for a node already known to
+be a nonMember; an ordinary content child can carry the same
+outbound ancestor (e.g. a cycle) yet is not a chain node."
   (cl-loop for (rel . role) in '((contains    . container)
                                  (linksTo . mentioner)
                                  (subscribesTo . subscribee)
@@ -25,27 +24,27 @@ role graft."
            return role))
 
 (defun headline--relation-from-sexp (sexp)
-  "Classify a parsed metadata SEXP using current parent/provenance vocab.
-Birth provenance is more specific than membership: a role graft (a node
-with nonMember) returns its ROLENAME from its (rels ...)
-facts (e.g. `container', `mentioner'); otherwise the result is
-`nonMember' for a non-member and `member' for a member."
+  "Classify a parsed metadata SEXP by membership and chain position.
+A chain node (a node with nonMember and an outbound-ancestor relation)
+returns its ROLENAME from its (rels ...) facts (e.g. `container');
+otherwise the result is `nonMember' for a non-member and `member' for
+a member."
   (let* ((non-member (and sexp
                           (skg-sexp-subtree-p sexp '(skg (node nonMember)))))
          (rels-body (when sexp
                       (skg-sexp-cdr-at-path sexp '(skg node rels))))
-         (role-graft-role (when non-member
-                       (headline--role-of-role-graft-from-rels rels-body))))
+         (chain-node-role (when non-member
+                       (headline--role-of-chain-node-from-rels rels-body))))
     (cond
-     ;; A role graft: a non-member, with an outbound-ancestor herald.
-     (role-graft-role role-graft-role)
+     ;; A chain node: a non-member, with an outbound-ancestor herald.
+     (chain-node-role chain-node-role)
      (non-member 'nonMember)
      (t 'member))))
 
 (defun headline-structure (buffer)
   "Extract (depth relation id) triples from every headline in BUFFER.
-Depth is the number of asterisks. Relation is a membership or birth symbol;
-see `headline--relation-from-sexp'.
+Depth is the number of asterisks. Relation is a membership symbol or
+a chain node's role; see `headline--relation-from-sexp'.
 ID comes from the (skg (node (id X) ...)) metadata. Headlines
 without metadata are skipped."
   (with-current-buffer buffer

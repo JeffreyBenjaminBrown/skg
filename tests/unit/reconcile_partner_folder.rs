@@ -27,7 +27,7 @@ fn view_order_wins_and_missing_members_append () {
     folder_mut . append (unrestricted_affected ("c"));
     folder_mut . append (unrestricted_affected ("x"));    // nonmember
     folder_mut . append (unrestricted_affected ("a"));
-    folder_mut . append (unrestricted_independent ("b")); } // parked, not a member claim
+    folder_mut . append (unrestricted_independent ("b")); } // a non-member, not a member claim
   let graph_members : Vec<ID> =
     vec! [ ID::from ("a"), ID::from ("b"), ID::from ("c") ];
   let goal : Vec<ID> =

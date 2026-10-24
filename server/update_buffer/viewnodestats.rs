@@ -133,8 +133,8 @@ fn set_herald_strings_in_viewnode (
       node_pid, anc_pid, *generation ); }
   if membership != Membership::Member {
     // A non-member under a subscribee-as-such: the content the
-    // subscriber hides, parked there with its subtree, says so, as the
-    // hiddenInSubscribeeFolder's members do.
+    // subscriber hides, retained there as non-member with its subtree,
+    // says so, as the hiddenInSubscribeeFolder's members do.
     if let (Some (graph), Some (subscriber_pid)) =
       (graph, subscriber_above_subscribee_viewparent (tree, treeid))
     { if graph . relation_membership_is_visible (
@@ -417,8 +417,9 @@ fn set_relRepo (
       else { break 'compute None; };
       ( t . collected_skgid (), t . membership ) };
     if membership != Membership::Member {
-      // Not a genuine member at this position (a self-writer parked
-      // under a folder, or a node of the containerward chain): there
+      // Not a genuine member at this position (a self-writer standing
+      // as a non-member under a folder, or a node of the containerward
+      // chain): there
       // is no binding relationship here to have a skgrepo at all.
       break 'compute None; }
     let (recorder_pid, relation, target_pid) : (ID, NodeRelation, ID) =

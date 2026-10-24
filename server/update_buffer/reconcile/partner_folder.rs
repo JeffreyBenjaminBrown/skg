@@ -108,7 +108,8 @@ pub fn reconcile_partnerFolder_children (
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &goal_items, &relRepos, runtime ) ?;
-  // The one rule ('docs/glossary.org'): the reconciler converts a stale
+  // Retain as non-member or tombstone, then prune
+  // ('docs/glossary.org'): the reconciler converts a stale
   // member, a leaf to a tombstone the prune removes and a branch
   // retained as non-member, so a write-protected PartnerFolder drops a
   // stale leaf member instead of preserving it.

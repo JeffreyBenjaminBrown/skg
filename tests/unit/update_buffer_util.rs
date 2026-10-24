@@ -31,9 +31,9 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
   assert! ( result . unwrap_err () . to_string ()
             . contains ("not an Unrestricted vognode") ); }
 
-// The one rule: a stale vognode with a subtree is retained as
-// non-member, keeping its title, ID and editability, its facts
-// cleared; a write-protected one's members become non-members, an
+// Retain as non-member or tombstone, then prune: a stale vognode
+// with a subtree is retained as non-member, keeping its title, ID
+// and editability, its change facts cleared; a write-protected one's members become non-members, an
 // editable one's stay members. A vognode leaf and every non-vognode
 // become tombstones, a leaf to be pruned, one holding children to
 // stay.

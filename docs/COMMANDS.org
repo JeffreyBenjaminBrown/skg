@@ -816,7 +816,7 @@ Opens a blank Skg content view in which to create new nodes.
 Creating a headline through Skg's commands prompts for any skgrepo it
 cannot inherit: a headline inherits one from the nearest node above it,
 passing through folders and phantoms, so a root, or a headline below a
-restricted vognode, a dead viewnode or a property, prompts.  Save
+restricted vognode, a tombstone or a property, prompts.  Save
 validation also catches a node whose skgrepo was omitted when the
 headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode

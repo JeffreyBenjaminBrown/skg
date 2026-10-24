@@ -940,7 +940,7 @@ record removed, the tests. Run all four suites.
 Position in place of every read, the atom off the wire, the test
 literals by script, the rendering cases, the tests. Run all four
 suites.
-** TODO Slice 8: the renames
+** DONE Slice 8: the renames
 The kind and atom, the repairs and functions, 'Presence', the
 words in comments and docs, the glossary headline and its links,
 the test literals by script. Run all four suites.

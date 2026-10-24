@@ -136,12 +136,12 @@ fn writeProtect_and_editable_requests_move_editability_and_back (
     |config, tantivy| Box::pin ( test_writeProtect_and_editable_requests_move_editability_and_back (config, tantivy) )) }
 
 #[test]
-fn parked_content_node_is_shown_once (
+fn retained_content_node_is_shown_once (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-evcb-parked-content-node-is-shown-once", FIXTURES,
-    "/tmp/tantivy-test-evcb-parked-content-node-is-shown-once",
-    |config, tantivy| Box::pin ( test_parked_content_node_is_shown_once (config, tantivy) )) }
+    "skg-test-evcb-retained-content-node-is-shown-once", FIXTURES,
+    "/tmp/tantivy-test-evcb-retained-content-node-is-shown-once",
+    |config, tantivy| Box::pin ( test_retained_content_node_is_shown_once (config, tantivy) )) }
 
 #[test]
 fn a_request_claimed_elsewhere_leaves_no_member (
@@ -1113,14 +1113,14 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
       Ok (( )) }
 
 // ===================================================
-// Test: a parked content node is shown once
+// Test: a retained content node is shown once
 // ===================================================
 // In a view of 1, 13 is marked as not affecting its parent and saved:
 // 1 no longer contains 13, which stays under 1 as a non-member. A
 // save of another view of 1 puts 13 back in 1's content. The first
-// view, rerendered as collateral, adopts the parked 13 as 1's member
+// view, rerendered as collateral, adopts the retained 13 as 1's member
 // instead of showing a second 13 beside it.
-async fn test_parked_content_node_is_shown_once (
+async fn test_retained_content_node_is_shown_once (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1134,13 +1134,13 @@ async fn test_parked_content_node_is_shown_once (
       let (viewforest_id, opened) : (ViewforestId, String) =
         open_content_view (
           &config, tantivy, &graph, &mut views_state, &["1"] ) ?;
-      let parked : String = save_view (
+      let retained : String = save_view (
         &opened . replacen ( "** (skg (node (id 13) (repo main) ",
                              "** (skg (node (id 13) (repo main) nonMember ", 1 ),
         &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
-      assert! ( lines_starting (&parked, "** (skg (node (id 13) ") . len () == 1
-                && parked . contains ("nonMember"),
-                "13 stays under 1 as a non-member:\n{}", parked );
+      assert! ( lines_starting (&retained, "** (skg (node (id 13) ") . len () == 1
+                && retained . contains ("nonMember"),
+                "13 stays under 1 as a non-member:\n{}", retained );
       let other_viewforest_id : ViewforestId = ViewforestId::ContentView ("other-view-of-1" . to_string ());
       let other : String = {
         let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =

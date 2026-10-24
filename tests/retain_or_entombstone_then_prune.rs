@@ -1,7 +1,8 @@
-// cargo nextest run --test grouped_overrides -E 'test(convert_then_prune::)'
+// cargo nextest run --test grouped_overrides -E 'test(retain_or_entombstone_then_prune::)'
 //
-// The one rule ('docs/glossary.org', "the one rule: convert, then
-// prune"): a reconciler never detaches. A child the graph no longer
+// Retain as non-member or tombstone, then prune ('docs/glossary.org',
+// "retain as non-member or tombstone, then prune"): a reconciler never
+// detaches. A child the graph no longer
 // warrants is converted -- a leaf, and every non-vognode, to a
 // tombstone that the prune ending the completion removes; an unrestricted
 // vognode with a subtree is retained as non-member, keeping its
@@ -47,13 +48,13 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let main : &str = "tests/convert_then_prune/fixtures/main";
-  let restricted : &str = "tests/convert_then_prune/fixtures/restricted";
+  let main : &str = "tests/retain_or_entombstone_then_prune/fixtures/main";
+  let restricted : &str = "tests/retain_or_entombstone_then_prune/fixtures/restricted";
   run_with_shared_test_stores (
-    "skg-test-convert-then-prune",
+    "skg-test-retain-or-entombstone-then-prune",
     |s| Box::pin ( async move {
-      s . reset ("a_stale_content_leaf_goes_and_a_stale_branch_is_parked", main) ?;
-      a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
+      s . reset ("a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember", main) ?;
+      a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected", main) ?;
       a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected (
@@ -61,11 +62,11 @@ fn all_tests
       s . reset ("a_retained_editable_copy_yields_the_claim_to_a_member_met_later", main) ?;
       a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_parked_folder_member_is_adopted_when_its_membership_returns", main) ?;
-      a_parked_folder_member_is_adopted_when_its_membership_returns (
+      s . reset ("a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns", main) ?;
+      a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_duplicate_member_leaves_one_member_and_one_parked_copy", main) ?;
-      a_duplicate_member_leaves_one_member_and_one_parked_copy (
+      s . reset ("a_duplicate_member_leaves_one_member_and_one_retained_copy", main) ?;
+      a_duplicate_member_leaves_one_member_and_one_retained_copy (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("an_editable_extra_copy_of_a_duplicate_is_writeProtected", main) ?;
       an_editable_extra_copy_of_a_duplicate_is_writeProtected (
@@ -155,13 +156,13 @@ fn the_line_after (
   lines . get (index + 1) . map ( |line| line . to_string () )
     . unwrap_or_default () }
 
-fn is_parked (line : &str) -> bool {
+fn is_writeProtected_nonMember (line : &str) -> bool {
   line . contains ("nonMember") && line . contains ("writeProtected") }
 
 /// k loses l (a leaf) and m (which holds mc), saved from a second view
 /// of k. The first view's rerender drops l and retains m as non-member,
 /// still editable, with mc still its content; that buffer saves.
-async fn a_stale_content_leaf_goes_and_a_stale_branch_is_parked (
+async fn a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -237,7 +238,7 @@ async fn a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected
   assert! ( m_lines . iter () . any ( |line| line . contains ("nonMember")
                                            && ! line . contains ("writeProtected") ),
     "the stale member is retained as non-member, still editable:\n{}", first_view );
-  assert! ( m_lines . iter () . any ( |line| is_parked (line) ),
+  assert! ( m_lines . iter () . any ( |line| is_writeProtected_nonMember (line) ),
     "the pasted copy stays a write-protected non-member:\n{}", first_view );
   assert! ( the_line_after (first_view, "** ", "nonMember writeProtected")
               . contains ("a note under the copy"),
@@ -273,9 +274,9 @@ async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
   the_line (&second_view, "*** ", "(id m)"); // the second view moved m under l
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  assert! ( is_parked ( &the_line (first_view, "** ", "(id m)") ),
+  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "** ", "(id m)") ),
     "the retained m yields the claim:\n{}", first_view );
-  assert! ( is_parked ( &the_line (first_view, "*** ", "(id mc)") ),
+  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "*** ", "(id mc)") ),
     "with its subtree:\n{}", first_view );
   let member_m : String = the_line (first_view, "*** ", "(id m)");
   assert! ( ! member_m . contains ("nonMember") && ! member_m . contains ("writeProtected"),
@@ -290,9 +291,9 @@ async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
 /// A note typed under b in x's containerFolder. When b stops
 /// containing x, x's view keeps b there as a write-protected non-member
 /// holding the note. When
-/// b contains x again, the folder adopts the parked b as the member and
+/// b contains x again, the folder adopts the retained b as the member and
 /// creates no second one, and x's view saves.
-async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
+async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -325,7 +326,7 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
   let x_after_drop : &String = collateral_views . iter ()
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
-  assert! ( is_parked ( &the_line (x_after_drop, "*** ", "(id b)") ),
+  assert! ( is_writeProtected_nonMember ( &the_line (x_after_drop, "*** ", "(id b)") ),
     "the stale member is a write-protected non-member:\n{}", x_after_drop );
   assert! ( the_line_after (x_after_drop, "*** ", "(id b)") . contains ("a note under b"),
     "the note stands under it:\n{}", x_after_drop );
@@ -338,7 +339,7 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
   let member_b : String = the_line (x_after_return, "*** ", "(id b)");
   assert! ( ! member_b . contains ("nonMember"),
-    "the parked b is the member again, and the only b in the folder:\n{}",
+    "the retained b is the member again, and the only b in the folder:\n{}",
     x_after_return );
   assert! ( the_line_after (x_after_return, "*** ", "(id b)") . contains ("a note under b"),
     "the note still stands under it:\n{}", x_after_return );
@@ -348,9 +349,10 @@ async fn a_parked_folder_member_is_adopted_when_its_membership_returns (
 
 /// The rerender of a stored view whose d holds two copies of e (a
 /// write-protected one holding ec, then an editable leaf) and two of f
-/// keeps the editable e as the member, parks the other, drops the
-/// second f, and gives a buffer the save accepts.
-async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
+/// keeps the editable e as the member, retains the other as
+/// non-member, drops the second f, and gives a buffer the save
+/// accepts.
+async fn a_duplicate_member_leaves_one_member_and_one_retained_copy (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -367,8 +369,8 @@ async fn a_duplicate_member_leaves_one_member_and_one_parked_copy (
     &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
   let e_lines : Vec<String> = lines_containing (&view, "(id e)");
   assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
-  assert! ( is_parked (&e_lines [0]),
-    "the write-protected copy is parked:\n{}", view );
+  assert! ( is_writeProtected_nonMember (&e_lines [0]),
+    "the write-protected copy is retained as non-member:\n{}", view );
   assert! ( ! e_lines [1] . contains ("nonMember")
             && ! e_lines [1] . contains ("writeProtected"),
     "the editable copy is the member:\n{}", view );
@@ -400,7 +402,7 @@ async fn an_editable_extra_copy_of_a_duplicate_is_writeProtected (
   let e_lines : Vec<String> = lines_containing (&view, "(id e)");
   assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
   // The reconciler puts what it converts before the members.
-  assert! ( is_parked (&e_lines [0]),
+  assert! ( is_writeProtected_nonMember (&e_lines [0]),
     "the extra copy is retained write-protected:\n{}", view );
   assert! ( ! e_lines [1] . contains ("nonMember")
             && ! e_lines [1] . contains ("writeProtected"),

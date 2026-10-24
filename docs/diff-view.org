@@ -10,7 +10,8 @@ each one commit-ready, and commit everything at once. C-c v d
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
 D, change-forest leaf, mark, changeset marker, ...) is the glossary's "Terms of the
 diff view" ('docs/glossary.org'); the reconcilers' words (key,
-the one rule, dead viewnode, non-member) are among its terms
+retain as non-member or tombstone, then prune, tombstone, non-member)
+are among its terms
 specific to Skg. The wire forms are the API doc's
 "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
@@ -286,8 +287,8 @@ relationship becomes a removed member and back, a deleted phantom
 becomes a historical phantom and back, a graft or a copy the user
 pasted becomes the removed member of its node. A second child of a
 matched key is a duplicate: of the copies the editable one is
-adopted, else the first in buffer order, and each other is converted
-by the one rule, its subtree staying under it. A child the shallow
+adopted, else the first in buffer order, and each other is retained
+write-protected or entombstoned, its subtree staying under it. A child the shallow
 model subtree lacks is converted, never detached (next section);
 what only the shallow model subtree has is created.
 "Produced by the shallow model subtree" is defined over the union of the two
@@ -305,7 +306,7 @@ as plain context with their change viewnodes gone, and a root whose
 node the commit deleted is shown as a deleted phantom. A removed
 member that held content, or any change viewnode that held
 something of the user's, stays as a non-member, keeping its
-editability, or a dead viewnode holding it.
+editability, or a tombstone holding it.
 ** What a reconciler keeps
 Two reconcilers run at an editable node's visit. The older one,
 'complete_managed_children' ('server/update_buffer/util.rs'),
@@ -313,10 +314,10 @@ reconciles the content list first, as in every view, and each folder's
 members at the folder's own visit; then the per-visit step runs the
 diff view's, 'reconcile_children_with_shallowModelSubtree', over the change
 viewnodes, the removed members and what the diff view adds below
-them. What the user added survives both. Both obey the one rule
-('docs/glossary.org', "the one rule: convert, then prune"): neither
+them. What the user added survives both. Both obey the glossary's
+"retain as non-member or tombstone, then prune": neither
 detaches, and each converts a child the graph no longer warrants into
-a non-member retained with its editability or a dead viewnode, which
+a non-member retained with its editability or a tombstone, which
 the prune removes once childless.
 
 Neither moves a child it keeps. A child it creates goes right after
@@ -367,15 +368,15 @@ metadata says nothing of it, so nothing about it can be lost in a
 save.
 
 Both convert a stale child by one function
-('convert_unwarranted_child'), as the glossary's statement of the
-one rule says. The older reconciler never looks below the
+('convert_unwarranted_child'), as the glossary's "retain as
+non-member or tombstone, then prune" says. The older reconciler never looks below the
 children it manages; the diff view's converts, with the stale
 child, what was made below it for the same model
 ('convert_unwarranted_subtree'): the diff view's own viewnodes, a
 folder's members and the chains, but not the content reconciler's
 members or what the user typed or pasted. The prune removes what holds
 nothing of the user's (a deleted node's phantom, once the
-deletion is committed, is deadened holding the user's note but
+deletion is committed, is entombstoned holding the user's note but
 not its old content).
 
 So a note the user adds under a member of a changed folder, under a
@@ -436,7 +437,7 @@ extends it as any editable occurrence's does, with its content list
 and its change viewnodes, among them its container folder listing the
 container that dropped it; a write-protected one holds nothing of its
 node. A removed member that was editable when a rerender began stays
-editable ('adopt_model_facts' only ever write-protects). In a partner
+editable ('give_model_facts_to' only ever write-protects). In a partner
 folder a removed member stays as the folder's other members are.
 
 A removed dangling ID is not shown in content or in a folder whose
@@ -580,7 +581,7 @@ OBJECTs are those a request on this headline may name ('node' and/or
 modified node, every leaf it records, beside 'rel' when its
 relationship changed; 'all' on a commit readiness aggregate, worth N; none on a
 headline that names exactly one leaf, which a bare request marks).
-The server's 'leaves_named_at' is the one rule; the fact is
+The server's 'leaves_named_at' is the single rule; the fact is
 display-only, and the clients read it instead of keeping tables of
 headline kinds.
 ** Readiness requests and gestures

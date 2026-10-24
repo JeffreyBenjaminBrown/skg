@@ -4,7 +4,7 @@
 //! The shallow model subtree is built in a scratch tree. Each existing
 //! viewnode it also produces is kept where it stands, with its fold
 //! state, and its kind and facts are updated in place; each it does
-//! not is converted by the one rule ('convert_unwarranted_child'), with
+//! not is converted ('convert_unwarranted_child'), with
 //! what the diff view made below it ('convert_unwarranted_subtree');
 //! what only it has is copied in, after the child that precedes it in
 //! the shallow model subtree. A viewnode that stands for a graphnode is
@@ -12,7 +12,8 @@
 //! entry by the entry), among all the children of the parent, whoever
 //! drew them ('docs/glossary.org', "key, match key"): a child of a key
 //! the model has is adopted, and a second child of a matched key is a
-//! duplicate, converted by the one rule.
+//! duplicate, converted too. Both conversions obey the glossary's
+//! "retain as non-member or tombstone, then prune".
 //! A stale child is converted only when it is the reconciler's, known
 //! by its kind and change facts ('is_diffView_change_viewnode'); what
 //! the user or another reconciler drew stays where it stands.
@@ -89,9 +90,8 @@ fn property_kind (
 /// several models under one parent; it is matched against every child
 /// it selects, whoever drew it. Of several selected children
 /// of a key the model has, the editable one is adopted, else the first
-/// in buffer order; the others are duplicates, each converted by the
-/// one rule ('convert_unwarranted_child') with its subtree where it
-/// stands. A kept child stays where it stands; a created one goes
+/// in buffer order; the others are duplicates, each converted
+/// ('convert_unwarranted_child') with its subtree where it stands. A kept child stays where it stands; a created one goes
 /// after the kept or created child that precedes it in the shallow
 /// model subtree, or first when none does
 /// ('place_created_children_after_their_model_predecessors'). A
@@ -174,8 +174,8 @@ fn adopted_copy (
     . or ( copies . first () )
     . copied () }
 
-/// Convert an extra copy of an adopted key by the one rule's duplicate
-/// clause: retained write-protected when it has a subtree, which stays
+/// Convert an extra copy of an adopted key by the duplicate clause of
+/// "retain as non-member or tombstone, then prune": retained write-protected when it has a subtree, which stays
 /// under it, a tombstone when it has none.
 fn convert_duplicate (
   tree      : &mut Tree<Viewnode>,

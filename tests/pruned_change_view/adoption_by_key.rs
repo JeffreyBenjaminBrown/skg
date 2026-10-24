@@ -1,7 +1,7 @@
 // Every reconciler of the diff view matches by key among all the
 // children of a node, whoever drew them: a child of a key its model
 // has is adopted, and a second child of that key is a duplicate,
-// converted by the one rule ('docs/diff-view.org', "What a reconciler
+// retained or entombstoned ('docs/diff-view.org', "What a reconciler
 // keeps"). Each case below once drew a second child of one key.
 //
 // Fixtures: 'requested_alias_folder' (x, with the alias xa1, its body
@@ -175,8 +175,8 @@ fn a_note_of_a_node_becomes_its_removed_member (
     assert_saves_back_cleanly (f, &after_head) }) }
 
 /// A write-protected copy of y that the user pasted beside the member
-/// y, when p then drops y elsewhere, is one of the two set aside as
-/// the removed member: y stands under p once.
+/// y, when p then drops y elsewhere, is one of the two retained as
+/// non-members and shown as the removed member: y stands under p once.
 #[test]
 fn a_pasted_copy_beside_a_removed_member_is_not_doubled (
 ) -> Result<(), Box<dyn Error>> {

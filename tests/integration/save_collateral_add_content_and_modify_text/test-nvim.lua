@@ -37,11 +37,11 @@ local function child_named (list, name)
   return nil
 end
 
----A role graft's ROLENAME from its semantic relationship facts
----(RELS_BODY = the cdr of (rels ...)), or nil. A role graft relates outbound
+---A chain node's ROLENAME from its semantic relationship facts
+---(RELS_BODY = the cdr of (rels ...)), or nil. A chain node relates outbound
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
----side, mapped to its role. Port of headline--role-of-role-graft-from-rels.
-local function role_of_role_graft_from_rels (rels_body)
+---side, mapped to its role. Port of headline--role-of-chain-node-from-rels.
+local function role_of_chain_node_from_rels (rels_body)
   if not rels_body then return nil end
   local roles = { { 'contains', 'container' }, { 'linksTo', 'mentioner' },
                   { 'subscribesTo', 'subscribee' }, { 'overrides', 'overrider' },
@@ -57,18 +57,18 @@ local function role_of_role_graft_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP's headline relation: a
----role graft's rolename, else 'nonMember' or 'member'. The
+---chain node's rolename, else 'nonMember' or 'member'. The
 ---port of test-helpers.el's headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
   local non_member = sexp ~= nil and not metadata.node_member_p(sexp)
-  local role_graft_role = nil
+  local chain_node_role = nil
   if non_member then
-    role_graft_role = role_of_role_graft_from_rels(metadata.sexp_cdr_at_path(
+    chain_node_role = role_of_chain_node_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' }))
   end
-  if role_graft_role then return role_graft_role end
+  if chain_node_role then return chain_node_role end
   if non_member then return 'nonMember' end
   return 'member'
 end

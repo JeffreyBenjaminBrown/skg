@@ -225,7 +225,7 @@ fn collect_flags_surfaces (
               flag, title, body, .. }) =>
               viewnodes . push ((*flag, title . clone (), body . clone ())),
             // A tombstone (a stale flag holding something) and a
-            // non-member parked in the folder are no part of its surface.
+            // non-member standing in the folder are no part of its surface.
             ViewnodeKind::Tombstone => (),
             ViewnodeKind::Vognode (Vognode::Unrestricted (t))
               if t . membership != Membership::Member => (),

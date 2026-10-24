@@ -340,24 +340,24 @@ fn a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected (
   Ok (( )) }
 
 /// The chain node d under c in x's container folder, from a
-/// relationship only the before-graph has, keeps its birth through
+/// relationship only the before-graph has, keeps its place through
 /// a save, and is not shown a second time.
 #[test]
-fn a_role_graft_under_an_editable_removed_member_keeps_its_birth_through_a_save (
+fn a_chain_node_under_an_editable_removed_member_keeps_its_place_through_a_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
-    let graft : &str =
+    let chain_node : &str =
       "***** (skg (node (id d) (repo main) nonMember writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert_eq! ( buffer . matches (graft) . count (), 1, "{}", buffer );
+    assert_eq! ( buffer . matches (chain_node) . count (), 1, "{}", buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     for view in [ &saved, &again ] {
-      assert_eq! ( view . matches (graft) . count (), 1, "{}", view );
+      assert_eq! ( view . matches (chain_node) . count (), 1, "{}", view );
       assert_lines_in_order ( view, &[
         "** (skg (node (id x) (repo main) nonMember",
         "**** (skg (node (id c) (repo main) writeProtected",
-        graft ] ); }
+        chain_node ] ); }
     Ok (( )) }) }
 
 /// x, editable as b's removed member, is retitled there. The save

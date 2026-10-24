@@ -695,7 +695,7 @@ Opens a blank Skg content view in which to create new nodes.
 Every node needs a skgrepo.
 A headline inherits one from the nearest node above it,
 passing through folders and phantoms;
-a root, or a headline below a restricted vognode, a dead viewnode
+a root, or a headline below a restricted vognode, a tombstone
 or a property, needs its skgrepo chosen explicitly
 ('<localleader>ss' on the new headline prompts for one).
 Save validation catches a node whose skgrepo is missing.

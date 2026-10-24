@@ -342,7 +342,8 @@ folder cannot be changed from here" — the same sense ☮
 (=server/heralds.rs=), with no wire atom of its own: which folders are
 write-protected is already known from the folder atom.
 
-Every policy's reconciler obeys [[*the one rule: convert, then prune][the one rule]]: a stale member or
+Every policy's reconciler obeys
+[[*retain as non-member or tombstone, then prune]]: a stale member or
 an extra copy of a member is converted, not detached, and missing
 graph members are restored.  A non-member standing for a node the
 folder's goal lists again is adopted back as its member.
@@ -356,13 +357,13 @@ nonempty =hiddenInSubscribeeFolder=; this is the filter specific to how that
 subscriber sees the subscribee.
 
 *A write-protected folder's children stay where they stand.*  Its
-reconciler moves no child it keeps, a non-member parked inside it
+reconciler moves no child it keeps, a non-member standing inside it
 included, and puts a member it creates right after the member that
 precedes it in the folder's goal list (=KeptChildOrder::Unmoved= in
 =complete_managed_children=; see "What a reconciler keeps" in
 =docs/diff-view.org=).  The alias folder and the editable folders,
 whose order the save writes, follow the graph's order instead
-(=KeptChildOrder::FollowsGoal=): a non-member parked in one of them
+(=KeptChildOrder::FollowsGoal=): a non-member standing in one of them
 goes above the members, which follow the graph's order.
 
 *** role tree, the containerward chain, and the -ward adjectives
@@ -722,7 +723,7 @@ A *vognode* is a viewnode representing a graphnode ('Vognode' in
 - a *phantom*: the graphnode is no longer in the graph, or never was.
 
 The other viewnodes are *non-vognodes*: folders, properties, the buffer
-root and dead viewnodes. They describe their viewparent, or its
+root and tombstones. They describe their viewparent, or its
 relationships, rather than standing for a graphnode.
 
 *** occurrence
@@ -778,9 +779,8 @@ neither adds nor removes a relationship for it; what it shows of
 its own node is saved or not by its editability, as at any
 occurrence. A chain node is a non-member, and so are a removed
 member, every vognode child of a write-protected occurrence, a
-note the user parks in a folder, and what
-[[*the one rule: convert, then prune][the one rule]] makes of a
-stale vognode with a subtree.
+note the user puts in a folder, and what
+[[*retain as non-member or tombstone, then prune]] makes of a stale vognode with a subtree.
 
 *** editability rule, editable map
 
@@ -818,7 +818,7 @@ and each folder's members in every view, and the diff view's
 ('reconcile_children_with_shallowModelSubtree'), which reconciles
 the change viewnodes, the removed members and what stands below
 them with a shallow model subtree. Both obey
-[[*the one rule: convert, then prune][the one rule]].
+[[*retain as non-member or tombstone, then prune]].
 
 *** managed child
 
@@ -826,7 +826,7 @@ A child viewnode is managed by the reconciler that owns it (its
 [[*owner][owner]]): that reconciler matches the child by its
 [[*key, match key][key]] against what it should show, and may
 convert it
-([[*the one rule: convert, then prune][the one rule]]). The older
+([[*retain as non-member or tombstone, then prune]]). The older
 reconciler finds the children it manages by predicates on their
 kind and membership ('complete_managed_children'), and records
 itself as the owner of each member it keeps; the diff view's
@@ -848,7 +848,7 @@ matches an unknown phantom by its raw ID and a historical phantom
 by its ID at HEAD. It matches a key among all the children of a
 node, whoever drew them: a child of a key its model has is
 adopted, and a second child of that key is a duplicate, converted
-by [[*the one rule: convert, then prune][the one rule]].
+by [[*retain as non-member or tombstone, then prune]].
 
 *** owner
 
@@ -869,7 +869,7 @@ before-graph only or its viewparent became a historical phantom,
 becomes the diff view's reconciler's, which shows it as removed;
 so does any child the diff view's reconciler adopts.
 
-*** the one rule: convert, then prune
+*** retain as non-member or tombstone, then prune
 
 A reconciler never detaches a child. A child it manages that the
 graph no longer warrants -- a stale child, whose key the
@@ -887,15 +887,15 @@ walk prefers a member to a non-member
 retained copy never keeps the editability claim from its node's
 member. A leaf, and any viewnode of another kind (a phantom, a
 restricted vognode, a property, a folder), becomes a
-[[*dead viewnode][dead viewnode]]. Of several copies of one key,
+[[*tombstone][tombstone]]. Of several copies of one key,
 the one kept as the member is the editable one, else the first;
 each other copy with a subtree is retained write-protected, its
 members made non-members, whatever its editability was, since the
 save refuses two editable occurrences of one node.
 After every completion the postorder *prune*
 ('prune_self_deletable_when_empty' in
-'server/update_buffer/complete.rs') removes the childless dead
-viewnodes (and childless deleted phantoms and empty
+'server/update_buffer/complete.rs') removes the childless
+tombstones (and childless deleted phantoms and empty
 write-protected folders), never a view root. A viewnode nobody
 owns -- one the user typed or pasted -- is never converted as
 stale, so it holds its ancestors alive: whatever stands below a
@@ -907,27 +907,27 @@ first converts what was made below the stale child for the same
 model ('convert_unwarranted_subtree' in
 'server/diff_view/shallow_model_subtree.rs'): postorder, every
 viewnode below it but those nobody owns and the content
-reconciler's (which a parked vognode keeps, as the older
+reconciler's (which a vognode retained as non-member keeps, as the older
 reconciler's does), so that a folder's members go with the folder
 and a member's chain with the member. A viewnode left holding
-only childless dead viewnodes is converted as a leaf.
+only childless tombstones is converted as a leaf.
 
 A converted copy is the one duplicate shape the save accepts:
 under an editable parent two editable copies of a node are
 refused, and so are two members, in a content list or a folder.
 
-The orphaned folder ('deaden_generalized_orphan_folder') and the
+The orphaned folder ('entombstone_generalized_orphan_folder') and the
 skgrepo-set switch ('convert_and_prune_for_skgrepo_switch')
 convert by the same rule: a member of a folder whose viewparent
 died, and a deleted or unknown phantom that a now restricted
 skgrepo records.
 
-*** dead viewnode
+*** tombstone
 
-A viewnode ('ViewnodeKind::DeadViewnode', '(skg deadViewnode)')
+A viewnode ('ViewnodeKind::Tombstone', '(skg tombstone)')
 with no title, ID, facts or key, which only holds what stands
-below it. It is what the one rule makes of an unwarranted leaf or
-non-vognode. The prune removes it once it is childless; the
+below it. It is what [[*retain as non-member or tombstone, then prune]]
+makes of an unwarranted leaf or non-vognode. The prune removes it once it is childless; the
 parser discards text typed on its line; its member children
 become non-members ('mark_orphans_under_dead_parents_false');
 every folder accepts one among its children.
@@ -1148,7 +1148,8 @@ a change of that node: its old text, its home skgrepo move, its
 changeset markers, its "it acquired" folder, its changed folders, its
 removed members, and, under a member, the relRepo move of the
 member's relationship. A rerender keeps a change viewnode the shallow
-model subtree still produces and converts the rest ([[*the one rule: convert, then prune][the one rule]]).
+model subtree still produces and converts the rest
+([[*retain as non-member or tombstone, then prune]]).
 
 *** per-visit step
 

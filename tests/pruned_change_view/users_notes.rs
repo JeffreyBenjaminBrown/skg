@@ -63,7 +63,7 @@ fn a_note_under_a_historical_phantom_survives (
     assert! ( ! without_viewnode_ids (&committed) . contains (old_member), "{}", committed );
     Ok (( )) }) }
 
-/// A note parked in the "it acquired" folder survives beside the
+/// A note placed in the "it acquired" folder survives beside the
 /// acquiree's phantom.
 #[test]
 fn a_note_in_the_acquired_folder_survives (
@@ -72,10 +72,10 @@ fn a_note_in_the_acquired_folder_survives (
     let folder : &str = "** (skg acquiredFolder)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
-      &insert_after_line_starting ( &buffer, folder, &note (3, "a parked note") )) ?;
-    assert! ( parent_line_of (&saved, "a parked note") . starts_with (folder), "{}", saved );
+      &insert_after_line_starting ( &buffer, folder, &note (3, "a placed note") )) ?;
+    assert! ( parent_line_of (&saved, "a placed note") . starts_with (folder), "{}", saved );
     assert_lines_in_order (&saved, &[
-      folder, " a parked note\n", "*** (skg (historical (id acqd)" ]);
+      folder, " a placed note\n", "*** (skg (historical (id acqd)" ]);
     Ok (( )) }) }
 
 /// A note under a removed member survives the member going stale:

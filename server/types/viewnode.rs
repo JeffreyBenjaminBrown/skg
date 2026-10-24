@@ -513,8 +513,8 @@ pub enum PartnerFolder {
 /// 'PartnerFolder::policy' rather than matching on folder variants, so the
 /// policies cannot drift apart per file.
 ///
-/// Every policy obeys the one rule (the glossary's "the one rule:
-/// convert, then prune"): during reconciliation a stale member is
+/// Every policy obeys the glossary's "retain as non-member or
+/// tombstone, then prune": during reconciliation a stale member is
 /// converted, a leaf to a tombstone the prune removes, one with
 /// children retained as non-member (nonMember), keeping its
 /// editability.

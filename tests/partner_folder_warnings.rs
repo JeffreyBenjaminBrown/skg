@@ -102,7 +102,7 @@ async fn write_protected_folder_repairs_warn_impl (
     let t_line : String =
       line_containing (&complete_buffer, "(id t)") . to_string ();
     let x_line : String = {
-      // x: an editable member leaf parked inside the folder, with a
+      // x: an editable member leaf placed inside the folder, with a
       // (new) child so the repair makes it a non-member rather than removing it.
       let mut l : String =
         r_line
@@ -120,7 +120,7 @@ async fn write_protected_folder_repairs_warn_impl (
       line_containing (&complete_buffer, "subscriberFolder") . to_string ();
     complete_buffer
       . replace ( &format! ("{}\n", r_line), "" ) // delete member r
-      . replace ( &t_line,                        // park x (with child) after t
+      . replace ( &t_line,                        // place x (with child) after t
                   &format! ("{}\n{}\n{}", t_line, x_line, x_child) )
       . replace ( &folder_line,                      // edit the folder headline text
                   &format! ("{} HELLO", folder_line) ) };

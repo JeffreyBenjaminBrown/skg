@@ -255,9 +255,10 @@ fn tag_root (
 /// of that node stands there (a removed member whose relationship
 /// returned, or a copy the user pasted, whoever drew it); a member, or
 /// any non-member, whose relationship is only in the before-graph is
-/// set aside (nonMember), for the diff view's step after the content
+/// retained as non-member, for the diff view's step after the content
 /// reconciler to find and show as removed. So a copy the user pasted
-/// is set aside as the removed member, not doubled by it.
+/// is retained as non-member and shown as the removed member, not
+/// doubled by it.
 pub(crate) fn align_content_members_with_straddle (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
