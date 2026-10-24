@@ -293,7 +293,7 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
     "**** (skg (node (id a) (repo main) writeProtected",
     "**** (skg (node (id b) (repo main) nonMember writeProtected",
     "**** (skg (node (id c) (repo main) writeProtected",
-    "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected",
+    "***** (skg (node (id d) (repo main) nonMember writeProtected",
     "**** (skg (node (id e) (repo main) nonMember writeProtected",
     "*** (skg (node (id xc) (repo main) writeProtected",
     "* (skg (node (id d)",
@@ -347,7 +347,7 @@ fn a_role_graft_under_an_editable_removed_member_keeps_its_birth_through_a_save 
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let graft : &str =
-      "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected";
+      "***** (skg (node (id d) (repo main) nonMember writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_eq! ( buffer . matches (graft) . count (), 1, "{}", buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;

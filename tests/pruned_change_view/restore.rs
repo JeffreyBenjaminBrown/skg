@@ -21,6 +21,8 @@ use crate::pruned_change_view::common::{
 use crate::git_fixture::{edit_line, skg_files};
 
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::types::errors::SaveError;
+use skg::types::save::format_save_error_as_org;
 use skg::serve::parse_metadata_sexp::{
   RESTORE_NODE_ON_A_NODE_NOT_DELETED, RESTORE_REL_ON_A_DELETED_NODE,
   RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP};
@@ -34,6 +36,10 @@ const D_REMOVED_AS_CS_CONTAINER : &str =
   "**** (skg (node (id d) (repo main) nonMember writeProtected (viewStats cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
   "*** (skg (node (id s) (repo main) nonMember writeProtected";
+/// d, a node of the containerward chain under c, a member of x's
+/// containers folder.
+const D_IN_THE_CHAIN_UNDER_C : &str =
+  "***** (skg (node (id d) (repo main) nonMember writeProtected)";
 const G_UNDER_Q : &str =
   "** (skg (historical (id g)";
 const GC_UNDER_G : &str =
@@ -202,4 +208,37 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
                 "{} on {:?} should be refused with {:?}, got {}",
                 request, prefix, message, refusal );
       assert_eq! ( skg_files (f) ?, files_before ); }
+    Ok (( )) }) }
+
+/// A restoreRel stands where it may by position: on a node of the
+/// containerward chain (d, under c in x's containers folder) it is
+/// refused, with or without a '(rel removed)' typed beside it, while
+/// on a containers folder's member carrying '(rel removed)' (d in c's
+/// containers folder) it saves.
+#[test]
+fn restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("removed_partners", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let files_before : BTreeMap<String, String> = skg_files (f) ?;
+    for parts in [ "(editRequest restoreRel) (diff (rel removed))",
+                   "(editRequest restoreRel)" ] {
+      let requested : String = edit_line (
+        &buffer, D_IN_THE_CHAIN_UNDER_C,
+        |line : &str| line . replacen (
+          "writeProtected)", &format! ("writeProtected {})", parts), 1 ));
+      assert_ne! ( requested, buffer );
+      let refusal : String = match save (f, &requested) {
+        Err (e) => match e . downcast_ref::<SaveError> () {
+          Some (save_error) => format_save_error_as_org (save_error),
+          None => e . to_string (), },
+        Ok (response) => format! ( "{:?}", response . errors ), };
+      assert! ( refusal . contains (RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP)
+                && refusal . contains ("viewnode ID"),
+                "a restoreRel with {} on a chain node should be refused, got {}",
+                parts, refusal );
+      assert_eq! ( skg_files (f) ?, files_before ); }
+    let (_response, files) : (SaveResponse, BTreeMap<String, String>) = saved ( f,
+      &requesting (&buffer, D_REMOVED_AS_CS_CONTAINER, "restoreRel") ) ?;
+    assert_eq! ( file_of (&files, "d"), "title: d\npid: d\ncontains:\n- c\n" );
     Ok (( )) }) }

@@ -18,9 +18,9 @@ use std::error::Error;
 const C_IN_THE_FOLDER : &str =
   "**** (skg (node (id c) (repo main) writeProtected";
 const B_UNDER_C : &str =
-  "***** (skg (node (id b) (repo main) nonMember (birth roleGraft container) writeProtected";
+  "***** (skg (node (id b) (repo main) nonMember writeProtected";
 const D_UNDER_C : &str =
-  "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected";
+  "***** (skg (node (id d) (repo main) nonMember writeProtected";
 
 /// Save 'buffer' as the "all changes" buffer, and require that it
 /// comes back as it went.

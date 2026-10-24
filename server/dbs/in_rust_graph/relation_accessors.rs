@@ -106,16 +106,14 @@ impl RelationRole {
 }
 
 //
-// The partner-role vocabulary: ROLENAME <-> RelationRole <-> glyph.
-// The single source of truth for the birth herald.
+// The roles, by name.
 //
 
 impl RelationRole {
-  // The nine partner roles a role tree can graft, named for the
-  // role the grafted partner plays toward the origin (= toward its
-  // viewparent), and CONTENT. CONTENT is no partner role -- the
-  // recursive content view already serves it, so PARTNER_ROLE_VOCAB
-  // lacks it -- but the diff view compares content lists by it.
+  // The nine partner roles, named for the role the partner plays
+  // toward the origin (as a member of a partner folder plays toward
+  // the folder's viewparent), and CONTENT, which the recursive content
+  // view serves and the diff view compares content lists by.
   pub const CONTAINER : RelationRole =
     RelationRole { relation : NodeRelation::Contains,
                    position : BinaryRolePosition::First };
@@ -146,52 +144,7 @@ impl RelationRole {
   pub const SUBSCRIBEE : RelationRole =
     RelationRole { relation : NodeRelation::SubscribesTo,
                    position : BinaryRolePosition::Second };
-
-  /// The single ROLENAME token naming this partner role in the wire
-  /// grammar ('(birth roleGraft ROLENAME)').
-  /// Panics for a role absent from PARTNER_ROLE_VOCAB (only
-  /// 'Contains, Second' -- "content", never a path/birth role).
-  pub fn rolename (
-    self,
-  ) -> &'static str {
-    PARTNER_ROLE_VOCAB . iter ()
-      . find ( |(_, role, _)| *role == self )
-      . map ( |(name, _, _)| *name )
-      . expect ( "RelationRole::rolename: role absent from PARTNER_ROLE_VOCAB" ) }
-
-  pub fn from_rolename (
-    s : &str,
-  ) -> Option<RelationRole> {
-    PARTNER_ROLE_VOCAB . iter ()
-      . find ( |(name, _, _)| *name == s )
-      . map ( |(_, role, _)| *role ) }
-
-  /// The path glyph for this partner role. Birth styling is applied
-  /// by the clients. Panics for a role absent from PARTNER_ROLE_VOCAB.
-  pub fn glyph (
-    self,
-  ) -> &'static str {
-    PARTNER_ROLE_VOCAB . iter ()
-      . find ( |(_, role, _)| *role == self )
-      . map ( |(_, _, glyph)| *glyph )
-      . expect ( "RelationRole::glyph: role absent from PARTNER_ROLE_VOCAB" ) }
 }
-
-/// Each row is (ROLENAME, RelationRole, glyph). A folder is named by
-/// its relation (spanning both roles); a birth is named by the one
-/// role the grafted partner plays. 'Contains, Second' is absent (see the consts above).
-pub const PARTNER_ROLE_VOCAB
-  : &[ (&'static str, RelationRole, &'static str) ] = &[
-  ("container",  RelationRole::CONTAINER,   "}"),
-  ("mentioner", RelationRole::MENTIONER, "←"),
-  ("mentioned",   RelationRole::MENTIONED,   "→"),
-  ("overrider",  RelationRole::OVERRIDER,   "Op"),
-  ("overridden", RelationRole::OVERRIDDEN,  "pO"),
-  ("hider",      RelationRole::HIDER,       "Hp"),
-  ("hidden",     RelationRole::HIDDEN,      "pH"),
-  ("subscriber", RelationRole::SUBSCRIBER,  "Sp"),
-  ("subscribee", RelationRole::SUBSCRIBEE,  "pS"),
-];
 
 impl InRustGraph {
   /// IDs whose rendered relationship context can change when any seed changes.
@@ -605,30 +558,4 @@ mod tests {
     enum_names . sort ();
     file_names . sort ();
     assert_eq! ( enum_names, file_names ); }
-
-  /// Every PARTNER_ROLE_VOCAB row round-trips ROLENAME <-> RelationRole
-  /// and resolves a glyph.
-  #[test]
-  fn partner_role_vocab_round_trips () {
-    let expected : [(&str, RelationRole, &str); 9] = [
-      ("container",  RelationRole::CONTAINER,   "}"),
-      ("mentioner",  RelationRole::MENTIONER,   "←"),
-      ("mentioned",  RelationRole::MENTIONED,   "→"),
-      ("overrider",  RelationRole::OVERRIDER,   "Op"),
-      ("overridden", RelationRole::OVERRIDDEN,  "pO"),
-      ("hider",      RelationRole::HIDER,       "Hp"),
-      ("hidden",     RelationRole::HIDDEN,      "pH"),
-      ("subscriber", RelationRole::SUBSCRIBER,  "Sp"),
-      ("subscribee", RelationRole::SUBSCRIBEE,  "pS"),
-    ];
-    for (name, role, glyph) in expected {
-      assert_eq! ( role . rolename (), name );
-      assert_eq! ( RelationRole::from_rolename (name), Some (role) );
-      assert_eq! ( role . glyph (), glyph ); } }
-
-  #[test]
-  fn from_rolename_rejects_unknown_and_the_absent_content_role () {
-    assert_eq! ( RelationRole::from_rolename (""), None );
-    assert_eq! ( RelationRole::from_rolename ("content"), None );
-    assert_eq! ( RelationRole::from_rolename ("bogus"), None ); }
 }

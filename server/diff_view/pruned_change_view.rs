@@ -228,8 +228,7 @@ pub fn diffView_buffer_viewforest (
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
     &mut ViewnodeIdRecord::default (),
-    &runtime . graph, &runtime . config, None,
-    Some (&straddle . before) ) ?;
+    &runtime . graph, &runtime . config, None ) ?;
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
   Ok ( RenderedDiffViewBuffer { text, pids, viewforest } ) }

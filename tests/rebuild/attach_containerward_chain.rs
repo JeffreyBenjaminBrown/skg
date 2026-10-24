@@ -46,12 +46,12 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     ContainerwardChainPartners::LiveGraph ) ?;
   let expected : &str = indoc! {"
     * (skg (node (id a11) (repo main))) a11
-    ** (skg (node (id a1) (repo main) nonMember (birth roleGraft container) writeProtected)) a1
-    *** (skg (node (id a) (repo main) nonMember (birth roleGraft container) writeProtected)) a
-    *** (skg (node (id a1) (repo main) nonMember (birth roleGraft container) writeProtected)) a1
-    ** (skg (node (id a2) (repo main) nonMember (birth roleGraft container) writeProtected)) a2
-    *** (skg (node (id a) (repo main) nonMember (birth roleGraft container) writeProtected)) a
-    *** (skg (node (id b) (repo main) nonMember (birth roleGraft container) writeProtected)) b
+    ** (skg (node (id a1) (repo main) nonMember writeProtected)) a1
+    *** (skg (node (id a) (repo main) nonMember writeProtected)) a
+    *** (skg (node (id a1) (repo main) nonMember writeProtected)) a1
+    ** (skg (node (id a2) (repo main) nonMember writeProtected)) a2
+    *** (skg (node (id a) (repo main) nonMember writeProtected)) a
+    *** (skg (node (id b) (repo main) nonMember writeProtected)) b
   "};
   let expected_trees : Tree<Viewnode> =
     maybePlaced_to_placed_tree ( org_to_uninterpreted_nodes (expected) ? . 0 ) ?;

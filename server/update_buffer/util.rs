@@ -183,7 +183,7 @@ pub enum KeptChildOrder {
 /// prune"): a child the graph no longer warrants (a stale child, or an
 /// extra copy of a duplicate) is converted, never detached. An
 /// unrestricted vognode with a subtree ('is_leaf' false) is retained
-/// as non-member: it keeps its title, ID and birth, and loses its
+/// as non-member: it keeps its title and ID, and loses its
 /// change facts and readiness request. A stale one keeps its
 /// editability: an editable one keeps its members, while a
 /// write-protected one's members become non-members, since a

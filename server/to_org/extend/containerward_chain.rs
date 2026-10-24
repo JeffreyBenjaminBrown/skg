@@ -18,7 +18,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
-use crate::types::viewnode::{ Birth, DiffChange, Membership, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
+use crate::types::viewnode::{ DiffChange, Membership, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -169,8 +169,7 @@ fn prepend_containerward_chain_node (
     graphnode_and_viewnode_from_skgid (graph, config, container) ? {
       Some ((_graphnode, viewnode)) =>
         mk_writeProtected_from_viewnode (
-          viewnode, Membership::NonMember,
-          Birth::RoleGraft (RelationRole::CONTAINER) ) ?,
+          viewnode, Membership::NonMember ) ?,
       None => mk_unknown_viewnode (container . clone ()), };
   Ok ( Some ( tree . get_mut (parent)
               . ok_or ("prepend_containerward_chain_node: parent not found") ?

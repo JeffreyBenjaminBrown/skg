@@ -100,8 +100,8 @@ local expected =
   .. '*** (skg containerFolder)\n'
   .. '**** (skg (node (id 1) (repo main) writeProtected'
      .. ' (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle))) 1\n'
-  .. '***** (skg (node (id 0) (repo main) nonMember (birth roleGraft container) writeProtected'
-     .. ' (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))))) 0\n'
+  .. '***** (skg (node (id 0) (repo main) nonMember writeProtected'
+     .. ' (rels (contains (out 1 (ancestors 1)))))) 0\n'
   .. '*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121\n'
   .. '** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13\n'
 

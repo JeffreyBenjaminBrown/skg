@@ -89,7 +89,8 @@ impl GraphStraddle {
 
   /// The partners that play 'role' toward the node, in either graph.
   /// 'role' names the role the partner plays, as in role trees
-  /// ('PARTNER_ROLE_VOCAB'): CONTAINER gives the node's containers,
+  /// ('RelationRole::CONTAINER' and its siblings): CONTAINER gives the
+  /// node's containers,
   /// '(Contains, Second)' its content. Partners the node records come
   /// in the order of the interleaved diff of the before-graph's list
   /// and the after-graph's ('interleaved_diff_without_reorders'): a

@@ -7,6 +7,7 @@ use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::viewnode::{NodeEditRequest, Editability, Membership, PartnerFolder, Property, PropertyFolder};
 use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
+use crate::serve::parse_metadata_sexp::RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_graphnode::{
   generation_includes_only,
@@ -15,7 +16,7 @@ use crate::types::tree::viewnode_graphnode::{
   siblings_cannot_include,
   skgid_from_self_or_nearest_ancestor,
 };
-use ego_tree::{Tree, NodeId};
+use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashSet;
 
 /// Error from local structure validation.
@@ -657,7 +658,58 @@ fn validate_unrestrictedVognode (
       . to_string ()); }
   if has_empty_title (t) {
     errors . push("Editable node has an empty title." . to_string()); }
+  if t . restoreRel_request
+    && ! restoreRel_stands_where_it_may (tree, treeid, t)
+  { errors . push ( RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP . to_string () ); }
   errors }
+
+/// Whether a restoreRel request, on a headline the parser found
+/// carrying '(rel removed)', stands where it may: on a member of a
+/// partner folder (whose removed members are non-members), or on a
+/// removed member, a non-member under a vognode that is no node of the
+/// containerward chain ('mp_is_in_containerward_chain'). A chain node
+/// stands for no relationship the diff view tracks.
+fn restoreRel_stands_where_it_may (
+  tree   : &Tree<MpViewnode>,
+  treeid : NodeId,
+  t      : &MpUnrestrictedVognode,
+) -> bool {
+  let Some (parent) : Option<NodeRef<MpViewnode>> =
+    tree . get (treeid) . and_then ( |node| node . parent () )
+    else { return false; };
+  match &parent . value () . kind {
+    MpViewnodeKind::PartnerFolder (_) => true,
+    MpViewnodeKind::Vognode (_) =>
+      t . membership == Membership::NonMember
+      && ! mp_is_in_containerward_chain (tree, treeid),
+    _ => false, }}
+
+/// 'is_in_containerward_chain' ('to_org/extend/containerward_chain.rs')
+/// over the parsed tree: a non-member vognode under a member of a
+/// containers folder, or under another such node.
+fn mp_is_in_containerward_chain (
+  tree   : &Tree<MpViewnode>,
+  treeid : NodeId,
+) -> bool {
+  let Some (mut current) : Option<NodeRef<MpViewnode>> = tree . get (treeid)
+    else { return false; };
+  loop {
+    let MpViewnodeKind::Vognode (vognode) = &current . value () . kind
+      else { return false; };
+    let is_nonMember : bool = match vognode {
+      MpVognode::Unrestricted (t) => t . membership == Membership::NonMember,
+      _ => true, };
+    if ! is_nonMember { return false; }
+    let Some (parent) : Option<NodeRef<MpViewnode>> = current . parent ()
+      else { return false; };
+    let MpViewnodeKind::Vognode (_) = &parent . value () . kind
+      else { return false; };
+    let parent_is_a_containers_folder_member : bool =
+      parent . parent () . is_some_and ( |grandparent| matches! (
+        &grandparent . value () . kind,
+        MpViewnodeKind::PartnerFolder (PartnerFolder::Container) ));
+    if parent_is_a_containers_folder_member { return true; }
+    current = parent; }}
 
 fn cannot_be_child_of_vognode (
   node : &MpViewnode,

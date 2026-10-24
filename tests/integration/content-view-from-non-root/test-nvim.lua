@@ -1,6 +1,6 @@
 -- Integration test: opening a content view of `child', whose parent
 -- contains it, should render the buffer with `parent' prepended as
--- the first child of `child' (Birth::ContainsParent write-protected).
+-- the first child of `child' (write-protected, in its containers folder).
 -- Because `child' is contained in the graph, the view-root is born as
 -- container; that default is implicit in emitted metadata.
 --

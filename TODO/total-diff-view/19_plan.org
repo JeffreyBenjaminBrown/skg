@@ -936,7 +936,7 @@ Neovim and integration suites.
 ** DONE Slice 6: the owner record goes
 Conversion by kind and change facts, the hand-overs removed, the
 record removed, the tests. Run all four suites.
-** TODO Slice 7: the birth goes
+** DONE Slice 7: the birth goes
 Position in place of every read, the atom off the wire, the test
 literals by script, the rendering cases, the tests. Run all four
 suites.

@@ -86,16 +86,16 @@
 (skg (node (id x) (rels (overrides (out 1 (ancestors 8)))) (viewStats (overridesHere y))))
 ---- text: Oĥh
 ---- styles: normal*1 crucial*1 medium*1
-==== birth: links and overrides
-(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1)) (birth (overrides out 1)))))
+==== birth: links and overrides, an overriders folder's member
+(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1)) (birth (overrides out 2)))))
 ---- text: 2/5L3 O1
 ---- styles: high*1 medium*2 normal*2 -*1 low*1 medium*1
 ==== birth: contains
 (skg (node (id x) (rels (contains (in 1) (out 2)) (birth (contains in 1)))))
 ---- text: 1C2
 ---- styles: medium*1 low*1 normal*1
-==== birth: linksTo
-(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (birth (linksTo out 1)))))
+==== birth: linksTo, a mentioners folder's member
+(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (birth (linksTo out 2)))))
 ---- text: 2/5L3
 ---- styles: high*1 medium*2 low*1 normal*1
 ==== birth: contains, unintegrated

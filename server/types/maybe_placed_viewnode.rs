@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, viewnode_id_suffix};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, Membership, };
+use super::viewnode::{ ChangeFacts, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, Membership, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -75,7 +75,6 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       skgid          : skgid,
       home_skgrepo: skgrepo,
       membership          : u . membership,
-      birth          : u . birth,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       relRepo_request : u . relRepo_request,
@@ -142,7 +141,6 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       skgid          : Some(t . skgid),
       home_skgrepo   : Some(t . home_skgrepo),
       membership          : t . membership,
-      birth          : t . birth,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       relRepo_request : t . relRepo_request,
@@ -257,7 +255,6 @@ impl Default for MpUnrestrictedVognode {
       skgid          : None,
       home_skgrepo   : None,
       membership       : Membership::Member,
-      birth          : Birth::Unremarkable,
       graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),
       relRepo_request : None,

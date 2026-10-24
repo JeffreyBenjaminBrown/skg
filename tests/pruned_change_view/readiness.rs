@@ -112,7 +112,7 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let chain_node : &str =
-      "***** (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected";
+      "***** (skg (node (id d) (repo main) nonMember writeProtected";
     let marked : String = edit_line (
       &buffer, chain_node,
       |line| { assert! ( ! line . contains ("(diff"), "{}", line );

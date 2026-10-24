@@ -37,7 +37,7 @@ use crate::types::errors::viewnode_id_suffix;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  Birth, ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
+  ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -390,12 +390,12 @@ pub fn apply_readiness_requests (
       } else { store . unmark (&key); }} }
   warnings }
 
-/// The relationship by which a vognode is shown here: for a role
-/// graft, the relation of the role its birth names, between it and its
-/// viewparent; for any other vognode under a vognode, its viewparent's
-/// content; under a partner folder, the relation of the folder,
-/// between it and the folder's viewparent. None at a root, or under
-/// anything else.
+/// The relationship by which a vognode is shown here, read from where
+/// it stands: under a vognode, its viewparent's content; under a
+/// partner folder, the relation of the folder, between it and the
+/// folder's viewparent. None for a node of the containerward chain
+/// ('is_in_containerward_chain'), which stands for no relationship
+/// the diff view tracks, at a root, or under anything else.
 pub(crate) fn relationship_to_viewparent (
   node   : NodeRef<Viewnode>,
   pid    : &ID,
@@ -411,15 +411,10 @@ pub(crate) fn relationship_to_viewparent (
       relationship : RelationshipKey { relation : role . relation, recorder, member },
       aspect } };
   match &parent . value () . kind {
+    ViewnodeKind::Vognode (_) if is_in_containerward_chain (node) => None,
     ViewnodeKind::Vognode (_) => {
       let viewparent : ID = vognode_leaf_pid (parent . value (), pid_of) ?;
-      Some ( match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          match t . birth {
-            Birth::RoleGraft (role) => key_for_role (role, viewparent),
-            Birth::Unremarkable =>
-              key_for_role (RelationRole::CONTENT, viewparent), },
-        _ => key_for_role (RelationRole::CONTENT, viewparent), } ) },
+      Some ( key_for_role (RelationRole::CONTENT, viewparent) ) },
     ViewnodeKind::PartnerFolder (folder) => {
       let role : RelationRole = folder . relation_member_role () ?;
       let folder_viewparent : ID = vognode_leaf_pid (

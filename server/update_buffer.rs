@@ -51,7 +51,7 @@ use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdReco
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::{NodeInstruction, ForkSpec};
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_as_members, validate_affectsParent_relationships_in_straddle, mark_orphans_under_dead_parents_false};
+use crate::to_org::util::{mark_view_roots_as_members, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{FolderRelation, Property, Vognode, PropertyFolder, ViewRequest};
@@ -591,8 +591,7 @@ pub fn rerender_view (
         viewnode_id_record,
         &context . runtime . graph,
         &context . runtime . config,
-        context . skgrepo_restriction,
-        straddle . map ( |straddle| &*straddle . before )) } ?;
+        context . skgrepo_restriction ) } ?;
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -603,9 +602,7 @@ pub fn rerender_view (
 /// content has already been completed, it:
 ///   - marks view-root and orphan membership,
 ///   - validates membership against the captured graph (the de-novo path could
-///     skip it for speed, but running it in both keeps the tails one); in a
-///     diff view a role graft's birth holds if either graph of the straddle
-///     holds its relationship ('diffView_before_graph'),
+///     skip it for speed, but running it in both keeps the tails one),
 ///   - computes graph- then viewnode stats,
 ///   - applies the skgrepo restriction,
 ///   - gives a viewnode ID to each viewnode that lacks one, from
@@ -621,7 +618,6 @@ pub fn finish_viewforest (
   graph              : &InRustGraph,
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  diffView_before_graph : Option<&InRustGraph>, // a diff view's: its straddle's before-graph
 ) -> Result<String, Box<dyn Error>> {
   mark_view_roots_as_members ( viewforest );
   // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
@@ -629,10 +625,8 @@ pub fn finish_viewforest (
   // must become a non-member.
   mark_orphans_under_dead_parents_false ( viewforest );
   // Correct any membership claims whose claimed relation to the parent doesn't
-  // hold in the captured graph (e.g. user moved a birth=linksToParent node
-  // under a new parent it doesn't link to).
-  validate_affectsParent_relationships_in_straddle (
-    viewforest, graph, diffView_before_graph );
+  // hold in the captured graph.
+  validate_affectsParent_relationships ( viewforest, graph );
   let ( container_to_contents, content_to_containers ) =
     match skgrepo_restriction {
       Some (restriction) =>

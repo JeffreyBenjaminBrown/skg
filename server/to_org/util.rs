@@ -10,7 +10,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, Membership, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Editability, Membership, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_skgids};
 
@@ -289,22 +289,16 @@ pub fn mark_view_roots_as_members (
 
 /// Walk the view and correct any UnrestrictedVognode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
-/// Silently clears stale birth claims or flips stale membership claims
-/// to non-member;
+/// Silently flips stale membership claims to non-member;
 /// the rendered herald then no longer misleads.
 ///
-/// Three kinds of claim are checked:
-/// - 'Birth::RoleGraft(role)' on child C with UnrestrictedVognode parent P:
-///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
-///   P; MENTIONER -> C's body/title links to P). Verified against the
-///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
-/// - 'Membership::Member' on child C with WRITE_PROTECTED UnrestrictedVognode
-///   parent P: claim is "C is part of P's content". Verified
-///   against P's 'contains' in the in-Rust graph. Editable parents are
-///   skipped because the save just redefined their 'contains' to
-///   include this very child; the check would always pass.
+/// The claim checked is 'Membership::Member' on child C with
+/// WRITE_PROTECTED UnrestrictedVognode parent P: "C is part of P's
+/// content". Verified against P's 'contains' in the in-Rust graph.
+/// Editable parents are skipped because the save just redefined their
+/// 'contains' to include this very child; the check would always pass.
 ///
-/// Both sides of every comparison resolve through 'graph.pid_of'
+/// Both sides of the comparison resolve through 'graph.pid_of'
 /// so extra_id aliasing (typically a nodeMerge side-effect) doesn't
 /// produce false mismatches.
 ///
@@ -317,25 +311,10 @@ pub fn validate_affectsParent_relationships (
   viewforest : &mut Tree<Viewnode>,
   graph  : &InRustGraph,
 ) {
-  validate_affectsParent_relationships_in_straddle (viewforest, graph, None) }
-
-/// 'validate_affectsParent_relationships', where in a buffer of the
-/// diff view ('before_graph' the straddle's before-graph) a role
-/// graft's claim also holds when its relationship is in the
-/// before-graph: the diff view walks the containerward chain over the
-/// union of the straddle, and a chain node keeps the birth that tells
-/// it from what the user added.
-pub fn validate_affectsParent_relationships_in_straddle (
-  viewforest   : &mut Tree<Viewnode>,
-  graph        : &InRustGraph,
-  before_graph : Option<&InRustGraph>,
-) {
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
   let mut to_independent : Vec<NodeId> = Vec::new ();
     // these will be made non-members
-  let mut to_unremarkable : Vec<NodeId> = Vec::new ();
-    // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
       let child_tn : &UnrestrictedVognode =
@@ -356,36 +335,13 @@ pub fn validate_affectsParent_relationships_in_straddle (
           } else { // The editable parent *defines* content, so cannot be incorrect.
             true }}
         Membership::NonMember => true, };
-      if ! affects_parent_claim_ok { to_independent . push ( child_ref . id () ); }
-      let birth_claim_ok : bool = match child_tn . birth {
-        Birth::RoleGraft (role) => {
-          // The child plays 'role' toward the parent (the origin).
-          // Resolve both through pid_of so extra_id aliasing (a
-          // nodeMerge side-effect) doesn't produce a false mismatch.
-          let is_real_in = |graph : &InRustGraph| -> bool {
-            let parent_pid : ID =
-              graph . pid_of (&parent_tn . skgid)
-                . unwrap_or_else ( || parent_tn . skgid . clone () );
-            let child_pid : ID =
-              graph . pid_of (&child_tn . skgid)
-                . unwrap_or_else ( || child_tn . skgid . clone () );
-            graph . relation_membership_is_real (
-              &parent_pid, &child_pid, role ) };
-          is_real_in (graph) || before_graph . is_some_and (is_real_in) }
-        Birth::Unremarkable => true, };
-      if ! birth_claim_ok { to_unremarkable . push ( child_ref . id () ); }}}
+      if ! affects_parent_claim_ok { to_independent . push ( child_ref . id () ); }}}
   for skgid in to_independent {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
-    { t . membership = Membership::NonMember; } }
-  for skgid in to_unremarkable {
-    let mut node_mut : NodeMut<Viewnode> =
-      viewforest . get_mut (skgid) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
-      = node_mut . value () . kind
-    { t . birth = Birth::Unremarkable; } } }
+    { t . membership = Membership::NonMember; } } }
 
 /// An invariant: a *non-dead generalized orphan*
 /// must have Membership=False. An Unrestricted node whose parent is a

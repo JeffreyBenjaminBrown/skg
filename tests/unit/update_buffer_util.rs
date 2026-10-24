@@ -1,9 +1,8 @@
 use super::*;
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
-  Birth, DiffChange, Existence, PartnerFolder, mk_editable_viewnode, mk_restricted_viewnode,
-  mk_writeProtected_viewnode_with_birth, viewforest_root_viewnode, viewnode_of };
+  DiffChange, Existence, PartnerFolder, mk_editable_viewnode, mk_restricted_viewnode,
+  mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of };
 use ego_tree::Tree;
 
 // The orderkey closure is fallible: a managed child whose kind the
@@ -33,7 +32,7 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
             . contains ("not an Unrestricted vognode") ); }
 
 // The one rule: a stale vognode with a subtree is retained as
-// non-member, keeping its birth and its editability, its facts
+// non-member, keeping its title, ID and editability, its facts
 // cleared; a write-protected one's members become non-members, an
 // editable one's stay members. A vognode leaf and every non-vognode
 // become dead viewnodes, a leaf to be pruned, one holding children to
@@ -42,11 +41,11 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
 fn an_unwarranted_child_is_converted_never_detached () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
-  let mut graft : Viewnode = mk_writeProtected_viewnode_with_birth (
+  let mut write_protected : Viewnode = mk_writeProtected_viewnode (
     ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
-    Membership::Member, Birth::RoleGraft (RelationRole::CONTAINER) );
-  graft . change_facts . change . rel = Some (Existence::Removed);
-  let branch : NodeId = t . get_mut (root) . unwrap () . append (graft) . id ();
+    Membership::Member );
+  write_protected . change_facts . change . rel = Some (Existence::Removed);
+  let branch : NodeId = t . get_mut (root) . unwrap () . append (write_protected) . id ();
   let member_below : NodeId = t . get_mut (branch) . unwrap () . append (
     mk_editable_viewnode ( ID::from ("m"), SkgrepoName::from ("main"),
                            "m" . into (), None )) . id ();
@@ -84,7 +83,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
     else { panic! ("the branch stays an unrestricted vognode") };
   assert_eq! ( u . membership, Membership::NonMember );
   assert! ( u . is_writeProtected () );
-  assert_eq! ( u . birth, Birth::RoleGraft (RelationRole::CONTAINER) );
+  assert_eq! ( ( u . skgid . clone (), u . title . as_str () ), ( ID::from ("g"), "g" ) );
   assert_eq! ( retained . change_facts . change, DiffChange::default () );
   assert_eq! ( membership_of (&t, member_below), Membership::NonMember,
     "a write-protected occurrence holds no member" );

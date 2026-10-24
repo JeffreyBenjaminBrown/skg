@@ -33,7 +33,7 @@ fn partnerFolder_policy_mapping () {
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut restriction : Viewnode = mk_viewnode (
     ID::from ("unrestricted"), SkgrepoName::from ("public"), "unrestricted" . into (),
-    Membership::Member, Birth::Unremarkable,
+    Membership::Member,
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
@@ -95,12 +95,12 @@ fn writeProtect_requests_round_trip () {
 
 // 'write_protect' discards the body and edit request and drops the
 // editable-view request, and touches nothing else: not the other view
-// requests, not 'membership', not 'birth'.
+// requests, not 'membership'.
 #[test]
-fn write_protect_drops_the_editable_request_and_keeps_membership_and_birth () {
+fn write_protect_drops_the_editable_request_and_keeps_membership () {
   let mut viewnode : Viewnode = mk_viewnode (
     ID::from ("node"), SkgrepoName::from ("public"), "node" . into (),
-    Membership::Member, Birth::RoleGraft (RelationRole::CONTAINER),
+    Membership::NonMember,
     Editability::Editable {
       body : Some ("body" . into ()),
       edit_request : Some (NodeEditRequest::Delete) },
@@ -111,8 +111,7 @@ fn write_protect_drops_the_editable_request_and_keeps_membership_and_birth () {
   assert_eq! (t . editability, Editability::WriteProtected);
   assert_eq! ( t . view_requests,
                [ ViewRequest::Flags ] . into_iter () . collect () );
-  assert_eq! (t . membership, Membership::Member);
-  assert_eq! (t . birth, Birth::RoleGraft (RelationRole::CONTAINER)); }
+  assert_eq! (t . membership, Membership::NonMember); }
 
 // 'editable_occurrences' collects the IDs of the editable unrestricted
 // vognodes at any depth, and no write-protected one, phantom or

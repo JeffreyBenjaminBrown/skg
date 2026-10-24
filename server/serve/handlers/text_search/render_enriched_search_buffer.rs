@@ -10,8 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::viewnode::{Birth, Membership, PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode_with_birth, viewnode_of};
+use crate::types::viewnode::{Membership, PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -48,8 +47,8 @@ pub fn insert_partner_folders_into_search_view (
       let folder : NodeId = prepend_folded_folder (viewforest, *hit_treeid, kind);
       for (skgid, skgrepo, title) in members {
         viewforest . get_mut (folder) . unwrap () . append (
-          mk_writeProtected_viewnode_with_birth (
-            skgid, skgrepo, title, Membership::Member, Birth::Unremarkable )); }}
+          mk_writeProtected_viewnode (
+            skgid, skgrepo, title, Membership::Member )); }}
     if let Some (ContainerwardRoleTree::Inner ( _, containers )) =
       containerward_role_trees_by_skgid . get (hit_skgid)
     { let folder : NodeId =
@@ -167,8 +166,8 @@ fn insert_containerward_tree (
 
 /// Looks up a node's title and skgrepo from Tantivy, and prepends it
 /// under the given parent as a write-protected vognode: a member of a
-/// containers folder, or a chain node, a non-member born of the
-/// container role. Returns the new child's NodeId.
+/// containers folder, or a chain node, a non-member. Returns the new
+/// child's NodeId.
 fn prepend_containing_child_from_tantivy (
   skgid         : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
@@ -178,21 +177,18 @@ fn prepend_containing_child_from_tantivy (
   _config       : &SkgConfig,
   restriction   : &SkgrepoRestriction,
 ) -> Option<NodeId> {
-  let birth : Birth = match membership {
-    Membership::Member    => Birth::Unremarkable,
-    Membership::NonMember => Birth::RoleGraft (RelationRole::CONTAINER), };
   let viewnode : Viewnode =
     match title_and_skgrepo_by_skgid ( tantivy_index, skgid ) {
       Some ((title, skgrepo)) => {
         if ! restriction . contains_skgrepo (&skgrepo) {
           return None;
         } else {
-          mk_writeProtected_viewnode_with_birth (
-            skgid . clone (), skgrepo, title, membership, birth ) }},
+          mk_writeProtected_viewnode (
+            skgid . clone (), skgrepo, title, membership ) }},
       None =>
-        mk_writeProtected_viewnode_with_birth (
+        mk_writeProtected_viewnode (
           skgid . clone (), SkgrepoName::from ("search"),
-          skgid . as_str () . to_string (), membership, birth ) };
+          skgid . as_str () . to_string (), membership ) };
   let mut parent_mut : NodeMut<Viewnode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some ( parent_mut . prepend (viewnode) . id () ) }

@@ -841,11 +841,10 @@ the view regenerates it.
 
 A chain node -- a node of the containerward chain under a member of a
 containers folder, a container of its viewparent (see "View requests"
-below) -- carries =writeProtected=, =nonMember= and =(birth roleGraft
-container)=, and its =(rels ...)= carries the birth fact =(contains
-out 1)= (see "Stats metadata" below). The parser reads =birth= back,
-so a chain node is still one after a save. A chain node carries no
-change facts.
+below) -- carries =writeProtected= and =nonMember=, and, being a
+non-member, no birth fact in its =(rels ...)= (see "Stats metadata"
+below). It is known by where it stands, so it is still one after a
+save. A chain node carries no change facts.
 
 ** View requests: (viewRequests ...)
 
@@ -955,8 +954,12 @@ one on a historical phantom:
   viewparent. Herald "restore membership". Written by
   =skg-restore-removed-membership= (=C-c s l=). Like the relRepo request it
   concerns that relationship, so a write-protected occurrence carries it
-  too. Anywhere else it is a parse error: on a historical phantom "This
-  node is deleted; restore it first (skg-restore-deleted-node)".
+  too. On a headline not carrying =(rel removed)= it is a parse error
+  (on a historical phantom "This node is deleted; restore it first
+  (skg-restore-deleted-node)"); on one carrying it that stands
+  elsewhere, as a member under a vognode or a node of the
+  containerward chain, the save refuses it as a local structure
+  violation, "Only a removed membership can be restored".
 - =(historical ... (editRequest restoreNode))= — in the diff view, write
   back the node this historical phantom stands for, as HEAD had it.
   Herald "restore node". Written by =skg-restore-deleted-node=
@@ -982,7 +985,7 @@ assembled glyphs, omitted numerals or colors. For example:
                (out 3 (ancestors 2)))
   (overrides (out 1 (ancestors 1)))
   (aliases 2) (extraIds 1) (flags 3)
-  (birth (overrides out 1)))
+  (birth (contains in 1)))
 #+end_example
 
 Each relation side is =(in COUNT (ancestors GEN...))= or
@@ -1008,10 +1011,11 @@ reconciler parks there when it holds a subtree -- also counts the
 subscriber, three generations up, on its =hidesFromSubs= incoming side,
 as a =hiddenInSubscribeeFolder= member does.
 =(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind this
-occurrence: for each, the side of this node it is on (=in= or =out=) and
-the ancestor generation it accounts for. =GEN= is omitted when no
-ancestor accounts for it, as for a node shown in place of a node it
-overrides, which carries =(overrides out)=.
+occurrence, read from where it stands: for each, the side of this node
+it is on (=in= or =out=) and the ancestor generation it accounts for.
+=GEN= is omitted when no ancestor accounts for it, as for a node shown
+in place of a node it overrides, which carries =(overrides out)=. A
+non-member carries no other.
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
@@ -1025,7 +1029,6 @@ overrides, which carries =(overrides out)=.
 | hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
 | hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
 | shown overrider (overrides-here) | =(overrides out)=                                    |
-| chain node                   | =(contains out 1)=                                           |
 Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 

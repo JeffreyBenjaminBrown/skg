@@ -23,7 +23,7 @@ use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  Membership, Birth, ChangeFacts, Existence, Phantom, Property, PropertyFolder,
+  Membership, ChangeFacts, Existence, Phantom, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, Unwarranted, convert_unwarranted_child};
 
@@ -281,7 +281,6 @@ pub fn adopt_model_facts (
       e . title         = f . title . clone ();
       e . home_skgrepo  = f . home_skgrepo . clone ();
       e . membership = f . membership;
-      e . birth         = f . birth; // the model's, over what the buffer carried back
       if f . is_writeProtected () {
         e . write_protect (); }},
     (kind, model_kind) => {
@@ -313,12 +312,14 @@ pub fn append_copy_of_subtree (
 /// to be). That is the one encoding of a removed relationship, in
 /// content, in a partner folder and in a historical phantom's old
 /// content ('mk_removed_member_viewnode', 'FolderGoalShape::Removed'),
-/// and this is its one reader.
+/// and this is its one reader. Where it stands is not read: the
+/// diff view gives change facts to no other non-member, and a node of
+/// the containerward chain, the one other non-member it draws, carries
+/// none.
 pub fn is_unrestricted_removed_member (
   viewnode : &Viewnode,
 ) -> bool {
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . membership == Membership::NonMember
-         && t . birth == Birth::Unremarkable
          && viewnode . change_facts . change . rel == Some (Existence::Removed) ) }

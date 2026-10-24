@@ -362,13 +362,9 @@ chain node as it draws one (write-protected, carrying no change
 facts: 'is_drawn_chain_node') and a relRepo move, so it leaves the
 member's own visit's viewnodes, which carry change facts, and a note
 the user typed there alone. A chain
-node's birth is written into its metadata as '(birth roleGraft
-container)' and read back by the parser ('Birth::RoleGraft'), so it
-survives a save, and the clients, which rewrite metadata structurally
-and strip only what they know, carry the atom through. Since the
-chains are walked over the union of the straddle, a chain node's
-birth is validated against either graph of the straddle, not only the
-live one.
+node is known by where it stands ('is_in_containerward_chain'): its
+metadata says nothing of it, so nothing about it can be lost in a
+save.
 
 Both convert a stale child by one function
 ('convert_unwarranted_child'), as the glossary's statement of the
@@ -421,8 +417,11 @@ of a removed relationship, wherever it stands: in content, in a
 partner folder, and in a historical phantom's old content
 ('mk_removed_member_viewnode', 'FolderGoalShape::Removed').
 'is_unrestricted_removed_member' reads it, and tests nothing
-about editability; the parser's check of where a restore request
-sits reads it too ('check_where_the_edit_request_sits'). Since a removed member is never a member, the
+about editability or position (a node of the containerward chain,
+the one other non-member the diff view draws, carries no change
+facts); the parser's check of a restore request reads it too
+('check_where_the_edit_request_sits'), and the save then checks
+where the request stands ('restoreRel_stands_where_it_may'). Since a removed member is never a member, the
 save's check of a write-protected occurrence's folders counts only
 members.
 
@@ -662,10 +661,13 @@ the buffer's editable occurrence of it, gains it there.
 ** '(editRequest restoreRel)': a removed membership
 C-c s l ('skg-restore-removed-membership'; Neovim '<localleader>sl',
 ':SkgRestoreRemovedMembership') writes it into an unrestricted vognode
-carrying '(rel removed)' that is no role graft: a removed member in
-content position, or a member of a partner folder whose relationship to
-the folder's viewparent was removed, editable or write-protected (herald
-"restore membership"). On a historical phantom it refuses with "This
+carrying '(rel removed)' that stands where it may: a removed member in
+content position (a non-member under a vognode that is no node of the
+containerward chain), or a member of a partner folder whose
+relationship to the folder's viewparent was removed, editable or
+write-protected (herald "restore membership"). The command and the
+save both refuse it anywhere else, by where the headline stands, with
+"Only a removed membership can be restored". On a historical phantom it refuses with "This
 node is deleted; restore it first (skg-restore-deleted-node)". The save
 re-adds the one relationship the headline stands for (the readiness
 requests' 'relationship_to_viewparent' names it), as HEAD recorded it:

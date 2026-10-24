@@ -9,7 +9,6 @@
 use super::errors::HeadlineName;
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -30,21 +29,6 @@ use std::str::FromStr;
 pub enum Membership {
   Member,    // this node takes part in its viewparent's membership
   NonMember, // it doesn't
-}
-
-/// Why a generated node was originally displayed under its viewparent.
-/// This is view history used for display and stale-relation validation,
-/// not save extraction.
-///
-/// A 'RoleGraft(role)' node was drawn as a partner playing that role
-/// toward its viewparent: a node of the containerward chain
-/// ('to_org/extend/containerward_chain.rs') is born of 'CONTAINER'.
-/// The role determines the wire ROLENAME and the herald glyph
-/// (see PARTNER_ROLE_VOCAB).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Birth {
-  Unremarkable,
-  RoleGraft (RelationRole),
 }
 
 /// The diff view's facts about one viewnode, the parts of its
@@ -316,7 +300,6 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub skgid         : Id,
   pub home_skgrepo  : Repo,
   pub membership      : Membership,
-  pub birth         : Birth,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
@@ -391,7 +374,7 @@ pub struct ViewnodeStats {
   /// The relationship heralds as the semantic `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
-  /// plus the birth. None when there is nothing to say. The
+  /// plus the birth facts. None when there is nothing to say. The
   /// client parses this and decides all presentation (letters, colors,
   /// order). See 'docs/heralds.org'.
   pub rel_heralds           : Option<String>,
@@ -422,7 +405,7 @@ pub struct ViewnodeStats {
   /// "What leaks, and what repair fixes") -- the herald marks
   /// exactly the deliberately privatized relationships. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (a non-member, or a role graft); and for the two
+  /// (a non-member); and for the two
   /// compound filter folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
@@ -1190,7 +1173,6 @@ pub fn default_unrestrictedVognode (
     skgid,
     home_skgrepo: skgrepo,
     membership       : Membership::Member,
-    birth          : Birth::Unremarkable,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relRepo_request : None,
@@ -1210,7 +1192,6 @@ pub fn mk_editable_viewnode (
                             skgrepo,
                             title,
                             Membership::Member,
-                            Birth::Unremarkable,
                             Editability::Editable {
                               body,
                               edit_request : None },
@@ -1241,21 +1222,10 @@ pub fn mk_writeProtected_viewnode (
   skgrepo : SkgrepoName,
   title  : String,
   membership  : Membership,
-) -> Viewnode {
-  mk_writeProtected_viewnode_with_birth (
-    skgid, skgrepo, title, membership, Birth::Unremarkable ) }
-
-pub fn mk_writeProtected_viewnode_with_birth (
-  skgid    : ID,
-  skgrepo  : SkgrepoName,
-  title    : String,
-  membership : Membership,
-  birth    : Birth,
 ) -> Viewnode { mk_viewnode ( skgid,
                             skgrepo,
                             title,
                             membership,
-                            birth,
                             Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
@@ -1265,7 +1235,6 @@ pub fn mk_writeProtected_viewnode_with_birth (
 pub fn mk_writeProtected_from_viewnode (
   mut viewnode : Viewnode,
   membership    : Membership,
-  birth       : Birth,
 ) -> Result < Viewnode, String > {
   match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
@@ -1274,7 +1243,6 @@ pub fn mk_writeProtected_from_viewnode (
       // viewStats, and any field added later) is preserved rather
       // than silently reset.
       t . membership = membership;
-      t . birth = birth;
       t . write_protect ();
       Ok (viewnode) },
     _ => Err (
@@ -1290,14 +1258,12 @@ pub fn mk_viewnode (
   skgrepo       : SkgrepoName,
   title         : String,
   membership      : Membership,
-  birth         : Birth,
   editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> Viewnode {
   viewnode_of ( ViewnodeKind::Vognode (
     Vognode::Unrestricted (
       UnrestrictedVognode { membership,
-                            birth,
                             view_requests,
                             editability,
                             .. default_unrestrictedVognode (

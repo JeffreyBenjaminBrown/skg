@@ -204,7 +204,7 @@ fn copies_of_a_write_protected_graft_merge (
   with_fixture ("users_notes", &["main"], |f| {
     let member_a : &str = "**** (skg (node (id a) (repo main) writeProtected";
     let graft_p  : &str =
-      "***** (skg (node (id p) (repo main) nonMember (birth roleGraft container) writeProtected";
+      "***** (skg (node (id p) (repo main) nonMember writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     let graft_line : String = buffer . lines ()
       . find ( |line| without_viewnode_ids (line) . starts_with (graft_p) )

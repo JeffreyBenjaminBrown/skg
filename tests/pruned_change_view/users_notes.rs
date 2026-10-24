@@ -21,7 +21,7 @@ use std::error::Error;
 
 const MEMBER_A : &str = "**** (skg (node (id a) (repo main) writeProtected";
 const GRAFT_P  : &str =
-  "***** (skg (node (id p) (repo main) nonMember (birth roleGraft container) writeProtected";
+  "***** (skg (node (id p) (repo main) nonMember writeProtected";
 
 /// A note under a member of a changed container folder survives, and
 /// the member's role tree is still shown around it, once.

@@ -2,7 +2,6 @@
 // parses back to the same viewnode.
 
 use crate::git_fixture_helpers::with_facts;
-use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   RESTORE_NODE_ON_A_NODE_NOT_DELETED, RESTORE_REL_ON_A_DELETED_NODE,
@@ -11,10 +10,10 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  Membership, Birth, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
+  Membership, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
-  mk_writeProtected_viewnode_with_birth, viewnode_of};
+  mk_writeProtected_viewnode, viewnode_of};
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -147,28 +146,14 @@ fn the_acquisition_folders_round_trip () {
     viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ),
     "acquiredFolder" ); }
 
-/// A role graft's birth survives a save, so the diff view's
-/// reconciler can tell a graft from a note the user added.
+/// A chain node is known by where it stands; the parser knows no
+/// birth.
 #[test]
-fn a_role_graft_round_trips_with_its_birth () {
-  for (role, expected) in [
-    ( RelationRole::CONTAINER,
-      "(node (id g) (repo main) nonMember (birth roleGraft container) writeProtected)" ),
-    ( RelationRole::SUBSCRIBEE,
-      "(node (id g) (repo main) nonMember (birth roleGraft subscribee) writeProtected)" ), ] {
-    let graft : Viewnode = mk_writeProtected_viewnode_with_birth (
-      ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
-      Membership::NonMember, Birth::RoleGraft (role) );
-    assert_round_trip (graft, expected); }}
-
-#[test]
-fn malformed_birth_metadata_is_refused () {
-  for metadata in [
-    "(skg (node (id g) (birth roleGraft)))",              // no role
-    "(skg (node (id g) (birth roleGraft content)))",      // no partner role
-    "(skg (node (id g) (birth unremarkable container)))", ] {
-    assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
-              "should refuse {}", metadata ); }}
+fn the_birth_atom_is_refused () {
+  assert_eq! (
+    parse_metadata_to_viewnodemd (
+      "(skg (node (id g) (repo main) nonMember (birth roleGraft container) writeProtected))" ),
+    Err ( "Unknown node key: birth" . to_string () )); }
 
 #[test]
 fn malformed_diff_view_metadata_is_refused () {
@@ -214,9 +199,9 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
     leaves : None };
   let mut editable : Viewnode = mk_editable_viewnode (
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (), None );
-  let mut write_protected : Viewnode = mk_writeProtected_viewnode_with_birth (
+  let mut write_protected : Viewnode = mk_writeProtected_viewnode (
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (),
-    Membership::NonMember, Birth::Unremarkable );
+    Membership::NonMember );
   for (node, expected) in [
     ( &mut editable,
       "(node (id x) (repo main) (editRequest restoreRel) (diff (rel removed)))" ),
@@ -244,8 +229,6 @@ fn restore_requests_on_the_wrong_kind_are_refused () {
     ( "(skg (node (id x) (repo main) (editRequest restoreRel)))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
     ( "(skg (node (id x) (repo main) (editRequest restoreRel) (diff (rel added))))",
-      RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
-    ( "(skg (node (id g) (repo main) (birth roleGraft container) (editRequest restoreRel) (diff (rel removed))))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
     ( "(skg (unknown (id x) (editRequest restoreRel) (diff (rel removed))))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ), ] {

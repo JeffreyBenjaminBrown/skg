@@ -4133,3 +4133,83 @@ are left for slice 11, which removes the entry.
 Rust 914 passed; Emacs 387 passed; Neovim 31 spec files passed;
 integration 34 of 35 under Emacs and again under Neovim,
 'import-md-and-org' failing as at baseline.
+** Slice 7: deviations
+*** the removed-member predicate reads no position
+'is_unrestricted_removed_member' tests a non-member unrestricted
+vognode carrying '(rel removed)', wherever it stands. The plan
+says "a non-member vognode child of a vognode", but the folder
+reconciler reads it for a partner folder's removed members
+('skgid_a_folder_child_stands_for'), which stand under a
+folder; and the birth test it replaces only kept out role
+grafts, while a chain node now carries no change facts at all.
+*** the restoreRel position is checked by the save
+The parser sees one headline, not where it stands, so it checks
+only the '(rel removed)' (its birth clause went). The save's
+local structure check ('restoreRel_stands_where_it_may',
+'local.rs') refuses the request unless the headline is a child
+of a partner folder, or a non-member under a vognode that is no
+chain node; the refusal is a local structure violation with the
+parser's text. 'mp_is_in_containerward_chain' there mirrors
+'is_in_containerward_chain' over the parsed tree: a
+quasi-duplicate, since the one takes 'MpViewnode' and the other
+'Viewnode'.
+**** the clients
+Both guards check the same by the parent headline:
+'skg--restoreRel-position-at-point-p' and
+'skg--containerward-chain-node-at-point-p' in Emacs,
+'restoreRel_position_p' and 'containerward_chain_node_p' in
+Neovim, each with a list of the partner folders' atoms. The
+editors' cycle of edit requests still offers restoreRel by the
+metadata alone ('skg--removed-membership-p'); the plan names
+only the guards, and the save refuses a misplaced one.
+*** a chain node names no relationship
+'relationship_to_viewparent' gives None for a vognode
+'is_in_containerward_chain' admits, as 'leaves_named_at' already
+did. No relRepo move hangs under a chain node, so nothing that
+named a graft's containment is lost.
+*** the before-graph went with the birth check
+The membership check, 'validate_affectsParent_relationships',
+stays; its straddle variant went, and with it the
+'diffView_before_graph' parameter of 'finish_viewforest'.
+*** the role vocabulary went
+'PARTNER_ROLE_VOCAB', 'RelationRole::rolename', 'from_rolename'
+and 'glyph' had no reader left but the birth's printer and
+parser; they went with their two tests. The role constants stay.
+*** the herald's low letter
+A non-member's '(rels ...)' carries no birth fact but
+'(overrides out)', so a chain node's '(contains out 1)' is gone
+from every buffer. The rendering cases "birth: linksTo" and
+"birth: links and overrides" carried a graft's generation 1;
+they are now a mentioners and an overriders folder's members,
+generation 2, with the same text and styles.
+*** tests
+The literal script
+('tests/results/plan19-slice7/drop_birth_atom.py') removed 19
+atoms from 10 files; the plan's 61 files predate slice 4.
+'tests/save/birth_and_write_protected.rs' had no birth case,
+only the name; it is 'nonMember_and_write_protected.rs' now,
+with its fixtures. Nine birth-claim unit tests of
+'tests/unit/to_org_util.rs' went; one became a membership claim
+through a merged extra ID. 'the_birth_atom_is_refused' replaces
+the graft round trip. New:
+'restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member'
+('tests/pruned_change_view/restore.rs'). The guard tests of
+both clients now give each headline its parents. The readiness
+tests already used folder members since slice 4. The Rust count
+is 903.
+**** verification at the TCP surface
+An isolated server over a, b and c (a contains b contains c):
+c's view shows a as a chain node with no birth atom and no low
+letter, saves back unchanged, and a restoreRel typed on a, with
+'(diff (rel removed))', is refused naming its viewnode ID.
+*** docs
+'docs/diff-view.org' and 'docs/api-and-formats.org' say a chain
+node is known by where it stands and where restoreRel may
+stand. The glossary's "birth" and "role graft" entries are left
+for slice 11, which removes them. About ten "role graft"
+comments remain in the save_collateral integration helpers,
+which classify headlines by their heralds, not by the atom.
+*** verification
+Rust 903 passed; Emacs 387 passed; Neovim 31 spec files passed;
+integration 34 of 35 under Emacs and again under Neovim,
+'import-md-and-org' failing as at baseline.

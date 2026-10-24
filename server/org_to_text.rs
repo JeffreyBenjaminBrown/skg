@@ -5,7 +5,7 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
-  Membership, Birth,
+  Membership,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -488,10 +488,6 @@ fn unrestrictedVognode_metadata_to_string (
     // A member carries nothing, being the default.
     if unrestrictedVognode . membership == Membership::NonMember {
       parts . push ( "nonMember" . to_string () ); }
-    if let Birth::RoleGraft (role) = unrestrictedVognode . birth {
-      // Written so that a role graft is still the server's after a
-      // save; the parser reads it back.
-      parts . push ( format! ( "(birth roleGraft {})", role . rolename () )); }
     if unrestrictedVognode . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata

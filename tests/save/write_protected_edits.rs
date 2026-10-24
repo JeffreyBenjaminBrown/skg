@@ -79,7 +79,7 @@ fn saving_an_edited_writeProtected_occurrence_is_rejected ()
   -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-write-protected-edits",
-    "tests/save/birth_and_write_protected/fixtures",
+    "tests/save/nonMember_and_write_protected/fixtures",
     "/tmp/tantivy-test-write-protected-edits",
     |config, tantivy| Box::pin (async move {
       saving_an_edited_writeProtected_occurrence_impl (config, tantivy) . await

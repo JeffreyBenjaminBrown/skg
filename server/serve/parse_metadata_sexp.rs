@@ -6,7 +6,6 @@
 ///                   (node [(id ID)]
 ///                         [(repo REPO)]
 ///                         [nonMember]        ; marks the occurrence a non-member
-///                         [(birth roleGraft ROLENAME)]
 ///                         [writeProtected]   ; marks the occurrence write-protected
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -29,10 +28,12 @@
 ///   diff view's properties other than bodyDiff. A changed folder,
 ///   '(KIND changed)', may carry '(diff (ready))' at top level, and
 ///   nothing else in it.
-///   'restoreRel' is valid only on a node carrying '(rel removed)' that
-///   is no role graft: a removed member, or a folder member whose
-///   relationship to the folder's viewparent was removed. It may sit
-///   beside 'writeProtected'.
+///   'restoreRel' is valid only on a node carrying '(rel removed)': a
+///   removed member, or a folder member whose relationship to the
+///   folder's viewparent was removed. Which of those the headline is
+///   depends on where it stands, which the save checks
+///   ('validate_restoreRel_position', local.rs). It may sit beside
+///   'writeProtected'.
 ///   The diff view's own viewnodes:
 ///     (historical (id ID) (repo REPO) [(editRequest restoreNode)] ...)
 ///                                            a historical phantom
@@ -54,9 +55,8 @@ use crate::types::viewnode::{
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
-  Birth, Editability, Membership, ViewnodeId,
+  Editability, Membership, ViewnodeId,
 };
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
     MpVognode, MpPhantom,
@@ -82,7 +82,6 @@ pub struct ViewnodeMetadata {
   pub skgid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
   pub membership: Membership,
-  pub birth: Birth,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
   pub viewStats: ViewnodeStats,
@@ -122,7 +121,6 @@ pub fn default_metadata() -> ViewnodeMetadata {
     skgid: None,
     home_skgrepo: None,
     membership: Membership::Member,
-    birth: Birth::Unremarkable,
     writeProtected: false,
     graphStats: GraphnodeStats::default(),
     viewStats: ViewnodeStats::default(),
@@ -324,7 +322,6 @@ pub fn viewnode_from_metadata (
             skgid            : metadata . skgid . clone (),
             home_skgrepo     : metadata . home_skgrepo . clone (),
             membership         : metadata . membership,
-            birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
@@ -646,7 +643,7 @@ fn misplaced_restore_request_message (
 
 /// A phantom carries no edit request but a historical phantom's
 /// restoreNode; restoreRel sits only on an unrestricted vognode that
-/// carries '(rel removed)' and is no role graft. The other requests
+/// carries '(rel removed)', and the save checks its position. The other requests
 /// keep the places their own checks give them.
 fn check_where_the_edit_request_sits (
   metadata : &ViewnodeMetadata,
@@ -664,7 +661,6 @@ fn check_where_the_edit_request_sits (
       Ok (( )),
     Some (NodeEditRequest::RestoreRel)
       if is_unrestricted_vognode
-      && metadata . birth == Birth::Unremarkable
       && metadata . change_facts . change . rel == Some (Existence::Removed) =>
       Ok (( )),
     request @ Some (NodeEditRequest::RestoreNode | NodeEditRequest::RestoreRel) =>
@@ -714,8 +710,6 @@ fn parse_node_sexp (
           // Semantic relationship facts are display-only; the view
           // regenerates them.
           "rels" => {},
-          "birth" => {
-            metadata . birth = parse_birth_sexp ( &subitems[1..] ) ?; },
           "viewStats" => {
             parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
@@ -753,19 +747,6 @@ fn parse_node_sexp (
       _ => { return Err ( "Unexpected element in node"
                            . to_string () ); }} }
   Ok (( )) }
-
-/// Parse the contents of '(birth roleGraft ROLENAME)'.
-fn parse_birth_sexp (
-  items : &[Sexp],
-) -> Result<Birth, String> {
-  let atoms : Vec<String> =
-    items . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
-  match atoms . as_slice () {
-    [kind, rolename] if kind == "roleGraft" =>
-      RelationRole::from_rolename (rolename)
-      . map (Birth::RoleGraft)
-      . ok_or_else ( || format! ( "Unknown birth role: {}", rolename )),
-    _ => Err ( "birth must be (birth roleGraft ROLENAME)" . to_string () ), }}
 
 /// Parse the (unknown (id X)) s-expression contents.
 /// Sets metadata.unknown_node_id when an id is found.

@@ -6,7 +6,7 @@ use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-  Birth, GraphnodeStats, Membership, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
+  GraphnodeStats, Membership, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
 use ego_tree::{Tree, NodeId, NodeRef};
@@ -112,12 +112,12 @@ fn set_herald_strings_in_viewnode (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, membership, birth, overridesHere)
-    : (GraphnodeStats, Membership, Birth, bool) = {
+  let (gstats, membership, overridesHere)
+    : (GraphnodeStats, Membership, bool) = {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . membership, t . birth,
+    ( t . graphStats . clone (), t . membership,
       t . viewStats . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
@@ -171,8 +171,7 @@ fn set_herald_strings_in_viewnode (
         Some (members . len ()) })
     } else { None };
   let birth_facts : Vec<BirthFact> =
-    birth_facts (&parent_kind, membership, birth, &flags,
-                 overridesHere);
+    birth_facts (&parent_kind, membership, &flags, overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
@@ -293,22 +292,19 @@ fn flag_ancestor_relations (
       flags . record (rel, false, generation); } } }
 
 /// The birth facts -- which relations explain this occurrence, on which
-/// side of it, accounting for which ancestor. Usually a singleton; a
-/// HiddenInSubscribee member has two.
+/// side of it, accounting for which ancestor -- read from the kind of
+/// its viewparent: for a folder's member, the relation the folder
+/// names, in the direction its role implies; for a content member, its
+/// viewparent's containment; for a non-member, none. Usually a
+/// singleton; a HiddenInSubscribee member has two.
 fn birth_facts (
   parent_kind : &ParentKind,
   membership    : Membership,
-  birth       : Birth,
   flags       : &AncestorFlags,
   overridesHere : bool, // whether the node is shown in place of a node it overrides
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
-    // A role graft's birth is its role's relation, regardless of
-    // membership (role grafts are typically non-members and write-protected).
-    // The role graft relates to its viewparent, one generation up.
-    if let Birth::RoleGraft (role) = birth {
-      vec![ BirthFact::new ( role . relation, side_of_role (role), Some (1) ) ]
-    } else if membership != Membership::Member { Vec::new ()
+    if membership != Membership::Member { Vec::new ()
     } else {
       match parent_kind {
         ParentKind::Vognode (_) =>
@@ -401,8 +397,8 @@ fn set_omitted_body (
 /// (see 'RelationRole::is_first_role') -- then compares the relationship's
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: no
-/// graph handle; membership is not Member or a role graft (not a
-/// genuine member here); a compound filter folder
+/// graph handle; membership is not Member (not a genuine member
+/// here); a compound filter folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded relationship; unresolvable homes;
 /// or the skgrepo equalling the default.
@@ -415,15 +411,14 @@ fn set_relRepo (
   let relRepo : Option<SkgrepoName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
-    let (node_pid, membership, birth) : (ID, Membership, Birth) = {
+    let (node_pid, membership) : (ID, Membership) = {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
-      ( t . collected_skgid (), t . membership, t . birth ) };
-    if membership != Membership::Member
-      || birth != Birth::Unremarkable {
-      // Not a genuine member at this position (a
-      // self-writer parked under a folder, or a role graft): there
+      ( t . collected_skgid (), t . membership ) };
+    if membership != Membership::Member {
+      // Not a genuine member at this position (a self-writer parked
+      // under a folder, or a node of the containerward chain): there
       // is no binding relationship here to have a skgrepo at all.
       break 'compute None; }
     let (recorder_pid, relation, target_pid) : (ID, NodeRelation, ID) =

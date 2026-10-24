@@ -1,4 +1,4 @@
-// cargo test --test save birth_and_write_protected
+// cargo test --test save nonMember_and_write_protected
 
 use skg::dbs::filesystem::one_node::graphnode_from_skgid;
 use skg::from_text::buffer_to_validated_saveplan;
@@ -14,14 +14,14 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn test_birth_and_write_protected(
+fn test_nonMember_and_write_protected(
 ) -> Result<(), Box<dyn Error>> {
   let fixtures_path: PathBuf =
     PathBuf::from (
-      "tests/save/birth_and_write_protected/fixtures" );
+      "tests/save/nonMember_and_write_protected/fixtures" );
   let backup_path: PathBuf =
     PathBuf::from (
-      "tests/save/birth_and_write_protected/fixtures_backup" );
+      "tests/save/nonMember_and_write_protected/fixtures_backup" );
 
   // Backup fixtures
   if backup_path . exists () {
@@ -32,7 +32,7 @@ fn test_birth_and_write_protected(
   let result : Result<(), Box<dyn Error>> =
     run_with_test_stores (
       "skg-test-nonMember",
-      "tests/save/birth_and_write_protected/fixtures",
+      "tests/save/nonMember_and_write_protected/fixtures",
       "/tmp/tantivy-test-nonMember",
       |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
