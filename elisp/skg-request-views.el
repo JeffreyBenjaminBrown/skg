@@ -2,11 +2,12 @@
 ;;;
 ;;; Commands that request viewbranches by adding a (viewRequests ...)
 ;;; atom to the headline at point and saving, letting Rust fulfill the
-;;; request during completion. Two families, both auto-saving:
-;;;   - folders, `skg-show-folder-*' : (folder RELNAME), builds
-;;;     both folders of the relation (one for containers and mentioners);
-;;;   - role trees, `skg-show-*ward-tree' : (roleTree ROLENAME), the
-;;;     role tree for that one partner role.
+;;; request during completion. The folder commands,
+;;; `skg-show-folderOf-*', auto-save: (folder RELNAME) builds both
+;;; folders of the relation (one for containers and mentioners). A
+;;; containers folder carries, under each member, that member's
+;;; containerward chain: its containers, theirs under them, up to the
+;;; roots.
 ;;; (`skg-request-editable-view' and the write-protect requests, a
 ;;; different concept, are also here.)
 
@@ -17,8 +18,8 @@
 
 (defun skg--request-view-and-save (view-request)
   "Request VIEW-REQUEST for the headline at point, then save.
-VIEW-REQUEST is a request form -- (folder RELNAME), (roleTree ROLENAME),
-or the bare symbol editableView -- spliced into a (viewRequests ...)
+VIEW-REQUEST is a request form -- (folder RELNAME), or a bare symbol
+such as editableView -- spliced into a (viewRequests ...)
 atom via `skg-edit-metadata-at-point'."
   (save-excursion
     (org-back-to-heading t)
@@ -54,29 +55,11 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
   (skg-show-folderOf-flags flags
     "Show the write-protected flags folder for the node at point.")
   (skg-show-folderOf-containers    (folder containers)
-    "Show the write-protected containerFolder: the nodes that contain this one.")
+    "Show the write-protected containerFolder: the nodes that contain this one.
+Under each member hangs its containerward chain: its containers, theirs
+under them, up to the roots.")
   (skg-show-folderOf-mentioners    (folder mentioners)
-    "Show the write-protected mentionerFolder: the nodes that link to this one.")
-  ;; Role trees ('C-c p'): the role tree for one partner role. UPPER = the
-  ;; partner's active (first) role, lower = its passive (second) role.
-  (skg-show-containerward-tree   (roleTree container)
-    "Show the role tree through the containers of the node (nodes that contain it).")
-  (skg-show-mentionerward-tree (roleTree mentioner)
-    "Show the role tree through the mentioners of the node (nodes that link to it).")
-  (skg-show-mentionedward-tree   (roleTree mentioned)
-    "Show the role tree through the nodes the node mentions (links to).")
-  (skg-show-overriderward-tree   (roleTree overrider)
-    "Show the role tree through the overriders of the node (nodes that override it).")
-  (skg-show-overriddenward-tree   (roleTree overridden)
-    "Show the role tree through the nodes the node overrides.")
-  (skg-show-hiderward-tree       (roleTree hider)
-    "Show the role tree through the hiders of the node (nodes that hide it).")
-  (skg-show-hiddenward-tree       (roleTree hidden)
-    "Show the role tree through the nodes the node hides.")
-  (skg-show-subscriberward-tree  (roleTree subscriber)
-    "Show the role tree through the subscribers of the node (nodes that subscribe to it).")
-  (skg-show-subscribeeward-tree  (roleTree subscribee)
-    "Show the role tree through the nodes the node subscribes to."))
+    "Show the write-protected mentionerFolder: the nodes that link to this one."))
 
 (defun skg-request-editable-view ()
   "Edit metadata to request a editable view for the headline at point.

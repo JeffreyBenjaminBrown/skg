@@ -175,21 +175,17 @@ and leave the headline's own metadata alone."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s m"))
               'skg-set-merge-request)))
 
-(ert-deftest test-skg-folder-and-path-keybindings ()
-  "A sample of the C-c l (folders) and C-c p (paths) bindings.
-The UPPER/lower path letters select opposite roles, so C-c p O and
-C-c p o must bind to distinct commands."
+(ert-deftest test-skg-folder-keybindings ()
+  "A sample of the C-c l (folders) bindings. No C-c p prefix is bound:
+the folder commands are the way to show a node's partners."
   (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
                   ("C-c l o" . skg-show-folderOf-overrides)
                   ("C-c l s" . skg-show-folderOf-subscribesTo)
-                  ("C-c p C" . skg-show-containerward-tree)
-                  ("C-c p L" . skg-show-mentionerward-tree)
-                  ("C-c p l" . skg-show-mentionedward-tree)
-                  ("C-c p O" . skg-show-overriderward-tree)
-                  ("C-c p o" . skg-show-overriddenward-tree)
-                  ("C-c p s" . skg-show-subscribeeward-tree)))
+                  ("C-c l c" . skg-show-folderOf-containers)
+                  ("C-c l m" . skg-show-folderOf-mentioners)))
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
-                (cdr pair)))))
+                (cdr pair))))
+  (should-not (lookup-key skg-content-view-mode-map (kbd "C-c p"))))
 
 (ert-deftest test-skg-set-repo ()
   "Test skg-set-repo replaces the node repo field."

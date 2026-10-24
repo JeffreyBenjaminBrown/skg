@@ -274,13 +274,13 @@ member, 'true' on a non-member."
                            "*** viewRequests\n"
                            "**** folder\n"
                            "***** aliases\n"
-                           "**** roleTree\n"
-                           "***** container"))
+                           "**** folder\n"
+                           "***** containers"))
          (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (repo jeff)
-                               (viewRequests (folder aliases) (roleTree container))))))))
+                               (viewRequests (folder aliases) (folder containers))))))))
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)

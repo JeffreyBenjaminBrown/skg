@@ -118,7 +118,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
     (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
-  (progn;; show folders (C-c l) and paths (C-c p): request a local
+  (progn;; show folders (C-c l): request a local
     ;; view change the server fulfills on save. Each command auto-saves.
     (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)
     (define-key map (kbd "C-c l o") #'skg-show-folderOf-overrides)
@@ -126,17 +126,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribesTo)
     (define-key map (kbd "C-c l p") #'skg-show-folderOf-flags)
     (define-key map (kbd "C-c l c") #'skg-show-folderOf-containers)
-    (define-key map (kbd "C-c l m") #'skg-show-folderOf-mentioners)
-    ;; UPPER = the partner's active (first) role; lower = passive (second).
-    (define-key map (kbd "C-c p C") #'skg-show-containerward-tree)
-    (define-key map (kbd "C-c p L") #'skg-show-mentionerward-tree)
-    (define-key map (kbd "C-c p l") #'skg-show-mentionedward-tree)
-    (define-key map (kbd "C-c p O") #'skg-show-overriderward-tree)
-    (define-key map (kbd "C-c p o") #'skg-show-overriddenward-tree)
-    (define-key map (kbd "C-c p H") #'skg-show-hiderward-tree)
-    (define-key map (kbd "C-c p h") #'skg-show-hiddenward-tree)
-    (define-key map (kbd "C-c p S") #'skg-show-subscriberward-tree)
-    (define-key map (kbd "C-c p s") #'skg-show-subscribeeward-tree))
+    (define-key map (kbd "C-c l m") #'skg-show-folderOf-mentioners))
   (progn;; properties
     (define-key map (kbd "C-c s d") #'skg-set-editable)
     (define-key map (kbd "C-c s w") #'skg-request-write-protected)
