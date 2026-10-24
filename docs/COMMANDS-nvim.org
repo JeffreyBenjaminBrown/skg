@@ -231,8 +231,8 @@ or go to the view of it that was already open if that exists.
 
 The requested node itself is always the raw root. Recursive content
 below it can still use override substitution. Override facts remain
-visible in enriched search results and through the override folder
-and role-tree commands.
+visible in enriched search results and through the override
+folders.
 
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
@@ -331,35 +331,16 @@ folder branch to dismiss this optional view without changing any flag.
 The containerFolder -- the nodes that contain this one. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
 content, is shown without a folder. On a node nothing contains, nothing
-appears.
+appears. Under each member hangs its containerward chain: the member's
+containers as write-protected non-members, theirs under them, up to the
+roots or 'max_roleTree_depth', a container met again on the way shown
+once more as a leaf. A request on a chain node draws that node's own
+containers folder. A fresh content view shows its root's containers
+folder this way.
 *** <localleader>lm : :SkgShowFolderOfMentioners
 The mentionerFolder -- the nodes that link to this one. Write-protected
 (☮): a link lives in the linking node's text. On a node nothing links to,
 nothing appears.
-** <localleader>p : show a role tree (through one relation role)
-Like the folders, each inserts a request that, on save, grafts the
-partners reached through one relation role as inverted, write-protected
-children, climbing transitively until a fork, cycle, or root. UPPER =
-the partner's active (first) role; lower = its passive (second) role.
-Every command auto-saves.
-*** <localleader>pC : :SkgShowContainerwardTree
-The nodes that contain this node (its containerward role tree).
-*** <localleader>pL : :SkgShowMentionerwardTree
-The nodes that link to this node (its mentioners).
-*** <localleader>pl : :SkgShowMentionedwardTree
-The nodes this node links to (the nodes it mentions).
-*** <localleader>pO : :SkgShowOverriderwardTree
-The nodes that override this node.
-*** <localleader>po : :SkgShowOverriddenwardTree
-The nodes this node overrides.
-*** <localleader>pH : :SkgShowHiderwardTree
-The nodes that hide this node from their subscriptions.
-*** <localleader>ph : :SkgShowHiddenwardTree
-The nodes this node hides from its subscriptions.
-*** <localleader>pS : :SkgShowSubscriberwardTree
-The nodes that subscribe to this node.
-*** <localleader>ps : :SkgShowSubscribeewardTree
-The nodes this node subscribes to.
 ** <localleader>s : setting node properties
 *** first some vocab: 'editable' and 'write-protected'
 A view of a node can be editable or write-protected.
@@ -472,7 +453,7 @@ existing =editRequest= are refused.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
-role trees, non-member branches, restricted nodes, and phantoms. Save with
+non-member branches, restricted nodes, and phantoms. Save with
 =:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,

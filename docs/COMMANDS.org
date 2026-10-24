@@ -241,8 +241,8 @@ or go to the view of it that was already open if that exists.
 
 The requested node itself is always the raw root. Recursive content
 below it can still use override substitution. Override facts remain
-visible in enriched search results and through the override folder
-and role-tree commands.
+visible in enriched search results and through the override
+folders.
 
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
@@ -338,35 +338,16 @@ optional view; doing so does not change any flag.
 The containerFolder -- the nodes that contain this one. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
 content, is shown without a folder. On a node nothing contains, nothing
-appears.
+appears. Under each member hangs its containerward chain: the member's
+containers as write-protected non-members, theirs under them, up to the
+roots or 'max_roleTree_depth', a container met again on the way shown
+once more as a leaf. A request on a chain node draws that node's own
+containers folder. A fresh content view shows its root's containers
+folder this way.
 *** C-c l m : skg-show-folderOf-mentioners
 The mentionerFolder -- the nodes that link to this one. Write-protected
 (☮): a link lives in the linking node's text. On a node nothing links to,
 nothing appears.
-** C-c p : show a role tree (through one relation role)
-Like the folders, each inserts a request that, on save, grafts the
-partners reached through one relation role as inverted, write-protected
-children, climbing transitively until a fork, cycle, or root. UPPER =
-the partner's active (first) role; lower = its passive (second) role.
-Every command auto-saves.
-*** C-c p C : skg-show-containerward-tree
-The nodes that contain this node (its containerward role tree).
-*** C-c p L : skg-show-mentionerward-tree
-The nodes that link to this node (its mentioners).
-*** C-c p l : skg-show-mentionedward-tree
-The nodes this node links to (the nodes it mentions).
-*** C-c p O : skg-show-overriderward-tree
-The nodes that override this node.
-*** C-c p o : skg-show-overriddenward-tree
-The nodes this node overrides.
-*** C-c p H : skg-show-hiderward-tree
-The nodes that hide this node from their subscriptions.
-*** C-c p h : skg-show-hiddenward-tree
-The nodes this node hides from its subscriptions.
-*** C-c p S : skg-show-subscriberward-tree
-The nodes that subscribe to this node.
-*** C-c p s : skg-show-subscribeeward-tree
-The nodes this node subscribes to.
 ** C-c s : setting node properties
 *** first some vocab: 'editable' and 'write-protected'
 A view of a node can be editable or write-protected.
@@ -474,7 +455,7 @@ It refuses foreign and write-protected nodes and conflicts with another
 =editRequest=. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
-subtree only. Non-vognodes, role trees, non-member children, restricted nodes, and
+subtree only. Non-vognodes, non-member children, restricted nodes, and
 phantoms are pruned. Repeated PIDs are changed once; ineligible descendants
 are skipped and reported in =*Messages*=.
 *** C-c s m : skg-set-merge-request

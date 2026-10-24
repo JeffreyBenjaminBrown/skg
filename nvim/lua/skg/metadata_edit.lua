@@ -187,8 +187,8 @@ function M.cycle_values_for_field (field_name, field_value)
   if field_name == 'repo' then
     return M.repo_cycle_values(field_value) end
   if field_name == 'viewRequests' then
-    -- Only the bare-atom requests are cycleable; (folder X)/(roleTree X)
-    -- are structured forms inserted by their dedicated commands.
+    -- Only the bare-atom requests are cycleable; (folder X) is a
+    -- structured form inserted by its dedicated commands.
     return { 'none (default)', 'editableView', 'writeProtectedView',
              'writeProtectedSubtreeView' } end
   return nil

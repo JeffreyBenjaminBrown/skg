@@ -200,10 +200,6 @@ describe('skg.view_requests', function ()
     assert.is_truthy(buffer_text():find(
       '(viewRequests (folder aliases))', 1, true))
     assert.are.equal(1, saved_count)
-    buffer_with('* (skg (node (id n2))) title')
-    view_requests.show_containerward_tree()
-    assert.is_truthy(buffer_text():find(
-      '(viewRequests (roleTree container))', 1, true))
   end)
 
   it('set_editable stamps without saving', function ()

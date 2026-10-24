@@ -226,14 +226,15 @@ folder's viewparent, of the folder's kind. The two filter folders
 ("It contains these, but the subscribing ancestor hides them" and
 "The subscriber ancestor hides these, but subscribes to nothing that
 contains them") show no change and carry no '(rel ...)'. Under each
-member of a changed folder hangs its member role tree, so that the
-user sees where the member sits: under a container, its full
-containerward tree; under a mentioner, subscriber, overrider or hider,
-the role tree of that role with a containerward tree under each graft.
-The role-tree engine walks the union of the two graphs, so a role
-graft whose relationship to its viewparent (the one its birth names)
-is in the before-graph only carries '(rel removed)', and a gesture on
-it names that relationship.
+member of a changed containers folder hangs its containerward chain,
+so that the user sees where the member sits: the member's containers
+as write-protected non-members, theirs under them, up to the roots,
+walked over the union of the two graphs. A chain node carries no
+change facts and takes no commit-readiness marker; only the folder's
+members show change. Under a member of any other changed folder hangs
+nothing, but for the move of its relationship to another skgrepo
+where that moved ('attach_chains_under_straddle_folder_members' in
+'server/diff_view/partner_folders.rs').
 *** aliases, IDs and flags
 The alias, ID and flags folders, drawn when their list changed,
 hold the union of the two lists in the order of their interleaved
@@ -291,7 +292,7 @@ model subtree lacks is converted, never detached (next section);
 what only the shallow model subtree has is created.
 "Produced by the shallow model subtree" is defined over the union of the two
 graphs, so a viewnode is converted only when what it stands for is in
-neither graph. The member role trees under a changed folder's members
+neither graph. The chains under a changed containers folder's members
 are reconciled the same way.
 
 So folding survives saves, rerenders and commits: the server sets a
@@ -323,7 +324,7 @@ the kept or created child that precedes it in its model, or first
 when none does ('place_created_children_after_their_model_predecessors'
 in 'server/types/tree/moves.rs'; 'KeptChildOrder::Unmoved' in
 'complete_managed_children'). So a buffer saves back to itself, and an
-order the user gives a role tree or a write-protected folder stands.
+order the user gives a chain or a write-protected folder stands.
 There are two exceptions. A list whose order is a graph fact the save
 writes -- the content of a node, the alias folder and the editable
 partner folders -- follows the graph's order
@@ -349,18 +350,17 @@ pasted), and so do the former members under a historical phantom,
 whose old content adopts them. Before the content reconciler runs,
 the first non-member of a node in the after-graph's content list
 becomes its member when no member of that node stands there
-('align_content_members_with_straddle'). The member role trees
-under a changed folder's members are the role-tree attach's; it
-matches every child of the member but its members, and converts
-only what it owns, so it leaves the member's own visit's viewnodes
-alone. A role graft's
-birth is written into its metadata as '(birth roleGraft ROLENAME)'
-and read back by the parser ('Birth::RoleGraft'), so it survives a
-save, and the clients, which rewrite metadata structurally and strip
-only what they know, carry the atom through. Since the member role
-trees are extended over the union of the straddle, a graft's birth is
-validated against either graph of the straddle, not only the live
-one.
+('align_content_members_with_straddle'). The chains under a changed
+containers folder's members are the role-tree attach's; it matches
+every child of the member but its members, and converts only what it
+owns, so it leaves the member's own visit's viewnodes alone. A chain
+node's birth is written into its metadata as '(birth roleGraft
+container)' and read back by the parser ('Birth::RoleGraft'), so it
+survives a save, and the clients, which rewrite metadata structurally
+and strip only what they know, carry the atom through. Since the
+chains are walked over the union of the straddle, a chain node's
+birth is validated against either graph of the straddle, not only the
+live one.
 
 Both convert a stale child by one function
 ('convert_unwarranted_child'), as the glossary's statement of the

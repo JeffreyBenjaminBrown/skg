@@ -369,9 +369,8 @@ describe('skg.metadata commands', function ()
 end)
 
 describe('skg.metadata keybinding surface', function ()
-  it('binds the folder and path commands distinctly', function ()
-    -- Mirrors test-skg-folder-and-path-keybindings: the
-    -- UPPER/lower path letters select opposite roles.
+  it('binds the folder commands, and nothing under p', function ()
+    -- Mirrors test-skg-folder-keybindings.
     local keymaps = require('skg.keymaps')
     local by_lhs = {}
     for _, binding in ipairs(keymaps.content_view_bindings) do
@@ -384,12 +383,11 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['ls'])
     assert.are.equal('ShowFolderOfFlags', by_lhs['lp'])
     assert.is_nil(by_lhs['cb'])
-    assert.are.equal('ShowContainerwardTree', by_lhs['pC'])
-    assert.are.equal('ShowMentionerwardTree', by_lhs['pL'])
-    assert.are.equal('ShowMentionedwardTree', by_lhs['pl'])
-    assert.are.equal('ShowOverriderwardTree', by_lhs['pO'])
-    assert.are.equal('ShowOverriddenwardTree', by_lhs['po'])
-    assert.are.equal('ShowSubscribeewardTree', by_lhs['ps'])
+    assert.are.equal('ShowFolderOfContainers', by_lhs['lc'])
+    assert.are.equal('ShowFolderOfMentioners', by_lhs['lm'])
+    for lhs, _ in pairs(by_lhs) do
+      assert.is_nil(lhs:match('^p'), lhs)
+    end
     assert.are.equal('SetMergeRequest', by_lhs['sm'])
     assert.are.equal('RestoreDeletedNode', by_lhs['sn'])
     assert.are.equal('RestoreRemovedMembership', by_lhs['sl'])

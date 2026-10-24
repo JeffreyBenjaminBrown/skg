@@ -211,7 +211,8 @@ buffer root; say "viewforest" rather than "viewtree" or "forest".
 
 A *viewbranch* is any subtree of a viewforest: a viewnode with all its
 descendants. A view request asks the server to add viewbranches: a
-folder, a role tree, the flags folder. A viewbranch may be degenerate,
+folder (with, for containers, its chains), the flags folder. A
+viewbranch may be degenerate,
 with one viewchild or none; compare "branching viewnode".
 
 *** "child" and "parent"
@@ -364,23 +365,28 @@ whose order the save writes, follow the graph's order instead
 (=KeptChildOrder::FollowsGoal=): a non-member parked in one of them
 goes above the members, which follow the graph's order.
 
-*** role tree, role graft, and the -ward adjectives
-A *role tree* is extended under a node, its origin, by following one
-relation role away from it: under the origin go the nodes playing that
-role toward it, under each of those the nodes playing the role toward
-them, and so on. A role, unlike a relation, is directed, so the tree
-goes one way. A role-tree request '(roleTree ROLE)' extends one (e.g.
-'skg-show-mentionerward-tree'); search enrichment extends containerward
-and override role trees under results. A role tree extended on request
-follows single partners until a node has several, then includes that
-first layer; a full containerward role tree ('ContainerwardRoleTree')
-goes as deep as 'max_roleTree_depth'.
+*** role tree, the containerward chain, and the -ward adjectives
+A *role tree* is what the view shows of a node's partners in one
+role: the members of the node's partner folder of that role, and, for
+the container role, the containerward chain under each member. A
+role, unlike a relation, is directed, so a role tree goes one way.
+Every role tree but the contentward one, which is the node's content,
+is drawn in a folder and is write-protected throughout; a partner
+never stands directly under a vognode. A folder request
+('(folder containers)' and its siblings, the 'C-c l' commands) draws
+one; search enrichment draws a containers folder and the two override
+folders under each hit.
 
-A *role graft* is one node of a role tree other than its origin. It is
-in the view because of the role, not because its parent contains it, so
-it carries 'nonMember' and a birth fact naming its role's
-relation. ("Role" is in the name because other things might someday be
-grafted onto views.)
+The *containerward chain* is the one tree that goes on below a
+folder: under a member of a containers folder hang that member's
+containers, as write-protected non-members, under each of those its
+containers, and so on breadth-first to the roots or to
+'max_roleTree_depth' ('ContainerwardRoleTree'); a container met again
+on the way is drawn once more as a leaf. Its nodes are *chain nodes*.
+A chain is drawn with its folder; a request on a chain node for its
+containers draws a containers folder under it. A chain node carries
+no change facts and takes no commit-readiness marker; a folder's
+member does both.
 
 The adjectives containerward, mentionerward, overriderward,
 overriddenward, and so on name the role a role tree follows: a
@@ -408,13 +414,7 @@ not confuse it with a *branch*: any viewnode together with its
 descendants, which may be degenerate, its root having one viewchild
 or none.
 
-A role tree is extended as paths that each end at their first
-"nonlinearity" ('PathToFirstNonlinearity'): a cycle, or a node with
-several partners in the direction walked, which the path shows
-as a branching viewnode. (The path code, which walks the graph before
-anything is rendered, calls that node a *branching graphnode*: one with
-several partners in the direction walked, e.g. containerward-branching.) None of this is
-related to forking a node, below.
+None of this is related to forking a node, below.
 
 *** clone, and the fork operation
 
@@ -515,7 +515,7 @@ display fact is =(overridesHere N)=; see "override substitution".
 *** view request vs edit request
 
 Both are requests the client writes into metadata and the server
-consumes. A *view request* (=(viewRequests ...)=: =folder=, =roleTree=,
+consumes. A *view request* (=(viewRequests ...)=: =folder=,
 =flags=, =editableView=, =writeProtectedView=,
 =writeProtectedSubtreeView=) asks for more of the view (viewbranches),
 or changes which occurrence of a node is editable; the server fulfills
@@ -776,7 +776,7 @@ view"). Under a vognode a non-member is not in the content list,
 and in a folder it is not one of the folder's members, so a save
 neither adds nor removes a relationship for it; what it shows of
 its own node is saved or not by its editability, as at any
-occurrence. A role graft is a non-member, and so are a removed
+occurrence. A chain node is a non-member, and so are a removed
 member, every vognode child of a write-protected occurrence, a
 note the user parks in a folder, and what
 [[*the one rule: convert, then prune][the one rule]] makes of a
@@ -855,7 +855,8 @@ by [[*the one rule: convert, then prune][the one rule]].
 The reconciler that created a viewnode, or nobody when the user
 typed or pasted it ('Owner' in 'server/types/viewnode.rs'): the
 content reconciler, a folder's reconciler (one per folder kind),
-the role-tree attach (which grafts a role tree under its origin),
+the role-tree attach (which hangs a containerward chain under a
+containers folder's member),
 the diff view's reconciler, or the stub roots (which make a
 view's roots). A member of a content list is owned by the content
 reconciler and a member of a folder by that folder's reconciler,
@@ -908,7 +909,7 @@ model ('convert_unwarranted_subtree' in
 viewnode below it but those nobody owns and the content
 reconciler's (which a parked vognode keeps, as the older
 reconciler's does), so that a folder's members go with the folder
-and a member's role tree with the member. A viewnode left holding
+and a member's chain with the member. A viewnode left holding
 only childless dead viewnodes is converted as a leaf.
 
 A converted copy is the one duplicate shape the save accepts:
@@ -934,14 +935,13 @@ every folder accepts one among its children.
 *** birth
 
 Why a generated occurrence was created under its parent ('Birth'
-in 'server/types/viewnode.rs'): either unremarkable, or a role
-graft naming its role. It is view history, used for display,
+in 'server/types/viewnode.rs'): either unremarkable, or, on a chain
+node, the container role. It is view history, used for display,
 stale-relation validation and the diff view, never by save
 extraction. The =(rels ...)= form renders it as =(birth ...)=
-facts. A role graft's birth is also written into its metadata as
-=(birth roleGraft ROLENAME)= and read back, so it survives a
-save; the diff view reads from it which relationship a graft
-stands for.
+facts. A chain node's birth is also written into its metadata as
+=(birth roleGraft container)= and read back, so it survives a
+save.
 
 *** phantom
 
@@ -1031,8 +1031,7 @@ graphs that records at least one change-forest leaf
 'Existence { Added, Removed }'. A member, a removed member, a folder's
 member and a root carry the node's two; a phantom never carries
 '(properties changed)'. The relationship is the viewparent's content
-under a vognode, the relation of its birth role on a role graft, and,
-in a partner folder, the relationship of the folder's kind between
+under a vognode, and, in a partner folder, the relationship of the folder's kind between
 the member and the folder's viewparent; the two filter folders' members
 carry none. On an alias, ID or flag entry, '(rel ...)' is the entry's
 existence in its list.
@@ -1186,13 +1185,13 @@ each tagged with the three kinds of change, and reads "its X changed
 (this file)" or "(other files)" (see "in, out"). Its '(diff ...)'
 holds only '(diff (ready))', when every changed membership is ready.
 
-*** member role tree
+*** what a changed folder's member holds
 
-The role tree extended under each member of a changed partner folder, so
-that the user sees where the member sits: under a container, its
-containerward role tree; under a mentioner, subscriber, overrider or
-hider, the role tree of that role, with a containerward role tree
-under each role graft.
+Under each member of a changed containers folder the diff view hangs
+the member's containerward chain, walked over both graphs of the
+straddle, so that the user sees where the member sits. Under a member
+of any other changed folder it hangs nothing, but for the move of
+the member's relationship to another skgrepo where that moved.
 
 *** moved-like-ancestor fact
 

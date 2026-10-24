@@ -1,9 +1,9 @@
 -- PURPOSE: Commands that request viewbranches by adding a
 -- (viewRequests ...) atom to the headline at point and saving,
--- letting the server fulfill the request during completion. Two
--- families, both auto-saving: folders (folder RELNAME), building
--- both folders of the relation, and role trees (roleTree ROLENAME), the role tree
--- for one partner role. Also the editable-view and write-protect
+-- letting the server fulfill the request during completion. The
+-- folder commands auto-save: (folder RELNAME) builds both folders of
+-- the relation, and a containers folder carries, under each member,
+-- its containerward chain. Also the editable-view and write-protect
 -- requests (no auto-save) and the explicit fork. The Lua port of
 -- elisp/skg-request-views.el.
 
@@ -13,8 +13,7 @@ local sexpr = require('skg.sexpr.parse')
 
 local M = {}
 
----Request VIEW_REQUEST_TEXT (e.g. '(folder aliases)', '(roleTree container)',
----'fork') for the headline owning point, then save.
+---Request VIEW_REQUEST_TEXT (e.g. '(folder aliases)', 'flags', 'fork') for the headline owning point, then save.
 ---@param view_request_text string
 function M.request_view_and_save (view_request_text)
   local line = focus.owning_headline_line()
@@ -24,7 +23,7 @@ function M.request_view_and_save (view_request_text)
   require('skg.save').request_save_buffer()
 end
 
----The two command families, generated like the elisp macro did.
+---The folder commands, generated like the elisp macro does.
 local command_rows = {
   { 'show_folderOf_aliases', '(folder aliases)' },
   { 'show_folderOf_overrides', '(folder overrides)' },
@@ -33,15 +32,6 @@ local command_rows = {
   { 'show_folderOf_flags', 'flags' },
   { 'show_folderOf_containers', '(folder containers)' },
   { 'show_folderOf_mentioners', '(folder mentioners)' },
-  { 'show_containerward_tree', '(roleTree container)' },
-  { 'show_mentionerward_tree', '(roleTree mentioner)' },
-  { 'show_mentionedward_tree', '(roleTree mentioned)' },
-  { 'show_overriderward_tree', '(roleTree overrider)' },
-  { 'show_overriddenward_tree', '(roleTree overridden)' },
-  { 'show_hiderward_tree', '(roleTree hider)' },
-  { 'show_hiddenward_tree', '(roleTree hidden)' },
-  { 'show_subscriberward_tree', '(roleTree subscriber)' },
-  { 'show_subscribeeward_tree', '(roleTree subscribee)' },
 }
 for _, row in ipairs(command_rows) do
   local name, form = row[1], row[2]

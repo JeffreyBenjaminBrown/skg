@@ -929,7 +929,7 @@ Rust tests rewritten, the four integration tests moved to the
 folder forms. Run all four suites. This slice is the plan's
 largest; commit it in several commits, the containers folder and
 chain first.
-** TODO Slice 5: every role tree is a folder, in the clients
+** DONE Slice 5: every role tree is a folder, in the clients
 The nine commands and keys removed in both clients, their tests
 removed, the five docs and the glossary entry. Run the Emacs,
 Neovim and integration suites.

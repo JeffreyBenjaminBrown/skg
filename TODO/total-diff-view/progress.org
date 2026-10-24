@@ -4014,3 +4014,42 @@ Rust 914 passed; Emacs 387 passed; Neovim 31 spec files passed;
 integration 34 of 35, under Emacs and again under Neovim
 ('SKG_TEST_CLIENT=nvim'), 'import-md-and-org' failing as at
 baseline.
+** Slice 5: deviations
+*** the prefixes went with the commands
+Nothing else used 'C-c p' or '<localleader>p', so both are free.
+The Emacs keybinding test is now 'test-skg-folder-keybindings', and
+it and its Neovim mirror check that nothing is bound under the
+prefix.
+*** two editor tests kept, on a request that exists
+The strip tests of both clients' unrestricted-node defaults used
+'(roleTree container)' as a second structured view request; they
+use '(folder containers)' now.
+*** comments beyond the commands
+The search enrichment's handler comments in both clients said
+"containerward role trees"; they say "partner folders". The
+cycler comments of both editors no longer name '(roleTree ...)'.
+*** the docs
+'docs/nvim-client-deviations.org' named neither the commands nor
+the prefix, so nothing there changed. Beyond the plan's list,
+'docs/heralds.org' lost the 'req:roleTree' label (its rule went in
+slice 4) and 'docs/sharing-model.org' one mention of role trees.
+In 'docs/api-and-formats.org' the role-graft paragraph now
+describes a chain node, the birth-fact table's row is "chain node",
+and the '(rel ...)' clause on a graft's birth role went, since a
+chain node carries no change facts. In the glossary, the entry is
+"role tree, the containerward chain, and the -ward adjectives";
+"member role tree" became "what a changed folder's member holds";
+the paragraph on paths to the first nonlinearity went with the
+engine; the non-member and birth entries say "chain node" where
+they said "role graft". The birth, the owner and the role-tree
+attach keep their text otherwise, for slices 6 and 7.
+**** "role graft" left in code comments
+About 27 server, test and client comments still say "role graft"; slices
+7 and 8, which remove the birth and rename, reach them. The help
+draft 'TODO/help.org' still cites the 'C-c p' keys; it is a TODO
+document and was left alone.
+*** verification
+Emacs 387 passed; Neovim 31 spec files passed; integration 34 of
+35 under Emacs and again under Neovim, 'import-md-and-org' failing
+as at baseline. No server code changed, so the Rust suite was not
+run.

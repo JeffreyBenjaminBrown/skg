@@ -72,24 +72,6 @@ M.commands = {
                              desc = 'Request the mentioner folder (auto-saves)' },
   ShowFolderOfFlags = { module = 'skg.view_requests', fn = 'show_folderOf_flags',
                              desc = 'Request the flags folder (auto-saves)' },
-  ShowContainerwardTree = { module = 'skg.view_requests', fn = 'show_containerward_tree',
-                                 desc = 'Graft the containerward role tree (auto-saves)' },
-  ShowMentionerwardTree = { module = 'skg.view_requests', fn = 'show_mentionerward_tree',
-                                  desc = 'Graft the nodes that link here (auto-saves)' },
-  ShowMentionedwardTree = { module = 'skg.view_requests', fn = 'show_mentionedward_tree',
-                                desc = 'Graft the nodes this links to (auto-saves)' },
-  ShowOverriderwardTree = { module = 'skg.view_requests', fn = 'show_overriderward_tree',
-                                 desc = 'Graft the nodes overriding this (auto-saves)' },
-  ShowOverriddenwardTree = { module = 'skg.view_requests', fn = 'show_overriddenward_tree',
-                                 desc = 'Graft the nodes this overrides (auto-saves)' },
-  ShowHiderwardTree = { module = 'skg.view_requests', fn = 'show_hiderward_tree',
-                             desc = 'Graft the nodes hiding this (auto-saves)' },
-  ShowHiddenwardTree = { module = 'skg.view_requests', fn = 'show_hiddenward_tree',
-                             desc = 'Graft the nodes this hides (auto-saves)' },
-  ShowSubscriberwardTree = { module = 'skg.view_requests', fn = 'show_subscriberward_tree',
-                                  desc = 'Graft the subscribers (auto-saves)' },
-  ShowSubscribeewardTree = { module = 'skg.view_requests', fn = 'show_subscribeeward_tree',
-                                  desc = 'Graft the subscribees (auto-saves)' },
   SetEditable = { module = 'skg.view_requests', fn = 'set_editable',
                     desc = 'Make this the editable view of its node' },
   RequestWriteProtected = { module = 'skg.view_requests', fn = 'request_write_protected',
@@ -273,15 +255,6 @@ M.content_view_bindings = {
   { 'lp', 'ShowFolderOfFlags' },         -- C-c l p
   { 'lc', 'ShowFolderOfContainers' },    -- C-c l c
   { 'lm', 'ShowFolderOfMentioners' },    -- C-c l m
-  { 'pC', 'ShowContainerwardTree' }, -- C-c p C
-  { 'pL', 'ShowMentionerwardTree' }, -- C-c p L
-  { 'pl', 'ShowMentionedwardTree' }, -- C-c p l
-  { 'pO', 'ShowOverriderwardTree' }, -- C-c p O
-  { 'po', 'ShowOverriddenwardTree' }, -- C-c p o
-  { 'pH', 'ShowHiderwardTree' },    -- C-c p H
-  { 'ph', 'ShowHiddenwardTree' },    -- C-c p h
-  { 'pS', 'ShowSubscriberwardTree' }, -- C-c p S
-  { 'ps', 'ShowSubscribeewardTree' }, -- C-c p s
   { 'sd', 'SetEditable' },             -- C-c s d
   { 'sw', 'RequestWriteProtected' },     -- C-c s w
   { 'sW', 'RequestWriteProtectedRecursive' }, -- C-c s W

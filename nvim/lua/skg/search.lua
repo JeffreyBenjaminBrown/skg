@@ -120,7 +120,7 @@ function M.send_text_search_request (search_terms, regex, body, operators,
   state.register_response_handler('request-snapshot',
     function (_payload_text, response)
       -- The server asks for a buffer snapshot of the search buffer so it
-      -- can integrate role trees without losing user edits.
+      -- can integrate partner folders without losing user edits.
       M.handle_buffer_snapshot_request(response)
     end, false) -- persistent, not one-shot
   state.register_response_handler('overPrivateText-telescope-confirmation',

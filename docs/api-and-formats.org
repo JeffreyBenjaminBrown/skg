@@ -839,20 +839,13 @@ node whose graphnode has a body — one the rendering hides. Herald
 "B", hugging the ☮. Display-only: the parser accepts and discards it;
 the view regenerates it.
 
-A role graft -- a node a role tree added, playing a partner role toward
-its viewparent (e.g. =container= for a containerward role tree,
-=mentioner= for a node that links to it, also =mentioned=, =overrider=,
-=overridden=, =hider=, =hidden=, =subscriber=, =subscribee=) -- carries
-=nonMember= and =(birth roleGraft ROLENAME)=, and its =(rels
-...)= carries a birth fact naming its role's relation (see "Stats
-metadata" below). The parser reads =birth= back, so a role graft is
-still one after a save; the diff view reads from it which
-relationship a graft stands for (=docs/diff-view.org=, "the
-in-folders and out-folders"). The roles are the nine
-in =PARTNER_ROLE_VOCAB= (=server/dbs/in_rust_graph/relation_accessors.rs=).
-A role graft's herald is not a fixed glyph: the clients render its
-semantic relation and ancestor facts, e.g. an =overrider= role graft
-reads =Oa=, an =overridden= role graft =aO=.
+A chain node -- a node of the containerward chain under a member of a
+containers folder, a container of its viewparent (see "View requests"
+below) -- carries =writeProtected=, =nonMember= and =(birth roleGraft
+container)=, and its =(rels ...)= carries the birth fact =(contains
+out 1)= (see "Stats metadata" below). The parser reads =birth= back,
+so a chain node is still one after a save. A chain node carries no
+change facts.
 
 ** View requests: (viewRequests ...)
 
@@ -879,10 +872,14 @@ node's heralds.
   build one write-protected folder (=containerFolder=,
   =mentionerFolder=), pruned when empty: the other side of each is the
   node's content, or its links, shown without a folder.
-  Emitted by the =C-c l= commands.
-- =(roleTree ROLENAME)= — build the role tree for one partner role, grafting
-  the partners as inverted write-protected children, the role grafts. ROLENAME
-  is one of the nine in =PARTNER_ROLE_VOCAB=. Emitted by the =C-c p= commands.
+  Under each member of a =containerFolder= hangs its containerward
+  chain: the member's containers as write-protected non-members, under
+  each of those its containers, breadth-first up to the roots or
+  =max_roleTree_depth=; a container met again on the way is drawn once
+  more as a leaf. A chain is drawn with its folder and extended by no
+  later request; a =(folder containers)= request on a chain node draws
+  a containers folder under it. A fresh content view puts this request
+  on each root. Emitted by the =C-c l= commands.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
   keeping its shown content, each member of which, there and below,
@@ -1028,7 +1025,7 @@ overrides, which carries =(overrides out)=.
 | hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
 | hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
 | shown overrider (overrides-here) | =(overrides out)=                                    |
-| role graft                   | its role's relation, =out= for a first role and =in= for a second, =1= |
+| chain node                   | =(contains out 1)=                                           |
 Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
@@ -1089,7 +1086,7 @@ the last visible link), cycle-guarded, and never in the diff view.
 Ordinary completion does not rewrite an existing raw viewnode merely because
 an overrider is visible (closing and reopening normalizes). In a de-novo
 render, only content substitutes: PartnerFolder members, view roots, search
-results, role grafts and phantoms begin as the raw node.
+results, chain nodes and phantoms begin as the raw node.
 
 The buffer whose approved save creates a fork is the post-save exception. A
 root named by one of that save's exact =ForkSpec=s is rewritten from original F
@@ -1145,7 +1142,7 @@ Pass its path as a command-line argument (default: =data/skgconfig.toml=) when s
 | =beep_when_server_becomes_available= | no | true | When true, plays a local sound after server initialization finishes. |
 | =default_repo_set= | no | =all= | The skgrepo restriction when a client connects. Runtime changes are per connection and are not written back. |
 | =owned_folder= | no | =owned= | The top-level folder under the data root whose skgrepos the user owns (see Skgrepos, below). |
-| =max_roleTree_depth= | no | 20 | Max breadth-first depth of a full containerward role tree. |
+| =max_roleTree_depth= | no | 20 | Max breadth-first depth of a containerward chain. |
 
 The retired keys =db_name=, =delete_on_quit=, and =auto_audit_daily= are
 rejected with a migration error; remove them from older configurations.
@@ -1404,8 +1401,7 @@ member, a removed member, a folder member, a root, and a deleted or
 historical phantom.
 **** =(rel added)=, =(rel removed)= -- the existence of the relationship to the viewparent
 The relationship that HEAD lacks (=added=) or the worktree lacks
-(=removed=). Under a vognode it is the viewparent's content, or, on a
-role graft, the relation of the role its birth names; in a partner
+(=removed=). Under a vognode it is the viewparent's content; in a partner
 folder it is the relationship, of the folder's kind, between the
 member and the folder's viewparent (the two filter folders carry
 none). On an alias, id or flag leaf, the single diff object is written
