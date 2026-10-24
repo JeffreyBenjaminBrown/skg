@@ -48,8 +48,8 @@ pub struct ChangeFacts {
 }
 
 /// '(leaves N OBJECT...)': the change-forest leaves a readiness
-/// request on a viewnode may name ('docs/diff-view.org', "Facts on
-/// the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
+/// request on a viewnode may name ('docs/diff-view.org', "Change
+/// facts on the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
 /// historical phantom, each worth one leaf; 'all' on a modified node
 /// (beside 'rel' when that names a leaf) and on a commit readiness
 /// aggregate; none where a bare request names them all.

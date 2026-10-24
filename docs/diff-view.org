@@ -8,12 +8,13 @@ each one commit-ready, and commit everything at once. C-c v d
 ('skg-diffView-open'; Neovim '<localleader>vd') opens it.
 
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
-D, change-forest leaf, mark, changeset marker, ...) is the glossary's "Terms of the
-diff view" ('docs/glossary.org'); the reconcilers' words (key,
-retain as non-member or tombstone, then prune, tombstone, non-member)
-are among its terms
-specific to Skg. The wire forms are the API doc's
-"Diff view", "Stage and commit", "Integrate unshown changes" and
+D, change-forest leaf, mark, changeset marker, ...) is the
+glossary's "Terms a user meets in the diff view" and "Terms of the
+diff view's implementation" ('docs/glossary.org'); the reconcilers'
+words (key, adopt, retain as non-member or tombstone, then prune)
+are among its "Terms of the implementation", and tombstone and
+non-member among its "Terms a user meets". The wire forms are the
+API doc's "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
 heralds are 'docs/heralds.org', "Diff heralds". The commands are
 both COMMANDS files, under C-c v d and C-c r, and the two restore
@@ -75,10 +76,12 @@ The graph straddle ('GraphStraddle', 'server/graph_straddle/') holds
 the before-graph (each owned skgrepo read at HEAD, each foreign one at
 its worktree) and the after-graph (the live graph), and answers
 questions about their union (the "union walk"): each node and each
-relationship it reports carries a presence, 'Both', 'OnlyBefore' or
-'OnlyAfter'. A partner of a node in some role is an entry of the
-union of the two graphs' lists, with its presence and its relRepo in
-each graph; it changed when the relationship is in one graph only, or
+relationship it reports carries its existence across the straddle
+('existence_across_straddle'): 'Existence::Added' when only the
+after-graph holds it, 'Existence::Removed' when only the before-graph
+does, none when both do. A partner of a node in some role is an
+entry of the union of the two graphs' lists, with its existence and
+its relRepo in each graph; it changed when the relationship is in one graph only, or
 its relRepo differs.
 
 Each connection keeps one straddle. A diff-view request, a save, a
@@ -156,7 +159,7 @@ and it changes completion so:
 - the node budget is charged only as "Editability in the diff view"
   says;
 - each editable node's visit ends in the per-visit step;
-- after completion, the readiness facts are set from the store.
+- after completion, the '(ready ...)' change facts are set from the store.
 The skgrepo restriction plays no part, since the diff view requires
 'all'.
 ** The per-visit step
@@ -175,7 +178,7 @@ viewnodes:
   skgrepo move, its "it acquired" folder, the alias, ID and flags
   folders whose list changed, the partner folders whose membership
   changed, and its changeset markers;
-- in the order-only buffer, its order-only marker.
+- in the order-only buffer, its order-only changeset marker.
 What it adds for a node in C, it reads from the leaves that mention
 the node (those it records and the relationship leaves naming it as
 member), grouped by aspect ('ChangedAspects' in
@@ -230,7 +233,8 @@ contains them") show no change and carry no '(rel ...)'. Under each
 member of a changed folder hangs its containerward chain, as in every
 view, so that the user sees where the member sits: the member's
 containers as write-protected non-members, theirs under them, up to
-the roots, walked over the union of the two graphs. A chain node
+the roots or to 'max_roleTree_depth', walked over the union of the
+two graphs. A phantom member holds no chain. A chain node
 carries no change facts and takes no commit-readiness marker; only
 the folder's members show change. Before the chain, where the
 member's relationship moved to another skgrepo, hangs that move
@@ -282,7 +286,7 @@ reconciler and the save's check of a write-protected occurrence read
 too); any other child by its kind (a folder entry by its entry). A
 key is matched among all the children of the viewnode, whoever drew
 them. A matched child is adopted: kept, with its fold state, and its
-kind and facts are updated in place: a member that loses its
+kind and change facts are updated in place: a member that loses its
 relationship becomes a removed member and back, a deleted phantom
 becomes a historical phantom and back, a graft or a copy the user
 pasted becomes the removed member of its node. A second child of a
@@ -349,8 +353,8 @@ viewnode the user typed or pasted that no model wants stays where it
 stands, and so does a content member, tagged or not. Under an
 editable node the content members are the content reconciler's, and
 the change viewnodes and removed members the diff view's
-reconciler's; a member that the straddle sets aside becomes a
-removed member, as does any non-member whose relationship to the
+reconciler's; a member whose relationship only the before-graph
+has becomes a removed member, as does any non-member whose relationship to the
 node is only in the before-graph (a graft, or a copy the user
 pasted), and a historical phantom's old content adopts the former
 members under it. Before the content reconciler runs, the first
@@ -415,7 +419,7 @@ list orders, come sorted by ID. So every rendering of the union of the
 two graphs places a removed entry by the LCS.
 ** One encoding of a removed relationship
 A removed member whose node survives is an unrestricted vognode, a
-non-member, with the fact '(rel removed)': its relationship to its
+non-member, with the change fact '(rel removed)': its relationship to its
 viewparent exists in the before-graph only. That is the one encoding
 of a removed relationship, wherever it stands: in content, in a
 partner folder, and in a historical phantom's old content
@@ -558,13 +562,13 @@ has no leaf and is ready. A modified node stands for every leaf it
 records, nearly its file (a home skgrepo move and a relRepo move name
 a second file): it shows M✓ when each of those is marked, wherever it
 stands.
-** Facts on the wire
-A headline's facts and its readiness request form one form, '(diff
+** Change facts on the wire
+A headline's change facts and its readiness request form one form, '(diff
 (node added|removed) (rel added|removed) (properties changed) (leaves
 N OBJECT...) (ready OBJECT...) REQUEST)', each part present only when
 it has something to say, the first three only when true
 ('change_fact_forms' in 'server/org_to_text.rs'; the grammar is in
-'docs/api-and-formats.org', "Facts and requests"). It sits inside the
+'docs/api-and-formats.org', "Change facts and requests"). It sits inside the
 node's or phantom's form, or at top level on a property. A changed
 folder's '(diff ...)' holds only its readiness, the objectless
 '(ready)', which is the folder's aggregate.
@@ -584,8 +588,8 @@ OBJECTs are those a request on this headline may name ('node' and/or
 modified node, every leaf it records, beside 'rel' when its
 relationship changed; 'all' on a commit readiness aggregate, worth N; none on a
 headline that names exactly one leaf, which a bare request marks).
-The server's 'leaves_named_at' is the single rule; the fact is
-display-only, and the clients read it instead of keeping tables of
+The server's 'leaves_named_at' is the single rule; the change fact
+is display-only, and the clients read it instead of keeping tables of
 headline kinds.
 ** Readiness requests and gestures
 A gesture writes readiness requests, '(readyRequest OBJECTS)' or
@@ -618,7 +622,7 @@ one leaf, counting each request's leaves as '(leaves N ...)' does,
 first asks for a typed "yes".
 
 Six commands move point between change headlines, the headlines
-whose metadata carries a '(leaves ...)' fact: C-c r n c
+whose metadata carries a '(leaves ...)' change fact: C-c r n c
 ('skg-diffView-goto-next-change') to the next, C-c r n u to the next
 unready one and C-c r n r to the next ready one, and C-c r p c, C-c r
 p u and C-c r p r to the previous ones. A change headline is ready

@@ -4542,3 +4542,100 @@ of 35 under Emacs and again under Neovim, 'import-md-and-org'
 failing as at baseline. At the TCP surface, an isolated server
 showed the chain under a subscribee folder's and a requested
 subscriber folder's members, and the view saved back unchanged.
+** Slice 12: deviations
+*** the glossary's shape
+'* Glossary' keeps its title and holds the two sections at level
+two, "Terms a user meets" and "Terms of the implementation". Each
+ends with its diff-view subsection, "Terms a user meets in the diff
+view" and "Terms of the diff view's implementation", named apart so
+that a citation finds one; the implementation's section also ends
+with "Terms of Tantivy, the search index" (prominence source,
+Document), which keeps the code's "the Tantivy section" true.
+Within each section the entries keep their old relative order. A
+script did the move
+('tests/results/plan19-slice12/build_glossary.py', over
+'new_entries.org' beside it), so the entries not rewritten moved
+unchanged but for small fixes made after.
+*** the split entries' headlines
+User half, then technical half: "graphnode, viewnode" and
+"vognode, non-vognode"; "view, buffer, viewforest" (the old
+headline, so its citations still hold) and "open views,
+single-root"; "relation, relationship, member, membership, partner"
+and "recorder, carrier"; "partner folder" and "PartnerFolder, and
+the folder-policy vocabulary" (the old headline, now the policies
+alone; the ☮ meaning and the default presentation moved to the
+user's half); "extend, rerender" and "view completion, extension,
+render"; "nodeMerge" and "instructionMerge", each headline ending
+'("merge" is always qualified)'; "mark, readiness" and
+"fingerprint, the readiness store"; "prominent" and "prominence
+source, prominence multiplier".
+*** entries beyond the plan's list
+"change facts" and "commit-readiness marker" (user's diff view),
+since slice 13 asks that every coined term have an entry; "the
+containerward chain, as drawn" (the reconciliation, beside the
+user's "foldering, the containerward chain, chain node"); "union
+walk, existence across the straddle", renamed from "union walk,
+presence", whose 'Both'/'OnlyBefore'/'OnlyAfter' no longer exist.
+"set aside", "parked", "view id, vid", "the one rule" and "role
+graft" had no entry left to remove; "dead viewnode" was already
+"tombstone". "owner" and "birth" are gone, and so is the "owner"
+aside in the carrier entry.
+*** the rule's headline and its citations
+"retain as non-member or tombstone, then prune; warrant, stale,
+duplicate". Its links in the glossary name it whole, with the old
+words as description. The code comments that cite "retain as
+non-member or tombstone, then prune" name its leading phrase and
+were left, slice 12 writing no code.
+*** the birth fact stays
+The '(rels ...)' form's '(birth (RELNAME SIDE [GEN]))' fact and the
+herald's birth letter are live ('birth_facts', which slice 7 kept,
+following the parent's kind). Only the 'Birth' record went, with its
+entry; the glossary's "occurrence" and "ancestor generation"
+entries, 'docs/heralds.org', 'docs/override.org' and the API doc's
+table name the fact, which slice 13's grep for "birth" will list.
+*** comments edited outside 'docs/'
+Two comments whose citations this slice's renames would have
+broken: 'tests/partner_folder_matrix.rs' (the glossary entry on the
+chain) and 'server/types/viewnode.rs' (diff-view.org's "Facts on
+the wire", now "Change facts on the wire"; the API doc's "Facts and
+requests" is "Change facts and requests"). No code changed.
+*** the four citations
+The plan counted five doc citations of "Terms of the diff view";
+four exist ('docs/diff-view.org', 'docs/heralds.org', two in
+'docs/api-and-formats.org'), each now naming the subsection meant.
+*** the docs read end to end
+Each of the six was read against the code by a subagent and the
+findings checked before editing. Beyond vocabulary ("change facts",
+"changeset marker", "non-member" for the old "affects its parent"
+phrasing, "retains" for "parks"): the API doc's birth-fact table
+gained the containers and mentioners folders' members and says an
+acquisition folder's member carries none; its 'ViewnodeIdRecord'
+holds no reconciler; five small fixes of a quoted message, a file
+name, a function name and two section pointers. COMMANDS:
+'skg-search-make-link' does not save first; the relRepo refusal list
+has all ten folders; the recursive relRepo menu's role is
+'content'; the chain hangs under every folder's member; 'C-a',
+'C-c C-o', the linkstack's 'C-x C-s' and the two restriction
+listings are documented; the Neovim doc gained ':SkgInit',
+':SkgStripBodyWhitespace' and the two listings.
+'docs/nvim-client-deviations.org' gained "Commands not ported". Left
+alone: the bindings outside content views (raw '.skg' files, report
+buffers), undocumented in both COMMANDS files; the "TODO edits for
+the above" tails of both.
+*** problems
+The eleven "FIX PLANNED" entries of the view-ids review moved to
+the top of 'TODO/DONE/problems.org', each with the slice that
+settled it. Two of them were settled only in part, so their
+remainders are new open entries: the spurious "reinstated 1
+member(s)" warning (traced in slice 2, not rechecked) and the
+foreign-change count of 'with_after'. New entries for what the
+reading found: Emacs's relRepo info request sends a nil recorder,
+two texts with a bare "repo", the three unported Neovim commands.
+*** verification
+No code; the suites were not run. Every identifier the glossary
+cites was grepped against 'server/', 'elisp/', 'nvim/', 'shared/'
+and 'tests/', and all were found; "editability claim", "viewforest
+id" and "foldering" occur in no code, as plan terms. Every glossary
+link resolves to a headline, and every citation of a glossary
+headline in 'docs/', the code and the tests names one
+('tests/results/plan19-slice12/check_glossary_citations.py').

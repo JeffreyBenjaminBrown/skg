@@ -54,12 +54,12 @@
 - A closed fold always displays vim's one-line fold placeholder; org
   hid the text entirely.
 - A one-line body cannot be body-folded (vim cannot close a
-  single-line fold). A 'bodyFolded' marker on such a body degrades
-  gracefully: the body stays visible and the marker is simply not
+  single-line fold). A 'bodyFolded' atom on such a body degrades
+  gracefully: the body stays visible and the atom is simply not
   re-recorded at the next save. Multi-line bodies body-fold normally.
 - Fold state lives on windows, so fold restoration after a save/
   rerender applies to a window showing the buffer; a collateral view
-  updated while not displayed anywhere gets its markers stripped but
+  updated while not displayed anywhere gets its fold atoms stripped but
   has no fold state to restore into, and appears fully open when next
   displayed. (Emacs restored folds even in undisplayed buffers.)
 - skg view buffers use skg's own foldexpr (a body gets its own fold
@@ -114,3 +114,14 @@
 - The 'M-x' cosmetic machinery (alias names, completion-predicate
   hiding of internal names) has no analog; the ':Skg*' commands are
   the public names.
+
+* Commands not ported
+These Emacs commands have no Neovim counterpart yet; nothing in
+nvim/lua/skg/keymaps.lua binds or defines them.
+- 'C-c s r' and 'C-c s R' ('skg-set-relRepo' and
+  'skg-set-relRepo-recursive'), which write a '(relRepo NAME)' edit
+  request. A '(relRepo NAME)' typed into the metadata by hand, or
+  set in the metadata editor, still works.
+- 'C-c v b' ('skg-org-body-toggle').
+- 'C-c v R' ('skg-readable-ids-refresh'); '<localleader>vr' toggles
+  readable-ids, as 'C-c v r' does.

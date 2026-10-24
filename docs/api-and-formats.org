@@ -18,7 +18,7 @@ is a bare symbol. So an empty view arrives as =(content "")=.
 
 The shared overPrivateText-telescope release warning is
 =OPERATION includes title or body text selected below its node's home
-skgrepo for PID P.= (or =PIDs P1, P2, ...=). A restricted request that
+repo for PID P.= (or =PIDs P1, P2, ...=). A restricted request that
 needs approval instead receives
 =((response-type overPrivateText-telescope-confirmation) (operation OPERATION)
 (pids ("P" ...)) (prompt "..."))=; the response itself contains no
@@ -201,8 +201,8 @@ So far there are these endpoints:
        root or an unrestricted vognode, or in the old content of such a
        phantom. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots, and every headline it holds editable, stay as
-       saved, and its change facts, change folders, markers and removed
-       members are recomputed. What it adds anew it adds by its pruned
+       saved, and its change facts, changed folders, changeset markers and
+       removed members are recomputed. What it adds anew it adds by its pruned
        change view sets recomputed after the save: a new member in U is editable,
        with its content list, and any other new member is a
        write-protected member shown without its content. It
@@ -429,8 +429,8 @@ since the command searches the current buffer.
     skgrepo-changes buffers are pruned change views over the nodeMerges and over the
     home skgrepo and relRepo moves; the order-only buffer lists the
     nodes whose only change is the order of a list. Foreign skgrepos
-    are excluded. See the glossary's "Terms of the diff view", and
-    "Metadata of the diff view" below.
+    are excluded. See the glossary's "Terms a user meets in the diff
+    view", and "Metadata of the diff view" below.
   - The server compares HEAD with the worktree through a graph straddle it
     keeps per connection, brought up to date at each request, at each
     save of a buffer of the diff view, and at each rerender of
@@ -442,7 +442,7 @@ since the command searches the current buffer.
     commit) reconciles what it holds with a shallow model subtree from
     the straddle: a viewnode the shallow model subtree also produces
     is kept, with
-    its =folded= and =bodyFolded=, its kind and facts updated in place
+    its =folded= and =bodyFolded=, its kind and change facts updated in place
     (a member that loses its relationship becomes a removed member, a
     deleted node a historical phantom, and back); one it does not is
     converted, and pruned once it holds nothing (the glossary's
@@ -566,7 +566,7 @@ since the command searches the current buffer.
     the relationship's relRepo.
     =skg-set-relRepo= uses the reply to offer only
     skgrepos the save can accept. Advisory: the save-time floor check
-    in =apply_sticky_relRepos= stays load-bearing, since buffers go
+    in =apply_sticky_relRepos_in_graph= stays load-bearing, since buffers go
     stale and the request is plain text.
 
 ** Flag state
@@ -745,7 +745,7 @@ one automatically.
 
 ** skgrepo-sets
   - Skgrepo-sets are the prefixes of the config's privacy order (see
-    "skgconfig.toml > Repo sets" below): each skgrepo name denotes
+    "skgconfig.toml > skgrepo-sets" below): each skgrepo name denotes
     itself plus everything more public, and =all= means every skgrepo.
   - Request: ((request . "list repo sets"))
   - Response: LP response-type "repo-sets" with
@@ -1039,7 +1039,8 @@ occurrence's subscriber. Subset counts cannot exceed their side's total.
 The ancestors counted are the viewparent, or, for a folder member, the
 vognodes of the folder's required ancestry. A non-member under a
 subscribee-as-such -- content its subscriber hides, which the
-reconciler parks there when it holds a subtree -- also counts the
+reconciler retains there as non-member when it holds a subtree --
+also counts the
 subscriber, three generations up, on its =hidesFromSubs= incoming side,
 as a =hiddenInSubscribeeFolder= member does.
 =(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind this
@@ -1058,9 +1059,13 @@ non-member carries no other.
 | overrider-folder member          | =(overrides out 2)=                                  |
 | hidden-folder member             | =(hidesFromSubs in 2)=                        |
 | hider-folder member              | =(hidesFromSubs out 2)=                       |
+| container-folder member          | =(contains out 2)=                            |
+| mentioner-folder member          | =(linksTo out 2)=                             |
 | hidden-in-subscribee member      | =(hidesFromSubs in 4) (contains in 2)=        |
 | hidden-outside-subscribee member | =(hidesFromSubs in 3)=                        |
 | shown overrider (overrides-here) | =(overrides out)=                                    |
+A member of an acquisition folder carries none: a nodeMerge is no
+relation.
 Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
@@ -1098,7 +1103,8 @@ under different parents):
   deliberately raised above the relationship's default. This is an observed,
   recomputed display fact: save never reads it as input.
 - =(overridesHere N)= — crucial =ĥ= immediately after the =O= token; the load-bearing
-  substitution fact, documented in the next subsection.
+  substitution fact, documented in "Override substitution and the
+  overridesHere fact" below.
 
 ** Node flags
 
@@ -1383,12 +1389,12 @@ gets a fresh one; a headline carrying one the view does not know
 (typed by hand, or brought back by an old copy of the buffer's text)
 gets a fresh one too, and the counter does not move past it. The
 clients show nothing for it and save it back untouched. The view's
-record of its viewnode IDs, with the counter, the viewnode IDs the
-forest holds and which reconciler made each viewnode, is
-'ViewnodeIdRecord' in =server/types/views_state.rs=.
+record of its viewnode IDs, with the counter and the viewnode IDs of
+the forest as last rendered, is 'ViewnodeIdRecord' in
+=server/types/views_state.rs=.
 
 Metadata is not WYSIWYG; its appearance in the client
-is determined by =elisp/heralds-minor-mode=, whose rule table is
+is determined by =elisp/heralds-minor-mode.el=, whose rule table is
 served by Rust (see "Herald rules" above; the table lives in
 =server/heralds.rs=).
 
@@ -1401,7 +1407,7 @@ remains the established bare non-vognode atom:
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
 A tombstone is written =(skg tombstone (vnid X))=: it has
-no ID, no facts and no title (the parser discards text typed on
+no ID, no change facts and no title (the parser discards text typed on
 its line), and holds only what stands below it. A reconciler
 makes one of a child the graph no longer warrants, and the prune
 removes it once it is childless (the glossary's "tombstone"
@@ -1415,10 +1421,11 @@ changes with the forms below. All are display facts except the
 readiness requests and the restore edit requests, which the save
 consumes; saving a buffer reads none of the new viewnodes, which
 are save-inert, but for a historical phantom's restore request.
-The glossary's "Terms of the diff view" defines the vocabulary.
+The glossary's "Terms a user meets in the diff view" and "Terms of
+the diff view's implementation" define the vocabulary.
 
-*** Facts and requests: =(diff ...)=
-A headline's facts of the diff view and its readiness request form
+*** Change facts and requests: =(diff ...)=
+A headline's change facts and its readiness request form
 one list:
 #+begin_example
 (diff (node added) (rel removed) (properties changed) (leaves N OBJECT...) (ready OBJECT...) (readyRequest OBJECT...))
@@ -1472,9 +1479,9 @@ absent when no request is pending.
 **** The server writes the three kinds of change, =(leaves ...)= and =(ready ...)=
 The server writes the =(diff ...)= form (=change_fact_forms= in
 =server/org_to_text.rs=), and it writes =(ready ...)= after completion
-(=set_ready_facts_in_viewforest=); see =docs/diff-view.org=, "Facts on
-the wire". A rerender of a buffer of the diff view updates each kept
-viewnode's facts in place, and a save of such a buffer recomputes its
+(=set_ready_facts_in_viewforest=); see =docs/diff-view.org=, "Change
+facts on the wire". A rerender of a buffer of the diff view updates each kept
+viewnode's change facts in place, and a save of such a buffer recomputes its
 change facts; see "Diff view" and "Save buffer" above. These parts
 are display facts: nothing reads =(ready ...)= at save, and the
 server's parser accepts and ignores =(leaves ...)=, as its headline
@@ -1537,7 +1544,7 @@ Each line is prefixed by a space, =-= or =+=.
 Under a historical phantom, an =acquiredByFolder= holds the node that
 acquired it by a nodeMerge; under an acquirer, an =acquiredFolder=
 holds the historical phantoms of the nodes it acquired. An
-=acquiredFolder= also accepts a non-member the user parks there.
+=acquiredFolder= also accepts a non-member the user puts there.
 
 *** Changed folders
 A partner, alias, ID or flags folder shown because some relationship of

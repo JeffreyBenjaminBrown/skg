@@ -7,10 +7,10 @@ metadata, such as the label shown after a link or a title shown beside
 an ID in magit, are *annotations*, not heralds.) Toggle the compact display with
 'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
 (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
-need to inspect the exact facts or requests.
+need to inspect the exact display facts or requests.
 
-Relationship counts describe the latest rendered graph under the unrestricted
-skgrepo-set. They count distinct visible nodes, including visible
+Relationship counts describe the latest rendered graph within the current
+skgrepo restriction. They count distinct visible nodes, including visible
 relationships, and resolve extra IDs. They do not count repeated
 links or unsaved buffer edits as new graph facts. A folded body can still
 contribute links. A view's position can add ancestor flags and a birth
@@ -30,7 +30,7 @@ polarity or kind, never its hue. There are eleven styles.
 | message     | black on white                 | prose meant to be read          |
 | stop        | white on red                   | polarity: bad, or not yet       |
 | go          | black on green                 | polarity: good, done            |
-| nonstandard | white on purple                | requests and diff facts         |
+| nonstandard | white on purple                | requests and change facts       |
 | ugly        | pink foreground, no background | error-flavored, but not too bad |
 | boring      | white on dark gray             | counts seldom worth reading     |
 
@@ -59,14 +59,14 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
-| position glyphs      | crucial     | =☮= write-protected, =⊥= affects not its parent, =ĥ= overrides here           |
+| position glyphs      | crucial     | =☮= write-protected, =⊥= non-member, =ĥ= overrides here                       |
 |                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
 | requests             | nonstandard | =delete=, =merge:...=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
-| diff facts           | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
+| change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= commit-ready                                                              |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
 | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
@@ -188,8 +188,8 @@ reveals no node title or skgrepo. =DELETED= marks a deleted node, or a
 viewnode whose node was deleted.
 
 ** Diff heralds
-In the diff view (see the glossary's "Terms of the diff
-view"), the heralds show the three kinds of change: a vognode's =∃+=
+In the diff view (see the glossary's "Terms a user meets in the
+diff view"), the heralds show the three kinds of change: a vognode's =∃+=
 or =∃-= says that HEAD lacks it or the worktree does (its node's
 existence), its =M= ("modified") that both have it and its file
 records a change (its other properties), and =~+= or =~-= that HEAD
@@ -198,9 +198,9 @@ where =∃= stands: a node is new, deleted or modified, never two of
 those. A folder member shows them as a content member does, so a
 modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
-flag entry, which has one diff object, the same facts read =+= and
+flag entry, which has one diff object, the same change facts read =+= and
 =-=; a deleted phantom's one object reads =∃+= or =∃-=, and an unknown
-phantom's =~+= or =~-=. A =✓= after a diff object's facts says its
+phantom's =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A commit readiness aggregate (a
@@ -209,7 +209,7 @@ folder or changeset marker) shows a =✓= when everything under it is ready. =re
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
-'docs/api-and-formats.org', "Facts and requests"): =∃+= and =∃-=
+'docs/api-and-formats.org', "Change facts and requests"): =∃+= and =∃-=
 come from its =(node added)= and =(node removed)= parts, =M= from
 =(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
 removed)= (the style keys 'existence' and 'properties' in

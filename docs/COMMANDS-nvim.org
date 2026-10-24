@@ -1,6 +1,6 @@
 # This file is generated to mirror docs/COMMANDS.org (the Emacs-client
 # command reference), translated to Neovim keybindings and :Skg*
-# Ex commands. nvim/lua/skg/keymaps.lua is the authoritative skgrepo
+# Ex commands. nvim/lua/skg/keymaps.lua is the authoritative source
 # for every binding named here; if this file and that module disagree,
 # keymaps.lua wins. Where COMMANDS.org describes Emacs-only mechanics
 # (the minibuffer, magit), the text below is rewritten for the nvim
@@ -307,7 +307,9 @@ These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, populated from
 the graph. Each builds both folders of its relation (but containers and
-mentioners build one). The write-protected folder ☮
+mentioners build one, as do aliases and flags, which are no relation).
+Under each member of a partner folder hangs its containerward chain
+(see <localleader>lc). The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its nonempty
 subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on an editable
@@ -338,10 +340,12 @@ folder branch to dismiss this optional view without changing any flag.
 The containerFolder -- the nodes that contain this one. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
 content, is shown without a folder. On a node nothing contains, nothing
-appears. Under each member hangs its containerward chain: the member's
-containers as write-protected non-members, theirs under them, up to the
-roots or 'max_roleTree_depth', a container met again on the way shown
-once more as a leaf. A request on a chain node draws that node's own
+appears. Under each member of this folder, and of every other partner
+folder but the diff view's two acquisition folders, hangs its
+containerward chain: the member's containers as write-protected
+non-members, theirs under them, up to the roots or
+'max_roleTree_depth', a container met again on the way shown once
+more as a leaf. A request on a chain node draws that node's own
 containers folder. A fresh content view shows its root's containers
 folder this way.
 *** <localleader>lm : :SkgShowFolderOfMentioners
@@ -357,20 +361,20 @@ cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. One also has no content --
 the server extends none under it,
 in order to prevent the view from becoming redundant and huge --
-but it may keep children that do not affect it.
+but it may keep children that are non-members (see below).
 
 A write-protected occurrence saves nothing of its own,
 so an edit to it refuses the whole save, and nothing is written:
 a changed title or home skgrepo;
 an alias folder, partner folder or flags folder
 that differs from the graph;
-or a child that affects it (a member).
+or a member child.
 The refusal names the occurrence and what differs.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (<localleader>sd on it), save, and edit it then.
-A child that should stay there can instead be marked
-as not affecting its parent.
+A child that should stay there can instead be made a non-member:
+its metadata carries the bare atom 'nonMember' (herald ⊥).
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use 'SetEditable' (<localleader>sd), below.
 That's because Skg has to make other occurrences of it
@@ -381,15 +385,16 @@ Otherwise, two editable nodes could contradict each other.
 
 Making a node write-protected is likewise a request
 ('RequestWriteProtected' (<localleader>sw), below), which the server
-performs: it also makes the children of the write-protected occurrence
-stop affecting it, since a write-protected occurrence has no content.
+performs: it also makes the member children of the write-protected
+occurrence non-members, since a write-protected occurrence has no
+content.
 *** <localleader>sd : :SkgSetEditable
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view
 (if it exists) write-protected, keeping what it shows
-(though no longer as its content: each child that affected its parent
-stops affecting it), and then make an editable view here.
+(though no longer as its content: each member child
+becomes a non-member), and then make an editable view here.
 Moving editability back to that occurrence later
 makes those children its content again.
 Called on a node that is already editable,
@@ -403,7 +408,7 @@ as described above. It does not save.
 At the next save, edits the occurrence carries are saved first;
 then the server makes it write-protected,
 resyncing its title from the graph,
-and makes each of its children stop affecting it,
+and makes each of its member children a non-member,
 so that edits to its title, body or children no longer affect it
   (although edits to its children still affect those children:
   they keep their own editability, and their own content).
@@ -415,7 +420,7 @@ and the save is refused.
 *** <localleader>sW : :SkgRequestWriteProtectedRecursive
 The same, for the occurrence and its whole content subtree:
 every node in it becomes write-protected,
-and every child under them stops affecting its parent.
+and every member child under them becomes a non-member.
 *** <localleader>ss : :SkgSetRepo
 Changes the skgrepo of the node at point.
 The prompt starts with the current skgrepo as editable command-line
@@ -449,7 +454,7 @@ then it saves with that answer, or not at all if you quit.
 Like 'SetRepo', but it also
 changes the skgrepo of every content descendent of the node at point
 whose skgrepo matches the original skgrepo of the node at point.
-Only descendents for which AffectsParent=True are traversed.
+Only member descendents (those without the 'nonMember' atom) are traversed.
 The write-protected warning and the save's handling of relationships
 described under <localleader>ss apply here too, across the whole
 subtree.
@@ -567,7 +572,7 @@ shows as a change. The
 commit lapses the marks of everything it committed.
 *** <localleader>rnc : :SkgDiffViewGotoNextChange
 Moves the cursor to the next change headline after it: a headline
-whose metadata carries a '(leaves ...)' fact, the server's count of
+whose metadata carries a '(leaves ...)' change fact, the server's count of
 the changes it names. The cursor lands on the headline's metadata, as
 with <localleader>in. It does not wrap: past the last one it says "No
 further change" and leaves the cursor. It works in any skg buffer;
@@ -732,6 +737,10 @@ to use that skgrepo-set and rerenders open Skg buffers in place. Choose
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
+
+':SkgListRepoSets' shows the current restriction and the skgrepo-sets
+available, and ':SkgShowSkgrepoRestriction' shows the restriction
+alone.
 *** <localleader>vm : :SkgViewMetadata
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
@@ -959,6 +968,8 @@ files there are left untouched.
 ** connection, reload, rebuild session-lifetime stores
 Unless you're coding or troubleshooting,
 you probably won't need these.
+*** :SkgInit CONFIG-PATH
+Initializes the client against a skgconfig.toml.
 *** :SkgConnectionVerify
 Sends a ping to the Rust server
 to check if the connection is working.
@@ -971,6 +982,12 @@ graph, and rebuilds the derived Tantivy search index. It does not rewrite the
 =.skg= files.
 Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
 to close them.
+*** :SkgStripBodyWhitespace
+Strips trailing whitespace from every line of every body,
+in every skgrepo you own.
+Foreign skgrepos are never written, so they are left untouched.
+Rewrites exactly the .skg files whose bodies change;
+the derived caches are refreshed to match.
 *** :SkgCloseAllSkgBuffers
 This may be warranted after an session-lifetime-store rebuild.
 Kills every skg view buffer (each triggers a close-view notice to

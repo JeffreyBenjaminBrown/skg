@@ -26,6 +26,10 @@ a successful save under a restricted skgrepo-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save skgsave-committed but sends no new view text and changes no
 open-view registry entry.
+** C-a : skg-beginning-of-line
+On a headline, moves point to the start of its title, after the stars
+and the metadata; pressed again, to the true start of the line. On
+any other line it moves to the start of the line.
 ** M-x skg-show-unsaved-changes : archive edits for manual recovery
 Prompts for a local Org file, writes a detached recovery document, opens
 it, and reports its actual path. The document contains context, lossless
@@ -218,10 +222,10 @@ Examples:
 Search-then-link: pick a result, return here, get a link.
 
 Like =skg-search= but tailored for inserting a link to a node
-you don't yet know the ID of. The current buffer is saved
-first (so detours through the search results' links don't
-collide with unsaved edits), and the position of point is
-remembered. The same conservative search defaults as
+you don't yet know the ID of. The current buffer is not saved
+first: the position of point is remembered, and a detour through
+the search results' links works against your unsaved edits. Save
+the buffer afterwards. The same conservative search defaults as
 =skg-search= apply.
 
 In the resulting search buffer, find the result you want and
@@ -234,6 +238,8 @@ it reduced to their labels (so the new link's label is plain
 text, never another link inside a link).
 ** C-c g : going to a node
 *** C-c g RET : skg-goto
+Also bound to =C-c C-o=, in place of org's =org-open-at-point=,
+which cannot follow skg links.
 Calling this when the cursor is on a link, a node's metadata,
 a bare UUID, or a .skg filename
 will open a new view from the ID it finds there,
@@ -312,7 +318,9 @@ These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, populated from
 the graph. Each builds both folders of its relation (but containers and
-mentioners build one). The write-protected folder ☮
+mentioners build one, as do aliases and flags, which are no relation).
+Under each member of a partner folder hangs its containerward chain
+(see C-c l c). The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, an editable node shows only its nonempty
 subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on an editable
@@ -345,10 +353,12 @@ optional view; doing so does not change any flag.
 The containerFolder -- the nodes that contain this one. Write-protected (☮):
 containment is edited from the container. Its other side, the node's
 content, is shown without a folder. On a node nothing contains, nothing
-appears. Under each member hangs its containerward chain: the member's
-containers as write-protected non-members, theirs under them, up to the
-roots or 'max_roleTree_depth', a container met again on the way shown
-once more as a leaf. A request on a chain node draws that node's own
+appears. Under each member of this folder, and of every other partner
+folder but the diff view's two acquisition folders, hangs its
+containerward chain: the member's containers as write-protected
+non-members, theirs under them, up to the roots or
+'max_roleTree_depth', a container met again on the way shown once
+more as a leaf. A request on a chain node draws that node's own
 containers folder. A fresh content view shows its root's containers
 folder this way.
 *** C-c l m : skg-show-folderOf-mentioners
@@ -364,20 +374,20 @@ cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. One also has no content --
 the server extends none under it,
 in order to prevent the view from becoming redundant and huge --
-but it may keep children that do not affect it.
+but it may keep children that are non-members (see below).
 
 A write-protected occurrence saves nothing of its own,
 so an edit to it refuses the whole save, and nothing is written:
 a changed title or home skgrepo;
 an alias folder, partner folder or flags folder
 that differs from the graph;
-or a child that affects it (a member).
+or a member child.
 The refusal names the occurrence and what differs.
 The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
-A child that should stay there can instead be marked
-as not affecting its parent.
+A child that should stay there can instead be made a non-member:
+its metadata carries the bare atom 'nonMember' (herald ⊥).
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use skg-set-editable, below.
 That's because Skg has to make other occurrences of it
@@ -388,15 +398,15 @@ Otherwise, two editable nodes could contradict each other.
 
 Making a node write-protected is likewise a request
 (skg-request-write-protected, below), which the server performs:
-it also makes the children of the write-protected occurrence
-stop affecting it, since a write-protected occurrence has no content.
+it also makes the member children of the write-protected occurrence
+non-members, since a write-protected occurrence has no content.
 *** C-c s d : skg-set-editable
 If you want to see the editable view of that node
 from a place where it is currently shown in a write-protected form,
 call this function. It will make the current editable view
 (if it exists) write-protected, keeping what it shows
-(though no longer as its content: each child that affected its parent
-stops affecting it), and then make an editable view here.
+(though no longer as its content: each member child
+becomes a non-member), and then make an editable view here.
 Moving editability back to that occurrence later
 makes those children its content again.
 Called on a node that is already editable,
@@ -410,7 +420,7 @@ as described above. It does not save.
 At the next save, edits the occurrence carries are saved first;
 then the server makes it write-protected,
 resyncing its title from the graph,
-and makes each of its children stop affecting it,
+and makes each of its member children a non-member,
 so that edits to its title, body or children no longer affect it
   (although edits to its children still affect those children:
   they keep their own editability, and their own content).
@@ -422,7 +432,7 @@ and the save is refused.
 *** C-c s W : skg-request-write-protected-recursive
 The same, for the occurrence and its whole content subtree:
 every node in it becomes write-protected,
-and every child under them stops affecting its parent.
+and every member child under them becomes a non-member.
 *** C-c s s : skg-set-repo
 Changes the skgrepo of the node at point.
 The prompt starts with the current skgrepo as editable minibuffer text.
@@ -452,7 +462,7 @@ that answer, or not at all if you quit.
 Like 'skg-set-repo', but it also
 changes the skgrepo of every content descendent of the node at point
 whose skgrepo matches the original skgrepo of the node at point.
-Only descendents for which AffectsParent=True are traversed.
+Only member descendents (those without the 'nonMember' atom) are traversed.
 The write-protected warning and the save's handling of relationships
 described under =C-c s s= apply here too, across the whole subtree.
 *** C-c s x : skg-set-flag-search-matching
@@ -540,6 +550,7 @@ relationship to its default -- to reach the default, choose it.
 
 Refuses with an error when point is on a member of a write-protected folder
 (subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
+containerFolder, mentionerFolder, acquiredByFolder, acquiredFolder,
 hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder): the
 relationship belongs to the other end there, so setting its skgrepo
 from this side would be meaningless. Also refuses on a root
@@ -567,7 +578,7 @@ the viewparent should qualify: the schema's five node-node
 relations are the level-1 headlines, and each level-2 headline is a
 role the view-child would play in that relation toward its
 viewparent. Only three roles are settable from the child's
-position -- =contained= (ordinary content), =subscribee= (a
+position -- =content= (ordinary content), =subscribee= (a
 subscribeeFolder member) and =overridden= (an overriddenFolder member);
 RET on any other role explains why its relationship cannot be set from
 there (write-protected folders belong to the other end; links carry no
@@ -582,8 +593,8 @@ defaults -- so every skgrepo is offered and the save's floor check
 validates each relationship (an offered skgrepo more public than some relationship's
 default makes the save fail, naming that relationship).
 
-The walk applies to, and recurses on, only viewchildren that affect
-their viewparents: member unrestrictedNodes, through the two
+The walk applies to, and recurses on, only viewchildren that are
+members: member unrestrictedNodes, through the two
 editable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
@@ -671,7 +682,7 @@ shows as a change. The
 commit lapses the marks of everything it committed.
 *** C-c r n c : skg-diffView-goto-next-change
 Moves point to the next change headline after point: a headline whose
-metadata carries a '(leaves ...)' fact, the server's count of the
+metadata carries a '(leaves ...)' change fact, the server's count of the
 changes it names. Point lands on the headline's metadata, as with
 C-c i n. It does not wrap: past the last one it says "No further
 change" and leaves point. It works in any skg buffer; outside the
@@ -862,6 +873,10 @@ server to use that skgrepo-set for subsequent requests. Choose =all=
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the skgrepo restriction or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
+
+=M-x skg-list-repo-sets= shows the current restriction and the
+skgrepo-sets available, and =M-x skg-show-skgrepo-restriction= shows
+the restriction alone.
 *** C-c v r : skg-readable-ids-mode
 This changes how node IDs are displayed.
 The ID itself is a kind of special random gibberish called UUID v4.
@@ -881,7 +896,8 @@ Empties the session's ID-to-title cache (see =C-c v r=) and
 re-annotates the current buffer. Use it after anything that changes
 what titles the server would answer with: a node retitled, or the
 skgrepo restriction widened (IDs restricted under the old set were
-cached as unresolvable).
+cached as unresolvable). Both keys are bound in content views only;
+in a magit or raw .skg buffer, use M-x.
 *** C-c v s : skg-view-linkstack
 View and maybe edit the set of links you've stored.
 (See "the linkstack" below.)
@@ -957,7 +973,8 @@ Then the pasted node stays write-protected, and Emacs says so.
 Like skg-paste-node,
 but also removes the node from the stack.
 **** C-c v s : skg-view-linkstack
-repeated here; described earlier in this doc
+repeated here; described earlier in this doc.
+In the linkstack buffer, =C-x C-s= saves your edits to the stack.
 ** import and export
 *** skg-import-md-and-org : additive mixed-document import
 :PROPERTIES:
