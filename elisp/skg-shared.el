@@ -2,8 +2,10 @@
 ;;;
 ;;; PURPOSE: Read the data files in 'shared/', which the server's tests
 ;;; and both clients read: 'herald-styles.json' (the herald styles and
-;;; how relationship heralds use them) and 'relations.json' (the
-;;; node-node relations). The Neovim analog is nvim/lua/skg/shared.lua.
+;;; how relationship heralds use them), 'relations.json' (the
+;;; node-node relations) and 'metadata-fields.json' (the fields a user
+;;; may set on each kind of headline). The Neovim analog is
+;;; nvim/lua/skg/shared.lua.
 
 (require 'cl-lib)
 (require 'json)
@@ -30,6 +32,11 @@ with symbol keys, and arrays become lists."
   (alist-get 'relations (skg-shared--read-json "relations.json"))
   "The relations in 'shared/relations.json', in the file's order.")
 
+(defconst skg-shared-metadata-kinds
+  (alist-get 'kinds (skg-shared--read-json "metadata-fields.json"))
+  "The headline kinds in 'shared/metadata-fields.json', each with the
+fields a user may set on it.")
+
 (defun skg-shared-styles ()
   "The herald styles: an alist from style name (a symbol) to its look."
   (alist-get 'styles skg-shared-herald-styles))
@@ -50,5 +57,11 @@ with symbol keys, and arrays become lists."
   (cl-find name skg-shared-relations
            :key (lambda (relation) (alist-get 'name relation))
            :test #'equal))
+
+(defun skg-shared-metadata-kind (atom)
+  "The kind in 'shared/metadata-fields.json' known by the atom ATOM (a
+string), or nil."
+  (cl-find-if (lambda (kind) (member atom (alist-get 'atoms kind)))
+              skg-shared-metadata-kinds))
 
 (provide 'skg-shared)

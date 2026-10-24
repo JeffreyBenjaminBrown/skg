@@ -11,7 +11,8 @@
 (require 'skg-lens)
 (require 'skg-metadata)
 (require 'skg-sexpr-org-bijection)
-(require 'skg-unrestrictedNode-defaults)
+(require 'skg-metadata-fields)
+(require 'skg-shared)
 (require 'skg-sexpr-cycling)
 (require 'skg-state)
 
@@ -29,8 +30,9 @@
 (defvar-local skg-sexp-edit--end nil
   "End position of the sexp in the source buffer.")
 
-(defvar-local skg-sexp-edit--is-unrestrictedNode nil
-  "Non-nil if the sexp being edited is an UnrestrictedVognode.")
+(defvar-local skg-sexp-edit--kind nil
+  "The kind of the headline being edited, from
+'shared/metadata-fields.json', or nil.")
 
 ;;
 ;; Minor mode for the edit buffer
@@ -56,8 +58,9 @@ Kill the buffer to cancel without saving."
   (let* ((org-text (buffer-substring-no-properties
                     (point-min) (point-max)))
          (final-org ;; last version of the org text in the sexp-edit buffer
-          (if skg-sexp-edit--is-unrestrictedNode
-              (skg-unrestrictedNode-strip-defaults-from-org org-text)
+          (if skg-sexp-edit--kind
+              (skg-metadata-fields-strip-defaults-from-org
+               org-text skg-sexp-edit--kind)
             org-text))
          (new-sexp (org-to-sexp final-org))
          (new-text (prin1-to-string new-sexp))
@@ -76,17 +79,17 @@ Kill the buffer to cancel without saving."
 
 
 (defun skg-sexp-edit--open-edit-buffer (org-text source-buffer
-                                       sexp-start sexp-end is-unrestrictedNode)
+                                       sexp-start sexp-end kind)
   "Open a sexp-edit buffer with ORG-TEXT from SOURCE-BUFFER.
-SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
+SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER. KIND is the
+headline's kind from 'shared/metadata-fields.json', or nil."
   (let (( edit-buffer (generate-new-buffer "*skg-metadata-edit*") ))
     (switch-to-buffer edit-buffer)
     (insert skg-edit--help-text)
     (insert org-text)
     (skg--org-mode-with-options)
     (org-fold-show-all)
-    (when is-unrestrictedNode
-      (skg-sexp-edit--make-title-headlines-read-only))
+    (skg-sexp-edit--make-title-headlines-read-only)
     (goto-char (point-min))
     (progn ;; move point
       (outline-next-heading)
@@ -99,7 +102,7 @@ SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER."
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
-    (setq-local skg-sexp-edit--is-unrestrictedNode is-unrestrictedNode)))
+    (setq-local skg-sexp-edit--kind kind)))
 
 (defun skg-sexp-edit--decorate-with-heralds ()
   "Append, per headline, the herald its metadata path produces:
@@ -200,7 +203,8 @@ field childless, so an untouched save yields just (skg (node (repo X)))."
          ( org-text (skg-view-metadata--empty-node-org-text
                      skgrepo title) ))
     (skg-sexp-edit--open-edit-buffer
-     org-text source-buffer sexp-start sexp-end t)
+     org-text source-buffer sexp-start sexp-end
+     (skg-shared-metadata-kind "node"))
     (skg-sexp-edit--goto-field-value "repo")))
 
 (defun skg-view-metadata--empty-node-org-text (skgrepo title)
@@ -208,7 +212,7 @@ field childless, so an untouched save yields just (skg (node (repo X)))."
 REPO is pre-filled under the `repo' field.  TITLE, if non-blank,
 appears under a display-only `title' group; otherwise `title' is shown
 childless.  Every editable field other than repo appears childless,
-so the strip step (`skg-unrestrictedNode-strip-defaults-from-org') drops the
+so the strip step (`skg-metadata-fields-strip-defaults-from-org') drops the
 ones the user never populates -- key and all."
   (let* (( title-group
            (if (string-empty-p (string-trim (or title "")))
@@ -222,8 +226,8 @@ ones the user never populates -- key and all."
                          (cons 4 skgrepo))
                    (mapcar (lambda (field)
                              (cons 3 field))
-                           (mapcar #'car
-                                   skg-unrestrictedNode--editable-defaults))) ))
+                           (skg-metadata-fields-field-names
+                            (skg-shared-metadata-kind "node")))) ))
     (skg-headlines-to-org
      (append title-group node-skeleton))))
 
@@ -287,7 +291,9 @@ metadata."
 
 (defun skg-view-metadata ()
   "Edit the metadata sexp on the current headline in an org buffer.
-Opens a temporary org buffer with the sexp converted to org headlines.
+Opens a temporary org buffer with the sexp converted to org headlines,
+showing each field a user may set on the headline's kind
+('shared/metadata-fields.json'), at its default when it is absent.
 If the headline has no metadata, populates a minimal (skg (node (repo X)))
 in place and opens the empty-node view over it -- repo pre-filled, the
 other editable fields childless (see `skg-view-metadata--open-empty-node-view').
@@ -306,18 +312,20 @@ Kill the buffer to cancel without saving."
           (skg-view-metadata--open-empty-node-view (caddr split))
         (let* (( source-buffer (current-buffer) )
                (sexp (read metadata-str) )
-               (is-unrestrictedNode (skg-unrestrictedNode-sexp-p sexp) )
+               (kind (skg-metadata-fields-kind-of-sexp sexp) )
                (sexp-start (+ (line-beginning-position)
                               (length (car split))) )
                (sexp-end (+ sexp-start (length metadata-str)) )
                (title (caddr split))
                (org-text (let ((sexp-as-org (sexp-to-org sexp)))
-                           (if is-unrestrictedNode
-                               (skg-unrestrictedNode-fillIn-defaults-in-org
-                                sexp-as-org nil title)
+                           (if kind
+                               (skg-metadata-fields-fillIn-defaults-in-org
+                                sexp-as-org kind nil
+                                (when (skg--unrestrictedNode-sexp-p sexp)
+                                  title))
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer
-           org-text source-buffer sexp-start sexp-end is-unrestrictedNode)
+           org-text source-buffer sexp-start sexp-end kind)
           (skg-sexp-edit--goto-field-value "repo"))))))
 
 (provide 'skg-sexpr-edit)

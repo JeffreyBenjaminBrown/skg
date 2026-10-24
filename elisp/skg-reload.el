@@ -109,7 +109,7 @@ rather than via `unload-feature'."
             skg-sexpr-org-bijection
             skg-sexpr-search
             skg-shared
-            skg-unrestrictedNode-defaults
+            skg-metadata-fields
             skg-state
             skg-test-utils
             skg-readable-ids

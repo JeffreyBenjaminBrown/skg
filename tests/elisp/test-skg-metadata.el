@@ -689,30 +689,127 @@ the request."
     (should (equal (test-skg--refusal-of headline #'skg-restore-deleted-node)
                    "Only a node deleted since HEAD can be restored"))))
 
-(ert-deftest test-skg-metadata-editor-offers-the-restore-requests-where-they-apply ()
-  "The metadata editor's cycle of edit requests offers restoreNode on
-a historical phantom, restoreRel beside the others on a removed
-membership, and neither elsewhere."
-  (require 'skg-sexpr-cycling)
+(defun test-skg--with-metadata-editor-on (headline body-fn)
+  "Open the metadata editor on HEADLINE, the only line of an org
+buffer, and call BODY-FN in the edit buffer with the source buffer.
+Kills both buffers after."
+  (let ((source (generate-new-buffer " *source*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer source
+            (insert headline "\n")
+            (org-mode)
+            (goto-char (point-min))
+            (skg-view-metadata))
+          (with-current-buffer
+              (cl-find-if (lambda (buffer)
+                            (eq (buffer-local-value
+                                 'skg-sexp-edit--source-buffer buffer)
+                                source))
+                          (buffer-list))
+            (funcall body-fn source)))
+      (dolist (buffer (buffer-list))
+        (when (eq (buffer-local-value 'skg-sexp-edit--source-buffer buffer)
+                  source)
+          (kill-buffer buffer)))
+      (kill-buffer source))))
+
+(defun test-skg--cycle-values-of-shown-field (field)
+  "The cycle values of FIELD in the current edit buffer, which must
+show FIELD with its value on the next line."
+  (goto-char (point-min))
+  (should (re-search-forward (concat "^\\*+ " field "$") nil t))
+  (forward-line 1)
+  (skg-sexp-edit--cycle-values-for-field
+   field (string-trim (org-get-heading t t t t))))
+
+(ert-deftest test-skg-metadata-editor-offers-each-kind-its-fields ()
+  "The metadata editor, opened on each kind of headline, shows the
+fields 'shared/metadata-fields.json' gives that kind, each at its
+default when absent; cycles each through the values the headline may
+take (a write-protected node is offered no delete, merge or flag, a
+removed member restoreRel, a historical phantom restoreNode); shows
+no field on a kind that has none; and saves an untouched view
+unchanged."
+  (require 'skg-sexpr-edit)
+  (let ((view-requests '("none (default)" "editableView"
+                         "writeProtectedView" "writeProtectedSubtreeView"
+                         "fork" "flags" "folder"))
+        (atom-values '("false (default)" "true")))
+    (dolist (case
+             `(("* (skg (node (id x) (repo main))) x"
+                ("writeProtected" . ,atom-values)
+                ("nonMember" . ,atom-values)
+                ("editRequest" . ("none (default)" "delete" "merge"
+                                  "relRepo" "flag"))
+                ("viewRequests" . ,view-requests))
+               ("* (skg (node (id x) (repo main) writeProtected)) x"
+                ("editRequest" . ("none (default)" "relRepo")))
+               ("* (skg (node (id x) (repo main) nonMember (diff (rel removed)))) x"
+                ("editRequest" . ("none (default)" "delete" "merge"
+                                  "relRepo" "flag" "restoreRel")))
+               ("* (skg (historical (id g) (repo main) (diff (node removed)))) g"
+                ("editRequest" . ("none (default)" "restoreNode")))
+               ("* (skg (unknown (id u)))"
+                ("editRequest" . ("none (default)" "relRepo")))
+               ("* (skg alias) an alias"
+                ("editRequest" . ("none (default)" "relRepo")))
+               ("* (skg (deleted (id d) (repo main))) d")
+               ("* (skg subscribeeFolder)")
+               ("* (skg (flag noSearchMatching)) no search matching")))
+      (test-skg--with-metadata-editor-on
+       (car case)
+       (lambda (source)
+         (dolist (field (cdr case))
+           (should (equal (test-skg--cycle-values-of-shown-field (car field))
+                          (cdr field))))
+         (unless (cdr case)
+           (goto-char (point-min))
+           (should-not (re-search-forward
+                        "^\\*+ \\(editRequest\\|viewRequests\\|writeProtected\\|nonMember\\)$"
+                        nil t)))
+         (skg-sexp-edit--apply)
+         (should (equal (with-current-buffer source
+                          (string-trim (buffer-string)))
+                        (car case))))))))
+
+(ert-deftest test-skg-metadata-editor-cycles-and-saves-values-with-arguments ()
+  "Cycling to a value that takes arguments prompts for each and saves
+the value as a list; an untouched default is stripped on every kind."
+  (require 'skg-sexpr-edit)
   (dolist (case
-           '(("* (skg (historical (id g) (repo main) (diff (node removed)))) g"
-              . ("none (default)" "restoreNode"))
-             ("* (skg (node (id x) (repo main) nonMember (diff (rel removed)))) x"
-              . ("none (default)" "delete" "merge" "restoreRel"))
-             ("* (skg (node (id x) (repo main))) x"
-              . ("none (default)" "delete" "merge"))))
-    (let ((source (generate-new-buffer " *source*")))
-      (unwind-protect
-          (progn
-            (with-current-buffer source (insert (car case)))
-            (with-temp-buffer
-              (setq-local skg-sexp-edit--source-buffer source)
-              (setq-local skg-sexp-edit--start 3)
-              (setq-local skg-sexp-edit--end
-                          (with-current-buffer source
-                            (save-excursion
-                              (goto-char 3) (forward-sexp) (point))))
-              (should (equal (skg-sexp-edit--cycle-values-for-field
-                              "editRequest" "none (default)")
-                             (cdr case)))))
-        (kill-buffer source)))))
+           '(("* (skg alias) an alias" ("editRequest") 1
+              "* (skg alias (editRequest (relRepo r))) an alias")
+             ("* (skg (unknown (id u)))" ("editRequest") 1
+              "* (skg (unknown (id u) (editRequest (relRepo r))))")
+             ("* (skg (historical (id g) (repo main))) g" ("editRequest") 1
+              "* (skg (historical (id g) (repo main) (editRequest restoreNode))) g")
+             ("* (skg (node (id x) (repo main))) x" ("viewRequests") 6
+              "* (skg (node (id x) (repo main) (viewRequests (folder containers)))) x")
+             ("* (skg (node (id x) (repo main))) x" ("editRequest") 4
+              "* (skg (node (id x) (repo main) (editRequest (flag noSearchMatching true)))) x")))
+    (test-skg--with-metadata-editor-on
+     (car case)
+     (lambda (source)
+       (goto-char (point-min))
+       (re-search-forward (concat "^\\*+ " (car (nth 1 case)) "$"))
+       (forward-line 1)
+       (let ((answers '("containers" "noSearchMatching" "true")))
+         (cl-letf (((symbol-function 'skg--repo-names)
+                    (lambda () '("r" "main")))
+                   ((symbol-function 'read-string)
+                    (lambda (&rest _) "[[id:m][a target]]"))
+                   ((symbol-function 'completing-read)
+                    (lambda (_prompt collection &rest _)
+                      (if (member "r" collection) "r"
+                        (let ((answer (cl-find-if
+                                       (lambda (a) (member a collection))
+                                       answers)))
+                          (setq answers (remove answer answers))
+                          answer)))))
+           (dotimes (_ (nth 2 case))
+             (skg-sexp-edit-cycle-right))))
+       (skg-sexp-edit--apply)
+       (should (equal (with-current-buffer source
+                        (string-trim (buffer-string)))
+                      (nth 3 case)))))))

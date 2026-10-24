@@ -1,7 +1,9 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: S-left / S-right cycling for sexp-edit buffers.
-;;; Dispatch is based on the parent headline text.
+;;; Dispatch is based on the parent headline text; what a field's
+;;; cycle runs through comes from 'shared/metadata-fields.json'
+;;; ('skg-metadata-fields.el').
 ;;;
 ;;; ENTRY POINTS:
 ;;;   skg-sexp-edit-cycle-left
@@ -10,6 +12,7 @@
 (require 'cl-lib)
 (require 'skg-config)
 (require 'skg-metadata)
+(require 'skg-metadata-fields)
 (require 'skg-state)
 
 ;; Buffer-local in the edit buffer; defined in skg-sexpr-edit.el.
@@ -32,8 +35,13 @@
 
 (defun skg-sexp-edit--cycle-through (field-value values direction)
   "Cycle FIELD-VALUE through VALUES by DIRECTION (+1 or -1).
-Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
-  (let* ((idx (or (cl-position field-value values :test #'string=) 0))
+Returns the new value. FIELD-VALUE is found in VALUES whole, or by its
+first word when it carries arguments ('merge ID'); if it is not
+there, cycling starts at index 0."
+  (let* ((idx (or (cl-position field-value values :test #'string=)
+                  (cl-position (car (split-string field-value)) values
+                               :test #'equal)
+                  0))
          (new-idx (mod (+ idx direction) (length values))))
     (nth new-idx values)))
 
@@ -44,22 +52,31 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 (defun skg-sexp-edit--cycle-values-for-field (field-name field-value)
   "Return the list of values to cycle through for FIELD-NAME.
 FIELD-VALUE is the current headline text, needed for repo defaulting.
-Returns nil if the field is not cycleable."
-  (cond
-   ((member field-name '("writeProtected" "nonMember"))
-    '("false (default)" "true"))
-   ((string= field-name "editRequest")
-    (skg-sexp-edit--edit-request-cycle-values))
-   ((string= field-name "repo") ;; from the config
-    (skg-sexp-edit--repo-cycle-values field-value))
-   ((string= field-name "viewRequests")
-    ;; Only the bare-atom requests are field-cycleable.
-    ;; The '(folder RELNAME)' requests are structured forms,
-    ;; inserted via their dedicated commands, not by cycling.
-    '("none (default)"
-      "editableView"
-      "writeProtectedView"
-      "writeProtectedSubtreeView"))))
+Every field but repo cycles as 'shared/metadata-fields.json' says for
+the kind of the headline being edited: a value offered only to an
+editable headline is left out when the edit buffer sets writeProtected
+to true, and one offered only to a removed member when the headline's
+metadata lacks '(diff (rel removed))'. The diff view's restore
+requests are described in 'docs/diff-view.org', \"Restoring what a
+change removed\". Returns nil if the field is not cycleable."
+  (if (string= field-name "repo") ;; from the config
+      (skg-sexp-edit--repo-cycle-values field-value)
+    (let ((source-sexp (skg-sexp-edit--source-sexp)))
+      (skg-metadata-fields-cycle-values
+       (skg-metadata-fields-kind-of-sexp source-sexp)
+       field-name
+       (skg-sexp-edit--editable-p)
+       (skg--removed-membership-p source-sexp)))))
+
+(defun skg-sexp-edit--editable-p ()
+  "Whether the headline being edited is editable: the edit buffer does
+not set its writeProtected field to true."
+  (save-excursion
+    (goto-char (point-min))
+    (not (and (re-search-forward "^\\(\\*+\\) writeProtected$" nil t)
+              (let ((level (length (match-string 1))))
+                (forward-line 1)
+                (looking-at (format "^\\*\\{%d\\} true$" (1+ level))))))))
 
 (defun skg-sexp-edit--repo-cycle-values (field-value)
   "Return repo names from config as a cycle list.
@@ -75,17 +92,18 @@ starts there rather than jumping to a bare repo name."
                         skgrepos))
         skgrepos))))
 
-(defun skg-sexp-edit--edit-request-cycle-values ()
-  "The edit requests to cycle through for the headline being edited.
-A historical phantom takes only restoreNode; a removed membership
-also takes restoreRel. The diff view's restore requests are
-described in 'docs/diff-view.org', \"Restoring what a change removed\"."
-  (let ((source-sexp (skg-sexp-edit--source-sexp)))
-    (cond ((skg-sexp-subtree-p source-sexp '(skg (historical)))
-           '("none (default)" "restoreNode"))
-          ((skg--removed-membership-p source-sexp)
-           '("none (default)" "delete" "merge" "restoreRel"))
-          (t '("none (default)" "delete" "merge")))))
+(defun skg-sexp-edit--read-argument (value argument)
+  "Prompt for ARGUMENT of the field value VALUE, as
+'shared/metadata-fields.json' describes it: an id (a pasted link is
+accepted), a skgrepo, or one of a fixed list."
+  (let ((of (alist-get 'of argument)))
+    (cond ((equal of "id")
+           (read-string (format "%s: ID (or paste a link): " value)))
+          ((equal of "skgrepo")
+           (completing-read (format "%s: skgrepo: " value)
+                            (skg--repo-names)))
+          (t (completing-read (format "%s: " value)
+                              (alist-get 'one_of argument) nil t)))))
 
 (defun skg-sexp-edit--source-sexp ()
   "The metadata sexp the edit buffer was opened on, as its source
@@ -117,13 +135,22 @@ Dispatch is based on the parent headline text."
                    parent field-value)))
       (cond
        (values
-        (let ((new-val (skg-sexp-edit--cycle-through
-                        field-value values direction)))
+        (let* ((new-val (skg-sexp-edit--cycle-through
+                         field-value values direction))
+               (arguments (skg-metadata-fields-value-arguments
+                           (skg-metadata-fields-kind-of-sexp
+                            (skg-sexp-edit--source-sexp))
+                           parent new-val)))
           (org-edit-headline new-val)
-          (when (string= new-val "merge")
-            (let ((skgid (read-string
-                       "Enter merge target ID (or paste a link): ")))
-              (org-edit-headline (concat "merge " skgid))))))
+          (when arguments
+            (org-edit-headline
+             (mapconcat #'identity
+                        (cons new-val
+                              (mapcar (lambda (argument)
+                                        (skg-sexp-edit--read-argument
+                                         new-val argument))
+                                      arguments))
+                        " ")))))
        ;; Skgrepo with no config: prompt
        ((string= parent "repo")
         (org-edit-headline (read-string "Repo: " field-value)))
