@@ -1,10 +1,10 @@
 //! Bringing views up to date with the graph. Every rendering of a
 //! view runs view completion ('complete_viewforest' in
 //! 'update_buffer/complete.rs') and then the shared tail
-//! ('finish_viewforest': root role trees, membership marking,
+//! ('finish_viewforest': membership marking,
 //! stats, the skgrepo set, the text):
 //! - 'render_initial_view' renders a new content view from a stub of its
-//!   roots;
+//!   roots, each with its containers folder;
 //! - 'complete_viewforest_with_graph_straddle'
 //!   ('server/diff_view/completion.rs') renders a buffer of the diff
 //!   view the same way, over the graph straddle;
@@ -46,8 +46,6 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::write_graph_straddle_back;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
-use crate::to_org::extend::role_tree::{
-  RoleTreePartners, attach_full_containerward_role_trees_at_treeids_with_skgrepo_set};
 use crate::to_org::util::EditableMap;
 use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
@@ -56,9 +54,8 @@ use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_as_members, validate_affectsParent_relationships_in_straddle, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
-use crate::types::viewnode::{Property, Vognode, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{FolderRelation, Property, Vognode, PropertyFolder, ViewRequest};
 use crate::update_buffer::ancestry::deaden_generalized_orphan_folder;
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -401,8 +398,7 @@ fn rerender_collateral_view (
 /// creates each fresh node's default PartnerFolders
 /// (create_partnerFolders_for_fresh_nodes = true), extends content, reconciles
 /// folders, and applies the node budget (see 'to_org/extend/editable.rs').
-/// The caller (multi_root_view_via_env) then adds containerward role tree and
-/// stats.
+/// The caller (multi_root_view_via_env) then adds the stats.
 /// Returns the completed viewforest plus the warning strings the
 /// render itself produced, of which there are none: folder-repair
 /// warnings stay silent for de novo renders (see the warning-sink
@@ -420,19 +416,19 @@ pub fn render_initial_view (
     crate::to_org::util::stub_viewforest_from_root_skgids (
       root_skgids, &runtime . graph, &runtime . config, &mut stub_editable_map,
       restriction ) ?;
-  // De-novo (and only de-novo) asks each view-root for its containerward
-  // ancestry, as a self-consuming view request. The during-completion dispatch
-  // leaves view-root Containerward alone (extract_view_requests); finish_viewforest
-  // fulfills it via the ContainerwardRoleTree attach and drops it. So root containerward is
-  // generated once, here, and round-trips in the saved buffer as ordinary content
-  // -- a later save never re-generates it. (Roots are already editable by
-  // construction -- first occurrence in the editable_map -- so they need no
+  // De-novo (and only de-novo) asks each view-root for its containers
+  // folder, which the root's visit draws with the containerward chain
+  // under each member ('to_org/extend/folder_request.rs'). The request
+  // is consumed there, so a later save never draws it again: the
+  // folder round-trips in the saved buffer, reconciled like any
+  // other. (Roots are already editable by construction -- first
+  // occurrence in the editable_map -- so they need no
   // ViewRequest::Editable; adding one would over-trigger the cascade.)
   for root_treeid in viewforest . root_skgids () {
     if let Some (mut node_mut) = viewforest . get_mut (root_treeid) {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &mut node_mut . value () . kind
-      { t . view_requests . insert ( ViewRequest::RoleTree (RelationRole::CONTAINER) ); }} }
+      { t . view_requests . insert ( ViewRequest::Folder (FolderRelation::Containers) ); }} }
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let mut editable_map : EditableMap = EditableMap::new ();
   let mut errors : Vec<String> = Vec::new ();
@@ -606,11 +602,6 @@ pub fn rerender_view (
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose UnrestrictedVognode
 /// content has already been completed, it:
-///   - fulfills a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-root (only de-novo
-///     sets it; see render_initial_view), building that root's
-///     containerward role tree and dropping the request. This is data-driven:
-///     post-save roots come from the saved buffer without the request, so a save
-///     never re-generates the containerward (it round-trips as ordinary content).
 ///   - marks view-root and orphan membership,
 ///   - validates membership against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one); in a
@@ -633,10 +624,6 @@ pub fn finish_viewforest (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   diffView_before_graph : Option<&InRustGraph>, // a diff view's: its straddle's before-graph
 ) -> Result<String, Box<dyn Error>> {
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "fulfill_root_containerward_requests" ). entered();
-    fulfill_root_containerward_requests (
-      viewforest, graph, config, skgrepo_restriction ) ? ; }
   mark_view_roots_as_members ( viewforest );
   // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
   // (a phantom / Deleted / DeadViewnode) is a non-dead generalized orphan and
@@ -749,45 +736,6 @@ fn remove_id_folders (
         . detach ();
     } else {
       deaden_generalized_orphan_folder (viewforest, folder) ?; }}
-  Ok (( )) }
-
-/// Fulfill a ViewRequest::RoleTree (RelationRole::CONTAINER) carried by a view-root: attach that
-/// root's full containerward role tree as its first children, then drop the
-/// request so it does not round-trip into the saved buffer (a later save must not
-/// re-generate the containerward -- it round-trips as ordinary content instead).
-///
-/// Only the de-novo render sets this request (render_initial_view), so
-/// this is a no-op post-save. The during-completion view-request dispatch
-/// deliberately leaves view-root Containerward alone (extract_view_requests) so it
-/// reaches here: this ContainerwardRoleTree-based attach builds a separate containerward
-/// subtree and handles a cyclic root, whereas the dispatch's
-/// build_and_integrate_containerward would merge it into existing content and
-/// panic on a cyclic root (one whose containerward path cycles back to the root,
-/// e.g. a contains b contains a).
-fn fulfill_root_containerward_requests (
-  viewforest : &mut ViewForest,
-  graph      : &InRustGraph,
-  config     : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
-) -> Result<(), Box<dyn Error>> {
-  let requesting_root_treeids : Vec<NodeId> =
-    viewforest . root_skgids () . into_iter ()
-      . filter ( |treeid| viewforest . get (*treeid)
-          . map ( |n| match &n . value () . kind {
-              ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-                t . view_requests . contains (& ViewRequest::RoleTree (RelationRole::CONTAINER)),
-              _ => false } )
-          . unwrap_or (false) )
-      . collect ();
-  if requesting_root_treeids . is_empty () { return Ok (( )); }
-  attach_full_containerward_role_trees_at_treeids_with_skgrepo_set (
-    viewforest, &requesting_root_treeids, graph, config, restriction,
-    RoleTreePartners::LiveGraph ) ?;
-  for treeid in requesting_root_treeids { // drop the now-fulfilled request
-    if let Some (mut node_mut) = viewforest . get_mut (treeid) {
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-        &mut node_mut . value () . kind
-      { t . view_requests . remove (& ViewRequest::RoleTree (RelationRole::CONTAINER)); }} }
   Ok (( )) }
 
 #[cfg(test)]

@@ -5,9 +5,9 @@
 /// METHOD: the de-novo render runs the single post-save view
 /// completion path (multi_root_view_via_env -> render_initial_view)
 /// over a stub forest. View completion (complete_viewforest) completes each node
-/// at its BFS visit. After view completion, the shared finish_viewforest
-/// tail (server/update_buffer.rs)
-/// attaches the roots' containerward role trees,
+/// at its BFS visit, each root's visit drawing its containers folder
+/// with the containerward chain. After view completion, the shared
+/// finish_viewforest tail (server/update_buffer.rs)
 /// marks/validates membership, sets graph/view stats, applies the skgrepo set,
 /// and renders to string.
 
@@ -85,7 +85,7 @@ fn multi_root_view_inner (
 /// The de-novo view, built through the single view completion path
 /// (render_initial_view). Takes a SkgEnv (carries
 /// config/driver/tantivy/graph), runs view completion over a stub forest of the
-/// requested roots, then attaches containerward role tree and stats and renders.
+/// requested roots, then adds stats and renders.
 /// Warning strings the render produces (today only the
 /// compound-override-chain notice) are appended to 'warnings_out'.
 pub fn multi_root_view_via_env (
@@ -114,10 +114,8 @@ pub(crate) fn multi_root_view_via_runtime (
           runtime, root_skgids, skgrepo_restriction ) ?;
       warnings_out . extend (render_warnings);
       viewforest };
-  // The de-novo and post-save render tails are one shared helper.
-  // Root containerward is requested per-root in render_initial_view
-  // (de-novo only) and fulfilled + dropped inside finish_viewforest, so the tail
-  // itself is caller-agnostic -- no mode flag.
+  // The de-novo and post-save render tails are one shared helper, so
+  // the tail itself is caller-agnostic -- no mode flag.
   let buffer_content : String =
     finish_viewforest (
       &mut viewforest,

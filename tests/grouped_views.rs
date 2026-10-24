@@ -26,3 +26,6 @@ mod subscribee_heralds;
 
 #[path = "viewnode_ids.rs"]
 mod viewnode_ids;
+
+#[path = "containerward_chain.rs"]
+mod containerward_chain;

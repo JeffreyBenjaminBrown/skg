@@ -916,7 +916,7 @@ async fn save_view (
 // Test: a write-protect request keeps the children editable
 // ===================================================
 // A view of 12 shows it editable, with 121..124 editable under it
-// (and its containerward branch, 1).
+// (and its containers folder, holding 1).
 // A write-protect request on root 12, in a save that also retitles
 // it, saves the title first; the rerender write-protects root 12 and
 // makes 121..124 non-members, still editable, with their own
@@ -946,14 +946,15 @@ async fn test_writeProtect_request_keeps_children_editable (
       assert! ( root . contains ("writeProtected") && root . ends_with (" twelve"),
                 "root 12 must be write-protected, with the saved title:\n{}", saved );
       assert! ( ! saved . contains ("viewRequests"), "{}", saved );
-      let children : Vec<&str> = // not the 1 the root's containerward branch shows
+      let children : Vec<&str> = // not the root's containers folder
         lines_starting (&saved, "** (skg (node (id 12");
       assert_eq! ( children . len (), 4, "{}", saved );
       assert! ( children . iter () . all ( |line|
                   line . contains ("nonMember")
                   && ! line . contains ("writeProtected") ),
                 "121..124 must be editable non-members:\n{}", saved );
-      let grandchildren : Vec<&str> = lines_starting (&saved, "*** ");
+      let grandchildren : Vec<&str> = // not the 1 in the containers folder
+        lines_starting (&saved, "*** (skg (node (id 12");
       assert_eq! ( grandchildren . len (), 3, "{}", saved );
       assert! ( grandchildren . iter () . all ( |line|
                   ! line . contains ("nonMember")
@@ -986,9 +987,11 @@ async fn test_writeProtect_subtree_request (
                         "writeProtectedSubtreeView"),
         &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       println! ("Result of a write-protect-subtree request:\n{}", saved);
-      let headlines : Vec<&str> = lines_starting (&saved, "*");
-      assert_eq! ( headlines . len (), 9, // with the 1 of the root's containerward branch
-                   "{}", saved );
+      let headlines : Vec<&str> = // 12's content subtree, not its containers folder
+        lines_starting (&saved, "*") . into_iter ()
+        . filter ( |line| line . contains ("(node (id 12") )
+        . collect ();
+      assert_eq! ( headlines . len (), 8, "{}", saved );
       assert! ( headlines . iter () . all ( |line| line . contains ("writeProtected") ),
                 "everything must be write-protected:\n{}", saved );
       assert! ( headlines [1 ..] . iter () . all ( |line|
@@ -1056,7 +1059,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
       let under_1 : &str = "** (skg (node (id 12) (repo main)";
       let folded_121 : &str = "** (skg folded (node (id 121) ";
       let content_under = |buffer : &str, root : &str| -> Vec<String> {
-        // 12's content subtree, not root 12's containerward branch (1)
+        // 12's content subtree, not root 12's containers folder (1)
         subtree_headlines (buffer, root) . iter ()
           . filter ( |line| line . contains ("(id 12") )
           . map ( |line| line . to_string () )

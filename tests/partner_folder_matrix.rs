@@ -332,9 +332,11 @@ async fn denovo_omits_unrequested_write_protected_folders (
   let s : &str = "denovo/write-protected-folders";
   let buf : String = render ("dn-owner", config) . await ?;
   for atom in ["subscriberFolder", "overriderFolder",
-               "hiderFolder", "hiddenFolder",
-               "containerFolder", "mentionerFolder"] {
+               "hiderFolder", "hiddenFolder", "mentionerFolder"] {
     fails . want_absent (s, &buf, &format! ("(skg {})", atom)); }
+  // But a root shows its containers folder, with the containerward
+  // chain under its members.
+  fails . want_contains (s, &buf, "** (skg containerFolder)");
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////

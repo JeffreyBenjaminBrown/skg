@@ -183,10 +183,9 @@ async fn test_multi_root_view_with_shared_nodes (
       // so node 2 appears first as a root, then as a child (marked write-protected).
       // Editable nodes with subscriptions get SubscribeeFolder children,
       // and each SubscribeeFolder has Subscribee children with the subscribed IDs.
-      // Because node 2 has node 1 as a container, the multi_root_view
-      // pipeline prepends node 1's ancestry (here just node 1 itself,
-      // write-protected Content) as the first child of the level-1 view of
-      // node 2.
+      // Because node 2 has node 1 as a container, the root 2 gets a
+      // containers folder, whose one write-protected member is node 1;
+      // node 1 has no container, so no chain hangs under it.
       let expected = indoc! {
         "* (skg (node (id 1) (repo main) (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
@@ -196,7 +195,8 @@ async fn test_multi_root_view_with_shared_nodes (
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (repo main) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) nonMember (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
+         ** (skg containerFolder)
+         *** (skg (node (id 1) (repo main) writeProtected omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2)) (birth (contains out 2))))) title 1
          ** (skg subscribeeFolder)
          *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]
@@ -228,8 +228,8 @@ async fn test_multi_root_view_with_node_limit (
       println!("Multi root view with limit=3 result:\n{}", result);
 
       // §5.5 node budget, limit=3: level-order creation spends the budget on the
-      // content children (2, and node 5 shown in place of 3, under root 1; and
-      // root 2's independent containerward node 1). Those nodes are created
+      // content children (2, and node 5 shown in place of 3, under root 1;
+      // root 2's containers folder costs nothing). Those nodes are created
       // definitively (no write-protected placeholders), so the shown 5 and root 2 extend
       // their bodies + default folders (folders are not budget-bound);
       // subscribee members are write-protected.
@@ -242,7 +242,8 @@ async fn test_multi_root_view_with_node_limit (
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
          * (skg (node (id 2) (repo main) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (repo main) nonMember (birth roleGraft container) writeProtected omittedBody (rels (contains (out 2 (ancestors 1))) (hidesFromSubs (out 2)) (birth (contains out 1))))) title 1
+         ** (skg containerFolder)
+         *** (skg (node (id 1) (repo main) writeProtected omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2)) (birth (contains out 2))))) title 1
          ** (skg subscribeeFolder)
          *** (skg (node (id 4) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (repo main) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2))))) this title includes a [[id:22][textlink to another file]]

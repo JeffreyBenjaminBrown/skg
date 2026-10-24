@@ -6,6 +6,9 @@
 /// folders are built only when populated (an empty write-protected
 /// folder is pruned by 'is_self_deletable_when_empty').
 ///
+/// A containers folder this builds carries the containerward chain
+/// under its members ('extend/containerward_chain.rs').
+///
 /// 'aliases' is handled by the AliasFolder builder ('extend/aliases.rs'),
 /// not here -- the dispatch in 'execute_view_requests' routes it there.
 
@@ -13,9 +16,12 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::{
   maybe_add_one_partnerFolder, maybe_add_subscribeeFolder_branch };
+use crate::to_org::extend::containerward_chain::{
+  ContainerwardChainPartners, attach_containerward_chains_under_folder_members };
 use crate::to_org::util::remove_completed_view_request;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{Viewnode, ViewRequest, FolderRelation, PartnerFolder};
+use crate::types::tree::viewnode_graphnode::unique_non_vognode_child_of_viewnode;
+use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation, PartnerFolder};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -84,12 +90,37 @@ fn build_and_integrate_folder (
         skgrepo_restriction, false ) ?; },
     FolderRelation::Containers =>
       // The other side, its content, is shown without a folder.
-      maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Container, config, graph,
-        skgrepo_restriction, false ) ?,
+      add_containers_folder_with_chains (
+        tree, treeid, graph, config, skgrepo_restriction ) ?,
     FolderRelation::Mentioners =>
       // The other side, its links, lives in its text.
       maybe_add_one_partnerFolder (
         tree, treeid, PartnerFolder::Mentioner, config, graph,
         skgrepo_restriction, false ) ?, }
+  Ok (( )) }
+
+/// Add the node's containers folder if it lacks one and has
+/// containers, and draw the containerward chain under each member of
+/// the folder it adds. A folder already there is left to its
+/// reconciler, and its chains as they stand.
+fn add_containers_folder_with_chains (
+  tree               : &mut Tree<Viewnode>,
+  treeid             : NodeId,
+  graph              : &InRustGraph,
+  config             : &SkgConfig,
+  skgrepo_restriction : Option<&SkgrepoRestriction>,
+) -> Result < (), Box<dyn Error> > {
+  let containers_folder_kind : ViewnodeKind =
+    ViewnodeKind::PartnerFolder (PartnerFolder::Container);
+  if unique_non_vognode_child_of_viewnode (
+       tree, treeid, &containers_folder_kind ) ? . is_some ()
+  { return Ok (( )); }
+  maybe_add_one_partnerFolder (
+    tree, treeid, PartnerFolder::Container, config, graph,
+    skgrepo_restriction, false ) ?;
+  if let Some (folder) = unique_non_vognode_child_of_viewnode (
+       tree, treeid, &containers_folder_kind ) ?
+  { attach_containerward_chains_under_folder_members (
+      tree, folder, graph, config, skgrepo_restriction,
+      ContainerwardChainPartners::LiveGraph ) ?; }
   Ok (( )) }

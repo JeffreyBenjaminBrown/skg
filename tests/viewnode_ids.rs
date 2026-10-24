@@ -6,8 +6,8 @@
 // 'ViewnodeIdRecord' says who made each viewnode.
 //
 // Fixture: p contains a; a contains b and c; c subscribes to d. The
-// view of a shows p as a containerward role graft, b and c as
-// members, and c's subscribee folder holding d.
+// view of a shows p in a's containers folder, b and c as members, and
+// c's subscribee folder holding d.
 
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
@@ -229,8 +229,8 @@ async fn a_copied_headline_gets_a_fresh_viewnode_id_and_the_original_keeps_its_o
     . find ( |line| line . contains ("(node (id p) ") )
     . expect ("p is shown");
   let p_viewnode_id : String = viewnode_id_atom_of (p_line) . unwrap () . to_string ();
-  let copied : String = buffer . replacen (
-    &format! ("{}\n", p_line), &format! ("{}\n{}\n", p_line, p_line), 1 );
+  let copied : String = // the copy a root after the buffer's last
+    format! ( "{}* {}\n", buffer, p_line . trim_start_matches ('*') . trim_start () );
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &copied, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
   let p_viewnode_ids : Vec<String> =
@@ -334,7 +334,8 @@ async fn an_unknown_viewnode_id_is_dropped (
   Ok (( )) }
 
 /// The view's record says who made each viewnode, before and after a
-/// save: the stub roots made root a, the role-tree attach made p, the
+/// save: the stub roots made root a, the containers folder's
+/// reconciler owns its member p, the
 /// content reconciler made c's subscribee folder and owns the member
 /// b, the subscribee folder's reconciler owns d, and a typed member is
 /// the content reconciler's while a typed non-member note is the
@@ -349,7 +350,8 @@ async fn the_owner_table_records_who_made_each_viewnode (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let expected : [(&str, Owner); 5] = [
     ( "(node (id a) ",          Owner::StubRoots ),
-    ( "(node (id p) ",          Owner::RoleTreeAttach ),
+    ( "(node (id p) ",          Owner::FolderReconciler (
+                                  FolderKind::Partner (PartnerFolder::Container)) ),
     ( "(node (id b) ",          Owner::ContentReconciler ),
     ( "(skg subscribeeFolder",  Owner::ContentReconciler ),
     ( "(node (id d) ",          Owner::FolderReconciler (
