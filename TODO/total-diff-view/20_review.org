@@ -110,7 +110,7 @@ tokens between them.
 Each item is a choice an agent made where the plan left room, or
 a fact it found; all are recorded in 'progress.org' under
 "Folders, retention, and the two records".
-** Slice 0
+** DONE Slice 0
 The type is 'Membership { Member, NonMember }', its field
 'membership'. 'mark_view_roots_parent_na' became
 'mark_view_roots_as_members' rather than going, so that a
@@ -123,18 +123,64 @@ first '(node '. The conversion covered 194 'false' and 98 'na',
 more than the plan counted, since sources and fixtures were
 converted too. The cache is a single-entry struct with a unit
 test.
-*** TODO Jeff
-**** mark_view_roots_as_members : smells bad
+*** DONE Jeff
+**** DONE mark_view_roots_as_members : smells bad
 We can't be saying they are members when they aren't.
 Explain the justification for it in more detail?
-**** Membership {Member, NonMember} smells awkward
+***** [Claude] It clears a mark; only its name makes a claim
+The function decides nothing about a root. It exists for one
+case: a non-member that the user moves up to root level arrives
+from the buffer carrying the 'nonMember' atom. A root has no
+viewparent, so the atom would say nothing there, and '18_1'
+settled that a root prints nothing. With 'na' gone the field
+must hold one of two values, and 'Member' is the one that
+prints nothing, so the function resets the field to the silent
+value. Its name says "as members", which overstates what it
+does: a root is a member of nothing. With the boolean proposed
+below, the function becomes 'clear_nonMember_mark_on_roots',
+and then it says exactly what it does.
+**** DONE Membership {Member, NonMember} smells awkward
 Didn't we say a membership was something biger than that --
 like, it included the relationship type?
 Why is this not simply a boolean called isMember?
-**** nonMember should be the orthogonal sign
+***** [Claude] Agreed: a boolean, named for the mark
+In our vocabulary a membership is a relationship, the one
+between a container and a member, and it carries a relation
+and a role. A two-valued type called 'Membership' misuses the
+word: its value 'Member' describes a node's standing, not a
+relationship. A boolean is right. I would name it for the mark
+rather than for the claim: a field 'nonMember : bool', false
+unless marked, the name of the wire atom. Then a root tells no
+lie: it carries no mark, which is true, since it has no
+viewparent. An 'isMember' boolean would still call a root a
+member. The readers keep a method 'is_member ()', which they
+apply to a child under a vognode or a folder, never to a root.
+Proposed for the housekeeping plan: the type goes, the field
+becomes the boolean, and the root function takes the name
+above. Decision for you: 'nonMember' or 'isMember'.
+****** TODO jeff : agreed, nonMember
+**** DONE nonMember should be the orthogonal sign
 not the peace sign -- it should show as affects not its parent,
 not you can't edit this.
-** Slice 1
+***** [Claude] It is ⊥ already
+The herald of 'nonMember' is ⊥: 'server/heralds.rs' has
+'leaf ("nonMember", "⊥")', and 'docs/heralds.org' says "=⊥=
+marks a non-member". The clients hold no glyph table of their
+own; they style what the server emits. My sentence "as they
+show 'writeProtected'" was about the metadata editors: the
+field is listed as "false (default)" or "true", and the strip
+collapses it to the bare atom, as it does for 'writeProtected'.
+It said nothing about the herald. Where you see ☮ on a
+non-member, the node is write-protected too, and the glyphs
+are glued: a chain node reads '⊥☮', as the rendering case
+"⊥☮ restore membership ~-" in
+'tests/shared/herald-rendering-cases.txt'
+shows. Most non-members a user meets are write-protected:
+chain nodes, retained copies, the extra copy of a duplicate.
+A non-member the user types stays editable and shows ⊥ alone.
+If you saw ☮ without ⊥ on a non-member, tell me where; that
+would be a bug.
+** DONE Slice 1
 Three test files were renamed with the identifiers; two locals
 named 'vid' held a skgid and are named for it; "view ID" for the
 buffer stays in server comments and the save envelope's strings.
@@ -148,12 +194,52 @@ node, tombstone leaves, and the folders that removal empties; a
 requested containers folder whose every member becomes restricted
 is still removed. The stability test is
 'tests/viewnode_id_stability.rs'.
-*** TODO jeff
-**** "view ID" must go
+*** DONE jeff
+**** DONE "view ID" must go
 It's either a viewnode ID or a viewforest ID.
 "view ID" is ambiguous.
-**** what are "the folders that removal empties"?
+***** [Claude] Agreed; the prose and the identifiers
+Slice 1 kept the capitalized "view ID" because the plan renamed
+only the viewnode's word. Every one of these means the buffer,
+so each should read "viewforest ID". A grep finds 37 lines in
+18 files: server comments and the save envelope's error
+strings, Emacs and Neovim docstrings, comments and messages,
+and the docs. That goes into the housekeeping plan. The
+identifiers are a separate question. 'view_id', 'view-id' and
+'skg-view-id' stand in about 207 lines, the wire key 'view-id'
+among them, and the plan left them alone. I would rename them
+too, as one scripted slice, since a reader who meets 'view_id'
+beside 'viewnode_id' has the same ambiguity. Decision for you:
+the prose only, or the identifiers and the wire key as well.
+****** TODO jeff : all of it
+**** DONE what are "the folders that removal empties"?
 What is removal here?
+***** [Claude] The prepass's own removal of leaves
+Define: the switch is a skgrepo-set switch, which hides every
+node whose home skgrepo is outside the chosen set. The prepass
+runs on each open view before the view is completed again
+('convert_and_prune_for_skgrepo_switch'): it converts a
+now-hidden unrestricted vognode to a restricted one, and then
+removes leaves of four kinds: a restricted vognode that is a
+leaf, a property under a restricted vognode, a tombstone that
+is a leaf, and a folder that this very removal has emptied.
+"Removal" is the prepass's own removal of those leaves. A
+folder that was empty before the switch stays, and so does a
+folder member that is not hidden. Suppose the worktree holds
+a contains b, and p contains a; p's home is the private
+skgrepo, and the rest are public. The view of a under the set
+"all":
+#+begin_example
+  * a
+  ** ☮ These contain it.
+  *** ☮ (Cb) p
+  ** b
+#+end_example
+The user switches to the public set. p becomes restricted and
+is a leaf, so the prepass removes it; the folder is now empty,
+so the prepass removes it too; b stays, since a node is not a
+folder. Had q, public, also contained a, the folder would
+stay, holding q.
 ** Slice 2
 The reconciler matches every child, whoever drew it, and still
 converted a stale child only if it owned it until slice 6. The
@@ -164,13 +250,129 @@ list no longer differs is unmarked at its node's step, never
 converted, and refreshed from the live graph at its own visit.
 The spurious "Repaired containerFolder" warning on the first save
 after HEAD changes was traced but not fixed.
-*** TODO Jeff
+*** Jeff
 **** What does "The removed-member reconciler and the chain attach never consider members" mean?
 What is the "chain attach"? What is "a removed-member reconciler"?
+***** TODO [Claude] Two reconcilers, and what they match
+Define: the removed-member reconciler is
+'reconcile_removed_content_members'
+('server/diff_view/changes.rs'). At an editable node's visit
+in the diff view it keeps the node's removed members in step
+with the straddle: a member of the node's content list in HEAD
+that the worktree's list lacks is drawn as a non-member with
+'(rel removed)', or as a historical phantom when the node
+itself was removed.
+
+The chain attach is the diff view's step
+that hangs the containerward chain under a partner folder's
+members: at slice 2 it was
+'attach_containerward_chains_under_folder_members', and now
+it is 'reconcile_containerward_chain_under_member'
+('server/update_buffer/reconcile/partner_folder.rs'), run at
+every visit of the folder. Both are reconcilers: each first
+matches the children already standing there against its
+model, by key, and only then draws or converts. "Never
+consider members" means that their selectors admit
+non-members only ('! is_unrestrictedVognode_and_member').
+
+Suppose, in HEAD and in the worktree alike, b contains a, d
+contains b, and b contains d. The diff view of a, with b
+extended as editable:
+#+begin_example
+  * a
+  ** ☮ These contain it.
+  *** (Cb) b
+  **** ⊥☮ (Ca) d
+  **** d
+#+end_example
+The first d is the chain node, since d contains b; the second
+is b's content member. Both have the key d. The chain attach
+matches only the non-member, so the content member is left to
+the content reconciler; and the removed-member reconciler
+matches no member, so a content member standing under a node
+is never taken for a removed member of the same key.
+****** TODO jeff : let's expunge "chains" from the vocabulary
+We don't want synonyms.
+Those chains are containerward role forests.
 **** "A pasted copy beside a member becomes the member only when no member of that node stands there."
 Please draw an example.
+***** TODO [Claude] Two buffers: with the member, and without
+Define: the adoption is
+'adopt_nonMember_children_that_are_content'
+('server/update_buffer/reconcile/content.rs'). At an editable
+node's visit, for each entry of its content list that has no
+member child, the first non-member child standing for that
+node becomes the member, keeping its viewnode and its folds,
+so that the reconciler, which matches members only, does not
+draw a second one beside it. Suppose p contains y, in HEAD and
+in the worktree alike. In the first buffer p is
+write-protected, so what it shows of its content stands as
+non-members:
+#+begin_example
+  * ☮ p
+  ** ⊥☮ y
+#+end_example
+The user makes p editable and saves. At p's visit the content
+list holds y, and no member y stands under p, so this y is
+adopted: it becomes the member, and the buffer reads
+#+begin_example
+  * p
+  ** y
+#+end_example
+In the second buffer p is editable, and the user pastes a
+write-protected copy of y beside the member:
+#+begin_example
+  * p
+  ** y
+  ** ⊥☮ y
+#+end_example
+A member y stands under p, so the copy stays a non-member.
+Were it adopted too, p would hold two members y, and the
+content reconciler would entombstone the copy as a duplicate,
+though the save accepted it. The slice's test
+('a_pasted_copy_beside_a_removed_member_is_not_doubled') goes
+on from this buffer: another view drops y from p, both copies
+are retained as non-members, and the removed-member reconciler
+adopts one of them as the removed member, so that y stands
+under p once.
+***** TODO Jeff : this feels too complex.
+We have a lot of different kinds of reconcilers,
+doing different kinds of things in overlapping contexts.
+Can you lay out all the reconciliation rules?
+What's the difference between reconciliation, view-completion,
+and buffer refresh?
 **** Do you see how to fix the spurious warning?
 Why does it arise?
+***** TODO [Claude] A folder created empty; one condition
+Why it arises: the diff view's node step
+('changed_partner_folders', 'server/diff_view/changes.rs')
+creates under a node in C, for each relationship whose
+membership changed, a partner folder, empty, by
+'child_folder_or_new', and leaves the filling to the folder's
+own visit. That visit runs the folder reconciler over the
+straddle
+('reconcile_partnerFolder_children_from_graph_straddle'),
+which compares the folder's children with its goal list and
+reports every goal member it had to create as "reinstated",
+under the explainer that a write-protected folder is edited
+from the other side. For a folder that stood in the saved
+buffer that is right: a member missing from it was deleted by
+the user. For a folder created a moment ago every member is
+missing, and nobody deleted anything.
+The fix: a folder created during this completion has no
+viewnode ID yet, since IDs are assigned after the prune, while
+a folder from the buffer carries its '(vnid X)' from the
+parse. The warning's callers already fetch that ID for the
+message's headline ('folder_viewnode_id_of'). So the fill
+reports 'ReinstatedMember' only when the folder has a viewnode
+ID; the other three repair kinds are unaffected. One corner: a
+save from a view that is not registered drops every viewnode
+ID, so there the warning would be silenced too. The tests save
+as registered views, and a user's view is always registered. A
+folder headline the user types by hand has no ID either, and
+is filled silently, which is right. The alternative is a
+"fresh" flag on the folder viewnode: more explicit, one more
+field. I would take the ID. For the housekeeping plan.
 ** Slice 3
 'convert_unwarranted_child' is told whether the child is stale or
 a duplicate. The member preference lives in
@@ -182,8 +384,52 @@ gives removed members a member's editability. A non-member yields
 with its whole content subtree, never when it is an ancestor of
 the member. The pasted write-protected copy test passes on the
 old code too; the yield test fails with the preference off.
-*** TODO jeff : "never when it is an ancestor of the member"
+*** DONE jeff : "never when it is an ancestor of the member"
 Please elaborate.
+**** TODO [Claude] Yielding would write-protect the member itself
+Define: the editability walk visits the occurrences in level
+order. An occurrence made editable without a request of its
+own holds its node's claim tentatively. The preference: when
+the walk reaches an editable member occurrence of a node whose
+claim a tentative non-member occurrence holds, the non-member
+yields: it is write-protected with its whole content subtree,
+and the member takes the claim, so that its content is
+extended. The slice's test shows the plain case. Suppose the
+worktree holds k contains l and m, and m contains mc. In the
+view of k, k is editable and m stands under it with mc. In a
+second view the user moves m into l and saves. In the first
+view's rerender, m under k is stale, is retained as a
+non-member keeping its editability, and holds m's claim
+tentatively, at level two. At level three the walk meets l's
+member m, editable; the retained m yields:
+#+begin_example
+  * k
+  ** l
+  *** m
+  **** mc
+  ** ⊥☮ m
+  *** ⊥☮ mc
+#+end_example
+The exception needs a cycle. Suppose instead that m contains
+n and n contains m, and the retained m holds its content:
+#+begin_example
+  * k
+  ** ⊥ m
+  *** n
+  **** m
+#+end_example
+If the lower m were an editable member, the preference would
+have the upper m yield, and 'writeProtect_content_subtree'
+would write-protect the upper m with everything under it, the
+lower m included: the member meant to take the claim would
+lose its editability, and the walk would have write-protected
+both. So an ancestor never yields ('prior_is_ancestor' in
+'take_claim_from_tentative_nonMember'), and the lower m is
+left to the ordinary rule, write-protected as a later
+occurrence of a claimed node. In practice the lower m arrives
+write-protected already, since a buffer holds one editable
+occurrence of a node; the guard is for the shape, which a
+cycle makes possible.
 ** Slice 4
 A fresh view puts a '(folder containers)' request on each root,
 and the folder and its chain are drawn during the completion;
@@ -199,23 +445,159 @@ the 'roleTree' herald rule and two fixture sets with it. Two
 integration tests beyond the plan's four changed, the
 'save_collateral' pair. Docs beyond slice 5's list were fixed
 here.
-*** TODO jeff
+*** jeff
 **** "Chains are walked per member" seems wrong.
 Each chain should start at the folder's parent,
 not at one of its children.
 But then that first, obvious itemshould then be stripped
 from each chain before it is grafted into the folder.
+***** [Claude] Agreed: one walk from the folder's viewparent
+As the code stands
+('attach_containerward_chains_under_members' in
+'server/to_org/extend/containerward_chain.rs'), each member
+of the folder gets its own walk: 'full_containerward_role_tree'
+starts at the member, with only the member in its met set.
+Your rule is better, and cheaper: one walk from the folder's
+viewparent, whose first level is the folder's members; the
+met set holds the viewparent from the start and is shared by
+the members' branches; the first node, the viewparent itself,
+is stripped, and each member's branch hangs under that member.
+Over a cycle this shortens the chain by one node.
+
+Let the
+worktree hold x contains y and y contains x. The view of x
+today:
+#+begin_example
+  * x
+  ** ☮ These contain it.
+  *** ☮ (Cb) y
+  **** ⊥☮ x
+  ***** ⊥☮ y
+  ** y
+  *** ☮ x
+#+end_example
+The last y in the folder is the repeat. Under your rule:
+#+begin_example
+  * x
+  ** ☮ These contain it.
+  *** ☮ (Cb) y
+  **** ⊥☮ x
+  ** y
+  *** ☮ x
+#+end_example
+Here x is the repeat, since x opened the walk. The shared met
+set has a second consequence, over a diamond. Suppose b and c
+contain m, and d contains b and c. In the view of m the container folder
+holds b and c; today each carries d in full, and under your
+rule d stands in full under b and as a repeat leaf under c,
+its containers shown once. I take that as intended: the
+module's rule is "a node the walk met before is shown once
+more, as a leaf". One test changes for certain
+('a_cycle_in_the_chain_ends_in_a_leaf' in
+'tests/containerward_chain.rs'); the diamond test's outline
+does not, since its d has no containers. The live-folder path
+('reconcile_containerward_chain_under_member') takes the
+viewparent's tree and hands each member its branch. For the
+housekeeping plan. Decision for you: the diamond consequence
+too, or the met set seeded with the viewparent only.
+****** TODO jeff : please draw the diamond problem
 **** "a note typed under a folder member counted as one"
 Please draw a picture.
+***** TODO [Claude] A note under b, then and now
+Suppose the worktree holds b contains a, and d contains b. In
+the view of a, the user types a note under the folder member
+b:
+#+begin_example
+  * a
+  ** ☮ These contain it.
+  *** ☮ (Cb) b
+  **** ⊥☮ (Ca) d // Jeff added the (Ca).
+  **** my note
+#+end_example
+d is the chain node, since d contains b. At slice 4 a chain
+node was recognised by position alone: any vognode under a
+containers folder's member, or under another chain node. The
+note stood in that position, so the save gave it what a chain
+node gets: no relationship to b, no change-forest leaf, so no
+readiness. For a plain note that costs nothing, since it has
+neither; the item records the smell, not a loss. Since then
+the test reads the shape too. 'is_in_containerward_chain'
+asks for a non-member, and 'is_drawn_chain_node', which the
+attach converts by, asks for one that is write-protected with
+no change facts. The note under a write-protected b is a
+non-member, since b writes no content, so it still stands in
+chain position; the attach leaves it alone, since it is
+editable, and the position costs it nothing it had. A note
+under a b extended as editable is b's new member, outside the
+chain. The one child for which position misleads is a removed
+member under an editable b, which carries '(rel removed)': the
+regression under "Decide".
 **** "a readiness gesture on a chain node is dropped silently"
 You mean on an interior one, not a child of the folder
 but a deeper descendent, right?
 From a child of the folder it should work.
+***** TODO [Claude] Yes: the members are not chain nodes
+A chain node is what hangs under a folder's member, and under
+that: the member's containers, and theirs. The members, the
+folder's children, are not chain nodes.
+'is_in_containerward_chain' asks for a non-member standing
+under a vognode, and a member is a member whose parent is the
+folder. So a gesture on a member works: 'leaves_named_at'
+names its relationship's leaf through
+'relationship_to_viewparent', as for any folder member. A
+gesture on a chain node gets None from 'leaves_named_at', and
+'readiness_requests_in_viewforest' drops the request with no
+warning ('server/diff_view/readiness_requests.rs'). The item
+"A gesture on a chain node is dropped silently" under "Decide"
+asks for a warning. One case belongs with the regression
+instead: a removed member drawn under an editable member
+stands in chain position, so its gesture is dropped too, by
+the same test the regression's fix corrects. I read this
+trace; the probe ran only the 'restoreRel' side of it.
 **** "The search buffer's override folders show direct relatives only."
 Is this a change? Please draw before and after.
+***** TODO [Claude] Yes; two chains became two folders
+Before slice 4 the search enrichment grafted under each hit,
+in each direction, an override chain: the nodes that override
+the hit, under each of them the nodes that override it, and
+so on, recursive and cycle-guarded; and likewise the nodes
+the hit overrides. Suppose the worktree holds F overrides N,
+and G overrides F, and N is a hit. Before:
+#+begin_example
+  * ☮ N
+  ** ☮ (Oa) F
+  *** ☮ (Oa) G
+#+end_example
+After (commit 'f2d98082'):
+#+begin_example
+  * ☮ N
+  ** ☮ These override the view of it.
+  *** ☮ (Ob) F
+#+end_example
+G is no longer shown; a folder request on F would show it.
+The plan's slice 4 said the search buffer draws the
+containers, overrider and overridden folders under its hits;
+it did not say how deep, and the agent gave the two override
+folders a folder's ordinary content, the direct partners,
+while the containers folder's members carry the chain as
+everywhere. The transitive walk over 'overrides' belonged to
+the role-tree engine, which went. 'docs/override.org'
+("Override folders in search results") describes the new
+form. The item "Search override folders show one level" under
+"Decide" recommends keeping it.
 **** "The engine took ... with it."
 What do you mean?
-** JEFF RESUME HERE : Slice 5
+***** TODO [Claude] What was deleted along with the engine
+The engine is the role-tree engine,
+'server/dbs/in_rust_graph/role_tree.rs', which answered the
+'(roleTree ROLE)' request. Slice 4 deleted it, and in the same
+commit the code that only it used: 'paths.rs', the path
+search ('PartnersOf' moved to 'containerward_role_tree.rs');
+'RelationRole::role_tree_triple'; the two path filters in
+'skgrepo_sets.rs', with their tests; the herald rule
+'roleTree'; and two fixture sets. "Took with it" means
+deleted together, because nothing else used them.
+** DONE Slice 5
 Both 'p' prefixes went with the commands, and the keybinding
 tests check that nothing is bound under them. Beyond the plan's
 list, 'docs/heralds.org' lost 'req:roleTree' and
