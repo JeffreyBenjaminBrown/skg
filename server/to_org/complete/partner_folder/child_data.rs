@@ -27,9 +27,12 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::diff_view::shallow_model_subtree::{
-  give_model_facts_to, is_unrestricted_removed_member};
+  convert_unwarranted_subtree_taking_along, give_model_facts_to,
+  is_unrestricted_removed_member};
+use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
 use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, Membership, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
-use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, RepairSummary};
+use crate::update_buffer::util::{
+  Conversion, KeptChildOrder, RepairSummary, Unwarranted, complete_managed_children};
 use crate::update_buffer::util::treat_certain_children;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -114,7 +117,7 @@ pub fn skgid_a_folder_child_stands_for (
     _ => None, }}
 
 /// Build a map from child ID to ChildData for the create-child
-/// closure of `complete_managed_children_in_viewforest`, for every
+/// closure of `complete_managed_children`, for every
 /// goal item but a historical phantom.
 /// The sharing completers build this before mutation so their flow
 /// stays explicit: read tree and graph facts, compute the goal list,
@@ -188,8 +191,11 @@ pub fn build_child_data (
 /// (SubscribeeFolder, HiddenInSubscribeeFolder,
 /// HiddenOutsideOfSubscribeeFolder) share the same call shape: build
 /// per-child data before mutation, then call
-/// `complete_managed_children_in_viewforest` with identical
-/// managed/key/create closures. A member with an unknown ChildData
+/// `complete_managed_children` with identical
+/// managed/key/create closures. Of several children of one key the
+/// editable one is kept, else the first. A stale or duplicate child is
+/// converted with the containerward chain drawn under it
+/// ('convert_unwarranted_member_with_its_chain'). A member with an unknown ChildData
 /// entry produces an unknown phantom; any other, a write-protected
 /// viewnode marked Membership::Member. An item with another shape
 /// is shown as its shape says, and matches an existing child of the
@@ -230,7 +236,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   mark_goal_children_as_folder_members (
     tree, folder_node, goal_list, graph ) ?;
   let summary : RepairSummary<ID> =
-    complete_managed_children_in_viewforest (
+    complete_managed_children (
     tree, folder_node,
     match kind . policy () {
       // The save reads these folders' membership, in the buffer's order.
@@ -246,15 +252,31 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     |vn : &Viewnode| skgid_a_folder_child_stands_for (vn, graph) . is_some (),
     |vn : &Viewnode| skgid_a_folder_child_stands_for (vn, graph) . ok_or_else ( || format! (
       "{}: managed child not a normal graphnode", label )),
+    |vn : &Viewnode| vn . editable_skgid () . is_some (),
     &goal_skgids,
     |skgid : &ID| {
       let item : &FolderGoalItem = items_by_skgid . get (skgid) . ok_or_else (
         || format! ( "{}: no goal item for {}", label, skgid . 0 )) ?;
       viewnode_of_goal_item (item, child_data, label) },
+    convert_unwarranted_member_with_its_chain,
   ) ?;
   apply_goal_shapes (
     tree, folder_node, &items_by_skgid, child_data, graph, label ) ?;
   Ok (summary) }
+
+/// Convert 'child', a child of a partner folder found stale or an
+/// extra copy, by the glossary's "retain as non-member or tombstone,
+/// then prune", and, first, the containerward chain drawn under it
+/// ('is_drawn_chain_node'), which goes with it: so a member holding
+/// nothing but its chain becomes a tombstone the prune removes, while
+/// one holding what the user put there is retained as non-member.
+fn convert_unwarranted_member_with_its_chain (
+  tree        : &mut Tree<Viewnode>,
+  child       : NodeId,
+  unwarranted : Unwarranted,
+) -> Result<Conversion, Box<dyn Error>> {
+  convert_unwarranted_subtree_taking_along (
+    tree, child, unwarranted, &is_drawn_chain_node ) }
 
 /// The viewnode made for a goal item when no child matches it. See
 /// 'FolderGoalShape'.

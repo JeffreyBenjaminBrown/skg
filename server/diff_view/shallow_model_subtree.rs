@@ -201,18 +201,34 @@ pub fn convert_unwarranted_subtree (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<Conversion, Box<dyn Error>> {
+  convert_unwarranted_subtree_taking_along (
+    tree, node, Unwarranted::Stale, &goes_with_a_stale_viewparent ) }
+
+/// Convert 'node', unwarranted as 'unwarranted' says, by the one rule
+/// ('convert_unwarranted_child'), and, first, postorder, every child
+/// of a viewnode being converted that 'goes_with' says goes with it,
+/// each as stale. The rest stay where they stand and keep 'node'
+/// retained; a viewnode holding nothing but childless tombstones is
+/// converted as a leaf. Detaches nothing.
+pub fn convert_unwarranted_subtree_taking_along (
+  tree        : &mut Tree<Viewnode>,
+  node        : NodeId,
+  unwarranted : Unwarranted,
+  goes_with   : &dyn Fn (NodeRef<Viewnode>) -> bool,
+) -> Result<Conversion, Box<dyn Error>> {
   let children : Vec<(NodeId, bool)> =
-    tree . get (node) . ok_or ("convert_unwarranted_subtree: node not found") ?
+    tree . get (node) . ok_or ("convert_unwarranted_subtree_taking_along: node not found") ?
     . children ()
-    . map ( |child| (child . id (), goes_with_a_stale_viewparent (child)) )
+    . map ( |child| (child . id (), goes_with (child)) )
     . collect ();
   let mut holds_something : bool = false;
   for (child, goes) in children {
     let conversion : Conversion =
-      if goes { convert_unwarranted_subtree (tree, child) ? }
+      if goes { convert_unwarranted_subtree_taking_along (
+                  tree, child, Unwarranted::Stale, goes_with ) ? }
       else { Conversion::Retained };
     if conversion == Conversion::Retained { holds_something = true; }}
-  convert_unwarranted_child (tree, node, ! holds_something, Unwarranted::Stale) ?;
+  convert_unwarranted_child (tree, node, ! holds_something, unwarranted) ?;
   Ok ( if holds_something { Conversion::Retained } else { Conversion::ChildlessTombstone } ) }
 
 /// Whether the diff view's reconciler drew 'node', known by its kind

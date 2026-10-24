@@ -84,12 +84,9 @@
     (assert-headline-structure
      buf
      '((1 member "a")
-       ;; b no longer contains a: the stale member is retained as a
-       ;; non-member in a's containers folder, with its chain, whose
-       ;; last b no longer contains its viewparent.
-       (3 nonMember "b")
-       (4 container "a")
-       (5 nonMember "b")
+       ;; b no longer contains a: the stale member goes from a's
+       ;; containers folder with its chain, and the empty folder with
+       ;; it.
        (2 member     "b"))
      "phase 4: buffer A after collateral update")))
 
