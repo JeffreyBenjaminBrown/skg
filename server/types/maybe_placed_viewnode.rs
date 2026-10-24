@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, viewnode_id_suffix};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Owner, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, Membership, };
+use super::viewnode::{ ChangeFacts, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, Membership, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -129,7 +129,6 @@ impl TryFrom<MpViewnode> for Viewnode {
       change_facts      : u . change_facts,
       readiness_request : u . readiness_request,
       viewnode_id       : u . viewnode_id,
-      owner             : Owner::User, // looked up by viewnode ID after the parse
     })
   }
 }

@@ -9,8 +9,8 @@ each one commit-ready, and commit everything at once. C-c v d
 
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
 D, change-forest leaf, mark, changeset marker, ...) is the glossary's "Terms of the
-diff view" ('docs/glossary.org'); the reconcilers' words (owner,
-key, the one rule, dead viewnode, non-member) are among its terms
+diff view" ('docs/glossary.org'); the reconcilers' words (key,
+the one rule, dead viewnode, non-member) are among its terms
 specific to Skg. The wire forms are the API doc's
 "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
@@ -337,23 +337,31 @@ containerward walk visits a node's containers in ID order, so a first
 render is the same every time.
 
 The diff view's reconciler matches a key among all the children of
-a node, whoever drew them, and owns every child it adopts; it
-converts a stale child only when it owns it ('docs/glossary.org',
-"owner"), as the view's record of owners says, so a viewnode the
-user typed or pasted that no model wants is nobody's, and stays
-where it stands. Under an editable node the content members are the
-content reconciler's, and the change viewnodes and removed members
-the diff view's reconciler's; a member that the straddle sets aside
-becomes the latter's, as does any non-member whose relationship to
-the node is only in the before-graph (a graft, or a copy the user
-pasted), and so do the former members under a historical phantom,
-whose old content adopts them. Before the content reconciler runs,
-the first non-member of a node in the after-graph's content list
-becomes its member when no member of that node stands there
+a node, whoever drew them. It converts a stale child only when the
+child is its own, which it knows by the child's kind and change facts
+at the completion that finds it stale
+('is_diffView_change_viewnode'): a change viewnode (an old text, a
+move, a changeset marker, a folder or a folder entry), a historical
+phantom, a removed member, which still carries '(rel removed)' then,
+or a member under a phantom, which has no content list. So a
+viewnode the user typed or pasted that no model wants stays where it
+stands, and so does a content member, tagged or not. Under an
+editable node the content members are the content reconciler's, and
+the change viewnodes and removed members the diff view's
+reconciler's; a member that the straddle sets aside becomes a
+removed member, as does any non-member whose relationship to the
+node is only in the before-graph (a graft, or a copy the user
+pasted), and a historical phantom's old content adopts the former
+members under it. Before the content reconciler runs, the first
+non-member of a node in the after-graph's content list becomes its
+member when no member of that node stands there
 ('align_content_members_with_straddle'). The chains under a changed
 containers folder's members are the role-tree attach's; it matches
-every child of the member but its members, and converts only what it
-owns, so it leaves the member's own visit's viewnodes alone. A chain
+every child of the member but its members, and converts only a
+chain node as it draws one (write-protected, carrying no change
+facts: 'is_drawn_chain_node') and a relRepo move, so it leaves the
+member's own visit's viewnodes, which carry change facts, and a note
+the user typed there alone. A chain
 node's birth is written into its metadata as '(birth roleGraft
 container)' and read back by the parser ('Birth::RoleGraft'), so it
 survives a save, and the clients, which rewrite metadata structurally
@@ -367,7 +375,9 @@ Both convert a stale child by one function
 one rule says. The older reconciler never looks below the
 children it manages; the diff view's converts, with the stale
 child, what was made below it for the same model
-('convert_unwarranted_subtree'), and the prune removes what holds
+('convert_unwarranted_subtree'): the diff view's own viewnodes, a
+folder's members and the chains, but not the content reconciler's
+members or what the user typed or pasted. The prune removes what holds
 nothing of the user's (a deleted node's phantom, once the
 deletion is committed, is deadened holding the user's note but
 not its old content).

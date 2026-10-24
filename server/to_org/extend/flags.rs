@@ -7,7 +7,7 @@ use crate::types::nodes::complete::{
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 use crate::types::viewnode::{
-  FolderKind, Owner, Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
+  Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -42,8 +42,7 @@ pub fn build_and_integrate_flags (
   let node : Option<Graphnode> = graphnode_from_graph (graph, &pid);
   let folder : ego_tree::NodeId = insert_non_vognode_as_child (
     tree, treeid,
-    ViewnodeKind::PropertyFolder (PropertyFolder::flags ()), false,
-    Owner::ContentReconciler ) ?;
+    ViewnodeKind::PropertyFolder (PropertyFolder::flags ()), false ) ?;
   if let Some (node) = node {
     for flag in Flag::ALL {
       if flag_is_true (&node . flags, flag) {
@@ -53,7 +52,7 @@ pub fn build_and_integrate_flags (
             flag,
             title : String::new (),
             body  : None, }),
-          false, Owner::FolderReconciler (FolderKind::Flags) ) ?; } } }
+          false ) ?; } } }
   Ok (())
 }
 

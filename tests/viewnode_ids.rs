@@ -3,7 +3,7 @@
 // Viewnode IDs ('docs/api-and-formats.org', "The metadata headers"):
 // every viewnode of a rendered buffer carries '(vnid X)', the view
 // keeps it across saves and rerenders, and the view's
-// 'ViewnodeIdRecord' says who made each viewnode.
+// 'ViewnodeIdRecord' knows the ones the forest holds.
 //
 // Fixture: p contains a; a contains b and c; c subscribes to d. The
 // view of a shows p in a's containers folder, b and c as members, and
@@ -22,7 +22,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{
-  FolderKind, Owner, PartnerFolder, ViewnodeId, Viewnode, viewforest_root_viewnode,
+  PartnerFolder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};
 use skg::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 
@@ -48,7 +48,6 @@ fn viewnode_ids_in_content_views (
         config, tantivy ) . await ?;
       a_moved_headline_keeps_its_viewnode_id (config, tantivy) . await ?;
       a_typed_headline_gets_a_viewnode_id (config, tantivy) . await ?;
-      the_owner_table_records_who_made_each_viewnode (config, tantivy) . await ?;
       // last, since it cuts b from a's content
       an_unknown_viewnode_id_is_dropped (config, tantivy) . await ?;
       Ok (( )) } )) }
@@ -145,17 +144,6 @@ fn viewnode_id_of_atom (
 ) -> ViewnodeId {
   ViewnodeId ( viewnode_id_atom . trim_start_matches ("(vnid ") . trim_end_matches (')')
         . to_string () ) }
-
-/// The owner the view's record gives the viewnode ID of 'viewnode_id_atom'.
-fn owner_in_view (
-  views_state : &ViewsState,
-  view_name   : &str,
-  viewnode_id_atom    : &str,
-) -> Owner {
-  views_state . open_views
-    . viewnode_id_record_of ( &ViewforestId::ContentView (view_name . to_string ()) )
-    . owner_by_viewnode_id . get ( &viewnode_id_of_atom (viewnode_id_atom) ) . copied ()
-    . unwrap_or (Owner::User) }
 
 //
 // Tests
@@ -333,65 +321,23 @@ async fn an_unknown_viewnode_id_is_dropped (
             counter_before, counter_after );
   Ok (( )) }
 
-/// The view's record says who made each viewnode, before and after a
-/// save: the stub roots made root a, the containers folder's
-/// reconciler owns its member p, the
-/// content reconciler made c's subscribee folder and owns the member
-/// b, the subscribee folder's reconciler owns d, and a typed member is
-/// the content reconciler's while a typed non-member note is the
-/// user's.
-async fn the_owner_table_records_who_made_each_viewnode (
-  config  : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = fresh_views_state ();
-  let buffer : String = open_view (
-    config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
-  let expected : [(&str, Owner); 5] = [
-    ( "(node (id a) ",          Owner::StubRoots ),
-    ( "(node (id p) ",          Owner::FolderReconciler (
-                                  FolderKind::Partner (PartnerFolder::Container)) ),
-    ( "(node (id b) ",          Owner::ContentReconciler ),
-    ( "(skg subscribeeFolder",  Owner::ContentReconciler ),
-    ( "(node (id d) ",          Owner::FolderReconciler (
-                                  FolderKind::Partner (PartnerFolder::Subscribee)) ) ];
-  for (needle, owner) in &expected {
-    assert_eq! ( owner_in_view ( &views_state, VIEW_OF_A,
-                                 &viewnode_id_of_line_containing (&buffer, needle) ),
-                 *owner, "the owner of {:?}, de novo:\n{}", needle, buffer ); }
-  let typed : String = format! (
-    "{}** a typed member\n** (skg (node nonMember)) a typed note\n",
-    buffer );
-  let (saved, _) : (SaveResponse, Vec<String>) = save_view (
-    &typed, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
-  for (needle, owner) in expected . iter () . chain ( [
-    ( "a typed member", Owner::ContentReconciler ),
-    ( "a typed note",   Owner::User ) ] . iter () ) {
-    assert_eq! ( owner_in_view ( &views_state, VIEW_OF_A,
-                                 &viewnode_id_of_line_containing (&saved . saved_view, needle) ),
-                 *owner, "the owner of {:?}, after a save:\n{}",
-                 needle, saved . saved_view ); }
-  Ok (( )) }
-
 /// The record's end-of-completion pass gives a viewnode ID to each viewnode
 /// without one, in buffer order, never one the counter has passed
 /// (so not one a viewnode cut from the buffer had), never one spelled
-/// like a number, and keeps the table to the viewnodes the forest
-/// holds.
+/// like a number, and knows the viewnode IDs the forest holds and no
+/// others.
 #[test]
 fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
 ) {
   let mut tree : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = tree . root () . id ();
-  let folder : NodeId = tree . get_mut (root) . unwrap () . append ( Viewnode {
-    owner : Owner::ContentReconciler,
-    .. viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) } ) . id ();
+  let folder : NodeId = tree . get_mut (root) . unwrap () . append (
+    viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) ) . id ();
   for _ in 0 .. 120 {
     tree . get_mut (folder) . unwrap () . append ( viewnode_of (
       ViewnodeKind::DeadViewnode )); }
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::default ();
-  record . assign_viewnode_ids_and_record_owners (&mut tree);
+  record . assign_viewnode_ids (&mut tree);
   assert_eq! ( tree . root () . value () . viewnode_id, None, "the buffer root gets none" );
   let viewnode_ids : Vec<ViewnodeId> = tree . root () . descendants () . skip (1)
     . map ( |node| node . value () . viewnode_id . clone () . expect ("a viewnode ID") )
@@ -403,9 +349,8 @@ fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
             "assigned in buffer order: {:?}", viewnode_ids );
   assert! ( viewnode_ids . iter () . all ( |viewnode_id| viewnode_id . 0 . parse::<f64> () . is_err () ),
             "{:?}", viewnode_ids );
-  assert_eq! ( record . owner_by_viewnode_id . len (), 1, "only the folder has an owner" );
-  assert_eq! ( record . owner_by_viewnode_id . get (&viewnode_ids [0]),
-               Some (&Owner::ContentReconciler) );
+  assert_eq! ( record . known_viewnode_ids,
+               viewnode_ids . iter () . cloned () . collect::<HashSet<ViewnodeId>> () );
   { // Cut the folder and its last child; append a new viewnode.
     let last : NodeId = tree . get (folder) . unwrap () . last_child () . unwrap () . id ();
     tree . get_mut (last) . unwrap () . detach ();
@@ -416,10 +361,13 @@ fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
     tree . get_mut (folder) . unwrap () . detach ();
     tree . get_mut (root) . unwrap () . append ( viewnode_of (
       ViewnodeKind::DeadViewnode )); }
-  record . assign_viewnode_ids_and_record_owners (&mut tree);
+  record . assign_viewnode_ids (&mut tree);
   let newest : ViewnodeId = tree . root () . last_child () . unwrap () . value ()
     . viewnode_id . clone () . unwrap ();
   assert! ( newest . counter_value () > viewnode_ids . last () . unwrap () . counter_value (),
             "{:?} reuses no viewnode ID the buffer had", newest );
-  assert! ( record . owner_by_viewnode_id . is_empty (),
-            "the table forgets the folder: {:?}", record . owner_by_viewnode_id ); }
+  assert! ( ! record . known_viewnode_ids . contains (&viewnode_ids [0])
+            && ! record . known_viewnode_ids . contains ( viewnode_ids . last () . unwrap () ),
+            "the record forgets the folder and its cut child: {:?}",
+            record . known_viewnode_ids );
+  assert! ( record . known_viewnode_ids . contains (&newest), "{:?}", newest ); }

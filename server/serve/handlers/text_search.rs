@@ -38,7 +38,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, Membership, mk_writeProtected_viewnode};
-use crate::types::viewnode::{FolderKind, Owner, PropertyFolder, Property, viewnode_of};
+use crate::types::viewnode::{PropertyFolder, Property, viewnode_of};
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -241,7 +241,7 @@ pub fn handle_text_search_request (
               vec! [warning],
             _ => Vec::new (), };
           ViewnodeIdRecord::default () // 'register_view' reads it back from the forest
-            . assign_viewnode_ids_and_record_owners (&mut viewforest);
+            . assign_viewnode_ids (&mut viewforest);
           let rendered : String =
             // Render first, before register_view moves the viewforest
             viewforest_to_string ( &viewforest, &runtime . config )
@@ -665,13 +665,11 @@ pub fn build_search_viewforest (
         b . 0 . partial_cmp (&a . 0) . unwrap () );
       let (_score, title) : &(f32, String) = sorted_matches [0];
       let result_treeid : NodeId =
-        viewforest . append_root ( Viewnode {
-          owner : Owner::StubRoots,
-          .. mk_writeProtected_viewnode (
-            (*skgid) . clone (),
-            (*skgrepo) . clone (),
-            title . clone (),
-            Membership::Member ) } );
+        viewforest . append_root ( mk_writeProtected_viewnode (
+          (*skgid) . clone (),
+          (*skgrepo) . clone (),
+          title . clone (),
+          Membership::Member ) );
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasFolder.
         // PITFALL: The title might not be the best match,
@@ -681,17 +679,14 @@ pub fn build_search_viewforest (
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( Viewnode {
             org_folded : true,
-            owner      : Owner::ContentReconciler,
             .. viewnode_of ( ViewnodeKind::PropertyFolder (PropertyFolder::Alias) ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliasfolder_mut : NodeMut<Viewnode> =
             viewforest . get_mut (aliasfolder_skgid) . unwrap ();
-          aliasfolder_mut . append ( Viewnode {
-            owner : Owner::FolderReconciler (FolderKind::Alias),
-            .. viewnode_of (
-              ViewnodeKind::Property ( Property::Alias {
-                text            : title . clone (),
-                relRepo         : None,
-                relRepo_request : None } )) } ); }} }
+          aliasfolder_mut . append ( viewnode_of (
+            ViewnodeKind::Property ( Property::Alias {
+              text            : title . clone (),
+              relRepo         : None,
+              relRepo_request : None } )) ); }} }
   (viewforest, search_results) }

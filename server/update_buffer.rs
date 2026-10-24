@@ -185,12 +185,11 @@ pub fn update_views_after_save (
   let mut saved_view_mut : ViewForest = saved_view;
   let mut saved_viewnode_id_record : ViewnodeIdRecord =
     // The parsed buffer carries viewnode IDs; the view's record says which
-    // it knows and whose each viewnode is, before any reconciler runs.
+    // it knows, before any reconciler runs.
     viewforest_id_from_request_result . as_ref () . ok ()
     . map ( |viewforest_id| views_state . open_views . viewnode_id_record_of (viewforest_id) )
     . unwrap_or_default ();
   saved_viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut saved_view_mut);
-  saved_viewnode_id_record . set_owners_in_parsed_viewforest (&mut saved_view_mut);
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
   // submitted view is now consumed input. Clear all request carriers at this
@@ -610,8 +609,8 @@ pub fn rerender_view (
 ///   - computes graph- then viewnode stats,
 ///   - applies the skgrepo restriction,
 ///   - gives a viewnode ID to each viewnode that lacks one, from
-///     'viewnode_id_record', which it brings up to date with the forest's
-///     owners (the end-of-completion pass, after the prune and after
+///     'viewnode_id_record', which it brings up to date with the forest
+///     (the end-of-completion pass, after the prune and after
 ///     everything this tail adds), and renders to a buffer string.
 /// Step order is immaterial between the membership marks and graphnodestats:
 /// membership is a view property and graphnodestats reads only the in-Rust graph,
@@ -648,7 +647,7 @@ pub fn finish_viewforest (
     skgrepo_restriction );
   if let Some (restriction) = skgrepo_restriction {
     apply_skgrepo_set_to_viewforest ( viewforest, restriction ); }
-  viewnode_id_record . assign_viewnode_ids_and_record_owners (viewforest);
+  viewnode_id_record . assign_viewnode_ids (viewforest);
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "viewforest_to_string" ). entered();
     viewforest_to_string ( viewforest, config ) } }

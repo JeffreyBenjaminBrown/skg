@@ -10,7 +10,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, Owner, Viewnode, ViewnodeKind, Editability, Membership, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, Membership, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_skgids};
 
@@ -255,8 +255,7 @@ pub fn stub_viewforest_from_root_skgids (
   Ok (viewforest) }
 
 /// Append one view root to the viewforest, completed via
-/// build_node_branch_minus_content, and owned by the stub roots.
-/// Returns its treeid.
+/// build_node_branch_minus_content. Returns its treeid.
 pub fn append_plain_stub_root (
   viewforest : &mut ViewForest,
   root_skgid : &ID,
@@ -267,14 +266,10 @@ pub fn append_plain_stub_root (
 ) -> Result < NodeId, Box<dyn Error> > {
   let viewforest_root_treeid : NodeId =
     viewforest . internal_root_skgid ();
-  let root_treeid : NodeId = build_node_branch_minus_content (
+  build_node_branch_minus_content (
     Some ( (viewforest . as_internal_tree_mut (),
             viewforest_root_treeid) ),
-    root_skgid, graph, config, visited, skgrepo_restriction ) ?;
-  viewforest . as_internal_tree_mut () . get_mut (root_treeid)
-    . ok_or ("append_plain_stub_root: the root vanished") ?
-    . value () . owner = Owner::StubRoots;
-  Ok (root_treeid) }
+    root_skgid, graph, config, visited, skgrepo_restriction ) }
 
 /// Mark forest-root UnrestrictedVognodes as members, so that a root
 /// carries no 'nonMember' atom; a root has no viewparent whose

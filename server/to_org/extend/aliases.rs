@@ -4,7 +4,7 @@ use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_requ
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
-use crate::types::viewnode::{FolderKind, Owner, PropertyFolder, Property};
+use crate::types::viewnode::{PropertyFolder, Property};
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 
@@ -62,8 +62,7 @@ pub fn build_and_integrate_aliases (
     . unwrap_or_default ();
   let aliasfolder_skgid : ego_tree::NodeId =
     insert_non_vognode_as_child ( tree, treeid,
-      ViewnodeKind::PropertyFolder (PropertyFolder::Alias), true,
-      Owner::ContentReconciler ) ?;
+      ViewnodeKind::PropertyFolder (PropertyFolder::Alias), true ) ?;
   for alias in & aliases {
     insert_non_vognode_as_child (
       tree, aliasfolder_skgid,
@@ -74,5 +73,5 @@ pub fn build_and_integrate_aliases (
                           if &alias . relRepo == home { None }
                           else { Some (alias . relRepo . clone ()) } ),
                       relRepo_request: None } ),
-      false, Owner::FolderReconciler (FolderKind::Alias) ) ?; }
+      false ) ?; }
   Ok (( )) }

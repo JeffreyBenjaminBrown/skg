@@ -18,7 +18,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
-use crate::types::viewnode::{ Birth, Membership, Owner, PartnerFolder, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
+use crate::types::viewnode::{ Birth, DiffChange, Membership, PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -174,7 +174,7 @@ fn prepend_containerward_chain_node (
       None => mk_unknown_viewnode (container . clone ()), };
   Ok ( Some ( tree . get_mut (parent)
               . ok_or ("prepend_containerward_chain_node: parent not found") ?
-              . prepend ( Viewnode { owner : Owner::RoleTreeAttach, .. viewnode } )
+              . prepend (viewnode)
               . id () )) }
 
 /// Whether 'node' is a chain node: a non-member vognode under a
@@ -200,3 +200,20 @@ pub fn is_in_containerward_chain (
         ViewnodeKind::PartnerFolder (PartnerFolder::Container) ));
     if parent_is_a_containers_folder_member { return true; }
     current = parent; }}
+
+/// Whether 'node' is a chain node as the walk draws it: write-protected
+/// (or a phantom or a restricted vognode, for a container it cannot
+/// show), carrying no change facts. So a non-member the user typed
+/// under a containers folder's member, which is editable, is not one,
+/// and neither is what that member's own visit adds there (a removed
+/// member, a historical phantom), which carries change facts.
+pub fn is_drawn_chain_node (
+  node : NodeRef<Viewnode>,
+) -> bool {
+  let viewnode : &Viewnode = node . value ();
+  is_in_containerward_chain (node)
+    && viewnode . editable_skgid () . is_none ()
+    && viewnode . change_facts . change == DiffChange::default ()
+    && ! matches! ( viewnode . kind,
+                    ViewnodeKind::Vognode (Vognode::Phantom (
+                      Phantom::Historical (_) | Phantom::Deleted (_) ))) }

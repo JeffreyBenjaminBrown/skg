@@ -19,11 +19,12 @@ use crate::to_org::complete::partner_folder::child_data::{
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
 use crate::to_org::extend::containerward_chain::{
-  ContainerwardChainPartners, attach_containerward_chains_under_members};
+  ContainerwardChainPartners, attach_containerward_chains_under_members,
+  is_drawn_chain_node};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  DiffChange, FolderPolicy, Owner, PartnerFolder, Viewnode,
+  DiffChange, FolderPolicy, PartnerFolder, Property, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_viewnode_id_of, push_repair_warnings, view_order_preserving_goal_list};
@@ -122,10 +123,11 @@ fn straddle_goal_item (
 /// its viewnodes, where they stand, and their fold state. Every child
 /// of the member but its members is matched, whoever drew it, so a
 /// chain node the user copied is a duplicate, converted by the one
-/// rule. Of the rest, this converts only what it owns
-/// ('Owner::RoleTreeAttach'): what the user added stays where it
-/// stands, and what the member's own visit adds (its old text, its
-/// removed members) is that visit's.
+/// rule. Of the rest, this converts only what it draws, known by its
+/// kind: a chain node as the walk draws it ('is_drawn_chain_node') and
+/// a relRepo move. What the user added stays where it stands, and
+/// what the member's own visit adds (its old text, its removed
+/// members), which carries change facts, is that visit's.
 fn attach_chains_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
@@ -159,7 +161,9 @@ fn attach_chains_under_straddle_folder_members (
         ContainerwardChainPartners::GraphStraddle (straddle) ) ?; }
     reconcile_children_with_shallowModelSubtree (
       tree, member, &model, model_member, &straddle . after,
-      Owner::RoleTreeAttach,
+      &|node| is_drawn_chain_node (node)
+        || matches! ( node . value () . kind,
+                      ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
       &|viewnode| ! viewnode . is_unrestrictedVognode_and_member (),
       &|_| true ) ?; }
   Ok (( )) }

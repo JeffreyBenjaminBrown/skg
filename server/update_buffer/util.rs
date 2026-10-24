@@ -1,6 +1,6 @@
 use crate::to_org::util::make_member_children_nonMembers;
 use crate::types::viewnode::{
-  Membership, ChangeFacts, Owner, Viewnode, ViewnodeKind, Vognode};
+  Membership, ChangeFacts, Viewnode, ViewnodeKind, Vognode};
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 use crate::types::tree::moves::{
   move_to_last_child, place_created_children_after_their_model_predecessors};
@@ -231,15 +231,11 @@ pub fn convert_unwarranted_child (
 /// - of several managed children with one key, the editable one is
 ///   kept as the member, else the first;
 /// - a stale or duplicate child is converted by
-///   'convert_unwarranted_child', as a leaf when it has no children;
-/// - 'owner' (the calling reconciler) owns every child it creates,
-///   and every managed child it keeps as a member of the goal,
-///   whoever typed it.
+///   'convert_unwarranted_child', as a leaf when it has no children.
 pub fn complete_managed_children_in_viewforest
 <Orderkey, Managed, View> (
   tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,
-  owner               : Owner,
   kept_child_order    : KeptChildOrder,
   managed             : Managed,
   view_child_orderkey : View,
@@ -255,25 +251,12 @@ where Managed  : Fn (&Viewnode) -> bool,
       tree, treeid, kept_child_order, &managed, &view_child_orderkey,
       |viewnode : &Viewnode| viewnode . editable_skgid () . is_some (),
       goal_list,
-      |orderkey : &Orderkey| create_child (orderkey)
-        . map ( |viewnode : Viewnode| Viewnode { owner, .. viewnode } ),
+      |orderkey : &Orderkey| create_child (orderkey),
       |tree : &mut Tree<Viewnode>, child : NodeId, unwarranted : Unwarranted| {
         let is_leaf : bool = tree . get (child)
           . ok_or ("complete_managed_children_in_viewforest: child not found") ?
           . children () . next () . is_none ();
         convert_unwarranted_child (tree, child, is_leaf, unwarranted) } ) ?;
-  let goal_set : HashSet<&Orderkey> = goal_list . iter () . collect ();
-  let kept_members : Vec<NodeId> =
-    tree . get (treeid)
-    . ok_or ("complete_managed_children_in_viewforest: node not found") ?
-    . children ()
-    . filter ( |child| managed ( child . value () )
-               && view_child_orderkey ( child . value () )
-                  . is_ok_and ( |orderkey| goal_set . contains (&orderkey) ))
-    . map ( |child| child . id () )
-    . collect ();
-  for member in kept_members {
-    tree . get_mut (member) . unwrap () . value () . owner = owner; }
   Ok (summary) }
 
 /// PURPOSE:

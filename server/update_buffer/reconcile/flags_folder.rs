@@ -3,7 +3,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
-use crate::types::viewnode::{FolderKind, Owner, Property, Viewnode, ViewnodeKind, viewnode_of};
+use crate::types::viewnode::{Property, Viewnode, ViewnodeKind, viewnode_of};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{
   KeptChildOrder, complete_managed_children_in_viewforest, treat_certain_children};
@@ -27,7 +27,7 @@ pub fn reconcile_flags_folder_children (
     . filter (|flag| flag_is_true (&node . flags, *flag))
     . collect ();
   complete_managed_children_in_viewforest (
-    tree, folder_skgid, Owner::FolderReconciler (FolderKind::Flags),
+    tree, folder_skgid,
     KeptChildOrder::Unmoved,
     |viewnode| matches! (&viewnode . kind,
       ViewnodeKind::Property (Property::Flag { .. })),

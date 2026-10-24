@@ -42,7 +42,8 @@ use crate::diff_view::change_viewnodes::{
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_homeSkgrepoMove_viewnode,
   mk_relRepo_move_viewnode, mk_removed_member_viewnode};
 use crate::diff_view::shallow_model_subtree::{
-  adopt_model_facts, reconcile_children_with_shallowModelSubtree};
+  adopt_model_facts, is_diffView_change_viewnode,
+  reconcile_children_with_shallowModelSubtree};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
@@ -54,7 +55,7 @@ use crate::types::tree::moves::{
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   Membership, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, Owner, PartnerFolder, Phantom, PhantomDeleted, Property,
+  Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
@@ -203,7 +204,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     . map ( |child| child . value () . kind . clone () ) . collect ();
   let fronts : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    Owner::DiffViewReconciler,
+    &is_diffView_change_viewnode,
     &|viewnode| is_front_change_viewnode (viewnode)
       && ( ! matches! ( viewnode . kind, ViewnodeKind::PropertyFolder (_) )
            || model_property_folders . iter () . any ( |kind|
@@ -254,10 +255,9 @@ fn tag_root (
 /// of that node stands there (a removed member whose relationship
 /// returned, or a copy the user pasted, whoever drew it); a member, or
 /// any non-member, whose relationship is only in the before-graph is
-/// set aside (nonMember), and so becomes the diff view's reconciler's,
-/// whose step after the content reconciler finds it and shows it as
-/// removed. So a copy the user pasted is set aside as the removed
-/// member, not doubled by it.
+/// set aside (nonMember), for the diff view's step after the content
+/// reconciler to find and show as removed. So a copy the user pasted
+/// is set aside as the removed member, not doubled by it.
 pub(crate) fn align_content_members_with_straddle (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -283,12 +283,10 @@ pub(crate) fn align_content_members_with_straddle (
   for child in children {
     let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
     let viewnode : &mut Viewnode = child_mut . value ();
-    let mut set_aside : bool = false;
     let returned : Option<Viewnode> = match &mut viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
         if removed . contains (&t . skgid) {
-          t . membership = Membership::NonMember;
-          set_aside = true; }
+          t . membership = Membership::NonMember; }
         else if t . membership == Membership::NonMember
                 && after_set . contains (&t . skgid)
                 && nodes_with_a_member . insert ( t . skgid . clone () ) {
@@ -301,8 +299,6 @@ pub(crate) fn align_content_members_with_straddle (
             h . skgid . clone (), node . home_skgrepo . clone (),
             node . title . clone (), node . body . clone () )),
       _ => None, };
-    if set_aside {
-      viewnode . owner = Owner::DiffViewReconciler; }
     if let Some (member) = returned {
       viewnode . replace_kind (member . kind); }}
   Ok (( )) }
@@ -326,9 +322,9 @@ pub(crate) enum HistoricalPhantomVisit {
 /// its old content is created editable when its node is in U of the
 /// buffer being completed ('prunedChangeView_sets_of_buffer'); one that
 /// stands already keeps its editability ('adopt_model_facts'). A
-/// historical phantom has no content list, so the content reconciler's
-/// former members under it are the diff view's reconciler's, and its
-/// old content adopts them.
+/// historical phantom has no content list, so its old content adopts
+/// the content reconciler's former members under it, and converts the
+/// rest of them ('is_diffView_change_viewnode').
 pub(crate) fn process_historical_phantom_visit (
   tree                 : &mut Tree<Viewnode>,
   treeid               : NodeId,
@@ -352,7 +348,6 @@ pub(crate) fn process_historical_phantom_visit (
           skgid . clone (), node . home_skgrepo . clone (),
           node . title . clone (), node . body . clone () ) . kind );
       return Ok (HistoricalPhantomVisit::RootIsLive); }}
-  claim_children_of_the_content_reconciler (tree, treeid) ?;
   let Some (model_phantom) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, None) else {
       // In neither graph.
@@ -369,7 +364,7 @@ pub(crate) fn process_historical_phantom_visit (
       let empty : Tree<Viewnode> = Tree::new (model_root ());
       reconcile_children_with_shallowModelSubtree (
         tree, treeid, &empty, empty . root () . id (), &straddle . after,
-        Owner::DiffViewReconciler, &|_| true, &|_| false ) ?;
+        &is_diffView_change_viewnode, &|_| true, &|_| false ) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
     adopt_model_facts (
@@ -388,26 +383,9 @@ pub(crate) fn process_historical_phantom_visit (
       & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u ); }
   reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    Owner::DiffViewReconciler, &|_| true,
+    &is_diffView_change_viewnode, &|_| true,
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   Ok (HistoricalPhantomVisit::Done) }
-
-/// Make the children of 'treeid' that the content reconciler owns the
-/// diff view's reconciler's.
-fn claim_children_of_the_content_reconciler (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  let children : Vec<NodeId> =
-    tree . get (treeid)
-    . ok_or ("claim_children_of_the_content_reconciler: node not found") ?
-    . children () . map ( |child| child . id () ) . collect ();
-  for child in children {
-    let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
-    let viewnode : &mut Viewnode = child_mut . value ();
-    if viewnode . owner == Owner::ContentReconciler {
-      viewnode . owner = Owner::DiffViewReconciler; }}
-  Ok (( )) }
 
 /// When a save deleted the node of the deleted phantom at 'treeid'
 /// and the straddle holds it as only-before, it becomes the node's
@@ -472,7 +450,7 @@ fn convert_change_viewnodes (
   let empty : Tree<Viewnode> = Tree::new (model_root ());
   reconcile_children_with_shallowModelSubtree (
     tree, treeid, &empty, empty . root () . id (), &straddle . after,
-    Owner::DiffViewReconciler,
+    &is_diffView_change_viewnode,
     &|viewnode| ( is_front_change_viewnode (viewnode)
                   && ! matches! ( viewnode . kind, ViewnodeKind::PropertyFolder (_) ))
       || matches! ( &viewnode . kind,
@@ -637,7 +615,7 @@ fn tag_content_members (
       model . root_mut () . append (moved); }
     reconcile_children_with_shallowModelSubtree ( // a new move goes first
       tree, member, &model, model . root () . id (), &straddle . after,
-      Owner::DiffViewReconciler,
+      &is_diffView_change_viewnode,
       &|viewnode| matches! ( &viewnode . kind,
         ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
       &|_| false ) ?; }
@@ -678,7 +656,7 @@ fn reconcile_removed_content_members (
       anchors . push (anchor); }}
   let kept : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
-    Owner::DiffViewReconciler,
+    &is_diffView_change_viewnode,
     &|viewnode| matches! ( &viewnode . kind,
       ViewnodeKind::Vognode (
         Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) ))
@@ -862,14 +840,13 @@ fn child_folder_or_new (
   existing . unwrap_or_else ( ||
     append ( tree, treeid, viewnode_of ( ViewnodeKind::PartnerFolder (kind) ))) }
 
-/// Append 'viewnode' under 'treeid', the diff view's reconciler's.
+/// Append 'viewnode' under 'treeid'.
 fn append (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   viewnode : Viewnode,
 ) -> NodeId {
-  tree . get_mut (treeid) . unwrap ()
-    . append ( Viewnode { owner : Owner::DiffViewReconciler, .. viewnode } ) . id () }
+  tree . get_mut (treeid) . unwrap () . append (viewnode) . id () }
 
 #[cfg(test)]
 #[path = "../../tests/unit/render_changes.rs"]

@@ -144,10 +144,6 @@ pub struct Viewnode {
   /// 'server/types/views_state.rs'); a parsed viewnode keeps the one
   /// its headline carried.
   pub viewnode_id       : Option<ViewnodeId>,
-  /// Who made this viewnode. Not printed: a reconciler sets it on a
-  /// viewnode it creates, and after a parse it is looked up by
-  /// viewnode ID in the view's 'ViewnodeIdRecord'.
-  pub owner             : Owner,
 }
 
 /// A viewnode ID: the identifier of one viewnode within one buffer,
@@ -157,30 +153,6 @@ pub struct Viewnode {
 /// characters long; a viewnode ID once used is never reused in the buffer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ViewnodeId (pub String);
-
-/// The reconciler that created a viewnode, or the user, who owns
-/// what they typed or pasted. A member of a content list is the
-/// content reconciler's and a member of a folder that folder's
-/// reconciler's, whoever typed it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum Owner {
-  ContentReconciler,
-  FolderReconciler (FolderKind),
-  RoleTreeAttach,
-  DiffViewReconciler,
-  StubRoots,
-  #[default]
-  User,
-}
-
-/// Which kind of folder a folder reconciler reconciles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FolderKind {
-  Partner (PartnerFolder),
-  Alias,
-  ID,
-  Flags,
-}
 
 #[derive( Debug, Clone, PartialEq )]
 pub enum ViewnodeKind {
@@ -293,7 +265,7 @@ pub struct PhantomUnknown {
 /// USED: write-protected and save-inert, like every phantom: it emits
 /// no fieldIntents, is excluded from its parent's contains, and the
 /// vognodes under it are not its members. The diff view's
-/// reconciler owns it.
+/// reconciler draws it, and knows it by its kind.
 ///
 /// DISTINCT INFO: the before-graph's title, body and home skgrepo.
 /// Its viewnode's change facts are those of its existence ('(node
@@ -494,7 +466,7 @@ pub enum Property {
     body     : Option<String>, },
   // The diff view's properties, below, are display-only and
   // save-inert: the validator ignores them, and the diff view's
-  // reconciler owns them. Each but BodyDiff is a change-forest leaf or
+  // reconciler draws them and knows them by their kind. Each but BodyDiff is a change-forest leaf or
   // commit readiness aggregate, so its viewnode carries '(ready ...)' and a
   // readiness request.
   /// In an alias folder: an alias the worktree lost since HEAD. The
@@ -1016,23 +988,6 @@ impl fmt::Display for ViewnodeId {
   fn fmt (&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
     write! (f, "{}", self . 0) }}
 
-impl FolderKind {
-  /// The folder kind of 'kind', if it is a folder.
-  pub fn of_viewnodeKind (
-    kind : &ViewnodeKind,
-  ) -> Option<FolderKind> {
-    match kind {
-      ViewnodeKind::PartnerFolder (partnerFolder) =>
-        Some ( FolderKind::Partner (*partnerFolder) ),
-      ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
-        Some (FolderKind::Alias),
-      ViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
-        Some (FolderKind::ID),
-      ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
-        Some (FolderKind::Flags),
-      _ => None, }}
-}
-
 impl AsRef<Viewnode> for Viewnode {
   fn as_ref (&self) -> &Viewnode {
     self }}
@@ -1043,7 +998,7 @@ impl AsMut<Viewnode> for Viewnode {
 
 impl Viewnode {
   /// Make this viewnode one of kind 'kind', keeping its focus, fold
-  /// state, viewnode ID and owner. The diff view's facts and the readiness request
+  /// state and viewnode ID. The diff view's facts and the readiness request
   /// describe the kind replaced, so they go with it.
   pub fn replace_kind (
     &mut self,
@@ -1353,8 +1308,8 @@ pub fn viewforest_root_viewnode () -> Viewnode {
   viewnode_of (ViewnodeKind::BufferRoot) }
 
 /// A viewnode of the given kind, unfocused and not org-folded,
-/// carrying no change facts, no readiness request and no viewnode ID,
-/// and owned by the user. A literal that
+/// carrying no change facts, no readiness request and no viewnode ID.
+/// A literal that
 /// sets other fields can take the rest from it:
 /// 'Viewnode { org_folded : true, .. viewnode_of (kind) }'.
 pub fn viewnode_of (
@@ -1366,8 +1321,7 @@ pub fn viewnode_of (
              kind,
              change_facts      : ChangeFacts::default (),
              readiness_request : None,
-             viewnode_id       : None,
-             owner             : Owner::User } }
+             viewnode_id       : None } }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

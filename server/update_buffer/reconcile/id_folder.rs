@@ -4,7 +4,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
-use crate::types::viewnode::{FolderKind, Owner, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{PropertyFolder, Property, viewnode_of};
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest};
 use ego_tree::{NodeId, Tree};
@@ -59,7 +59,6 @@ pub fn reconcile_idFolder_children (
   complete_managed_children_in_viewforest(
     tree,
     idfolder_treeid,
-    Owner::FolderReconciler (FolderKind::ID),
     KeptChildOrder::Unmoved,
     is_skgid,
     view_id_text,

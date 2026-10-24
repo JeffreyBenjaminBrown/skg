@@ -142,3 +142,43 @@ fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b)", REMOVED_X_UNDER_B,
       " a note under x\n" ]);
     Ok (( )) }) }
+
+/// A write-protected copy the user pasted under an editable removed
+/// member stays where it stood through the commit, write-protected,
+/// under the member retained as non-member: it is neither a change
+/// viewnode nor a removed member, so the conversion of the stale
+/// member leaves it.
+#[test]
+fn a_pasted_write_protected_copy_under_a_stale_child_stays (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("commit_leftovers", &["main"], |f| {
+    let copy : &str = "*** (skg (node (id s1) (repo main) nonMember writeProtected";
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let saved : String = saved_and_rerendered ( f,
+      &insert_after_line_starting (
+        &buffer, REMOVED_X_UNDER_E,
+        "*** (skg (node (id s1) (repo main) nonMember writeProtected)) s1\n" )) ?;
+    let copy_before : &str = line_starting (&saved, copy);
+    assert! ( headline_parent_of (&saved, copy_before) . starts_with (REMOVED_X_UNDER_E),
+              "{}", saved );
+    let committed : String = committed (f) ?;
+    let copy_after : &str = line_starting (&committed, copy);
+    assert_eq! ( viewnode_id_on (copy_after), viewnode_id_on (copy_before),
+                 "the copy is kept, not made again:\n{}", committed );
+    assert! ( headline_parent_of (&committed, copy_after) . starts_with (PARKED_X_UNDER_E),
+              "{}", committed );
+    Ok (( )) }) }
+
+/// The headline above 'line' one level up, viewnode IDs aside.
+fn headline_parent_of (
+  buffer : &str,
+  line   : &str,
+) -> String {
+  let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
+  let headlines : Vec<&str> =
+    buffer . lines () . filter ( |line| line . starts_with ('*') ) . collect ();
+  let at : usize = headlines . iter () . position ( |headline| *headline == line )
+    . expect ("the line is a headline of the buffer");
+  without_viewnode_ids ( headlines [.. at] . iter () . rev ()
+    . find ( |headline| depth (headline) + 1 == depth (line) )
+    . expect ("the headline has a parent") ) }

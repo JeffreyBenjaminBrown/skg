@@ -409,7 +409,6 @@ fn enrich_search_buffer_snapshot (
   let mut viewnode_id_record : ViewnodeIdRecord =
     views_state . open_views . viewnode_id_record_of (&viewforest_id);
   viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut viewforest);
-  viewnode_id_record . set_owners_in_parsed_viewforest (&mut viewforest);
   insert_partner_folders_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . containerward_role_trees_by_skgid, &runtime . tantivy_index,
@@ -460,7 +459,7 @@ fn enrich_search_buffer_snapshot (
   let release_warnings : Vec<String> = match release {
     TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
-  viewnode_id_record . assign_viewnode_ids_and_record_owners (&mut viewforest);
+  viewnode_id_record . assign_viewnode_ids (&mut viewforest);
   let enriched : String =
     viewforest_to_string ( &viewforest, &runtime . config )
     . expect ("search viewforest rendering never fails");

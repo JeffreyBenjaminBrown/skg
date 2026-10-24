@@ -43,7 +43,7 @@ impl PartnerFolder {
         "reconcile_hiddenInSubscribeeFolder_children",
       PartnerFolder::HiddenOutsideOfSubscribee =>
         "reconcile_hiddenoutsideSubscribeeFolder_children",
-      // Derived from the graph straddle, and owned by the diff
+      // Derived from the graph straddle, and drawn by the diff
       // view's reconciler rather than by view completion.
       PartnerFolder::AcquiredBy
         | PartnerFolder::Acquired =>

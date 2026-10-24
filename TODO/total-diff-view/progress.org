@@ -4053,3 +4053,83 @@ Emacs 387 passed; Neovim 31 spec files passed; integration 34 of
 35 under Emacs and again under Neovim, 'import-md-and-org' failing
 as at baseline. No server code changed, so the Rust suite was not
 run.
+** Slice 6: deviations
+*** the stale test is a predicate the caller passes
+'reconcile_children_with_shallowModelSubtree' takes
+'converts_when_stale' where it took 'owner'. The per-visit step
+and the historical phantom's visit pass
+'is_diffView_change_viewnode' ('shallow_model_subtree.rs'): a
+property viewnode, a folder, a historical phantom, a removed
+member, or a member under a phantom. The chain attach passes its
+own ("the chain attach converts by shape", below).
+**** change facts on a vognode means '(rel removed)'
+The diff view tags others' vognodes too: a content member, and a
+non-member whose node is content, carry '(rel added)' or
+'(node added)'. Counting any change fact would convert those:
+'convert_change_viewnodes' under a write-protected node selects
+every unrestricted vognode against an empty model, so its tagged
+children would be converted at every completion. So a vognode is
+the diff view's only as a removed member ('(rel removed)') or a
+historical phantom; a pasted copy of a removed member still
+counts as one, as the plan's pitfall says.
+**** a member under a phantom
+This replaces the hand-over under a historical phantom: a phantom
+has no content list, so a member under it is one the content
+reconciler drew while the node was live. Its old content adopts it
+by key; one it lacks is converted, as the claimed member was.
+*** the chain attach converts by shape
+A chain node carries no change facts and no kind of its own, so
+'is_drawn_chain_node' ('containerward_chain.rs') stands in for
+'RoleTreeAttach': in chain position, not editable, no change
+facts, not a historical or deleted phantom. The attach converts
+such a child and a relRepo move when stale. A note the user types
+there is editable and stays; the member's own visit's viewnodes
+carry change facts and stay. The step's reconcilers do not use it:
+under an editable containers-folder member, the removed-member
+reconciler selects every non-member and would convert its chain.
+**** consequence: a pasted write-protected copy in a chain
+A write-protected copy pasted under a containers folder's member
+has a chain node's shape, so the attach converts it once it is
+stale: retained write-protected if it holds something, removed by
+the prune if not. The owner rule kept it as the user's.
+*** what goes with a stale child
+'goes_with_a_stale_viewparent' ('shallow_model_subtree.rs'): the
+diff view's own viewnodes, a folder's member (any vognode child of
+a partner folder but a non-member that is no removed member), and
+a drawn chain node. The plan's "leaving the rest" read literally
+would keep an unchanged member of a changed folder, with its
+chain, and leave the folder a tombstone holding them;
+'a_commit_converts_what_the_diff_view_showed' pins that the
+changed folders go. One difference from the owner rule remains: a
+folder the user requested under a stale child goes with it, where
+the owner rule kept it as the user's.
+*** names
+'assign_viewnode_ids_and_record_owners' is 'assign_viewnode_ids'.
+'FolderKind' went with 'Owner', having no other use.
+'complete_managed_children_in_viewforest',
+'insert_non_vognode_as_child' and 'append_copy_of_subtree' lost
+their owner parameter; 'claim_children_of_the_content_reconciler'
+went. 'owner_of_folder' ('readiness_requests.rs') names the
+folder's viewparent, not the record, and stays.
+*** tests
+'a_pasted_write_protected_copy_under_a_stale_child_stays' in
+'tests/pruned_change_view/after_a_commit.rs' (it passes under the
+owner rule too; it pins the outcome).
+'tests/pruned_change_view/viewnode_ids.rs' went, since it tested
+only owners, and so did the owner part of 'tests/viewnode_ids.rs';
+its record test checks 'known_viewnode_ids' instead.
+**** a throwaway probe
+'users_notes' with "p contains a" only in the worktree, removed
+by a save through p's root: the chain node p under a, in x's
+containers folder, went stale without a commit and was converted
+and pruned; with a note typed under p, p stayed as a
+write-protected non-member holding it. The probe is deleted.
+*** docs
+'docs/diff-view.org' says how each reconciler knows its own. The
+glossary's "owner" entry and the lines that cite it (the
+"carrier" entry, the viewnode ID record, the reconciler entries)
+are left for slice 11, which removes the entry.
+*** verification
+Rust 914 passed; Emacs 387 passed; Neovim 31 spec files passed;
+integration 34 of 35 under Emacs and again under Neovim,
+'import-md-and-org' failing as at baseline.

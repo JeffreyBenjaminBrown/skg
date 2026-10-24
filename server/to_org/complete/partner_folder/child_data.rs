@@ -28,7 +28,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::diff_view::shallow_model_subtree::{
   adopt_model_facts, is_unrestricted_removed_member};
-use crate::types::viewnode::{DiffChange, FolderKind, Owner, Phantom, Viewnode, ViewnodeKind, Vognode, Membership, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, Membership, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -231,7 +231,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     tree, folder_node, goal_list, graph ) ?;
   let summary : RepairSummary<ID> =
     complete_managed_children_in_viewforest (
-    tree, folder_node, Owner::FolderReconciler (FolderKind::Partner (kind)),
+    tree, folder_node,
     match kind . policy () {
       // The save reads these folders' membership, in the buffer's order.
       FolderPolicy::EditableSet | FolderPolicy::EditableFilter =>

@@ -13,7 +13,7 @@ use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder};
-use crate::types::viewnode::{FolderKind, Owner, Vognode};
+use crate::types::viewnode::{Vognode};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child,
@@ -166,8 +166,7 @@ pub fn maybe_add_subscribeeFolder_branch (
 
   let subscribee_folder_treeid : NodeId =
     insert_non_vognode_as_child ( tree, treeid,
-      ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee), true,
-      Owner::ContentReconciler ) ?;
+      ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee), true ) ?;
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &subscribee_skgids, graph, config ) ?;
@@ -181,8 +180,7 @@ pub fn maybe_add_subscribeeFolder_branch (
       insert_non_vognode_as_child (
         tree, subscribee_folder_treeid,
         ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
-        false,
-        Owner::FolderReconciler (FolderKind::Partner (PartnerFolder::Subscribee)) ) ?;
+        false ) ?;
     with_node_mut ( tree, hidden_outside_folder_treeid,
       |mut n| {
         // A new hidden folder begins folded. The
@@ -280,8 +278,7 @@ pub fn maybe_add_one_partnerFolder (
     return Ok (( )); }
   let folder_treeid : NodeId =
     insert_non_vognode_as_child (
-      tree, treeid, ViewnodeKind::PartnerFolder (kind), true,
-      Owner::ContentReconciler ) ?;
+      tree, treeid, ViewnodeKind::PartnerFolder (kind), true ) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &member_skgids, graph, config ) ?;
@@ -345,7 +342,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
     insert_non_vognode_as_child (
       tree, subscribee_treeid,
       ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee),
-      true, Owner::ContentReconciler ) ?;
+      true ) ?;
   with_node_mut ( tree, hidden_folder_treeid,
     |mut n| {
       // A new hidden folder begins folded. The

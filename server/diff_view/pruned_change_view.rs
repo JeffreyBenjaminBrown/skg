@@ -34,7 +34,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  Membership, Editability, Owner, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  Membership, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
@@ -362,7 +362,7 @@ fn append_stub_root (
         "diffView_buffer_viewforest: root {} is in neither graph", root )) ?;
     return Ok ( viewforest . as_internal_tree_mut () . get_mut (buffer_root)
                 . ok_or ("diffView_buffer_viewforest: no buffer root") ?
-                . append ( Viewnode { owner : Owner::StubRoots, .. phantom } ) . id () ); }
+                . append (phantom) . id () ); }
   let root_treeid : NodeId = append_plain_stub_root (
     viewforest, root, &runtime . graph, &runtime . config,
     stub_editable_map, None ) ?;
@@ -372,7 +372,6 @@ fn append_stub_root (
       . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?
       . append ( Viewnode {
         org_folded : true,
-        owner      : Owner::StubRoots,
         .. viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) ) } ); }
   Ok (root_treeid) }
 

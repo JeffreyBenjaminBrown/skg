@@ -18,7 +18,7 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
     mk_restricted_viewnode () );
   let result : Result<RepairSummary<ID>, Box<dyn Error>> =
     complete_managed_children_in_viewforest (
-      &mut t, root, Owner::ContentReconciler, KeptChildOrder::FollowsGoal,
+      &mut t, root, KeptChildOrder::FollowsGoal,
       |_vn : &Viewnode| true, // the managed predicate admits the Restricted child
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode))

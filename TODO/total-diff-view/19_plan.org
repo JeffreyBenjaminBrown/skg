@@ -933,7 +933,7 @@ chain first.
 The nine commands and keys removed in both clients, their tests
 removed, the five docs and the glossary entry. Run the Emacs,
 Neovim and integration suites.
-** TODO Slice 6: the owner record goes
+** DONE Slice 6: the owner record goes
 Conversion by kind and change facts, the hand-overs removed, the
 record removed, the tests. Run all four suites.
 ** TODO Slice 7: the birth goes
