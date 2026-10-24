@@ -65,9 +65,9 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
     local headlines =
       filledIn_headlines('(skg (node (id abc) (repo jeff)))')
     -- skg, node, id/abc, skgrepo/jeff, write-protected/false, nonMember/false,
-    -- birth/unremarkable, editRequest/none, viewRequests/none:
+    -- editRequest/none, viewRequests/none:
     -- each key and each value is a separate headline.
-    assert.are.equal(16, #headlines)
+    assert.are.equal(14, #headlines)
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
     assert.is_not_nil(find_text(headlines, 'false (default)'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
@@ -102,7 +102,7 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
         table.insert(level_3, headline.text) end
     end
     assert.are.same(
-      { 'id', 'repo', 'writeProtected', 'nonMember', 'birth',
+      { 'id', 'repo', 'writeProtected', 'nonMember',
         'editRequest', 'viewRequests', 'graphStats' },
       level_3)
   end)
@@ -122,7 +122,6 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
         '*** repo', '**** jeff',
         '*** writeProtected', '**** true',
         '*** nonMember', '**** false (default)',
-        '*** birth', '**** unremarkable (default)',
         '*** editRequest', '**** none (default)',
         '*** viewRequests', '**** none (default)' }, '\n')))
   end)
@@ -134,7 +133,6 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
         '*** repo', '**** jeff',
         '*** writeProtected', '**** false',
         '*** nonMember', '**** false',
-        '*** birth', '**** unremarkable',
         '*** editRequest', '**** none',
         '*** viewRequests', '**** none' }, '\n')))
   end)
@@ -198,7 +196,7 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
     assert.are.same(sexpr.read('(skg (node (repo only)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** repo', '**** only',
-        '*** writeProtected', '*** nonMember', '*** birth',
+        '*** writeProtected', '*** nonMember',
         '*** editRequest', '*** viewRequests' }, '\n')))
   end)
 

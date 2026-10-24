@@ -19,13 +19,12 @@
 
 (defconst skg-unrestrictedNode--canonical-field-order
   '("id" "repo"
-    "writeProtected" "nonMember" "birth" "editRequest" "viewRequests")
+    "writeProtected" "nonMember" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-unrestrictedNode--editable-defaults
   '(("writeProtected"  . "false (default)")
     ("nonMember"       . "false (default)")
-    ("birth"         . "unremarkable (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
   "Alist of editable field names to their default value text.")
@@ -294,12 +293,6 @@ CHILD-LEVEL is the level of the field headline."
         ;; Collapse to bare atom (no children)
         (list (cons child-level field-name)))
        (t group)))
-     ((string= field-name "birth")
-      (cond
-       ((or (null value-text)
-            (skg-unrestrictedNode--default-birth-p value-text))
-        nil)
-       (t group)))
      ((string= field-name "editRequest")
       (cond
        ((or (null value-text)
@@ -350,12 +343,6 @@ CHILD-LEVEL is the level of the field headline."
   (let ((trimmed (string-trim text)))
     (or (string= trimmed "false (default)")
         (string= trimmed "false"))))
-
-(defun skg-unrestrictedNode--default-birth-p (text)
-  "Return non-nil if TEXT represents the default birth value."
-  (let ((trimmed (string-trim text)))
-    (or (string= trimmed "unremarkable (default)")
-        (string= trimmed "unremarkable"))))
 
 (defun skg-unrestrictedNode--default-none-p (text)
   "Return non-nil if TEXT represents the default none value."

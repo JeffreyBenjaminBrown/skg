@@ -632,16 +632,114 @@ function M.historical_sexp_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it an UnrestrictedVognode, no role graft, whose
----'(diff ...)' says its relationship was removed?
+---@return boolean is it an UnrestrictedVognode whose '(diff ...)' says
+---its relationship was removed? Whether a restoreRel may sit on it
+---depends also on where it stands (M.restoreRel_position_p).
 function M.removed_membership_p (metadata_sexp)
   if not M.unrestrictedNode_sexp_p(metadata_sexp) then return false end
-  if M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'node', 'birth' }) then
-    return false end
   local rel = M.sexp_cdr_at_path(metadata_sexp,
                                  { 'skg', 'node', 'diff', 'rel' })
   return rel ~= nil and #rel == 1
          and sexpr.atom_text(rel[1]) == 'removed'
+end
+
+---The atoms of the partner folders ('PartnerFolder::from_client_string',
+---server/types/viewnode.rs).
+M.partner_folder_atoms = {
+  subscribeeFolder = true, subscriberFolder = true,
+  overriddenFolder = true, overriderFolder = true,
+  hiderFolder = true, hiddenFolder = true,
+  hiddenInSubscribeeFolder = true, hiddenOutsideOfSubscribeeFolder = true,
+  containerFolder = true, mentionerFolder = true,
+  acquiredByFolder = true, acquiredFolder = true }
+
+---@param metadata_sexp any
+---@return string|nil the partner folder's atom if METADATA_SEXP is a
+---partner folder's, bare or as the diff view writes a changed one,
+---'(ATOM changed)'
+function M.partner_folder_atom (metadata_sexp)
+  if not sexpr.is_list(metadata_sexp) then return nil end
+  for i = 2, #metadata_sexp do
+    local item = metadata_sexp[i]
+    if sexpr.is_list(item) then item = item[1] end
+    if item ~= nil and not sexpr.is_list(item) then
+      local atom = sexpr.atom_text(item)
+      if M.partner_folder_atoms[atom] then return atom end
+    end
+  end
+  return nil
+end
+
+---@param metadata_sexp any
+---@return boolean is it a vognode's: an UnrestrictedVognode, a phantom
+---(deleted, unknown or historical) or a restricted node?
+function M.vognode_sexp_p (metadata_sexp)
+  if not sexpr.is_list(metadata_sexp) then return false end
+  if M.unrestrictedNode_sexp_p(metadata_sexp) then return true end
+  for _, head in ipairs({ 'deleted', 'unknown', 'historical' }) do
+    if compare.subtree_p(metadata_sexp,
+                         { SKG, { sexpr.symbol(head) } }) then
+      return true end
+  end
+  return compare.subtree_p(metadata_sexp,
+                           { SKG, sexpr.symbol('restrictedNode') })
+end
+
+---@param line_number integer
+---@return integer|nil the line of the headline's viewparent
+local function parent_line (line_number)
+  local level = M.outline_level(line_number)
+  if not level then return nil end
+  return M.parent_headline_line(line_number, level)
+end
+
+---Is the headline at LINE_NUMBER a node of the containerward chain: a
+---non-member vognode under a member of a containers folder, or under
+---another such node ('is_in_containerward_chain',
+---server/to_org/extend/containerward_chain.rs)?
+---@param line_number integer
+---@return boolean
+function M.containerward_chain_node_p (line_number)
+  local line = line_number
+  while true do
+    local metadata = M.metadata_sexp_at_line_or_nil(line)
+    if not (M.vognode_sexp_p(metadata)
+            and (not M.unrestrictedNode_sexp_p(metadata)
+                 or not M.node_member_p(metadata))) then
+      return false end
+    local parent = parent_line(line)
+    if not (parent
+            and M.vognode_sexp_p(M.metadata_sexp_at_line_or_nil(parent)))
+    then return false end
+    local grandparent = parent_line(parent)
+    if grandparent
+       and M.partner_folder_atom(
+             M.metadata_sexp_at_line_or_nil(grandparent))
+           == 'containerFolder' then
+      return true end
+    line = parent
+  end
+end
+
+---Does the headline at LINE_NUMBER (default: point) stand where a
+---restoreRel may: under a partner folder (whose removed members are
+---non-members), or as a removed member, a non-member under a vognode
+---that is no node of the containerward chain? The save checks the
+---same ('restoreRel_stands_where_it_may',
+---server/from_text/buffer_to_viewnodes/local.rs).
+---@param line_number integer|nil
+---@return boolean
+function M.restoreRel_position_p (line_number)
+  local line = line_number or M.current_line_number()
+  local parent = parent_line(line)
+  if not parent then return false end
+  local parent_sexp = M.metadata_sexp_at_line_or_nil(parent)
+  if M.partner_folder_atom(parent_sexp) then return true end
+  if M.vognode_sexp_p(parent_sexp) then
+    return not M.node_member_p(M.metadata_sexp_at_line_or_nil(line))
+           and not M.containerward_chain_node_p(line)
+  end
+  return false
 end
 
 ---Ask the next save to write back the deleted node at point, a
@@ -657,12 +755,14 @@ end
 
 ---Ask the next save to re-add the removed relationship at point: a
 ---removed member's, or a folder member's carrying '(rel removed)', as
----HEAD recorded it. Does not save.
+---HEAD recorded it; which of the two it is, and whether it is either,
+---depends on where it stands (M.restoreRel_position_p). Does not save.
 function M.restore_removed_membership ()
   local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
   if M.historical_sexp_p(metadata_sexp) then
     error(M.restore_rel_on_a_deleted_node, 0) end
-  if not M.removed_membership_p(metadata_sexp) then
+  if not (M.removed_membership_p(metadata_sexp)
+          and M.restoreRel_position_p(nil)) then
     error(M.restore_rel_without_a_removed_membership, 0) end
   M.edit_metadata_at_point(sexpr.read(
     '(skg (node (DELETE (editRequest)) (editRequest restoreRel)))'))

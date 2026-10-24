@@ -153,7 +153,7 @@ describe('skg.metadata commands', function ()
       '*** (skg (node (id content-grandchild) (repo public))) content grandchild',
       '** (skg (node (id mismatched-content) (repo foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch',
-      '** (skg (node (id link-child) (repo public) nonMember (birth roleGraft mentioner))) link child',
+      '** (skg (node (id link-child) (repo public) nonMember)) link child',
       '*** (skg (node (id under-link) (repo public))) under link',
       '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-non-vognode) (repo public))) under non-vognode' },
@@ -284,8 +284,20 @@ describe('skg.metadata commands', function ()
 
   ---The message with which COMMAND refuses HEADLINE, which it must
   ---leave as it was.
-  local function refusal_of (headline, command)
+  ---A buffer of HEADLINE's lines with point on the last: the lines
+  ---before give it the place it stands in.
+  local function buffer_at_last_line (headline)
     buffer_with(headline)
+    vim.api.nvim_win_set_cursor(0, { vim.api.nvim_buf_line_count(0), 0 })
+  end
+
+  local function last_metadata_sexp ()
+    return metadata.metadata_sexp_at_line_or_nil(
+      vim.api.nvim_buf_line_count(0))
+  end
+
+  local function refusal_of (headline, command)
+    buffer_at_last_line(headline)
     local ok, err = pcall(command)
     assert.is_false(ok)
     assert.are.equal(headline, buffer_text())
@@ -300,17 +312,23 @@ describe('skg.metadata commands', function ()
       '(skg (historical (id g) (editRequest restoreNode)))'))
   end)
 
-  it('restore_removed_membership marks a removed member, editable or'
-     .. ' write-protected', function ()
+  it('restore_removed_membership marks a removed member, under a node'
+     .. ' or a historical phantom, and a folder member', function ()
+    local removed_member = '** (skg (node (id x) (repo main) nonMember'
+      .. ' (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x'
     for _, headline in ipairs({
-      '** (skg (node (id x) (repo main) nonMember'
-        .. ' (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x',
-      '**** (skg (node (id d) (repo main) nonMember'
+      '* (skg (node (id r) (repo main))) r\n' .. removed_member,
+      '* (skg (historical (id g) (repo main) (diff (node removed)))) g\n'
+        .. removed_member,
+      '* (skg (node (id r) (repo main))) r\n'
+        .. '** (skg (node (id c) (repo main))) c\n'
+        .. '*** (skg containerFolder) containers\n'
+        .. '**** (skg (node (id d) (repo main) nonMember'
         .. ' writeProtected (diff (rel removed) (properties changed)'
         .. ' (leaves 1 rel all))) (vnid 0o)) d' }) do
-      buffer_with(headline)
+      buffer_at_last_line(headline)
       metadata.restore_removed_membership()
-      assert.is_true(subtree_p(first_metadata_sexp(),
+      assert.is_true(subtree_p(last_metadata_sexp(),
         '(skg (node (editRequest restoreRel)))'))
     end
   end)
@@ -324,8 +342,18 @@ describe('skg.metadata commands', function ()
     for _, headline in ipairs({
       '* (skg (node (id x) (repo main) (diff (rel added)))) x',
       '* (skg (node (id x) (repo main))) x',
+      -- a root stands for no relationship
       '* (skg (node (id d) (repo main) nonMember'
-        .. ' (birth roleGraft container) writeProtected'
+        .. ' writeProtected'
+        .. ' (diff (rel removed)))) d',
+      -- a member is no removed member
+      '* (skg (node (id r) (repo main))) r\n'
+        .. '** (skg (node (id x) (repo main) (diff (rel removed)))) x',
+      -- a node of the containerward chain
+      '* (skg (node (id r) (repo main))) r\n'
+        .. '** (skg containerFolder) containers\n'
+        .. '*** (skg (node (id c) (repo main) writeProtected)) c\n'
+        .. '**** (skg (node (id d) (repo main) nonMember writeProtected'
         .. ' (diff (rel removed)))) d' }) do
       assert.are.equal('Only a removed membership can be restored',
         refusal_of(headline, metadata.restore_removed_membership))

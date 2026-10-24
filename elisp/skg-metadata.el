@@ -385,7 +385,7 @@ next save will do with the relationship."
 
 (defconst skg--relationship-role-menu-prose
   '(("container" nil
-     "The node would contain its view-parent -- the shape of a containerward role graft. The relationship belongs to the role graft's own contains list, wherever that list is shown editable; it cannot be set from the role graft's position.")
+     "The node would contain its view-parent -- the shape of a node of the containerward chain. The relationship belongs to that node's own contains list, wherever that list is shown editable; it cannot be set from the chain node's position.")
     ("content" content
      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child relationship.")
     ("mentioner" nil
@@ -738,13 +738,16 @@ Does not save; call `skg-request-save-buffer' afterward."
 The headline must be a removed member, or a member of a partner
 folder carrying '(rel removed)': its relationship to its viewparent
 (in a folder, to the folder's viewparent) existed at HEAD and is gone.
+Which of the two it is, and whether it is either, depends on where it
+stands (`skg--restoreRel-position-at-point-p').
 The save re-adds it as HEAD recorded it.
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
   (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
     (cond ((skg-sexp-subtree-p metadata '(skg (historical)))
            (user-error "%s" skg--restore-rel-on-a-deleted-node))
-          ((not (skg--removed-membership-p metadata))
+          ((not (and (skg--removed-membership-p metadata)
+                     (skg--restoreRel-position-at-point-p)))
            (user-error "%s" skg--restore-rel-without-a-removed-membership)))
     (skg-edit-metadata-at-point
      '(skg (node (DELETE (editRequest))
@@ -752,12 +755,82 @@ Does not save; call `skg-request-save-buffer' afterward."
     (message "Restore request set. Save to apply.")))
 
 (defun skg--removed-membership-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP is an UnrestrictedVognode, no role
-graft, whose '(diff ...)' says its relationship was removed."
+  "Non-nil when METADATA-SEXP is an UnrestrictedVognode whose
+'(diff ...)' says its relationship was removed. Whether a restoreRel
+may sit on it depends also on where it stands
+(`skg--restoreRel-position-at-point-p')."
   (and (skg--unrestrictedNode-sexp-p metadata-sexp)
-       (not (skg-sexp-cdr-at-path metadata-sexp '(skg node birth)))
        (equal (skg-sexp-cdr-at-path metadata-sexp '(skg node diff rel))
               '(removed))))
+
+(defun skg--restoreRel-position-at-point-p ()
+  "Non-nil iff the headline at point stands where a restoreRel may:
+under a partner folder (whose removed members are non-members), or as
+a removed member, a non-member under a vognode that is no node of the
+containerward chain. The save checks the same
+('restoreRel_stands_where_it_may', server/from_text/
+buffer_to_viewnodes/local.rs)."
+  (let ((metadata (skg--metadata-sexp-at-point-or-nil))
+        (parent-sexp (save-excursion
+                       (and (org-up-heading-safe)
+                            (skg--metadata-sexp-at-point-or-nil)))))
+    (cond ((skg--partner-folder-atom parent-sexp) t)
+          ((skg--vognode-sexp-p parent-sexp)
+           (and (not (skg--node-member-p metadata))
+                (not (skg--containerward-chain-node-at-point-p))))
+          (t nil))))
+
+(defun skg--containerward-chain-node-at-point-p ()
+  "Non-nil iff the headline at point is a node of the containerward
+chain: a non-member vognode under a member of a containers folder, or
+under another such node ('is_in_containerward_chain',
+server/to_org/extend/containerward_chain.rs)."
+  (save-excursion
+    (catch 'answer
+      (while t
+        (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
+          (unless (and (skg--vognode-sexp-p metadata)
+                       (or (not (skg--unrestrictedNode-sexp-p metadata))
+                           (not (skg--node-member-p metadata))))
+            (throw 'answer nil))
+          (unless (and (org-up-heading-safe)
+                       (skg--vognode-sexp-p
+                        (skg--metadata-sexp-at-point-or-nil)))
+            (throw 'answer nil))
+          (when (eq 'containerFolder
+                    (save-excursion
+                      (and (org-up-heading-safe)
+                           (skg--partner-folder-atom
+                            (skg--metadata-sexp-at-point-or-nil)))))
+            (throw 'answer t)))))))
+
+(defconst skg--partner-folder-atoms
+  '(subscribeeFolder subscriberFolder overriddenFolder overriderFolder
+    hiderFolder hiddenFolder hiddenInSubscribeeFolder
+    hiddenOutsideOfSubscribeeFolder containerFolder mentionerFolder
+    acquiredByFolder acquiredFolder)
+  "The atoms of the partner folders ('PartnerFolder::from_client_string',
+server/types/viewnode.rs).")
+
+(defun skg--partner-folder-atom (metadata-sexp)
+  "The partner folder's atom if METADATA-SEXP is a partner folder's,
+bare or as the diff view writes a changed one, '(ATOM changed)';
+else nil."
+  (and (consp metadata-sexp)
+       (seq-some (lambda (item)
+                   (let ((atom (if (consp item) (car item) item)))
+                     (car (memq atom skg--partner-folder-atoms))))
+                 (cdr metadata-sexp))))
+
+(defun skg--vognode-sexp-p (metadata-sexp)
+  "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode, a
+phantom (deleted, unknown or historical) or a restricted node."
+  (and (consp metadata-sexp)
+       (or (skg--unrestrictedNode-sexp-p metadata-sexp)
+           (skg-sexp-subtree-p metadata-sexp '(skg (deleted)))
+           (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))
+           (skg-sexp-subtree-p metadata-sexp '(skg (historical)))
+           (memq 'restrictedNode (cdr metadata-sexp)))))
 
 (defun skg--read-id-or-link (prompt)
   "Read an ID or link with linkstack paste/pop bindings in the minibuffer."

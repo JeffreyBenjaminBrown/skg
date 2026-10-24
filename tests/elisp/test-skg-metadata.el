@@ -295,7 +295,7 @@ the folder commands are the way to show a node's partners."
       "*** (skg (node (id content-grandchild) (repo public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (repo foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch\n"
-      "** (skg (node (id link-child) (repo public) nonMember (birth roleGraft mentioner))) link child\n"
+      "** (skg (node (id link-child) (repo public) nonMember)) link child\n"
       "*** (skg (node (id under-link) (repo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-non-vognode) (repo public))) under non-vognode\n"))
@@ -610,25 +610,29 @@ the folder commands are the way to show a node's partners."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s l"))
               'skg-restore-removed-membership)))
 
-(defun test-skg--metadata-after (headline command)
-  "The metadata of HEADLINE after COMMAND runs on it; the command
-must not save, so the buffer is all there is."
+(defun test-skg--metadata-after (headlines command)
+  "The metadata of the last of HEADLINES after COMMAND runs on it;
+the command must not save, so the buffer is all there is. The
+headlines before the last give it the place it stands in."
   (with-temp-buffer
     (org-mode)
-    (insert headline)
-    (goto-char (point-min))
+    (insert headlines)
+    (goto-char (point-max))
+    (beginning-of-line)
     (funcall command)
-    (test-skg--extract-metadata-sexp)))
+    (skg--metadata-sexp-at-point-or-nil)))
 
-(defun test-skg--refusal-of (headline command)
-  "The message with which COMMAND refuses HEADLINE, leaving it as it was."
+(defun test-skg--refusal-of (headlines command)
+  "The message with which COMMAND refuses the last of HEADLINES,
+leaving the buffer as it was."
   (with-temp-buffer
     (org-mode)
-    (insert headline)
-    (goto-char (point-min))
+    (insert headlines)
+    (goto-char (point-max))
+    (beginning-of-line)
     (let ((refusal (condition-case err (progn (funcall command) nil)
                      (user-error (cadr err)))))
-      (should (equal (buffer-string) headline))
+      (should (equal (buffer-string) headlines))
       refusal)))
 
 (ert-deftest test-skg-restore-deleted-node-marks-a-historical-phantom ()
@@ -640,11 +644,18 @@ must not save, so the buffer is all there is."
            '(skg (historical (id g) (editRequest restoreNode))))))
 
 (ert-deftest test-skg-restore-removed-membership-marks-a-removed-member ()
-  "An editable removed member and a write-protected folder member
-carrying '(rel removed)' both take the request."
+  "An editable removed member, under a node or a historical phantom,
+and a write-protected folder member carrying '(rel removed)' all take
+the request."
   (dolist (headline
-           '("** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
-             "**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vnid 0o)) d"))
+           '("* (skg (node (id r) (repo main))) r
+** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
+             "* (skg (historical (id g) (repo main) (diff (node removed)))) g
+** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
+             "* (skg (node (id r) (repo main))) r
+** (skg (node (id c) (repo main))) c
+*** (skg containerFolder) containers
+**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vnid 0o)) d"))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-after
               headline #'skg-restore-removed-membership)
@@ -659,7 +670,16 @@ carrying '(rel removed)' both take the request."
   (dolist (headline
            '("* (skg (node (id x) (repo main) (diff (rel added)))) x"
              "* (skg (node (id x) (repo main))) x"
-             "* (skg (node (id d) (repo main) nonMember (birth roleGraft container) writeProtected (diff (rel removed)))) d"))
+             ;; a root stands for no relationship
+             "* (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"
+             ;; a member is no removed member
+             "* (skg (node (id r) (repo main))) r
+** (skg (node (id x) (repo main) (diff (rel removed)))) x"
+             ;; a node of the containerward chain
+             "* (skg (node (id r) (repo main))) r
+** (skg containerFolder) containers
+*** (skg (node (id c) (repo main) writeProtected)) c
+**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"))
     (should (equal (test-skg--refusal-of
                     headline #'skg-restore-removed-membership)
                    "Only a removed membership can be restored")))

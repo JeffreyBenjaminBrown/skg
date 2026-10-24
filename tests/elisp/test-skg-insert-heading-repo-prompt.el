@@ -366,7 +366,6 @@ and shows the title under a `title' group."
                      (4 . "only")
                      (3 . "writeProtected")
                      (3 . "nonMember")
-                     (3 . "birth")
                      (3 . "editRequest")
                      (3 . "viewRequests"))))))
 

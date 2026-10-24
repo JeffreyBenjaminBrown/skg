@@ -44,9 +44,8 @@
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, repo : jeff,
     ;; write-protected : false (default), nonMember : false (default),
-    ;; birth : unremarkable (default),
     ;; editRequest : none (default), viewRequests : none (default)
-    (should (= (length headlines) 16)) ;; each key *and each value* is a separate headline
+    (should (= (length headlines) 14)) ;; each key *and each value* is a separate headline
     ;; Check default fields are present
     (should (cl-find "writeProtected" headlines
                      :key #'cdr :test #'string=))
@@ -123,8 +122,6 @@ member, 'true' on a non-member."
                            "**** true\n"
                            "*** nonMember\n"
                            "**** false (default)\n"
-                           "*** birth\n"
-                           "**** unremarkable (default)\n"
                            "*** editRequest\n"
                            "**** none (default)\n"
                            "*** viewRequests\n"
@@ -149,8 +146,6 @@ member, 'true' on a non-member."
                            "**** false\n"
                            "*** nonMember\n"
                            "**** false\n"
-                           "*** birth\n"
-                           "**** unremarkable\n"
                            "*** editRequest\n"
                            "**** none\n"
                            "*** viewRequests\n"
@@ -214,11 +209,11 @@ member, 'true' on a non-member."
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, repo, write-protected, nonMember, birth,
+    ;; Order should be: id, repo, write-protected, nonMember,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
                    '("id" "repo" "writeProtected" "nonMember"
-                     "birth" "editRequest" "viewRequests" "graphStats")))))
+                     "editRequest" "viewRequests" "graphStats")))))
 
 ;;
 ;; Strip: editRequest merge with org link
@@ -297,7 +292,6 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "**** only\n"
                            "*** writeProtected\n"
                            "*** nonMember\n"
-                           "*** birth\n"
                            "*** editRequest\n"
                            "*** viewRequests"))
          (stripped (skg-unrestrictedNode-strip-defaults-from-org org-text))
