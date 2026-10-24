@@ -384,8 +384,8 @@ fn relationship_matrix
 
 //////////////////////////////////////////////////////////////
 // The containerward chain under every partner folder's member
-// ('docs/glossary.org', "role tree, the containerward chain, and the
-// -ward adjectives"). One subgraph per folder kind: the member m of
+// ('docs/glossary.org', "foldering, the containerward chain, chain
+// node"). One subgraph per folder kind: the member m of
 // the owner's folder is contained by chain-c, which chain-cc contains.
 // Under m hang chain-c and, under it, chain-cc, each a
 // write-protected non-member, and the view saves back unchanged.

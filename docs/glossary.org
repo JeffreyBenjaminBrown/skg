@@ -1,219 +1,23 @@
 * Glossary
-Some terms and abbreviations used in this code.
+The words Skg uses, in two parts: the terms a user meets, and the
+terms of the implementation. Links inside it name headlines.
 
-** Terms and abbreviations specific to Skg
+** Terms a user meets
+What the clients show, what the heralds and the messages say, and
+the words of the user docs ('docs/COMMANDS.org',
+'docs/COMMANDS-nvim.org', 'docs/heralds.org').
 
-*** update-relevant neighborhood
+*** graphnode, viewnode
 
-For a set of IDs in one graph snapshot, the *update-relevant
-neighborhood* contains the IDs themselves, their immediate neighbors in
-both directions along =contains=, =linksTo=, =subscribesTo=, and
-=hidesFromSubs=, and every node reachable by each of the
-two monotonic override walks. The overriderward and overriddenward walks
-start independently at the original IDs, never reverse direction, and
-never continue from an ordinary neighbor. Thus it includes no mixed
-ordinary/override path and no two-hop ordinary path. Saves compute this
-neighborhood independently in the before and after graph snapshots.
-
-*** "telescope" = privacy telescope
-
-In code and comments the short form "telescope" always means the
-privacy telescope; see "privacy telescope" below.
-
-*** skgrepo, home skgrepo, skgrepo-set, gitrepo
-
-A *skgrepo* is a directory of =.skg= files, configured by one
-=[[repos]]= entry in =skgconfig.toml=. A node's *home skgrepo* is the
-skgrepo that holds its home section (see below). A *skgrepo-set* is a
-prefix of the config's privacy order: the skgrepos made available
-together. A *gitrepo* is a Git repository. Skgrepos are usually gitrepos
-too, but they need not be.
-
-In prose, always say "skgrepo" or "gitrepo", never a bare "repo", so the
-two cannot be confused. ("relRepo" is a single coined term, so it keeps
-the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
-'home_skgrepo'); a skgrepo's config entry is the 'Skgrepo' type.
-
-The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
-connection currently shows; the skgrepo-set =all= means no
-restriction. A skgrepo inside it is *unrestricted*, one outside it
-*restricted*, and so are their nodes: an unrestricted vognode is shown
-in full, a restricted one only as an anonymous placeholder
-(=restrictedNode=).
-
-*** owned, foreign
-
-A skgrepo is *owned* iff its directory lies under the config's
-=owned_folder= (default =owned/=); every other skgrepo is *foreign*.
-Only owned sections are ever written. A real edit to a foreign node is
-read as a request to fork it (see "clone, and the fork operation").
-Say "owned" rather than "owned", and "foreign" rather than
-"write-protected", when speaking of skgrepos: write-protection is a
-property of a viewnode occurrence (see "editable, write-protected").
-
-*** privacy telescope, telescope section, home
-
-One node can be recorded at several privacy levels at once: same-ID
-=.skg= files across skgrepos, at most one per skgrepo. That family of
-files is the node's *privacy telescope*; each file is one
-*telescope section* ("section" for short in code), holding the
-slice of the node recorded at its skgrepo's privacy level. The *home* is
-the most public retained section; it alone holds title, body, and extra
-ids. That the home carries the title is an invariant, not a
-search rule: a node's text always lives in its most public
-section, so a titleless section above the title is a violation
-the composition reports (=CompositionWarning::TitleBelowHome=), not a shape to
-look past. There is no linking relationship between sections —
-sharing an ID is being the same node. See =docs/telescopes.org=
-and =server/types/nodes/fs.rs=.
-
-Before composing, an owned-PID collision is normalized: if any owned
-section exists for a PID, the entire owned telescope is retained and all
-same-PID foreign sections are ignored (with a deterministic warning and no
-filesystem edit). A telescope with no owned section remains wholly foreign.
-
-*** overPrivateText
-
-A privacy telescope is *overPrivateText* when its composed title or body is
-selected from a section more private than its home (most public retained)
-section. The flag applies to the whole telescope, even if only one text
-field is below home. This violates the rule that the node's text lives at
-home; see [[file:./telescopes.org][privacy telescopes]].
-
-Skgrepo-set =all= can show that text with a warning. A restricted request
-asks for approval scoped to the affected node IDs and that request before
-releasing it; search asks whether to include or exclude such telescopes.
-Approval to display the text does not authorize *Hoist*, the separate
-repair that moves the selected title and body to home.
-
-*** relation, relationship, recorder, member, membership, partner
-
-As in TypeDB, a *relation* is a kind of relationship: =contains=,
-=linksTo=, =subscribesTo=, =hidesFromSubs=, =overrides=. Each names
-its two roles: container contains content, mentioner linksTo
-mentioned, subscriber subscribesTo subscribee, overrider overrides
-overridden, hider hidesFromSubs hidden. =hidesFromSubs= is short for
-"hides from its subscriptions": the hider hides the hidden node from
-what the hider sees through its subscriptions. A *relationship* is one instance of a relation: this
-node contains that one. (Graph theory would call it an edge; we don't,
-because the word is opaque to newcomers.)
-
-A relationship is recorded in the .skg file of one of its two nodes, its
-*recorder*: the node playing the relation's first role (the container,
-the mentioner, the subscriber, the hider, the overrider). The other node
-is a *member* of the recorder's list. Either end is the other's
-*partner*. In a view, a folder's children are *members* too: entries of
-one monomorphic list, usually all partners on the same side of some
-relation with the folder's viewparent.
-
-A *membership* is the relationship that causes a node to be drawn
-as a member of a list or folder; the member is the node.
-
-The node that has an ID, as its PID or as an extra ID, is that ID's
-*carrier*. (Not "owner": the user *owns* skgrepos, and a
-viewnode's [[*owner][owner]] is a reconciler.)
-
-*** privacy order and relRepo
-
-The position of a skgrepo in the config's privacy order (most public
-first) is its privacy level. Live code does not use "level" for the
-value carried by a relationship: every relationship member carries its
-*relRepo*, the skgrepo whose section records it. In code
-that is =RelPartner { relRepo, member }=; a collection of them is
-a *list of relation partners*. "More private" = later in the
-privacy order.
-
-*** home skgrepo move, relRepo move
-
-A *home skgrepo move* is a change of a node's home skgrepo (=C-c s s=,
-then a save); a *relRepo move* is a change of a relationship's relRepo
-(=C-c s r=, or a save that resets or raises it). The diff view shows
-each move since HEAD as one change-forest leaf: a home skgrepo move as
-the property "⌂ -OLD +NEW" under the node, a relRepo move as the
-property "relationship moved from OLD to NEW" under the member, keyed
-by the relationship, so the same move seen from either end is the
-same leaf. A relRepo move puts only the recorder in C. The
-skgrepo-changes buffer of the diff view shows the nodes whose home
-skgrepo moved and the recorders of the relationships whose relRepo
-moved, each with all of its changes. Say "home skgrepo move", not
-"home move".
-
-*** MSV = maybe specified vector
-
-=MSV<T>= distinguishes "no opinion" from "empty". =Unspecified= says a
-file section or an edit has nothing to say about the field;
-=Specified(vec![])= says the field is explicitly empty. Telescope
-folding and partial nodeIntents both depend on the difference.
-
-*** composition (visible vs full), decomposition
-
-The *composition* of a telescope combines its sections, most public
-first, into one effective node (=server/telescope/compose.rs=). The
-*full composition* uses every section; a *visible composition* uses only the
-sections unrestricted under the current skgrepo restriction, and is what a
-restricted view renders. *Decomposition* is the save-side inverse:
-splitting the effective node back into sections, byte-stably.
-
-*** placement, more public anchor
-
-How a more private section orders its members into a more public
-list without the public file recording anything: in the section's
-stored sequence, a =- anchor: ID= entry names a *more public anchor*,
-a member of the more public list, and the members after it insert
-immediately after that ID; members before the first anchor prepend.
-Placements exist only on disk — more public anchors are derived at
-save from the in-memory order, so they can never go stale in memory.
-Say "more public anchor", never a bare "anchor".
-
-*** sticky rule (sticky-else-default)
-
-Where a relationship's relRepo comes from at save time:
-a relationship already on disk keeps its relRepo (*sticky*); a new relationship
-between owned nodes defaults to the more-private endpoint home. A new
-relationship from an owned recorder to a foreign member defaults to the recorder's
-home, deliberately making the foreign ID and relationship visible at
-that owned skgrepo without proposing a foreign write. Every relRepo is
-clamped to be no more public than the recorder's home. Hides
-floor higher (at least the most public subscription explaining them). A
-=(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
-overrides sticky with any skgrepo at least as private as the relationship's
-default — raising privacy, or moving a stuck skgrepo back to the
-default; a more-public choice is a save error. A legacy or
-hand-authored relationship whose disk relRepo already sits more public than
-its default may be held or made more private, never made still more
-public. See =server/from_text/supplement_from_disk.rs=.
-
-**** stranded relationship, strandeds
-
-A home skgrepo move can strand a relationship touching the moved
-node: a *stranded relationship* is one that sat at its default relRepo
-before the move and that the sticky rule would leave off its new
-default. *Strandeds* is the noun for stranded relationships; "strand"
-is only a verb. A save finds every one, of every relation, in both
-directions, shown in some view or not ('server/from_text/strandeds.rs').
-It raises the inbound strandeds of a privatizing move to the new home
-by itself, since they would leak the member's ID, and asks the user
-whether to reset the strandeds of a publicizing move to their new
-defaults (the strandeds-confirmation). Mentions carry no relRepo, so
-they are never stranded.
-
-*** view, buffer, viewforest
-
-A *view* is what the server tracks for one open window onto the graph:
-a content view or a search view, identified by its *viewforest id*
-('ViewforestId' in 'server/types/views_state.rs'; on the wire the
-key =view-id=, which the clients call the buffer's view ID). A
-content view may have several roots; the request that opens one today
-asks for a single root, so only the request is "single-root". A
-*buffer* is the editor's container for one view (an Emacs or Neovim
-buffer). A view's *viewforest* is its tree of viewnodes, under a
-buffer root; say "viewforest" rather than "viewtree" or "forest".
-
-A *viewbranch* is any subtree of a viewforest: a viewnode with all its
-descendants. A view request asks the server to add viewbranches: a
-folder (with its members' chains), the flags folder. A
-viewbranch may be degenerate,
-with one viewchild or none; compare "branching viewnode".
+A *graphnode* is a node of the graph, which a =.skg= file records; a
+*viewnode* is a node of a view, which a buffer shows as a headline.
+A graphnode can appear in one view as several viewnodes, or as none,
+and some viewnodes stand for no graphnode: a folder, for instance,
+names a relationship between its viewparent and its children. Say
+"graphnode" and "viewnode" rather than "graph node" or "view node";
+bare "node" is fine where only one kind is possible. The
+implementation sorts viewnodes by whether they stand for a graphnode
+(see "vognode, non-vognode").
 
 *** "child" and "parent"
 
@@ -239,266 +43,62 @@ Where the code says "child" or "parent", it means the relationship between viewn
 For one example, see the discussion of alias nodes in
 [[file:../coding-advice/architecture.md][the architecture documentation]].
 
-*** col
+*** title != headline
 
-*Col* was the old name for a folder viewnode (short for
-"collection"). It has been expunged from production code, but may still
-appear in old documentation, plans, or the knowledge graph.
+Headline is a term from org-mode. It refers to a line that begins with some asterisks, followed by at least one whitespace, followed by at least one non-whitespace. The text after the first chunk of adjacent whitespace is what I'm calling the 'title'.
 
-*** PartnerFolder, and the folder-policy vocabulary
+*** view, buffer, viewforest
 
-**** The idea
+A *view* is one open window onto the graph: a content view, which
+shows nodes and what they contain, or a search view. A *buffer* is
+the editor's container for one view (an Emacs or Neovim buffer). A
+view's *viewforest* is its tree of viewnodes, under a buffer root;
+say "viewforest" rather than "viewtree" or "forest". The buffer as a
+whole is named by its viewforest id (see "viewnode ID, vnid,
+viewforest id").
 
-Recall that viewnodes and graphnodes are distinct.
-Some viewnodes correspond to individual graphnodes.
-Other viewnodes mediate a relationship between their parent and their children.
-For instance, a 'subscribee folder' viewnode contains it's parent's subscribees:
-#+begin_example
-  * subscriber
-  ** subscribee folder
-  *** subscribee
-  *** subscribee
-#+end_example
+A *viewbranch* is any subtree of a viewforest: a viewnode with all its
+descendants. A view request asks the server to add viewbranches: a
+folder (with its members' chains), the flags folder. A
+viewbranch may be degenerate,
+with one viewchild or none; compare "branching viewnode".
 
-In that example, the first viewnode represents a graphnode,
-as do the last two. The subscriber subscribes to the two subscribees.
-Ths second viewnode, though, corresponds to nothing in the graph.
-It exists only to name the relationship between its children and its parent.
+*** viewnode ID, vnid, viewforest id
 
-A *PartnerFolder* is the general concept.
-Recall that there are five relations in the graph:
-containment, link, subscription, hiding, and overriding.
-Because a node can be on either side of each relationship --
-it can be the container or the content, the hider or the hidden, etc. --
-there are many kinds of PartnerFolder. Each lists, as its children,
-the nodes that play one role toward its parent. For each relation,
-one folder could list the members its parent records, and another the
-recorders that record its parent:
+A *viewnode ID* identifies one viewnode within one buffer, for the
+life of the buffer: the atom =(vnid X)=, X one or more lowercase
+letters and digits, that ends every viewnode's metadata
+('docs/api-and-formats.org', "The metadata headers"). "vnid" is the
+wire's word; prose and messages say "viewnode ID", and code
+'ViewnodeId' and 'viewnode_id'. A message names a headline by its
+viewnode ID, which =C-c g v= finds (see "how a message names a
+headline"). The view gives one to each viewnode that lacks one at
+the end of a completion and never reuses one, so a viewnode ID that
+reappears after a cut and paste names the same viewnode moved. A
+parsed headline carrying a viewnode ID the view does not know (typed
+by hand, or brought back by an old copy of the buffer's text) loses
+it and gets a fresh one. A skgrepo-set switch keeps the viewnode ID
+of everything the restriction does not hide. The view's
+'ViewnodeIdRecord' ('server/types/views_state.rs') holds the counter
+and the viewnode IDs of the forest as last rendered.
 
-| relation      | members its parent records | recorders of its parent |
-|---------------+----------------------------+-------------------------|
-| containment   | not implemented[1]         | containerFolder         |
-| link          | not implemented[2]         | mentionerFolder         |
-| subscription  | subscribeeFolder           | subscriberFolder        |
-| hiding        | hiddenFolder               | hiderFolder             |
-| overriding    | overriddenFolder           | overriderFolder         |
+A *viewforest id* names a whole buffer, not one viewnode:
+'ViewforestId' in code, the key =view-id= on the wire, and "view ID"
+in the clients' prose (see "view, buffer, viewforest").
 
-1. A contentFolder would be silly: a node's contents are already its
-   ordinary viewchildren.
-2. A mentionedFolder would be silly: the links are already visible in
-   the node's own text.
+*** how a message names a headline
 
-Two more PartnerFolders filter the hiding relation by subscription:
-- a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
-  subscribee's contents which the subscriber hides;
-- a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
-  the nodes its parent hides that no subscribee contains.
-
-The diff view adds two more, for nodeMerges since HEAD:
-- an *acquiredByFolder* ("it was acquired by"), under an acquiree's
-  historical phantom, holds its acquirer;
-- an *acquiredFolder* ("it acquired"), under an acquirer, holds the
-  historical phantoms of the nodes it acquired.
-
-**** Some extremely technical details
-
-It is the =ViewnodeKind::PartnerFolder= variant and the payload
-type of the same name.  “Folder” here describes an org non-vognode that groups
-viewnodes; it does not mean a filesystem directory.  “Role col”, “relation
-col”, and bare “sharing col” are retired names for the general concept.
-
-There are twelve PartnerFolders, named by their external non-vognode
-atom. Each kind's behavior is decided by one method,
-=PartnerFolder::policy= (=server/types/viewnode.rs=), returning a
-*FolderPolicy*.  This single arbiter is consulted by reconciliation
-dispatch, save extraction's write-protected treatment, and
-herald/warning gating, so a new relation cannot acquire inconsistent
-policies in different layers:
-
-- *EditableSet* (=subscribeeFolder=, =overriddenFolder=): membership edits
-  are graph edits.  An absent folder means "no opinion" (its field lowers
-  to =MSV::Unspecified=, filled from disk); a present-but-empty folder
-  means an explicit empty set (=MSV::Specified(vec![])=).
-- *EditableFilter* (=hiddenOutsideOfSubscribeeFolder=): membership is
-  derived from hide state, and a visible member set is an explicit
-  edit of that subset; the hides' relRepos stay derived.
-- *WriteProtectedSet*: membership is generated from graph facts; the
-  user's order is respected view-locally; repairs warn.  See
-  [[*write-protected set][write-protected set]].  These are the inbound folders
-  =subscriberFolder=, =overriderFolder=, =hiderFolder= and
-  =containerFolder= and =mentionerFolder= (the folders of =C-c l c= and
-  =C-c l m=; the other side of each is the node's content, or its
-  links, shown without a folder), the outbound =hiddenFolder=, and the
-  diff view's =acquiredByFolder= and =acquiredFolder=, which are
-  derived from the graph straddle and save-inert.
-- *WriteProtectedFilter* (=hiddenInSubscribeeFolder=): membership is
-  derived from hide state rather than from a single relation role.
-
-The write-protected folders (those of the two write-protected
-policies) carry the ☮ herald on their folder headline, meaning "this
-folder cannot be changed from here" — the same sense ☮
-(=writeProtected=) carries on a node.  The editable folders and
-=aliasFolder= do not.  This is a herald-table fact only
-(=server/heralds.rs=), with no wire atom of its own: which folders are
-write-protected is already known from the folder atom.
-
-Every policy's reconciler obeys
-[[*retain as non-member or tombstone, then prune]]: a stale member or
-an extra copy of a member is converted, not detached, and missing
-graph members are restored.  A non-member standing for a node the
-folder's goal lists again is adopted back as its member.
-
-*Default presentation is intentionally narrow.* An editable node gets a
-nonempty =subscribeeFolder= automatically. The other top-level relation
-folders require an explicit folder request, even when their herald counts say
-they would be nonempty. The same rule applies when a member of any
-PartnerFolder is extended as editable. A subscribee-as-such also gets its
-nonempty =hiddenInSubscribeeFolder=; this is the filter specific to how that
-subscriber sees the subscribee.
-
-*A write-protected folder's children stay where they stand.*  Its
-reconciler moves no child it keeps, a non-member standing inside it
-included, and puts a member it creates right after the member that
-precedes it in the folder's goal list (=KeptChildOrder::Unmoved= in
-=complete_managed_children=; see "What a reconciler keeps" in
-=docs/diff-view.org=).  The alias folder and the editable folders,
-whose order the save writes, follow the graph's order instead
-(=KeptChildOrder::FollowsGoal=): a non-member standing in one of them
-goes above the members, which follow the graph's order.
-
-*** role tree, the containerward chain, and the -ward adjectives
-A *role tree* is what the view shows of a node's partners in one
-role: the members of the node's partner folder of that role, and the
-containerward chain under each member. A
-role, unlike a relation, is directed, so a role tree goes one way.
-Every role tree but the contentward one, which is the node's content,
-is drawn in a folder and is write-protected throughout; a partner
-never stands directly under a vognode. A folder request
-('(folder containers)' and its siblings, the 'C-c l' commands) draws
-one; search enrichment draws a containers folder and the two override
-folders under each hit.
-
-The *containerward chain* is the one tree that goes on below a
-folder: under each member of a partner folder (of any kind but the
-diff view's two acquisition folders, in content views and the diff
-view alike) hang that member's containers, as write-protected
-non-members, under each of those its containers, and so on
-breadth-first to the roots or to 'max_roleTree_depth'
-('ContainerwardRoleTree'); a container met again on the way is drawn
-once more as a leaf. Its nodes are *chain nodes*. The member's
-partners in the folder's own role are not drawn below it; a request
-on the member draws them as a folder. Nothing hangs under a phantom
-member, nor under a property folder's entries. The folder's
-reconciler reconciles each member's chain by key at every visit of
-the folder, so a member it adds later gets its chain and a chain that
-stays keeps its viewnodes and their fold state; a stale member's
-chain goes with it. No request extends a chain; a request on a chain
-node for its containers draws a containers folder under it. A chain
-node carries no change facts and takes no commit-readiness marker; a
-folder's member does both.
-
-The adjectives containerward, mentionerward, overriderward,
-overriddenward, and so on name the role a role tree follows: a
-containerward role tree follows the container role.
-
-*** view-lifetime
-
-Some data regarding a node is view-lifetime data
-(viewStats, for instance):
-it lasts only as long as the view of it in some buffer.
-
-Data on disk, by contrast,
-remains when the app terminates,
-and can be recovered by a later session.
-*Session-lifetime* data lasts as long as one server session: the
-in-Rust graph and the search index, together the *session-lifetime
-stores*. The server rebuilds them from the .skg files when it starts,
-or when asked ('skg-rebuild-session-lifetime-stores'); they outlive
-every view. Say which lifetime is meant, never "ephemeral".
-
-*** branching viewnode (vs a branch)
-
-A *branching viewnode* is a viewnode with more than one viewchild. Do
-not confuse it with a *branch*: any viewnode together with its
-descendants, which may be degenerate, its root having one viewchild
-or none.
-
-None of this is related to forking a node, below.
-
-*** clone, and the fork operation
-
-To *fork* a node N is to turn it into an editable *clone* C in a
-skgrepo you own. C copies N's title, body, and child-list (the child IDs
-only — shallow), =subscribesTo= N (so N's later additions surface to C
-as unintegrated subscribed content) and =overrides= N (so
-override substitution shows C wherever N would appear). Children of N
-that the forking edit deleted become C's
-=hidesFromSubs=, and thereafter any child removed from
-an owned subscriber's contains that some subscribee still contains is
-hidden likewise on save (re-adding it unhides). A node may have at
-most one clone you own (override monogamy).
-
-Forking spans two gestures, foreign and owned:
-
-- /implicit/ (foreign N): make N editable (=C-c s d=), edit it, and
-  save; any real change to a foreign node is read as a fork request, and
-  the save asks you to confirm. N is left untouched on disk.
-- /explicit/ (owned N): =skg-fork-node= (=C-c m f=), for a node you
-  already own — used to deepen an override chain (D overrides C overrides
-  N, all owned). N keeps its own content; only the clone is added. The
-  clone is built from N's saved state, so the command refuses a dirty
-  buffer.
-
-See =docs/forks.org= and =docs/sharing-model.org=.
-
-*** hiderel = "hides" relationship
-
-See [[file:./data-model_technical.org][the technical data model]] for the hiding
-relationship.
-
-*** kv-pair = key-value pair
-
-*** fieldIntent, nodeIntent, nodeInstruction, savePlan
-
-What a save turns the buffer into, in order:
-- a *fieldIntent* ('FieldIntent') says what one position in the buffer
-  wants for one field of one node (its title and body, its contains,
-  a hide, ...). Local fieldIntent collection emits these into a map
-  keyed by ID ('CollectedFieldIntents').
-- a *nodeIntent* ('NodeIntent') is all of one node's fieldIntents,
-  lowered into a save or a delete. It may still be partial: fields
-  the buffer said nothing about are 'MSV::Unspecified'.
-- a *nodeInstruction* ('NodeInstruction': 'Save' or 'Delete') is a
-  nodeIntent after disk supplementation: complete, ready to write.
-- the *savePlan* ('SavePlan') is everything one save applies: its
-  nodeInstructions, plus forks and nodeMerges.
-
-*** local fieldIntent collection
-
-The save path's fieldIntent extraction: one pure DFS preorder over
-the buffer's viewforest, in which each position reads only itself and
-its direct children, plus a context that flows down from its
-ancestors. Each visit emits fieldIntents into a map keyed by
-node ID; downstream stages (validation, lowering, visibility
-resolution, disk supplementation, the noop filter) consume the map.
-Lives in =server/from_text/local_fieldintent_collection/=, entered
-via =extract_nonmergeSavePlan_locally=.
-
-This entry is the canonical sketch of the save pipeline. Its
-surrounding stages are, in order: parse, enrich, validate, place,
-extract (this entry), foreign-node validation, nodeMerge build, graph
-update, rerender.
-
-*** lp = length-prefixed
-
-Sometimes an API response is prefixed with a length, letting the receiver know how many characters to expect in the response.
-
-*** An 'm' prefix
-
-In Haskell, 'm' is sometimes prefixed to a word to indicate 'maybe'.
-The Rust term for Maybe is Optional, but I've used the Haskell idiom.
-For any function with a name like this, if its meaning is unclear,
-the type signature should clarify what's going on.
+A message from the server -- an error, a warning, a refused save --
+names each headline it concerns as an org subheadline of its own,
+below the message's own lines: the headline's title, or
+'(untitled)' (a folder, say); then '- graphnode ID: X' when the
+headline carries one; then '- viewnode ID: X. To find it: C-c g v X'
+(in Neovim, '<localleader>gv X'), or '- not yet saved' for a
+headline typed or copied since the last render, which has none.
+=C-c g v= ('skg-goto-viewnode-id') puts point on the headline with
+that viewnode ID and opens the folds around it. In code it is
+'HeadlineName' ('server/types/errors.rs'); see
+'docs/api-and-formats.org', "How a message names a headline".
 
 *** metadata
 
@@ -549,92 +149,303 @@ the fork gesture (=skg-fork-node=) and the readiness gestures are
 kinds. The fork and readiness gestures save at once; the others leave
 the save to the user.
 
-*** collateral view
+*** occurrence
 
-When a save changes nodes that other open views show, those views are
-*collateral*: the server rerenders them and streams each as a
-=collateral-view= message. The save envelope's =other-views= lists every
-other open view; the collateral views are the subset that needs a
-rerender.
+One appearance of a graphnode in a view. A graphnode can occur several
+times in one buffer. Facts that depend on the position (viewStats such
+as =cycle=, the displayed relRepo, =overridesHere=, and the =(rels ...)=
+form's birth fact, which names the relationship to the viewparent)
+belong to the occurrence; graphStats belong to the graphnode.
 
-*** startup warnings channel
+*** editable, write-protected
 
-How the server's startup warnings reach the user: 'load_config'
-returns warnings beside the config, 'main' records them once on the
-runtime ('record_startup_warnings' in 'server/types/env.rs'), the
-server serves them on request ("server warnings"), and each client
-shows them in its '*SKG Server Warnings*' buffer on connect.
+Each occurrence of an unrestricted vognode is either *editable* or
+*write-protected* ('Editability' in 'server/types/viewnode.rs'). Edits to
+an editable occurrence's title, body and children are saved; a
+write-protected occurrence shows no body and saves nothing of its own,
+so a save is refused if one differs from the graph (in its title,
+skgrepo, aliases, flags or partner folders) or has a member child.
+The server adds no such child under one. A buffer may hold at most one editable occurrence of a node,
+so that two occurrences cannot contradict each other. Make one
+editable with =skg-set-editable= (=C-c s d=), which writes a
+=editableView= view request; make one write-protected with
+=skg-request-write-protected= (=C-c s w=; =C-c s W= for its whole
+content subtree), which writes a =writeProtectedView= or
+=writeProtectedSubtreeView= view request.
 
-*** mk = make / create
+*** relation, relationship, member, membership, partner
 
-*** "merge" is always qualified: nodeMerge vs instructionMerge
+As in TypeDB, a *relation* is a kind of relationship: =contains=,
+=linksTo=, =subscribesTo=, =hidesFromSubs=, =overrides=. Each names
+its two roles: container contains content, mentioner linksTo
+mentioned, subscriber subscribesTo subscribee, overrider overrides
+overridden, hider hidesFromSubs hidden. =hidesFromSubs= is short for
+"hides from its subscriptions": the hider hides the hidden node from
+what the hider sees through its subscriptions. A *relationship* is one instance of a relation: this
+node contains that one. (Graph theory would call it an edge; we don't,
+because the word is opaque to newcomers.)
 
-A /nodeMerge/ is the acquirer/acquiree operation on graphnodes (the
-=NodeMerge= type, requested via =(editRequest (merge ID))=). An
-/instructionMerge/ is the combining of emitted save intents into the
-map during local fieldIntent collection. In prose, say "merge nodes"
-or "merge instructions"; bare "merge" appears only in client-facing
-wire strings, where only nodes can merge.
+Either end of a relationship is the other's *partner*. One of the
+two records the relationship in its file (see "recorder, carrier");
+the other is a *member* of the recorder's list. In a view, a
+folder's children are *members* too: entries of one monomorphic
+list, usually all partners on the same side of some relation with
+the folder's viewparent.
 
-*** text preserver
+A *membership* is the relationship that causes a node to be drawn
+as a member of a list or folder; the member is the node.
 
-A nodeMerge keeps the acquiree's text in a new node, its *text
-preserver*: titled "MERGED: " and the acquiree's title, with the
-acquiree's body, and placed first in the acquirer's content. The
-acquiree's other content joins the acquirer's, and the acquiree's ID
-becomes an extra ID of the acquirer. See =docs/merging.org=.
+*** non-member, 'nonMember'
 
-*** "snapshot" is always qualified: graph, git or buffer snapshot
+A *non-member* is a vognode child that takes no part in the
+membership its viewparent represents: its metadata carries the bare
+atom =nonMember=, and its herald is ⊥, where a member's carries
+nothing ('docs/api-and-formats.org', "Content view"). A root carries
+nothing either. Under a vognode a non-member is not in the content
+list, and in a folder it is not one of the folder's members, so a
+save neither adds nor removes a relationship for it; what it shows
+of its own node is saved or not by its editability, as at any
+occurrence. A chain node is a non-member, and so are a removed
+member, every vognode child of a write-protected occurrence, a note
+the user puts in a folder, and a stale vognode with a subtree that a
+reconciler retained (see "retain as non-member"). In code the type is
+'Membership { Member, NonMember }' ('server/types/viewnode.rs').
 
-A /graph snapshot/ is one immutable state of the in-Rust graph
-('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
-the worktree; 'server/git_ops/git_snapshot.rs' reads HEAD and the
-worktree (the graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
-buffer's text as a client sends it: for search enrichment, or for a
-dirty view in the save envelope. The wire atoms 'request-snapshot' and
-'snapshot response' predate the rule and mean buffer snapshots.
+*** partner folder
 
-*** "index" is always qualified: search, git or graph index
+Recall that viewnodes and graphnodes are distinct.
+Some viewnodes correspond to individual graphnodes.
+Other viewnodes mediate a relationship between their parent and their children.
+For instance, a 'subscribee folder' viewnode contains its parent's subscribees:
+#+begin_example
+  * subscriber
+  ** subscribee folder
+  *** subscribee
+  *** subscribee
+#+end_example
 
-The /search index/ is Tantivy's. The /git index/ is git's staging
-area; next to HEAD and worktree it needs no qualifier ("HEAD vs
-index"). A /graph index/ is a derived map inside the in-Rust graph:
-the /recorderward relmaps/ ('contained_by', 'subscribers_of', ...), plus
-'extra_id_to_pid'. A recorderward relmap maps each member of one
-relation to the recorders that list it. (Not "inverse": today every
-relationship is recorded by its first member, but the data model may
-someday let the second member record one; 'RecorderwardRelmap' in
-'server/dbs/in_rust_graph.rs' says more.)
+In that example, the first viewnode represents a graphnode,
+as do the last two. The subscriber subscribes to the two subscribees.
+The second viewnode, though, corresponds to nothing in the graph.
+It exists only to name the relationship between its children and its parent.
+
+A *partner folder* is the general concept ('PartnerFolder' in code).
+Recall that there are five relations in the graph:
+containment, link, subscription, hiding, and overriding.
+Because a node can be on either side of each relationship --
+it can be the container or the content, the hider or the hidden, etc. --
+there are many kinds of partner folder. Each lists, as its children,
+the nodes that play one role toward its parent. For each relation,
+one folder could list the members its parent records, and another the
+recorders that record its parent:
+
+| relation      | members its parent records | recorders of its parent |
+|---------------+----------------------------+-------------------------|
+| containment   | not implemented[1]         | containerFolder         |
+| link          | not implemented[2]         | mentionerFolder         |
+| subscription  | subscribeeFolder           | subscriberFolder        |
+| hiding        | hiddenFolder               | hiderFolder             |
+| overriding    | overriddenFolder           | overriderFolder         |
+
+1. A contentFolder would be silly: a node's contents are already its
+   ordinary viewchildren.
+2. A mentionedFolder would be silly: the links are already visible in
+   the node's own text.
+
+Two more partner folders filter the hiding relation by subscription:
+- a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
+  subscribee's contents which the subscriber hides;
+- a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
+  the nodes its parent hides that no subscribee contains.
+
+The diff view adds two more, for nodeMerges since HEAD:
+- an *acquiredByFolder* ("it was acquired by"), under an acquiree's
+  historical phantom, holds its acquirer;
+- an *acquiredFolder* ("it acquired"), under an acquirer, holds the
+  historical phantoms of the nodes it acquired.
+
+Membership edits in the subscribee, overridden and
+hidden-outside-of-subscribee folders are graph edits. The others are
+write-protected: their membership follows from the graph (see
+"write-protected set"), and they carry the ☮ herald on their folder
+headline, meaning "this folder cannot be changed from here" -- the
+same sense ☮ (=writeProtected=) carries on a node.
+
+*Default presentation is intentionally narrow.* An editable node gets a
+nonempty =subscribeeFolder= automatically, and a fresh content view a
+=containerFolder= on its root. The other relation folders require an
+explicit folder request (the =C-c l= commands), even when their
+herald counts say they would be nonempty. The same rule applies when
+a member of any partner folder is extended as editable. A
+subscribee-as-such also gets its nonempty =hiddenInSubscribeeFolder=;
+this is the filter specific to how that subscriber sees the
+subscribee. Under each member of a partner folder hangs its
+containerward chain (see "foldering, the containerward chain, chain
+node").
+
+*** write-protected set
+
+A write-protected set is a generated folder whose membership follows
+from graph facts rather than direct edits to that folder.  A view
+may preserve an order for the set locally, but adding or removing an
+item in the generated folder does not add or remove the underlying
+graph membership fact.  If a user puts a non-member inside such a set,
+the save treats that item as independent of the generated membership.
+If completion discovers that a real member is missing from the view, it
+reinstates that member (see "reinstated").
+
+For instance, if nodes R and T subscribe to nodes N, the user might land
+at a view like the following:
+#+begin_example
+  * N
+  ** subscriberFolder
+  *** R
+  *** T
+#+end_example
+The subscriberFolder ("folder of subscribers") is a write-protected set.
+Thus the user could flip the order of R and T in the subscriberFolder,
+and this change would be respected in the display, but have no effect
+in the graph. The user could insert X under subscriberFolder,
+but because it is a write-protected set, X will be
+marked 'nonMember' (a non-member), and have no effect on N.
+(If the user wants X to subscribe to N, they must modify X, not N.)
+The user could delete R, but it is reinstated as soon as they save,
+because, again, the subscriberFolder is a write-protected set.
+
+*** "subscribee as such"
+
+In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
+(See [[file:./data-model_technical.org][the technical data model]].)
+A node that plays the 'subscribee' role can be viewed as an ordinary node,
+or /as/ a subscribee. In the latter case it appears
+underneath the relevant subscriber, in a 'subscribeeFolder':
+#+begin_example
+  * subscriber
+  ** subscribeeFolder
+  *** subsribee1
+  *** subsribee2
+  ...
+#+end_example
+
+In the above view, subscribee1 and subscribee2 are both "subscribees as such":
+They are not just subscribees, but they are being shown /as/ subscribees.
+This changes the way edits are interpreted:
+Edits to a "subscribee as such" can only affect
+what the relevant subscriber hides, nothing else.
+
+*** role tree, and the -ward adjectives
+
+A *role tree* is what a view shows of a node's partners in one role
+(see "relation, relationship, member, membership, partner"): for the
+content role, the node's content; for every other role, the members
+of the node's partner folder of that role, each with its
+containerward chain. A role, unlike a relation, is directed, so a
+role tree goes one way.
+
+The adjectives containerward, contentward, mentionerward,
+overriderward, overriddenward, and so on name the role a role tree
+follows: a containerward role tree follows the container role.
+
+*** foldering, the containerward chain, chain node
+
+To *folder* a role tree is to draw every partner as a member of a
+partner folder of its role, never directly under the node. Every
+role tree but the contentward one is foldered, and is
+write-protected throughout. A folder request ('(folder containers)'
+and its siblings, the =C-c l= commands) draws one; a fresh content
+view draws a containers folder on its root; search enrichment draws
+a containers folder and the two override folders under each hit.
+
+The *containerward chain* is the one tree that goes on below a
+folder. Under each member of a partner folder, of any kind but the
+diff view's two acquisition folders, hang that member's containers,
+as write-protected non-members; under each of those, its containers;
+and so on to the roots, or to the config's 'max_roleTree_depth'. A
+container met again on the way is drawn once more, as a leaf. The
+nodes of a chain are *chain nodes*. Nothing hangs under a phantom
+member, nor under a property folder's entries, and the member's
+partners in the folder's own role are not drawn below it: a folder
+request on the member draws them. No request extends a chain; a
+folder request on a chain node draws a folder under it. A chain node
+carries no change facts and takes no commit-readiness marker; a
+folder's member does both. Nothing in a chain node's metadata says
+that it is one: it is known by where it stands.
+
+*** extend, rerender
+
+The server *extends* a view when it draws more of it: the content of
+a node shown editable, or a viewbranch a view request asks for. A
+*rerender* redraws a view, after a save or a request, keeping what
+the user put in it. Org folding keeps the words "fold" and "unfold";
+drawing more of a view is not called unfolding.
+
+*** retain as non-member
+
+To *retain as non-member* a stale vognode with a subtree is to keep
+it where it stands as a non-member, with its title, ID, subtree and
+the editability it had, so that it can be adopted back as a member
+when its membership returns. A reconciler does this to a member the
+graph no longer warrants that holds something, so that what stands
+below it survives; it loses its change facts. A save's warning says
+"retained N child(ren) as non-members". The verb is always spelled
+out this way; "retain" alone and "park" are not used. The rule that
+decides between this and a tombstone is in the implementation's
+glossary:
+[[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]].
+
+*** tombstone, entombstone
+
+A *tombstone* is a viewnode with no title, no ID and no change facts,
+shown as DELETED, left where a viewnode the graph no longer warrants
+stood and holding that viewnode's children. To *entombstone* a
+viewnode is to make it one. The prune removes a childless tombstone
+before the buffer is rendered, so a user sees one only where it holds
+something. The save discards anything typed on its line; its member
+children become non-members ('mark_orphans_under_dead_parents_false');
+every folder accepts one among its children. In code the kind is
+'ViewnodeKind::Tombstone', and on the wire the atom =tombstone=. It
+is what
+[[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]]
+makes of an unwarranted leaf or non-vognode.
+
+*** reinstated
+
+A member of a write-protected folder that is missing from the buffer
+(the user deleted its headline, say) is *reinstated*: the folder's
+reconciler draws it again, as a new viewnode, at the next
+completion, since its membership is a fact of the graph, edited from
+the other side of the relationship. After a save the warning
+"Repaired FOLDER under node X: reinstated N member(s): IDS" says so
+('RepairKind::ReinstatedMember' in 'server/update_buffer/warnings.rs').
+"Reinstate" names only this; a non-member taken back as a member
+when its membership returns is adopted (see "adopt").
+
+*** phantom
+
+A vognode standing for something that is not a current graph member
+('Phantom' in 'server/types/viewnode.rs'). There are three kinds:
+*Historical* (in the diff view, a node HEAD has and the worktree
+lacks; it shows HEAD's title and body), *Deleted* (a save just deleted
+it; it keeps its last title and body), and *Unknown* (a reference that
+resolves to nothing; see "unknown node"). Phantoms are save-inert.
+
+*** unknown node, dangling ID
+
+An *unknown node* is an ID that some node's contains, subscribesTo,
+hidesFromSubs or overrides list names but that no node of the graph
+answers to, as primary or extra ID; such an ID is *dangling*. A view
+shows it as an unknown phantom ("Reference to unknown node.").
+The "investigate unknown node" request says what git history knows of
+it, and the delete-references-to-absent-node command removes the
+references.
 
 *** ancestor generation
 
 How far up the view an ancestor is: 1 is the viewparent, 2 the
 grandparent, counting folders. The '(rels ...)' form's '(ancestors GEN
-...)' and a birth fact's GEN are ancestor generations, and heralds
+...)' and its birth fact's GEN are ancestor generations, and heralds
 show them as a, b, ... z, then {27}. A tree's plain "generation",
 counting down from its root, is the opposite direction.
-
-*** "commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit
-
-A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that
-writes the .skg files and swaps in the new graph; a save that stops to
-ask for confirmation (forks, Hoist) skgsave-commits nothing. A
-/tantivy-commit/ makes search-index writes visible; a save's happens
-later, on a background worker. Where context leaves no doubt (HEAD, a
-merge commit, a 'git2' call) bare "commit" means a git-commit.
-
-*** swap in (a runtime generation), vs publish
-
-A save, rebuild or import ends by atomically *swapping in* a new
-runtime generation (config, graph and search index): readers holding
-the old one keep it, and the next reader gets the new one. "Publish"
-means only making text more public: sharing a skgrepo, or writing text
-into a more public telescope section. Hoist /moves/ text to home.
-
-*** mp = maybe-placed
-
-A viewnode that might have an ID and skgrepo,
-but might not, is maybe-placed.
 
 *** override substitution, and the vocabulary around it
 
@@ -667,329 +478,211 @@ folders, holding its visible direct override relatives in both
 directions. Override facts also appear in explicitly requested override
 folders.
 
-*** "subscribee as such"
+*** skgrepo, home skgrepo, skgrepo-set, gitrepo
 
-In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
-(See [[file:./data-model_technical.org][the technical data model]].)
-A node that plays the 'subscribee' role can be viewed as an ordinary node,
-or /as/ a subscribee. In the latter case it appears
-underneath the relevant subscriber, in a 'subscribeeFolder':
-#+begin_example
-  * subscriber
-  ** subscribeeFolder
-  *** subsribee1
-  *** subsribee2
-  ...
-#+end_example
+A *skgrepo* is a directory of =.skg= files, configured by one
+=[[repos]]= entry in =skgconfig.toml=. A node's *home skgrepo* is the
+skgrepo that holds its home section (see below). A *skgrepo-set* is a
+prefix of the config's privacy order: the skgrepos made available
+together. A *gitrepo* is a Git repository. Skgrepos are usually gitrepos
+too, but they need not be.
 
-In the above view, subscribee1 and subscribee2 are both "subscribees as such":
-They are not just subscribees, but they are being shown /as/ subscribees.
-This changes the way edits are interpreted:
-Edits to a "subscribee as such" can only affect
-what the relevant subscriber hides, nothing else.
+In prose, always say "skgrepo" or "gitrepo", never a bare "repo", so the
+two cannot be confused. ("relRepo" is a single coined term, so it keeps
+the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
+'home_skgrepo'); a skgrepo's config entry is the 'Skgrepo' type.
 
-*** write-protected set
+The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
+connection currently shows; the skgrepo-set =all= means no
+restriction. A skgrepo inside it is *unrestricted*, one outside it
+*restricted*, and so are their nodes: an unrestricted vognode is shown
+in full, a restricted one only as an anonymous placeholder
+(=restrictedNode=).
 
-A write-protected set is a generated folder whose membership follows
-from graph facts rather than direct edits to that folder.  A view
-may preserve an order for the set locally, but adding or removing an
-item in the generated folder does not add or remove the underlying
-graph membership fact.  If a user labels a nonmember inside such a set,
-the save treats that item as independent of the generated membership.
-If completion discovers that a real member is missing from the view, it
-restores that member.
+*** owned, foreign
 
-For instance, if nodes R and T subscribe to nodes N, the user might land
-at a view like the following:
-#+begin_example
-  * N
-  ** subscriberFolder
-  *** R
-  *** T
-#+end_example
-The subscriberFolder ("folder of subscribers") is a write-protected set.
-Thus the user could flip the order of R and T in the subscriberFolder,
-and this change would be respected in the display, but have no effect
-in the graph. The user could insert X under subscriberFolder,
-but because it is a write-protected set, X will be
-marked 'nonMember' (a non-member), and have no effect on N.
-(If the user wants X to subscribe to N, they must modify X, not N.)
-The user could delete R, but it will respawn as soon as they save,
-because, again, the subscriberFolder is a write-protected set.
+A skgrepo is *owned* iff its directory lies under the config's
+=owned_folder= (default =owned/=); every other skgrepo is *foreign*.
+Only owned sections are ever written. A real edit to a foreign node is
+read as a request to fork it (see "clone, and the fork operation").
+Say "owned" rather than "owned", and "foreign" rather than
+"write-protected", when speaking of skgrepos: write-protection is a
+property of a viewnode occurrence (see "editable, write-protected").
 
-*** graphnode, viewnode, vognode, non-vognode
+*** "telescope" = privacy telescope
 
-A *graphnode* is a node of the graph; a *viewnode* is a node of a view.
-Say "graphnode" and "viewnode" rather than "graph node" or "view node";
-bare "node" is fine where only one kind is possible.
+In code and comments the short form "telescope" always means the
+privacy telescope; see "privacy telescope" below.
 
-A *vognode* is a viewnode representing a graphnode ('Vognode' in
-'server/types/viewnode.rs'). It is one of three kinds:
-- *unrestricted*: the graphnode is in an unrestricted skgrepo, so the view shows it;
-- *restricted*: it is in a restricted skgrepo, so the view shows only an
-  anonymous, dataless placeholder;
-- a *phantom*: the graphnode is no longer in the graph, or never was.
+*** privacy telescope, telescope section, home
 
-The other viewnodes are *non-vognodes*: folders, properties, the buffer
-root and tombstones. They describe their viewparent, or its
-relationships, rather than standing for a graphnode.
+One node can be recorded at several privacy levels at once: same-ID
+=.skg= files across skgrepos, at most one per skgrepo. That family of
+files is the node's *privacy telescope*; each file is one
+*telescope section* ("section" for short in code), holding the
+slice of the node recorded at its skgrepo's privacy level. The *home* is
+the most public retained section; it alone holds title, body, and extra
+ids. That the home carries the title is an invariant, not a
+search rule: a node's text always lives in its most public
+section, so a titleless section above the title is a violation
+the composition reports (=CompositionWarning::TitleBelowHome=), not a shape to
+look past. There is no linking relationship between sections —
+sharing an ID is being the same node. See =docs/telescopes.org=
+and =server/types/nodes/fs.rs=.
 
-*** occurrence
+Before composing, an owned-PID collision is normalized: if any owned
+section exists for a PID, the entire owned telescope is retained and all
+same-PID foreign sections are ignored (with a deterministic warning and no
+filesystem edit). A telescope with no owned section remains wholly foreign.
 
-One appearance of a graphnode in a view. A graphnode can occur several
-times in one buffer. Facts that depend on the position (viewStats such
-as =cycle=, the displayed relRepo, =overridesHere=; and the birth) belong
-to the occurrence; graphStats belong to the graphnode.
+*** overPrivateText
 
-*** viewnode ID, vnid
+A privacy telescope is *overPrivateText* when its composed title or body is
+selected from a section more private than its home (most public retained)
+section. The flag applies to the whole telescope, even if only one text
+field is below home. This violates the rule that the node's text lives at
+home; see [[file:./telescopes.org][privacy telescopes]].
 
-A *viewnode ID* identifies one viewnode within one buffer, for the
-life of the buffer: the atom =(vnid X)= that ends every viewnode's
-metadata ('docs/api-and-formats.org', "The metadata headers"). "vnid"
-is the wire's word; code says 'ViewnodeId' and 'viewnode_id', and
-prose and messages say "viewnode ID". The view gives one to each
-viewnode that lacks one at the end of a completion and never reuses
-one, so a viewnode ID that reappears after a cut and paste names the
-same viewnode moved. A parsed headline carrying a viewnode ID the
-view does not know (typed by hand, or brought back by an old copy of
-the buffer's text) loses it and gets a fresh one. A skgrepo-set
-switch keeps the viewnode ID of everything the restriction does not
-hide. The view's 'ViewnodeIdRecord' ('server/types/views_state.rs')
-holds the counter, the viewnode IDs the forest holds, and the owner of
-each viewnode a reconciler made. A viewnode ID is not a viewforest id
-(see "view, buffer, viewforest"), which names the whole buffer.
+Skgrepo-set =all= can show that text with a warning. A restricted request
+asks for approval scoped to the affected node IDs and that request before
+releasing it; search asks whether to include or exclude such telescopes.
+Approval to display the text does not authorize *Hoist*, the separate
+repair that moves the selected title and body to home.
 
-*** editable, write-protected
+*** privacy order and relRepo
 
-Each occurrence of an unrestricted vognode is either *editable* or
-*write-protected* ('Editability' in 'server/types/viewnode.rs'). Edits to
-an editable occurrence's title, body and children are saved; a
-write-protected occurrence shows no body and saves nothing of its own,
-so a save is refused if one differs from the graph (in its title,
-skgrepo, aliases, flags or partner folders) or has a child that
-affects its parent.
-The server adds no such child under one. A buffer may hold at most one editable occurrence of a node,
-so that two occurrences cannot contradict each other. Make one
-editable with =skg-set-editable= (=C-c s d=), which writes a
-=editableView= view request; make one write-protected with
-=skg-request-write-protected= (=C-c s w=; =C-c s W= for its whole
-content subtree), which writes a =writeProtectedView= or
-=writeProtectedSubtreeView= view request.
+The position of a skgrepo in the config's privacy order (most public
+first) is its privacy level. Live code does not use "level" for the
+value carried by a relationship: every relationship member carries its
+*relRepo*, the skgrepo whose section records it. In code
+that is =RelPartner { relRepo, member }=; a collection of them is
+a *list of relation partners*. "More private" = later in the
+privacy order.
 
-*** non-member
+*** home skgrepo move, relRepo move
 
-A viewnode that takes no part in the membership its viewparent
-represents: its metadata carries the bare atom 'nonMember', where a
-member's carries nothing ('docs/api-and-formats.org', "Content
-view"). Under a vognode a non-member is not in the content list,
-and in a folder it is not one of the folder's members, so a save
-neither adds nor removes a relationship for it; what it shows of
-its own node is saved or not by its editability, as at any
-occurrence. A chain node is a non-member, and so are a removed
-member, every vognode child of a write-protected occurrence, a
-note the user puts in a folder, and what
-[[*retain as non-member or tombstone, then prune]] makes of a stale vognode with a subtree.
+A *home skgrepo move* is a change of a node's home skgrepo (=C-c s s=,
+then a save); a *relRepo move* is a change of a relationship's relRepo
+(=C-c s r=, or a save that resets or raises it). The diff view shows
+each move since HEAD as one change-forest leaf: a home skgrepo move as
+the property "⌂ -OLD +NEW" under the node, a relRepo move as the
+property "relationship moved from OLD to NEW" under the member, keyed
+by the relationship, so the same move seen from either end is the
+same leaf. A relRepo move puts only the recorder in C. The
+skgrepo-changes buffer of the diff view shows the nodes whose home
+skgrepo moved and the recorders of the relationships whose relRepo
+moved, each with all of its changes. Say "home skgrepo move", not
+"home move".
 
-*** editability rule, editable map
+*** sticky rule (sticky-else-default)
 
-The *editability rule* decides, at each occurrence view completion
-reaches in level order, whether it is editable: an occurrence without
-a request is editable when its node is unclaimed in the *editable
-map* and write-protected when another occurrence claimed it first,
-except that the walk prefers a member to a non-member: an editable
-member takes the claim from a non-member that holds it without a
-request, and the non-member is write-protected with its content
-subtree. The editable map is built empty at every completion, and
-only an editable occurrence claims. The module comment of
-'server/to_org/extend/editable.rs' states the whole rule, with the
-cascade and the node budget.
+Where a relationship's relRepo comes from at save time:
+a relationship already on disk keeps its relRepo (*sticky*); a new relationship
+between owned nodes defaults to the more-private endpoint home. A new
+relationship from an owned recorder to a foreign member defaults to the recorder's
+home, deliberately making the foreign ID and relationship visible at
+that owned skgrepo without proposing a foreign write. Every relRepo is
+clamped to be no more public than the recorder's home. Hides
+floor higher (at least the most public subscription explaining them). A
+=(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
+overrides sticky with any skgrepo at least as private as the relationship's
+default — raising privacy, or moving a stuck skgrepo back to the
+default; a more-public choice is a save error. A legacy or
+hand-authored relationship whose disk relRepo already sits more public than
+its default may be held or made more private, never made still more
+public. See =server/from_text/supplement_from_disk.rs=.
 
-*** view completion, extend, render, rerender
+**** stranded relationship, strandeds
 
-*View completion* extends a viewforest: it adds viewnodes to one
-that stands ('complete_viewforest'). Extending is countable: an
-*extension* is one editable vognode's content list, drawn whole,
-and is what the node budget counts ('initial_node_limit'; a
-folder fills its members without spending any). The module
-comment of 'server/to_org/extend/editable.rs' states the budget.
-The server *renders* a viewforest when it produces its org text
-('server/org_to_text.rs'); a *rerender* is the request that
-recompletes a view and sends its text. Org folding keeps the
-words "fold" and "unfold".
+A home skgrepo move can strand a relationship touching the moved
+node: a *stranded relationship* is one that sat at its default relRepo
+before the move and that the sticky rule would leave off its new
+default. *Strandeds* is the noun for stranded relationships; "strand"
+is only a verb. A save finds every one, of every relation, in both
+directions, shown in some view or not ('server/from_text/strandeds.rs').
+It raises the inbound strandeds of a privatizing move to the new home
+by itself, since they would leak the member's ID, and asks the user
+whether to reset the strandeds of a publicizing move to their new
+defaults (the strandeds-confirmation). Mentions carry no relRepo, so
+they are never stranded.
 
-*** reconciler
+*** clone, and the fork operation
 
-One of the two functions that bring an editable node's children
-in line with what they should be: the older one
-('complete_managed_children'), which reconciles the content list
-and each folder's members in every view, and the diff view's
-('reconcile_children_with_shallowModelSubtree'), which reconciles
-the change viewnodes, the removed members and what stands below
-them with a shallow model subtree. Both obey
-[[*retain as non-member or tombstone, then prune]].
+To *fork* a node N is to turn it into an editable *clone* C in a
+skgrepo you own. C copies N's title, body, and child-list (the child IDs
+only — shallow), =subscribesTo= N (so N's later additions surface to C
+as unintegrated subscribed content) and =overrides= N (so
+override substitution shows C wherever N would appear). Children of N
+that the forking edit deleted become C's
+=hidesFromSubs=, and thereafter any child removed from
+an owned subscriber's contains that some subscribee still contains is
+hidden likewise on save (re-adding it unhides). A node may have at
+most one clone you own (override monogamy).
 
-*** managed child
+Forking spans two gestures, foreign and owned:
 
-A child viewnode is managed by the reconciler that owns it (its
-[[*owner][owner]]): that reconciler matches the child by its
-[[*key, match key][key]] against what it should show, and may
-convert it
-([[*retain as non-member or tombstone, then prune]]). The older
-reconciler finds the children it manages by predicates on their
-kind and membership ('complete_managed_children'), and records
-itself as the owner of each member it keeps; the diff view's
-reconciler matches every child of the kinds the model of each call
-concerns, since it runs several models under one parent, whoever
-drew it, and owns each it adopts, but converts a stale child only
-when the view's record of owners says it owns it.
+- /implicit/ (foreign N): make N editable (=C-c s d=), edit it, and
+  save; any real change to a foreign node is read as a fork request, and
+  the save asks you to confirm. N is left untouched on disk.
+- /explicit/ (owned N): =skg-fork-node= (=C-c m f=), for a node you
+  already own — used to deepen an override chain (D overrides C overrides
+  N, all owned). N keeps its own content; only the clone is added. The
+  clone is built from N's saved state, so the command refuses a dirty
+  buffer.
 
-*** key, match key
+See =docs/forks.org= and =docs/sharing-model.org=.
 
-A child's *key* is what a reconciler matches it by: for an
-occurrence of a graphnode, the node's ID as the live graph
-resolves it (so one shown by an extra ID matches its node); for
-an entry of a property folder, the entry itself; for any other
-viewnode, its kind. In the older reconciler it is the key of a
-goal item ('Orderkey' in 'complete_managed_children'). The diff
-view's reconciler calls it the *match key* ('MatchKey'), and
-matches an unknown phantom by its raw ID and a historical phantom
-by its ID at HEAD. It matches a key among all the children of a
-node, whoever drew them: a child of a key its model has is
-adopted, and a second child of that key is a duplicate, converted
-by [[*retain as non-member or tombstone, then prune]].
+*** nodeMerge ("merge" is always qualified)
 
-*** owner
+A /nodeMerge/ joins two graphnodes: the acquirer takes the
+acquiree's content and IDs, and the acquiree's text is kept in a
+text preserver. =C-c s m= ('skg-set-merge-request') writes the
+request, =(editRequest (merge ID))=, and a save applies it; the diff
+view's merges buffer shows each nodeMerge since HEAD. In prose, say
+"merge nodes" or "nodeMerge", never a bare "merge"; the bare word
+appears only in client-facing wire strings, where only nodes can
+merge. See =docs/merging.org=.
 
-The reconciler that created a viewnode, or nobody when the user
-typed or pasted it ('Owner' in 'server/types/viewnode.rs'): the
-content reconciler, a folder's reconciler (one per folder kind),
-the role-tree attach (which hangs a containerward chain under a
-containers folder's member),
-the diff view's reconciler, or the stub roots (which make a
-view's roots). A member of a content list is owned by the content
-reconciler and a member of a folder by that folder's reconciler,
-whoever typed it, since membership is a fact of the graph that
-its reconciler maintains. The owner is recorded per
-[[*viewnode ID, vnid][viewnode ID]] in the view's state ('ViewnodeIdRecord'),
-never inferred from a viewnode's shape. In the diff view a member
-that stops being one, because its relationship is in the
-before-graph only or its viewparent became a historical phantom,
-becomes the diff view's reconciler's, which shows it as removed;
-so does any child the diff view's reconciler adopts.
+*** text preserver
 
-*** retain as non-member or tombstone, then prune
+A nodeMerge keeps the acquiree's text in a new node, its *text
+preserver*: titled "MERGED: " and the acquiree's title, with the
+acquiree's body, and placed first in the acquirer's content. The
+acquiree's other content joins the acquirer's, and the acquiree's ID
+becomes an extra ID of the acquirer. See =docs/merging.org=.
 
-A reconciler never detaches a child. A child it manages that the
-graph no longer warrants -- a stale child, whose key the
-reconciler's model lacks, or an extra copy of a key a sibling has
--- is *converted* ('convert_unwarranted_child' in
-'server/update_buffer/util.rs'): an unrestricted vognode with a
-subtree is retained as [[*non-member][non-member]]: it keeps its
-title, ID and birth, loses its change facts, and can be adopted
-back when its membership returns. A stale one keeps its
-editability: an editable one keeps its members as they are, and a
-write-protected one's members become non-members, since a
-write-protected occurrence holds no member. Since the editability
-walk prefers a member to a non-member
-([[*editability rule, editable map][editability rule]]), a
-retained copy never keeps the editability claim from its node's
-member. A leaf, and any viewnode of another kind (a phantom, a
-restricted vognode, a property, a folder), becomes a
-[[*tombstone][tombstone]]. Of several copies of one key,
-the one kept as the member is the editable one, else the first;
-each other copy with a subtree is retained write-protected, its
-members made non-members, whatever its editability was, since the
-save refuses two editable occurrences of one node.
-After every completion the postorder *prune*
-('prune_self_deletable_when_empty' in
-'server/update_buffer/complete.rs') removes the childless
-tombstones (and childless deleted phantoms and empty
-write-protected folders), never a view root. A viewnode nobody
-owns -- one the user typed or pasted -- is never converted as
-stale, so it holds its ancestors alive: whatever stands below a
-converted child survives under it. It is converted as a duplicate
-when a reconciler adopts another copy of its key.
+*** no search matching
 
-The diff view's reconciler converts by the same function, and
-first converts what was made below the stale child for the same
-model ('convert_unwarranted_subtree' in
-'server/diff_view/shallow_model_subtree.rs'): postorder, every
-viewnode below it but those nobody owns and the content
-reconciler's (which a vognode retained as non-member keeps, as the older
-reconciler's does), so that a folder's members go with the folder
-and a member's chain with the member. A viewnode left holding
-only childless tombstones is converted as a leaf. A folder's
-reconciler likewise converts a stale or extra member's chain with it
-('convert_unwarranted_member_with_its_chain'), so a member holding
-nothing but its chain goes, and one holding a note stays.
+A node-file flag (=NoSearchMatching= in YAML,
+=noSearchMatching= on the wire) that prevents the node's title, aliases, and
+body from producing a direct text-search hit. The node remains indexed for
+exact-ID lookup and may appear as context around another hit. It is search
+decluttering, not privacy.
 
-A converted copy is the one duplicate shape the save accepts:
-under an editable parent two editable copies of a node are
-refused, and so are two members, in a content list or a folder.
+*** prominent
 
-The orphaned folder ('entombstone_generalized_orphan_folder') and the
-skgrepo-set switch ('convert_and_prune_for_skgrepo_switch')
-convert by the same rule: a member of a folder whose viewparent
-died, and a deleted or unknown phantom that a now restricted
-skgrepo records.
+Search ranks *prominent* nodes higher: a root, a member of a cycle,
+a node linked to, a node that had an ID before import, or a
+multiply contained node. Most nodes are not prominent.
 
-*** tombstone
+*** flags folder and Flag
 
-A viewnode ('ViewnodeKind::Tombstone', '(skg tombstone)')
-with no title, ID, facts or key, which only holds what stands
-below it. It is what [[*retain as non-member or tombstone, then prune]]
-makes of an unwarranted leaf or non-vognode. The prune removes it once it is childless; the
-parser discards text typed on its line; its member children
-become non-members ('mark_orphans_under_dead_parents_false');
-every folder accepts one among its children.
+=flagsFolder= is a generated, write-protected non-vognode under a graphnode. Its
+=(flag FLAG)= leaves list the node's true flags in canonical
+order. Each leaf is titleless because its herald supplies the visible label.
+The folder stays visible when empty. Edits within a retained folder are
+rejected before save, but deleting the entire folder safely dismisses the
+optional viewbranch and changes no flag. =noSearchMatching= is changed
+through the dedicated setter, while the two org-roam import provenance
+flags have no setter. A node with =n= true flags has the low-styled =Fn=
+herald; no flag herald is shown at zero.
 
-*** birth
+*** Terms a user meets in the diff view
 
-Why a generated occurrence was created under its parent ('Birth'
-in 'server/types/viewnode.rs'): either unremarkable, or, on a chain
-node, the container role. It is view history, used for display,
-stale-relation validation and the diff view, never by save
-extraction. The =(rels ...)= form renders it as =(birth ...)=
-facts. A chain node's birth is also written into its metadata as
-=(birth roleGraft container)= and read back, so it survives a
-save.
+'docs/diff-view.org' describes the diff view; these are the terms
+a user meets in it, and they mean nothing outside it.
 
-*** phantom
-
-A vognode standing for something that is not a current graph member
-('Phantom' in 'server/types/viewnode.rs'). There are three kinds:
-*Historical* (in the diff view, a node HEAD has and the worktree
-lacks; it shows HEAD's title and body), *Deleted* (a save just deleted
-it; it keeps its last title and body), and *Unknown* (a reference that
-resolves to nothing; see "unknown node"). Phantoms are save-inert.
-
-*** unknown node, dangling ID
-
-An *unknown node* is an ID that some node's contains, subscribesTo,
-hidesFromSubs or overrides list names but that no node of the graph
-answers to, as primary or extra ID; such an ID is *dangling*. A view
-shows it as an unknown phantom ("Reference to unknown node.").
-The "investigate unknown node" request says what git history knows of
-it, and the delete-references-to-absent-node command removes the
-references.
-
-*** save-inert
-
-A viewnode is *save-inert* if it emits no fieldIntents: phantoms,
-restricted vognodes, and the diff view's properties, among
-them removed aliases and IDs. Its descendants may still emit them, so save
-extraction still visits them.
-
-*** title != headline
-
-Headline is a term from org-mode. It refers to a line that begins with some asterisks, followed by at least one whitespace, followed by at least one non-whitespace. The text after the first chunk of adjacent whitespace is what I'm calling the 'title'.
-
-** Terms of the diff view
-
-'docs/diff-view.org' describes the diff view; these are its
-terms, and they mean nothing outside it.
-
-*** diff view
+**** diff view
 
 Four buffers that show every change in the owned skgrepos since their
 last commits, with the context needed to understand them: "all
@@ -997,14 +690,7 @@ changes", "merges", "skgrepo changes" and "order-only changes". Each is
 an ordinary editable view. Foreign skgrepos are excluded; the
 readiness summary only counts their changed files.
 
-*** buffer kind
-
-Which of the four buffers of the diff view a buffer is
-('DiffViewBufferKind'). A buffer of the diff view is rendered over the
-graph straddle; the straddle and the buffer kind are separate fields
-of the completion context.
-
-*** pruned change view
+**** pruned change view
 
 The viewforest the "all changes" buffer renders, defined by the sets
 C, R, U and D (below; 'server/diff_view/pruned_change_view.rs',
@@ -1012,23 +698,7 @@ functions 'prunedChangeView_...'). The merges and skgrepo-changes
 buffers render pruned change views over subsets of the changes: the
 nodeMerges, and the home skgrepo and relRepo moves.
 
-*** graph straddle, before-graph, after-graph
-
-The *graph straddle* ('GraphStraddle { before, after }',
-'server/graph_straddle/') is what the diff view compares. A straddle stands
-with one foot in the committed graph and one in the live graph. The
-*before-graph* is an in-Rust graph built from each owned skgrepo at
-HEAD (each foreign skgrepo at its worktree); the *after-graph* is the
-live graph.
-
-*** union walk, presence
-
-The *union walk* is the API over the graph straddle that answers
-questions about the union of its two graphs. Each node and each
-relationship it reports carries a *presence*: 'Both', 'OnlyBefore' or
-'OnlyAfter'. A view shows it as [[*the three kinds of change][the three kinds of change]].
-
-*** the three kinds of change
+**** the three kinds of change
 
 The first three parts of a headline's '(diff ...)' form, each written
 only when true ('DiffChange'): the node's existence, '(node added)'
@@ -1047,22 +717,32 @@ the member and the folder's viewparent; the two filter folders' members
 carry none. On an alias, ID or flag entry, '(rel ...)' is the entry's
 existence in its list.
 
-*** diff object, diff aspect
+**** change facts
+
+A headline's *change facts* are the parts of its '(diff ...)' form
+that the server writes: the three kinds of change, the '(leaves
+...)' count of its change-forest leaves, and the '(ready ...)'
+readiness, its commit-readiness marker ('ChangeFacts' in
+'server/types/viewnode.rs'). A readiness request, the form's last
+part, is the user's, not a change fact. The words are never
+shortened to "facts".
+
+**** diff object, diff aspect
 
 A *diff object* is what a part of a '(diff ...)' form or a readiness request
 names on a headline: the node itself ('node'), or the node's
 relationship to its viewparent ('rel'; in a partner folder, to the
 folder's viewparent). There are exactly these two.
 A change-forest leaf about a relationship has the relationship as its
-object, never the member. A request, a '(leaves ...)' fact and a
-'(ready ...)' fact may also say 'all', which names every leaf a
+object, never the member. A request, a '(leaves ...)' change fact and
+a '(ready ...)' change fact may also say 'all', which names every leaf a
 modified node records (so one gesture on it marks its file), or every
 leaf of a commit readiness aggregate one level down; 'all' is shorthand, not a third
 object. A *diff aspect* is what a
 change-forest leaf is about: existence, text, home skgrepo, an alias,
 an extra ID, a flag, or relRepo.
 
-*** C, R, U, D, content origin
+**** C, R, U, D, content origin
 
 The sets the pruned change view is computed from: C, the changed
 nodes; R, the content origins; U, the nodes to extend contentward; D,
@@ -1091,7 +771,7 @@ described: "the nodes to extend contentward (U; see
 'docs/diff-view.org', "C, R, U and D", and the module comment of
 'server/diff_view/pruned_change_view.rs')".
 
-*** change-forest, change-forest leaf, recorder of a leaf
+**** change-forest, change-forest leaf, recorder of a leaf
 
 The *change-forest* is the picture of everything commit-readiness can
 be asked about, built from the graph straddle, independent of any
@@ -1105,15 +785,13 @@ that node *records* the leaf; a relationship's leaf is recorded by
 the relationship's recorder, so seen from either end it is the same
 leaf.
 
-*** mark, fingerprint, readiness
+**** mark, readiness
 
-A *mark* says that one change-forest leaf is commit-ready. It is
-stored ('<data_root>/readiness-marks.json') with a *fingerprint* of
-the change it approved, and a mark whose fingerprint no longer
-matches the change counts as absent: editing a marked change unmarks
-it. A leaf's *readiness* is whether it is marked.
+A *mark* says that one change-forest leaf is commit-ready; the
+readiness gestures set and clear marks. Editing a marked change
+unmarks it. A leaf's *readiness* is whether it is marked.
 
-*** commit readiness aggregate
+**** commit readiness aggregate
 
 A *commit readiness aggregate* is a thing with change-forest leaves
 under it: a folder, a changeset marker, a node, a file, the whole
@@ -1122,26 +800,27 @@ ready; that derived value is *its readiness*. A view shows it as
 '(ready ...)' (in the '(diff ...)' form, or bare on a folder), which
 nothing reads at save.
 
-*** changeset marker
+**** commit-readiness marker
+
+The '(ready ...)' part of a headline's '(diff ...)' form, or the
+bare '(ready ...)' of a folder, and its herald: the derived readiness
+of a commit readiness aggregate or of a change headline's leaves. A
+folder's member takes one; a chain node takes none. It is never
+called a bare "marker", since a changeset marker is another thing.
+
+**** changeset marker
 
 A childless property viewnode ('Property::ChangesetMarker') that
 stands for a set of changes recorded in its parent's file, and carries
 their derived readiness. There are three kinds: the content changeset
 marker ("its content changed"), the relRepo changeset marker ("some
-content relationships changed skgrepo") and the order-only marker
+content relationships changed skgrepo") and the order-only changeset marker
 ("order-only change", which is always ready).
 
-*** content position
-
-A viewnode is in *content position* when its viewparent is the buffer
-root, an unrestricted vognode, or a historical phantom that is itself
-in content position ('in_content_position'). A historical phantom in
-content position holds its old content under it.
-
-*** removed member, former member
+**** removed member, former member
 
 A *removed member* is an unrestricted vognode, a
-[[*non-member][non-member]], with the fact '(rel removed)': its
+[[*non-member, 'nonMember'][non-member]], with the change fact '(rel removed)': its
 node survives, but its relationship to its viewparent exists in
 the before-graph only. It is encoded so in content, in a partner
 folder and in a historical phantom's old content alike. In
@@ -1152,34 +831,7 @@ standing for such a before-only relationship, historical phantoms
 included. These phrases, like "stale member" and "new member",
 name the node by its membership's fate.
 
-*** change viewnode
-
-A viewnode the diff view adds, at an editable node's visit, to show
-a change of that node: its old text, its home skgrepo move, its
-changeset markers, its "it acquired" folder, its changed folders, its
-removed members, and, under a member, the relRepo move of the
-member's relationship. A rerender keeps a change viewnode the shallow
-model subtree still produces and converts the rest
-([[*retain as non-member or tombstone, then prune]]).
-
-*** per-visit step
-
-What the diff view does at an editable occurrence's visit, after the
-content reconciler ('process_unrestrictedVognode_changes' in
-'server/diff_view/changes.rs'): it tags the members with the three
-kinds of change, adds the removed members, and for a node in C adds
-its change viewnodes.
-
-*** shallow model subtree
-
-The scratch tree a visit builds of what a viewnode should hold, which
-the diff view's reconciler matches the viewnode's children against.
-It is shallow: it includes other vognodes but not what their own
-visits add. A folder's goal list ('FolderGoalItem'), the input of the
-folder reconciler, is a flat list of what each member should be, not
-a tree.
-
-*** old text
+**** old text
 
 The change viewnode ('(oldText ASPECT)') under a node whose title or
 body changed since HEAD: labelled "old title and body", "old title" or
@@ -1188,7 +840,7 @@ When the body changed, a "body diff" property under it holds the line
 diff. The text change is one change-forest leaf, marked on the old
 text.
 
-*** changed folder
+**** changed folder
 
 A partner, alias, ID or flags folder the diff view shows because its
 membership changed since HEAD. It is written '(FOLDER changed)' in
@@ -1197,15 +849,15 @@ each tagged with the three kinds of change, and reads "its X changed
 (this file)" or "(other files)" (see "in, out"). Its '(diff ...)'
 holds only '(diff (ready))', when every changed membership is ready.
 
-*** what a changed folder's member holds
+**** what a changed folder's member holds
 
-Under each member of a changed folder the diff view hangs the
-member's containerward chain, walked over both graphs of the
-straddle, so that the user sees where the member sits, and before
-it, where the member's relationship moved to another skgrepo, that
-move.
+Under each member of a changed folder hangs its containerward chain,
+as under any folder's member, walked over both graphs of the
+straddle, so that the user sees where the member sits; and before
+the chain, where the member's relationship moved to another
+skgrepo, that move.
 
-*** moved-like-ancestor fact
+**** moved-like-ancestor fact
 
 In the skgrepo-changes buffer, a vognode whose home skgrepo moved
 carries '(homeSkgrepoMove (old OLD) (new NEW))' in its viewStats, its
@@ -1215,7 +867,7 @@ moved the same way, it also carries the *moved-like-ancestor fact*
 names that ancestor as an ancestor generation does (a, the
 viewparent; b, the grandparent; ...).
 
-*** removed alias, removed ID
+**** removed alias, removed ID
 
 An alias or extra ID of a node that HEAD has and the worktree lacks.
 The diff view shows it in the node's alias or ID folder as its own kind
@@ -1224,7 +876,7 @@ the two lists puts it, with the '-' herald. It is save-inert by kind:
 the save reads no alias from it and does not count it among the
 node's IDs. Marking it marks the leaf of the lost alias or ID.
 
-*** readiness summary
+**** readiness summary
 
 The line a client shows after every save of a diff-view buffer, after the
 "integrate unshown changes" command (C-c r u), and before a
@@ -1235,14 +887,14 @@ marked; a file whose only change is order is ready without marks. The
 summary also counts the changed files of foreign skgrepos and the
 changes not editable in the view.
 
-*** already-staged entry
+**** already-staged entry
 
 An entry git's index already holds when stage-and-commit runs, staged
 by a hand or another tool. Stage-and-commit asks for confirmation
 before committing a gitrepo that has one, and the git-commit then
 includes it.
 
-*** editable in the diff view
+**** editable in the diff view
 
 A buffer *makes a node's changes editable* when it holds an
 editable occurrence of the node, wherever it sits, or the node's
@@ -1250,7 +902,7 @@ historical phantom in content position
 ('nodes_editable_in_diffView'). The change-forest leaves those
 nodes record are the changes editable in the buffer.
 
-*** changes not editable in the view
+**** changes not editable in the view
 
 The change-forest leaves recorded by the nodes whose changes a
 buffer does not
@@ -1258,7 +910,7 @@ buffer does not
 not editable in the view*, which the readiness summary counts. A
 save never makes them editable; C-c r u integrates them.
 
-*** readiness request, readiness gesture
+**** readiness request, readiness gesture
 
 A *readiness request* is a metadata form, '(readyRequest OBJECTS)' or
 '(unreadyRequest OBJECTS)', the last part of a headline's '(diff ...)'
@@ -1268,7 +920,7 @@ edits succeed, to set or clear the marks of a headline's leaves. A
 recursive forms) that writes readiness requests on one or many
 headlines, then saves.
 
-*** restore request
+**** restore request
 
 Either of the two edit requests that undo a removal in the diff
 view. '(editRequest restoreNode)', on a historical phantom,
@@ -1281,14 +933,14 @@ recorded it. C-c s n ('skg-restore-deleted-node') and C-c s l
 and consumes them as it does every edit request
 ('docs/diff-view.org', "Restoring what a change removed").
 
-*** change headline
+**** change headline
 
-A headline whose metadata carries a '(leaves ...)' fact. It is ready
+A headline whose metadata carries a '(leaves ...)' change fact. It is ready
 when its '(ready ...)' names every object its '(leaves ...)' lists,
 and otherwise unready. The navigation commands (C-c r n c and its
 kin) move between change headlines.
 
-*** in, out, "(this file)", "(other files)"
+**** in, out, "(this file)", "(other files)"
 
 A relationship is *out* from its recorder (the node whose file records
 it) and *in* to its member. In the diff view, a folder of out-relationships
@@ -1296,37 +948,553 @@ that changed is labelled "its ... changed (this file)", and one of
 in-relationships "its ... changed (other files)". Changeset markers
 carry no suffix.
 
-** Terms specific to Tantivy
+** Terms of the implementation
+The words of the code, its comments and the technical docs. A user
+almost certainly need not read this section.
 
-*** no search matching
+*** update-relevant neighborhood
 
-A node-file flag (=NoSearchMatching= in YAML,
-=noSearchMatching= on the wire) that prevents the node's title, aliases, and
-body from producing a direct text-search hit. The node remains indexed for
-exact-ID lookup and may appear as context around another hit. It is search
-decluttering, not privacy.
+For a set of IDs in one graph snapshot, the *update-relevant
+neighborhood* contains the IDs themselves, their immediate neighbors in
+both directions along =contains=, =linksTo=, =subscribesTo=, and
+=hidesFromSubs=, and every node reachable by each of the
+two monotonic override walks. The overriderward and overriddenward walks
+start independently at the original IDs, never reverse direction, and
+never continue from an ordinary neighbor. Thus it includes no mixed
+ordinary/override path and no two-hop ordinary path. Saves compute this
+neighborhood independently in the before and after graph snapshots.
 
-*** prominent, prominence source, prominence multiplier
+*** vognode, non-vognode
 
-Search ranks *prominent* nodes higher. A node's *prominence source*
-('ProminenceSource') says why it is prominent: it is a root, a cycle
-member, mentioned (linked to), had an ID before import, or is
-multiply contained. Each source has a *prominence multiplier* applied
-to the text-match score. Most nodes have no prominence source.
+A *vognode* is a viewnode representing a graphnode ('Vognode' in
+'server/types/viewnode.rs'). It is one of three kinds:
+- *unrestricted*: the graphnode is in an unrestricted skgrepo, so the view shows it;
+- *restricted*: it is in a restricted skgrepo, so the view shows only an
+  anonymous, dataless placeholder;
+- a *phantom*: the graphnode is no longer in the graph, or never was.
 
-*** flags folder and Flag
+The other viewnodes are *non-vognodes*: folders, properties, the buffer
+root and tombstones. They describe their viewparent, or its
+relationships, rather than standing for a graphnode.
 
-=flagsFolder= is a generated, write-protected non-vognode under a graphnode. Its
-=(flag FLAG)= leaves list the node's true flags in canonical
-order. Each leaf is titleless because its herald supplies the visible label.
-The folder stays visible when empty. Edits within a retained folder are
-rejected before save, but deleting the entire folder safely dismisses the
-optional viewbranch and changes no flag. =noSearchMatching= is changed
-through the dedicated setter, while the two org-roam import provenance
-flags have no setter. A node with =n= true flags has the low-styled =Fn=
-herald; no flag herald is shown at zero.
+*** open views, single-root
 
-*** Document
+The server keeps, per connection, the views open in the client
+('OpenViews' in 'server/types/views_state.rs'), each by its
+viewforest id ('ViewforestId': a content view by its root's ID, a
+search view by its query), with its viewforest, the IDs it shows and
+its 'ViewnodeIdRecord'. A content view may have several roots; the
+request that opens one today asks for a single root, so only the
+request is "single-root".
+
+*** recorder, carrier
+
+A relationship is recorded in the .skg file of one of its two nodes, its
+*recorder*: the node playing the relation's first role (the container,
+the mentioner, the subscriber, the hider, the overrider). The other node
+is a member of the recorder's list.
+
+The node that has an ID, as its PID or as an extra ID, is that ID's
+*carrier*. (Not "owner": the user *owns* skgrepos.)
+
+*** PartnerFolder, and the folder-policy vocabulary
+
+How a partner folder (see "partner folder") is built. It is the
+=ViewnodeKind::PartnerFolder= variant and the payload
+type of the same name.  “Folder” here describes an org non-vognode that groups
+viewnodes; it does not mean a filesystem directory.  “Role col”, “relation
+col”, and bare “sharing col” are retired names for the general concept.
+
+There are twelve PartnerFolders, named by their external non-vognode
+atom. Each kind's behavior is decided by one method,
+=PartnerFolder::policy= (=server/types/viewnode.rs=), returning a
+*FolderPolicy*.  This single arbiter is consulted by reconciliation
+dispatch, save extraction's write-protected treatment, and
+herald/warning gating, so a new relation cannot acquire inconsistent
+policies in different layers:
+
+- *EditableSet* (=subscribeeFolder=, =overriddenFolder=): membership edits
+  are graph edits.  An absent folder means "no opinion" (its field lowers
+  to =MSV::Unspecified=, filled from disk); a present-but-empty folder
+  means an explicit empty set (=MSV::Specified(vec![])=).
+- *EditableFilter* (=hiddenOutsideOfSubscribeeFolder=): membership is
+  derived from hide state, and a visible member set is an explicit
+  edit of that subset; the hides' relRepos stay derived.
+- *WriteProtectedSet*: membership is generated from graph facts; the
+  user's order is respected view-locally; repairs warn.  See
+  [[*write-protected set][write-protected set]].  These are the inbound folders
+  =subscriberFolder=, =overriderFolder=, =hiderFolder= and
+  =containerFolder= and =mentionerFolder= (the folders of =C-c l c= and
+  =C-c l m=; the other side of each is the node's content, or its
+  links, shown without a folder), the outbound =hiddenFolder=, and the
+  diff view's =acquiredByFolder= and =acquiredFolder=, which are
+  derived from the graph straddle and save-inert.
+- *WriteProtectedFilter* (=hiddenInSubscribeeFolder=): membership is
+  derived from hide state rather than from a single relation role.
+
+The ☮ herald on a write-protected folder's headline is a
+herald-table fact only (=server/heralds.rs=), with no wire atom of
+its own: which folders are write-protected is already known from the
+folder atom. The editable folders and =aliasFolder= carry none.
+
+Every policy's reconciler obeys
+[[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]]:
+a stale member or an extra copy of a member is converted, not
+detached, and a missing graph member is reinstated. A non-member
+standing for a node the folder's goal lists again is adopted back as
+its member.
+
+*A write-protected folder's children stay where they stand.*  Its
+reconciler moves no child it keeps, a non-member standing inside it
+included, and puts a member it creates right after the member that
+precedes it in the folder's goal list (=KeptChildOrder::Unmoved= in
+=complete_managed_children=; see "What a reconciler keeps" in
+=docs/diff-view.org=).  The alias folder and the editable folders,
+whose order the save writes, follow the graph's order instead
+(=KeptChildOrder::FollowsGoal=): a non-member standing in one of them
+goes above the members, which follow the graph's order.
+
+*** the containerward chain, as drawn
+
+A folder's reconciler reconciles each member's chain by key at every
+visit of the folder ('reconcile_containerward_chain_under_member' in
+'server/to_org/extend/containerward_chain.rs'), so a member it adds
+later gets its chain, and a chain that stays keeps its viewnodes and
+their fold state. A stale member's chain goes with it
+('convert_unwarranted_member_with_its_chain'). The walk visits a
+node's containers breadth-first, in ID order ('ContainerwardRoleTree').
+'is_in_containerward_chain' says whether a viewnode stands in chain
+position, and 'is_drawn_chain_node' whether it is a chain node as the
+walk draws it (write-protected, carrying no change facts), not a note
+the user typed there.
+
+*** view completion, extension, render
+
+*View completion* extends a viewforest: it adds viewnodes to one
+that stands ('complete_viewforest'). Extending is countable: an
+*extension* is one editable vognode's content list, drawn whole,
+and is what the node budget counts ('initial_node_limit'; a
+folder fills its members without spending any). The module
+comment of 'server/to_org/extend/editable.rs' states the budget.
+The server *renders* a viewforest when it produces its org text
+('server/org_to_text.rs'); a *rerender* is the request that
+recompletes a view and sends its text.
+
+*** editability rule, editable map
+
+The *editability rule* decides, at each occurrence view completion
+reaches in level order, whether it is editable: an occurrence without
+a request is editable when its node is unclaimed in the *editable
+map* and write-protected when another occurrence claimed it first,
+except that the walk prefers a member to a non-member: an editable
+member takes the claim from a non-member that holds it without a
+request, and the non-member is write-protected with its content
+subtree. The editable map is built empty at every completion, and
+only an editable occurrence claims. The module comment of
+'server/to_org/extend/editable.rs' states the whole rule, with the
+cascade and the node budget.
+
+*** editability claim
+
+The record, in the editable map ('EditableMap' in
+'server/to_org/util.rs'), that one occurrence of a node is the
+editable one, so that no other occurrence in the buffer may be.
+Only an editable occurrence claims. A claim is 'Final' when an
+editable-view request made the occurrence editable and 'Tentative'
+otherwise. An editable member takes a Tentative claim from a
+non-member, which is then write-protected; an editable-view request
+that meets a Final claim elsewhere is dropped and its occurrence
+write-protected ('EditabilityOutcome::ClaimedElsewhere'). Say
+"editability claim", not "editable claim". See "editability rule,
+editable map".
+
+*** reconciler
+
+One of the two functions that bring an editable node's children
+in line with what they should be: the older one
+('complete_managed_children'), which reconciles the content list
+and each folder's members in every view, and the diff view's
+('reconcile_children_with_shallowModelSubtree'), which reconciles
+the change viewnodes, the removed members and what stands below
+them with a shallow model subtree. Both obey
+[[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]].
+
+*** managed child
+
+A child viewnode is *managed* by a reconciler when the reconciler
+matches it by its [[*key, match key][key]] against what it should
+show, and may convert it
+([[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]]).
+The content reconciler manages a node's member vognode children, and
+a folder's reconciler the folder's members, removed members and
+phantoms ('skgid_a_folder_child_stands_for' in
+'server/to_org/complete/partner_folder/child_data.rs'): each finds
+them by predicates on kind and membership
+('complete_managed_children'), and first adopts a non-member of a key
+it lacks (see "adopt"). The diff view's reconciler, which runs
+several models under one parent, matches every child of the kinds a
+model concerns, whoever drew it, but converts a stale child only when
+it is its own, which it knows by the child's kind and change facts
+('is_diffView_change_viewnode' in
+'server/diff_view/shallow_model_subtree.rs'). So a non-member the
+user typed or pasted is converted as stale by no reconciler.
+
+*** key, match key
+
+A child's *key* is what a reconciler matches it by: for an
+occurrence of a graphnode, the node's ID as the live graph
+resolves it (so one shown by an extra ID matches its node); for
+an entry of a property folder, the entry itself; for any other
+viewnode, its kind. In the older reconciler it is the key of a
+goal item ('Orderkey' in 'complete_managed_children'). The diff
+view's reconciler calls it the *match key* ('MatchKey'), and
+matches an unknown phantom by its raw ID and a historical phantom
+by its ID at HEAD. It matches a key among all the children of a
+node, whoever drew them: a child of a key its model has is
+adopted, and a second child of that key is a duplicate, converted
+by [[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]].
+
+*** adopt
+
+A reconciler *adopts* a child when a key its model has is already
+among the node's children, whoever drew the child: it takes that
+child instead of drawing a second, keeping its viewnode, viewnode ID
+and fold state. A non-member standing for a node the content list,
+or a folder's goal list, names again becomes the member
+('adopt_nonMember_children_that_are_content' in
+'server/update_buffer/reconcile/content.rs',
+'mark_goal_children_as_folder_members' in
+'server/to_org/complete/partner_folder/child_data.rs'), so a vognode
+retained as non-member is adopted back when its membership returns.
+The diff view's reconciler adopts by its match key (see "key, match
+key").
+
+*** retain as non-member or tombstone, then prune; warrant, stale, duplicate
+
+A child's [[*key, match key][key]] is what a reconciler matches it
+by. The graph *warrants* a child when the model its reconciler builds
+from the graph has an item of the child's key; a *stale* child is
+one whose key the model lost; a *duplicate* is a second child of a
+key already matched.
+
+A reconciler never detaches a child. A stale or duplicate child it
+manages ([[*managed child][managed child]]) is *converted*
+('convert_unwarranted_child' in 'server/update_buffer/util.rs'): an
+unrestricted vognode with a subtree is
+[[*retain as non-member][retained as non-member]]: it keeps its
+title, ID and subtree, loses its change facts, and can be
+[[*adopt][adopted]] back when its membership returns. A stale one
+keeps its editability: an editable one keeps its members as they
+are, and a write-protected one's members become non-members, since a
+write-protected occurrence holds no member. Since the editability
+walk prefers a member to a non-member
+([[*editability rule, editable map][editability rule]]), a
+retained copy never keeps the editability claim from its node's
+member. A leaf, and any viewnode of another kind (a phantom, a
+restricted vognode, a property, a folder), is
+[[*tombstone, entombstone][entombstoned]]. Of several copies of one
+key, the one kept as the member is the editable one, else the first;
+each other copy with a subtree is retained write-protected, its
+members made non-members, whatever its editability was, since the
+save refuses two editable occurrences of one node.
+After every completion the postorder *prune*
+('prune_self_deletable_when_empty' in
+'server/update_buffer/complete.rs') removes the childless
+tombstones (and childless deleted phantoms and empty
+write-protected folders), never a view root. Whatever stands below a
+converted child survives under it, so a child no reconciler converts
+as stale -- a non-member the user typed or pasted -- holds its
+ancestors alive. It is converted as a duplicate when a reconciler
+adopts another copy of its key.
+
+The diff view's reconciler converts by the same function a stale
+child that is its own (see "managed child"), and first converts
+what was made below the stale child for the same model
+('convert_unwarranted_subtree' in
+'server/diff_view/shallow_model_subtree.rs'): postorder, the diff
+view's own viewnodes, a folder's members and the drawn chain nodes
+('goes_with_a_stale_viewparent'), but not the content reconciler's
+members or what the user typed or pasted, so that a folder's members
+go with the folder and a member's chain with the member. A viewnode
+left holding only childless tombstones is converted as a leaf. A
+folder's reconciler likewise converts a stale or extra member's chain
+with it ('convert_unwarranted_member_with_its_chain'), so a member
+holding nothing but its chain goes, and one holding a note stays.
+
+A converted copy is the one duplicate shape the save accepts:
+under an editable parent two editable copies of a node are
+refused, and so are two members, in a content list or a folder.
+
+The orphaned folder ('entombstone_generalized_orphan_folder') and the
+skgrepo-set switch ('convert_and_prune_for_skgrepo_switch')
+convert by the same rule: a member of a folder whose viewparent
+died, and a deleted or unknown phantom that a now restricted
+skgrepo records.
+
+*** save-inert
+
+A viewnode is *save-inert* if it emits no fieldIntents: phantoms,
+restricted vognodes, and the diff view's properties, among
+them removed aliases and IDs. Its descendants may still emit them, so save
+extraction still visits them.
+
+*** MSV = maybe specified vector
+
+=MSV<T>= distinguishes "no opinion" from "empty". =Unspecified= says a
+file section or an edit has nothing to say about the field;
+=Specified(vec![])= says the field is explicitly empty. Telescope
+folding and partial nodeIntents both depend on the difference.
+
+*** composition (visible vs full), decomposition
+
+The *composition* of a telescope combines its sections, most public
+first, into one effective node (=server/telescope/compose.rs=). The
+*full composition* uses every section; a *visible composition* uses only the
+sections unrestricted under the current skgrepo restriction, and is what a
+restricted view renders. *Decomposition* is the save-side inverse:
+splitting the effective node back into sections, byte-stably.
+
+*** placement, more public anchor
+
+How a more private section orders its members into a more public
+list without the public file recording anything: in the section's
+stored sequence, a =- anchor: ID= entry names a *more public anchor*,
+a member of the more public list, and the members after it insert
+immediately after that ID; members before the first anchor prepend.
+Placements exist only on disk — more public anchors are derived at
+save from the in-memory order, so they can never go stale in memory.
+Say "more public anchor", never a bare "anchor".
+
+*** col
+
+*Col* was the old name for a folder viewnode (short for
+"collection"). It has been expunged from production code, but may still
+appear in old documentation, plans, or the knowledge graph.
+
+*** view-lifetime
+
+Some data regarding a node is view-lifetime data
+(viewStats, for instance):
+it lasts only as long as the view of it in some buffer.
+
+Data on disk, by contrast,
+remains when the app terminates,
+and can be recovered by a later session.
+*Session-lifetime* data lasts as long as one server session: the
+in-Rust graph and the search index, together the *session-lifetime
+stores*. The server rebuilds them from the .skg files when it starts,
+or when asked ('skg-rebuild-session-lifetime-stores'); they outlive
+every view. Say which lifetime is meant, never "ephemeral".
+
+*** branching viewnode (vs a branch)
+
+A *branching viewnode* is a viewnode with more than one viewchild. Do
+not confuse it with a *branch*: any viewnode together with its
+descendants, which may be degenerate, its root having one viewchild
+or none.
+
+None of this is related to forking a node, below.
+
+*** fieldIntent, nodeIntent, nodeInstruction, savePlan
+
+What a save turns the buffer into, in order:
+- a *fieldIntent* ('FieldIntent') says what one position in the buffer
+  wants for one field of one node (its title and body, its contains,
+  a hide, ...). Local fieldIntent collection emits these into a map
+  keyed by ID ('CollectedFieldIntents').
+- a *nodeIntent* ('NodeIntent') is all of one node's fieldIntents,
+  lowered into a save or a delete. It may still be partial: fields
+  the buffer said nothing about are 'MSV::Unspecified'.
+- a *nodeInstruction* ('NodeInstruction': 'Save' or 'Delete') is a
+  nodeIntent after disk supplementation: complete, ready to write.
+- the *savePlan* ('SavePlan') is everything one save applies: its
+  nodeInstructions, plus forks and nodeMerges.
+
+*** local fieldIntent collection
+
+The save path's fieldIntent extraction: one pure DFS preorder over
+the buffer's viewforest, in which each position reads only itself and
+its direct children, plus a context that flows down from its
+ancestors. Each visit emits fieldIntents into a map keyed by
+node ID; downstream stages (validation, lowering, visibility
+resolution, disk supplementation, the noop filter) consume the map.
+Lives in =server/from_text/local_fieldintent_collection/=, entered
+via =extract_nonmergeSavePlan_locally=.
+
+This entry is the canonical sketch of the save pipeline. Its
+surrounding stages are, in order: parse, enrich, validate, place,
+extract (this entry), foreign-node validation, nodeMerge build, graph
+update, rerender.
+
+*** instructionMerge ("merge" is always qualified)
+
+An /instructionMerge/ is the combining of emitted save intents into
+the map during local fieldIntent collection. It shares nothing with
+a nodeMerge (the =NodeMerge= type) but the word.
+
+*** collateral view
+
+When a save changes nodes that other open views show, those views are
+*collateral*: the server rerenders them and streams each as a
+=collateral-view= message. The save envelope's =other-views= lists every
+other open view; the collateral views are the subset that needs a
+rerender.
+
+*** startup warnings channel
+
+How the server's startup warnings reach the user: 'load_config'
+returns warnings beside the config, 'main' records them once on the
+runtime ('record_startup_warnings' in 'server/types/env.rs'), the
+server serves them on request ("server warnings"), and each client
+shows them in its '*SKG Server Warnings*' buffer on connect.
+
+*** "snapshot" is always qualified: graph, git or buffer snapshot
+
+A /graph snapshot/ is one immutable state of the in-Rust graph
+('GraphSnapshot'). A /git snapshot/ is one of HEAD, the git index or
+the worktree; 'server/git_ops/git_snapshot.rs' reads HEAD and the
+worktree (the graph straddle's before-graph reads HEAD). A /buffer snapshot/ is a
+buffer's text as a client sends it: for search enrichment, or for a
+dirty view in the save envelope. The wire atoms 'request-snapshot' and
+'snapshot response' predate the rule and mean buffer snapshots.
+
+*** "index" is always qualified: search, git or graph index
+
+The /search index/ is Tantivy's. The /git index/ is git's staging
+area; next to HEAD and worktree it needs no qualifier ("HEAD vs
+index"). A /graph index/ is a derived map inside the in-Rust graph:
+the /recorderward relmaps/ ('contained_by', 'subscribers_of', ...), plus
+'extra_id_to_pid'. A recorderward relmap maps each member of one
+relation to the recorders that list it. (Not "inverse": today every
+relationship is recorded by its first member, but the data model may
+someday let the second member record one; 'RecorderwardRelmap' in
+'server/dbs/in_rust_graph.rs' says more.)
+
+*** "commit" is qualified when ambiguous: git-, skgsave- or tantivy-commit
+
+A /git-commit/ is git's. A /skgsave-commit/ is the step of a save that
+writes the .skg files and swaps in the new graph; a save that stops to
+ask for confirmation (forks, Hoist) skgsave-commits nothing. A
+/tantivy-commit/ makes search-index writes visible; a save's happens
+later, on a background worker. Where context leaves no doubt (HEAD, a
+merge commit, a 'git2' call) bare "commit" means a git-commit.
+
+*** swap in (a runtime generation), vs publish
+
+A save, rebuild or import ends by atomically *swapping in* a new
+runtime generation (config, graph and search index): readers holding
+the old one keep it, and the next reader gets the new one. "Publish"
+means only making text more public: sharing a skgrepo, or writing text
+into a more public telescope section. Hoist /moves/ text to home.
+
+*** hiderel = "hides" relationship
+
+See [[file:./data-model_technical.org][the technical data model]] for the hiding
+relationship.
+
+*** kv-pair = key-value pair
+
+*** lp = length-prefixed
+
+Sometimes an API response is prefixed with a length, letting the receiver know how many characters to expect in the response.
+
+*** An 'm' prefix
+
+In Haskell, 'm' is sometimes prefixed to a word to indicate 'maybe'.
+The Rust term for Maybe is Optional, but I've used the Haskell idiom.
+For any function with a name like this, if its meaning is unclear,
+the type signature should clarify what's going on.
+
+*** mk = make / create
+
+*** mp = maybe-placed
+
+A viewnode that might have an ID and skgrepo,
+but might not, is maybe-placed.
+
+*** Terms of the diff view's implementation
+
+How the diff view ('docs/diff-view.org') is computed.
+
+**** buffer kind
+
+Which of the four buffers of the diff view a buffer is
+('DiffViewBufferKind'). A buffer of the diff view is rendered over the
+graph straddle; the straddle and the buffer kind are separate fields
+of the completion context.
+
+**** graph straddle, before-graph, after-graph
+
+The *graph straddle* ('GraphStraddle { before, after }',
+'server/graph_straddle/') is what the diff view compares. A straddle stands
+with one foot in the committed graph and one in the live graph. The
+*before-graph* is an in-Rust graph built from each owned skgrepo at
+HEAD (each foreign skgrepo at its worktree); the *after-graph* is the
+live graph.
+
+**** union walk, existence across the straddle
+
+The *union walk* is the API over the graph straddle that answers
+questions about the union of its two graphs
+('server/graph_straddle/union_walk.rs'). Each node and each
+relationship it reports carries its existence across the straddle
+('existence_across_straddle'): 'Existence::Added' when only the
+after-graph holds it, 'Existence::Removed' when only the before-graph
+does, and none when both do. A view shows it as
+[[*the three kinds of change][the three kinds of change]].
+
+**** fingerprint, the readiness store
+
+Marks are stored in '<data_root>/readiness-marks.json', each with a
+*fingerprint* of the change it approved. A mark whose fingerprint no
+longer matches the change counts as absent, which is how editing a
+marked change unmarks it.
+
+**** content position
+
+A viewnode is in *content position* when its viewparent is the buffer
+root, an unrestricted vognode, or a historical phantom that is itself
+in content position ('in_content_position'). A historical phantom in
+content position holds its old content under it.
+
+**** change viewnode
+
+A viewnode the diff view adds, at an editable node's visit, to show
+a change of that node: its old text, its home skgrepo move, its
+changeset markers, its "it acquired" folder, its changed folders, its
+removed members, and, under a member, the relRepo move of the
+member's relationship. A rerender keeps a change viewnode the shallow
+model subtree still produces and converts the rest
+([[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]]).
+
+**** per-visit step
+
+What the diff view does at an editable occurrence's visit, after the
+content reconciler ('process_unrestrictedVognode_changes' in
+'server/diff_view/changes.rs'): it tags the members with the three
+kinds of change, adds the removed members, and for a node in C adds
+its change viewnodes.
+
+**** shallow model subtree
+
+The scratch tree a visit builds of what a viewnode should hold, which
+the diff view's reconciler matches the viewnode's children against.
+It is shallow: it includes other vognodes but not what their own
+visits add. A folder's goal list ('FolderGoalItem'), the input of the
+folder reconciler, is a flat list of what each member should be, not
+a tree.
+
+*** Terms of Tantivy, the search index
+
+Tantivy is the search engine that holds the search index.
+
+**** prominence source, prominence multiplier
+
+A node's *prominence source* ('ProminenceSource') says why it is
+prominent (see "prominent"). Each source has a *prominence
+multiplier* applied to the text-match score.
+
+**** Document
 
 A Tantivy association. In my case, from a title or alias to an ID.
 (Each ID can have multiple such associations.)

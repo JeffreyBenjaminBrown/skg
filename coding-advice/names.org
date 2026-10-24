@@ -29,6 +29,11 @@ The glossary ('docs/glossary.org') defines each kind.
   generation (the clients' per-buffer request counter), or ancestor
   generation (how far up the view an ancestor is: 1 = viewparent). A
   bare "generation" of a tree, counting down from its root, is fine.
+- facts: change facts, a viewnode's '(diff ...)' parts (the three
+  kinds of change, the leaves, the readiness).
+- marker: changeset marker (a property viewnode standing for a set
+  of changes) or commit-readiness marker (the '(ready ...)' part and
+  its herald).
 * Do not ask the reader to learn a distinction that does not exist outside skg
 Two ordinary words that are near-synonyms outside skg must not be
 given different technical meanings inside it. Outside skg, "unfold"
