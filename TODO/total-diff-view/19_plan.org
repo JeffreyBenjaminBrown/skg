@@ -1002,7 +1002,7 @@ tests, the docs. Run all four suites.
 The split, the entries, the docs read end to end, 'names.org',
 the problem entries moved. No code; run nothing but a grep for
 each term it adds against the code.
-** TODO Slice 13: the two-question check
+** DONE Slice 13: the two-question check
 The report under 'tests/results/', the small fixes, the commit
 message listing the rest.
 

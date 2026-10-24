@@ -60,7 +60,7 @@ There are three ways to test the code:
 
 * The save-buffer pipeline
 
-  The canonical definition of step 5, "local instruction
+  The canonical definition of step 5, "local fieldIntent
   collection", lives in 'docs/glossary.org'; this section lists the
   surrounding stages and links there rather than re-explaining
   extraction.

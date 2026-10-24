@@ -43,12 +43,12 @@ Now the first buffer should look like:
 #+begin_example
   * 1
   ** (deleted)
-  *** (deadviewnode)
+  *** (tombstone)
   **** subee
   ***** subee-1  ;; tricky!
-  ***** (deadviewnode)
+  ***** (tombstone)
   ****** subee-1
-  **** (deadviewnode)
+  **** (tombstone)
   ***** also-hidden
   * subee
   ** subee-1
@@ -65,13 +65,13 @@ to subee:
 #+begin_example
   * 1
   ** (deleted)
-  *** (deadviewnode)
+  *** (tombstone)
   **** subee
   ***** subee-1
   ***** subee-2 ;; NEW
-  ***** (deadviewnode)
+  ***** (tombstone)
   ****** subee-1
-  **** (deadviewnode)
+  **** (tombstone)
   ***** also-hidden
   * subee
   ** subee-1
@@ -96,10 +96,10 @@ completion, and render unchanged. The new node gets a UUID.
 #+begin_example
   * 1
   ** (deleted)
-  *** (deadviewnode)
+  *** (tombstone)
   **** subee
   **** new-root ;; NEW, now has a UUID
-  **** (deadviewnode)
+  **** (tombstone)
   ***** also-hidden
   * subee
   ** subee-1

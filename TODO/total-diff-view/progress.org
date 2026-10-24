@@ -4639,3 +4639,23 @@ id" and "foldering" occur in no code, as plan terms. Every glossary
 link resolves to a headline, and every citation of a glossary
 headline in 'docs/', the code and the tests names one
 ('tests/results/plan19-slice12/check_glossary_citations.py').
+** Slice 13: deviations
+*** the report
+'tests/results/plan19-slice13/report.org', with the citation
+script beside it.
+*** beyond the literal list
+Old locals spelled 'affects_parent_X', which meant "parent is X",
+were renamed with 'validate_affectsParent_relationships', which
+is now 'validate_membership_claims'. 'owner_of_folder' is now
+'pid_of_folders_viewparent'. A broken glossary citation in
+'coding-advice/maybe-obsolete/' was fixed too, although the plan
+names only code and docs.
+*** kept, for the reviewer
+The birth fact in '(rels ...)' and the herald's birth letter are
+live, and slice 7 kept them. 'the_birth_atom_is_refused' and
+'roleTree_request_is_refused' keep their refused inputs.
+'max_roleTree_depth' is a config key.
+'mark_orphans_under_dead_parents_false' keeps its name.
+'bash/run-plan-slices.sh' cites the plan it runs.
+*** verification
+Rust 910 passed. No client code changed.

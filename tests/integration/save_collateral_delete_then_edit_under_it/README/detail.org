@@ -46,12 +46,12 @@ Now the first buffer should look like:
 #+begin_example
   * 1
   ** (deleted)
-  *** (deadviewnode)
+  *** (tombstone)
   **** subee
   ***** subee-1  ;; tricky!
-  ***** (deadviewnode)
+  ***** (tombstone)
   ****** subee-1
-  **** (deadviewnode)
+  **** (tombstone)
   ***** also-hidden
   * subee
   ** subee-1
@@ -68,13 +68,13 @@ to subee:
 #+begin_example
   * 1
   ** (deleted)
-  *** (deadviewnode)
+  *** (tombstone)
   **** subee
   ***** subee-1
   ***** subee-2
-  ***** (deadviewnode)
+  ***** (tombstone)
   ****** subee-1
-  **** (deadviewnode)
+  **** (tombstone)
   ***** also-hidden
   * subee
   ** subee-1
@@ -528,13 +528,13 @@ expects =(skg (node ...))= structure.
 ** The notation in the prompt (resolved)
 
 The prompt uses shorthand throughout: =** (deleted)= means a
-=DeletedNode=, =*** (deadviewnode)= means =Tombstone=,
+=DeletedNode=, =*** (tombstone)= means =Tombstone=,
 =* (writeProtected) 11= means a write-protected UnrestrictedVognode, etc. None of these
 are the literal org-mode rendering.
 
 The actual rendering would be:
 - =(deleted)= → =(skg (deleted (id 11) (repo main))) 11=
-- =(deadviewnode)= → =(skg tombstone)= (no title)
+- =(tombstone)= → =(skg tombstone)= (no title)
 - =(writeProtected) 11= → =(skg (node (id 11) (repo main) writeProtected)) 11=
 
 ** Childless DeletedNode stays in tree (resolved)

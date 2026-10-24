@@ -7,7 +7,7 @@ additions still reach you, but your edits never touch the original.
 
 See also [[file:./sharing-model.org][the sharing model]] for the underlying
 relations (=subscribes=, =overrides=,
-=hidesFromSubs=) and =glossary.org= ("fork", "clone",
+=hidesFromSubs=) and =glossary.org= ("clone, and the fork operation",
 "subscribee as such", "override substitution").
 
 ** The implicit gesture: editing a foreign node
