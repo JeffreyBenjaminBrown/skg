@@ -730,7 +730,7 @@ async fn mentionerward_extension_filters_forks_per_branch_and_omits_empty_forks 
       Ok (( )) }
 
 #[test]
-fn search_enrichment_truncates_role_tree_before_restricted_container (
+fn search_enrichment_truncates_containers_folder_before_restricted_container (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
@@ -793,8 +793,14 @@ fn search_enrichment_truncates_role_tree_before_restricted_container (
         &config,
         &restriction)?;
   assert! (
-    rendered . contains ("active-container"),
-    "unrestricted ancestry should render: {}",
+    rendered . lines () . any ( |line|
+      line . starts_with ("** (skg folded containerFolder") ),
+    "the hit's containers folder hangs under it, folded: {}",
+    rendered );
+  assert! (
+    rendered . lines () . any ( |line|
+      line . starts_with ("*** ") && line . contains ("active-container") ),
+    "unrestricted ancestry should render, in the folder: {}",
     rendered );
   assert! (
     rendered . contains ("(homeRepoHerald ⌂:public)"),

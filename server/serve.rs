@@ -38,7 +38,7 @@ use crate::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use crate::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
-use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_full_containerward_role_trees_into_search_view, insert_overrideward_view_subtrees};
+use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_partner_folders_into_search_view;
 use crate::serve::handlers::text_search::{ abandon_search_enrichment, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_skgids::handle_titles_by_skgids_request_with_skgrepo_set;
 use crate::serve::handlers::diff_view::handle_diffView_request;
@@ -410,13 +410,10 @@ fn enrich_search_buffer_snapshot (
     views_state . open_views . viewnode_id_record_of (&viewforest_id);
   viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut viewforest);
   viewnode_id_record . set_owners_in_parsed_viewforest (&mut viewforest);
-  insert_full_containerward_role_trees_into_search_view (
+  insert_partner_folders_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . containerward_role_trees_by_skgid, &runtime . tantivy_index,
     &runtime . config, skgrepo_restriction );
-  insert_overrideward_view_subtrees (
-    &mut viewforest, &runtime . graph, &payload . search_results,
-    skgrepo_restriction );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (

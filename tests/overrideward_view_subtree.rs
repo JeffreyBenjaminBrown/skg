@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
 //
-// Overrideward view-subtrees + suppression in search results
-// ('docs/override.org', "Overrideward view-subtrees in search results").
+// The override folders under search hits, and suppression in search
+// results ('docs/override.org', "Override folders in search results").
 //
 // Fixture (tests/overrideward_view_subtree/fixtures): owned skgrepo
 // "main" holds U, which overrides foreign F, which overrides foreign
@@ -9,7 +9,7 @@
 // E. Ownership is by location -- "main" lives under owned/, so it is
 // owned; "foreign" is not.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -21,15 +21,15 @@ use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, suppressed_result_skgids};
 use skg::serve::handlers::text_search::render_enriched_search_buffer::{
-  collect_overrideward_view_subtree_skgids,
-  insert_overrideward_view_subtrees};
+  collect_override_folder_member_skgids,
+  insert_partner_folders_into_search_view};
 use skg::skgrepo_sets::{
   SkgrepoRestriction, SkgrepoSetName, apply_skgrepo_set_to_viewforest};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_as_members;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{Birth, Viewnode, ViewnodeKind, Vognode};
+use skg::types::viewnode::{Membership, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use skg::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -56,23 +56,25 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (&s . config) ? . load_full ();
       suppression_anchors_at_owned (
         &graph, &s . config, &restriction ) ?;
-      override_relatives_are_role_grafted_as_descendants ( &graph, &restriction ) ?;
-      end_to_end_render_shows_suppressed_role_grafts_with_heralds (
-        &graph, &s . config, &restriction ) . await ?;
+      a_hit_shows_the_nodes_it_overrides_in_a_folder (
+        &graph, &s . config, &s . tantivy, &restriction ) ?;
+      end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
+        &graph, &s . config, &s . tantivy, &restriction ) . await ?;
       Ok (( )) } )) }
 
 /// End-to-end: replay production's phase-1 + phase-2 enrichment
 /// (suppression -> pre-fetch graphStats for results + override
-/// relatives -> graft -> graphStats -> heralds -> render) and check the
-/// rendered buffer. The suppressed F and G are absent from the top
-/// level and reappear nested under U (U -> F -> G), each carrying its
-/// override birth herald -- overrides inbound from the gen-1 ancestor
-/// (the parent overrides it), birth = overrides -- which only renders
-/// because the pre-fetch now includes the override-relative ids
-/// ('collect_overrideward_view_subtree_ids').
-async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
+/// folder members -> folders -> graphStats -> heralds -> render) and
+/// check the rendered buffer. The suppressed F is absent from the top
+/// level and reappears in U's overridden folder, carrying its
+/// override heralds -- U, two levels up, overrides it -- which only
+/// render because the pre-fetch includes the folder members
+/// ('collect_override_folder_member_skgids'). G, which F overrides,
+/// is not shown: only a containers folder's members carry anything.
+async fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
+  tantivy : &TantivyIndex,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups = [
@@ -90,21 +92,22 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
     search_results, vec![ ID::from ("U") ],
     "F and G are suppressed, so only U is a top-level result" );
   // Production's pre-fetch id-set: results + ancestry (none here) +
-  // the override relatives the role graft will add.
+  // the members of the override folders.
   let all_skgids : Vec<ID> = {
     let mut skgids : HashSet<ID> =
       search_results . iter () . cloned () . collect ();
     skgids . extend (
-      collect_overrideward_view_subtree_skgids (
+      collect_override_folder_member_skgids (
         &graph, &search_results, restriction ) );
     skgids . into_iter () . collect () };
   let stats : AllGraphnodeStats =
     fetch_all_graphnodestats_with_skgrepo_set (
       &graph, &all_skgids, Some (restriction) ) ?;
-  // Phase 2: graft, then the same stats/herald/render passes as
+  // Phase 2: the folders, then the same stats/herald/render passes as
   // handle_snapshot_response.
-  insert_overrideward_view_subtrees (
-    &mut viewforest, &graph, &search_results, restriction );
+  insert_partner_folders_into_search_view (
+    &mut viewforest, &graph, &search_results, &HashMap::new (),
+    tantivy, config, restriction );
   let root_skgid : NodeId = viewforest . root () . id ();
   set_metadata_relationships_in_node_recursive (
     &mut viewforest, root_skgid, &graph, &stats, config );
@@ -125,22 +128,19 @@ async fn end_to_end_render_shows_suppressed_role_grafts_with_heralds (
       . unwrap_or (0) };
   assert_eq! ( level_of ("cooking the owned way"), 1,
     "U is the top-level result.\n{}", buffer );
-  assert_eq! ( level_of ("cooking, forked once"), 2,
-    "F (suppressed) reappears one level under U.\n{}", buffer );
-  assert_eq! ( level_of ("cooking, the original"), 3,
-    "G (suppressed) reappears one level under F.\n{}", buffer );
-
-  let herald_line = |needle : &str| -> String {
-    buffer . lines () . find ( |l| l . contains (needle) )
-      . unwrap_or ("") . to_string () };
-  for title in ["cooking, forked once", "cooking, the original"] {
-    let line : String = herald_line (title);
-    assert! ( line . contains ("(overrides (in 1 (ancestors 1))")
-              && line . contains ("(birth (overrides in 1))"),
-      "the override role graft must render its override birth herald -- its \
-       parent overrides it (overrides inbound from the gen-1 ancestor) \
-       and overrides is its birth -- proving graphStats were \
-       fetched for it: {}", line ); }
+  assert_eq! ( level_of ("(skg folded overriddenFolder"), 2,
+    "U's overridden folder hangs under it, folded.\n{}", buffer );
+  assert_eq! ( level_of ("cooking, forked once"), 3,
+    "F (suppressed) reappears in U's overridden folder.\n{}", buffer );
+  assert_eq! ( level_of ("cooking, the original"), 0,
+    "G, which F overrides, is not shown.\n{}", buffer );
+  let line : String = buffer . lines ()
+    . find ( |l| l . contains ("cooking, forked once") )
+    . unwrap_or ("") . to_string ();
+  assert! ( line . contains ("(overrides (in 1 (ancestors 2))")
+            && line . contains ("(birth (overrides in 2))"),
+    "F must render its override heralds -- U, two levels up, overrides \
+     it -- proving graphStats were fetched for it: {}", line );
   Ok (( )) }
 
 /// Only nodes recursively overridden by an owned result are
@@ -171,10 +171,14 @@ fn suppression_anchors_at_owned (
      by the foreign B) must survive at top level." );
   Ok (( )) }
 
-/// U's overriddenward chain grafts beneath it as write-protected descendants
-/// marked with the OVERRIDDEN role-graft birth: U -> F -> G.
-fn override_relatives_are_role_grafted_as_descendants (
-  graph : &InRustGraph,
+/// U overrides F, which overrides G, and nothing overrides U. So
+/// under U hangs, folded, an overridden folder whose one
+/// write-protected member is F, and no overrider folder. F holds
+/// nothing: G is not drawn under it.
+fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
+  graph       : &InRustGraph,
+  config      : &SkgConfig,
+  tantivy     : &TantivyIndex,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups =
@@ -182,24 +186,61 @@ fn override_relatives_are_role_grafted_as_descendants (
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
-  insert_overrideward_view_subtrees (
-    &mut viewforest, graph, &results, restriction );
+  insert_partner_folders_into_search_view (
+    &mut viewforest, graph, &results, &HashMap::new (),
+    tantivy, config, restriction );
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
   let u : NodeRef<Viewnode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");
+  let folders : Vec<NodeRef<Viewnode>> = u . children ()
+    . filter ( |c| matches! ( &c . value () . kind, ViewnodeKind::PartnerFolder (_) ))
+    . collect ();
+  assert_eq! ( folders . len (), 1, "only the overridden folder" );
+  assert! ( matches! ( &folders [0] . value () . kind,
+                       ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) )
+            && folders [0] . value () . org_folded,
+            "U's one folder is its overridden folder, folded" );
   let f : NodeRef<Viewnode> =
-    find_child ( u, "F" )
-    . expect ("F (the node U overrides) should be grafted under U");
-  assert! ( is_overriddenward_role_graft (f),
-    "F should carry the OVERRIDDEN role-graft birth under U" );
-  let g : NodeRef<Viewnode> =
-    find_child ( f, "G" )
-    . expect ("G (the node F overrides) should be grafted under F");
-  assert! ( is_overriddenward_role_graft (g),
-    "G should carry the OVERRIDDEN role-graft birth under F" );
-  // Nothing overrides U, so no overriderward role graft appears there.
-  assert! ( find_child (u, "G") . is_none (),
-    "G must hang under F, not directly under U" );
+    find_child ( folders [0], "F" )
+    . expect ("F (the node U overrides) is in the folder");
+  assert! ( matches! ( &f . value () . kind,
+                       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+                       if t . membership == Membership::Member
+                          && t . is_writeProtected () ),
+            "F is a write-protected member" );
+  assert! ( f . children () . next () . is_none (), "F holds nothing" );
+  a_hit_shows_the_nodes_that_override_it_in_a_folder (
+    graph, config, tantivy, restriction ) }
+
+/// B overrides E, and E overrides nothing. So under E hangs, folded,
+/// an overrider folder whose one member is B.
+fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
+  graph       : &InRustGraph,
+  config      : &SkgConfig,
+  tantivy     : &TantivyIndex,
+  restriction : &SkgrepoRestriction,
+) -> Result<(), Box<dyn Error>> {
+  let matches : MatchGroups =
+    [ hit ("E", "foreign", "exciting original") ]
+    . into_iter () . collect ();
+  let (mut viewforest, results) =
+    build_search_viewforest ( "exciting", &matches, &HashSet::new () );
+  insert_partner_folders_into_search_view (
+    &mut viewforest, graph, &results, &HashMap::new (),
+    tantivy, config, restriction );
+  let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
+  let e : NodeRef<Viewnode> =
+    find_result_root ( &tree, "E" ) . expect ("E is a result root");
+  let folders : Vec<NodeRef<Viewnode>> = e . children ()
+    . filter ( |c| matches! ( &c . value () . kind, ViewnodeKind::PartnerFolder (_) ))
+    . collect ();
+  assert_eq! ( folders . len (), 1, "only the overrider folder" );
+  assert! ( matches! ( &folders [0] . value () . kind,
+                       ViewnodeKind::PartnerFolder (PartnerFolder::Overrider) )
+            && folders [0] . value () . org_folded,
+            "E's one folder is its overrider folder, folded" );
+  assert! ( find_child ( folders [0], "B" ) . is_some (),
+            "B (which overrides E) is in the folder" );
   Ok (( )) }
 
 fn find_result_root<'a> (
@@ -222,11 +263,3 @@ fn unrestricted_skgid_is (
   matches! ( &node . value () . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       if t . skgid == ID::from (skgid) ) }
-
-fn is_overriddenward_role_graft (
-  node : NodeRef<Viewnode>,
-) -> bool {
-  matches! ( &node . value () . kind,
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if matches! ( &t . birth,
-        Birth::RoleGraft (r) if r . rolename () == "overridden" ) ) }

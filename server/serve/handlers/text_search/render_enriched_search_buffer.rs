@@ -1,3 +1,9 @@
+//! The search buffer's enrichment ('docs/api-and-formats.org',
+//! "Text search"): under each hit, folded, its containers folder, each
+//! member carrying the containerward chain, then the folder of the
+//! nodes that override it and the folder of the nodes it overrides.
+//! A folder with no member is not drawn.
+
 use crate::dbs::tantivy::title_and_skgrepo_by_skgid;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -5,16 +11,17 @@ use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::viewnode::{Birth, Owner, Viewnode, ViewnodeKind, Membership, mk_writeProtected_viewnode_with_birth};
+use crate::types::viewnode::{Birth, FolderKind, Membership, Owner, PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode_with_birth, viewnode_of};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 
-/// Insert full containerward role trees into the search viewforest,
-/// under each level-1 result UnrestrictedVognode.
-/// Role tree children are prepended (inserted first among siblings).
-pub(crate) fn insert_full_containerward_role_trees_into_search_view (
+/// Under each level-1 hit of the search viewforest that is among
+/// 'search_results', prepend, folded, its containers folder, its
+/// overrider folder and its overridden folder, in that order, each
+/// only if it has a member.
+pub fn insert_partner_folders_into_search_view (
   viewforest                        : &mut Tree<Viewnode>,
   graph                             : &InRustGraph,
   search_results                    : &[ID],
@@ -23,47 +30,124 @@ pub(crate) fn insert_full_containerward_role_trees_into_search_view (
   config                            : &SkgConfig,
   restriction                       : &SkgrepoRestriction,
 ) {
-  // Search results ("hits") are forest roots.
-  // Match them by ID from search_results.
-  let level1_skgids : Vec<(NodeId, ID)> = {
+  let hits : Vec<(NodeId, ID)> = {
     let root_ref : NodeRef<Viewnode> = viewforest . root ();
     root_ref . children ()
     . filter_map ( |c| match &c . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        if search_results . contains (&t . skgid)
         => Some (( c . id (), t . skgid . clone () )),
       _ => None } )
     . collect () };
-  for (node_treeid, skgid) in &level1_skgids {
-    if ! search_results . contains (skgid) { continue; }
-    if let Some (role_tree) = containerward_role_trees_by_skgid . get (skgid) {
-      // The role tree root is the result node itself;
-      // its children (containers) go under the level-1 node.
-      if let ContainerwardRoleTree::Inner ( _, children ) = role_tree {
-        for child in children . iter () . rev () {
-          // Insert in reverse so the first child in
-          // the role tree ends up first among siblings.
-          insert_full_containerward_role_tree (
-            child, skgid, *node_treeid,
-            viewforest, graph, tantivy_index, config, restriction ); } } } } }
+  for (hit_treeid, hit_skgid) in &hits {
+    // Prepended last-first, so that they stand in the order named.
+    for kind in [ PartnerFolder::Overridden, PartnerFolder::Overrider ] {
+      let members : Vec<(ID, SkgrepoName, String)> =
+        override_folder_members (graph, hit_skgid, kind, restriction);
+      if members . is_empty () { continue; }
+      let folder : NodeId = prepend_folded_folder (viewforest, *hit_treeid, kind);
+      for (skgid, skgrepo, title) in members {
+        viewforest . get_mut (folder) . unwrap () . append ( Viewnode {
+          owner : Owner::FolderReconciler (FolderKind::Partner (kind)),
+          .. mk_writeProtected_viewnode_with_birth (
+            skgid, skgrepo, title, Membership::Member, Birth::Unremarkable ) } ); }}
+    if let Some (ContainerwardRoleTree::Inner ( _, containers )) =
+      containerward_role_trees_by_skgid . get (hit_skgid)
+    { let folder : NodeId =
+        prepend_folded_folder (viewforest, *hit_treeid, PartnerFolder::Container);
+      for container in containers . iter () . rev () {
+        insert_containerward_tree (
+          container, hit_skgid, folder, Membership::Member,
+          viewforest, graph, tantivy_index, config, restriction ); }
+      let is_empty : bool =
+        viewforest . get (folder) . unwrap () . children () . next () . is_none ();
+      if is_empty { viewforest . get_mut (folder) . unwrap () . detach (); }} }}
 
-/// Recursively insert an ContainerwardRoleTree and its children
-/// as write-protected non-content UnrestrictedVognode children
-/// under the given parent. Role tree nodes are prepended.
-fn insert_full_containerward_role_tree(
-  node          : &ContainerwardRoleTree,
-  contained_skgid  : &ID, // the node this role-tree step contains
-  parent_treeid : NodeId,
-  viewforest        : &mut Tree<Viewnode>,
+/// Prepend a folded partner folder of 'kind' under 'parent'.
+fn prepend_folded_folder (
+  viewforest : &mut Tree<Viewnode>,
+  parent     : NodeId,
+  kind       : PartnerFolder,
+) -> NodeId {
+  viewforest . get_mut (parent) . unwrap () . prepend ( Viewnode {
+    org_folded : true,
+    owner      : Owner::ContentReconciler,
+    .. viewnode_of ( ViewnodeKind::PartnerFolder (kind) ) } ) . id () }
+
+/// The members of the hit's overrider folder (the nodes that override
+/// it) or overridden folder (the nodes it overrides): their IDs,
+/// skgrepos and titles, less those whose override relationship or own
+/// skgrepo the restriction hides.
+fn override_folder_members (
+  graph       : &InRustGraph,
+  hit         : &ID,
+  kind        : PartnerFolder,
+  restriction : &SkgrepoRestriction,
+) -> Vec<(ID, SkgrepoName, String)> {
+  override_relatives (graph, hit, kind, restriction) . into_iter ()
+    . filter_map ( |relative| graph . nodes . get (&relative)
+      . map ( |node| ( relative . clone (), node . home_skgrepo . clone (),
+                       node . title . clone () )) )
+    . collect () }
+
+/// The IDs of the hit's override relatives that a folder of 'kind'
+/// shows (see 'override_folder_members').
+fn override_relatives (
+  graph       : &InRustGraph,
+  hit         : &ID,
+  kind        : PartnerFolder,
+  restriction : &SkgrepoRestriction,
+) -> Vec<ID> {
+  let relatives : Vec<ID> = match kind {
+    PartnerFolder::Overridden =>
+      graph . outbound_pids_for_relation_gated (
+        hit, NodeRelation::Overrides, Some (restriction) ),
+    _ =>
+      graph . inbound_pids_for_relation_gated (
+        hit, NodeRelation::Overrides, Some (restriction) ), };
+  relatives . into_iter ()
+    . filter ( |relative| graph . nodes . get (relative)
+      . is_some_and ( |node| restriction . contains_skgrepo (&node . home_skgrepo) ))
+    . collect () }
+
+/// Every ID the override folders under the given results would show.
+/// The enrichment thread unions these into the graphStats pre-fetch so
+/// the folder members get their relationship heralds; without this
+/// they would render herald-less, since the folders do not exist yet
+/// when the pre-fetch runs.
+pub fn collect_override_folder_member_skgids (
   graph          : &InRustGraph,
-  tantivy_index : &TantivyIndex,
-  config        : &SkgConfig,
-  restriction   : &SkgrepoRestriction,
+  search_results : &[ID],
+  restriction    : &SkgrepoRestriction,
+) -> HashSet<ID> {
+  search_results . iter ()
+    . flat_map ( |hit|
+      [ PartnerFolder::Overrider, PartnerFolder::Overridden ] . into_iter ()
+      . flat_map ( |kind| override_relatives (graph, hit, kind, restriction) ) )
+    . collect () }
+
+/// Prepend 'node', a container of 'contained_skgid', under
+/// 'parent_treeid' as a write-protected vognode of 'membership' (a
+/// member of the containers folder, or below that a chain node), and
+/// under it, recursively, its own containers as chain nodes. A node
+/// whose containment or skgrepo the restriction hides is left out,
+/// and its branch stops.
+fn insert_containerward_tree (
+  node            : &ContainerwardRoleTree,
+  contained_skgid : &ID,
+  parent_treeid   : NodeId,
+  membership      : Membership,
+  viewforest      : &mut Tree<Viewnode>,
+  graph           : &InRustGraph,
+  tantivy_index   : &TantivyIndex,
+  config          : &SkgConfig,
+  restriction     : &SkgrepoRestriction,
 ) {
   if ! restriction . is_all () {
-    // relRepo gating ('docs/telescopes.org', "What lives where"): a private
-    // membership must not surface through enrichment role tree even
+    // relRepo gating ('docs/telescopes.org', "What lives where"): a
+    // private membership must not surface through the enrichment even
     // when both nodes are public. The relationship's recorder is the
-    // container (this role-tree step).
+    // container.
     let rel_is_visible : bool =
       graph . relRepo (
         node . skgid (), NodeRelation::Contains, contained_skgid )
@@ -73,151 +157,36 @@ fn insert_full_containerward_role_tree(
     if ! rel_is_visible { return; }}
   let child_treeid : NodeId = match
     prepend_containing_child_from_tantivy (
-      node . skgid (), parent_treeid,
+      node . skgid (), parent_treeid, membership,
       viewforest, tantivy_index, config, restriction ) {
         Some (child_treeid) => child_treeid,
         None => return, };
   if let ContainerwardRoleTree::Inner ( _, children ) = node {
-    for child in children {
-      insert_full_containerward_role_tree (
-        child, node . skgid (), child_treeid,
+    for child in children . iter () . rev () {
+      insert_containerward_tree (
+        child, node . skgid (), child_treeid, Membership::NonMember,
         viewforest, graph, tantivy_index, config, restriction ); } } }
 
-/// Which way an override role graft walks from a node, and the
-/// role-graft birth it stamps on each grafted relative.
-#[derive(Clone, Copy)]
-enum OverrideDir {
-  /// The nodes this node overrides (outbound `overrides`).
-  /// Birth OVERRIDDEN; renders herald "aO" (parent overrides child).
-  Overriddenward,
-  /// The nodes that override this node (inbound). Birth OVERRIDER;
-  /// renders herald "Oa" (child overrides parent).
-  Overriderward,
-}
-
-/// Graft each result's override relatives -- both directions -- as
-/// inverted write-protected viewdescendants, so an overridden
-/// node and the node(s) overriding it are navigable straight from the
-/// search results
-/// (the API doc's "Text search"). Each direction is
-/// its own one-directional chain hanging under the result, recursive
-/// and cycle-guarded. Reads the in-Rust graph (override relationships are
-/// direct graph-index lookups); a relative whose override relationship is
-/// relRepo-hidden, or whose own skgrepo is restricted, is skipped.
-pub fn insert_overrideward_view_subtrees (
-  viewforest     : &mut Tree<Viewnode>,
-  graph          : &InRustGraph,
-  search_results : &[ID],
-  restriction    : &SkgrepoRestriction,
-) {
-  let level1_skgids : Vec<(NodeId, ID)> = {
-    let root_ref : NodeRef<Viewnode> = viewforest . root ();
-    root_ref . children ()
-    . filter_map ( |c| match &c . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        => Some (( c . id (), t . skgid . clone () )),
-      _ => None } )
-    . collect () };
-  for (node_treeid, skgid) in &level1_skgids {
-    if ! search_results . contains (skgid) { continue; }
-    for dir in [ OverrideDir::Overriddenward,
-                 OverrideDir::Overriderward ] {
-      let mut path : HashSet<ID> =
-        HashSet::from ([ skgid . clone () ]);
-      graft_override_chain (
-        skgid, *node_treeid, dir, graph,
-        viewforest, restriction, &mut path ); }} }
-
-/// Every id that 'insert_overrideward_view_subtrees' would
-/// graft under the given results -- the override-relative closure in
-/// both directions, gated identically to the role graft. The enrichment
-/// thread unions these into the graphStats pre-fetch so the grafted
-/// nodes get their relationship heralds; without this they would render
-/// herald-less (their graphStats would never be fetched, since the
-/// role grafts do not exist yet when the pre-fetch runs). MUST stay in sync
-/// with 'graft_override_chain' (same directions, same gated accessors,
-/// same node-repo gate). Returns empty without a graph handle.
-pub fn collect_overrideward_view_subtree_skgids (
-  graph          : &InRustGraph,
-  search_results : &[ID],
-  restriction    : &SkgrepoRestriction,
-) -> HashSet<ID> {
-  let mut out : HashSet<ID> = HashSet::new ();
-  for root in search_results {
-    for dir in [ OverrideDir::Overriddenward,
-                 OverrideDir::Overriderward ] {
-      let mut seen  : HashSet<ID> = HashSet::from ([ root . clone () ]);
-      let mut stack : Vec<ID> = vec![ root . clone () ];
-      while let Some (cur) = stack . pop () {
-        let relatives : Vec<ID> = match dir {
-          OverrideDir::Overriddenward =>
-            graph . outbound_pids_for_relation_gated (
-              &cur, NodeRelation::Overrides, Some (restriction) ),
-          OverrideDir::Overriderward =>
-            graph . inbound_pids_for_relation_gated (
-              &cur, NodeRelation::Overrides, Some (restriction) ), };
-        for rel in relatives {
-          let visible : bool = graph . nodes . get (&rel)
-            . map_or ( false,
-                       |n| restriction . contains_skgrepo (&n . home_skgrepo) );
-          if ! visible { continue; }
-          out . insert ( rel . clone () );
-          if seen . insert ( rel . clone () ) {
-            stack . push ( rel ); }} }} }
-  out }
-
-/// Append, under 'parent_treeid', one write-protected non-member child per
-/// override relative of 'pid' in direction 'dir', recursing into each
-/// relative not already on the path (cycle guard: a repeated id is
-/// still shown, so the stats pass marks it 'cycle', but its branch
-/// stops).
-fn graft_override_chain (
-  pid           : &ID,
-  parent_treeid : NodeId,
-  dir           : OverrideDir,
-  graph         : &InRustGraph,
-  viewforest    : &mut Tree<Viewnode>,
-  restriction   : &SkgrepoRestriction,
-  path          : &mut HashSet<ID>,
-) {
-  let relatives : Vec<ID> = match dir {
-    OverrideDir::Overriddenward =>
-      graph . outbound_pids_for_relation_gated (
-        pid, NodeRelation::Overrides, Some (restriction) ),
-    OverrideDir::Overriderward =>
-      graph . inbound_pids_for_relation_gated (
-        pid, NodeRelation::Overrides, Some (restriction) ), };
-  let birth_role : RelationRole = match dir {
-    OverrideDir::Overriddenward => RelationRole::OVERRIDDEN,
-    OverrideDir::Overriderward  => RelationRole::OVERRIDER, };
-  for rel in relatives {
-    let Some (node) = graph . nodes . get (&rel) else { continue; };
-    if ! restriction . contains_skgrepo (&node . home_skgrepo) { continue; }
-    let child : Viewnode = mk_writeProtected_viewnode_with_birth (
-      rel . clone (), node . home_skgrepo . clone (), node . title . clone (),
-      Membership::NonMember, Birth::RoleGraft (birth_role) );
-    let child : Viewnode = Viewnode { owner : Owner::RoleTreeAttach, .. child };
-    let child_treeid : NodeId = {
-      let mut parent_mut : NodeMut<Viewnode> =
-    viewforest . get_mut (parent_treeid) . unwrap ();
-      parent_mut . append (child) . id () };
-    if path . insert (rel . clone ()) {
-      graft_override_chain (
-        &rel, child_treeid, dir, graph, viewforest, restriction, path );
-      path . remove (&rel); }} }
-
-/// Looks up a node's title and skgrepo from Tantivy,
-/// prepends a write-protected independent UnrestrictedVognode child
-/// under the given parent.
-/// Returns the new child's NodeId.
+/// Looks up a node's title and skgrepo from Tantivy, and prepends it
+/// under the given parent as a write-protected vognode: a member of a
+/// containers folder, or a chain node, a non-member born of the
+/// container role. Returns the new child's NodeId.
 fn prepend_containing_child_from_tantivy (
   skgid         : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
+  membership    : Membership,
   viewforest        : &mut Tree<Viewnode>,
   tantivy_index : &TantivyIndex,
   _config       : &SkgConfig,
   restriction   : &SkgrepoRestriction,
 ) -> Option<NodeId> {
+  let birth : Birth = match membership {
+    Membership::Member    => Birth::Unremarkable,
+    Membership::NonMember => Birth::RoleGraft (RelationRole::CONTAINER), };
+  let owner : Owner = match membership {
+    Membership::Member    => Owner::FolderReconciler (
+                               FolderKind::Partner (PartnerFolder::Container)),
+    Membership::NonMember => Owner::RoleTreeAttach, };
   let viewnode : Viewnode =
     match title_and_skgrepo_by_skgid ( tantivy_index, skgid ) {
       Some ((title, skgrepo)) => {
@@ -225,14 +194,11 @@ fn prepend_containing_child_from_tantivy (
           return None;
         } else {
           mk_writeProtected_viewnode_with_birth (
-            skgid . clone (), skgrepo, title,
-            Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER) ) }},
+            skgid . clone (), skgrepo, title, membership, birth ) }},
       None =>
         mk_writeProtected_viewnode_with_birth (
           skgid . clone (), SkgrepoName::from ("search"),
-          skgid . as_str () . to_string (),
-          Membership::NonMember, Birth::RoleGraft (RelationRole::CONTAINER) ) };
+          skgid . as_str () . to_string (), membership, birth ) };
   let mut parent_mut : NodeMut<Viewnode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
-  Some ( parent_mut . prepend (
-    Viewnode { owner : Owner::RoleTreeAttach, .. viewnode } ) . id () ) }
+  Some ( parent_mut . prepend ( Viewnode { owner, .. viewnode } ) . id () ) }

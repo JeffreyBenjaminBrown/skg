@@ -82,18 +82,13 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
 ) -> Result<String, Box<dyn std::error::Error>> {
   let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_skgid, &HashSet::new ());
-  render_enriched_search_buffer::insert_full_containerward_role_trees_into_search_view (
+  render_enriched_search_buffer::insert_partner_folders_into_search_view (
     &mut viewforest,
     graph,
     search_results,
     containerward_role_trees_by_skgid,
     tantivy_index,
     config,
-    restriction );
-  render_enriched_search_buffer::insert_overrideward_view_subtrees (
-    &mut viewforest,
-    graph,
-    search_results,
     restriction );
   set_viewnodestats_in_viewforest (
     // Mirror the production enrichment path (handle_snapshot_response):
@@ -386,16 +381,16 @@ fn spawn_enrichment_thread (
       tracing::info! ("search enrichment: cancelled after role tree");
       return; }
     let all_enriched_skgids : Vec<ID> = {
-      // Collect result IDs + every ID from role trees + every
-      // override relative the enrichment will graft (so those grafted
-      // nodes get their graphStats, hence their override heralds).
+      // Collect result IDs + every ID of their containerward trees +
+      // every member of the override folders the enrichment will draw
+      // (so those nodes get their graphStats, hence their heralds).
       let mut skgid_set : HashSet<ID> = HashSet::new ();
       for skgid in &ids_clone {
         skgid_set . insert ( skgid . clone () ); }
       for tree in containerward_role_trees_by_skgid . values () {
         collect_skgids_from_role_tree_node ( tree, &mut skgid_set ); }
       skgid_set . extend (
-        render_enriched_search_buffer::collect_overrideward_view_subtree_skgids (
+        render_enriched_search_buffer::collect_override_folder_member_skgids (
           &runtime . graph, &ids_clone, &restriction_clone ) );
       skgid_set . into_iter () . collect () };
     let graphnodestats : AllGraphnodeStats =
