@@ -1,7 +1,9 @@
 -- PURPOSE: Read the data files in 'shared/', which the server's tests
 -- and both clients read: 'herald-styles.json' (the herald styles and
--- how relationship heralds use them) and 'relations.json' (the
--- node-node relations). The Emacs analog is elisp/skg-shared.el.
+-- how relationship heralds use them), 'relations.json' (the
+-- node-node relations) and 'metadata-fields.json' (the fields a user
+-- may set on each kind of headline). The Emacs analog is
+-- elisp/skg-shared.el.
 
 local M = {}
 
@@ -20,6 +22,9 @@ end
 
 M.herald_styles = read_json('herald-styles.json')
 M.relations = read_json('relations.json').relations
+---The headline kinds in 'shared/metadata-fields.json', each with the
+---fields a user may set on it.
+M.metadata_kinds = read_json('metadata-fields.json').kinds
 
 ---The style names, sorted.
 ---@return string[]
@@ -54,6 +59,16 @@ end
 function M.relation (name)
   for _, relation in ipairs(M.relations) do
     if relation.name == name then return relation end end
+  return nil
+end
+
+---The kind in 'shared/metadata-fields.json' known by the atom ATOM, or
+---nil.
+---@param atom string
+---@return table|nil
+function M.metadata_kind (atom)
+  for _, kind in ipairs(M.metadata_kinds) do
+    if vim.tbl_contains(kind.atoms, atom) then return kind end end
   return nil
 end
 

@@ -1,8 +1,10 @@
 -- PURPOSE: Edit a headline's metadata sexp as an org tree in a
 -- temporary buffer: ':w' (or <localleader>cc) applies the edited tree
 -- back into the source headline; killing the buffer cancels;
--- S-left/S-right cycle field values. The Lua port of
--- elisp/skg-sexpr-edit.el and skg-sexpr-edit/skg-sexpr-cycling.el.
+-- S-left/S-right cycle field values, as 'shared/metadata-fields.json'
+-- says for the headline's kind (skg.sexpr.metadata_fields). The Lua
+-- port of elisp/skg-sexpr-edit.el and
+-- skg-sexpr-edit/skg-sexpr-cycling.el.
 --
 -- DEVIATION: the elisp made the display-only title group read-only
 -- with text properties; nvim has no per-range read-only text, so
@@ -18,9 +20,11 @@
 
 local bijection = require('skg.sexpr.org_bijection')
 local config = require('skg.config')
-local defaults = require('skg.sexpr.unrestrictednode_defaults')
+local fields = require('skg.sexpr.metadata_fields')
 local metadata = require('skg.metadata')
+local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 
 local M = {}
 
@@ -43,13 +47,14 @@ function M.edit_metadata ()
     M.open_empty_node_view(source_buf, line_number, split)
     return end
   local sexp = sexpr.read(split.metadata)
-  local is_unrestrictedNode = defaults.unrestrictedNode_sexp_p(sexp)
+  local kind = fields.kind_of_sexp(sexp)
   local org_text = bijection.sexp_to_org(sexp)
-  if is_unrestrictedNode then
-    org_text = defaults.fillIn_defaults_in_org(
-      org_text, nil, split.title) end
+  if kind then
+    org_text = fields.fillIn_defaults_in_org(
+      org_text, kind, nil,
+      metadata.unrestrictedNode_sexp_p(sexp) and split.title or nil) end
   M.open_edit_buffer(org_text, source_buf, line_number,
-                     #split.stars, #split.metadata, is_unrestrictedNode)
+                     #split.stars, #split.metadata, kind)
   M.goto_field_value('repo')
 end
 
@@ -67,7 +72,8 @@ function M.open_empty_node_view (source_buf, line_number, split)
   M.open_edit_buffer(
     M.empty_node_org_text(skgrepo, split.title),
     source_buf, line_number,
-    #new_split.stars, #new_split.metadata, true)
+    #new_split.stars, #new_split.metadata,
+    shared.metadata_kind('node'))
   M.goto_field_value('repo')
 end
 
@@ -87,10 +93,10 @@ function M.empty_node_org_text (skgrepo, title)
   table.insert(headlines, { level = 2, text = 'node' })
   table.insert(headlines, { level = 3, text = 'repo' })
   table.insert(headlines, { level = 4, text = skgrepo })
-  for _, entry in ipairs(defaults.editable_defaults) do
-    table.insert(headlines, { level = 3, text = entry.name })
+  for _, name in ipairs(fields.field_names(shared.metadata_kind('node'))) do
+    table.insert(headlines, { level = 3, text = name })
   end
-  return defaults.headlines_to_org(headlines)
+  return fields.headlines_to_org(headlines)
 end
 
 ---Open the edit buffer over ORG_TEXT, remembering where the metadata
@@ -100,10 +106,9 @@ end
 ---@param line_number integer
 ---@param metadata_start integer 0-based byte column
 ---@param metadata_length integer
----@param is_unrestrictedNode boolean
+---@param kind table|nil the headline's kind, from 'shared/metadata-fields.json'
 function M.open_edit_buffer (org_text, source_buf, line_number,
-                             metadata_start, metadata_length,
-                             is_unrestrictedNode)
+                             metadata_start, metadata_length, kind)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.api.nvim_buf_set_name(
     buf, 'skg://metadata-edit/' .. tostring(buf))
@@ -119,7 +124,9 @@ function M.open_edit_buffer (org_text, source_buf, line_number,
   vim.b[buf].skg_edit_line = line_number
   vim.b[buf].skg_edit_start = metadata_start
   vim.b[buf].skg_edit_length = metadata_length
-  vim.b[buf].skg_edit_is_unrestrictedNode = is_unrestrictedNode
+  -- The kind is kept by its first atom, a string, since a buffer
+  -- variable holds a copy of what it is given.
+  vim.b[buf].skg_edit_kind_atom = kind and kind.atoms[1] or nil
   vim.api.nvim_create_autocmd('BufWriteCmd', {
     buffer = buf,
     callback = function () M.apply(buf) end })
@@ -159,8 +166,10 @@ function M.apply (buf)
     error('The buffer this metadata came from is no longer open') end
   local org_text = table.concat(
     vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
-  if vim.b[buf].skg_edit_is_unrestrictedNode then
-    org_text = defaults.strip_defaults_from_org(org_text) end
+  local kind_atom = vim.b[buf].skg_edit_kind_atom
+  if kind_atom then
+    org_text = fields.strip_defaults_from_org(
+      org_text, shared.metadata_kind(kind_atom)) end
   local new_sexp = bijection.org_to_sexp(org_text)
   local new_text = sexpr.to_string(new_sexp)
   vim.bo[buf].modified = false
@@ -175,37 +184,62 @@ end
 -- ── value cycling ──────────────────────────────────────────────────
 
 ---The values to cycle through for FIELD_NAME, or nil when the field
----is not cycleable. FIELD_VALUE matters for skgrepo defaulting.
+---is not cycleable. FIELD_VALUE matters for skgrepo defaulting. Every
+---field but the skgrepo cycles as 'shared/metadata-fields.json' says
+---for the kind of the headline being edited: a value offered only to
+---an editable headline is left out when the edit buffer sets
+---writeProtected to true, and one offered only to a removed member when
+---the headline's metadata lacks '(diff (rel removed))'. The diff view's
+---restore requests are described in 'docs/diff-view.org', "Restoring
+---what a change removed". Mirrors skg-sexp-edit--cycle-values-for-field.
 ---@param field_name string
 ---@param field_value string
 ---@return string[]|nil
 function M.cycle_values_for_field (field_name, field_value)
-  if field_name == 'writeProtected' or field_name == 'nonMember' then
-    return { 'false (default)', 'true' } end
-  if field_name == 'editRequest' then
-    return M.edit_request_cycle_values() end
   if field_name == 'repo' then
     return M.repo_cycle_values(field_value) end
-  if field_name == 'viewRequests' then
-    -- Only the bare-atom requests are cycleable; (folder X) is a
-    -- structured form inserted by its dedicated commands.
-    return { 'none (default)', 'editableView', 'writeProtectedView',
-             'writeProtectedSubtreeView' } end
-  return nil
+  return fields.cycle_values(M.edit_buffer_kind(), field_name,
+                             M.editable_p(),
+                             metadata.removed_membership_p(M.source_sexp()))
 end
 
----The edit requests to cycle through for the headline being edited: a
----historical phantom takes only restoreNode, a removed membership also
----takes restoreRel ('docs/diff-view.org', "Restoring what a change
----removed"). Mirrors skg-sexp-edit--edit-request-cycle-values.
----@return string[]
-function M.edit_request_cycle_values ()
-  local source_sexp = M.source_sexp()
-  if metadata.historical_sexp_p(source_sexp) then
-    return { 'none (default)', 'restoreNode' } end
-  if metadata.removed_membership_p(source_sexp) then
-    return { 'none (default)', 'delete', 'merge', 'restoreRel' } end
-  return { 'none (default)', 'delete', 'merge' }
+---The kind of the headline the current edit buffer edits, from
+---'shared/metadata-fields.json', or nil.
+---@return table|nil
+function M.edit_buffer_kind ()
+  local kind_atom = vim.b.skg_edit_kind_atom
+  return kind_atom and shared.metadata_kind(kind_atom) or nil
+end
+
+---Is the headline being edited editable: does the current edit buffer
+---not set its writeProtected field to true?
+---@return boolean
+function M.editable_p ()
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  for i, line in ipairs(lines) do
+    local stars = line:match('^(%*+) writeProtected$')
+    if stars then
+      return lines[i + 1] ~= stars .. '* true' end
+  end
+  return true
+end
+
+---Prompt for ARGUMENT of the field value VALUE, as
+---'shared/metadata-fields.json' describes it: an id (a pasted link is
+---accepted), a skgrepo, or one of a fixed list.
+---@param value string
+---@param argument table
+---@return string|nil
+function M.read_argument (value, argument)
+  if argument.of == 'id' then
+    return vim.fn.input(value .. ': ID (or paste a link): ') end
+  if argument.of == 'skgrepo' then
+    local names = config.repo_names() or {}
+    return picker.completing_read_with_cycle(
+      value .. ': skgrepo: ', names, { cycle_values = names }) end
+  return picker.completing_read_with_cycle(
+    value .. ': ', argument.one_of,
+    { require_match = true, cycle_values = argument.one_of })
 end
 
 ---The metadata sexp the current edit buffer was opened on, as its
@@ -244,8 +278,9 @@ function M.repo_cycle_values (field_value)
 end
 
 ---Cycle the headline value at point by DIRECTION (1 or -1); dispatch
----is based on the parent headline text. Choosing 'merge' prompts for
----the target id.
+---is based on the parent headline text. Choosing a value that takes
+---arguments prompts for each. FIELD_VALUE is found among the values
+---whole, or by its first word when it carries arguments ('merge ID').
 ---@param direction integer
 function M.cycle (direction)
   if not metadata.at_headline_p() then error('Not on a headline') end
@@ -261,21 +296,31 @@ function M.cycle (direction)
     metadata.line_text(parent_line)).title)
   local values = M.cycle_values_for_field(parent, field_value)
   if values then
-    local index = 1
+    local index = nil
     for i, value in ipairs(values) do
       if value == field_value then index = i break end
     end
+    if not index then
+      local first_word = field_value:match('^(%S+)')
+      for i, value in ipairs(values) do
+        if value == first_word then index = i break end
+      end
+    end
     local new_value =
-      values[(index - 1 + direction) % #values + 1]
+      values[((index or 1) - 1 + direction) % #values + 1]
     metadata.replace_line(line,
       string.rep('*', level) .. ' ' .. new_value)
-    if new_value == 'merge' then
-      local skgid = vim.fn.input(
-        'Enter merge target ID (or paste a link): ')
-      if skgid ~= '' then
-        metadata.replace_line(line,
-          string.rep('*', level) .. ' merge ' .. skgid)
+    local arguments = fields.value_arguments(
+      M.edit_buffer_kind(), parent, new_value)
+    if arguments then
+      local texts = { new_value }
+      for _, argument in ipairs(arguments) do
+        local answer = M.read_argument(new_value, argument)
+        if not answer or vim.trim(answer) == '' then return end
+        table.insert(texts, vim.trim(answer))
       end
+      metadata.replace_line(line,
+        string.rep('*', level) .. ' ' .. table.concat(texts, ' '))
     end
   elseif parent == 'repo' then
     local answer = vim.fn.input('Repo: ', field_value)

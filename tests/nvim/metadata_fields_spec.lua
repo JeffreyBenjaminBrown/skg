@@ -1,8 +1,12 @@
--- Mirrors tests/elisp/test-skg-unrestrictedNode-defaults.el.
+-- Mirrors tests/elisp/test-skg-metadata-fields.el.
 
 local sexpr = require('skg.sexpr.parse')
 local bijection = require('skg.sexpr.org_bijection')
-local defaults = require('skg.sexpr.unrestrictednode_defaults')
+local fields = require('skg.sexpr.metadata_fields')
+local shared = require('skg.shared')
+
+---The unrestricted node's kind from 'shared/metadata-fields.json'.
+local node_kind = shared.metadata_kind('node')
 
 ---Find a headline with text TEXT among HEADLINES; returns its index.
 local function find_text (headlines, text)
@@ -15,52 +19,53 @@ end
 local function filledIn_headlines (sexp_text, default_skgrepo,
                                    display_title)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
-  local filledIn = defaults.fillIn_defaults_in_org(
-    org_text, default_skgrepo, display_title)
+  local filledIn = fields.fillIn_defaults_in_org(
+    org_text, node_kind, default_skgrepo, display_title)
   return bijection.extract_headlines(filledIn)
 end
 
 ---Fill in then strip then re-read, as the edit-buffer apply path does.
 local function round_trip (sexp_text, default_skgrepo)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
-  local filledIn = defaults.fillIn_defaults_in_org(
-    org_text, default_skgrepo)
-  local stripped = defaults.strip_defaults_from_org(filledIn)
+  local filledIn = fields.fillIn_defaults_in_org(
+    org_text, node_kind, default_skgrepo)
+  local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
   return bijection.org_to_sexp(stripped)
 end
 
 local function strip_to_sexp (org_text)
   return bijection.org_to_sexp(
-    defaults.strip_defaults_from_org(org_text))
+    fields.strip_defaults_from_org(org_text, node_kind))
 end
 
-describe('skg.sexpr.unrestrictednode_defaults.unrestrictedNode_sexp_p', function ()
-  it('recognizes an UnrestrictedVognode sexp', function ()
-    assert.is_true(defaults.unrestrictedNode_sexp_p(
-      sexpr.read('(skg (node (id abc) (repo jeff)))')))
-  end)
-
-  it('rejects a non-skg sexp', function ()
-    assert.is_false(defaults.unrestrictedNode_sexp_p(
-      sexpr.read('(foo (node (id abc)))')))
-  end)
-
-  it('rejects a skg sexp without node', function ()
-    assert.is_false(defaults.unrestrictedNode_sexp_p(
-      sexpr.read('(skg (alias (id abc)))')))
+describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
+  it('finds the kind of the first atom the table names', function ()
+    for sexp_text, kind_name in pairs({
+        ['(skg (node (id abc) (repo jeff)))'] = 'unrestricted node',
+        ['(skg focused (node (id abc)))'] = 'unrestricted node',
+        ['(skg (historical (id g) (repo r)))'] = 'historical phantom',
+        ['(skg alias (relRepo r))'] = 'alias',
+        ['(skg (flag noSearchMatching))'] = 'flag',
+        ['(skg (subscribeeFolder changed))'] = 'folder',
+        ['(skg folded tombstone)'] = 'tombstone' }) do
+      assert.are.equal(kind_name,
+        fields.kind_of_sexp(sexpr.read(sexp_text)).kind, sexp_text)
+    end
+    assert.is_nil(fields.kind_of_sexp(sexpr.read('(skg (relRepo r))')))
+    assert.is_nil(fields.kind_of_sexp(sexpr.read('(foo)')))
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults.headlines_to_org', function ()
+describe('skg.sexpr.metadata_fields.headlines_to_org', function ()
   it('converts a headline list to org text', function ()
     assert.are.equal('* skg\n** node\n*** id\n**** abc',
-      defaults.headlines_to_org({
+      fields.headlines_to_org({
         { level = 1, text = 'skg' }, { level = 2, text = 'node' },
         { level = 3, text = 'id' }, { level = 4, text = 'abc' } }))
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
+describe('skg.sexpr.metadata_fields filling in', function ()
   it('inserts all default fields into a minimal UnrestrictedVognode', function ()
     local headlines =
       filledIn_headlines('(skg (node (id abc) (repo jeff)))')
@@ -108,7 +113,7 @@ describe('skg.sexpr.unrestrictednode_defaults filling in', function ()
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
+describe('skg.sexpr.metadata_fields stripping', function ()
   it('is identity on unmodified filled-in text', function ()
     assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
       round_trip('(skg (node (id abc) (repo jeff)))'))
@@ -209,7 +214,7 @@ describe('skg.sexpr.unrestrictednode_defaults stripping', function ()
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults repo defaults', function ()
+describe('skg.sexpr.metadata_fields repo defaults', function ()
   it('marks a matching repo value with (default)', function ()
     local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo jeff)))', 'jeff')
@@ -250,15 +255,15 @@ describe('skg.sexpr.unrestrictednode_defaults repo defaults', function ()
   end)
 
   it('round-trips a new node with no repo', function ()
-    local filledIn = defaults.fillIn_defaults_in_org(
-      '* skg\n** node', 'jeff')
-    local stripped = defaults.strip_defaults_from_org(filledIn)
+    local filledIn = fields.fillIn_defaults_in_org(
+      '* skg\n** node', node_kind, 'jeff')
+    local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
     assert.are.same(sexpr.read('(skg (node (repo jeff)))'),
       bijection.org_to_sexp(stripped))
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults real-world metadata', function ()
+describe('skg.sexpr.metadata_fields real-world metadata', function ()
   it('preserves an existing repo and appends non-canonical fields',
      function ()
     local headlines = filledIn_headlines(
@@ -289,7 +294,7 @@ describe('skg.sexpr.unrestrictednode_defaults real-world metadata', function ()
   end)
 end)
 
-describe('skg.sexpr.unrestrictednode_defaults display title', function ()
+describe('skg.sexpr.metadata_fields display title', function ()
   it('prepends the title group', function ()
     local headlines = filledIn_headlines(
       '(skg (node (id abc) (repo jeff)))', nil, 'actual title')
@@ -310,10 +315,66 @@ describe('skg.sexpr.unrestrictednode_defaults display title', function ()
   it('is removed again by stripping', function ()
     local org_text = bijection.sexp_to_org(
       sexpr.read('(skg (node (id abc) (repo jeff)))'))
-    local filledIn = defaults.fillIn_defaults_in_org(
-      org_text, nil, 'actual title')
-    local stripped = defaults.strip_defaults_from_org(filledIn)
+    local filledIn = fields.fillIn_defaults_in_org(
+      org_text, node_kind, nil, 'actual title')
+    local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
     assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
       bijection.org_to_sexp(stripped))
+  end)
+end)
+
+describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', function ()
+  it('fills in and strips a top-level field beside the atom', function ()
+    local sexp = sexpr.read('(skg focused alias)')
+    local kind = fields.kind_of_sexp(sexp)
+    local filledIn = fields.fillIn_defaults_in_org(
+      bijection.sexp_to_org(sexp), kind)
+    assert.are.same(
+      { { level = 1, text = 'skg' }, { level = 2, text = 'focused' },
+        { level = 2, text = 'alias' }, { level = 2, text = 'editRequest' },
+        { level = 3, text = 'none (default)' } },
+      bijection.extract_headlines(filledIn))
+    assert.are.same(sexp, bijection.org_to_sexp(
+      fields.strip_defaults_from_org(filledIn, kind)))
+  end)
+
+  it('leaves a kind without fields alone', function ()
+    local sexp = sexpr.read('(skg (deleted (id d) (repo r)))')
+    local kind = fields.kind_of_sexp(sexp)
+    local org_text = bijection.sexp_to_org(sexp)
+    assert.are.equal(org_text,
+      fields.fillIn_defaults_in_org(org_text, kind))
+    assert.are.same(sexp, bijection.org_to_sexp(
+      fields.strip_defaults_from_org(org_text, kind)))
+  end)
+
+  it('writes values with arguments as lists', function ()
+    assert.are.same(
+      sexpr.read('(skg (node (id abc) (editRequest (relRepo r))'
+                 .. ' (viewRequests editableView (folder containers))))'),
+      strip_to_sexp(table.concat({
+        '* skg', '** node', '*** id', '**** abc',
+        '*** editRequest', '**** relRepo r',
+        '*** viewRequests', '**** editableView', '**** none (default)',
+        '**** folder containers' }, '\n')))
+    assert.are.same(sexpr.read('(skg (node (editRequest (merge x))))'),
+      strip_to_sexp('* skg\n** node\n*** editRequest\n'
+                    .. '**** merge [[id:x][a title]]'))
+    assert.are.same(
+      sexpr.read('(skg (node (editRequest (flag noSearchMatching false))))'),
+      strip_to_sexp('* skg\n** node\n*** editRequest\n'
+                    .. '**** flag noSearchMatching false'))
+  end)
+
+  it('honors the conditions on values', function ()
+    assert.are.same({ 'none (default)', 'relRepo' },
+      fields.cycle_values(node_kind, 'editRequest', false, false))
+    assert.are.same(
+      { 'none (default)', 'delete', 'merge', 'relRepo', 'flag',
+        'restoreRel' },
+      fields.cycle_values(node_kind, 'editRequest', true, true))
+    assert.are.same({ 'false (default)', 'true' },
+      fields.cycle_values(node_kind, 'writeProtected', false, false))
+    assert.is_nil(fields.cycle_values(node_kind, 'repo', true, false))
   end)
 end)

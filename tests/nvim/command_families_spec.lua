@@ -4,7 +4,7 @@
 -- apply/cycle round trips (test-skg-insert-heading.el's empty-node
 -- view cases and test-skg-metadata-editing.el's spirit).
 
-local defaults = require('skg.sexpr.unrestrictednode_defaults')
+local fields = require('skg.sexpr.metadata_fields')
 local metadata = require('skg.metadata')
 local metadata_edit = require('skg.metadata_edit')
 local modify_graph = require('skg.modify_graph')
@@ -297,6 +297,7 @@ describe('skg.metadata_edit', function ()
       metadata_edit.help_text, '',
       '* skg', '** node', '*** nonMember',
       '**** false (default)' }, '\n'))
+    vim.b.skg_edit_kind_atom = 'node' -- as the editor sets it
     vim.api.nvim_win_set_cursor(0, { 6, 0 })
     metadata_edit.cycle(1)
     assert.are.equal('**** true', metadata.line_text(6))

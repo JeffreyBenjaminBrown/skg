@@ -366,23 +366,123 @@ describe('skg.metadata commands', function ()
     end
   end)
 
-  it('the metadata editor offers the restore requests where they apply',
-     function ()
+  ---Open the metadata editor on HEADLINE, the only line of a buffer,
+  ---and call BODY(source_buf) in the edit buffer; delete both after.
+  local function with_metadata_editor_on (headline, body)
     local metadata_edit = require('skg.metadata_edit')
-    for _, case in ipairs({
-      { '* (skg (historical (id g) (repo main) (diff (node removed)))) g',
-        { 'none (default)', 'restoreNode' } },
-      { '* (skg (node (id x) (repo main) nonMember'
-          .. ' (diff (rel removed)))) x',
-        { 'none (default)', 'delete', 'merge', 'restoreRel' } },
-      { '* (skg (node (id x) (repo main))) x',
-        { 'none (default)', 'delete', 'merge' } } }) do
-      buffer_with(case[1])
-      metadata_edit.edit_metadata()
-      assert.are.same(case[2],
-        metadata_edit.cycle_values_for_field('editRequest', 'none (default)'))
-      vim.api.nvim_buf_delete(0, { force = true })
+    local source = buffer_with(headline)
+    metadata_edit.edit_metadata()
+    local ok, err = pcall(body, source)
+    if vim.api.nvim_get_current_buf() ~= source then
+      vim.api.nvim_buf_delete(0, { force = true }) end
+    vim.api.nvim_buf_delete(source, { force = true })
+    if not ok then error(err, 0) end
+  end
+
+  ---Put the cursor on the value headline under FIELD in the edit buffer.
+  local function goto_value_of (field)
+    for line = 1, vim.api.nvim_buf_line_count(0) do
+      if metadata.line_text(line):match('^%*+ ' .. field .. '$') then
+        vim.api.nvim_win_set_cursor(0, { line + 1, 0 })
+        return true end
     end
+    return false
+  end
+
+  it('the metadata editor offers each kind its fields', function ()
+    -- Mirrors test-skg-metadata-editor-offers-each-kind-its-fields.
+    local metadata_edit = require('skg.metadata_edit')
+    local view_requests = { 'none (default)', 'editableView',
+                            'writeProtectedView', 'writeProtectedSubtreeView',
+                            'fork', 'flags', 'folder' }
+    local atom_values = { 'false (default)', 'true' }
+    for _, case in ipairs({
+      { '* (skg (node (id x) (repo main))) x',
+        { writeProtected = atom_values, nonMember = atom_values,
+          editRequest = { 'none (default)', 'delete', 'merge',
+                          'relRepo', 'flag' },
+          viewRequests = view_requests } },
+      { '* (skg (node (id x) (repo main) writeProtected)) x',
+        { editRequest = { 'none (default)', 'relRepo' } } },
+      { '* (skg (node (id x) (repo main) nonMember (diff (rel removed)))) x',
+        { editRequest = { 'none (default)', 'delete', 'merge',
+                          'relRepo', 'flag', 'restoreRel' } } },
+      { '* (skg (historical (id g) (repo main) (diff (node removed)))) g',
+        { editRequest = { 'none (default)', 'restoreNode' } } },
+      { '* (skg (unknown (id u)))',
+        { editRequest = { 'none (default)', 'relRepo' } } },
+      { '* (skg alias) an alias',
+        { editRequest = { 'none (default)', 'relRepo' } } },
+      { '* (skg (deleted (id d) (repo main))) d', {} },
+      { '* (skg subscribeeFolder)', {} },
+      { '* (skg (flag noSearchMatching)) no search matching', {} } }) do
+      with_metadata_editor_on(case[1], function (source)
+        for field, values in pairs(case[2]) do
+          assert.is_true(goto_value_of(field), case[1] .. ' ' .. field)
+          local value = vim.trim(metadata.line_text(
+            metadata.current_line_number()):gsub('^%*+', ''))
+          assert.are.same(values,
+            metadata_edit.cycle_values_for_field(field, value),
+            case[1] .. ' ' .. field)
+        end
+        if next(case[2]) == nil then
+          for _, field in ipairs({ 'editRequest', 'viewRequests',
+                                   'writeProtected', 'nonMember' }) do
+            assert.is_false(goto_value_of(field), case[1] .. ' ' .. field)
+          end
+        end
+        metadata_edit.apply(vim.api.nvim_get_current_buf())
+        assert.are.equal(case[1], vim.api.nvim_buf_get_lines(
+          source, 0, 1, false)[1])
+      end)
+    end
+  end)
+
+  it('the metadata editor cycles to and saves values with arguments',
+     function ()
+    -- Mirrors test-skg-metadata-editor-cycles-and-saves-values-with-arguments.
+    local metadata_edit = require('skg.metadata_edit')
+    local config = require('skg.config')
+    local real_picker = picker.completing_read_with_cycle
+    local real_repo_names = config.repo_names
+    local real_input = vim.fn.input
+    local ok, err = pcall(function ()
+      for _, case in ipairs({
+        { '* (skg alias) an alias', 'editRequest', 1,
+          '* (skg alias (editRequest (relRepo r))) an alias' },
+        { '* (skg (unknown (id u)))', 'editRequest', 1,
+          '* (skg (unknown (id u) (editRequest (relRepo r))))' },
+        { '* (skg (historical (id g) (repo main))) g', 'editRequest', 1,
+          '* (skg (historical (id g) (repo main) (editRequest restoreNode))) g' },
+        { '* (skg (node (id x) (repo main))) x', 'viewRequests', 6,
+          '* (skg (node (id x) (repo main) (viewRequests (folder containers)))) x' },
+        { '* (skg (node (id x) (repo main))) x', 'editRequest', 4,
+          '* (skg (node (id x) (repo main) (editRequest (flag noSearchMatching true)))) x' } }) do
+        local answers = { 'containers', 'noSearchMatching', 'true' }
+        config.repo_names = function () return { 'r', 'main' } end
+        vim.fn.input = function () return '[[id:m][a target]]' end
+        picker.completing_read_with_cycle = function (_prompt, choices)
+          if vim.tbl_contains(choices, 'r') then return 'r' end
+          for i, answer in ipairs(answers) do
+            if vim.tbl_contains(choices, answer) then
+              table.remove(answers, i)
+              return answer end
+          end
+          return nil
+        end
+        with_metadata_editor_on(case[1], function (source)
+          assert.is_true(goto_value_of(case[2]))
+          for _ = 1, case[3] do metadata_edit.cycle(1) end
+          metadata_edit.apply(vim.api.nvim_get_current_buf())
+          assert.are.equal(case[4], vim.api.nvim_buf_get_lines(
+            source, 0, 1, false)[1])
+        end)
+      end
+    end)
+    picker.completing_read_with_cycle = real_picker
+    config.repo_names = real_repo_names
+    vim.fn.input = real_input
+    if not ok then error(err, 0) end
   end)
 
   it('beginning_of_line toggles between title and column zero',

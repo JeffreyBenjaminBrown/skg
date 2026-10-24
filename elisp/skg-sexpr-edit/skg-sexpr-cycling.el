@@ -16,6 +16,7 @@
 (require 'skg-state)
 
 ;; Buffer-local in the edit buffer; defined in skg-sexpr-edit.el.
+(defvar skg-sexp-edit--kind)
 (defvar skg-sexp-edit--source-buffer)
 (defvar skg-sexp-edit--start)
 (defvar skg-sexp-edit--end)
@@ -61,12 +62,11 @@ requests are described in 'docs/diff-view.org', \"Restoring what a
 change removed\". Returns nil if the field is not cycleable."
   (if (string= field-name "repo") ;; from the config
       (skg-sexp-edit--repo-cycle-values field-value)
-    (let ((source-sexp (skg-sexp-edit--source-sexp)))
-      (skg-metadata-fields-cycle-values
-       (skg-metadata-fields-kind-of-sexp source-sexp)
-       field-name
-       (skg-sexp-edit--editable-p)
-       (skg--removed-membership-p source-sexp)))))
+    (skg-metadata-fields-cycle-values
+     skg-sexp-edit--kind
+     field-name
+     (skg-sexp-edit--editable-p)
+     (skg--removed-membership-p (skg-sexp-edit--source-sexp)))))
 
 (defun skg-sexp-edit--editable-p ()
   "Whether the headline being edited is editable: the edit buffer does
@@ -138,9 +138,7 @@ Dispatch is based on the parent headline text."
         (let* ((new-val (skg-sexp-edit--cycle-through
                          field-value values direction))
                (arguments (skg-metadata-fields-value-arguments
-                           (skg-metadata-fields-kind-of-sexp
-                            (skg-sexp-edit--source-sexp))
-                           parent new-val)))
+                           skg-sexp-edit--kind parent new-val)))
           (org-edit-headline new-val)
           (when arguments
             (org-edit-headline
