@@ -89,8 +89,8 @@ After saving that, the other buffer should now read:
 
 And finally, we re-save the first buffer with a new node
 (new-root) inserted as a sibling of subee under the
-deadViewnode. This exercises the round-trip: Deleted and
-DeadViewnode nodes are parsed back from text, pass through
+tombstone. This exercises the round-trip: Deleted and
+Tombstone nodes are parsed back from text, pass through
 completion, and render unchanged. The new node gets a UUID.
 
 #+begin_example

@@ -72,7 +72,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       // The one rule ('docs/glossary.org'): a HiddenInSubscribeeFolder child
       // that becomes stale (e.g. the user moved it into the subscribee-as-such,
       // 'unhiding' it) is converted: a leaf -- the common case for hidden
-      // members -- to a dead viewnode the prune removes, one holding a subtree
+      // members -- to a tombstone the prune removes, one holding a subtree
       // retained as non-member.
       tree, node, kind,
       &goal_items, &child_data, &runtime . graph,

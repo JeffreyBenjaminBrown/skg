@@ -41,7 +41,7 @@ pub enum MpViewnodeKind {
   Property         (Property),
   PartnerFolder   (PartnerFolder),
   BufferRoot,
-  DeadViewnode,
+  Tombstone,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,8 +109,8 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
         Ok (ViewnodeKind::PartnerFolder (r)),
       MpViewnodeKind::BufferRoot =>
         Ok (ViewnodeKind::BufferRoot),
-      MpViewnodeKind::DeadViewnode =>
-        Ok (ViewnodeKind::DeadViewnode), }}
+      MpViewnodeKind::Tombstone =>
+        Ok (ViewnodeKind::Tombstone), }}
 }
 
 impl TryFrom<MpViewnode> for Viewnode {
@@ -173,8 +173,8 @@ impl From<ViewnodeKind> for MpViewnodeKind {
         MpViewnodeKind::PartnerFolder (r),
       ViewnodeKind::BufferRoot =>
         MpViewnodeKind::BufferRoot,
-      ViewnodeKind::DeadViewnode =>
-        MpViewnodeKind::DeadViewnode, }}
+      ViewnodeKind::Tombstone =>
+        MpViewnodeKind::Tombstone, }}
 }
 
 impl From<Viewnode> for MpViewnode {
@@ -299,7 +299,7 @@ impl MpViewnode {
       MpViewnodeKind::PropertyFolder (folder) => folder . title (),
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
-        | MpViewnodeKind::DeadViewnode
+        | MpViewnodeKind::Tombstone
         | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         "", }}
@@ -335,8 +335,8 @@ impl MpViewnode {
         format!("deleted:{}", d . skgid . 0),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
         format!("historical:{}", h . skgid . 0),
-      MpViewnodeKind::DeadViewnode =>
-        "deadViewnode" . to_string (),
+      MpViewnodeKind::Tombstone =>
+        "tombstone" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
         "restricted" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
@@ -355,7 +355,7 @@ impl MpViewnode {
       MpViewnodeKind::Property (property) => property . body (),
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
-        | MpViewnodeKind::DeadViewnode
+        | MpViewnodeKind::Tombstone
         | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         None, }}
@@ -378,7 +378,7 @@ impl MpViewnode {
         | MpViewnodeKind::Property (_)
         | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
-        | MpViewnodeKind::DeadViewnode =>
+        | MpViewnodeKind::Tombstone =>
         None, }}
 
   pub fn is_unrestricted (&self) -> bool {

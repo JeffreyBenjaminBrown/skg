@@ -75,7 +75,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // The one rule ('docs/glossary.org'): a stale member of this folder
-      // is converted, a leaf (the common case) to a dead viewnode the prune
+      // is converted, a leaf (the common case) to a tombstone the prune
       // removes, one holding a subtree retained as non-member.
       tree, node, kind,
       &goal_items, &child_data, &runtime . graph,

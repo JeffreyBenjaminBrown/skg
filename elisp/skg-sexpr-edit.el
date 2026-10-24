@@ -252,7 +252,7 @@ inheritance, as the server's walk rootward decides
 phantoms and folders, and through headlines without metadata, which
 inherit the same way; the first other ancestor must be an
 unrestricted vognode.  A root cannot inherit, nor can a headline whose
-walk ends at a restricted vognode, a dead viewnode or a property."
+walk ends at a restricted vognode, a tombstone or a property."
   (save-excursion
     (catch 'answer
       (while (org-up-heading-safe)

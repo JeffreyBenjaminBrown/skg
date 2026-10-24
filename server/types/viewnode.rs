@@ -117,7 +117,7 @@ pub struct Viewnode {
   pub kind            : ViewnodeKind,
   /// The diff view's display facts. Empty on a kind that never
   /// carries a change (a folder, a restricted vognode, the buffer
-  /// root, a dead viewnode, 'BodyDiff'), and outside the diff view.
+  /// root, a tombstone, 'BodyDiff'), and outside the diff view.
   pub change_facts      : ChangeFacts,
   /// Save intent, like 'relRepo_request', but allowed on a
   /// write-protected occurrence, and beside an edit request.
@@ -145,7 +145,7 @@ pub enum ViewnodeKind {
   Property          (Property),
   PartnerFolder    (PartnerFolder),
   BufferRoot,
-  DeadViewnode,
+  Tombstone,
 }
 
 /// A viewnode that represents a graphnode, which need not exist: Unrestricted
@@ -221,7 +221,7 @@ pub struct PhantomDeleted {
 /// no fieldIntents, though its descendants still might, so extraction recurses
 /// through it). If it is still a member of its parent's contains it is retained
 /// (a present-but-unresolvable reference); if it is no longer a member it
-/// converts to a DeadViewnode (`convert_nonmember_unknown_children_to_dead`) and
+/// converts to a tombstone (`convert_nonmember_unknown_children_to_tombstones`) and
 /// is pruned.
 ///
 /// DISTINCT INFO: it carries only the `id`. Unlike PhantomDeleted it has no skgrepo
@@ -515,7 +515,7 @@ pub enum PartnerFolder {
 ///
 /// Every policy obeys the one rule (the glossary's "the one rule:
 /// convert, then prune"): during reconciliation a stale member is
-/// converted, a leaf to a dead viewnode the prune removes, one with
+/// converted, a leaf to a tombstone the prune removes, one with
 /// children retained as non-member (nonMember), keeping its
 /// editability.
 /// The policies differ in:
@@ -1037,7 +1037,7 @@ impl Viewnode {
       ViewnodeKind::PropertyFolder (folder) => folder . title (),
       ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
-        | ViewnodeKind::DeadViewnode
+        | ViewnodeKind::Tombstone
         | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
         "",
@@ -1059,7 +1059,7 @@ impl Viewnode {
         | ViewnodeKind::Vognode (Vognode::Restricted (_))
         | ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
-        | ViewnodeKind::DeadViewnode => None,
+        | ViewnodeKind::Tombstone => None,
     }}
 
   pub fn is_unrestrictedVognode_and_member (&self) -> bool {

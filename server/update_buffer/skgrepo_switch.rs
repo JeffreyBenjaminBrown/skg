@@ -4,12 +4,12 @@
 /// RestrictedVognode, and every deleted or unknown phantom whose
 /// relationship or node a now-restricted skgrepo records (a deleted
 /// phantom's home skgrepo; an unknown phantom's relRepo, or, when it
-/// has none, its recorder's home) into a dead viewnode, then prune (DFS
+/// has none, its recorder's home) into a tombstone, then prune (DFS
 /// postorder, so emptied parents prune in the same sweep) the leaves
 /// the restriction hides, and only those:
 /// - RestrictedVognode leaf;
 /// - Property leaf whose owning vognode (grandparent) is restricted;
-/// - DeadViewnode leaf;
+/// - Tombstone leaf;
 /// - PropertyFolder or PartnerFolder emptied by this prune (one that
 ///   was empty before it stays).
 /// Everything else stays as it was, with its viewnode ID: folders and
@@ -59,8 +59,8 @@ fn convert_now_restricted_vognodes (
       tree . get_mut (skgid) . unwrap () . value () . replace_kind (kind); }}}
 
 /// A phantom shows its node's ID, and a deleted one its last title and
-/// body, so one that a now-restricted skgrepo records becomes a dead
-/// viewnode: the prune below removes it if it is a leaf, and otherwise
+/// body, so one that a now-restricted skgrepo records becomes a tombstone:
+/// the prune below removes it if it is a leaf, and otherwise
 /// it stays, titleless, holding what is under it.
 fn convert_now_restricted_phantoms (
   tree        : &mut Tree<Viewnode>,
@@ -81,7 +81,7 @@ fn convert_now_restricted_phantoms (
     . collect ();
   for phantom in phantoms {
     tree . get_mut (phantom) . unwrap () . value ()
-      . replace_kind (ViewnodeKind::DeadViewnode); }}
+      . replace_kind (ViewnodeKind::Tombstone); }}
 
 /// The home skgrepo of the unrestricted vognode that records the
 /// relationship an unknown phantom without a relRepo stands in: its
@@ -161,7 +161,7 @@ fn should_prune (
       | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
       | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       is_leaf && had_children, // emptied: its children were pruned first
-    ViewnodeKind::DeadViewnode =>
+    ViewnodeKind::Tombstone =>
       is_leaf,
     ViewnodeKind::Vognode (Vognode::Unrestricted (_))
       | ViewnodeKind::Vognode (Vognode::Phantom (_))

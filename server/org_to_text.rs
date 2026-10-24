@@ -248,8 +248,8 @@ fn viewnode_to_string_without_viewnode_id (
         folder_facts )),
     ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
-    ViewnodeKind::DeadViewnode =>
-      Ok ( dead_viewnode_metadata_to_string (
+    ViewnodeKind::Tombstone =>
+      Ok ( tombstone_metadata_to_string (
         viewnode . focused, viewnode . org_folded,
         viewnode . org_body_folded )),
     ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
@@ -608,9 +608,9 @@ fn restricted_node_metadata_to_string (
   parts . push ( "restrictedNode" . to_string () );
   parts . join (" ") }
 
-/// Render metadata for a DeadViewnode:
-///   (skg [focused] [folded] deadViewnode)
-fn dead_viewnode_metadata_to_string (
+/// Render metadata for a tombstone:
+///   (skg [focused] [folded] tombstone)
+fn tombstone_metadata_to_string (
   focused         : bool,
   org_folded      : bool,
   org_body_folded : bool,
@@ -619,7 +619,7 @@ fn dead_viewnode_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if org_folded  { parts . push ( "folded"     . to_string () ); }
   if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( "deadViewnode" . to_string () );
+  parts . push ( "tombstone" . to_string () );
   parts . join (" ") }
 
 fn org_bullet ( level: usize ) -> String {

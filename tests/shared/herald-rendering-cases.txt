@@ -210,8 +210,8 @@
 (skg (deleted (id gone) (repo main)))
 ---- text: DELETED
 ---- styles: message*7
-==== placeholders: dead viewnode
-(skg deadViewnode)
+==== placeholders: tombstone
+(skg tombstone)
 ---- text: DELETED
 ---- styles: message*7
 ==== node: write-protected with a hidden body

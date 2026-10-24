@@ -40,7 +40,7 @@ fn a_note_under_a_changed_folders_member_survives (
 
 /// A note under a historical phantom survives beside its old content,
 /// and survives the phantom going stale: once stage-and-commit makes
-/// the deletion part of HEAD, the phantom is deadened, holding the
+/// the deletion part of HEAD, the phantom is entombstoned, holding the
 /// note but not its old content.
 #[test]
 fn a_note_under_a_historical_phantom_survives (
@@ -58,7 +58,7 @@ fn a_note_under_a_historical_phantom_survives (
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
     let committed : String = rerendered_view_content (&response);
-    assert_eq! ( parent_line_of (&committed, "a note under h"), "** (skg deadViewnode)",
+    assert_eq! ( parent_line_of (&committed, "a note under h"), "** (skg tombstone)",
                  "{}", committed );
     assert! ( ! without_viewnode_ids (&committed) . contains (old_member), "{}", committed );
     Ok (( )) }) }

@@ -35,7 +35,7 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
 // non-member, keeping its title, ID and editability, its facts
 // cleared; a write-protected one's members become non-members, an
 // editable one's stay members. A vognode leaf and every non-vognode
-// become dead viewnodes, a leaf to be pruned, one holding children to
+// become tombstones, a leaf to be pruned, one holding children to
 // stay.
 #[test]
 fn an_unwarranted_child_is_converted_never_detached () {
@@ -71,13 +71,13 @@ fn an_unwarranted_child_is_converted_never_detached () {
                Conversion::Parked );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, vognode_leaf, true, Unwarranted::Stale ) . unwrap (),
-               Conversion::DeadLeaf );
+               Conversion::ChildlessTombstone );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, folder, false, Unwarranted::Stale ) . unwrap (),
                Conversion::Parked );
   assert_eq! ( convert_unwarranted_child (
                  &mut t, childless, true, Unwarranted::Stale ) . unwrap (),
-               Conversion::DeadLeaf );
+               Conversion::ChildlessTombstone );
   let retained : &Viewnode = t . get (branch) . unwrap () . value ();
   let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &retained . kind
     else { panic! ("the branch stays an unrestricted vognode") };
@@ -96,7 +96,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
     "an editable retained copy keeps its members" );
   for dead in [vognode_leaf, folder, childless] {
     assert_eq! ( t . get (dead) . unwrap () . value () . kind,
-                 ViewnodeKind::DeadViewnode ); }
+                 ViewnodeKind::Tombstone ); }
   assert_eq! ( t . root () . children () . count (), 5,
     "nothing is detached" ); }
 
@@ -160,7 +160,7 @@ fn complete_letters (
       let mut node : NodeMut<String> = t . get_mut (child) . unwrap ();
       let lowered : String = node . value () . to_lowercase ();
       *node . value () = lowered;
-      Ok (Conversion::DeadLeaf) } ) . unwrap ();
+      Ok (Conversion::ChildlessTombstone) } ) . unwrap ();
   t . root () . children () . map ( |c| c . value () . clone () ) . collect () }
 
 // Unmoved, every kept child stays where it stands, the user's notes

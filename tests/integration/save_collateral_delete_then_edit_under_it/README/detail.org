@@ -95,16 +95,16 @@ After saving that, the other buffer should now read:
 This integration test exercises:
 1. Node deletion via =(editRequest delete)=: a save from one buffer
    deletes a =.skg= file, and the collateral buffer degrades the
-   node to =DeletedNode= with non-vognodes becoming =DeadViewnode=.
+   node to =DeletedNode= with non-vognodes becoming =Tombstone=.
 2. Editing under a =DeletedNode=: a subsequent save from the
    collateral buffer adds a new child node, and the other buffer
    picks up the change.
-3. Re-saving a buffer containing =Deleted= / =DeadViewnode= nodes:
+3. Re-saving a buffer containing =Deleted= / =Tombstone= nodes:
    they round-trip through parse → completion → render unchanged,
-   and a new node created under a =DeadViewnode= gets a UUID.
+   and a new node created under a =Tombstone= gets a UUID.
 
 All existing collateral tests deal only with containment changes.
-This is the first to exercise the =DeletedNode= / =DeadViewnode=
+This is the first to exercise the =DeletedNode= / =Tombstone=
 degradation path in =complete_viewtree=.
 
 * Fixtures
@@ -262,13 +262,13 @@ Line 1 metadata should contain =(deleted (id 11) ...)=.
 
 Node 11 degrades to =DeletedNode=. Its non-vognodes
 (subscribeeFolder, hiddenInSubscribeeFolder,
-hiddenOutsideOfSubscribeeFolder) become =DeadViewnode=. The
-aliasFolder also becomes =DeadViewnode=; its leaf child
-(the =alias= non-vognode) becomes a childless =DeadViewnode=
+hiddenOutsideOfSubscribeeFolder) become =Tombstone=. The
+aliasFolder also becomes =Tombstone=; its leaf child
+(the =alias= non-vognode) becomes a childless =Tombstone=
 which the postorder pass detaches. So aliasFolder and its
 alias disappear entirely.
 
-subee is an UnrestrictedVognode under the (now =DeadViewnode=)
+subee is an UnrestrictedVognode under the (now =Tombstone=)
 subscribeeFolder. =complete_viewtree= completes it normally,
 adding subee-1 as a real child. This is the "tricky" line.
 
@@ -276,25 +276,25 @@ Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
- (3 . "")             ;; DeadViewnode (was subscribeeFolder)
+ (3 . "")             ;; Tombstone (was subscribeeFolder)
  (4 . "subee")        ;; UnrestrictedVognode, completed
  (5 . "subee-1")      ;; child from completion
- (5 . "")             ;; DeadViewnode (was hiddenInSubscribeeFolder)
+ (5 . "")             ;; Tombstone (was hiddenInSubscribeeFolder)
  (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; DeadViewnode (was hiddenOutsideOfSubscribeeFolder)
+ (4 . "")             ;; Tombstone (was hiddenOutsideOfSubscribeeFolder)
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unaffected
  (2 . "subee-1"))     ;; its child
 #+end_example
 
 Note: Childless DeletedNode stays in the tree (the postorder
-handler is a no-op for Deleted; only childless DeadViewnode
-is detached). The aliasFolder becomes DeadViewnode;
+handler is a no-op for Deleted; only childless Tombstone
+is detached). The aliasFolder becomes Tombstone;
 its leaf child (the =alias= non-vognode) also becomes childless
-DeadViewnode and IS detached. So aliasFolder and its alias
+Tombstone and IS detached. So aliasFolder and its alias
 disappear entirely.
 
-DeadViewnode has no title (renders as empty). The assertion
+Tombstone has no title (renders as empty). The assertion
 should check for the presence of the right number of
 empty-titled headlines at the right depths, and the UnrestrictedVognode
 titles at the right depths.
@@ -307,7 +307,7 @@ Edit buffer 1 (the one with deleted structure):
 - Insert =****** subee-2= (a bare headline with no metadata)
 - Save
 
-Deleted and DeadViewnode nodes are save-inert (generate no save
+Deleted and Tombstone nodes are save-inert (generate no save
 instructions). The save pipeline creates a new node for subee-2
 and updates subee's =contains= to include it.
 
@@ -322,13 +322,13 @@ Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode, still present
- (3 . "")             ;; DeadViewnode
+ (3 . "")             ;; Tombstone
  (4 . "subee")        ;; UnrestrictedVognode, completed
  (5 . "subee-1")      ;; existing child
  (5 . "subee-2")      ;; new child (now has UUID + metadata)
- (5 . "")             ;; DeadViewnode
+ (5 . "")             ;; Tombstone
  (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; DeadViewnode
+ (4 . "")             ;; Tombstone
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, completed
  (2 . "subee-1")
@@ -351,19 +351,19 @@ Expected headline-titles:
  (2 . "subee-2"))     ;; new child from collateral update
 #+end_example
 
-* Phase 5: Add new-root under deadViewnode in buffer 1
+* Phase 5: Add new-root under tombstone in buffer 1
 
 Insert =new-root= as a sibling of =subee= under the depth-3
-=DeadViewnode= (formerly =subscribeeFolder=) in buffer 1. Repo
+=Tombstone= (formerly =subscribeeFolder=) in buffer 1. Repo
 metadata must be supplied explicitly (=(repo main)=) because
-=DeadViewnode= has no repo to inherit from.
+=Tombstone= has no repo to inherit from.
 
 This exercises:
-- =Deleted= / =DeadViewnode= round-tripping through the save
+- =Deleted= / =Tombstone= round-tripping through the save
   pipeline (parse → completion → render) without disruption.
-- Creating a new node under a =DeadViewnode=: the node gets a
+- Creating a new node under a =Tombstone=: the node gets a
   UUID and is saved to disk, but no parent claims it in its
-  =contains= (the =DeadViewnode= generates no save instructions).
+  =contains= (the =Tombstone= generates no save instructions).
 
 ** Expected buffer 1 after save
 
@@ -373,10 +373,10 @@ Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
- (3 . "")             ;; DeadViewnode
+ (3 . "")             ;; Tombstone
  (4 . "subee")        ;; UnrestrictedVognode (writeProtected)
  (4 . "new-root")     ;; new UnrestrictedVognode (now has UUID)
- (4 . "")             ;; DeadViewnode
+ (4 . "")             ;; Tombstone
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unchanged
  (2 . "subee-1")
@@ -467,8 +467,8 @@ with =skg-split-as-stars-metadata-title= and check the
 metadata sexp itself — e.g., that it contains =(deleted ...)=
 rather than =(node ...)=.
 
-For =DeadViewnode= lines, check that metadata contains
-=deadViewnode=.
+For =Tombstone= lines, check that metadata contains
+=tombstone=.
 
 * Reusable tools
 
@@ -504,37 +504,37 @@ saving to register. The two-root structure is needed so that
 the standalone subee root reflects collateral updates (e.g.,
 gains subee-2 after phase 4's save).
 
-** DeadViewnode title rendering
+** Tombstone title rendering
 
-=DeadViewnode= nodes render via =deleted_scaff_metadata_to_string=
-(=server/org_to_text.rs=) which produces =(skg deadViewnode)=
+=Tombstone= nodes render via =deleted_scaff_metadata_to_string=
+(=server/org_to_text.rs=) which produces =(skg tombstone)=
 with NO title. The non-vognodes they replaced (subscribeeFolder, etc.)
 had titles like "it subscribes to these". After degradation,
-=deadViewnode= is an opaque tombstone — it renders as:
+=tombstone= is an opaque tombstone — it renders as:
 
 #+begin_example
-  *** (skg deadViewnode)
+  *** (skg tombstone)
 #+end_example
 
 This means =skg-split-as-stars-metadata-title= will return an
-empty title for =DeadViewnode= lines. The assertion strategy
+empty title for =Tombstone= lines. The assertion strategy
 needs to account for this: check depths and the count of
 empty-titled lines, not their original non-vognode names.
 
 However, I should verify whether =skg-split-as-stars-metadata-title=
-can parse =(skg deadViewnode)= at all. It might fail if it
+can parse =(skg tombstone)= at all. It might fail if it
 expects =(skg (node ...))= structure.
 
 ** The notation in the prompt (resolved)
 
 The prompt uses shorthand throughout: =** (deleted)= means a
-=DeletedNode=, =*** (deadviewnode)= means =DeadViewnode=,
+=DeletedNode=, =*** (deadviewnode)= means =Tombstone=,
 =* (writeProtected) 11= means a write-protected UnrestrictedVognode, etc. None of these
 are the literal org-mode rendering.
 
 The actual rendering would be:
 - =(deleted)= → =(skg (deleted (id 11) (repo main))) 11=
-- =(deadviewnode)= → =(skg deadViewnode)= (no title)
+- =(deadviewnode)= → =(skg tombstone)= (no title)
 - =(writeProtected) 11= → =(skg (node (id 11) (repo main) writeProtected)) 11=
 
 ** Childless DeletedNode stays in tree (resolved)
@@ -544,9 +544,9 @@ It has no children in buffer 2, but it stays in the tree.
 
 Confirmed from code: in =complete_postorder_with_limited_recursion=
 (=server/update_buffer/complete.rs= line ~194), =DeletedNode= is
-a no-op ("Deleted nodes are inert"). Only =DeadViewnode= checks
+a no-op ("Deleted nodes are inert"). Only =Tombstone= checks
 for childlessness and detaches. So:
-- Childless =DeadViewnode= → detached (removed from tree)
+- Childless =Tombstone= → detached (removed from tree)
 - Childless =DeletedNode= → stays (save-inert, no-op)
 
 The prompt's expected outputs are correct.

@@ -77,7 +77,7 @@ fn visit (
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       // A Restricted vognode is anonymous and emits nothing; its
       // membership is owned by disk supplementation, not extraction. With no
-      // identity it owns no defining folder, so (like a DeadViewnode) any
+      // identity it owns no defining folder, so (like a tombstone) any
       // folder found under it stays silent.
       recurse_under_vognode (node_ref, None, None, collected),
     ViewnodeKind::Vognode (Vognode::Phantom (p)) =>
@@ -94,7 +94,7 @@ fn visit (
           is_editable    : false,
           is_saveEligible : false } ),
         None, collected),
-    ViewnodeKind::DeadViewnode =>
+    ViewnodeKind::Tombstone =>
       recurse_under_vognode (node_ref, None, None, collected),
     ViewnodeKind::BufferRoot =>
       // A BufferRoot is unreachable as a child, but the traversal
@@ -246,7 +246,7 @@ fn recurse_under_vognode (
             Some (o) =>
               LocalContext::UnderDefiningFolder (o . clone()),
             None =>
-              // The recorder has no identity (it is a DeadViewnode), so
+              // The recorder has no identity (it is a tombstone), so
               // the folder will stay silent.
               LocalContext::UnderVognode {
                 parent_if_editable : None } },

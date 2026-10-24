@@ -247,7 +247,7 @@ fn reconcile_content_children (
   // not per child, so a node either fully extends or is left write-protected; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
-  // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder
+  // becomes a PhantomDeleted whose folders generalized-orphan and entombstone -- so no folder
   // reconciles against a missing Graphnode -- while any user subtree under it
   // is preserved (made a non-member), and a now-childless PhantomDeleted is
   // removed by the prune sweep ('prune_self_deletable_when_empty').
@@ -276,7 +276,7 @@ fn reconcile_content_children (
     substitution_for_children ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_skgids ) ?;
-  convert_nonmember_unknown_children_to_dead(
+  convert_nonmember_unknown_children_to_tombstones(
     tree, node, &apparent_content_skgids ) ?;
   Ok (( )) }
 
@@ -376,12 +376,12 @@ fn replace_raw_content_children_with_visible_overriders (
 
 /// An Unknown content placeholder (a dangling reference the parent kept
 /// rather than failing the whole view) that is *no longer a member* of the
-/// parent's contains converts to a DeadViewnode; the postorder prune sweep
+/// parent's contains converts to a tombstone; the postorder prune sweep
 /// then removes it. An Unknown still in contains is retained (a present-but-
 /// unresolvable reference). Self-deletion is the sweep's job -- this only
-/// decides member-vs-convert, so a Dead -> Unknown -> Dead chain collapses in
+/// decides member-vs-convert, so a Tombstone -> Unknown -> Tombstone chain collapses in
 /// one sweep.
-fn convert_nonmember_unknown_children_to_dead (
+fn convert_nonmember_unknown_children_to_tombstones (
   tree          : &mut Tree<Viewnode>,
   node          : NodeId,
   member_skgids : &[ID],
@@ -394,7 +394,7 @@ fn convert_nonmember_unknown_children_to_dead (
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
         ! member_set . contains (&u . skgid),
       _ => false },
-    |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::DeadViewnode); },
+    |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::Tombstone); },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
@@ -753,7 +753,7 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
           | ViewnodeKind::Property (_)
           | ViewnodeKind::PartnerFolder (_)
           | ViewnodeKind::BufferRoot
-          | ViewnodeKind::DeadViewnode                => 0,
+          | ViewnodeKind::Tombstone                => 0,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . membership != Membership::Member                  => 1,
         ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => 2,

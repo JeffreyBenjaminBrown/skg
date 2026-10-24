@@ -164,7 +164,7 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
                                  "w" . into (), Membership::NonMember ),
     mk_unknown_viewnode (ID::from ("u")),
     mk_restricted_viewnode (),
-    viewnode_of (ViewnodeKind::DeadViewnode),
+    viewnode_of (ViewnodeKind::Tombstone),
     viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)),
     viewnode_of (ViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
     viewnode_of (ViewnodeKind::Property (Property::Alias {

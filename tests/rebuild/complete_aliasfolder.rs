@@ -84,7 +84,7 @@ async fn test_reconcile_alias_folder_children_logic (
   // Test 1: First AliasFolder should have b and c (deduped, valid only, disk order)
   reconcile_aliasFolder_children (
     &mut viewforest, aliasfolder_1_skgid, &graph, config )?;
-  // A stale or duplicate alias is converted to a dead viewnode; the
+  // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
   prune_self_deletable_when_empty (&mut viewforest) ?;
 
@@ -116,7 +116,7 @@ async fn test_reconcile_alias_folder_children_logic (
   // Test 2: Second AliasFolder should have b and c, and gain focus
   reconcile_aliasFolder_children (
     &mut viewforest, aliasfolder_2_skgid, &graph, config )?;
-  // A stale or duplicate alias is converted to a dead viewnode; the
+  // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
   prune_self_deletable_when_empty (&mut viewforest) ?;
 
@@ -225,7 +225,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
     &graph,
     config
   )?;
-  // A stale or duplicate alias is converted to a dead viewnode; the
+  // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
   prune_self_deletable_when_empty (&mut viewforest) ?;
 
@@ -274,7 +274,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
     &graph,
     config
   )?;
-  // A stale or duplicate alias is converted to a dead viewnode; the
+  // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
   prune_self_deletable_when_empty (&mut viewforest) ?;
 

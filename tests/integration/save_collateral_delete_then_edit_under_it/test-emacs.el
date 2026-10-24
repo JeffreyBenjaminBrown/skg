@@ -4,15 +4,15 @@
 ;;; Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
 ;;;
 ;;; Phase 4: delete 11 from buffer 2 → 11 becomes DeletedNode,
-;;;   non-vognodes become DeadViewnode in collateral buffer 1.
+;;;   non-vognodes become Tombstone in collateral buffer 1.
 ;;; Phase 6: add subee-2 under subee in buffer 1 → collateral
 ;;;   buffer 2 picks up subee-2.
-;;; Phase 8: add new-root under a deadViewnode in buffer 1 →
-;;;   Deleted/DeadViewnode round-trip harmlessly through save.
+;;; Phase 8: add new-root under a tombstone in buffer 1 →
+;;;   Deleted/Tombstone round-trip harmlessly through save.
 ;;;
-;;; Exercises DeletedNode / DeadViewnode degradation path in
+;;; Exercises DeletedNode / Tombstone degradation path in
 ;;; complete_viewtree, editing under a DeletedNode, and
-;;; re-saving a buffer containing Deleted/DeadViewnode nodes.
+;;; re-saving a buffer containing Deleted/Tombstone nodes.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -162,7 +162,7 @@ which takes priority over subee.skg on disk."
   ;; Verify buffer 1 (collateral): the delete of 11 propagates to
   ;; node 1 (which contained it). 1.skg's contains has had 11
   ;; stripped, so on rerender the 11-subtree is gone entirely from
-  ;; buffer 1 -- no DeletedNode, no DeadViewnode descendants.
+  ;; buffer 1 -- no DeletedNode, no Tombstone descendants.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
@@ -247,13 +247,13 @@ which takes priority over subee.skg on disk."
 
 (defun phase-8-add-new-root-under-deleted-scaff ()
   "Add new-root as a sibling of the standalone subee in buffer 1.
-Originally this exercised inserting a node under a DeadViewnode;
+Originally this exercised inserting a node under a tombstone;
 after the delete pipeline started cleaning up references to the
-deleted node, buffer 1 no longer contains a DeadViewnode, so the
+deleted node, buffer 1 no longer contains a tombstone, so the
 phase now exercises adding a top-level root via metadata-only
-insertion (the BufferRoot, like a DeadViewnode, supplies no repo
+insertion (the BufferRoot, like a tombstone, supplies no repo
 to inherit, so explicit (repo main) is still required)."
-  (message "=== PHASE 8: Add new-root under deadViewnode in buffer 1 ===")
+  (message "=== PHASE 8: Add new-root under tombstone in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
     (when (goto-nth-headline-with-title "subee" 1)
@@ -282,11 +282,11 @@ to inherit, so explicit (repo main) is still required)."
   (skg-test-wait-for-response))
 
 (defun phase-9-verify-after-new-root ()
-  "Verify both buffers after saving with new-root under a deadViewnode."
+  "Verify both buffers after saving with new-root under a tombstone."
   (message "=== PHASE 9: Verify both buffers after new-root ===")
   (setq integration-test-phase "phase-9-verify-after-new-root")
 
-  ;; Verify buffer 1: new-root appears at depth 4 under deadViewnode,
+  ;; Verify buffer 1: new-root appears at depth 4 under tombstone,
   ;; everything else unchanged from phase 7.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1

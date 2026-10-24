@@ -2,7 +2,7 @@
 //
 // Outside the diff view, every rerender removes the ID folders
 // ('remove_id_folders'). The parser lets a non-member sit under an
-// ID folder; the rerender keeps it, under the folder deadened as an
+// ID folder; the rerender keeps it, under the folder entombstoned as an
 // orphaned folder is, and drops the folder's entries.
 //
 // Fixture: two unrelated nodes, n and x.
@@ -75,8 +75,8 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
   assert! ( x_line . starts_with ("*** ") && x_line . contains ("nonMember"),
             "x stays a non-member at its depth:\n{}", saved );
   assert! ( saved . lines () . any ( |line|
-              line . starts_with ("** ") && line . contains ("deadViewnode") ),
-            "the folder that held x is a dead viewnode:\n{}", saved );
+              line . starts_with ("** ") && line . contains ("tombstone") ),
+            "the folder that held x is a tombstone:\n{}", saved );
   let again : String = save_buffer (
     &saved, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_eq! ( again, saved, "a further save changes nothing" );

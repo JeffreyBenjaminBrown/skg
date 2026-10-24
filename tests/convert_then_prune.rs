@@ -2,8 +2,8 @@
 //
 // The one rule ('docs/glossary.org', "the one rule: convert, then
 // prune"): a reconciler never detaches. A child the graph no longer
-// warrants is converted -- a leaf, and every non-vognode, to a dead
-// viewnode that the prune ending the completion removes; an unrestricted
+// warrants is converted -- a leaf, and every non-vognode, to a
+// tombstone that the prune ending the completion removes; an unrestricted
 // vognode with a subtree is retained as non-member, keeping its
 // editability if stale, write-protected if an extra copy of a
 // duplicate -- and a folder adopts such a non-member back when its
@@ -474,7 +474,7 @@ async fn a_stale_alias_goes (
 
 /// A view of u shows two deleted phantoms of private nodes, q as a
 /// leaf and q2 holding qc. After the switch to the public skgrepo-set,
-/// q is gone and q2 is a dead viewnode without its title, still
+/// q is gone and q2 is a tombstone without its title, still
 /// holding qc; nothing of either's text remains.
 async fn a_deleted_phantom_of_a_restricted_node_loses_its_text (
   config  : &SkgConfig,
@@ -516,8 +516,8 @@ async fn a_deleted_phantom_of_a_restricted_node_loses_its_text (
   assert! ( lines_containing (view, "(id q)") . is_empty ()
             && lines_containing (view, "(id q2)") . is_empty (),
     "no private ID remains:\n{}", view );
-  assert_eq! ( the_line (view, "** ", "deadViewnode"), "** (skg deadViewnode)",
-    "the phantom holding qc is a dead viewnode, untitled:\n{}", view );
-  assert! ( the_line_after (view, "** ", "deadViewnode") . contains ("(id qc)"),
+  assert_eq! ( the_line (view, "** ", "tombstone"), "** (skg tombstone)",
+    "the phantom holding qc is a tombstone, untitled:\n{}", view );
+  assert! ( the_line_after (view, "** ", "tombstone") . contains ("(id qc)"),
     "it still holds qc:\n{}", view );
   Ok (( )) }

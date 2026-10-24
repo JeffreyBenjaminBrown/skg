@@ -99,8 +99,8 @@ pub struct ViewnodeMetadata {
   pub is_deleted_node: bool,
   // When true, this is a PhantomHistorical (id and skgrepo are used).
   pub is_historical_node: bool,
-  // When true, this is a DeadViewnode.
-  pub is_dead_viewnode: bool,
+  // When true, this is a tombstone.
+  pub is_tombstone: bool,
   // When Some, this is a PhantomUnknown (a phantom for a missing
   // referent). Carries only the id; no skgrepo/title/body apply.
   pub unknown_node_skgid: Option<ID>,
@@ -133,7 +133,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     property_relRepo_request : None,
     is_deleted_node: false,
     is_historical_node: false,
-    is_dead_viewnode: false,
+    is_tombstone: false,
     unknown_node_skgid: None,
     unknown_relRepo: None,
     unknown_relRepo_request: None,
@@ -181,8 +181,8 @@ pub fn viewnode_from_metadata (
         ( MpViewnodeKind::Vognode (
             MpVognode::Restricted ( RestrictedVognode ) ),
           error, None )
-      } else if metadata . is_dead_viewnode {
-        ( MpViewnodeKind::DeadViewnode, None, None )
+      } else if metadata . is_tombstone {
+        ( MpViewnodeKind::Tombstone, None, None )
       } else if metadata . is_historical_node {
         ( MpViewnodeKind::Vognode (MpVognode::Phantom (
             MpPhantom::Historical ( PhantomHistorical {
@@ -338,7 +338,7 @@ pub fn viewnode_from_metadata (
                MpViewnodeKind::PropertyFolder (_)
                | MpViewnodeKind::PartnerFolder (_)
                | MpViewnodeKind::BufferRoot
-               | MpViewnodeKind::DeadViewnode
+               | MpViewnodeKind::Tombstone
                | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
                | MpViewnodeKind::Property (Property::BodyDiff { .. }) );
   ( MpViewnode { focused           : metadata . focused,
@@ -366,8 +366,8 @@ fn maybeplaced_kind_error_label (
       partnerFolder . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
-    MpViewnodeKind::DeadViewnode =>
-      "deadViewnode" . to_string (),
+    MpViewnodeKind::Tombstone =>
+      "tombstone" . to_string (),
     MpViewnodeKind::Vognode (_) =>
       MpViewnode { kind : kind . clone (),
                    .. MpViewnode::default () }
@@ -575,7 +575,7 @@ pub fn parse_metadata_to_viewnodemd (
             result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
             result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default() } ) ),
-          "deadViewnode" => result . is_dead_viewnode = true,
+          "tombstone" => result . is_tombstone = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },
@@ -653,7 +653,7 @@ fn check_where_the_edit_request_sits (
   let is_unrestricted_vognode : bool =
     metadata . non_vognode . is_none ()
     && ! is_phantom
-    && ! metadata . is_dead_viewnode
+    && ! metadata . is_tombstone
     && ! metadata . is_restricted_node
     && metadata . unknown_node_skgid . is_none ();
   match &metadata . edit_request {

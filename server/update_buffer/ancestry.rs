@@ -6,7 +6,7 @@
 //! ancestor vognode(s). If a required ancestor died this save, the read would
 //! hit a missing Graphnode, return Err, and abort the whole (often
 //! collateral) rerender. To prevent that, every folder first self-checks its
-//! required ancestry; if it is a *generalized orphan* it deadens itself and
+//! required ancestry; if it is a *generalized orphan* it entombstones itself and
 //! disposes its children instead of reconciling.
 //!
 //! "Generalized orphan": traditionally in CS an "orphan" is a node whose
@@ -109,7 +109,7 @@ fn matches_expected (
 /// Whether `kind` is a folder -- a folder is a
 /// *collecting* non-vognode, i.e. a PropertyFolder (ID/Alias) or a PartnerFolder. (A non-vognode
 /// is any non-Vognode viewnode; the non-folders -- Property leaves, BufferRoot,
-/// DeadViewnode -- are excluded here.) Folders are the kinds that carry a required
+/// Tombstone -- are excluded here.) Folders are the kinds that carry a required
 /// ancestry and so are subject to the generalized-orphan check.
 pub fn is_folder_kind (
   kind : &ViewnodeKind,
@@ -156,7 +156,7 @@ pub fn folder_is_generalized_orphan (
 ///
 /// RELIES ON THE ORPHAN PRE-CHECK: it does not re-validate that each ancestor is
 /// the kind the table demands. 'folder_is_generalized_orphan' runs in the BFS
-/// dispatch and deadens any folder with a wrong-kind required ancestry *before* its
+/// dispatch and entombstones any folder with a wrong-kind required ancestry *before* its
 /// reconcile runs, and every caller of this is inside a reconcile -- so by the
 /// time we get here the chain is already known-valid, and we can read the
 /// table-indexed ancestor directly. (The kind-validation lives in exactly one
@@ -176,7 +176,7 @@ pub fn required_ancestor (
 /// The (pid, skgrepo) of the folder's i-th required ancestor, read *through* the
 /// required-ancestry table. Errors if that ancestor is absent (the folder is a generalized
 /// orphan up to i) -- unreachable in practice, since the BFS dispatch runs the
-/// orphan pre-check and deadens an orphan before its reconcile is ever called,
+/// orphan pre-check and entombstones an orphan before its reconcile is ever called,
 /// but the contract is what keeps a reconcile from reading an unlisted ancestor.
 pub fn pid_and_skgrepo_from_required_ancestor (
   tree   : &Tree<Viewnode>,
@@ -200,39 +200,39 @@ pub fn pid_and_skgrepo_from_required_ancestor (
     . ok_or_else ( || format! (
       "{}: required ancestor {} has no pid/repo", caller, i ) . into () ) }
 
-/// Deaden a generalized-orphan folder at its BFS visit: dispose each
-/// direct child, then convert the folder itself to a DeadViewnode and skip its
+/// Entombstone a generalized-orphan folder at its BFS visit: dispose each
+/// direct child, then convert the folder itself to a tombstone and skip its
 /// reconcile. The BFS still visits the (disposed) children; a survivor
-/// made a non-member is visited normally, a DeadViewnode child is a no-op.
-pub fn deaden_generalized_orphan_folder (
+/// made a non-member is visited normally, a tombstone child is a no-op.
+pub fn entombstone_generalized_orphan_folder (
   tree : &mut Tree<Viewnode>,
   folder  : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let child_skgids : Vec<NodeId> =
     tree . get (folder)
-    . ok_or ("deaden_generalized_orphan_folder: folder not found") ?
+    . ok_or ("entombstone_generalized_orphan_folder: folder not found") ?
     . children () . map ( |c| c . id () ) . collect ();
   for cid in child_skgids {
     dispose_orphaned_folder_child (tree, cid) ?; }
   write_at_node_in_tree ( tree, folder,
-    |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::DeadViewnode); } )
+    |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::Tombstone); } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
-/// Dispose one direct child of a deadened orphan folder, by the one
+/// Dispose one direct child of an entombstoned orphan folder, by the one
 /// rule ('convert_unwarranted_child'):
 /// - a member (an Unrestricted member) -> convert it: a
-///   view-leaf to a dead viewnode, which the prune removes; a branch
+///   view-leaf to a tombstone, which the prune removes; a branch
 ///   retained as non-member, so the user's subtree survives;
 /// - a nested folder (PropertyFolder / PartnerFolder) -> leave it untouched: it is itself a
-///   generalized orphan under this now-dead folder, so it deadens itself -- and
+///   generalized orphan under this now-dead folder, so it entombstones itself -- and
 ///   disposes its own children -- at its own BFS visit. (Converting a nested
-///   folder to DeadViewnode here would freeze it before it could dispose its
+///   folder to Tombstone here would freeze it before it could dispose its
 ///   own leaf members, leaving them stranded under a dead chain. Leaving it to
-///   self-deaden is what makes leaf members at every depth die. A Property
+///   self-entombstone is what makes leaf members at every depth die. A Property
 ///   leaf does not self-dispatch, so it is still converted below.)
-/// - any other non-vognode child (a Property, a DeadViewnode) -> convert
-///   it to a dead viewnode;
+/// - any other non-vognode child (a Property, a tombstone) -> convert
+///   it to a tombstone;
 /// - any other child (a non-member vognode -- a non-member Unrestricted or an
 ///   Restricted -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_folder_child (
@@ -250,7 +250,7 @@ fn dispose_orphaned_folder_child (
       is_folder_kind (&c . value () . kind) ) };
   if affected || ( ! is_folder && ! is_vognode_or_phantom ) {
     convert_unwarranted_child (tree, child, is_leaf, Unwarranted::Stale) ?; }
-  // else: a nested folder (it self-deadens at its own visit; see the
+  // else: a nested folder (it self-entombstones at its own visit; see the
   // doc above), a non-member vognode or a phantom -- kept untouched.
   Ok (( )) }
 

@@ -58,7 +58,7 @@ pub fn handle_skgrepo_set_request (
 /// re-renders open views in place rather than closing them.  Each
 /// view gets the convert-and-prune prepass (now-restricted unrestricted vognodes
 /// become RestrictedVognodes; childless restricted branches, properties of
-/// restricted recorders, dead viewnodes and the folders these leave empty
+/// restricted recorders, tombstones and the folders these leave empty
 /// are pruned, and the rest keeps its viewnode IDs), then completion with
 /// PartnerFolder creation
 /// enabled, because a switch can also activate skgrepos, revealing

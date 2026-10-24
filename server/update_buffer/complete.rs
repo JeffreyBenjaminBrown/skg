@@ -12,7 +12,7 @@ use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
-use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
+use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, entombstone_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::graph_straddle::types::GraphStraddle;
@@ -272,13 +272,13 @@ fn dispatch_node_update (
   // Death-leafward ('update_buffer/ancestry.rs'): before reconciling any
   // folder, self-check its required ancestry. If it is a generalized orphan (some
   // required ancestor is the wrong viewnode kind -- full chain, not just the
-  // parent), deaden it and dispose its children instead of reconciling, so the
+  // parent), entombstone it and dispose its children instead of reconciling, so the
   // reconcile never reads a since-deleted ancestor's missing Graphnode.
   // The BFS visits every folder, and the check walks the folder's whole required
-  // ancestry, so a folder whose grandparent (not just its parent) died is deadened.
+  // ancestry, so a folder whose grandparent (not just its parent) died is entombstoned.
   if is_folder_kind (&kind)
     && folder_is_generalized_orphan (tree, treeid) ? {
-    deaden_generalized_orphan_folder (tree, treeid) ?;
+    entombstone_generalized_orphan_folder (tree, treeid) ?;
     return Ok (( )); }
   let settings : VisitSettings =
     match diffView_visit_before_extension (
@@ -350,7 +350,7 @@ fn dispatch_node_update (
       // identity, and flipping it to a "DELETED" placeholder would leak that
       // a hidden node vanished; it just lingers until the next full
       // rerender drops it), Unknown (unresolvable-id placeholder),
-      // Deleted, Historical, DeadViewnode, Property leaves and BufferRoot.
+      // Deleted, Historical, Tombstone, Property leaves and BufferRoot.
       // The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
@@ -491,7 +491,7 @@ fn update_normal_node (
 /// single postorder prune sweep removes it once it is childless. This is the
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
-/// - DeadViewnode and a childless Vognode::Deleted.
+/// - Tombstone and a childless Vognode::Deleted.
 /// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden/
 ///   Container/Mentioner/AcquiredBy/Acquired (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
@@ -506,7 +506,7 @@ fn is_self_deletable_when_empty (
   kind : &ViewnodeKind,
 ) -> bool {
   matches! ( kind,
-    ViewnodeKind::DeadViewnode
+    ViewnodeKind::Tombstone
     | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
     | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
@@ -522,9 +522,9 @@ fn is_self_deletable_when_empty (
 
 /// The postorder prune sweep -- the *one* place self-deletion happens.
 /// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
-/// deadened folders whose members all died, a childless Deleted, and empty
+/// entombstoned folders whose members all died, a childless Deleted, and empty
 /// write-protected relation / Hidden* / ID folders. Postorder so a chain (e.g.
-/// Dead -> Deleted, or a folder emptied by the removal of its last member)
+/// Tombstone -> Deleted, or a folder emptied by the removal of its last member)
 /// collapses completely in one pass. Focus is transferred to the surviving
 /// parent if the removed node held it. Never prunes a *view root* (child of the
 /// invisible BufferRoot): the user should still see a deleted root.
@@ -560,7 +560,7 @@ where Predicate : Fn (&Viewnode) -> bool {
   let mut result : Vec<NodeId> = Vec::new ();
   do_everywhere_in_tree_dfs_readonly (
     tree, root_treeid,
-    false, // postorder: a chain (Dead -> Deleted, or a folder emptied by the
+    false, // postorder: a chain (Tombstone -> Deleted, or a folder emptied by the
            // removal of its last child) collapses bottom-up in one sweep.
     &mut |node| {
       if predicate (node . value ()) {

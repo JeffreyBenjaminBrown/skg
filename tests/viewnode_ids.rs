@@ -335,7 +335,7 @@ fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
     viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) ) . id ();
   for _ in 0 .. 120 {
     tree . get_mut (folder) . unwrap () . append ( viewnode_of (
-      ViewnodeKind::DeadViewnode )); }
+      ViewnodeKind::Tombstone )); }
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::default ();
   record . assign_viewnode_ids (&mut tree);
   assert_eq! ( tree . root () . value () . viewnode_id, None, "the buffer root gets none" );
@@ -360,7 +360,7 @@ fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
       tree . get_mut (root) . unwrap () . append_id (child); }
     tree . get_mut (folder) . unwrap () . detach ();
     tree . get_mut (root) . unwrap () . append ( viewnode_of (
-      ViewnodeKind::DeadViewnode )); }
+      ViewnodeKind::Tombstone )); }
   record . assign_viewnode_ids (&mut tree);
   let newest : ViewnodeId = tree . root () . last_child () . unwrap () . value ()
     . viewnode_id . clone () . unwrap ();

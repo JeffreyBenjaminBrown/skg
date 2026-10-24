@@ -55,7 +55,7 @@ use crate::to_org::util::{mark_view_roots_as_members, validate_affectsParent_rel
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{FolderRelation, Property, Vognode, PropertyFolder, ViewRequest};
-use crate::update_buffer::ancestry::deaden_generalized_orphan_folder;
+use crate::update_buffer::ancestry::entombstone_generalized_orphan_folder;
 
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -621,7 +621,7 @@ pub fn finish_viewforest (
 ) -> Result<String, Box<dyn Error>> {
   mark_view_roots_as_members ( viewforest );
   // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
-  // (a phantom / Deleted / DeadViewnode) is a non-dead generalized orphan and
+  // (a phantom / Deleted / Tombstone) is a non-dead generalized orphan and
   // must become a non-member.
   mark_orphans_under_dead_parents_false ( viewforest );
   // Correct any membership claims whose claimed relation to the parent doesn't
@@ -703,8 +703,8 @@ fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
 /// view, whose step at its node's visit
 /// ('process_unrestrictedVognode_changes') reconciles it instead.
 /// The parser lets a non-member sit under an ID folder; a folder
-/// holding anything but its entries is deadened instead, as an
-/// orphaned folder is ('deaden_generalized_orphan_folder'), so what
+/// holding anything but its entries is entombstoned instead, as an
+/// orphaned folder is ('entombstone_generalized_orphan_folder'), so what
 /// it holds survives, and the prune that ends the completion removes
 /// its entries.
 fn remove_id_folders (
@@ -728,7 +728,7 @@ fn remove_id_folders (
         . ok_or ("remove_id_folders: folder not found") ?
         . detach ();
     } else {
-      deaden_generalized_orphan_folder (viewforest, folder) ?; }}
+      entombstone_generalized_orphan_folder (viewforest, folder) ?; }}
   Ok (( )) }
 
 #[cfg(test)]

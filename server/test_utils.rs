@@ -665,8 +665,8 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
     ( MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))) =>
     { if n1 != n2 { return false; }}
-    ( MpViewnodeKind::DeadViewnode,
-      MpViewnodeKind::DeadViewnode) =>
+    ( MpViewnodeKind::Tombstone,
+      MpViewnodeKind::Tombstone) =>
     { if n1 != n2 { return false; }}
     _ => return false, // mismatched kinds
   }

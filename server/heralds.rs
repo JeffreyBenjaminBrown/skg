@@ -377,7 +377,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     let the conformance test demand that every emittable atom
 ///     appear here.
 ///
-///   * deadViewnode vs deleted -- two shapes come in from the
+///   * tombstone vs deleted -- two shapes come in from the
 ///     server depending on whether the deletion is on a non-vognode viewnode
 ///     (like a deleted aliasFolder) or on a file-level node. Each gets
 ///     its own matcher; both render as "DELETED".
@@ -450,7 +450,7 @@ pub fn herald_rule_table () -> HeraldRule {
       // folder's '(diff (ready))'.
       change_fact_rules_for_one_object ("+", "-"),
       vec! [
-      crule ("deadViewnode", vec! [ s ("DELETED") ]),
+      crule ("tombstone", vec! [ s ("DELETED") ]),
       crule ("deleted", vec! [
         s ("DELETED"),
         vac ("id"),
@@ -692,7 +692,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "vnid",
     // Form heads, from org_to_text.rs:
     "node", "deleted", "unknown", "restrictedNode",
-    "deadViewnode", "historical",
+    "tombstone", "historical",
     // Keys inside node / deleted / unknown forms:
     "id", "repo",
     "writeProtected", "omittedBody",

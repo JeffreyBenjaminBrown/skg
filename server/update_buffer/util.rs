@@ -118,9 +118,9 @@ pub fn detach_viewnode_transferring_focus (
 
 /// What 'complete_managed_children' changed while reconciling: the
 /// orderkeys it created, those of the stale or duplicate children it
-/// retained as non-members or converted to dead viewnodes holding
+/// retained as non-members or converted to tombstones holding
 /// something, and those of the stale and duplicate children
-/// it converted to childless dead viewnodes, which the prune that ends
+/// it converted to childless tombstones, which the prune that ends
 /// the completion removes. Callers that warn about repairs to
 /// write-protected folders consume this ('CompletionWarning'); other
 /// callers ignore it.
@@ -144,9 +144,9 @@ impl<Orderkey> RepairSummary<Orderkey> {
 /// What 'convert_unwarranted_child' made of a child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Conversion {
-  /// A dead viewnode with no children, which the prune removes.
-  DeadLeaf,
-  /// A vognode retained as non-member, or a dead viewnode holding
+  /// A tombstone with no children, which the prune removes.
+  ChildlessTombstone,
+  /// A vognode retained as non-member, or a tombstone holding
   /// children: either stays in the buffer.
   Parked,
 }
@@ -191,7 +191,7 @@ pub enum KeptChildOrder {
 /// duplicate is write-protected whatever it was, its members made
 /// non-members, since the save refuses two editable occurrences of
 /// one node. Any other child -- a leaf, a non-vognode, a phantom or a
-/// restricted vognode -- becomes a dead viewnode, which the prune
+/// restricted vognode -- becomes a tombstone, which the prune
 /// that ends the completion removes once it is childless
 /// ('prune_self_deletable_when_empty'), so that whatever stands below
 /// it survives.
@@ -215,7 +215,7 @@ pub fn convert_unwarranted_child (
         viewnode . change_facts      = ChangeFacts::default ();
         viewnode . readiness_request = None;
         Some (writeProtected) },
-      _ => { viewnode . replace_kind (ViewnodeKind::DeadViewnode);
+      _ => { viewnode . replace_kind (ViewnodeKind::Tombstone);
              None }, }};
   if let Some (writeProtected) = retained_writeProtected {
     if writeProtected {
@@ -223,7 +223,7 @@ pub fn convert_unwarranted_child (
     return Ok (Conversion::Parked); }
   let has_children : bool =
     tree . get (child) . unwrap () . children () . next () . is_some ();
-  Ok ( if has_children { Conversion::Parked } else { Conversion::DeadLeaf } ) }
+  Ok ( if has_children { Conversion::Parked } else { Conversion::ChildlessTombstone } ) }
 
 /// Viewnode-specialized version of complete_managed_children.
 /// See that one's description for more info.
@@ -282,7 +282,7 @@ where Managed  : Fn (&Viewnode) -> bool,
 ///   unmanaged and the converted ones, in their order), then the
 ///   members in goal_list order.
 /// - Returns a RepairSummary: which children it created, which it
-///   parked, and which it converted to dead leaves.
+///   parked, and which it converted to childless tombstones.
 pub fn complete_managed_children
 <Node, Orderkey, Managed, View, PreferredCopy, ConvertUnwarranted> (
   tree                : &mut Tree<Node>,
@@ -340,11 +340,11 @@ where
   let mut summary : RepairSummary<Orderkey> = RepairSummary::new();
   for ( treeid, orderkey ) in duplicate_skgids {
     match convert_unwarranted ( tree, treeid, Unwarranted::Duplicate ) ? {
-      Conversion::DeadLeaf => summary . deleted_duplicates . push (orderkey),
+      Conversion::ChildlessTombstone => summary . deleted_duplicates . push (orderkey),
       Conversion::Parked   => summary . made_nonMembers    . push (orderkey), }}
   for ( treeid, orderkey ) in invalid_skgids {
     match convert_unwarranted ( tree, treeid, Unwarranted::Stale ) ? {
-      Conversion::DeadLeaf => summary . deleted_stale   . push (orderkey),
+      Conversion::ChildlessTombstone => summary . deleted_stale   . push (orderkey),
       Conversion::Parked   => summary . made_nonMembers . push (orderkey), }}
   let kept_members : HashSet<NodeId> =
     orderkey_to_treeid . values () . copied () . collect ();

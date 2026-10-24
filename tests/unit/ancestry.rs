@@ -62,11 +62,11 @@ fn aliasfolder_under_deleted_is_orphan () {
   assert! ( folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
-fn relation_folder_under_deadviewnode_is_orphan () {
+fn relation_folder_under_tombstone_is_orphan () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let dead : NodeId = child (&mut t, root,
-    viewnode_of (ViewnodeKind::DeadViewnode));
+    viewnode_of (ViewnodeKind::Tombstone));
   let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
@@ -126,31 +126,31 @@ fn required_ancestor_reads_without_revalidating_kind () {
   assert_eq! ( required_ancestor (&t, hin, 3) . unwrap (), None,
     "still None past the end of the table" ); }
 
-// ---- deaden_generalized_orphan_folder (child disposal) ----
+// ---- entombstone_generalized_orphan_folder (child disposal) ----
 
 #[test]
-fn deaden_disposes_each_child_kind () {
+fn entombstone_disposes_each_child_kind () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
   let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
-  // Member leaf -> a dead viewnode, for the prune to remove.
+  // Member leaf -> a tombstone, for the prune to remove.
   let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", Membership::Member));
   // Member branch (has a child) -> a write-protected non-member, kept.
   let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", Membership::Member));
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", Membership::Member));
-  // Nested folder -> leave it (self-deadens at its own visit).
+  // Nested folder -> leave it (self-entombstones at its own visit).
   let nested : NodeId = child (&mut t, subscribee_folder,
     role_folder (PartnerFolder::HiddenOutsideOfSubscribee));
   // Non-member vognode -> keep untouched.
   let indep : NodeId = child (&mut t, subscribee_folder, normal ("I", Membership::NonMember));
 
-  deaden_generalized_orphan_folder (&mut t, subscribee_folder) . unwrap ();
+  entombstone_generalized_orphan_folder (&mut t, subscribee_folder) . unwrap ();
 
-  assert! ( matches! ( kind_at (&t, subscribee_folder), ViewnodeKind::DeadViewnode ),
-    "the orphan folder itself becomes a DeadViewnode" );
-  assert! ( matches! ( kind_at (&t, leaf), ViewnodeKind::DeadViewnode ),
-    "a member leaf becomes a dead viewnode" );
+  assert! ( matches! ( kind_at (&t, subscribee_folder), ViewnodeKind::Tombstone ),
+    "the orphan folder itself becomes a tombstone" );
+  assert! ( matches! ( kind_at (&t, leaf), ViewnodeKind::Tombstone ),
+    "a member leaf becomes a tombstone" );
   assert! ( ! is_detached (&t, subscribee_folder, leaf),
     "the prune, not the disposal, removes it" );
   assert_eq! ( parentis_at (&t, branch), Some (Membership::NonMember),
@@ -162,18 +162,18 @@ fn deaden_disposes_each_child_kind () {
   assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
                        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
-    "a nested folder is left untouched to self-deaden at its visit" );
+    "a nested folder is left untouched to self-entombstone at its visit" );
   assert_eq! ( parentis_at (&t, indep), Some (Membership::NonMember),
     "a non-member vognode is kept untouched" ); }
 
 #[test]
-fn deaden_converts_property_leaf_to_deadviewnode () {
+fn entombstone_converts_property_leaf_to_tombstone () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
   let ac : NodeId = child (&mut t, d, property_folder (PropertyFolder::Alias));
   let q : NodeId = child (&mut t, ac, alias_property ("eleven"));
-  deaden_generalized_orphan_folder (&mut t, ac) . unwrap ();
-  assert! ( matches! ( kind_at (&t, ac), ViewnodeKind::DeadViewnode ) );
-  assert! ( matches! ( kind_at (&t, q), ViewnodeKind::DeadViewnode ),
-    "a Property leaf (which does not self-dispatch) is converted to DeadViewnode" ); }
+  entombstone_generalized_orphan_folder (&mut t, ac) . unwrap ();
+  assert! ( matches! ( kind_at (&t, ac), ViewnodeKind::Tombstone ) );
+  assert! ( matches! ( kind_at (&t, q), ViewnodeKind::Tombstone ),
+    "a Property leaf (which does not self-dispatch) is converted to Tombstone" ); }

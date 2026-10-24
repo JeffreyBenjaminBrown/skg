@@ -43,7 +43,7 @@ pub enum MatchKey {
 }
 
 /// None for a viewnode that carries no identity (a restricted
-/// vognode, a dead viewnode, the buffer root). 'graph' is the live
+/// vognode, a tombstone, the buffer root). 'graph' is the live
 /// graph, which resolves a member's extra ID.
 pub fn match_key (
   viewnode : &Viewnode,
@@ -63,7 +63,7 @@ pub fn match_key (
         PropertyFolder::Flags { .. } => "flagsFolder", } . to_string () )),
     ViewnodeKind::PartnerFolder (folder) =>
       Some ( MatchKey::Kind ( format! ("{:?}Folder", folder) )),
-    ViewnodeKind::BufferRoot | ViewnodeKind::DeadViewnode => None, }}
+    ViewnodeKind::BufferRoot | ViewnodeKind::Tombstone => None, }}
 
 fn property_kind (
   property : &Property,
@@ -194,7 +194,7 @@ fn convert_duplicate (
 /// pasted) stay where they stand, so a vognode retained as non-member
 /// keeps its content, as the older reconciler's does. So a folder's
 /// members go with the folder, and a member's chain with the member.
-/// A viewnode holding nothing but childless dead viewnodes is
+/// A viewnode holding nothing but childless tombstones is
 /// converted as a leaf, so the prune that ends the completion removes
 /// the lot. Detaches nothing.
 pub fn convert_unwarranted_subtree (
@@ -213,7 +213,7 @@ pub fn convert_unwarranted_subtree (
       else { Conversion::Parked };
     if conversion == Conversion::Parked { holds_something = true; }}
   convert_unwarranted_child (tree, node, ! holds_something, Unwarranted::Stale) ?;
-  Ok ( if holds_something { Conversion::Parked } else { Conversion::DeadLeaf } ) }
+  Ok ( if holds_something { Conversion::Parked } else { Conversion::ChildlessTombstone } ) }
 
 /// Whether the diff view's reconciler drew 'node', known by its kind
 /// and its change facts as they stand at the completion that finds it

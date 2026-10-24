@@ -14,27 +14,27 @@ fn parent_with_unknown_child (child : &ID) -> (Tree<Viewnode>, NodeId, NodeId) {
     tree . root_mut () . append ( mk_unknown_viewnode (child . clone ()) ) . id ();
   (tree, parent, child_treeid) }
 
-fn is_dead (tree : &Tree<Viewnode>, treeid : NodeId) -> bool {
+fn is_tombstone (tree : &Tree<Viewnode>, treeid : NodeId) -> bool {
   matches! ( tree . get (treeid) . unwrap () . value () . kind,
-             ViewnodeKind::DeadViewnode ) }
+             ViewnodeKind::Tombstone ) }
 
 fn is_unknown (tree : &Tree<Viewnode>, treeid : NodeId) -> bool {
   matches! ( & tree . get (treeid) . unwrap () . value () . kind,
              ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) ) }
 
 #[test]
-fn nonmember_unknown_child_becomes_dead () {
+fn nonmember_unknown_child_becomes_tombstone () {
   let (mut tree, parent, child) = parent_with_unknown_child (& skgid ("ghost"));
-  convert_nonmember_unknown_children_to_dead (
+  convert_nonmember_unknown_children_to_tombstones (
     &mut tree, parent, &[ skgid ("kept") ] ) . unwrap ();
-  assert! ( is_dead (&tree, child),
-            "an Unknown no longer in contains should become DeadViewnode" );
+  assert! ( is_tombstone (&tree, child),
+            "an Unknown no longer in contains should become Tombstone" );
 }
 
 #[test]
 fn member_unknown_child_is_retained () {
   let (mut tree, parent, child) = parent_with_unknown_child (& skgid ("ghost"));
-  convert_nonmember_unknown_children_to_dead (
+  convert_nonmember_unknown_children_to_tombstones (
     &mut tree, parent, &[ skgid ("ghost") ] ) . unwrap ();
   assert! ( is_unknown (&tree, child),
             "an Unknown still in contains should be retained" );

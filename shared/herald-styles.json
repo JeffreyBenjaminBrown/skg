@@ -61,7 +61,7 @@
     "editRequest_flag":                "nonstandard",
     "viewRequests":                    "nonstandard",
     "restrictedNode":                  "message",
-    "deadViewnode":                    "message",
+    "tombstone":                       "message",
     "deleted":                         "message",
     "unknown":                         "message",
     "aliasFolder":                     "message",

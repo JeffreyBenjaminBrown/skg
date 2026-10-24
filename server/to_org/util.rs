@@ -326,7 +326,7 @@ pub fn validate_affectsParent_relationships (
       let parent_tn : &UnrestrictedVognode =
         match & parent_ref . value () . kind {
           ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
-          // A non-UnrestrictedVognode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
+          // A non-UnrestrictedVognode parent (BufferRoot, a property or folder, Deleted, Tombstone) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       let affects_parent_claim_ok : bool = match child_tn . membership {
         Membership::Member => {
@@ -345,24 +345,24 @@ pub fn validate_affectsParent_relationships (
 
 /// An invariant: a *non-dead generalized orphan*
 /// must have Membership=False. An Unrestricted node whose parent is a
-/// non-container -- a Deleted phantom or a DeadViewnode -- is exactly
+/// non-container -- a Deleted phantom or a tombstone -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
 /// Make it a non-member so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - parent is a Deleted phantom / DeadViewnode -> make a member child a non-member.
+/// - parent is a Deleted phantom / Tombstone -> make a member child a non-member.
 /// - parent is a historical phantom (the diff view): left alone.
 /// - parent is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   member; membership is correct -> leave. (A folder whose own ancestry broke is
-///   deadened to DeadViewnode first, and then this pass catches its members.)
+///   entombstoned first, and then this pass catches its members.)
 /// - parent is an Unrestricted vognode: handled by validate_affectsParent_relationships.
 /// - parent is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_as_members.
 /// Belt-and-suspenders: most such children are already made non-members during the BFS
 /// (mark_erroneous_content_children_as_indep for content children;
-/// dispose_orphaned_folder_child for a deadened folder's members). This final pass
+/// dispose_orphaned_folder_child for an entombstoned folder's members). This final pass
 /// guarantees the invariant for any survivor those miss, in both the
 /// post-save and de-novo paths. Purely structural -- no graph read.
 pub fn mark_orphans_under_dead_parents_false (
@@ -380,7 +380,7 @@ pub fn mark_orphans_under_dead_parents_false (
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
             ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-              | ViewnodeKind::DeadViewnode ) );
+              | ViewnodeKind::Tombstone ) );
       if affects_parent_non_container { targets . push ( child_ref . id () ); }}}
   for skgid in targets {
     let mut node_mut : NodeMut<Viewnode> =
