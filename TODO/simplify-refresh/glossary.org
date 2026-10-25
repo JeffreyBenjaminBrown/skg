@@ -39,7 +39,8 @@ it; it keeps its last title and body. *Historical*
 the worktree lacks it; shows HEAD's text. *Unknown*
 ('Phantom::Unknown'): an ID some list names that no node answers
 to; the docs call the ID *dangling* and the viewnode a
-*placeholder*. Phantoms are save-inert.
+*placeholder*. A deleted or historical phantom is save-inert;
+an unknown's ID is kept in its parent's list on save.
 *** non-vognode
 Every other viewnode: a folder, a property, a tombstone, the
 buffer root. They describe their viewparent rather than stand for

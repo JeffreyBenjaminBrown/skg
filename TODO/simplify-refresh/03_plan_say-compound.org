@@ -1,0 +1,241 @@
+#+title: Plan 03: say "compound partner folder"
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification,
+and nothing here is open for discussion. Writing it has
+implemented nothing. It stands on its own: every term it uses
+is defined below or in 'docs/glossary.org'. The discussion that
+produced it (the "tombstones" thread of
+[[file:02_jeff_de-novo.org][02_jeff_de-novo.org]]) is background
+that nobody needs to read; where it and this document differ,
+this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the
+orientation]] and its code-change advice ('names.org',
+'formatting.org', 'ai-agents.org', 'common-gotchas.md',
+'when-to-stop.org'), and 'commit-messages.org', before
+starting. Preserve unrelated edits. Do not change branches or
+git configuration. Finish the work and its verification without
+stopping for routine choices; stopping to ask is for the rare
+conditions that 'when-to-stop.org' describes, and this plan
+expects none. Record any deviation in
+[[file:progress.org][progress.org]] beside this plan, under a
+top-level headline "Say compound partner folder". This plan's
+text stays as it is, except the keyword of its slice headline.
+Write any scratch file of your own under 'tests/results/',
+never under 'TODO/'.
+
+** Commits
+One slice, two commits. The first carries the code and the
+tests; the second carries the documentation, the two glossaries
+and the change of the slice headline here from TODO to DONE.
+Each message names the slice and this document ("Slice 0 of
+TODO/simplify-refresh/03_plan_say-compound.org: ..."). Commit
+only the files this plan names. Other files under 'TODO/' may
+carry Jeff's uncommitted edits; they are not this plan's and
+must not ride in its commits.
+
+** Scope
+One mechanical rename. The two partner folders whose membership
+is computed from three nodes, 'hiddenInSubscribeeFolder' and
+'hiddenOutsideOfSubscribeeFolder', are called "filter folders"
+in comments, docs, two test names and the two 'FolderPolicy'
+variants that govern them. The slice will replace that word,
+in that sense only, with "compound partner folder". Nothing on
+the wire changes: the folder atoms, the 'PartnerFolder'
+variants, the module and fixture names, and the reconcilers'
+function names all stay.
+
+* Words this plan uses
+** compound partner folder
+A partner folder whose membership joins more than one
+relationship, as against the ordinary partner folders, which
+read one relation role. Today there are two, and each joins
+three nodes: a subscriber N, a subscribee S and a hidden node
+H, by "N subscribes to S", "N hides H" and "S contains H". The
+name joins two phrases the code already uses: "partner folder"
+and the "compound filter folders" of three comments
+('server/types/viewnode.rs' line 409,
+'server/update_buffer/viewnodestats.rs' lines 401 and 431),
+which the slice will turn into "compound partner folders".
+The *hidden-in compound partner folder*
+('hiddenInSubscribeeFolder') stands under S inside N's
+subscribee folder and holds N's hides that S contains, in the
+order of N's hides list. The *hidden-outside compound partner
+folder* ('hiddenOutsideOfSubscribeeFolder') stands in N's
+subscribee folder beside the subscribees and holds N's hides
+that no subscribee contains. Their goal lists are
+'goal_list_for_hiddenInSubscribee_folder' and
+'goal_list_for_hiddenOutsideOfSubscribee_folder' in
+'server/to_org/complete/partner_folder/goal_list.rs'.
+** the retired word
+"Filter folder", "filter policy" and "derived filter", when
+they name one of these two folders or the policies of both,
+are retired by this plan; "compound filter folder" becomes
+"compound partner folder". "Derived filter" goes with the rest
+because it names the hidden-outside folder, in five comments
+and one docstring, in other words. "Filter" keeps its other
+senses, which this plan does not touch: Rust's
+iterator method; the save pipeline's noop filter
+('filter_wouldbe_noop_nodeInstructions'); search filtering in
+Tantivy and 'text_search.rs'; Emacs's and Neovim's process
+filters; the tracing 'EnvFilter'.
+* Agreed behavior
+** The policy variants
+'FolderPolicy::EditableFilter' will be 'EditableCompound' and
+'FolderPolicy::WriteProtectedFilter' will be
+'WriteProtectedCompound'. The variants' trailing comments and
+the enum's doc comment will say "compound" where they say
+"filter", keeping what they explain: that both compound policies
+take their goal list from hide state and subscription rather
+than from one relation role, that the hidden-outside one is
+editable as an explicit visible-outside subset, and that the
+hidden-in one is repaired with a warning.
+** The test names
+'filter_folder_two_births_in_fixed_order' in
+'tests/herald_tokens.rs' will be
+'compoundPartnerFolder_two_births_in_fixed_order'. The
+camel-cased token makes the noun one word, as 'names.org' asks.
+'test_subscribee_and_filter_folders' in
+'tests/hidden_from_subscriptions.rs' will be
+'test_subscribee_and_compoundPartnerFolders', in its
+definition, its call, and the label string passed to
+'reset_from_config' beside the call; the three stay identical.
+** Comments
+Every comment listed in the code map will say "compound partner
+folder" (or "the two compound partner folders", or the folder's
+wire atom) where it says "filter folder", "compound filter
+folder" or "derived filter", and "edits of the hidden-outside
+compound partner folder" where 'lower.rs' says "Filter edits".
+A comment's meaning does not change; only the noun does.
+** The official glossary
+'docs/glossary.org' will gain an entry for the term, in the
+glossary's own form: a headline '*** compound partner folder'
+with a blank line and a prose body, placed directly after the
+'*** partner folder' entry, before '*** write-protected set'.
+The body is the definition given above under "Words this plan
+uses", shortened as the glossary's neighbours are. The
+paragraph of the 'partner folder' entry that now begins "Two
+more partner folders filter the hiding relation" (line 255
+today) will introduce the two as "the two compound partner
+folders" and say which three relationships they join, without
+the verb "filter", and will point to the new entry. The
+sentence at line 281 ("this is the filter specific to how that
+subscriber sees the subscribee") will say "this is the
+hidden-in compound partner folder specific to how that
+subscriber sees the subscribee". The folder-policy list (lines
+1020 and 1032) will name the renamed variants. Line 716 will
+say "the two compound partner folders' members".
+** The other docs
+'docs/api-and-formats.org' line 1449 and 'docs/diff-view.org'
+line 230 will say "the two compound partner folders".
+** The detour glossary
+'TODO/simplify-refresh/glossary.org' will rename the entry "the
+two filter folders, the two acquisition folders" to "the two
+compound partner folders, the two acquisition folders", say
+"the compound partner folders" in its body, name the renamed
+variants in the entry "folder policy", and say "the two
+compound partner folders" at line 284.
+** What stays as it is
+The wire atoms 'hiddenInSubscribeeFolder' and
+'hiddenOutsideOfSubscribeeFolder';
+'PartnerFolder::HiddenInSubscribee' and
+'HiddenOutsideOfSubscribee'; the files
+'hiddeninsubscribee_folder.rs' and
+'hiddenoutsideof_subscribeefolder.rs'; the goal-list functions;
+'HiddenOutsidePosition' and 'visit_hiddenOutside_folder'; the
+fixture directory 'fixtures-every-kind-of-folder'; the clients,
+which never say "filter" of a folder; the shared rendering
+cases; and every discussion document other than the detour
+glossary, '02_jeff_de-novo.org' included, whose replies are
+history.
+* Pitfalls the slice must respect
+** "filter" is mostly not this word
+A repository-wide replace would break the code. 'filter' is an
+iterator method in dozens of files, and the word names the noop
+filter, search filtering, process filters and 'EnvFilter'
+(see "the retired word"). Rename by the code map below, then
+confirm with the grep under "Verification"; expect the grep to
+show only those other senses.
+** The test label is printed, not used as a path
+'reset_from_config' ('server/test_utils.rs') prints its
+'subtest_name' and uses 'test_name' for paths, so renaming the
+label string is safe; the plan keeps it equal to the function
+name for the reader.
+** The unit test of the policies
+'tests/unit/viewnode.rs' asserts each folder kind's policy; it
+will name the renamed variants and otherwise stay.
+** Uncommitted edits under TODO/
+Jeff edits the discussion documents while plans run. Commit only
+the files this plan names, as "Commits" says.
+
+* Code map
+Line numbers are as of 2026-10-25 and may have drifted; the
+phrase is the anchor.
+** 'server/types/viewnode.rs'
+Lines 409 ("compound filter folders"), 502 ("This derived
+filter is editable"), 523, 525 and 528 (the 'FolderPolicy' doc
+comment), 534 and 536 (the two variants), 685 and 687 (the
+'policy' method), 692 ("a filter of one").
+** 'server/to_org/complete/partner_folder/'
+'goal_list.rs' line 1 ("the filter folders' rerender
+completers"); 'child_data.rs' lines 243 and 245 (the variants).
+** 'server/update_buffer/'
+'viewnodestats.rs' lines 335, 351, 401 and 431;
+'reconcile/partner_folder.rs' lines 82, 84 and 86;
+'reconcile/hiddeninsubscribee_folder.rs' line 58;
+'reconcile/hiddenoutsideof_subscribeefolder.rs' line 63;
+'complete.rs' line 355.
+** 'server/from_text/local_fieldintent_collection/'
+'traverse.rs' lines 108 and 340; 'lower.rs' lines 453 and 468
+("Filter edits"); 'types.rs' line 30 ("derived-but-editable
+filter"); 'resolve_visibility.rs' line 103 ("this derived
+filter").
+** 'server/types/save.rs'
+Line 64 ("a derived editable filter").
+** 'elisp/skg-metadata.el'
+Line 207 ("editable as a derived filter").
+** tests
+'tests/unit/viewnode.rs' lines 28 and 30;
+'tests/herald_tokens.rs' line 100;
+'tests/hidden_from_subscriptions.rs' lines 326, 328 and 771;
+'tests/new/local_fieldintent_collection/extraction.rs'
+line 1554 ("The filter folders have this guarantee tested").
+** docs
+'docs/glossary.org' lines 255, 281, 716, 1020 and 1032, plus the
+new entry; 'docs/api-and-formats.org' line 1449;
+'docs/diff-view.org' line 230;
+'TODO/simplify-refresh/glossary.org' lines 66, 69, 73, 74
+and 285.
+
+* Implementation sequence
+** TODO Slice 0: say compound partner folder
+Rename the two variants and fix every use until
+'cargo check --all-targets' is clean. Rename the two tests and
+the label. Reword the comments in the code map. Run
+'bash/nextest.sh'. Commit the code and the tests. Then edit the
+docs and the two glossaries as "Agreed behavior" says, run the
+grep under "Verification", read the diff of the docs, change
+this headline to DONE, and commit.
+
+* Verification and completion
+'cargo check --all-targets' clean; 'bash/nextest.sh' green. The
+integration suite is not required: nothing the server writes
+into a buffer changes, no atom, label or herald. The grep
+#+begin_example
+  rg -n -i 'filter folder|filter_folder|filter polic' \
+    '|EditableFilter|WriteProtectedFilter' \
+    '|derived filter|derived editable filter' \
+    '|derived-but-editable filter|Filter edits|filter of one' \
+    '|folders filter the hiding|the filter specific' \
+    server tests docs elisp nvim shared \
+    TODO/simplify-refresh/glossary.org --glob '!target'
+#+end_example
+reports nothing; today it reports every site in the code map
+and nothing else. The two-question check of 'plans.org' is
+answered here in advance: the slice coins nothing ("compound
+partner folder" joins two phrases the code already uses, and
+this plan defines it in 'docs/glossary.org'), and cites nothing
+under 'TODO/' from code. The slice is complete when its headline
+reads DONE and both commits exist.
