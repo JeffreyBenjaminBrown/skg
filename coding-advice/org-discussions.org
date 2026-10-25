@@ -4,16 +4,19 @@ asynchronously, inside Org files under 'TODO/<topic>/' (for instance
 '1_discussion.org', '2_plan.org'). Jeff reads and answers in Emacs.
 * The two things that matter
 ** Searching for "\* TODO" finds everything that needs attention
-After either of us finishes a pass, every heading that needs the other's
-attention is marked TODO, and nothing else is. So when you finish
-processing a TODO, clear it: mark it DONE, ONGOING, or something else,
-or remove the keyword. Which of those you choose doesn't matter, and
-Jeff is not consistent about it either. Other keywords (ONGOING,
+Every heading that needs the other's attention is marked TODO. Each
+of us marks our own new headings TODO, and each of us clears only the
+TODOs on headings we wrote, once the other's reply has been read. So
+Claude marks every reply it writes TODO, including a plain agreement,
+and never changes the keyword on a heading of Jeff's: Jeff closes his
+own TODOs himself after reading the reply. Other keywords (ONGOING,
 AWAITS, DONE) are informal notes on the state of a heading; nothing
 depends on them.
 
 A TODO is for whoever didn't write it. A TODO in Claude's voice is for
-Jeff, and a TODO in Jeff's voice is for Claude.
+Jeff, and a TODO in Jeff's voice is for Claude. A TODO of Jeff's that
+already has a 'Claude says' child is answered and waiting for Jeff to
+close it; Claude leaves it alone.
 ** The voice switch is visible
 Every reply begins its headline with an author marker: 'Claude says'
 or 'Jeff says'. Jeff often abbreviates his to 'js'; Claude always
@@ -24,7 +27,7 @@ marker starts a reply, so the marker need not be repeated.
 * Habits that help
 ** Replying
 Reply to one of Jeff's headings as a child of it. Never alter his
-words; changing his keyword and adding children is fine. Claude may
+words or his keywords; adding children is fine. Claude may
 revise its own text, for instance to fold in decisions, but should leave
 Jeff's direct edits to Claude's text in place.
 ** Folding decisions

@@ -1,6 +1,3 @@
-Welcome, Claude! My name is Jeff. Please see coding-advice/ORIENTATION.org.
-
-Then, please
 * REMEMBER
 ** not to dirty the production skg's code.
 ** to set the model

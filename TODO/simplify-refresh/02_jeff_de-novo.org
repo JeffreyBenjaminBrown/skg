@@ -1,23 +1,370 @@
-* Rebuild buffer-refresh from scratch.
-** shape
+* DONE Jeff speaking : Rebuild buffer-refresh from scratch.
+** DONE shape
 The input of the refresh is a graph -- the truth -- and a buffer.
-The output of refresh is a graph.
+The output of refresh is a buffer.
 The graph is org format plus metadata for every headline.
-** principles
+*** DONE Claude: inputs today's refresh reads beyond those two
+**** DONE HEAD, the before-graph
+Historical phantoms, the restore request and every change
+fact read HEAD through the graph straddle. Today only the
+diff view builds it; a content view's rerender context
+carries 'None' ('RerenderAfterSaveContext::graph_straddle').
+Your phantom proposal wants HEAD in every refresh. I would
+make "the truth" mean the worktree graph plus HEAD, always;
+the diff view would then differ only in what it asks to be
+drawn, not in what it can see. Do you accept building the
+before-graph for content views too?
+***** DONE Jeff : Do you mean the view of the before-graph?
+The graph, before and after,
+ is settled by the time we are refreshing the buffer.
+We can use the whole straddle as input to buffer-refresh,
+that's fine.
+****** Claude says: the graph itself, not a view of it
+I meant 'straddle.before', the in-Rust graph built from each
+owned skgrepo at HEAD, not any buffer drawn from it. Your
+conclusion is what I was after: the whole straddle is the
+input, for every buffer kind. The cost is already paid:
+'current_graph_straddle_in_slot' rebuilds the before-graph
+only when an owned HEAD moved (a commit), re-pairs it when
+the live graph changed, and otherwise reuses it. A standing
+input adds nothing per save.
+**** DONE the session's deleted set
+'deleted_by_this_save_pids' and the extra IDs of those pids
+exist so that an occurrence can be turned into a deleted
+phantom. If phantoms are recalculated from among the
+parent's children, the set is unnecessary: an occurrence
+whose ID the graph no longer resolves is a phantom, keeping
+the text the buffer already shows. Nothing else reads the
+set (three files). I would drop it.
+***** DONE Jeff : Why keep a deleted set?
+Was it because I said a phantom can be session-lifetime?
+I take that back! They shuoldn't persist across sessions.
+They should be "precarious-lifetime": They aren't in the graph,
+only the view, and if the user deletes a precarious node,
+the only way they can get it back is out of band
+(e.g. they could use Emacs's undo, but it's painful).
+****** DONE Claude says: we agree; I proposed dropping it
+The heading named a thing today's refresh reads, not a thing
+to keep; its last sentence was "I would drop it". With
+phantoms derived from graph plus buffer, nothing needs it.
+Nothing persists a phantom either: the viewforest lives in
+the server for the session and in the buffer, nowhere else.
+"Precarious" is the better word, and I would use it for the
+axis: Permanence = version-controlled | precarious. One
+consequence worth a sentence in the shape: a precarious
+phantom's title and body exist only in the buffer, so for it
+the buffer dictates the values and the refresh copies them
+through unchanged. That is the one exception to "the graph
+dictates values"; a version-controlled phantom's text comes
+from HEAD.
+**** DONE AGREED the skgrepo restriction
+Part of the truth, not of the buffer: what the graph is
+willing to say. I would hand the refresh an already gated
+graph, so that no rule inside it mentions restriction.
+***** DONE Claude says: one amendment, from your "unsayable" note
+If an occurrence of a hidden node is to be entombstoned
+rather than shown (see the reply under "unsayable"), the
+refresh must tell "hidden" from "gone": an occurrence of a
+gone node becomes a phantom and keeps its text, which for a
+hidden node would be the leak. So the gated graph needs one
+more answer: for an ID, present, hidden or absent. Everything
+else stays gated.
+****** DONE jeff : it's especially nice
+that the tombstone won't reveal that something was hidden there --
+maybe it's some other kind of tombstone.
+**** DONE the requests in the buffer
+View requests ('editableView', '(folder containers)' and so
+on) ride in the metadata, so they arrive with the buffer,
+but they are commands, not state: the refresh fulfils and
+drops them, and the output carries none. Worth a sentence in
+the shape, since it is the one way the output is not a
+function of the buffer taken as state.
+***** DONE jeff : agreed
+Moreover, dropping edit requests is not the refresh's job --
+it would have to assume they were executed,
+when their presence suggests otherwise.
+If they are there, they shuoldn't be,
+but buffer-refresh retains them.
+
+view requests are handled by the buffer-refresh.
+****** DONE AGREED Claude says: agreed, and that is today's rule too
+'consume_edit_requests_after_save' clears them only after a
+save that succeeds; one that stops or fails leaves them, and
+completion never reads them. Readiness and restore requests
+are edit requests, so the refresh carries those too. One
+small case: an edit request on a headline whose kind the
+refresh changes, say '(editRequest delete)' on an occurrence
+that becomes a phantom. A phantom's metadata has no slot for
+it. I would drop it there with a warning, since the save
+could not have acted on it either; everywhere else, retain.
+**** DONE the node budget
+'initial_node_limit' bounds how much content the refresh
+draws for editable occurrences. A parameter, not an input;
+see "extent" under your first question.
+** DONE principles
 Where the buffer contradicts the graph, it is corrected or removed.
 It must not lie.
 It should recompute every value from the graph that the graph dictates.
 It should not show restricted data -- nodes or relationships,
 although if the relationships are hard to hide, whatever,
 perfect privacy is not critical.
+*** DONE Claude: agreed, with two sharpenings
+**** DONE correct before removing, by the weakest correction
+"Corrected or removed" leaves open which, and today that
+choice is made in several places. I would fix the order: the
+weakest change that makes the headline true wins. A member
+the graph does not confirm becomes a non-member; a second
+editable occurrence becomes write-protected; a stale title
+is clobbered; an occurrence of a vanished node becomes a
+phantom; only a headline that no kind can state truthfully
+in its position is entombstoned. Your "unsayable" then has a
+definition: nothing on that ladder applies.
+***** DONE jeff : agreed
+And when something is made WP its children are made nonmembers.
+****** DONE Claude says: yes; to fold into the ladder
+The step then reads "a second editable occurrence becomes
+write-protected, and its children non-members". It is also
+the invariant the merge rule trusts. I will fold it into the
+ladder in the main document when you hand that back.
+***** DONE jeff : "unsayable" should maybe mean either or both
+of two things: restricted or can't be stated truthfully.
+But I'm not sure how "can't be stated truthfully" happens
+before one of the cases can claim the node.
+****** DONE AGREED Claude says: the two senses; where the ladder ends
+On "can't be stated truthfully": for an occurrence of a node
+it never happens. Any ID can be stated as an occurrence (the
+graph has the node), an unknown (a list names it) or a
+phantom (neither), so the ladder always ends in a kind, and
+a parent's kind is settled before its children's. The bottom
+is reached only by headlines that describe their viewparent
+rather than stand for a node: a folder or a property entry
+under a viewparent that is no longer a node (it became a
+phantom or a tombstone), and a diff-view property whose
+change is gone. The duplicate I listed in the main document
+does not belong there: the merge removes it by construction,
+not because it is unsayable.
+On restricted: if "unsayable" includes it, the restricted
+placeholder kind goes away. An occurrence of a hidden node
+is entombstoned; childless, it is pruned, so a tightened
+restriction makes hidden nodes vanish instead of leaving an
+anonymous line; with children, the tombstone holds them,
+revealing only that something stood there. I like that
+better than today's placeholder, which lingers. It needs the
+gated graph to say "hidden" (the amendment above), and the
+folder goal lists to omit hidden members, which they do.
+**** DONE the converse: preserve what the graph does not dictate
+Viewnode IDs, fold state and focus, which occurrence is
+editable, the order of siblings the graph has no order for,
+where a non-member stands, and any headline the user typed
+as a note. In one sentence: the graph dictates values, the
+buffer dictates positions. Much of today's complexity sits
+where the code is unsure which side a fact belongs to;
+naming the principle lets each fact be assigned once.
+**** DONE restricted data
+The placeholder already reveals that a node exists at that
+position, and the relationship counts are gated, so I agree
+perfect privacy is not critical. One case to keep as it is:
+a placeholder whose hidden node vanished stays a
+placeholder, since a tombstone there would reveal that
+something hidden died.
+***** DONE Jeff : what's the placeholder?
+I don't remember seeing that in [[./metadata-format.org][the metadata]].
+
+****** DONE Claude says: the restricted node
+It is the kind the metadata notes call "restricted node":
+'(skg restrictedNode (vnid X))', 'Vognode::Restricted', the
+anonymous headline the herald labels "node from restricted
+skgrepo". It carries no ID, repo, title or body.
+"Placeholder" is the docs' word for it, and, confusingly,
+also for an unknown. If restricted joins "unsayable", this
+is the kind that disappears.
+******* DONE jeff : Yes, disappear it!
 * kinds of thing, and what they should do
 ** tombstones
+*** Jeff
 Things should be tombstoned if they are unsayable.
 (Let's say 'entombstone' only when the shorter form
 could be confused with a noun).
 Tombstones need be collected and pruned only once,
 after all other computations that produce the new buffer.
-** phantoms
+*** Claude: agreed; what the prune removes, and "unsayable"
+Pruning once, postorder, after everything else, is what
+'prune_self_deletable_when_empty' does today, and I would
+keep exactly that: a childless tombstone goes; one with
+children stays and holds them; a root is never pruned.
+**** DONE what else the prune removes today
+Childless deleted phantoms, the childless write-protected
+partner folders and filter folders, and the childless ID
+folder ('is_self_deletable_when_empty'). Under your phantom
+rule the deleted phantoms leave that list. For the folders I
+would rather have one rule than a list: an empty folder the
+graph does not warrant is entombstoned, and only tombstones
+are pruned.
+***** DONE jeff
+Let's hold onto all deleted phantoms, with children or not.
+What's a filter folder? Is that a term you just invented,
+  or is it in the codebase? If the latter it needs renaming.
+  Please before inventing a term check for how it is said,
+  and if there's no precedent, inform me that you had to coin it.
+Agreed, one rule better than a list.
+****** DONE Claude says: phantoms stay; the term is the code's
+******* DONE Folded:
+phantoms, with children or not, leave the prune
+entirely; only tombstones are pruned, and an empty folder the
+graph does not warrant is entombstoned first.
+******* DONE "filter folder" is the code's word, not mine
+'FolderPolicy::EditableFilter' and 'WriteProtectedFilter' in
+'server/types/viewnode.rs' name the policy, and the phrase
+"filter folders" stands in 'docs/glossary.org',
+'docs/api-and-formats.org', two comments in 'viewnode.rs' and
+the header comment of
+'server/to_org/complete/partner_folder/goal_list.rs'. It names
+the two folders whose membership is derived from hide state
+rather than read from one relation role,
+'hiddenInSubscribeeFolder' and
+'hiddenOutsideOfSubscribeeFolder'; "filter" means the hides
+are filtered by whether the hidden node is inside the
+subscribee's content.
+******** DONE jeff : let's rename those Ternary Folders
+They involve two relationships from a node, right?
+And let's expunge "filter folder", which is vague.
+********* DONE Claude says: three nodes; names and sites
+Right, with one refinement. Three nodes take part: the
+subscriber N, a subscribee S and a hidden node H, joined by
+"N subscribes to S", "N hides H" and "S contains H". Two of
+the three relationships are N's; the third is S's. The
+hidden-in folder, under S inside N's subscribee folder, holds
+N's hides that S contains, in the order of the hides list;
+the hidden-outside folder, beside the subscribees, holds N's
+hides that no subscribee contains
+('goal_list_for_hiddenInSubscribee_folder' and its twin in
+'server/to_org/complete/partner_folder/goal_list.rs'). So
+"ternary" is exact.
+********** names
+In prose: "the two ternary folders", "the hidden-in ternary
+folder" and "the hidden-outside ternary folder". The folder
+kinds keep their wire atoms. The two policies, if the enum
+survives the rebuild, become 'EditableTernary' and
+'WriteProtectedTernary'.
+********** DONE Claude says: the sites, and whether to do it now
+"Filter" in this sense stands in about thirty places: the two
+'FolderPolicy' variants and their four uses; comments in
+'viewnode.rs', 'goal_list.rs', 'viewnodestats.rs',
+'partner_folder.rs', the two folders' reconcilers,
+'complete.rs' and 'traverse.rs'; the docs ('docs/glossary.org'
+twice, 'docs/api-and-formats.org', 'docs/diff-view.org'); and
+the detour's 'glossary.org'. No test name and no wire atom
+carries it. It is one mechanical slice, a rename with the
+suite run after. Shall I do it now, as a commit of its own,
+or leave it for the rebuild, which will touch most of those
+files anyway?
+*********** TODO jeff : Don't do it but please write a plan for it.
+Call it 03_plan_say-ternary.org
+******* DONE Claude says: a rename, or no name at all
+Those comments also say "compound filter folders", and
+"compound" alone says what matters (members come from
+combining two relationships) without suggesting a filter. But
+the main document's reply under "folders" collapses the four
+policies to one question, whether the graph orders the
+members; if that holds, the enum goes and no policy name is
+left to rename, only the docs' phrase. I would wait for that
+and then say "the two compound folders". Which do you prefer?
+******** DONE jeff : Is this closed by earlier discussion?
+********* DONE Claude says: closed by your rename
+You chose "ternary", so the choice between "compound" and no
+name is moot. What remains open is in the main document under
+"folders": whether the policy enum survives the rebuild. If it
+does, the two variants take the new word; if not, only the
+comments and the docs do.
+******* DONE on coining terms
+Noted as a standing rule: before naming a thing I check how
+the code and docs say it, and when I must coin a term I say
+so where it first appears.
+**** Claude: a definition of unsayable, to confirm
+A headline is unsayable when no kind can state it truthfully
+in its position. With the ladder under "principles", that
+leaves: a folder or property entry whose viewparent is not a
+node (it died, or became a tombstone or a phantom); a
+diff-view property whose change no longer exists (an "old
+text" for a node whose text no longer differs from HEAD); a
+headline for a vanished node that has no text to show (it
+was an unknown) and no children; a duplicate occurrence
+after the merge rule has taken its children. Everything else
+is sayable: a non-member occurrence of a real node says
+something true even when nothing warrants its position.
+***** jeff : a headline on an unknown node
+should be refused at validation,
+(let's make it a validation error if it's not),
+but by the time such a headlined unknown reaches refresh,
+refresh should accept it.
+****** Claude says: already refused; I meant the viewnode
+Text on an unknown's line is a validation error today: the
+parser returns "Unknown phantom content cannot be edited." as
+a 'BufferValidationError' when an '(unknown ...)' headline
+has a title or body ('server/serve/parse_metadata_sexp.rs'),
+and the same for a restricted node. So the refresh never
+meets one, and if it did it would accept it, as you say.
+My sentence meant something else by "headline": the viewnode
+itself, an unknown that no list names any more, so that it
+has neither text nor a warrant. I called it unsayable. With
+your decision to hold every phantom it is not: it is a
+precarious phantom with nothing but an ID to show, kept until
+the user tombstones it. I would drop that item from the
+unsayable list, which makes the rule for an ID uniform: the
+graph has the node, it is an occurrence; a list names it, an
+unknown; otherwise a phantom, with whatever text the buffer
+or HEAD can give it.
+******* jeff : let's let go of an unwarranted unknown
+Out of place, all it says is "this ID is not in the graph",
+without even saying why we thought it might be,
+so it has zero information content and should be tombstoned.
+******** Claude says: agreed; folded
+An unknown that no list names is entombstoned; childless, it
+is then pruned. That is today's rule
+('convert_nonmember_unknown_children_to_tombstones'), kept.
+The rule for an ID then reads: the graph has the node, it is
+an occurrence; it has text to
+show, a phantom; its parent names it, an unknown;
+none of those, a tombstone. The last clause
+is what separates it from a precarious phantom, which also
+says only "not in the graph" but carries the text that says
+what was lost.
+********* TODO jeff : I edited the preceding paragraph
+the body of your "Claude says: agreed; folded".
+If you read it back and it doesn't make sense to you now,
+let me know.
+***** DONE jeff : careful, a folder can be in a folder
+The hiddenOut folder is in the subscribee folder.
+But the general principle holds: A thing that is somewhere
+its kind cannot be should be tombstoned.
+
+A node can be anywhere; if it's in a property folder,
+or a write-protected partnerfolder,
+or anywhere else it doesn't make sense,
+it just becomes a nonmember.
+****** DONE Claude says: right; allowed viewparents per kind
+My phrase "whose viewparent is not a node" was wrong for the
+two folders that nest: the hidden-outside folder stands in
+the subscribee folder, and the hidden-in folder stands in a
+member of the subscribee folder. The code has the general
+form already: 'required_ancestry' in
+'server/update_buffer/ancestry.rs' gives each folder kind the
+chain of ancestor kinds it may stand under (a node; the
+subscribee folder, then a node; a historical phantom, for the
+acquired-by folder). Your principle in those terms: a
+headline whose kind allows no viewparent of the kind it has
+is entombstoned, and that table is the whole definition of
+"unsayable" for headlines that are not nodes. It would gain
+rows for the property entries and the diff view's properties,
+which are not checked today, and lose the special row for the
+acquired-by folder once phantoms are one kind.
+On nodes: agreed, a node is never unsayable. Where its kind
+cannot be a member (a property folder) or the graph does not
+list it (a write-protected folder, or a content list that no
+longer names it) it becomes a non-member and stays. That is
+the first rung of the ladder.
+** DONE phantoms
+*** DONE vision
 Things deleted this session are currently one kind of phantom.
 Things dredged up from version history are another.
 We should use one type for those two things,
@@ -35,17 +382,135 @@ before redisplay.)
 
 Phantoms should be recalculated from among their parents' children,
 in-place (to make sure we don't detach interesting descendents).
+*** DONE Claude says: yes to one type; what it needs
+**** DONE AGREED: permanence is computed, not stored
+Whether HEAD has the node changes while the buffer does not:
+a node deleted this session is in HEAD until the next commit
+and gone from it after. So the refresh recomputes permanence
+from HEAD each time, writes it as a display fact for the
+heralds, and the parser may discard it. That is why HEAD
+must be in every refresh (see "shape"). Without it, every
+phantom in a content view is session-lifetime and only the
+diff view can say more.
+**** DONE AGREED: which text a phantom shows
+Today a deleted phantom keeps the buffer's last text and a
+historical one shows HEAD's. When HEAD has the node the two
+can differ (edited, then deleted, no commit between). I
+would show HEAD's text whenever HEAD has the node, because
+that is what a restore brings back, and the buffer's text
+otherwise. Agreed?
+**** DONE the restore request follows the type
+'restoreNode' is accepted on historical phantoms only and
+reads HEAD ('server/diff_view/restore_requests.rs'). With
+one type it is accepted on any phantom HEAD has, and the
+herald can offer it there and nowhere else. That is one way
+the permanence shows up: restorable, or not.
+**** DONE the two requests
+A phantom is never a member (a member whose node vanished is
+an unknown; see below), so entombstoning one edits nothing,
+and the request can be a view request. The buffer-wide
+command needs no server support: the client finds every
+phantom by its metadata, stamps the request on each, and
+saves. A childless phantom so stamped vanishes at the prune;
+one with children leaves a tombstone holding them, as you
+say.
+**** DONE in place, both ways
+Agreed, and I would state it for every occurrence: a
+viewnode becomes whatever kind the truth now supports, where
+it stands. That includes the reverse direction: a phantom
+whose node is back (restored, or recreated with the same ID)
+becomes an ordinary occurrence again. Today only the diff
+view's align step does that, for historical phantoms under
+editable content; the general rule makes it one case.
+**** DONE a consequence for a pitfall the code records
+A comment on 'Phantom' says a foreign view shows a node
+deleted elsewhere as unknown rather than deleted, so that it
+looks the same next session. Deriving phantoms from graph
+plus buffer gives that for free: an occurrence with text
+becomes a phantom, an ID a list names becomes an unknown,
+and no session memory is consulted.
 ** unknown
 This should be distinct from phantoms. I believe it already is.
 It is not tombstoned -- that would be an edit.
+*** Claude says: distinct in the metadata, not in the type
+'Phantom::Unknown' is a variant of 'Phantom' in
+'server/types/viewnode.rs', and the docs say "unknown
+phantom"; only the metadata form '(unknown ...)' sets it
+apart. For the rebuild I would make it its own kind and draw
+the line by membership. The graph lacks the node in both
+cases, but a list in the graph names an unknown's ID, so it
+is a member and save-relevant, while nothing names a
+phantom's ID, so it is save-inert. Removing an unknown's
+headline would drop the ID from the list at the next save,
+which is the edit you mean.
+**** TODO Claude says: the one crossing between the kinds
+An occurrence whose node vanished while the parent's list
+still names it is both: it has text, and the list names it.
+Today 'normalize_relationship_backed_content_unknowns' makes
+it an unknown and the text is lost. I would keep that: the
+title was the node's, the node is gone, and showing it would
+be the lie you forbid. If you want the last title kept as a
+hint, it needs a marked slot of its own. Which?
+**** today's exception
+'convert_nonmember_unknown_children_to_tombstones'
+tombstones a non-member unknown, which edits nothing. Under
+the line above a non-member unknown cannot exist: an ID that
+nothing names and no node answers to, with no text, is
+unsayable and goes to a tombstone by the general rule.
 ** folders
 I think these rules apply to all folder kinds!
+*** Claude says: yes, with the one axis the rules need
+The four folder policies collapse to one question: does the
+graph have an order for the members? A folder whose members
+are a list in the viewparent's own file (subscribees,
+overridden, hidden-from-subscribers; and the aliases) has
+one. A folder of recorders (containers, subscribers,
+overriders, hiders, mentioners, hidden-in) has none; the
+graph holds those as sets. The diff view's acquisition
+folders read the straddle but follow the same rules.
+Editable or write-protected matters to the save, not to the
+refresh: when the refresh runs the save has already run, so
+the graph is the truth for both. One scoping note: a
+write-protected folder's members are members, not
+non-members (they carry no 'nonMember' and show ☮ without
+⊥), so the trust assumption under "merge" is about
+occurrences of nodes, not about folders.
 *** restore members
 if any are missing
+**** Claude says: agreed; a name, and the warning
+"Restore" collides with the restore request ('restoreNode',
+'restoreRel'), which asks the save to undo a deletion in the
+graph. The glossary already has "reinstate" for a member the
+refresh draws anew; I would use that. Today a reinstatement
+in a write-protected folder is also reported as a repair
+warning to the just-saved view, since it means the user
+deleted a headline that cannot be deleted. I would keep the
+report but make it the client's business: the refresh
+returns what it corrected, and the client decides what to
+say.
 *** reorder members
 to match the truth, but only if there is one
 (the graph says, not the view).
+**** TODO Claude says: where the non-members go
+Members take the graph's order; the rule is silent on the
+non-members among them (chain nodes, notes). Today
+'KeptChildOrder::FollowsGoal' puts non-members first, then
+members in order. "As little change as possible" suggests
+instead that each non-member stays after the sibling it
+followed. I would take the second; it is no harder, since
+the reorder is a stable sort of the members with each
+non-member riding behind its predecessor. Agreed?
 *** retain nonmembers, with as little change as possible
+**** Claude says: what that includes, and one rule to drop
+Keep their viewnode ID, fold state, subtree, editability and
+text; recompute their display facts (change facts, stats).
+One rule today changes a non-member for convenience rather
+than truth: a non-member holding the editable claim "yields"
+it to a member occurrence met later in the walk, and is
+write-protected with its content. The graph does not dictate
+which occurrence is editable, so under your principles that
+rule goes; the user asks for editability where they want it.
+I would drop it.
 *** merge
 If the ID for a member is repeated among its siblilngs,
 those instances should be unified.
@@ -74,14 +539,209 @@ which, when refresh recurses to process the children of x, then becomes
 #+end_example
 When so unifying, if any collection is editable,
 their union is editable.
+**** Claude says: agreed; the invariant must be made first
+***** the invariant is established, not trusted
+Neither the parser nor the clients guarantee that the
+children of a write-protected occurrence are non-members.
+Today the walk makes the member children of a repeat
+occurrence non-members
+('make_writeProtected_if_repeat_then_extend_editable_map'),
+and a later pass ('validate_membership_claims') flips member
+claims under other write-protected occurrences that the
+graph does not confirm. So the rebuild's first pass should
+do it outright: for every write-protected occurrence, make
+its children non-members. Then the merge may trust it. The
+danger it removes: a headline the user typed under a
+write-protected copy of x would otherwise become a member of
+the editable x after the union, and the next save would add
+it to x's contents.
+***** TODO Claude says: which sibling survives
+Your example keeps the editable one, which is also the
+first. When they differ, I would keep the first in position
+(least movement) and give it the editable one's claim, so
+that the union is editable if any was. The survivor keeps
+its viewnode ID and fold state; the others' children are
+appended. Agreed?
+***** TODO Claude says: content siblings too?
+The rule stands under "folders" but the example is content
+under 'n'. I would apply it to every sibling set, folders
+and content alike, since the key is the same. One check
+first: can a contains list name the same ID twice? If it
+can, two member occurrences are warranted, and merging them
+would edit the list at the next save.
 ** diff data
 This can safely be recomputed in-place
 (to make sure we don't detach interesting descendents).
 Every diff-specific node -- not just phantoms, but folders
 and maybe anything else -- should have an
 unusual-colored pac-man ghost ᗣ character as its first emoji.
+*** Claude says: agreed; how the glyph gets there
+**** the glyph is a herald rule, not metadata
+The server chooses no glyphs: 'server/heralds.rs' serves a
+rule table keyed by metadata atoms, and each client renders
+it. The diff-specific kinds already have atoms of their own
+('oldText', 'bodyDiff', 'homeSkgrepoMove', 'relRepoMove',
+'changesetMarker', 'removedAlias', 'removedID',
+'acquiredByFolder', 'acquiredFolder', 'historical'), so a
+rule per atom emitting ᗣ first, in a style of its own in
+'shared/herald-styles.json', needs no new metadata. Two
+cautions. ᗣ is a Canadian Syllabics letter, not an emoji,
+and a font that lacks the block shows a box. And a removed
+member is an ordinary node with a change fact, not a
+diff-specific kind, so it gets no ghost unless you want
+every headline with a '(diff ...)' to carry one.
+**** recomputed in place, with the ladder
+A change viewnode is kept while its change exists, dropped
+as unsayable when the change is gone, and created when
+missing; the user's notes under one are held by the
+tombstone that replaces it. That is your phantom rule again.
+**** the 'changed' spelling of a folder
+'(FOLDER changed)' says what the folder's members already
+say (the metadata notes record this). If a changed folder is
+an ordinary folder whose members carry change facts, one
+spelling goes.
 * Let's also fix some awkwardness in the metadata.
 ** props counts are in (rels ...);
 there should be separate (props ...) and (rels ...).
+*** Claude says: agreed
+'(aliases N) (extraIds N) (flags N)' describe the node, not
+a relation. A separate '(props ...)' touches the writer
+('server/update_buffer/viewnodestats.rs'), both renderers
+('elisp/heralds-minor-mode.el' reads the counts near line
+494; Neovim has its own), the grammar note in
+'server/herald_tokens.rs', the "Stats metadata" section of
+'docs/api-and-formats.org', and the shared cases in
+'tests/shared/herald-rendering-cases.txt'.
 ** birth should be a view prop, not a graph prop
+*** Claude says: agreed
+'birth_facts' is computed from the parent's kind, the
+membership, the flags and 'overridesHere', all positional,
+so '(viewStats (birth ...))' is the honest place. The
+renderers read birth together with the relationship counts
+to decide which side a fraction's ancestors count on
+('docs/heralds.org', "Birth"); after the move they read two
+forms of one headline, which costs nothing.
 ** homeSkgRepo should be in props, not viewstats
+*** TODO Claude says: which of the three do you mean?
+The home skgrepo itself is already in the node form, as
+'(repo SKGREPO)', which is "props" by your scheme. What
+'(viewStats ...)' holds is positional or historical: the
+boundary marker '(homeRepoHerald ⌂:LABEL)', written only
+when the node's home differs from its nearest unrestricted
+ancestor's or at a root, and the skgrepo-changes buffer's
+'(homeSkgrepoMove (old X) (new Y))' with 'movedLikeAncestor'.
+I would leave 'repo' where it is; keep a boundary fact in
+'viewStats' but shrink it to a bare 'repoBoundary', since its
+label repeats '(repo ...)'; and move the home-skgrepo move
+into '(diff ...)', where the node's other changes live. The
+diff view also writes that move as a property leaf under the
+node, so this would leave it one spelling.
+* questions for Claude
+** Are there principles I've missed?
+*** Claude says: what I would add
+**** never detach; re-kind in place
+You state it for phantoms and for diff data. Make it the law
+for every headline: the refresh's only operations are to
+change a headline's kind or marks where it stands, to
+reorder siblings, to create a missing child, to merge
+siblings of one key, and, once at the end, to prune
+childless tombstones. Nothing moves to another parent, and
+nothing with children is deleted. "Retain as non-member" and
+your merge rule are instances.
+**** normalize before reconciling
+The per-parent rules rely on invariants the input does not
+guarantee: one editable occurrence per node, and non-members
+under every write-protected occurrence. One pass over the
+whole buffer establishes both before any parent is
+processed; then no rule needs to re-check them. Today those
+checks are spread through the walk.
+**** a fresh render is a refresh of a stub
+'render_initial_view' already completes a stub of one root
+per requested node, each with a containers-folder request;
+the diff view's first drawing completes a stub over the
+straddle. If the rebuild keeps that, there is one code path,
+and refresh (refresh (b)) = refresh (b) is the test that the
+rules are consistent.
+**** the graph dictates extent only where the buffer asked
+"Recompute every value the graph dictates" must not mean
+draw everything the graph has; the graph is cyclic. The
+buffer says how much is drawn: an editable occurrence shows
+its whole content list (bounded by the node budget); a
+write-protected occurrence shows the children the buffer
+had, corrected, with nothing added; a folder shows all its
+members. Stating this per kind is what keeps the refresh
+finite.
+**** requests are consumed, never carried
+The output carries no view request. A request the refresh
+cannot fulfil becomes a warning, not a headline that
+pretends.
+**** the round trip through the metadata is exact
+Every headline the refresh writes parses back to the same
+viewnode, and the save reads the marks the refresh meant
+('nonMember', 'writeProtected', the kind). The notes in
+'metadata-format.org' sort each part into save input or
+display fact; the rebuild should keep that sorting as a
+checked table, since "must not lie" is addressed to the
+save's reader as much as to the user.
+** Are there cases it isn't obvious how to handle?
+
+*** Claude says: those not raised above
+**** TODO Claude says: a childless occurrence no list names
+Node 'n' contained 'x'; another buffer's save dropped it. In
+n's buffer, x's headline has no children. Today it is
+entombstoned and pruned, so it disappears. Under "retain
+non-members" it stays, as a non-member with ⊥. The second is
+truthful and loses nothing; it also means every removal made
+elsewhere leaves a ⊥ line behind in open buffers. Which?
+**** TODO Claude says: content under a write-protected occurrence
+Your folder rules name members, but content under a
+write-protected occurrence is also a list the graph has. I
+read your intent as: an editable occurrence's content
+behaves like an editable folder (missing members reinstated,
+graph order), while a write-protected occurrence keeps what
+the buffer had, corrected, with nothing reinstated. Right?
+**** TODO Claude says: the containerward chain
+Under each folder member hang its containers, under those
+theirs, as write-protected non-members. Are those dictated
+by the graph (reinstate missing containers, re-kind the
+stale) or retained like other non-members? I would treat
+each chain level as an implicit containers folder, so the
+folder rules apply, and a container that no longer contains
+becomes a plain non-member. Today the diff view's reconciler
+rebuilds chains, and a stale member takes its chain with it.
+**** TODO Claude says: override substitution
+A content view shows an overrider in the place of the
+overridden node, recording '(overridesHere ID)'. When the
+override relationship vanishes, the headline stands for a
+node that is not in the list, and the node that is in the
+list is not drawn. Re-kinding in place gives: the shown
+headline becomes a non-member and the overridden node is
+reinstated as a member beside it. Is that acceptable, or
+should the headline flip to the overridden node and keep its
+children? The first follows your rules; the second keeps the
+user's subtree attached to the member.
+**** two editable occurrences in the input
+The user yanks a subtree, so the buffer holds two editable
+copies of one node. The first wins and the second is
+write-protected, as today. The graph does not dictate it,
+but the save needs it: two editable copies would be two
+sources of one node's text. The ladder under "principles"
+covers it.
+**** a root whose node vanished
+A root is a member of nothing, so it becomes a phantom and
+stays; a deleted phantom may already stand as a root today,
+and roots are never pruned. The buffer-wide tombstone
+request would then leave a tombstone root, which the rules
+allow.
+**** a restricted placeholder with children
+When the restriction changes, an occurrence becomes a
+placeholder or a placeholder becomes an occurrence, in
+place. A placeholder that holds children reveals that
+something hidden has children; by your note on privacy,
+acceptable.
+**** the search buffer
+Its roots are hits, members of nothing, enriched later with
+folders and stats by a second pass. If a root needs no
+warrant, the enrichment is a refresh of a buffer whose roots
+are write-protected occurrences with a containers-folder
+request, and the search buffer needs no path of its own.
