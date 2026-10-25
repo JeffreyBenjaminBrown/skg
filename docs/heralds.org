@@ -59,7 +59,7 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
-| position glyphs      | crucial     | =☮= write-protected, =⊥= non-member, =ĥ= overrides here                       |
+| position glyphs      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= overrides here                      |
 |                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
@@ -165,8 +165,13 @@ is saved. See [[file:override.org][override behavior]].
 ** Other heralds
 =☮= marks a write-protected position: a node, a folder, or a flag row.
 On a node, =B= rides the ☮ when the node's body exists but is omitted from the buffer.
-=⊥= marks a non-member (the bare atom =noClaim=): a displayed child
-that does not affect its parent's membership on save. =⟳= marks a cycle.
+=⊥= marks an unwarranted position (the atom =noWarrant= in
+=(viewStats ...)=): the graph does not relate the node to its
+viewparent as the position implies -- content its parent does not
+contain, a folder member the folder's relation does not hold for, a
+chain node that does not contain the node above. The bare atom
+=noClaim= (a child that does not affect its parent's membership on
+save) has no glyph of its own. =⟳= marks a cycle.
 
 =⌂:LABEL= marks a node's home skgrepo boundary. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than

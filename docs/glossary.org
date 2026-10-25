@@ -199,7 +199,7 @@ as a member of a list or folder; the member is the node.
 
 A *non-member* is a vognode child that takes no part in the
 membership its viewparent represents: its metadata carries the bare
-atom =noClaim=, and its herald is ⊥, where a member's carries
+atom =noClaim=, where a member's carries
 nothing ('docs/api-and-formats.org', "Content view"). A root carries
 nothing either. Under a vognode a non-member is not in the content
 list, and in a folder it is not one of the folder's members, so a

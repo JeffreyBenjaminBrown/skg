@@ -2,10 +2,10 @@
 
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
-use skg::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
+use skg::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, ViewnodeStats, default_unrestrictedVognode };
-use skg::types::viewnode::{PropertyFolder, viewnode_of};
+use skg::types::viewnode::{PropertyFolder, Warrant, viewnode_of};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -106,6 +106,27 @@ fn test_metadata_ordering () {
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats cycle))) Test\n" ); }
+
+#[test]
+fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
+  let t : UnrestrictedVognode = UnrestrictedVognode {
+    viewStats : ViewnodeStats {
+      isWarranted : Warrant::No,
+      cycle       : true,
+      .. ViewnodeStats::default() },
+    .. default_unrestrictedVognode ( ID::from ("xyz"),
+                          SkgrepoName::from ("main"),
+                          "Test" . to_string() ) };
+  let node : Viewnode = viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (t)));
+  let result : String =
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
+    . expect ("UnrestrictedVognode rendering never fails");
+  assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats noWarrant cycle))) Test\n" );
+  let metadata : ViewnodeMetadata =
+    parse_metadata_to_viewnodemd (
+      "(skg (node (id xyz) (repo main) (viewStats noWarrant cycle)))" )
+    . expect ("noWarrant parses");
+  assert_eq! ( metadata . viewStats . isWarranted, Warrant::ByGraph ); }
 
 #[test]
 fn test_rel_heralds_emitted () {

@@ -798,7 +798,7 @@ suite green. A slice that changes what the server writes into
 a buffer (0, 2, 3, 4, 5, 6, 9, 10, 11, 12) runs
 'bash/integration-tests.sh' and both client suites before it
 ends.
-** TODO Slice 0: the claim and the warrant
+** DONE Slice 0: the claim and the warrant
 'Membership' becomes 'claimsMembership : bool' on the
 occurrence; the atom 'nonMember' becomes 'noClaim' in the
 printer, the parser, both clients, 'metadata-fields.json' and

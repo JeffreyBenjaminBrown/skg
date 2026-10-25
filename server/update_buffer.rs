@@ -23,6 +23,7 @@ pub mod reconcile;
 pub mod graphnodestats;
 pub mod util;
 pub mod viewnodestats;
+pub mod warrant;
 
 pub use graphnodestats::{
   set_graphnodestats_in_viewforest,

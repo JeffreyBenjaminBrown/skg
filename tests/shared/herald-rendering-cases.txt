@@ -114,10 +114,10 @@
 (skg (node (id x) (rels (hidesFromSubs (in 1) (out 2)) (birth (hidesFromSubs in 2)))))
 ---- text: 1H2
 ---- styles: medium*1 low*1 normal*1
-==== node: independent, a cycle, a delete request, contained by the parent and another
-(skg (node (id 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats cycle) (editRequest delete)))
----- text: ⊥ 2aC ⟳ delete
----- styles: crucial*1 -*1 medium*1 low*2 -*1 medium*1 -*1 nonstandard*6
+==== node: unwarranted, a cycle, a delete request, contained by the parent and another
+(skg (node (id 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats noWarrant cycle) (editRequest delete)))
+---- text: 2aC ⊥ ⟳ delete
+---- styles: medium*1 low*2 -*1 crucial*1 -*1 medium*1 -*1 nonstandard*6
 ==== property counts: flags
 (skg (node (id 1) (rels (flags 2))))
 ---- text: F2
@@ -227,9 +227,9 @@
 ---- text: merge:y
 ---- styles: nonstandard*7
 ==== diff view: a request to restore a removed membership
-(skg (node (id x) noClaim writeProtected (editRequest restoreRel) (diff (rel removed))))
----- text: ⊥☮ restore membership ~-
----- styles: crucial*2 -*1 nonstandard*18 -*1 nonstandard*2
+(skg (node (id x) noClaim writeProtected (viewStats noWarrant) (editRequest restoreRel) (diff (rel removed))))
+---- text: ☮ ⊥ restore membership ~-
+---- styles: crucial*1 -*1 crucial*1 -*1 nonstandard*18 -*1 nonstandard*2
 ==== diff view: a request to restore a deleted node
 (skg (historical (id g) (repo main) (editRequest restoreNode) (diff (node removed) (rel removed))))
 ---- text: ☮ restore node ∃- ~-

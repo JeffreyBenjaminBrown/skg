@@ -357,13 +357,32 @@ pub struct GraphnodeStats {
   pub rels      : Option<RelationCounts>,
 }
 
+/// Whether the graph relates a viewnode to its viewparent as its
+/// position implies: content under an occurrence, a partner of the
+/// folder's relation in a partner folder, a container of the node
+/// above it in a containerward chain, a property of the node in a
+/// property folder. A derived fact, recomputed at every rendering
+/// and independent of whether the viewnode claims membership.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Warrant {
+  /// The graph relates it so; also every root, and every viewnode
+  /// whose position implies no relationship.
+  ByGraph,
+  /// The graph does not. On the wire: the atom 'noWarrant'.
+  No,
+}
+
 /// View-specific statistics about a node.
 /// These depend on the node's position in the current viewforest.
-/// `cycle` depends on ancestors; `membership` depends on the specific parent.
+/// `cycle` depends on ancestors; `isWarranted` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
   pub homeSkgrepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest unrestrictedVognode ancestor.
+  /// Computed by the stats pass ('set_warrant'); written as
+  /// 'noWarrant' when 'Warrant::No'. Display-only: the parser
+  /// accepts and discards it.
+  pub isWarranted           : Warrant,
   /// The relationship heralds as the semantic `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
@@ -1155,6 +1174,7 @@ impl Default for ViewnodeStats {
     ViewnodeStats {
       cycle             : false,
       homeSkgrepoAtBoundary  : false,
+      isWarranted       : Warrant::ByGraph,
       rel_heralds       : None,
       overridesHere     : None,
       omitted_body      : false,

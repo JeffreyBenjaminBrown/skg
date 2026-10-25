@@ -897,7 +897,7 @@ fn parse_deleted_sexp (
 
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
-/// 'cycle' stat and the keyed 'overridesHere' / 'homeRepoHerald' /
+/// 'cycle' stat, the discarded bare atom 'noWarrant', and the keyed 'overridesHere' / 'homeRepoHerald' /
 /// 'homeSkgrepoMove' / 'movedLikeAncestor' sub-forms. Relationship stats are semantic display-only '(rels ...)'
 /// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
@@ -911,6 +911,7 @@ fn parse_viewstats_sexp (
           atom_to_string (element) ?;
         match bare_value . as_str () {
           "cycle"          => stats . cycle = true,
+          "noWarrant"      => {}, // output-only, silently discard
           _ => {
             return Err ( format! ( "Unknown viewStats value: {}",
                                     bare_value )); }} },

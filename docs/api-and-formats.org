@@ -1086,6 +1086,12 @@ body.)
 relationship tokens (the same graphnode can warrant different ones
 under different parents):
 
+- =noWarrant= — the graph does not relate the node to its viewparent
+  as its position implies: its parent does not contain it, the
+  folder's relation does not hold for it, or, on a chain node, it
+  does not contain the node above. A root is always warranted.
+  Herald "⊥". A display fact, discarded at save; independent of
+  =noClaim=;
 - =cycle= — this position repeats an ancestor's ID;
 - =(homeRepoHerald ⌂:LABEL)= — the node sits at a skgrepo boundary (a
   root, or a skgrepo differing from its nearest unrestricted-vognode ancestor);

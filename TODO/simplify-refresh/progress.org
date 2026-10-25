@@ -1,0 +1,126 @@
+#+title: Progress of plan 04.1, the rewrite of the refresh
+* Rewrite refresh
+** Slice 0: the claim and the warrant
+Stopped before marking the slice DONE: one rule of the slice
+cannot be implemented without changing what the save refuses,
+which the plan says does not change. See "Choices determining
+the future".
+*** What's done and went well
+**** the claim
+'Membership' is the bool 'claimsMembership' on the occurrence;
+the atom 'nonMember' is 'noClaim' in the printer, the parser,
+both clients, 'shared/metadata-fields.json', the herald table,
+the docs and the fixtures (two scripts, kept under
+'tests/results/slice0/'). Commit afe1da82.
+**** the warrant
+'Warrant' ('ByGraph', 'No') and 'ViewnodeStats::isWarranted',
+set in the stats pass by 'warrant_of_viewnode'
+('server/update_buffer/warrant.rs'). The printer writes
+'noWarrant' first in '(viewStats ...)'; the parser discards it.
+The herald table moves ⊥ from 'noClaim' (now glyphless) to
+'noWarrant'; 'docs/heralds.org', 'docs/api-and-formats.org'
+and the rendering cases follow. Unit tests, one per position
+kind, in 'tests/unit/warrant.rs'.
+**** verified at the TCP surface
+An isolated server rendered a typed 'noClaim' child its parent
+does not contain as 'noClaim (viewStats noWarrant)', left the
+graph unchanged, and re-saved its own output unchanged. The
+herald rules serve '(CRUCIAL noWarrant "⊥")' and a glyphless
+'(noClaim)'.
+*** Deviations from the plan's "how"
+**** ByHead is not yet a variant
+'Warrant' has 'ByGraph' and 'No' only; slice 11 adds 'ByHead'
+with what computes it.
+**** property members compute a warrant but do not carry it
+A property member (alias, ID, flag) has no 'ViewnodeStats', so
+'warrant_of_viewnode' answers for it (and is tested for it) but
+nothing stores or prints the answer. It gets a home when the
+grammar gives every headline its view facts (slice 5).
+**** where ⊥ now stands
+'noWarrant' sits in '(viewStats ...)', which the lens draws
+after the '(rels ...)' tokens, so ⊥ moved from the front of a
+node's heralds to after its relationship tokens ("2aC ⊥ ⟳").
+*** Suite failures and their classification
+**** first failure: 11 diff-view tests (pruned_change_view)
+Expected fixture adaptation: removed members (and chain nodes
+drawn from HEAD) now carry '(viewStats noWarrant)', which the
+tests' expected line prefixes lacked. Adapted with a script;
+the expectations for children of a historical phantom, which
+stay warranted, were kept as they were.
+**** save::id_folder_outside_diff_view::all_tests
+Unrelated: "Directory not empty" at cleanup during the full
+run; it passes alone.
+**** three client herald tests
+Expected fixture adaptation: they asserted ⊥ on 'noClaim'.
+**** integration: import-md-and-org
+Unrelated and pre-existing: it fails the same way in the logs
+of earlier runs, among them
+'tests/results/15-slice12-integration-baseline.log'.
+*** Changes to the plan's envisioned order
+**** the printer rule moves to slice 9 (orchestrator's decision)
+Decision, 2026-10-26, by the orchestrating agent (Claude, Fable)
+on the recommended option below: the printer keeps writing
+'noClaim' wherever a child does not claim until slice 9, which
+lands the rule "no claim atom under a write-protected parent"
+together with the removal of the readers that depend on the
+atom: the refusal 'MemberChildOfWriteProtectedOccurrence' and
+the folder comparison in 'write_protected_edits.rs' (under the
+model a child of a write-protected parent claims nothing, so
+there is nothing to refuse; a typed child there is an
+unwarranted note), 'is_in_containerward_chain' (the refresh
+knows a chain node by position), and the editability helpers.
+Slices 5 and 6 must move both clients' readiness walks off the
+claim atom (traverse by warrant, or by position) before that.
+The plan's pitfall "the save reads claims only under editable
+parents" was true of 'traverse.rs' and false of
+'write_protected_edits.rs'; the review will record it as a
+false belief about the existing code. The end state the plan
+describes is unchanged; only the slice that lands it moves.
+Slice 0 is therefore DONE with this one rule deferred.
+*** What's imperfect about what's done
+The printer still writes 'noClaim' under write-protected
+parents, as it always did, until slice 9 (see above).
+*** Choices determining the future
+**** the printer rule conflicts with the save's refusals
+The slice says "the printer writes 'noClaim' only under an
+editable parent", and the pitfall "the save reads claims only
+under editable parents" concludes that this "changes nothing
+the save does". That reads 'traverse.rs' only. Other readers
+take the claim of a child of a write-protected parent:
+- 'errors_for_writeProtected_occurrences'
+  ('server/from_text/write_protected_edits.rs') refuses a save
+  in which a write-protected occurrence has a child that claims
+  ('MemberChildOfWriteProtectedOccurrence'), and compares a
+  write-protected occurrence's partner folders with the graph
+  by their claiming children ('partnerFolder_members_in_view'),
+  excluding a removed member by its non-claim;
+- 'is_in_containerward_chain' knows a chain node by its
+  non-claim, and the folder reconcilers and the diff view use
+  it;
+- both clients' readiness walks traverse only children that
+  claim.
+A child with no atom reads as claiming. So once the printer
+drops the atom under write-protected parents, the server's
+own rendering is refused when saved back.
+**** the evidence
+A throwaway printer change that dropped the atom under every
+write-protected occurrence, run against the whole Rust suite:
+55 of 918 tests failed, 35 of them with
+'MemberChildOfWriteProtectedOccurrence' on a buffer the server
+had just rendered (for example the test
+'the_removed_partners_buffer_saves_back_unchanged' in
+'tests/pruned_change_view/buffer.rs').
+The change was reverted; the log is
+'tests/results/slice0/nextest-experiment-printer-rule.log'.
+**** the options
+- Recommended: keep printing 'noClaim' wherever a child does
+  not claim until slice 9, where the ladder replaces the
+  editability helpers, and decide there what replaces the
+  refusals. The rest of slice 0 stands as committed.
+- Or do it now: read every child of a write-protected parent as
+  not claiming, whatever it carries; delete the refusal
+  'MemberChildOfWriteProtectedOccurrence' (typing a child under
+  a write-protected occurrence, and write-protecting one with
+  members, then save silently; the child shows ⊥); judge a
+  write-protected folder's members by '(rel removed)' instead
+  of the claim; and find chain nodes by position.

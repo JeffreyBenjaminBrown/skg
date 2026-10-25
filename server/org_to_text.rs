@@ -5,6 +5,7 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
+  Warrant,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -420,6 +421,8 @@ fn unrestrictedVognode_metadata_to_string (
       config    : & SkgConfig,
     ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
+      if unrestrictedVognode . viewStats . isWarranted == Warrant::No {
+        parts . push ( "noWarrant" . to_string () ); }
       if unrestrictedVognode . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
       if let Some (ref original) =

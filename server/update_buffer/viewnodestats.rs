@@ -6,9 +6,10 @@ use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-  GraphnodeStats, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
+  GraphnodeStats, PartnerFolder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
+use crate::update_buffer::warrant::warrant_of_viewnode;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 
@@ -66,6 +67,7 @@ fn set_viewnodestats_recursive (
         container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, graph, config);
+      set_warrant (tree, treeid, graph, config, restriction);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -363,6 +365,24 @@ fn birth_facts_for_folder (
     PartnerFolder::HiddenOutsideOfSubscribee =>
       vec![ BirthFact::new (
               NodeRelation::HidesFromSubs, Side::In, Some (3) ) ], } }
+
+/// Sets 'isWarranted' on the unrestricted vognode at treeid (see
+/// 'warrant_of_viewnode'). Warranted without a graph handle (some
+/// tests): better no herald than a wrong one.
+fn set_warrant (
+  tree        : &mut Tree<Viewnode>,
+  treeid      : NodeId,
+  graph       : Option<&InRustGraph>,
+  config      : &SkgConfig,
+  restriction : Option<&SkgrepoRestriction>,
+) {
+  let warrant : Warrant = match graph {
+    Some (graph) => warrant_of_viewnode (
+      tree . get (treeid) . unwrap (), graph, config, restriction ),
+    None => Warrant::ByGraph, };
+  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    &mut tree . get_mut (treeid) . unwrap () . value () . kind
+  { t . viewStats . isWarranted = warrant; }}
 
 /// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one

@@ -111,7 +111,7 @@ describe('skg.heralds', function ()
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) noClaim'
       .. ' (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))'
-      .. ' (viewStats cycle) (editRequest delete))) text' })
+      .. ' (viewStats noWarrant cycle) (editRequest delete))) text' })
     heralds.enable(buf)
     local marks = herald_extmarks(buf)
     assert.are.equal(1, #marks)
@@ -124,7 +124,7 @@ describe('skg.heralds', function ()
       hl_of[chunk[1]] = chunk[2] end
     -- the sentinel placeholder must never leak into the display
     assert.is_falsy(text:find('__RELS_SPANS__', 1, true))
-    -- ⊥ (false), the 2aC relationship token, ⟳ (cycle), delete
+    -- ⊥ (noWarrant), the 2aC relationship token, ⟳ (cycle), delete
     assert.is_truthy(text:find('⊥', 1, true))
     assert.is_truthy(text:find('2aC', 1, true))
     assert.is_truthy(text:find('⟳', 1, true))

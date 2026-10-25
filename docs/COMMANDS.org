@@ -387,7 +387,7 @@ The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
 A child that should stay there can instead be made a non-member:
-its metadata carries the bare atom 'noClaim' (herald ⊥).
+its metadata carries the bare atom 'noClaim'.
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use skg-set-editable, below.
 That's because Skg has to make other occurrences of it

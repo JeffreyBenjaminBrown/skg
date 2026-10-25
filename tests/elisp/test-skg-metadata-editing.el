@@ -128,7 +128,7 @@ plain parens. Fields producing no herald get none."
                (and ov (substring-no-properties
                         (overlay-get ov 'after-string)))))))
       (should (equal (funcall hint-on-line "*** writeProtected") " (\u262e)"))
-      (should (equal (funcall hint-on-line "*** noClaim") " (\u22a5)"))
+      (should-not (funcall hint-on-line "*** noClaim"))
       (should-not (funcall hint-on-line "**** main"))
       (should-not (funcall hint-on-line "*** repo"))
       ;; The buffer text is untouched: applying must not see hints.

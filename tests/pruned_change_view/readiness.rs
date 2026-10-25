@@ -56,7 +56,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
                               "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "*** (skg (node (id s1) (repo public) noClaim writeProtected (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
+      "*** (skg (node (id s1) (repo public) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
       "the image under sub is ready:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       line . starts_with ("*** (skg (node (id sub)")

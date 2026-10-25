@@ -366,8 +366,8 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     any leaf/atom.
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
-///     token with no space (used so the write-protected glyph "☮" sits
-///     directly on its noClaim glyph).
+///     token with no space (used so the omitted-body glyph "B" sits
+///     directly on the write-protected glyph "☮").
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
 ///
@@ -488,7 +488,9 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("node", [ vec! [
         vac ("id"),
         vac ("repo"),
-        leaf ("noClaim", "⊥"),
+        // A child that does not claim membership carries the atom
+        // 'noClaim'; it has no glyph of its own.
+        vac ("noClaim"),
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
         leaf_abut ("writeProtected", "☮"),
@@ -503,6 +505,9 @@ pub fn herald_rule_table () -> HeraldRule {
         // client swaps for the rendered spans.
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         rule ("viewStats", vec! [
+          // The graph does not relate the node to its viewparent as
+          // its position implies (see 'Warrant').
+          leaf ("noWarrant", "⊥"),
           leaf ("cycle", "⟳"),
           // overridesHere is displayed as a crucial ĥ inside the O token
           // by the client relationship renderer. The atom's
@@ -766,6 +771,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
     let ViewnodeStats {
       cycle : _,
       homeSkgrepoAtBoundary : _, // -> the homeRepoHerald atom
+      isWarranted : _,      // -> the noWarrant atom
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       omitted_body : _,      // -> the node-level omittedBody atom
@@ -774,7 +780,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       moved_like_ancestor : _, // -> the movedLikeAncestor atom
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo",
+  vec! [ "cycle", "homeRepoHerald", "noWarrant", "overridesHere", "relRepo",
          "homeSkgrepoMove", "movedLikeAncestor" ] }
 
 /// The claim atom the serializer can emit: 'noClaim' on an occurrence

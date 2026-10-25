@@ -33,19 +33,19 @@ use std::error::Error;
 const X_REMOVED_FROM_B : &str =
   "** (skg (node (id x) (repo main) noClaim (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg (node (id d) (repo main) noClaim writeProtected (viewStats cycle)";
+  "**** (skg (node (id d) (repo main) noClaim writeProtected (viewStats noWarrant cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
   "*** (skg (node (id s) (repo main) noClaim writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
-  "***** (skg (node (id d) (repo main) noClaim writeProtected)";
+  "***** (skg (node (id d) (repo main) noClaim writeProtected (viewStats noWarrant))";
 const G_UNDER_Q : &str =
   "** (skg (historical (id g)";
 const GC_UNDER_G : &str =
   "*** (skg (node (id gc) (repo main) noClaim writeProtected";
 const GC_REMOVED_FROM_R : &str =
-  "** (skg (node (id gc) (repo main) noClaim (diff";
+  "** (skg (node (id gc) (repo main) noClaim (viewStats noWarrant) (diff";
 
 /// g's file at HEAD, as the save writes a node.
 const G_AT_HEAD : &str =
@@ -256,7 +256,7 @@ fn restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member (
       let requested : String = edit_line (
         &buffer, D_IN_THE_CHAIN_UNDER_C,
         |line : &str| line . replacen (
-          "writeProtected)", &format! ("writeProtected {})", parts), 1 ));
+          "(viewStats noWarrant))", &format! ("(viewStats noWarrant) {})", parts), 1 ));
       assert_ne! ( requested, buffer );
       let refusal : String = match save (f, &requested) {
         Err (e) => match e . downcast_ref::<SaveError> () {
