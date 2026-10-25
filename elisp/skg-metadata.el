@@ -203,9 +203,10 @@ write-protected -- the save would refuse that edit. Returns
     containerFolder mentionerFolder acquiredByFolder acquiredFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
   "The PartnerFolder atoms where an explicit relRepo
-request is unsupported from this side.  HiddenOutside membership is
-editable as a derived filter, but hide repos are still derived and
-cannot carry this request.
+request is unsupported from this side.  The membership of
+hiddenOutsideOfSubscribeeFolder, a compound partner folder, is
+editable, but hide repos are still derived and cannot carry this
+request.
 `skg-set-relRepo' refuses on a member of one of these:
 the relationship belongs to the other end, so setting its repo here would
 be meaningless.")

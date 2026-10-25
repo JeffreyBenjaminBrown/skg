@@ -100,7 +100,7 @@ pub fn resolve_visibility (
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* viewnodes are replaceable: restricted
 /// relationship members and viewnodes classified inside a subscribee remain owned
-/// by the graph and survive an edit of this derived filter.
+/// by the graph and survive an edit of this compound partner folder.
 fn apply_hiddenoutside_edits (
   lowered                : &mut LoweredNodeIntents,
   edits                  : &[(ID, HiddenOutsideEdit)],

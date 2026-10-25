@@ -352,8 +352,9 @@ fn dispatch_node_update (
   if let ViewnodeKind::PartnerFolder (folder_kind) = &kind {
     // In a content view, each member of the folder carries its
     // containerward chain. Over the straddle, the diff view's folder
-    // reconciler reconciled the chains already; the two filter folders,
-    // which the diff view does not draw, carry none there.
+    // reconciler reconciled the chains already; the two compound
+    // partner folders, which the diff view does not draw, carry none
+    // there.
     if folder_kind . members_carry_containerward_chain ()
       && matches! ( context . mode, CompletionMode::ContentView )
     { reconcile_containerward_chains_under_folder_members (

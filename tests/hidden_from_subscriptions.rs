@@ -323,9 +323,9 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_owned_subscribee_is_deleted (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_subscribee_and_filter_folders",
+      s . reset_from_config ("test_subscribee_and_compoundPartnerFolders",
         "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
-      test_subscribee_and_filter_folders (
+      test_subscribee_and_compoundPartnerFolders (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
@@ -768,7 +768,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
 ///
 /// Also tests ordering rule: HiddenInSubscribeeFolder precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeFolder before E21.
-async fn test_subscribee_and_filter_folders (
+async fn test_subscribee_and_compoundPartnerFolders (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

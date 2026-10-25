@@ -25,9 +25,9 @@ fn partnerFolder_policy_mapping () {
   assert_eq! ( PartnerFolder::Hidden . policy (),
                FolderPolicy::WriteProtectedSet );
   assert_eq! ( PartnerFolder::HiddenInSubscribee . policy (),
-               FolderPolicy::WriteProtectedFilter );
+               FolderPolicy::WriteProtectedCompound );
   assert_eq! ( PartnerFolder::HiddenOutsideOfSubscribee . policy (),
-               FolderPolicy::EditableFilter ); }
+               FolderPolicy::EditableCompound ); }
 
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {

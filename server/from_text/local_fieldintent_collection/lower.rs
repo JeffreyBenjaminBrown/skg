@@ -450,8 +450,9 @@ impl LoweredNodeIntents {
     }}
 
   /// As 'subscriber_contains_after_save', but for the post-save list of
-  /// subscribees.  Filter edits must classify hides against this list, not
-  /// against a stale disk subscription that the same buffer removed.
+  /// subscribees.  Edits of the hidden-outside compound partner folder
+  /// must classify hides against this list, not against a stale disk
+  /// subscription that the same buffer removed.
   pub fn subscriber_subscribes_after_save (
     &self,
     subscriber_from_disk : &Graphnode,
@@ -465,8 +466,9 @@ impl LoweredNodeIntents {
           subscriber_from_disk . subscribesTo . or_default () ),
     }}
 
-  /// The hide IDs after the preceding inference stages.  Filter edits run
-  /// last, so they calculate their delta against this intermediate state.
+  /// The hide IDs after the preceding inference stages.  Edits of the
+  /// hidden-outside compound partner folder run last, so they calculate
+  /// their delta against this intermediate state.
   pub fn subscriber_hides_after_resolution (
     &self,
     subscriber_from_disk : &Graphnode,

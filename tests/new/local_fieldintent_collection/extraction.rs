@@ -1551,7 +1551,7 @@ fn deleting_from_hiddenFolder_emits_no_hide_change (
   // the recorder's hidesFromSubs. A member shown there
   // (and, equally, a member deleted from there) emits no hide intent;
   // the recorder's hides stay Unspecified (no opinion), preserving
-  // whatever disk holds. The filter folders have this guarantee tested;
+  // whatever disk holds. The compound partner folders have this guarantee tested;
   // the plain hiddenFolder did not.
   let input : &str =
     indoc! {"

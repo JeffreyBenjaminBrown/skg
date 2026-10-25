@@ -240,9 +240,9 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     tree, folder_node,
     match kind . policy () {
       // The save reads these folders' membership, in the buffer's order.
-      FolderPolicy::EditableSet | FolderPolicy::EditableFilter =>
+      FolderPolicy::EditableSet | FolderPolicy::EditableCompound =>
         KeptChildOrder::FollowsGoal,
-      FolderPolicy::WriteProtectedSet | FolderPolicy::WriteProtectedFilter =>
+      FolderPolicy::WriteProtectedSet | FolderPolicy::WriteProtectedCompound =>
         KeptChildOrder::Unmoved, },
     // A RestrictedVognode child is unmanaged
     // (the API doc's "Restricted-skgrepo nodes"): the goal omits

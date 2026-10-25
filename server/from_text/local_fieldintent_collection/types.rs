@@ -27,7 +27,7 @@ pub enum LocalContext {
   SubscribeeAsSuchPosition { // The node is a direct child of a SubscribeeFolder.
     subscriber               : ID,
     subscriber_is_editable   : bool, },
-  HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeFolder.
+  HiddenOutsidePosition { // The one derived-but-editable compound partner folder under a SubscribeeFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
   UnderWriteProtectedFolder, // The node is inside one of the write-protected RoleFolders, an IDFolder, or a Property.

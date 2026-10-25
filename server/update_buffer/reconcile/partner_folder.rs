@@ -79,11 +79,11 @@ pub fn reconcile_partnerFolder_children (
         // hides this node").
         view_order_preserving_goal_list (
           tree, node, &graph_members, graph_snap ) ?,
-      FolderPolicy::WriteProtectedFilter =>
+      FolderPolicy::WriteProtectedCompound =>
         // Unreachable: the let-else above already returned,
-        // because the filter folders have no relation member role.
+        // because the compound partner folders have no relation member role.
         graph_members,
-      FolderPolicy::EditableFilter =>
+      FolderPolicy::EditableCompound =>
         // Likewise unreachable here: HiddenOutside has its own
         // hide-derived reconciler, rather than a relation role.
         graph_members, }};

@@ -97,7 +97,7 @@ fn overrider_as_such_out_side () {
 }
 
 #[test]
-fn filter_folder_two_births_in_fixed_order () {
+fn compoundPartnerFolder_two_births_in_fixed_order () {
   // HiddenInSubscribee: born of both hides (gen 4) and contains (gen 2).
   // Relations emitted contains-first; birth lists in the given order.
   let c = RelationCounts { hiders : 1, containers : 1, .. counts () };

@@ -332,8 +332,8 @@ fn side_of_role (
   if role . is_first_role () { Side::Out } else { Side::In } }
 
 /// A partner-folder member's birth facts. The folder's recorder is the
-/// member's grandparent; the filter folders sit one or two levels
-/// deeper under the subscriber. (The table of birth facts is in
+/// member's grandparent; the compound partner folders sit one or two
+/// levels deeper under the subscriber. (The table of birth facts is in
 /// docs/api-and-formats.org.)
 fn birth_facts_for_folder (
   folder : PartnerFolder,
@@ -348,7 +348,7 @@ fn birth_facts_for_folder (
         Some (role) => vec![ BirthFact::new (
           role . relation, side_of_role (role), Some (2) ) ],
         None => Vec::new (), },
-    // Filter folders. In
+    // Compound partner folders. In
     //   subscriber > subscribeeFolder > subscribee
     //     > hiddenInSubscribeeFolder > member
     // the subscriber (generation 4) hides the member, and the
@@ -398,7 +398,7 @@ fn set_omitted_body (
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: no
 /// graph handle; membership is not Member (not a genuine member
-/// here); a compound filter folder
+/// here); a compound partner folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded relationship; unresolvable homes;
 /// or the skgrepo equalling the default.
@@ -428,7 +428,7 @@ fn set_relRepo (
           (parent_pid, NodeRelation::Contains, node_pid),
         ParentKind::Folder (folder, folder_treeid) => {
           let Some (role) = folder . relation_member_role ()
-          else { break 'compute None; }; // compound filter folders
+          else { break 'compute None; }; // compound partner folders
           let Some (anchor_pid) =
             tree . get (folder_treeid) . unwrap () . parent ()
             . and_then ( |p| unrestricted_vognode_pid (tree, p . id ()) )

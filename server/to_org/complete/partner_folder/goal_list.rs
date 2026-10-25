@@ -1,6 +1,6 @@
-/// Goal-list computers for the filter folders' rerender completers:
-/// each returns the ordered list of children the folder should
-/// contain.
+/// Goal-list computers for the compound partner folders' rerender
+/// completers: each returns the ordered list of children the folder
+/// should contain.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;

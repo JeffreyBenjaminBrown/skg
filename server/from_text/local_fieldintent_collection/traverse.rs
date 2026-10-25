@@ -105,7 +105,7 @@ fn visit (
       visit_aliasFolder (node_ref, context, collected),
     // The two arms below are exactly the FolderPolicy::EditableSet
     // PartnerFolders; the catch-all PartnerFolder arm after them covers the
-    // WriteProtectedSet and WriteProtectedFilter policies. If a new PartnerFolder is
+    // WriteProtectedSet and WriteProtectedCompound policies. If a new PartnerFolder is
     // added, 'PartnerFolder::policy' says which group it joins.
     ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
       visit_subscribee_folder (node_ref, context, collected),
@@ -337,7 +337,7 @@ fn visit_subscribee_folder (
         collected), }}
 
 /// Collect the explicitly submitted visible-outside subset.  This folder is a
-/// derived filter rather than a direct relationship set, so its meaning is
+/// compound partner folder rather than a direct relationship set, so its meaning is
 /// resolved only after ordinary subscribee visibility inference has run.
 fn visit_hiddenOutside_folder (
   node_ref  : NodeRef<Viewnode>,

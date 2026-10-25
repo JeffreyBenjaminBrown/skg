@@ -61,9 +61,10 @@ pub struct SavePlan {
   /// clones are skgsave-committed only on approval (see ForkSpec, the save handler's
   /// fork-confirmation stage). Empty for an ordinary save.
   pub fork_specs         : Vec<ForkSpec>,
-  /// Facts collected while interpreting a derived editable filter.  They are
-  /// deliberately not warnings yet: the save handler turns them into user
-  /// messages only after filesystem and graph mutation succeeds.
+  /// Facts collected while interpreting the hidden-outside compound
+  /// partner folder.  They are deliberately not warnings yet: the save
+  /// handler turns them into user messages only after filesystem and
+  /// graph mutation succeeds.
   pub post_skgsave_commit_notice_candidates : Vec<PostSkgsaveCommitNoticeCandidate>,
 }
 

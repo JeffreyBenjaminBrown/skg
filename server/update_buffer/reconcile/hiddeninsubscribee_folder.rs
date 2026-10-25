@@ -55,7 +55,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       &context . subscribee_contains, &context . subscriber_hides );
   let goal_list : Vec<ID> =
     // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): omit restricted
-    // members; no retention for this filter folder.
+    // members; no retention for this compound partner folder.
     omit_restricted_members (
       goal_list, skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );

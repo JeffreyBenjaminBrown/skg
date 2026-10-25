@@ -406,7 +406,7 @@ pub struct ViewnodeStats {
   /// exactly the deliberately privatized relationships. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
   /// (a non-member); and for the two
-  /// compound filter folders (HiddenInSubscribee /
+  /// compound partner folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
   /// This is a display fact, unlike a requested replacement stored in
@@ -499,7 +499,7 @@ pub enum PartnerFolder {
   // here, but editable within the parent's SubscribeeFolder.
   Hidden,
   HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Write-protected (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
-  HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
+  HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This compound partner folder is editable as an exclusive visible-outside subset; its hide skgrepos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
   // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
@@ -520,20 +520,20 @@ pub enum PartnerFolder {
 /// editability.
 /// The policies differ in:
 /// - whether buffer membership is read at save extraction
-///   ('EditableSet' and 'EditableFilter'),
+///   ('EditableSet' and 'EditableCompound'),
 /// - where the goal list comes from ('EditableSet' and 'WriteProtectedSet'
-///   from 'relation_member_role'; both filter policies from hide state),
+///   from 'relation_member_role'; both compound policies from hide state),
 /// - goal-list order ('EditableSet': graph/disk order, which the
 ///   user's own save defines; 'WriteProtectedSet': the view's current
-///   member order, then missing members appended; filter folders are
-///   derived),
+///   member order, then missing members appended; compound partner
+///   folders are derived),
 /// - whether repairs warn (the write-protected policies, in the saved view).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderPolicy {
-  EditableSet,    // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
-  EditableFilter, // A visible derived subset is an explicit edit of that subset; skgrepo requests remain unsupported.
-  WriteProtectedSet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
-  WriteProtectedFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
+  EditableSet,      // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
+  EditableCompound, // A visible derived subset is an explicit edit of that subset; skgrepo requests remain unsupported.
+  WriteProtectedSet,      // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
+  WriteProtectedCompound, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
 }
 
 /// Requests for editing operations on a node.
@@ -682,15 +682,16 @@ impl PartnerFolder {
         | PartnerFolder::Acquired
         => FolderPolicy::WriteProtectedSet,
       PartnerFolder::HiddenInSubscribee
-        => FolderPolicy::WriteProtectedFilter,
+        => FolderPolicy::WriteProtectedCompound,
       PartnerFolder::HiddenOutsideOfSubscribee
-        => FolderPolicy::EditableFilter,
+        => FolderPolicy::EditableCompound,
     } }
 
   /// Whether each member of a folder of this kind carries its
   /// containerward chain: every kind whose members are live nodes,
-  /// partners in a role or a filter of one. The diff view's two
-  /// acquisition folders, which record a nodeMerge, do not.
+  /// partners in a role or members of a compound partner folder. The
+  /// diff view's two acquisition folders, which record a nodeMerge, do
+  /// not.
   pub fn members_carry_containerward_chain (self) -> bool {
     ! matches! ( self,
                  PartnerFolder::AcquiredBy | PartnerFolder::Acquired ) }
