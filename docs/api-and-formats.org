@@ -1446,8 +1446,8 @@ historical phantom.
 The relationship that HEAD lacks (=added=) or the worktree lacks
 (=removed=). Under a vognode it is the viewparent's content; in a partner
 folder it is the relationship, of the folder's kind, between the
-member and the folder's viewparent (the two filter folders carry
-none). On an alias, id or flag leaf, the single diff object is written
+member and the folder's viewparent (the two compound partner folders
+carry none). On an alias, id or flag leaf, the single diff object is written
 =(rel added)= or =(rel removed)=: the entry's existence in its list. A
 lost alias or ID is a =removedAlias= or =removedID= leaf (below),
 whose =(rel removed)= is display only.

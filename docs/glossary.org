@@ -252,7 +252,8 @@ recorders that record its parent:
 2. A mentionedFolder would be silly: the links are already visible in
    the node's own text.
 
-Two more partner folders filter the hiding relation by subscription:
+The two compound partner folders (see "compound partner folder")
+each join three relationships -- subscription, hiding and containment:
 - a *hiddenInSubscribeeFolder*, under a subscribee as such, lists that
   subscribee's contents which the subscriber hides;
 - a *hiddenOutsideOfSubscribeeFolder*, under a subscribeeFolder, lists
@@ -278,10 +279,24 @@ explicit folder request (the =C-c l= commands), even when their
 herald counts say they would be nonempty. The same rule applies when
 a member of any partner folder is extended as editable. A
 subscribee-as-such also gets its nonempty =hiddenInSubscribeeFolder=;
-this is the filter specific to how that subscriber sees the
-subscribee. Under each member of a partner folder hangs its
+this is the hidden-in compound partner folder specific to how that
+subscriber sees the subscribee. Under each member of a partner folder hangs its
 containerward chain (see "foldering, the containerward chain, chain
 node").
+
+*** compound partner folder
+
+A compound partner folder is a partner folder whose membership joins
+more than one relationship, as against the ordinary partner folders,
+which read one relation role. There are two, and each joins three
+nodes -- a subscriber N, a subscribee S and a hidden node H -- by
+"N subscribes to S", "N hides H" and "S contains H". The *hidden-in
+compound partner folder* (=hiddenInSubscribeeFolder=) stands under S
+inside N's subscribee folder and holds N's hides that S contains, in
+the order of N's hides list. The *hidden-outside compound partner
+folder* (=hiddenOutsideOfSubscribeeFolder=) stands in N's subscribee
+folder beside the subscribees and holds N's hides that no subscribee
+contains.
 
 *** write-protected set
 
@@ -713,8 +728,8 @@ graphs that records at least one change-forest leaf
 member and a root carry the node's two; a phantom never carries
 '(properties changed)'. The relationship is the viewparent's content
 under a vognode, and, in a partner folder, the relationship of the folder's kind between
-the member and the folder's viewparent; the two filter folders' members
-carry none. On an alias, ID or flag entry, '(rel ...)' is the entry's
+the member and the folder's viewparent; the two compound partner
+folders' members carry none. On an alias, ID or flag entry, '(rel ...)' is the entry's
 existence in its list.
 
 **** change facts
@@ -1017,7 +1032,7 @@ policies in different layers:
   are graph edits.  An absent folder means "no opinion" (its field lowers
   to =MSV::Unspecified=, filled from disk); a present-but-empty folder
   means an explicit empty set (=MSV::Specified(vec![])=).
-- *EditableFilter* (=hiddenOutsideOfSubscribeeFolder=): membership is
+- *EditableCompound* (=hiddenOutsideOfSubscribeeFolder=): membership is
   derived from hide state, and a visible member set is an explicit
   edit of that subset; the hides' relRepos stay derived.
 - *WriteProtectedSet*: membership is generated from graph facts; the
@@ -1029,7 +1044,7 @@ policies in different layers:
   links, shown without a folder), the outbound =hiddenFolder=, and the
   diff view's =acquiredByFolder= and =acquiredFolder=, which are
   derived from the graph straddle and save-inert.
-- *WriteProtectedFilter* (=hiddenInSubscribeeFolder=): membership is
+- *WriteProtectedCompound* (=hiddenInSubscribeeFolder=): membership is
   derived from hide state rather than from a single relation role.
 
 The ☮ herald on a write-protected folder's headline is a

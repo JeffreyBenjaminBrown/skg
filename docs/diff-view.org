@@ -227,8 +227,8 @@ changed (this file)" and so on. A folder holds the partners in either
 graph, each tagged as a content member is: its node's existence and
 other properties, so a modified member shows ☮ M and one gesture
 there marks its file, and the existence of its relationship to the
-folder's viewparent, of the folder's kind. The two filter folders
-("It contains these, but the subscribing ancestor hides them" and
+folder's viewparent, of the folder's kind. The two compound partner
+folders ("It contains these, but the subscribing ancestor hides them" and
 "The subscriber ancestor hides these, but subscribes to nothing that
 contains them") show no change and carry no '(rel ...)'. Under each
 member of a changed folder hangs its containerward chain, as in every

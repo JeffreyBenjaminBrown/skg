@@ -63,15 +63,15 @@ of a partner folder, with a 'FolderGoalShape': 'Member',
 *** folder policy
 'PartnerFolder::policy' gives each kind a 'FolderPolicy':
 *EditableSet* ('subscribeeFolder', 'overriddenFolder': the save
-writes its membership), *EditableFilter*
+writes its membership), *EditableCompound*
 ('hiddenOutsideOfSubscribeeFolder'), *WriteProtectedSet* (the
 inbound folders, 'hiddenFolder', the two acquisition folders) and
-*WriteProtectedFilter* ('hiddenInSubscribeeFolder'). "In-folders"
+*WriteProtectedCompound* ('hiddenInSubscribeeFolder'). "In-folders"
 and "out-folders" ('IN_FOLDERS', 'OUT_FOLDERS' in
 'server/diff_view/changes.rs') are the folders of the node's
 recorders and of the relationships it records.
-*** the two filter folders, the two acquisition folders
-The *filter folders* are 'hiddenInSubscribeeFolder' and
+*** the two compound partner folders, the two acquisition folders
+The *compound partner folders* are 'hiddenInSubscribeeFolder' and
 'hiddenOutsideOfSubscribeeFolder', whose membership is derived
 from hide state. The *acquisition folders* are the diff view's
 'acquiredByFolder' and 'acquiredFolder', recording a nodeMerge;
@@ -282,8 +282,8 @@ The *prune* ('prune_self_deletable_when_empty') is the one place
 a viewnode is detached during completion: postorder, every
 childless viewnode of a *self-deletable* kind
 ('is_self_deletable_when_empty': tombstone, deleted phantom, the
-write-protected partner folders, the two filter folders, the ID
-folder), never a root. The code also says *sweep*. Nothing
+write-protected partner folders, the two compound partner folders,
+the ID folder), never a root. The code also says *sweep*. Nothing
 deletes itself; the name is figurative.
 *** reinstated, created
 A goal entry with no child is *created*; for a write-protected
