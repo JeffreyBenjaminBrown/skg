@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{Membership, NodeEditRequest, PartnerFolder, Property, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{NodeEditRequest, PartnerFolder, Property, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
@@ -370,7 +370,7 @@ fn relRepo_request_is_collected (
   t        : &MpUnrestrictedVognode,
 ) -> bool {
   let is_member : bool =
-    t . membership == Membership::Member;
+    t . claimsMembership;
   is_member
   && match node_ref . parent () {
     Some (parent) => match &parent . value () . kind {
@@ -395,7 +395,7 @@ fn is_saveEligible_unrestricted_vognode (
   let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
     &node_ref . value () . kind else { return false; };
   let is_subscribee_as_such : bool =
-    t . membership == Membership::Member
+    t . claimsMembership
     && node_ref . parent ()
        . map ( |p| matches! ( &p . value () . kind,
                  MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) ))

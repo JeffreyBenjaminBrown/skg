@@ -158,7 +158,7 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( saved . contains ("(id r)"),
     "deleted member r must respawn:\n{}", saved );
   { let x_line_after : &str = line_containing (&saved, "(id x)");
-    assert! ( x_line_after . contains ("nonMember"),
+    assert! ( x_line_after . contains ("noClaim"),
       "x must be rerendered as a non-member: {}", x_line_after ); }
   assert! ( ! line_containing (&saved, "subscriberFolder")
               . contains ("HELLO"),

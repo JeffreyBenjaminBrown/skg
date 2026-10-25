@@ -24,7 +24,7 @@ use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  Membership, ChangeFacts, Existence, Phantom, Property, PropertyFolder,
+  ChangeFacts, Existence, Phantom, Property, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, Unwarranted, convert_unwarranted_child};
 
@@ -252,7 +252,7 @@ pub fn is_diffView_change_viewnode (
       | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       is_unrestricted_removed_member (viewnode)
-      || ( t . membership == Membership::Member
+      || ( t . claimsMembership
            && node . parent () . is_some_and ( |parent| matches! (
                 parent . value () . kind,
                 ViewnodeKind::Vognode (Vognode::Phantom (_)) ))),
@@ -272,7 +272,7 @@ fn goes_with_a_stale_viewparent (
       parent . value () . kind, ViewnodeKind::PartnerFolder (_) ))
     && match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        t . membership == Membership::Member,
+        t . claimsMembership,
       ViewnodeKind::Vognode (_) => true,
       _ => false, };
   is_diffView_change_viewnode (node) || is_folder_member
@@ -297,7 +297,7 @@ pub fn give_model_facts_to (
       ViewnodeKind::Vognode (Vognode::Unrestricted (f)) ) => {
       e . title         = f . title . clone ();
       e . home_skgrepo  = f . home_skgrepo . clone ();
-      e . membership = f . membership;
+      e . claimsMembership = f . claimsMembership;
       if f . is_writeProtected () {
         e . write_protect (); }},
     (kind, model_kind) => {
@@ -338,5 +338,5 @@ pub fn is_unrestricted_removed_member (
 ) -> bool {
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if t . membership == Membership::NonMember
+      if ! t . claimsMembership
          && viewnode . change_facts . change . rel == Some (Existence::Removed) ) }

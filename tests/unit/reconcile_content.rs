@@ -110,7 +110,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 }
 
 // Regression: a content goal id present only as a
-// nonMember child must still get ChildData pre-fetched.
+// noClaim child must still get ChildData pre-fetched.
 // complete_content_children counts only member Unrestricted children as
 // "already present", so a non-member same-id child is sent to the create
 // closure; if build_child_creation_data skipped pre-fetching it (because it
@@ -119,7 +119,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 // present-set: a non-member same-id child must not be skipped.
 #[test]
 fn independent_same_skgid_child_is_prefetched () {
-  use crate::types::viewnode::{ mk_editable_viewnode, Membership };
+  use crate::types::viewnode::{ mk_editable_viewnode };
   let goal : ID = skgid ("regression_independent_child");
   let mut tree : Tree<Viewnode> =
     Tree::new ( mk_editable_viewnode (
@@ -129,7 +129,7 @@ fn independent_same_skgid_child_is_prefetched () {
     mk_editable_viewnode (
       goal . clone (), skgrepo_name ("main"), "c" . to_string (), None );
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut child . kind
-    { t . membership = Membership::NonMember; }
+    { t . claimsMembership = false; }
   tree . root_mut () . append (child);
   let config : SkgConfig =
     SkgConfig::dummyFromSkgrepos ( HashMap::new () );

@@ -195,11 +195,11 @@ the folder's viewparent.
 A *membership* is the relationship that causes a node to be drawn
 as a member of a list or folder; the member is the node.
 
-*** non-member, 'nonMember'
+*** non-member, 'noClaim'
 
 A *non-member* is a vognode child that takes no part in the
 membership its viewparent represents: its metadata carries the bare
-atom =nonMember=, and its herald is ⊥, where a member's carries
+atom =noClaim=, and its herald is ⊥, where a member's carries
 nothing ('docs/api-and-formats.org', "Content view"). A root carries
 nothing either. Under a vognode a non-member is not in the content
 list, and in a folder it is not one of the folder's members, so a
@@ -322,7 +322,7 @@ Thus the user could flip the order of R and T in the subscriberFolder,
 and this change would be respected in the display, but have no effect
 in the graph. The user could insert X under subscriberFolder,
 but because it is a write-protected set, X will be
-marked 'nonMember' (a non-member), and have no effect on N.
+marked 'noClaim' (a non-member), and have no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it is reinstated as soon as they save,
 because, again, the subscriberFolder is a write-protected set.
@@ -835,7 +835,7 @@ content relationships changed skgrepo") and the order-only changeset marker
 **** removed member, former member
 
 A *removed member* is an unrestricted vognode, a
-[[*non-member, 'nonMember'][non-member]], with the change fact '(rel removed)': its
+[[*non-member, 'noClaim'][non-member]], with the change fact '(rel removed)': its
 node survives, but its relationship to its viewparent exists in
 the before-graph only. It is encoded so in content, in a partner
 folder and in a historical phantom's old content alike. In

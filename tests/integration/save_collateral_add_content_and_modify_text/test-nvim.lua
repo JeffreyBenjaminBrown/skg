@@ -57,7 +57,7 @@ local function role_of_chain_node_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP's headline relation: a
----chain node's rolename, else 'nonMember' or 'member'. The
+---chain node's rolename, else 'noClaim' or 'member'. The
 ---port of test-helpers.el's headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
@@ -69,7 +69,7 @@ local function relation_from_sexp (sexp)
       sexp, { 'skg', 'node', 'rels' }))
   end
   if chain_node_role then return chain_node_role end
-  if non_member then return 'nonMember' end
+  if non_member then return 'noClaim' end
   return 'member'
 end
 

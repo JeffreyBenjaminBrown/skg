@@ -5,7 +5,7 @@
 // even if the parent ignores it.
 
 use skg::types::misc::{ ID, SkgrepoName, SkgConfig, Skgrepo };
-use skg::types::viewnode::{ Membership, Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
+use skg::types::viewnode::{ Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_editable_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 use skg::dbs::in_rust_graph::InRustGraph;
@@ -34,7 +34,7 @@ fn two_skgrepo_config () -> SkgConfig {
   SkgConfig::dummyFromSkgrepos (skgrepos) }
 
 /// When a node N has the same skgrepo as its nearest unrestrictedVognode ancestor,
-/// even if N is marked nonMember,
+/// even if N is marked noClaim,
 /// homeRepoAtBoundary should be false.
 #[test]
 fn skgrepo_inheritance_across_non_content_same_skgrepo () {
@@ -54,7 +54,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
       ID::from ("b"),
       SkgrepoName::from ("pub"),
       "node B" . to_string (),
-      Membership::NonMember );
+      false );
     viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
@@ -96,7 +96,7 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
       ID::from ("b"),
       SkgrepoName::from ("priv"),
       "node B" . to_string (),
-      Membership::NonMember );
+      false );
     viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,

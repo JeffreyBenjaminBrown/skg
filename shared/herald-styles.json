@@ -42,7 +42,7 @@
   "node_heralds": {
     "comment": "The style of each styled atom in the server's herald rule table (server/heralds.rs), keyed by atom name. Where one atom takes different styles in different places, a qualified key names the other place: editRequest_X is the atom X under editRequest; homeSkgrepoMove_skgrepo and relRepoMove_skgrepo are the skgrepo names those properties show, as is homeSkgrepoMove_skgrepo in a moved node's own heralds. The ☮ on a write-protected label or flag takes writeProtected's style. See docs/heralds.org.",
     "writeProtected":                  "crucial",
-    "nonMember":                       "crucial",
+    "noClaim":                       "crucial",
     "omittedBody":                     "high",
     "cycle":                           "medium",
     "relRepo":                         "ugly",

@@ -217,7 +217,7 @@ fn a_member_added_at_a_later_visit_gets_its_chain
           "T should be a member of N's subscriberFolder:\n{}", n_collateral ));
       let chain_node : &str = lines . get (t_index + 1) . copied () . unwrap_or ("");
       assert! ( chain_node . starts_with ("**** ") && chain_node . contains ("(id C)")
-                && chain_node . contains ("nonMember")
+                && chain_node . contains ("noClaim")
                 && chain_node . contains ("writeProtected"),
         "T should hold its chain, C:\n{}", n_collateral );
       Ok (( )) } )) }

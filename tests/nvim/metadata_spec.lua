@@ -153,7 +153,7 @@ describe('skg.metadata commands', function ()
       '*** (skg (node (id content-grandchild) (repo public))) content grandchild',
       '** (skg (node (id mismatched-content) (repo foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch',
-      '** (skg (node (id link-child) (repo public) nonMember)) link child',
+      '** (skg (node (id link-child) (repo public) noClaim)) link child',
       '*** (skg (node (id under-link) (repo public))) under link',
       '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-non-vognode) (repo public))) under non-vognode' },
@@ -314,7 +314,7 @@ describe('skg.metadata commands', function ()
 
   it('restore_removed_membership marks a removed member, under a node'
      .. ' or a historical phantom, and a folder member', function ()
-    local removed_member = '** (skg (node (id x) (repo main) nonMember'
+    local removed_member = '** (skg (node (id x) (repo main) noClaim'
       .. ' (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x'
     for _, headline in ipairs({
       '* (skg (node (id r) (repo main))) r\n' .. removed_member,
@@ -323,7 +323,7 @@ describe('skg.metadata commands', function ()
       '* (skg (node (id r) (repo main))) r\n'
         .. '** (skg (node (id c) (repo main))) c\n'
         .. '*** (skg containerFolder) containers\n'
-        .. '**** (skg (node (id d) (repo main) nonMember'
+        .. '**** (skg (node (id d) (repo main) noClaim'
         .. ' writeProtected (diff (rel removed) (properties changed)'
         .. ' (leaves 1 rel all))) (vnid 0o)) d' }) do
       buffer_at_last_line(headline)
@@ -343,7 +343,7 @@ describe('skg.metadata commands', function ()
       '* (skg (node (id x) (repo main) (diff (rel added)))) x',
       '* (skg (node (id x) (repo main))) x',
       -- a root stands for no relationship
-      '* (skg (node (id d) (repo main) nonMember'
+      '* (skg (node (id d) (repo main) noClaim'
         .. ' writeProtected'
         .. ' (diff (rel removed)))) d',
       -- a member is no removed member
@@ -353,13 +353,13 @@ describe('skg.metadata commands', function ()
       '* (skg (node (id r) (repo main))) r\n'
         .. '** (skg containerFolder) containers\n'
         .. '*** (skg (node (id c) (repo main) writeProtected)) c\n'
-        .. '**** (skg (node (id d) (repo main) nonMember writeProtected'
+        .. '**** (skg (node (id d) (repo main) noClaim writeProtected'
         .. ' (diff (rel removed)))) d',
       -- a node of the chain under another folder's member
       '* (skg (node (id r) (repo main))) r\n'
         .. '** (skg subscriberFolder) subscribers\n'
         .. '*** (skg (node (id s) (repo main) writeProtected)) s\n'
-        .. '**** (skg (node (id d) (repo main) nonMember writeProtected'
+        .. '**** (skg (node (id d) (repo main) noClaim writeProtected'
         .. ' (diff (rel removed)))) d' }) do
       assert.are.equal('Only a removed membership can be restored',
         refusal_of(headline, metadata.restore_removed_membership))
@@ -404,13 +404,13 @@ describe('skg.metadata commands', function ()
     local atom_values = { 'false (default)', 'true' }
     for _, case in ipairs({
       { '* (skg (node (id x) (repo main))) x',
-        { writeProtected = atom_values, nonMember = atom_values,
+        { writeProtected = atom_values, noClaim = atom_values,
           editRequest = { 'none (default)', 'delete', 'merge',
                           'relRepo', 'flag' },
           viewRequests = view_requests } },
       { '* (skg (node (id x) (repo main) writeProtected)) x',
         { editRequest = { 'none (default)', 'relRepo' } } },
-      { '* (skg (node (id x) (repo main) nonMember (diff (rel removed)))) x',
+      { '* (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x',
         { editRequest = { 'none (default)', 'delete', 'merge',
                           'relRepo', 'flag', 'restoreRel' } } },
       { '* (skg (historical (id g) (repo main) (diff (node removed)))) g',
@@ -433,7 +433,7 @@ describe('skg.metadata commands', function ()
         end
         if next(case[2]) == nil then
           for _, field in ipairs({ 'editRequest', 'viewRequests',
-                                   'writeProtected', 'nonMember' }) do
+                                   'writeProtected', 'noClaim' }) do
             assert.is_false(goto_value_of(field), case[1] .. ' ' .. field)
           end
         end

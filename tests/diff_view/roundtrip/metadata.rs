@@ -10,7 +10,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  Membership, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
   PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
@@ -152,7 +152,7 @@ fn the_acquisition_folders_round_trip () {
 fn the_birth_atom_is_refused () {
   assert_eq! (
     parse_metadata_to_viewnodemd (
-      "(skg (node (id g) (repo main) nonMember (birth roleGraft container) writeProtected))" ),
+      "(skg (node (id g) (repo main) noClaim (birth roleGraft container) writeProtected))" ),
     Err ( "Unknown node key: birth" . to_string () )); }
 
 #[test]
@@ -201,12 +201,12 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (), None );
   let mut write_protected : Viewnode = mk_writeProtected_viewnode (
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (),
-    Membership::NonMember );
+    false );
   for (node, expected) in [
     ( &mut editable,
       "(node (id x) (repo main) (editRequest restoreRel) (diff (rel removed)))" ),
     ( &mut write_protected,
-      "(node (id x) (repo main) nonMember writeProtected (editRequest restoreRel) (diff (rel removed)))" ), ] {
+      "(node (id x) (repo main) noClaim writeProtected (editRequest restoreRel) (diff (rel removed)))" ), ] {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut node . kind
     { t . restoreRel_request = true; }
     assert_round_trip (

@@ -10,7 +10,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, Editability, Membership, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Editability, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_skgids};
 
@@ -207,13 +207,13 @@ pub fn make_member_children_nonMembers (
     . children ()
     . filter ( |child| matches! ( &child . value () . kind,
                                   ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                                  if t . membership == Membership::Member ))
+                                  if t . claimsMembership ))
     . map ( |child| child . id () )
     . collect ();
   for member in &members {
     write_at_unrestrictedVognode_in_tree (
       tree, *member,
-      |t| { t . membership = Membership::NonMember; } )
+      |t| { t . claimsMembership = false; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
   Ok (members) }
 
@@ -272,7 +272,7 @@ pub fn append_plain_stub_root (
     root_skgid, graph, config, visited, skgrepo_restriction ) }
 
 /// Mark forest-root UnrestrictedVognodes as members, so that a root
-/// carries no 'nonMember' atom; a root has no viewparent whose
+/// carries no 'noClaim' atom; a root has no viewparent whose
 /// membership it could take part in.
 pub fn mark_view_roots_as_members (
   viewforest : &mut Tree<Viewnode>,
@@ -285,14 +285,14 @@ pub fn mark_view_roots_as_members (
     let vn : &mut Viewnode = node_mut . value ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = vn . kind
-      { t . membership = Membership::Member; }}}
+      { t . claimsMembership = true; }}}
 
 /// Walk the view and correct any UnrestrictedVognode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
 /// Silently flips stale membership claims to non-member;
 /// the rendered herald then no longer misleads.
 ///
-/// The claim checked is 'Membership::Member' on child C with
+/// The claim checked is 'claimsMembership' on child C with
 /// WRITE_PROTECTED UnrestrictedVognode parent P: "C is part of P's
 /// content". Verified against P's 'contains' in the in-Rust graph.
 /// Editable parents are skipped because the save just redefined their
@@ -328,23 +328,23 @@ pub fn validate_membership_claims (
           ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
           // A non-UnrestrictedVognode parent (BufferRoot, a property or folder, Deleted, Tombstone) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
-      let member_claim_ok : bool = match child_tn . membership {
-        Membership::Member => {
+      let member_claim_ok : bool = match child_tn . claimsMembership {
+        true => {
           if parent_tn . is_writeProtected () {
             child_contained_by_parent (graph, &child_tn . skgid, &parent_tn . skgid)
           } else { // The editable parent *defines* content, so cannot be incorrect.
             true }}
-        Membership::NonMember => true, };
+        false => true, };
       if ! member_claim_ok { to_independent . push ( child_ref . id () ); }}}
   for skgid in to_independent {
     let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (skgid) . unwrap ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
-    { t . membership = Membership::NonMember; } } }
+    { t . claimsMembership = false; } } }
 
 /// An invariant: a *non-dead generalized orphan*
-/// must have Membership=False. An Unrestricted node whose parent is a
+/// must not claim membership. An Unrestricted node whose parent is a
 /// non-container -- a Deleted phantom or a tombstone -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
@@ -374,7 +374,7 @@ pub fn mark_orphans_under_dead_parents_false (
       let is_unrestricted_member : bool =
         matches! ( & child_ref . value () . kind,
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-            if t . membership == Membership::Member );
+            if t . claimsMembership );
       if ! is_unrestricted_member { continue; }
       let parent_is_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
@@ -387,7 +387,7 @@ pub fn mark_orphans_under_dead_parents_false (
       viewforest . get_mut (skgid) . unwrap ();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
       = node_mut . value () . kind
-    { t . membership = Membership::NonMember; } } }
+    { t . claimsMembership = false; } } }
 
 /// Does 'parent's 'contains' list include 'child' (modulo extra_id
 /// aliasing on either side)? The inverse of "child contains parent".

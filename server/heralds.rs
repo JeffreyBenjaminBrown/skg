@@ -367,7 +367,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
 ///     token with no space (used so the write-protected glyph "☮" sits
-///     directly on its nonMember glyph).
+///     directly on its noClaim glyph).
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
 ///
@@ -488,7 +488,7 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("node", [ vec! [
         vac ("id"),
         vac ("repo"),
-        leaf ("nonMember", "⊥"),
+        leaf ("noClaim", "⊥"),
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
         leaf_abut ("writeProtected", "☮"),
@@ -714,7 +714,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend (Flag::ALL . map (Flag::wire_name));
   atoms . extend ( graphstats_atoms () );
   atoms . extend ( viewstats_atoms () );
-  atoms . extend ( membership_emitted_atoms () );
+  atoms . extend ( claim_emitted_atoms () );
   atoms . extend ( property_and_folder_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . extend ( change_fact_atoms () );
@@ -777,15 +777,10 @@ fn viewstats_atoms () -> Vec<&'static str> {
   vec! [ "cycle", "homeRepoHerald", "overridesHere", "relRepo",
          "homeSkgrepoMove", "movedLikeAncestor" ] }
 
-/// Membership atoms the serializer can emit (a member carries nothing).
-fn membership_emitted_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::Membership;
-  fn guard ( p : Membership ) { // compile error here = update the list below
-    match p {
-      Membership::Member | Membership::NonMember
-        => () }}
-  let _ = guard;
-  vec! [ "nonMember" ] }
+/// The claim atom the serializer can emit: 'noClaim' on an occurrence
+/// that does not claim membership (one that claims carries nothing).
+fn claim_emitted_atoms () -> Vec<&'static str> {
+  vec! [ "noClaim" ] }
 
 /// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.

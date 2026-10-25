@@ -31,19 +31,19 @@ fn test_nonMember_and_write_protected(
   // Run test with database
   let result : Result<(), Box<dyn Error>> =
     run_with_test_stores (
-      "skg-test-nonMember",
+      "skg-test-noClaim",
       "tests/save/nonMember_and_write_protected/fixtures",
-      "/tmp/tantivy-test-nonMember",
+      "/tmp/tantivy-test-noClaim",
       |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
-        // Node 1 contains node 2 (which is nonMember and write-protected)
+        // Node 1 contains node 2 (which is noClaim and write-protected)
         // Node 2 contains node 3 (already); node 4 (new) sits under it
         // without affecting it, as a write-protected node holds no member.
-        // Node 2 should not affect node 1 because it is nonMember
+        // Node 2 should not affect node 1 because it is noClaim
         let org_text = indoc! {"
           * (skg (node (id 1) (repo main))) 1
-          ** (skg (node (id 2) (repo main) nonMember writeProtected)) 2
-          *** (skg (node (id 4) (repo main) nonMember)) 4
+          ** (skg (node (id 2) (repo main) noClaim writeProtected)) 2
+          *** (skg (node (id 4) (repo main) noClaim)) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
@@ -64,14 +64,14 @@ fn test_nonMember_and_write_protected(
           vec![ ID("3" . to_string()) ],
           "Node 2 should only contain [3]. Node 2 is 'writeProtected', so it writes no content." ); }
 
-        { // verify nonMember is treated correctly
+        { // verify noClaim is treated correctly
           let node1 : Graphnode =
             graphnode_from_skgid(
               config, &ID("1" . to_string() ))
 ?;
         assert!(
           node1 . contains . is_empty(),
-          "Node 1 should have empty contents (empty when read from disk), because its child 2 has nonMember in its metadata." ); }
+          "Node 1 should have empty contents (empty when read from disk), because its child 2 has noClaim in its metadata." ); }
 
         Ok (( )) } )
     );

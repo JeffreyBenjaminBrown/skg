@@ -2,7 +2,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, Membership};
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, PropertyFolder, Property, viewnode_of};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
@@ -93,6 +93,6 @@ pub fn reconcile_aliasFolder_children (
       |vn : &mut Viewnode| {
         if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
           = vn . kind
-          { t . membership = Membership::NonMember; }},
+          { t . claimsMembership = false; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }

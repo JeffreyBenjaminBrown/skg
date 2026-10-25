@@ -5,7 +5,6 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::misc::ID;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
-use skg::types::viewnode::Membership;
 use ego_tree::Tree;
 
 #[test]
@@ -72,7 +71,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg folded (node (id child1))) child1
             Child1 body
-            * (skg (node nonMember writeProtected)) independent root node
+            * (skg (node noClaim writeProtected)) independent root node
             ParentIgnores body
             * (skg (node (viewStats cycle))) cycling node
             This node has cycle flag
@@ -97,7 +96,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
       MpVognode::Unrestricted (t)) => t,
     _ => panic!("expected UnrestrictedVognode") };
   assert_eq!(unrel_node . title(), "independent root node");
-  assert_eq!(rel_t . membership, Membership::NonMember);
+  assert_eq!(rel_t . claimsMembership, false);
   assert_eq!(rel_t . is_writeProtected (), true);
   assert_eq!(unrel_node . body(), None);
 
@@ -161,7 +160,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
   assert_eq!(first_t . skgid . as_ref(), None);
   assert_eq!(first_t . viewStats . cycle, false);
-  assert_eq!(first_t . membership != Membership::Member, false);
+  assert!(first_t . claimsMembership);
   assert_eq!(first_node . focused, false);
   assert_eq!(first_node . org_folded, false);
   assert_eq!(first_t . is_writeProtected (), false);

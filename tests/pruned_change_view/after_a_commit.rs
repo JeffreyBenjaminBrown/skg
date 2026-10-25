@@ -24,11 +24,11 @@ use skg::types::env::SkgEnv;
 
 use std::error::Error;
 
-const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) nonMember ";
+const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) noClaim ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
-  "*** (skg (node (id x) (repo main) nonMember writeProtected (rels (contains (in 2) (out 1))";
+  "*** (skg (node (id x) (repo main) noClaim writeProtected (rels (contains (in 2) (out 1))";
 const RETAINED_X_UNDER_E : &str = // retained as non-member, still editable
-  "** (skg (node (id x) (repo main) nonMember (rels ";
+  "** (skg (node (id x) (repo main) noClaim (rels ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
 /// rerender stream that follows sends it.
@@ -152,12 +152,12 @@ fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
 fn a_pasted_write_protected_copy_under_a_stale_child_stays (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("commit_leftovers", &["main"], |f| {
-    let copy : &str = "*** (skg (node (id s1) (repo main) nonMember writeProtected";
+    let copy : &str = "*** (skg (node (id s1) (repo main) noClaim writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting (
         &buffer, REMOVED_X_UNDER_E,
-        "*** (skg (node (id s1) (repo main) nonMember writeProtected)) s1\n" )) ?;
+        "*** (skg (node (id s1) (repo main) noClaim writeProtected)) s1\n" )) ?;
     let copy_before : &str = line_starting (&saved, copy);
     assert! ( headline_parent_of (&saved, copy_before) . starts_with (REMOVED_X_UNDER_E),
               "{}", saved );

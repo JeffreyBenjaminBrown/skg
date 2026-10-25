@@ -10,7 +10,7 @@ ancestor: it has a relation with an (out ... (ancestors ...)) side.
 That relation names the role: contains -> container, linksTo ->
 mentioner, subscribesTo -> subscribee, overrides -> overrider,
 hidesFromSubs -> hider. Only meaningful for a node already known to
-be a nonMember; an ordinary content child can carry the same
+be a noClaim; an ordinary content child can carry the same
 outbound ancestor (e.g. a cycle) yet is not a chain node."
   (cl-loop for (rel . role) in '((contains    . container)
                                  (linksTo . mentioner)
@@ -25,12 +25,12 @@ outbound ancestor (e.g. a cycle) yet is not a chain node."
 
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP by membership and chain position.
-A chain node (a node with nonMember and an outbound-ancestor relation)
+A chain node (a node with noClaim and an outbound-ancestor relation)
 returns its ROLENAME from its (rels ...) facts (e.g. `container');
-otherwise the result is `nonMember' for a non-member and `member' for
+otherwise the result is `noClaim' for a non-member and `member' for
 a member."
   (let* ((non-member (and sexp
-                          (skg-sexp-subtree-p sexp '(skg (node nonMember)))))
+                          (skg-sexp-subtree-p sexp '(skg (node noClaim)))))
          (rels-body (when sexp
                       (skg-sexp-cdr-at-path sexp '(skg node rels))))
          (chain-node-role (when non-member
@@ -38,7 +38,7 @@ a member."
     (cond
      ;; A chain node: a non-member, with an outbound-ancestor herald.
      (chain-node-role chain-node-role)
-     (non-member 'nonMember)
+     (non-member 'noClaim)
      (t 'member))))
 
 (defun headline-structure (buffer)

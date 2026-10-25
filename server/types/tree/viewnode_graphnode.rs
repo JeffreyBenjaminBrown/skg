@@ -5,7 +5,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, UnrestrictedVognode, Membership, viewnode_of };
+    Viewnode, ViewnodeKind, UnrestrictedVognode, viewnode_of };
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
@@ -256,7 +256,7 @@ fn collect_generation (
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
-                                    if t . membership != Membership::Member ))
+                                    if ! t . claimsMembership ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }

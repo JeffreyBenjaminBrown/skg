@@ -165,7 +165,7 @@ is saved. See [[file:override.org][override behavior]].
 ** Other heralds
 =☮= marks a write-protected position: a node, a folder, or a flag row.
 On a node, =B= rides the ☮ when the node's body exists but is omitted from the buffer.
-=⊥= marks a non-member (the bare atom =nonMember=): a displayed child
+=⊥= marks a non-member (the bare atom =noClaim=): a displayed child
 that does not affect its parent's membership on save. =⟳= marks a cycle.
 
 =⌂:LABEL= marks a node's home skgrepo boundary. A =~NAME= immediately

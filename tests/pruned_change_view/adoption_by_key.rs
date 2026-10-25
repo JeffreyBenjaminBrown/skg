@@ -165,9 +165,9 @@ fn a_note_of_a_node_becomes_its_removed_member (
         . expect ("r is shown");
       let after_r_body : usize = r_index + 1 + lines [ r_index + 1 .. ] . iter ()
         . take_while ( |line| ! line . starts_with ('*') ) . count ();
-      lines . insert ( after_r_body, "*** (skg (node (id x) nonMember writeProtected)) x" );
+      lines . insert ( after_r_body, "*** (skg (node (id x) noClaim writeProtected)) x" );
       saved ( f, &( lines . join ("\n") + "\n" )) ? };
-    assert_one_child_with (&noted, member_r, "(node (id x) (repo main) nonMember writeProtected");
+    assert_one_child_with (&noted, member_r, "(node (id x) (repo main) noClaim writeProtected");
     rewrite_head (f, "r", "pid: r\ntitle: r\nbody: old\ncontains:\n- x\n") ?;
     let after_head : String = saved (f, &noted) ?;
     assert_one_child_with (&after_head, member_r, "(node (id x)");
@@ -184,7 +184,7 @@ fn a_pasted_copy_beside_a_removed_member_is_not_doubled (
     let root_p : &str = "* (skg (node (id p)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let pasted : String = saved ( f, &format! (
-      "{}** (skg (node (id y) nonMember writeProtected)) y\n", buffer )) ?;
+      "{}** (skg (node (id y) noClaim writeProtected)) y\n", buffer )) ?;
     assert_eq! ( children_of (&pasted, root_p) . iter ()
                  . filter ( |child| child . contains ("(node (id y)") ) . count (),
                  2, "{}", pasted );
@@ -204,7 +204,7 @@ fn copies_of_a_write_protected_graft_merge (
   with_fixture ("users_notes", &["main"], |f| {
     let member_a : &str = "**** (skg (node (id a) (repo main) writeProtected";
     let graft_p  : &str =
-      "***** (skg (node (id p) (repo main) nonMember writeProtected";
+      "***** (skg (node (id p) (repo main) noClaim writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     let graft_line : String = buffer . lines ()
       . find ( |line| without_viewnode_ids (line) . starts_with (graft_p) )

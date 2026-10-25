@@ -21,7 +21,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
-use crate::types::viewnode::{ DiffChange, Membership, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
+use crate::types::viewnode::{ DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -151,7 +151,7 @@ fn prepend_containerward_chain_node (
     graphnode_and_viewnode_from_skgid (graph, config, container) ? {
       Some ((_graphnode, viewnode)) =>
         mk_writeProtected_from_viewnode (
-          viewnode, Membership::NonMember ) ?,
+          viewnode, false ) ?,
       None => mk_unknown_viewnode (container . clone ()), };
   Ok ( Some ( tree . get_mut (parent)
               . ok_or ("prepend_containerward_chain_node: parent not found") ?
@@ -170,7 +170,7 @@ pub fn is_in_containerward_chain (
     let ViewnodeKind::Vognode (vognode) = &current . value () . kind
       else { return false; };
     let is_nonMember : bool = match vognode {
-      Vognode::Unrestricted (t) => t . membership == Membership::NonMember,
+      Vognode::Unrestricted (t) => ! t . claimsMembership,
       _ => true, };
     if ! is_nonMember { return false; }
     let Some (parent) : Option<NodeRef<Viewnode>> = current . parent ()

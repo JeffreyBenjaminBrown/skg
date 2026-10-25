@@ -34,7 +34,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  Membership, Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  Editability, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
@@ -477,7 +477,7 @@ fn content_occurrences_in_level_order (
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
         let is_root_or_member : bool =
-          t . membership == Membership::Member
+          t . claimsMembership
           || node . parent () . is_some_and ( |parent| match parent . value () . kind {
                ViewnodeKind::BufferRoot => true,
                ViewnodeKind::Vognode (

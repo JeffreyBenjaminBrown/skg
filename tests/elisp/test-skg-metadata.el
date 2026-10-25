@@ -295,7 +295,7 @@ the folder commands are the way to show a node's partners."
       "*** (skg (node (id content-grandchild) (repo public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (repo foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch\n"
-      "** (skg (node (id link-child) (repo public) nonMember)) link child\n"
+      "** (skg (node (id link-child) (repo public) noClaim)) link child\n"
       "*** (skg (node (id under-link) (repo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-non-vognode) (repo public))) under non-vognode\n"))
@@ -649,13 +649,13 @@ and a write-protected folder member carrying '(rel removed)' all take
 the request."
   (dolist (headline
            '("* (skg (node (id r) (repo main))) r
-** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
+** (skg (node (id x) (repo main) noClaim (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
              "* (skg (historical (id g) (repo main) (diff (node removed)))) g
-** (skg (node (id x) (repo main) nonMember (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
+** (skg (node (id x) (repo main) noClaim (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
              "* (skg (node (id r) (repo main))) r
 ** (skg (node (id c) (repo main))) c
 *** (skg containerFolder) containers
-**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vnid 0o)) d"))
+**** (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vnid 0o)) d"))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-after
               headline #'skg-restore-removed-membership)
@@ -671,7 +671,7 @@ the request."
            '("* (skg (node (id x) (repo main) (diff (rel added)))) x"
              "* (skg (node (id x) (repo main))) x"
              ;; a root stands for no relationship
-             "* (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"
+             "* (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed)))) d"
              ;; a member is no removed member
              "* (skg (node (id r) (repo main))) r
 ** (skg (node (id x) (repo main) (diff (rel removed)))) x"
@@ -679,12 +679,12 @@ the request."
              "* (skg (node (id r) (repo main))) r
 ** (skg containerFolder) containers
 *** (skg (node (id c) (repo main) writeProtected)) c
-**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"
+**** (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed)))) d"
              ;; a node of the chain under another folder's member
              "* (skg (node (id r) (repo main))) r
 ** (skg subscriberFolder) subscribers
 *** (skg (node (id s) (repo main) writeProtected)) s
-**** (skg (node (id d) (repo main) nonMember writeProtected (diff (rel removed)))) d"))
+**** (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed)))) d"))
     (should (equal (test-skg--refusal-of
                     headline #'skg-restore-removed-membership)
                    "Only a removed membership can be restored")))
@@ -744,13 +744,13 @@ unchanged."
     (dolist (case
              `(("* (skg (node (id x) (repo main))) x"
                 ("writeProtected" . ,atom-values)
-                ("nonMember" . ,atom-values)
+                ("noClaim" . ,atom-values)
                 ("editRequest" . ("none (default)" "delete" "merge"
                                   "relRepo" "flag"))
                 ("viewRequests" . ,view-requests))
                ("* (skg (node (id x) (repo main) writeProtected)) x"
                 ("editRequest" . ("none (default)" "relRepo")))
-               ("* (skg (node (id x) (repo main) nonMember (diff (rel removed)))) x"
+               ("* (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x"
                 ("editRequest" . ("none (default)" "delete" "merge"
                                   "relRepo" "flag" "restoreRel")))
                ("* (skg (historical (id g) (repo main) (diff (node removed)))) g"
@@ -771,7 +771,7 @@ unchanged."
          (unless (cdr case)
            (goto-char (point-min))
            (should-not (re-search-forward
-                        "^\\*+ \\(editRequest\\|viewRequests\\|writeProtected\\|nonMember\\)$"
+                        "^\\*+ \\(editRequest\\|viewRequests\\|writeProtected\\|noClaim\\)$"
                         nil t)))
          (skg-sexp-edit--apply)
          (should (equal (with-current-buffer source

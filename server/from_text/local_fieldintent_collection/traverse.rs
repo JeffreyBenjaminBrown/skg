@@ -51,7 +51,7 @@ use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, Membership, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
+  NodeEditRequest, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -133,7 +133,7 @@ fn visit_unrestricted_vognode (
     match context {
       LocalContext::SubscribeeAsSuchPosition {
         subscriber, subscriber_is_editable }
-        if t . membership == Membership::Member =>
+        if t . claimsMembership =>
         Some (( subscriber, *subscriber_is_editable )),
       _ => None };
   let is_editable : bool =

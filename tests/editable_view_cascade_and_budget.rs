@@ -484,7 +484,7 @@ async fn test_editable_view_conflicting (
         // rather than [121,122,123,124].
         "* (skg (node (id 1) (repo main) (rels (contains (out 1))))) 1
          ** (skg (node (id 12) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12
-         *** (skg (node (id 122) (repo main) nonMember writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
+         *** (skg (node (id 122) (repo main) noClaim writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
          * (skg (node (id 12) (repo main) (rels (contains (in 1) (out 1))))) 12
          ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
          122 body
@@ -809,7 +809,7 @@ async fn test_editable_view_request_moves_editability_back (
           . map ( |line| line . replace ("writeProtected ", "")
                               . replace ("omittedBody ", "")
                               // write-protected, the content stops being members
-                              . replace ("nonMember ", "")
+                              . replace ("noClaim ", "")
                               . replace (" (birth (contains in 1))", "") )
           . collect () };
       let moved : String = save (
@@ -950,14 +950,14 @@ async fn test_writeProtect_request_keeps_children_editable (
         lines_starting (&saved, "** (skg (node (id 12");
       assert_eq! ( children . len (), 4, "{}", saved );
       assert! ( children . iter () . all ( |line|
-                  line . contains ("nonMember")
+                  line . contains ("noClaim")
                   && ! line . contains ("writeProtected") ),
                 "121..124 must be editable non-members:\n{}", saved );
       let grandchildren : Vec<&str> = // not the 1 in the containers folder
         lines_starting (&saved, "*** (skg (node (id 12");
       assert_eq! ( grandchildren . len (), 3, "{}", saved );
       assert! ( grandchildren . iter () . all ( |line|
-                  ! line . contains ("nonMember")
+                  ! line . contains ("noClaim")
                   && ! line . contains ("writeProtected") ),
                 "their content must stay editable members:\n{}", saved );
       let again : String = save_view (
@@ -995,7 +995,7 @@ async fn test_writeProtect_subtree_request (
       assert! ( headlines . iter () . all ( |line| line . contains ("writeProtected") ),
                 "everything must be write-protected:\n{}", saved );
       assert! ( headlines [1 ..] . iter () . all ( |line|
-                  line . contains ("nonMember") ),
+                  line . contains ("noClaim") ),
                 "every child must be a non-member:\n{}", saved );
       assert! ( ! saved . contains ("viewRequests")
                 && ! saved . contains ("body\n"),
@@ -1086,13 +1086,13 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
                    "root 12 shows its content once:\n{}", moved );
       assert! ( content_under (&moved, root_12) . iter ()
                   . all ( |line| line . contains ("writeProtected")
-                                 && line . contains ("nonMember") ),
+                                 && line . contains ("noClaim") ),
                 "under root 12, write-protected non-members:\n{}", moved );
       assert_eq! ( ids_under (&moved, under_1), [ "121", "122", "123", "124" ],
                    "{}", moved );
       assert! ( content_under (&moved, under_1) . iter ()
                   . all ( |line| ! line . contains ("writeProtected")
-                                 && ! line . contains ("nonMember") ),
+                                 && ! line . contains ("noClaim") ),
                 "under the 12 under 1, editable members:\n{}", moved );
       let moved_back : String = save_view (
         &requesting_editable_at (
@@ -1106,7 +1106,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
                    "{}", moved_back );
       assert! ( content_under (&moved_back, root_12) . iter ()
                   . all ( |line| ! line . contains ("writeProtected")
-                                 && ! line . contains ("nonMember") ),
+                                 && ! line . contains ("noClaim") ),
                 "root 12's content must be editable members again:\n{}", moved_back );
       assert! ( content_under (&moved_back, root_12) [0] . starts_with (folded_121),
                 "the adopted 121 keeps its fold:\n{}", moved_back );
@@ -1136,10 +1136,10 @@ async fn test_retained_content_node_is_shown_once (
           &config, tantivy, &graph, &mut views_state, &["1"] ) ?;
       let retained : String = save_view (
         &opened . replacen ( "** (skg (node (id 13) (repo main) ",
-                             "** (skg (node (id 13) (repo main) nonMember ", 1 ),
+                             "** (skg (node (id 13) (repo main) noClaim ", 1 ),
         &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       assert! ( lines_starting (&retained, "** (skg (node (id 13) ") . len () == 1
-                && retained . contains ("nonMember"),
+                && retained . contains ("noClaim"),
                 "13 stays under 1 as a non-member:\n{}", retained );
       let other_viewforest_id : ViewforestId = ViewforestId::ContentView ("other-view-of-1" . to_string ());
       let other : String = {
@@ -1160,7 +1160,7 @@ async fn test_retained_content_node_is_shown_once (
       println! ("The first view after the other's save:\n{}", collateral);
       let thirteens : Vec<&str> = lines_starting (&collateral, "** (skg (node (id 13) ");
       assert! ( thirteens . len () == 1
-                && ! thirteens [0] . contains ("nonMember"),
+                && ! thirteens [0] . contains ("noClaim"),
                 "13 is shown once, as 1's member:\n{}", collateral );
       Ok (( )) }
 
@@ -1204,7 +1204,7 @@ async fn test_budget_spent_on_a_node_with_members (
         . collect ();
       assert_eq! ( members_of_twelve . len (), 4, "{}", saved );
       assert! ( members_of_twelve . iter () . all ( |line|
-                  line . contains ("nonMember") ),
+                  line . contains ("noClaim") ),
                 "121..124 must be non-members under write-protected 12:\n{}", saved );
       save_view (
         &saved, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
@@ -1256,6 +1256,6 @@ async fn test_a_request_claimed_elsewhere_leaves_no_member (
       let under_twelve : Vec<&str> =
         subtree_headlines (rerendered, "** (skg (node (id 12) ");
       assert! ( ! under_twelve . is_empty ()
-                && under_twelve . iter () . all ( |line| line . contains ("nonMember") ),
+                && under_twelve . iter () . all ( |line| line . contains ("noClaim") ),
                 "a write-protected occurrence holds no member:\n{}", rerendered );
       Ok (( )) }

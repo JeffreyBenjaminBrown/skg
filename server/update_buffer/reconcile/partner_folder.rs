@@ -35,7 +35,7 @@ use std::sync::Arc;
 /// 'diff_view/partner_folders.rs').
 /// Makes the folder's UnrestrictedVognode children that are members match a goal list,
 /// preserving reusable children and creating missing ones,
-/// then makes stale member children non-members ('nonMember').
+/// then makes stale member children non-members ('noClaim').
 pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,

@@ -202,7 +202,7 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     n_view
       . replace ( r_line, "SWAP_PLACEHOLDER" )
       . replace ( t_line, &format! (
-        "{}\n*** (skg (node nonMember)) a placed note", r_line ))
+        "{}\n*** (skg (node noClaim)) a placed note", r_line ))
       . replace ( "SWAP_PLACEHOLDER", t_line ) };
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &reordered, &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;

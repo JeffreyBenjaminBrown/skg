@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::types::viewnode::{Membership, PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
+use crate::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -48,14 +48,14 @@ pub fn insert_partner_folders_into_search_view (
       for (skgid, skgrepo, title) in members {
         viewforest . get_mut (folder) . unwrap () . append (
           mk_writeProtected_viewnode (
-            skgid, skgrepo, title, Membership::Member )); }}
+            skgid, skgrepo, title, true )); }}
     if let Some (ContainerwardRoleTree::Inner ( _, containers )) =
       containerward_role_trees_by_skgid . get (hit_skgid)
     { let folder : NodeId =
         prepend_folded_folder (viewforest, *hit_treeid, PartnerFolder::Container);
       for container in containers . iter () . rev () {
         insert_containerward_tree (
-          container, hit_skgid, folder, Membership::Member,
+          container, hit_skgid, folder, true,
           viewforest, graph, tantivy_index, config, restriction ); }
       let is_empty : bool =
         viewforest . get (folder) . unwrap () . children () . next () . is_none ();
@@ -124,7 +124,7 @@ pub fn collect_override_folder_member_skgids (
     . collect () }
 
 /// Prepend 'node', a container of 'contained_skgid', under
-/// 'parent_treeid' as a write-protected vognode of 'membership' (a
+/// 'parent_treeid' as a write-protected vognode claiming membership or not (a
 /// member of the containers folder, or below that a chain node), and
 /// under it, recursively, its own containers as chain nodes. A node
 /// whose containment or skgrepo the restriction hides is left out,
@@ -133,7 +133,7 @@ fn insert_containerward_tree (
   node            : &ContainerwardRoleTree,
   contained_skgid : &ID,
   parent_treeid   : NodeId,
-  membership      : Membership,
+  claimsMembership : bool,
   viewforest      : &mut Tree<Viewnode>,
   graph           : &InRustGraph,
   tantivy_index   : &TantivyIndex,
@@ -154,14 +154,14 @@ fn insert_containerward_tree (
     if ! rel_is_visible { return; }}
   let child_treeid : NodeId = match
     prepend_containing_child_from_tantivy (
-      node . skgid (), parent_treeid, membership,
+      node . skgid (), parent_treeid, claimsMembership,
       viewforest, tantivy_index, config, restriction ) {
         Some (child_treeid) => child_treeid,
         None => return, };
   if let ContainerwardRoleTree::Inner ( _, children ) = node {
     for child in children . iter () . rev () {
       insert_containerward_tree (
-        child, node . skgid (), child_treeid, Membership::NonMember,
+        child, node . skgid (), child_treeid, false,
         viewforest, graph, tantivy_index, config, restriction ); } } }
 
 /// Looks up a node's title and skgrepo from Tantivy, and prepends it
@@ -171,7 +171,7 @@ fn insert_containerward_tree (
 fn prepend_containing_child_from_tantivy (
   skgid         : &ID, // what to prepend
   parent_treeid : NodeId, // where to prepend
-  membership    : Membership,
+  claimsMembership : bool,
   viewforest        : &mut Tree<Viewnode>,
   tantivy_index : &TantivyIndex,
   _config       : &SkgConfig,
@@ -184,11 +184,11 @@ fn prepend_containing_child_from_tantivy (
           return None;
         } else {
           mk_writeProtected_viewnode (
-            skgid . clone (), skgrepo, title, membership ) }},
+            skgid . clone (), skgrepo, title, claimsMembership ) }},
       None =>
         mk_writeProtected_viewnode (
           skgid . clone (), SkgrepoName::from ("search"),
-          skgid . as_str () . to_string (), membership ) };
+          skgid . as_str () . to_string (), claimsMembership ) };
   let mut parent_mut : NodeMut<Viewnode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some ( parent_mut . prepend (viewnode) . id () ) }

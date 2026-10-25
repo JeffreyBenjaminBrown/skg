@@ -54,7 +54,7 @@ use crate::types::tree::moves::{
   place_created_children_after_their_model_predecessors};
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
-  Membership, ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
   Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
@@ -278,7 +278,7 @@ pub(crate) fn align_content_members_with_straddle (
     tree . get (treeid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if t . membership == Membership::Member => Some ( t . skgid . clone () ),
+        if t . claimsMembership => Some ( t . skgid . clone () ),
       _ => None, } )
     . collect ();
   for child in children {
@@ -287,11 +287,11 @@ pub(crate) fn align_content_members_with_straddle (
     let returned : Option<Viewnode> = match &mut viewnode . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
         if removed . contains (&t . skgid) {
-          t . membership = Membership::NonMember; }
-        else if t . membership == Membership::NonMember
+          t . claimsMembership = false; }
+        else if ! t . claimsMembership
                 && after_set . contains (&t . skgid)
                 && nodes_with_a_member . insert ( t . skgid . clone () ) {
-          t . membership = Membership::Member; }
+          t . claimsMembership = true; }
         None },
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
         if after_set . contains (&h . skgid) =>
@@ -593,14 +593,14 @@ fn tag_content_members (
       let viewnode : &mut Viewnode = member_mut . value ();
       match &mut viewnode . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . membership == Membership::Member
+          if t . claimsMembership
           || by_id . contains_key (&t . skgid) => {
           // A non-member whose node is content (as under a
           // write-protected node) is tagged too, but never recreated.
           let partner : Option<&&Partner> = by_id . get (&t . skgid);
           viewnode . change_facts . change = straddle . node_change (
             &t . skgid, partner . and_then ( |p| p . existence ));
-          if t . membership == Membership::Member
+          if t . claimsMembership
              && u_and_editable . is_some_and ( |(u, writable)|
             ! u . contains (&t . skgid) && ! writable . contains (&member) ) {
             // Not 'write_protect': the member keeps its view requests.
@@ -667,7 +667,7 @@ fn reconcile_removed_content_members (
     tree . get (treeid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if t . membership == Membership::Member =>
+        if t . claimsMembership =>
         Some (( t . skgid . clone (), child . id () )),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
         Some (( u . skgid . clone (), child . id () )),

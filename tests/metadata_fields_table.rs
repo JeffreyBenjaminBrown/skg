@@ -14,7 +14,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  ChangesetMarkerKind, FolderRelation, Membership, NodeEditRequest,
+  ChangesetMarkerKind, FolderRelation, NodeEditRequest,
   PartnerFolder, Property, PropertyFolder, ViewRequest};
 
 use serde_json::Value;
@@ -348,7 +348,7 @@ fn the_values_name_every_request_the_parser_knows () {
         match name {
           "editRequest"  => { edit_request_values . insert (word); },
           "viewRequests" => { view_request_values . insert (word); },
-          "writeProtected" | "nonMember" => assert_eq! ( word, "true" ),
+          "writeProtected" | "noClaim" => assert_eq! ( word, "true" ),
           other => panic! ( "unknown field {}", other ), } } } }
   let mut expected_edit_request_values : BTreeSet<String> =
     every_edit_request () . iter ()
@@ -387,7 +387,7 @@ fn each_node_value_parses_to_what_it_names () {
   let example : String = example_of_kind ("node");
   let absent : ViewnodeMetadata = parse_cleanly (&example) . unwrap ();
   assert! ( ! absent . writeProtected );
-  assert_eq! ( absent . membership, Membership::Member );
+  assert_eq! ( absent . claimsMembership, true );
   assert! ( absent . edit_request . is_none ()
             && absent . relRepo_request . is_none () );
   assert! ( absent . view_requests . is_empty () );
@@ -399,7 +399,7 @@ fn each_node_value_parses_to_what_it_names () {
         . unwrap ();
       match written . field_name . as_str () {
         "writeProtected" => assert! ( parsed . writeProtected ),
-        "nonMember" => assert_eq! ( parsed . membership, Membership::NonMember ),
+        "noClaim" => assert_eq! ( parsed . claimsMembership, false ),
         "editRequest" if written . value == "relRepo" =>
           assert! ( parsed . relRepo_request . is_some () ),
         "editRequest" => assert_eq! (

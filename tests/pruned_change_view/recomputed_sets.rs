@@ -317,16 +317,16 @@ fn an_editable_view_request_moves_editability_back (
       subtree_starting (buffer, "* (skg (node (id x) ") . iter ()
         . filter ( |line| line . starts_with ("*** ") )
         . map ( |line| [ "writeProtected ", "omittedBody ", "bodyFolded ", "folded ",
-                         "nonMember ", " (birth (contains in 1))" ]
+                         "noClaim ", " (birth (contains in 1))" ]
                          . iter () . fold ( line . to_string (),
                                             |line, atom| line . replace (atom, "") ))
         . collect () };
-    let b_under_x : &str = "(skg (node (id b) (repo main) nonMember writeProtected ";
+    let b_under_x : &str = "(skg (node (id b) (repo main) noClaim writeProtected ";
     assert! ( without_viewnode_ids (&moved) . contains (n_under_x) && without_viewnode_ids (&moved) . contains (b_under_x),
               "n and b must be write-protected under x:\n{}", moved );
     let requested : String = requesting_editable_at (
       &moved . replacen ( b_under_x,
-                          "(skg folded (node (id b) (repo main) nonMember writeProtected ",
+                          "(skg folded (node (id b) (repo main) noClaim writeProtected ",
                           1 ),
       n_under_x );
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
@@ -538,7 +538,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg (node (id m) (repo main) nonMember (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled";
+    let m_line : &str = "*** (skg (node (id m) (repo main) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (m_line), "{}", buffer );
     let requested : String = buffer . replacen (
@@ -564,12 +564,12 @@ fn the_command_makes_a_member_under_a_historical_phantom_editable (
 fn the_command_makes_a_removed_member_under_a_live_vognode_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
-    let x_under_b : &str = "** (skg (node (id x) (repo main) nonMember (rels";
+    let x_under_b : &str = "** (skg (node (id x) (repo main) noClaim (rels";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( buffer . contains (x_under_b), "{}", buffer );
     let requested : String = buffer . replacen (
-      "(node (id x) (repo main) nonMember ",
-      "(node (id x) (repo main) nonMember (viewRequests writeProtectedView) ", 1 );
+      "(node (id x) (repo main) noClaim ",
+      "(node (id x) (repo main) noClaim (viewRequests writeProtectedView) ", 1 );
     let protected : String =
       save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     assert! ( ! shown_editable (&protected, "x"), "{}", protected );

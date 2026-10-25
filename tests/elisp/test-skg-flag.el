@@ -37,7 +37,7 @@
      "** (skg (node (id protected) (repo main) writeProtected)) protected\n"
      "** (skg (node (id foreign) (repo elsewhere))) foreign\n"
      "** (skg (node (id conflict) (repo main) (editRequest delete))) conflict\n"
-     "** (skg (node (id link) (repo main) nonMember)) link\n"
+     "** (skg (node (id link) (repo main) noClaim)) link\n"
      "*** (skg (node (id under-link) (repo main))) under link\n"
      "** (skg aliasFolder) aliases\n"
      "*** (skg (node (id under-folder) (repo main))) under folder\n"

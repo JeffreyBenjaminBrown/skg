@@ -69,7 +69,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
   it('inserts all default fields into a minimal UnrestrictedVognode', function ()
     local headlines =
       filledIn_headlines('(skg (node (id abc) (repo jeff)))')
-    -- skg, node, id/abc, skgrepo/jeff, write-protected/false, nonMember/false,
+    -- skg, node, id/abc, skgrepo/jeff, write-protected/false, noClaim/false,
     -- editRequest/none, viewRequests/none:
     -- each key and each value is a separate headline.
     assert.are.equal(14, #headlines)
@@ -87,14 +87,14 @@ describe('skg.sexpr.metadata_fields filling in', function ()
     assert.are.equal('true', headlines[write_protected_index + 1].text)
   end)
 
-  it('offers nonMember as a bare atom', function ()
+  it('offers noClaim as a bare atom', function ()
     for sexp_text, value in pairs({
         ['(skg (node (id abc) (repo jeff)))'] = 'false (default)',
-        ['(skg (node (id abc) (repo jeff) nonMember))'] = 'true' }) do
+        ['(skg (node (id abc) (repo jeff) noClaim))'] = 'true' }) do
       local headlines = filledIn_headlines(sexp_text)
-      local nonMember_index = find_text(headlines, 'nonMember')
-      assert.is_not_nil(nonMember_index)
-      assert.are.equal(value, headlines[nonMember_index + 1].text)
+      local noClaim_index = find_text(headlines, 'noClaim')
+      assert.is_not_nil(noClaim_index)
+      assert.are.equal(value, headlines[noClaim_index + 1].text)
     end
   end)
 
@@ -107,7 +107,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
         table.insert(level_3, headline.text) end
     end
     assert.are.same(
-      { 'id', 'repo', 'writeProtected', 'nonMember',
+      { 'id', 'repo', 'writeProtected', 'noClaim',
         'editRequest', 'viewRequests', 'graphStats' },
       level_3)
   end)
@@ -126,7 +126,7 @@ describe('skg.sexpr.metadata_fields stripping', function ()
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
         '*** writeProtected', '**** true',
-        '*** nonMember', '**** false (default)',
+        '*** noClaim', '**** false (default)',
         '*** editRequest', '**** none (default)',
         '*** viewRequests', '**** none (default)' }, '\n')))
   end)
@@ -137,7 +137,7 @@ describe('skg.sexpr.metadata_fields stripping', function ()
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
         '*** writeProtected', '**** false',
-        '*** nonMember', '**** false',
+        '*** noClaim', '**** false',
         '*** editRequest', '**** none',
         '*** viewRequests', '**** none' }, '\n')))
   end)
@@ -175,14 +175,14 @@ describe('skg.sexpr.metadata_fields stripping', function ()
         '\n')))
   end)
 
-  it('collapses nonMember=true to a bare atom', function ()
+  it('collapses noClaim=true to a bare atom', function ()
     assert.are.same(
       sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' nonMember))'),
+                 .. ' noClaim))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** repo', '**** jeff',
-        '*** nonMember', '**** true' }, '\n')))
+        '*** noClaim', '**** true' }, '\n')))
   end)
 
   it('keeps populated viewRequests', function ()
@@ -201,7 +201,7 @@ describe('skg.sexpr.metadata_fields stripping', function ()
     assert.are.same(sexpr.read('(skg (node (repo only)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** repo', '**** only',
-        '*** writeProtected', '*** nonMember',
+        '*** writeProtected', '*** noClaim',
         '*** editRequest', '*** viewRequests' }, '\n')))
   end)
 
@@ -288,7 +288,7 @@ describe('skg.sexpr.metadata_fields real-world metadata', function ()
     assert.is_not_nil(find_text(headlines, 'repo'))
     assert.is_not_nil(find_text(headlines, 'public'))
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
-    assert.is_not_nil(find_text(headlines, 'nonMember'))
+    assert.is_not_nil(find_text(headlines, 'noClaim'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
     assert.is_not_nil(find_text(headlines, 'rels'))
   end)

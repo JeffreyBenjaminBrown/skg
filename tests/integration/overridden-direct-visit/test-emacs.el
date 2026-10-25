@@ -40,7 +40,7 @@
         (unless (string-match-p (regexp-quote "(id Z)") content)
           (test-fail "raw view lacks requested root Z:\n%s" content))
         (when (string-match-p
-               "^\\*\\* (skg (node (id R).*nonMember"
+               "^\\*\\* (skg (node (id R).*noClaim"
                content)
           (test-fail
            "ordinary visit injected overrider R as an independent sibling:\n%s"

@@ -38,13 +38,13 @@ local function assert_leaf_b_root_is_content (buf, phase)
   local line = search_root_line(buf)
   T.check(line ~= nil,
     'leaf-b search root found during ' .. phase)
-  T.check(not line:find('nonMember', 1, true),
+  T.check(not line:find('noClaim', 1, true),
     'leaf-b search root is not false during ' .. phase)
   T.check(not line:find(
-            'nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
+            'noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
     'leaf-b search root is not content-birthed during ' .. phase)
   T.check(not line:find(
-            'nonMember writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
+            'noClaim writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
     'leaf-b search root is not linksToParent-birthed during ' .. phase)
 end
 

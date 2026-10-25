@@ -43,7 +43,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
   let root : NodeId = t . root () . id ();
   let mut write_protected : Viewnode = mk_writeProtected_viewnode (
     ID::from ("g"), SkgrepoName::from ("main"), "g" . into (),
-    Membership::Member );
+    true );
   write_protected . change_facts . change . rel = Some (Existence::Removed);
   let branch : NodeId = t . get_mut (root) . unwrap () . append (write_protected) . id ();
   let member_below : NodeId = t . get_mut (branch) . unwrap () . append (
@@ -81,18 +81,18 @@ fn an_unwarranted_child_is_converted_never_detached () {
   let retained : &Viewnode = t . get (branch) . unwrap () . value ();
   let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) = &retained . kind
     else { panic! ("the branch stays an unrestricted vognode") };
-  assert_eq! ( u . membership, Membership::NonMember );
+  assert_eq! ( u . claimsMembership, false );
   assert! ( u . is_writeProtected () );
   assert_eq! ( ( u . skgid . clone (), u . title . as_str () ), ( ID::from ("g"), "g" ) );
   assert_eq! ( retained . change_facts . change, DiffChange::default () );
-  assert_eq! ( membership_of (&t, member_below), Membership::NonMember,
+  assert_eq! ( membership_of (&t, member_below), false,
     "a write-protected occurrence holds no member" );
   let ViewnodeKind::Vognode (Vognode::Unrestricted (e)) =
     &t . get (editable_branch) . unwrap () . value () . kind
     else { panic! ("the editable branch stays an unrestricted vognode") };
-  assert_eq! ( e . membership, Membership::NonMember );
+  assert_eq! ( e . claimsMembership, false );
   assert! ( ! e . is_writeProtected (), "a stale copy keeps its editability" );
-  assert_eq! ( membership_of (&t, member_below_editable), Membership::Member,
+  assert_eq! ( membership_of (&t, member_below_editable), true,
     "an editable retained copy keeps its members" );
   for dead in [vognode_leaf, folder, childless] {
     assert_eq! ( t . get (dead) . unwrap () . value () . kind,
@@ -119,20 +119,20 @@ fn an_extra_copy_of_a_duplicate_is_writeProtected () {
   let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) =
     &t . get (copy) . unwrap () . value () . kind
     else { panic! ("the copy stays an unrestricted vognode") };
-  assert_eq! ( u . membership, Membership::NonMember );
+  assert_eq! ( u . claimsMembership, false );
   assert! ( u . is_writeProtected () );
-  assert_eq! ( membership_of (&t, member_below), Membership::NonMember,
+  assert_eq! ( membership_of (&t, member_below), false,
     "a write-protected occurrence holds no member" ); }
 
 /// The membership of the unrestricted vognode at 'treeid'.
 fn membership_of (
   t      : &Tree<Viewnode>,
   treeid : NodeId,
-) -> Membership {
+) -> bool {
   let ViewnodeKind::Vognode (Vognode::Unrestricted (u)) =
     &t . get (treeid) . unwrap () . value () . kind
     else { panic! ("not an unrestricted vognode") };
-  u . membership }
+  u . claimsMembership }
 
 /// The children of 'parent', in order, after completing them against
 /// 'goal' as 'kept_child_order' says. Managed children are those

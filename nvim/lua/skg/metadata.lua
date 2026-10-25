@@ -306,10 +306,10 @@ function M.unknown_id_at_point ()
 end
 
 ---@param metadata_sexp any
----@return boolean is it a member: does it lack the bare nonMember atom?
+---@return boolean is it a member: does it lack the bare noClaim atom?
 function M.node_member_p (metadata_sexp)
   return not compare.subtree_p(metadata_sexp,
-    { SKG, { NODE, sexpr.symbol('nonMember') } })
+    { SKG, { NODE, sexpr.symbol('noClaim') } })
 end
 
 ---@param metadata_sexp any
@@ -531,7 +531,7 @@ function M.change_repo_at_line_unless_write_protected (line_number,
 end
 
 ---Change OLD_REPO to NEW_REPO in this content subtree (root
----inclusive; only member descendants (no nonMember atom) are
+---inclusive; only member descendants (no noClaim atom) are
 ---traversed).
 ---A write-protected occurrence is not edited -- the save would
 ---refuse its skgrepo edit -- and its ID is returned instead, for the

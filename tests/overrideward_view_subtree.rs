@@ -29,7 +29,7 @@ use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_as_members;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{Membership, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+use skg::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use skg::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -207,7 +207,7 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
     . expect ("F (the node U overrides) is in the folder");
   assert! ( matches! ( &f . value () . kind,
                        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                       if t . membership == Membership::Member
+                       if t . claimsMembership
                           && t . is_writeProtected () ),
             "F is a write-protected member" );
   assert! ( f . children () . next () . is_none (), "F holds nothing" );

@@ -270,12 +270,12 @@ async fn write_protected_insert (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // The intruder is made a non-member (nonMember) in the rerendered view.
+  // The intruder is made a non-member (noClaim) in the rerendered view.
   { let intruder_after : &str = line_containing (
       &resp . saved_view, &format! ("(id {})", spec . intruder) );
-    if ! intruder_after . contains ("nonMember") {
+    if ! intruder_after . contains ("noClaim") {
       fails . record (&scenario, format! (
-        "intruder must be made a non-member (nonMember): {}",
+        "intruder must be made a non-member (noClaim): {}",
         intruder_after )); } }
   // ... and a warning says so.
   if ! resp . warnings . iter () . any ( |w|
@@ -444,7 +444,7 @@ async fn member_carries_its_chain (
     lines . get (member_index + offset) . is_some_and ( |line|
       line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + offset)))
       && line . contains (&format! ("(id {})", skgid))
-      && line . contains ("nonMember") && line . contains ("writeProtected") ) };
+      && line . contains ("noClaim") && line . contains ("writeProtected") ) };
   if ! ( lines [member_index] . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1)))
          && chain_line (1, "chain-c") && chain_line (2, "chain-cc") ) {
     fails . record (&scenario, format! (

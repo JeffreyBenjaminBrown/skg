@@ -13,24 +13,6 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
-/// Whether this node participates in the membership represented by
-/// its viewparent. For an ordinary Vognode parent, that membership
-/// is the parent's content. For a PartnerFolder parent, the PartnerFolder
-/// decides the membership (per its relation and role). For other kinds of parent's,
-/// a node's Membership has no effect; a view root is a 'Member'.
-/// On the wire a non-member carries the bare atom 'nonMember' and a
-/// member carries nothing.
-///
-/// PITFALL: If a vognode is write-protected, *none* of it children affect it,
-/// just as edits to itself do not affect it,
-/// regardless of what the children might claim with their Membership field.
-///
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Membership {
-  Member,    // this node takes part in its viewparent's membership
-  NonMember, // it doesn't
-}
-
 /// The diff view's facts about one viewnode, the parts of its
 /// '(diff ...)' form: the three kinds of change ('(node ...)',
 /// '(rel ...)', '(properties changed)'), which leaves a request on it
@@ -299,7 +281,18 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   pub title         : String,
   pub skgid         : Id,
   pub home_skgrepo  : Repo,
-  pub membership      : Membership,
+  /// Whether the save reads this occurrence as an entry of its
+  /// viewparent's list. For an occurrence parent, that list is the
+  /// parent's content; for a partner folder, the folder's relation
+  /// (per its role) decides it. Under any other parent the claim has
+  /// no effect; a view root claims. On the wire a child that does not
+  /// claim carries the bare atom 'noClaim', and one that claims
+  /// carries nothing.
+  ///
+  /// PITFALL: If a vognode is write-protected, *none* of its children
+  /// affect it, just as edits to itself do not affect it, regardless
+  /// of what the children claim.
+  pub claimsMembership : bool,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
@@ -516,7 +509,7 @@ pub enum PartnerFolder {
 /// Every policy obeys the glossary's "retain as non-member or
 /// tombstone, then prune": during reconciliation a stale member is
 /// converted, a leaf to a tombstone the prune removes, one with
-/// children retained as non-member (nonMember), keeping its
+/// children retained as non-member (noClaim), keeping its
 /// editability.
 /// The policies differ in:
 /// - whether buffer membership is read at save extraction
@@ -1078,7 +1071,7 @@ impl Viewnode {
   pub fn is_unrestrictedVognode_and_member (&self) -> bool {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        t . membership == Membership::Member,
+        t . claimsMembership,
       _ => false,
     }}
 
@@ -1185,7 +1178,7 @@ pub fn default_unrestrictedVognode (
     title,
     skgid,
     home_skgrepo: skgrepo,
-    membership       : Membership::Member,
+    claimsMembership : true,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relRepo_request : None,
@@ -1204,7 +1197,7 @@ pub fn mk_editable_viewnode (
 ) -> Viewnode { mk_viewnode ( skgid,
                             skgrepo,
                             title,
-                            Membership::Member,
+                            true,
                             Editability::Editable {
                               body,
                               edit_request : None },
@@ -1234,11 +1227,11 @@ pub fn mk_writeProtected_viewnode (
   skgid     : ID,
   skgrepo : SkgrepoName,
   title  : String,
-  membership  : Membership,
+  claimsMembership : bool,
 ) -> Viewnode { mk_viewnode ( skgid,
                             skgrepo,
                             title,
-                            membership,
+                            claimsMembership,
                             Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
@@ -1247,7 +1240,7 @@ pub fn mk_writeProtected_viewnode (
 /// Errors if the input is not an UnrestrictedVognode.
 pub fn mk_writeProtected_from_viewnode (
   mut viewnode : Viewnode,
-  membership    : Membership,
+  claimsMembership : bool,
 ) -> Result < Viewnode, String > {
   match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
@@ -1255,7 +1248,7 @@ pub fn mk_writeProtected_from_viewnode (
       // (the other view_requests, graphStats,
       // viewStats, and any field added later) is preserved rather
       // than silently reset.
-      t . membership = membership;
+      t . claimsMembership = claimsMembership;
       t . write_protect ();
       Ok (viewnode) },
     _ => Err (
@@ -1270,13 +1263,13 @@ pub fn mk_viewnode (
   skgid         : ID,
   skgrepo       : SkgrepoName,
   title         : String,
-  membership      : Membership,
+  claimsMembership : bool,
   editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> Viewnode {
   viewnode_of ( ViewnodeKind::Vognode (
     Vognode::Unrestricted (
-      UnrestrictedVognode { membership,
+      UnrestrictedVognode { claimsMembership,
                             view_requests,
                             editability,
                             .. default_unrestrictedVognode (

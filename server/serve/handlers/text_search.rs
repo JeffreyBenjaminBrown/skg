@@ -37,7 +37,7 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, Membership, mk_writeProtected_viewnode};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
 use crate::types::viewnode::{PropertyFolder, Property, viewnode_of};
 
 use ego_tree::{NodeId, NodeMut};
@@ -669,7 +669,7 @@ pub fn build_search_viewforest (
           (*skgid) . clone (),
           (*skgrepo) . clone (),
           title . clone (),
-          Membership::Member ) );
+          true ) );
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasFolder.
         // PITFALL: The title might not be the best match,

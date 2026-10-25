@@ -43,17 +43,17 @@ end
 T.check(root_line, string.format(
   'view-root not as expected; got:\n%s', text))
 
-T.check(not root_line:find('nonMember', 1, true),
+T.check(not root_line:find('noClaim', 1, true),
   string.format(
     'contained view-root should be content, not false; line: %s',
     root_line))
 T.check(not root_line:find(
-    'nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
+    'noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    'nonMember writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
+    'noClaim writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 

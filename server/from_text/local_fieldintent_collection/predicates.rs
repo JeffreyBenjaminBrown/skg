@@ -9,7 +9,7 @@
 /// error ('nonignored_children_have_distinct_ids'), and duplicate
 /// defining-folder members are silently deduplicated at emission.
 
-use crate::types::viewnode::{NodeEditRequest, Membership, UnrestrictedVognode};
+use crate::types::viewnode::{NodeEditRequest, UnrestrictedVognode};
 
 /// This returns true iff the given Unrestricted vognode counts as a
 /// member of the writable PartnerFolder (a SubscribeeFolder or
@@ -18,7 +18,7 @@ use crate::types::viewnode::{NodeEditRequest, Membership, UnrestrictedVognode};
 pub fn member_counts_for_partnerFolder (
   t : &UnrestrictedVognode,
 ) -> bool {
-  t . membership == Membership::Member
+  t . claimsMembership
     && !matches!( t . edit_request (),
                   Some (&NodeEditRequest::Delete)) }
 
@@ -40,6 +40,6 @@ pub fn unrestricted_child_counts_as_content (
 pub fn unrestricted_child_counts_as_visible_content (
   t : &UnrestrictedVognode,
 ) -> bool {
-  t . membership == Membership::Member
+  t . claimsMembership
     && !matches!( t . edit_request (),
                   Some (&NodeEditRequest::Delete)) }

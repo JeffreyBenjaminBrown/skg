@@ -387,7 +387,7 @@ The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (C-c s d on it), save, and edit it then.
 A child that should stay there can instead be made a non-member:
-its metadata carries the bare atom 'nonMember' (herald ⊥).
+its metadata carries the bare atom 'noClaim' (herald ⊥).
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use skg-set-editable, below.
 That's because Skg has to make other occurrences of it
@@ -462,7 +462,7 @@ that answer, or not at all if you quit.
 Like 'skg-set-repo', but it also
 changes the skgrepo of every content descendent of the node at point
 whose skgrepo matches the original skgrepo of the node at point.
-Only member descendents (those without the 'nonMember' atom) are traversed.
+Only member descendents (those without the 'noClaim' atom) are traversed.
 The write-protected warning and the save's handling of relationships
 described under =C-c s s= apply here too, across the whole subtree.
 *** C-c s x : skg-set-flag-search-matching

@@ -30,7 +30,7 @@ use crate::diff_view::shallow_model_subtree::{
   convert_unwarranted_subtree_taking_along, give_model_facts_to,
   is_unrestricted_removed_member};
 use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
-use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, Membership, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{
   Conversion, KeptChildOrder, RepairSummary, Unwarranted, complete_managed_children};
 use crate::update_buffer::util::treat_certain_children;
@@ -71,7 +71,7 @@ pub enum FolderGoalShape {
   /// or an unknown phantom when the live graph lacks its node.
   Member,
   /// A member whose relationship is only in the before-graph: a
-  /// write-protected vognode marked nonMember (so that
+  /// write-protected vognode marked noClaim (so that
   /// saving the buffer does not restore it), or an unknown phantom
   /// when the live graph lacks its node.
   Removed,
@@ -107,7 +107,7 @@ pub fn skgid_a_folder_child_stands_for (
 ) -> Option<ID> {
   match &viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if t . membership == Membership::Member
+      if t . claimsMembership
          || is_unrestricted_removed_member (viewnode) =>
       Some ( graph . relationship_member_key (&t . skgid) . into_id () ),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
@@ -197,7 +197,7 @@ pub fn build_child_data (
 /// converted with the containerward chain drawn under it
 /// ('convert_unwarranted_member_with_its_chain'). A member with an unknown ChildData
 /// entry produces an unknown phantom; any other, a write-protected
-/// viewnode marked Membership::Member. An item with another shape
+/// viewnode that claims membership. An item with another shape
 /// is shown as its shape says, and matches an existing child of the
 /// same skgid whatever its shape, which then takes the item's
 /// ('apply_goal_shapes').
@@ -301,8 +301,8 @@ fn viewnode_of_goal_item (
       } else { mk_writeProtected_viewnode (
         item . skgid . clone (), d . home_skgrepo . clone (),
         d . title . clone (),
-        match shape { FolderGoalShape::Removed => Membership::NonMember,
-                      _ => Membership::Member, } ) } }, };
+        match shape { FolderGoalShape::Removed => false,
+                      _ => true, } ) } }, };
   if let Some (change) = item . change {
     viewnode . change_facts . change = change; }
   Ok (viewnode) }
@@ -340,10 +340,10 @@ fn apply_goal_shapes (
     match &item . shape {
       FolderGoalShape::Member if ! historical => {
         if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
-          t . membership = Membership::Member; }},
+          t . claimsMembership = true; }},
       FolderGoalShape::Removed if unrestricted => {
         if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind {
-          t . membership = Membership::NonMember;
+          t . claimsMembership = false;
           t . write_protect (); }},
       _ => give_model_facts_to (
         viewnode, &viewnode_of_goal_item (item, child_data, label) ? ), }
@@ -365,7 +365,7 @@ fn normalize_relationship_backed_partner_unknowns (
     tree, folder_node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
-        restriction . membership == Membership::Member
+        restriction . claimsMembership
         && (child_data . get (&restriction . skgid)
             . is_some_and (|data| data . unknown)
             || deleted_by_this_save_extra_ids . get (&restriction . skgid)
@@ -418,7 +418,7 @@ mod tests {
       viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)));
     let folder : NodeId = tree . root () . id ();
     let member : Viewnode = mk_writeProtected_viewnode (
-      skgid ("x2"), skgrepo ("main"), "x" . to_string (), Membership::Member );
+      skgid ("x2"), skgrepo ("main"), "x" . to_string (), true );
     assert_eq! ( skgid_a_folder_child_stands_for (&member, &graph),
                  Some (skgid ("x")) );
     let member_treeid : NodeId = tree . root_mut () . append (member) . id ();
@@ -444,7 +444,7 @@ mod tests {
     let folder : NodeId = tree . root () . id ();
     let mut child : Viewnode = mk_writeProtected_viewnode (
       primary . clone (), skgrepo ("main"), "last seen" . to_string (),
-      Membership::Member );
+      true );
     child . focused = true;
     let child_treeid   : NodeId = tree . root_mut () . append (child) . id ();
     let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
@@ -521,5 +521,5 @@ fn mark_goal_children_as_folder_members (
   for adoptee in adoptees {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       = &mut tree . get_mut (adoptee) . unwrap () . value () . kind
-    { t . membership = Membership::Member; }}
+    { t . claimsMembership = true; }}
   Ok (( )) }

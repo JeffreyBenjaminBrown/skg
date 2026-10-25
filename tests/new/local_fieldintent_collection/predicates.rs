@@ -8,7 +8,7 @@ use skg::from_text::local_fieldintent_collection::predicates::{
   member_counts_for_partnerFolder };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{
-  default_unrestrictedVognode, NodeEditRequest, Editability, Membership,
+  default_unrestrictedVognode, NodeEditRequest, Editability,
   UnrestrictedVognode };
 
 fn base_unrestrictedVognode (
@@ -34,7 +34,7 @@ fn relation_folder_membership_conditions () {
     &base_unrestrictedVognode () ));
   { // a non-member excludes.
     let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . membership = Membership::NonMember;
+    t . claimsMembership = false;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! member_counts_for_partnerFolder (
@@ -52,7 +52,7 @@ fn content_membership_coincides_with_relation_folder_membership () {
             with_edit_request (NodeEditRequest::Delete),
             with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ];
     { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-      t . membership = Membership::NonMember;
+      t . claimsMembership = false;
       cases . push (t); }
     cases };
   for t in &cases {
@@ -65,7 +65,7 @@ fn visible_content_membership_conditions () {
     &base_unrestrictedVognode () ));
   { // a non-member excludes.
     let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
-    t . membership = Membership::NonMember;
+    t . claimsMembership = false;
     assert!( ! unrestricted_child_counts_as_visible_content (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! unrestricted_child_counts_as_visible_content (

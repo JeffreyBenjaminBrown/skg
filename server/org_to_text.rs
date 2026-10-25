@@ -5,7 +5,6 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
-  Membership,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -485,9 +484,9 @@ fn unrestrictedVognode_metadata_to_string (
     parts . push ( format! ( "(id {})", unrestrictedVognode . skgid . 0 ));
     parts . push ( format! (
       "(repo {})", metadata_value_atom (&unrestrictedVognode . home_skgrepo) ));
-    // A member carries nothing, being the default.
-    if unrestrictedVognode . membership == Membership::NonMember {
-      parts . push ( "nonMember" . to_string () ); }
+    // A claimant carries nothing, being the default.
+    if ! unrestrictedVognode . claimsMembership {
+      parts . push ( "noClaim" . to_string () ); }
     if unrestrictedVognode . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata

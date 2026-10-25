@@ -374,7 +374,7 @@ The way out is to make the edit at the node's editable occurrence
 instead, or to undo it, make this occurrence editable
 (<localleader>sd on it), save, and edit it then.
 A child that should stay there can instead be made a non-member:
-its metadata carries the bare atom 'nonMember' (herald ⊥).
+its metadata carries the bare atom 'noClaim' (herald ⊥).
 *** PITFALL: Don't make something 'editable' by directly editing its metadata.
 Instead, use 'SetEditable' (<localleader>sd), below.
 That's because Skg has to make other occurrences of it
@@ -454,7 +454,7 @@ then it saves with that answer, or not at all if you quit.
 Like 'SetRepo', but it also
 changes the skgrepo of every content descendent of the node at point
 whose skgrepo matches the original skgrepo of the node at point.
-Only member descendents (those without the 'nonMember' atom) are traversed.
+Only member descendents (those without the 'noClaim' atom) are traversed.
 The write-protected warning and the save's handling of relationships
 described under <localleader>ss apply here too, across the whole
 subtree.
@@ -746,7 +746,7 @@ When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) applies
 the edited tree back into the source headline; ':bd!' cancels;
-S-Left / S-Right cycle a field's value (writeProtected, nonMember,
+S-Left / S-Right cycle a field's value (writeProtected, noClaim,
 editRequest, viewRequests, skgrepo, ...).
 Each field a user may set on the headline's kind is shown,
 at its default when it is absent, and cycles through the values

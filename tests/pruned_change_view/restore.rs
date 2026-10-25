@@ -31,21 +31,21 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 const X_REMOVED_FROM_B : &str =
-  "** (skg (node (id x) (repo main) nonMember (rels";
+  "** (skg (node (id x) (repo main) noClaim (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg (node (id d) (repo main) nonMember writeProtected (viewStats cycle)";
+  "**** (skg (node (id d) (repo main) noClaim writeProtected (viewStats cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
-  "*** (skg (node (id s) (repo main) nonMember writeProtected";
+  "*** (skg (node (id s) (repo main) noClaim writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
-  "***** (skg (node (id d) (repo main) nonMember writeProtected)";
+  "***** (skg (node (id d) (repo main) noClaim writeProtected)";
 const G_UNDER_Q : &str =
   "** (skg (historical (id g)";
 const GC_UNDER_G : &str =
-  "*** (skg (node (id gc) (repo main) nonMember writeProtected";
+  "*** (skg (node (id gc) (repo main) noClaim writeProtected";
 const GC_REMOVED_FROM_R : &str =
-  "** (skg (node (id gc) (repo main) nonMember (diff";
+  "** (skg (node (id gc) (repo main) noClaim (diff";
 
 /// g's file at HEAD, as the save writes a node.
 const G_AT_HEAD : &str =
@@ -226,7 +226,7 @@ fn restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member (
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let requested : String = edit_line (
       &buffer,
-      "***** (skg (node (id p) (repo main) nonMember writeProtected",
+      "***** (skg (node (id p) (repo main) noClaim writeProtected",
       |line : &str| line . replacen (
         "writeProtected", "writeProtected (editRequest restoreRel) (diff (rel removed))", 1 ));
     assert_ne! ( requested, buffer );

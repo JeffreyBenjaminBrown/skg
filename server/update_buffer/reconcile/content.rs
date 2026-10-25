@@ -14,7 +14,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, PhantomDeleted, Editability,
-    Membership, ViewRequest, mk_editable_viewnode};
+    ViewRequest, mk_editable_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
@@ -152,7 +152,7 @@ fn pass_editableViewRequest_to_content_children (
     . children ()
     . filter ( |c| matches!( &c . value () . kind,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . membership == Membership::Member ) )
+          if t . claimsMembership ) )
     . map ( |c| c . id () )
     . collect ();
   for cid in child_skgids {
@@ -185,7 +185,7 @@ fn sync_unrestrictedVognode_from_disk (
 
 /// Compute the content goal list (diff-aware), reconcile
 /// children against it, and mark any surviving non-goal children
-/// as Membership::NonMember.
+/// as not claiming membership.
 fn reconcile_content_children (
   tree                           : &mut Tree<Viewnode>,
   node                           : NodeId,
@@ -294,26 +294,26 @@ fn adopt_nonMember_children_that_are_content (
   let adoptees : Vec<NodeId> = {
     let node_ref : NodeRef<Viewnode> = tree . get (node)
       . ok_or ("adopt_nonMember_children_that_are_content: node not found") ?;
-    let unrestricted_children : Vec<(NodeId, &ID, Membership)> =
+    let unrestricted_children : Vec<(NodeId, &ID, bool)> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          Some (( child . id (), &t . skgid, t . membership )),
+          Some (( child . id (), &t . skgid, t . claimsMembership )),
         _ => None, } )
       . collect ();
     goal . iter ()
       . filter ( |entry| ! unrestricted_children . iter () . any (
-        |(_, skgid, membership)| *skgid == *entry
-                                    && *membership == Membership::Member ))
+        |(_, skgid, claimsMembership)| *skgid == *entry
+                                    && *claimsMembership ))
       . filter_map ( |entry| unrestricted_children . iter () . find (
-        |(_, skgid, membership)| *skgid == entry
-                                    && *membership == Membership::NonMember )
+        |(_, skgid, claimsMembership)| *skgid == entry
+                                    && ! *claimsMembership )
         . map ( |(treeid, _, _)| *treeid ))
       . collect () };
   for adoptee in adoptees {
     write_at_unrestrictedVognode_in_tree (
       tree, adoptee,
-      |t| { t . membership = Membership::Member; } )
+      |t| { t . claimsMembership = true; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok (( )) }
 
@@ -342,7 +342,7 @@ fn replace_raw_content_children_with_visible_overriders (
     for child in node_ref . children () {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
         &child . value () . kind else { continue; };
-      if restriction . membership != Membership::Member
+      if ! restriction . claimsMembership
          || restriction . viewStats . overridesHere . is_some ()
       { continue; }
       let original : ID = restriction . skgid . clone ();
@@ -483,7 +483,7 @@ fn is_subscribee (
     read_at_node_in_tree( tree, node,
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => t . membership == Membership::Member,
+          => t . claimsMembership,
         _ => false } ) ?;
   let parent_is_subscribeeFolder : bool =
     read_at_ancestor_in_tree( tree, node, 1,
@@ -601,7 +601,7 @@ fn complete_content_children (
     tree, node, KeptChildOrder::FollowsGoal,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        => t . membership == Membership::Member,
+        => t . claimsMembership,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         // An Unknown is a real raw relationship member.  Match it by
         // its raw ID so a rerender retains one placeholder rather than
@@ -682,7 +682,7 @@ fn normalize_relationship_backed_content_unknowns (
     tree, node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
-        restriction . membership == Membership::Member
+        restriction . claimsMembership
         && graph_snap . pid_of (&restriction . collected_skgid ()) . is_none ()
         && goal_list . iter () . any (|raw_member|
           raw_member == &restriction . collected_skgid ()
@@ -711,7 +711,7 @@ fn normalize_relationship_backed_content_unknowns (
 
 /// 'erroneous content children' are children that look like content,
 /// but are not actually content.
-/// This marks them nonMember.
+/// This marks them noClaim.
 ///
 /// `content_ids` describes the parent's current, saved/worktree
 /// `contains` list.
@@ -726,7 +726,7 @@ fn mark_erroneous_content_children_as_indep (
     tree, node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        t . membership == Membership::Member
+        t . claimsMembership
         // collected_id: a shown substitute is a member via its
         // original, and must not be made a non-member.
         && !content_id_set . contains( &t . collected_skgid () ),
@@ -734,7 +734,7 @@ fn mark_erroneous_content_children_as_indep (
     |vn : &mut Viewnode| {
       if let ViewnodeKind::Vognode (Vognode::Unrestricted ( ref mut t ))
         = vn . kind
-        { t . membership = Membership::NonMember; }},
+        { t . claimsMembership = false; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:
@@ -755,7 +755,7 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
           | ViewnodeKind::BufferRoot
           | ViewnodeKind::Tombstone                => 0,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . membership != Membership::Member                  => 1,
+          if ! t . claimsMembership                  => 1,
         ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => 2,
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))  => 2,
         // A historical phantom is a former member, standing where the member was.
@@ -810,7 +810,7 @@ fn build_child_creation_data (
           // Keys are collected ids, matching the reconcile's orderkey:
           // an existing shown substitute registers under its original.
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-            if t . membership == Membership::Member
+            if t . claimsMembership
             => { m . insert( t . collected_skgid (),
                              t . home_skgrepo . clone()); },
           // No Restricted arm: a restricted child is never a goal member

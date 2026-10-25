@@ -7,7 +7,7 @@
       "fields": [
         { "name": "writeProtected", "shape": "atom", "default": "false",
           "values": [ { "value": "true" } ] },
-        { "name": "nonMember", "shape": "atom", "default": "false",
+        { "name": "noClaim", "shape": "atom", "default": "false",
           "values": [ { "value": "true" } ] },
         { "name": "editRequest", "shape": "one", "default": "none",
           "values": [

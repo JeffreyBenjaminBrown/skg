@@ -376,7 +376,7 @@ pub fn note (
   stars : usize,
   title : &str,
 ) -> String {
-  format! ( "{} (skg (node nonMember)) {}",
+  format! ( "{} (skg (node noClaim)) {}",
             "*" . repeat (stars), title ) }
 
 /// Save 'buffer', then save what the save rendered: both without errors,

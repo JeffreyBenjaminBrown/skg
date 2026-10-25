@@ -62,7 +62,7 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
 * (skg (node (id n) (repo main))) n
 ** (skg idFolder)
 *** (skg id) n
-*** (skg (node (id x) (repo main) nonMember)) x
+*** (skg (node (id x) (repo main) noClaim)) x
 ";
   let saved : String = save_buffer (
     buffer, config, tantivy, &graph, &mut views_state ) . await ?;
@@ -72,7 +72,7 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
   let x_line : &str = saved . lines ()
     . find ( |line| line . contains ("(id x)") )
     . unwrap_or_else ( || panic! ("x must survive the rerender:\n{}", saved) );
-  assert! ( x_line . starts_with ("*** ") && x_line . contains ("nonMember"),
+  assert! ( x_line . starts_with ("*** ") && x_line . contains ("noClaim"),
             "x stays a non-member at its depth:\n{}", saved );
   assert! ( saved . lines () . any ( |line|
               line . starts_with ("** ") && line . contains ("tombstone") ),

@@ -357,7 +357,7 @@ pub fn pids_from_viewforest (
 
 /// Collect all IDs (primary + extras) for every root
 /// -- i.e. every level-1 headline -- in the view.
-/// (There can be graph roots at other levels, via non-member (nonMember) children;
+/// (There can be graph roots at other levels, via non-member (noClaim) children;
 /// this does not return those.)
 ///
 /// Extra IDs are pulled from the operation's captured in-Rust graph.

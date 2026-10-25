@@ -129,7 +129,7 @@ through owned repos, C-? displays all configured repos and
 their paths, and typed repo names are accepted directly.
 With a prefix argument RECURSIVE, changes every true content
 descendent whose repo matches the repo at point.
-Only member descendents (no nonMember atom) are traversed.
+Only member descendents (no noClaim atom) are traversed.
 On a headline that has no metadata yet, instead populates it minimally
 via `skg--populate-minimal-node-metadata' (RECURSIVE is then moot).
 
@@ -160,7 +160,7 @@ Does not save; call `skg-request-save-buffer' afterward."
   "Prompt for and recursively change the repo of the node at point.
 This is the recursive form of `skg-set-repo': it changes every
 content-descendent whose repo matches the repo at point.
-Only member descendents (no nonMember atom) are traversed.
+Only member descendents (no noClaim atom) are traversed.
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
   (skg-set-repo t))
@@ -556,7 +556,7 @@ to its view-parent is of KIND (`content', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes non-member
-(nonMember) nodes -- except the walk's root, which the
+(noClaim) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the two
 writable folders. Returns the number of relationships true."
   (let ((targets (skg--relRepo-recursive-targets kind)))
@@ -866,7 +866,7 @@ phantom (deleted, unknown or historical) or a restricted node."
 (defun skg--change-repo-recursive (old-skgrepo new-skgrepo)
   "Change OLD-REPO to NEW-REPO in this content subtree.
 Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
-only member descendents (no nonMember atom) are traversed.
+only member descendents (no noClaim atom) are traversed.
 A write-protected occurrence is not edited -- the save would refuse
 its repo edit -- and its ID is
 collected into WRITE-PROTECTED-IDS instead, for the caller to warn about,
@@ -936,9 +936,9 @@ OLD-REPO. Restores point afterward."
        (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
 
 (defun skg--node-member-p (metadata-sexp)
-  "Return non-nil unless METADATA-SEXP carries the bare nonMember atom.
+  "Return non-nil unless METADATA-SEXP carries the bare noClaim atom.
 A member carries nothing."
-  (not (skg-sexp-subtree-p metadata-sexp '(skg (node nonMember)))))
+  (not (skg-sexp-subtree-p metadata-sexp '(skg (node noClaim)))))
 
 (defun skg--node-repo (metadata-sexp)
   "Return METADATA-SEXP's node repo as a string, or nil."

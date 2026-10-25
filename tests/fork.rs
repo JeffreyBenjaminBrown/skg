@@ -480,7 +480,7 @@ async fn clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
     * (skg (node (id P) (repo owned) writeProtected)) P-container
-    ** (skg (node (id N) (repo foreign) nonMember)) N-edited
+    ** (skg (node (id N) (repo foreign) noClaim)) N-edited
     *** (skg (node (id N1) (repo foreign) writeProtected)) N1
     *** (skg (node (id N2) (repo foreign) writeProtected)) N2
     * (skg (node (id P) (repo owned2))) P-container

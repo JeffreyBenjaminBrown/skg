@@ -70,7 +70,7 @@ Tokens carry `skg-style' on character ranges (single-style tokens
 propertize the whole string; INTERC-built tokens carry per-segment
 styles). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
-with no separator (used to glue e.g. ☮ onto its nonMember character).
+with no separator (used to glue e.g. ☮ onto its noClaim character).
 Structural colons added by the transform (like `3:{' -> `3{') are
 stripped when either side is non-alphanumeric."
   (when tokens

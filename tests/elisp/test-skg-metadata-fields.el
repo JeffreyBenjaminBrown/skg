@@ -51,7 +51,7 @@ bare or heading a list, after any marker; nil for no kind."
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, repo : jeff,
-    ;; write-protected : false (default), nonMember : false (default),
+    ;; write-protected : false (default), noClaim : false (default),
     ;; editRequest : none (default), viewRequests : none (default)
     (should (= (length headlines) 14)) ;; each key *and each value* is a separate headline
     ;; Check default fields are present
@@ -82,23 +82,23 @@ bare or heading a list, after any marker; nil for no kind."
     (should (string= (cdr (nth (1+ write-protected-idx) headlines)) "true"))))
 
 ;;
-;; Fill in: a member (no nonMember atom) -> inserts 'false (default)';
+;; Fill in: a member (no noClaim atom) -> inserts 'false (default)';
 ;; a non-member's bare atom -> shows 'true'
 ;;
 
-(ert-deftest test-fillIn-nonMember ()
-  "Filling in offers nonMember as a bare atom: 'false (default)' on a
+(ert-deftest test-fillIn-noClaim ()
+  "Filling in offers noClaim as a bare atom: 'false (default)' on a
 member, 'true' on a non-member."
   (dolist (case '(((skg (node (id abc) (repo jeff))) . "false (default)")
-                  ((skg (node (id abc) (repo jeff) nonMember)) . "true")))
+                  ((skg (node (id abc) (repo jeff) noClaim)) . "true")))
     (let* ((org-text (sexp-to-org (car case)))
            (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
            (lines (split-string filledIn "\n"))
            (headlines (org-to-sexp--extract-headlines lines))
-           (nonMember-idx (cl-position "nonMember" headlines
+           (noClaim-idx (cl-position "noClaim" headlines
                                        :key #'cdr :test #'string=)))
-      (should nonMember-idx)
-      (should (string= (cdr (nth (1+ nonMember-idx) headlines))
+      (should noClaim-idx)
+      (should (string= (cdr (nth (1+ noClaim-idx) headlines))
                        (cdr case))))))
 
 ;;
@@ -128,7 +128,7 @@ member, 'true' on a non-member."
                            "**** jeff\n"
                            "*** writeProtected\n"
                            "**** true\n"
-                           "*** nonMember\n"
+                           "*** noClaim\n"
                            "**** false (default)\n"
                            "*** editRequest\n"
                            "**** none (default)\n"
@@ -152,7 +152,7 @@ member, 'true' on a non-member."
                            "**** jeff\n"
                            "*** writeProtected\n"
                            "**** false\n"
-                           "*** nonMember\n"
+                           "*** noClaim\n"
                            "**** false\n"
                            "*** editRequest\n"
                            "**** none\n"
@@ -217,10 +217,10 @@ member, 'true' on a non-member."
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, repo, write-protected, nonMember,
+    ;; Order should be: id, repo, write-protected, noClaim,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
-                   '("id" "repo" "writeProtected" "nonMember"
+                   '("id" "repo" "writeProtected" "noClaim"
                      "editRequest" "viewRequests" "graphStats")))))
 
 ;;
@@ -244,23 +244,23 @@ member, 'true' on a non-member."
                                (editRequest (merge XYZ))))))))
 
 ;;
-;; Strip: nonMember true -> the bare atom
+;; Strip: noClaim true -> the bare atom
 ;;
 
-(ert-deftest test-strip-nonMember-true ()
-  "Stripping nonMember=true produces the bare atom in the sexp."
+(ert-deftest test-strip-noClaim-true ()
+  "Stripping noClaim=true produces the bare atom in the sexp."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
                            "**** abc\n"
                            "*** repo\n"
                            "**** jeff\n"
-                           "*** nonMember\n"
+                           "*** noClaim\n"
                            "**** true"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (repo jeff) nonMember))))))
+                   '(skg (node (id abc) (repo jeff) noClaim))))))
 
 ;;
 ;; Strip: viewRequests with actual values -> kept as-is
@@ -299,7 +299,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
                            "*** repo\n"
                            "**** only\n"
                            "*** writeProtected\n"
-                           "*** nonMember\n"
+                           "*** noClaim\n"
                            "*** editRequest\n"
                            "*** viewRequests"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
@@ -445,7 +445,7 @@ preserves repo and all fields."
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; All editable defaults must be present
     (should (cl-find "writeProtected" headlines :key #'cdr :test #'string=))
-    (should (cl-find "nonMember" headlines :key #'cdr :test #'string=))
+    (should (cl-find "noClaim" headlines :key #'cdr :test #'string=))
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
     ;; the rels herald must be preserved
     (should (cl-find "rels" headlines :key #'cdr :test #'string=))))

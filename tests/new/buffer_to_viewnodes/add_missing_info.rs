@@ -15,7 +15,6 @@ use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_skgids};
-use skg::types::viewnode::Membership;
 
 use ego_tree::Tree;
 
@@ -57,12 +56,12 @@ fn all_tests
 /// membership.
 fn new_note_skgrepo_and_membership (
   viewforest : &MpViewForest,
-) -> (Option<SkgrepoName>, Membership) {
+) -> (Option<SkgrepoName>, bool) {
   viewforest . nodes ()
     . find_map ( |node_ref| match &node_ref . value () . kind {
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
           if t . title == "new note"
-          => Some (( t . home_skgrepo . clone (), t . membership )),
+          => Some (( t . home_skgrepo . clone (), t . claimsMembership )),
         _ => None } )
     . expect ("the new note should be in the forest") }
 
@@ -82,21 +81,21 @@ async fn test_new_headline_inherits_through_phantoms_and_folders (
         * (skg (node (id editable) (repo alt))) editable
         ** (skg (historical (id gone) (repo main) (diff (node removed) (rel removed)))) gone
         *** new note
-      "}, "alt", Membership::Member ),
+      "}, "alt", true ),
     ( // In a partner folder of an editable node, as a non-member.
       indoc! {"
         * (skg (node (id editable) (repo alt))) editable
         ** (skg containerFolder)
-        *** (skg (node nonMember)) new note
-      "}, "alt", Membership::NonMember ),
+        *** (skg (node noClaim)) new note
+      "}, "alt", false ),
     ( // In a partner folder under a write-protected occurrence whose
       // shown skgrepo is stale: the graph says 'main'.
       indoc! {"
         * (skg (node (id other) (repo alt))) other
         ** (skg (node (id root) (repo stale) writeProtected)) root again
         *** (skg containerFolder)
-        **** (skg (node nonMember)) new note
-      "}, "main", Membership::NonMember ), ] {
+        **** (skg (node noClaim)) new note
+      "}, "main", false ), ] {
     let mut viewforest : MpViewForest =
       org_to_uninterpreted_viewforest (input) . unwrap() . 0;
     add_missing_info_to_viewforest (

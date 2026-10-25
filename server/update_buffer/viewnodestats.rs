@@ -6,7 +6,7 @@ use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-  GraphnodeStats, Membership, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
+  GraphnodeStats, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
 use ego_tree::{Tree, NodeId, NodeRef};
@@ -112,12 +112,12 @@ fn set_herald_strings_in_viewnode (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, membership, overridesHere)
-    : (GraphnodeStats, Membership, bool) = {
+  let (gstats, claimsMembership, overridesHere)
+    : (GraphnodeStats, bool, bool) = {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . membership,
+    ( t . graphStats . clone (), t . claimsMembership,
       t . viewStats . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
@@ -131,7 +131,7 @@ fn set_herald_strings_in_viewnode (
       &mut flags, graph, restriction,
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
-  if membership != Membership::Member {
+  if ! claimsMembership {
     // A non-member under a subscribee-as-such: the content the
     // subscriber hides, retained there as non-member with its subtree,
     // says so, as the hiddenInSubscribeeFolder's members do.
@@ -143,7 +143,7 @@ fn set_herald_strings_in_viewnode (
         restriction )
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
-    if membership == Membership::Member
+    if claimsMembership
       && matches! (parent_kind, ParentKind::Folder (PartnerFolder::Subscribee, _)) {
       graph . and_then (|g| {
         let subscriber_pid : &ID = &ancestors . iter ()
@@ -171,7 +171,7 @@ fn set_herald_strings_in_viewnode (
         Some (members . len ()) })
     } else { None };
   let birth_facts : Vec<BirthFact> =
-    birth_facts (&parent_kind, membership, &flags, overridesHere);
+    birth_facts (&parent_kind, claimsMembership, &flags, overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
@@ -299,12 +299,12 @@ fn flag_ancestor_relations (
 /// singleton; a HiddenInSubscribee member has two.
 fn birth_facts (
   parent_kind : &ParentKind,
-  membership    : Membership,
+  claimsMembership : bool,
   flags       : &AncestorFlags,
   overridesHere : bool, // whether the node is shown in place of a node it overrides
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
-    if membership != Membership::Member { Vec::new ()
+    if ! claimsMembership { Vec::new ()
     } else {
       match parent_kind {
         ParentKind::Vognode (_) =>
@@ -411,12 +411,12 @@ fn set_relRepo (
   let relRepo : Option<SkgrepoName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
-    let (node_pid, membership) : (ID, Membership) = {
+    let (node_pid, claimsMembership) : (ID, bool) = {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
-      ( t . collected_skgid (), t . membership ) };
-    if membership != Membership::Member {
+      ( t . collected_skgid (), t . claimsMembership ) };
+    if ! claimsMembership {
       // Not a genuine member at this position (a self-writer standing
       // as a non-member under a folder, or a node of the containerward
       // chain): there

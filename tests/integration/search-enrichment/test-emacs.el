@@ -21,15 +21,15 @@
       (message "✗ FAIL: leaf-b search root not found during %s" phase)
       (message "Buffer content:\n%s" content)
       (kill-emacs 1))
-    (when (string-match-p "nonMember" line)
+    (when (string-match-p "noClaim" line)
       (message "✗ FAIL: leaf-b search root is false during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
+    (when (string-match-p "noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "nonMember writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" line)
+    (when (string-match-p "noClaim writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))

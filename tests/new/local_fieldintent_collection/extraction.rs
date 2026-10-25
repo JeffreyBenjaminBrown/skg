@@ -329,12 +329,12 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (node (id root) (repo main))) root node
-            ** (skg (node (id unrelated1) (repo main) nonMember)) unrelated child
+            ** (skg (node (id unrelated1) (repo main) noClaim)) unrelated child
             ** (skg (node (id content1) (repo main))) content child 1
             ** (skg aliasFolder) aliases
             *** (skg alias) my alias
             ** (skg (node (id content2) (repo main))) content child 2
-            ** (skg (node (id unrelated2) (repo main) nonMember)) another unrelated child
+            ** (skg (node (id unrelated2) (repo main) noClaim)) another unrelated child
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -363,7 +363,7 @@ fn extraction_preserves_content_and_independent_children (
     indoc! {"
             * (skg (node (id root) (repo main))) root
             ** (skg (node (id ordinary) (repo main))) ordinary
-            ** (skg (node (id independent) (repo main) nonMember)) independent
+            ** (skg (node (id independent) (repo main) noClaim)) independent
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -649,7 +649,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             ** (skg subscribeeFolder)
             *** (skg (node (id subscribee) (repo main))) subscribee
             **** (skg (node (id keep) (repo main))) keep
-            **** (skg (node (id independent) (repo main) nonMember)) independent
+            **** (skg (node (id independent) (repo main) noClaim)) independent
             **** (skg (node (id delete-me) (repo main) (editRequest delete))) delete me
             **** (skg (historical (id phantom) (repo main))) phantom
             "};
@@ -740,7 +740,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
     indoc! {"
             * (skg (node (id root) (repo main))) root
             Root body
-            ** (skg (node (id independent) (repo main) nonMember)) independent
+            ** (skg (node (id independent) (repo main) noClaim)) independent
             ** (skg (node (id content) (repo main))) content
             ** (skg aliasFolder) aliases
             *** (skg alias) root alias
@@ -1328,7 +1328,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
             ** (skg (node (id section2) (repo main) (editRequest delete))) Section 2
             ** (skg (node (id section3) (repo main))) Section 3
             * (skg (node (id doc2) (repo main))) Document 2
-            ** (skg (node (id ref_section) (repo main) nonMember)) Reference Section
+            ** (skg (node (id ref_section) (repo main) noClaim)) Reference Section
         "};
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
@@ -1416,7 +1416,7 @@ fn independent_member_is_excluded_from_overriddens (
             * (skg (node (id overrider) (repo main))) overrider
             ** (skg overriddenFolder)
             *** (skg (node (id keep) (repo main))) keep
-            *** (skg (node (id bystander) (repo main) nonMember)) bystander
+            *** (skg (node (id bystander) (repo main) noClaim)) bystander
         "};
   let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);

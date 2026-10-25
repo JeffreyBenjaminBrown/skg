@@ -5,7 +5,7 @@
 ///   UnrestrictedVognodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(repo REPO)]
-///                         [nonMember]        ; marks the occurrence a non-member
+///                         [noClaim]          ; the occurrence claims no membership
 ///                         [writeProtected]   ; marks the occurrence write-protected
 ///                         [cycle]
 ///                         [(stats [containsParent]
@@ -55,7 +55,7 @@ use crate::types::viewnode::{
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
-  Editability, Membership, ViewnodeId,
+  Editability, ViewnodeId,
 };
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
@@ -81,7 +81,7 @@ pub struct ViewnodeMetadata {
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
   pub skgid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
-  pub membership: Membership,
+  pub claimsMembership: bool,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
   pub viewStats: ViewnodeStats,
@@ -120,7 +120,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     non_vognode: None,
     skgid: None,
     home_skgrepo: None,
-    membership: Membership::Member,
+    claimsMembership: true,
     writeProtected: false,
     graphStats: GraphnodeStats::default(),
     viewStats: ViewnodeStats::default(),
@@ -326,7 +326,7 @@ pub fn viewnode_from_metadata (
             title,
             skgid            : metadata . skgid . clone (),
             home_skgrepo     : metadata . home_skgrepo . clone (),
-            membership         : metadata . membership,
+            claimsMembership : metadata . claimsMembership,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
@@ -738,10 +738,10 @@ fn parse_node_sexp (
           // The server emits and accepts this exact atom (see org_to_text.rs).
           "writeProtected" =>
             metadata . writeProtected = true,
-          // A 'nonMember' atom makes this occurrence a non-member; a
-          // member carries nothing.
-          "nonMember" =>
-            metadata . membership = Membership::NonMember,
+          // A 'noClaim' atom says this occurrence does not claim
+          // membership; a claimant carries nothing.
+          "noClaim" =>
+            metadata . claimsMembership = false,
           "omittedBody" =>
             // Display-only (like rels): the view
             // regenerates it, so accept and discard.

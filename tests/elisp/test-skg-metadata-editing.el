@@ -109,7 +109,7 @@ plain parens. Fields producing no herald get none."
   (skg-test-install-herald-rules)
   (with-temp-buffer
     (insert "* skg\n** node\n*** repo\n**** main\n*** writeProtected\n"
-            "*** nonMember\n**** true\n")
+            "*** noClaim\n**** true\n")
     (org-mode)
     (skg-sexp-edit--decorate-with-heralds)
     (let ((hint-on-line
@@ -128,7 +128,7 @@ plain parens. Fields producing no herald get none."
                (and ov (substring-no-properties
                         (overlay-get ov 'after-string)))))))
       (should (equal (funcall hint-on-line "*** writeProtected") " (\u262e)"))
-      (should (equal (funcall hint-on-line "*** nonMember") " (\u22a5)"))
+      (should (equal (funcall hint-on-line "*** noClaim") " (\u22a5)"))
       (should-not (funcall hint-on-line "**** main"))
       (should-not (funcall hint-on-line "*** repo"))
       ;; The buffer text is untouched: applying must not see hints.

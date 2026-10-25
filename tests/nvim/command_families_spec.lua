@@ -295,7 +295,7 @@ describe('skg.metadata_edit', function ()
   it('cycles field values by their parent field', function ()
     buffer_with(table.concat({
       metadata_edit.help_text, '',
-      '* skg', '** node', '*** nonMember',
+      '* skg', '** node', '*** noClaim',
       '**** false (default)' }, '\n'))
     vim.b.skg_edit_kind_atom = 'node' -- as the editor sets it
     vim.api.nvim_win_set_cursor(0, { 6, 0 })

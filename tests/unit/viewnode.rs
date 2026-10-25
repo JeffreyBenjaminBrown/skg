@@ -33,7 +33,7 @@ fn partnerFolder_policy_mapping () {
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut restriction : Viewnode = mk_viewnode (
     ID::from ("unrestricted"), SkgrepoName::from ("public"), "unrestricted" . into (),
-    Membership::Member,
+    true,
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
@@ -100,7 +100,7 @@ fn writeProtect_requests_round_trip () {
 fn write_protect_drops_the_editable_request_and_keeps_membership () {
   let mut viewnode : Viewnode = mk_viewnode (
     ID::from ("node"), SkgrepoName::from ("public"), "node" . into (),
-    Membership::NonMember,
+    false,
     Editability::Editable {
       body : Some ("body" . into ()),
       edit_request : Some (NodeEditRequest::Delete) },
@@ -111,7 +111,7 @@ fn write_protect_drops_the_editable_request_and_keeps_membership () {
   assert_eq! (t . editability, Editability::WriteProtected);
   assert_eq! ( t . view_requests,
                [ ViewRequest::Flags ] . into_iter () . collect () );
-  assert_eq! (t . membership, Membership::NonMember); }
+  assert_eq! (t . claimsMembership, false); }
 
 // 'editable_occurrences' collects the IDs of the editable unrestricted
 // vognodes at any depth, and no write-protected one, phantom or
@@ -133,7 +133,7 @@ fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
   tree . get_mut (root) . unwrap () . append (editable ("member"));
   tree . get_mut (root) . unwrap () . append ( mk_writeProtected_viewnode (
     ID::from ("protected"), SkgrepoName::from ("public"), "protected" . into (),
-    Membership::Member ));
+    true ));
   tree . get_mut (root) . unwrap () . append ( mk_unknown_viewnode (ID::from ("unknown")) );
   assert_eq! ( editable_occurrences (&viewforest),
                [ "root", "in-folder", "member" ] . into_iter ()
@@ -161,7 +161,7 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     mk_editable_viewnode ( ID::from ("n"), SkgrepoName::from ("main"),
                            "n" . into (), None ),
     mk_writeProtected_viewnode ( ID::from ("w"), SkgrepoName::from ("main"),
-                                 "w" . into (), Membership::NonMember ),
+                                 "w" . into (), false ),
     mk_unknown_viewnode (ID::from ("u")),
     mk_restricted_viewnode (),
     viewnode_of (ViewnodeKind::Tombstone),

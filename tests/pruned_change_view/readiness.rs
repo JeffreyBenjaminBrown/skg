@@ -56,7 +56,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
                               "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "*** (skg (node (id s1) (repo public) nonMember writeProtected (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
+      "*** (skg (node (id s1) (repo public) noClaim writeProtected (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
       "the image under sub is ready:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       line . starts_with ("*** (skg (node (id sub)")
@@ -78,7 +78,7 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let member : &str =
-      "*** (skg (node (id sub) (repo public) nonMember writeProtected";
+      "*** (skg (node (id sub) (repo public) noClaim writeProtected";
     let marked : String = edit_line (
       &buffer, member,
       |line| line . replace (
@@ -112,7 +112,7 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let chain_node : &str =
-      "***** (skg (node (id d) (repo main) nonMember writeProtected";
+      "***** (skg (node (id d) (repo main) noClaim writeProtected";
     let marked : String = edit_line (
       &buffer, chain_node,
       |line| { assert! ( ! line . contains ("(diff"), "{}", line );
@@ -125,7 +125,7 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
                 line . starts_with (chain_node) && ! line . contains ("(diff") ),
               "the chain node shows no change:\n{}", saved );
     assert! ( saved . lines () . any ( |line|
-                line . starts_with ("** (skg (node (id c) (repo main) nonMember")
+                line . starts_with ("** (skg (node (id c) (repo main) noClaim")
                 && line . ends_with ("(diff (rel removed) (leaves 1 rel)))) c") ),
               "c, as d's removed member, is not ready:\n{}", saved );
     Ok (( )) }) }

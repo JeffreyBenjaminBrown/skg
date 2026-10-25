@@ -59,7 +59,7 @@ use crate::to_org::extend::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ EditableMap, Finalizable, get_skgid_from_viewnode_at, makeWriteProtectedAndClobber, make_member_children_nonMembers, unrestrictedVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::tree::generic::read_at_node_in_tree;
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, Membership, ViewRequest, FolderRelation, Editability };
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, ViewRequest, FolderRelation, Editability };
 use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -226,7 +226,7 @@ fn counts_as_member_for_the_claim (
 ) -> bool {
   matches! ( &viewnode . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if t . membership == Membership::Member )
+      if t . claimsMembership )
   || is_unrestricted_removed_member (viewnode) }
 
 /// Apply a write-protect request -- 'ViewRequest::WriteProtected' or

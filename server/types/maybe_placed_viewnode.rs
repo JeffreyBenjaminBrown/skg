@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, with_org_subheadlines};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, Membership, };
+use super::viewnode::{ ChangeFacts, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -74,7 +74,7 @@ impl TryFrom<MpUnrestrictedVognode> for UnrestrictedVognode {
       title          : u . title,
       skgid          : skgid,
       home_skgrepo: skgrepo,
-      membership          : u . membership,
+      claimsMembership : u . claimsMembership,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
       relRepo_request : u . relRepo_request,
@@ -142,7 +142,7 @@ impl From<UnrestrictedVognode> for MpUnrestrictedVognode {
       title          : t . title,
       skgid          : Some(t . skgid),
       home_skgrepo   : Some(t . home_skgrepo),
-      membership          : t . membership,
+      claimsMembership : t . claimsMembership,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
       relRepo_request : t . relRepo_request,
@@ -256,7 +256,7 @@ impl Default for MpUnrestrictedVognode {
       title          : String::new(),
       skgid          : None,
       home_skgrepo   : None,
-      membership       : Membership::Member,
+      claimsMembership : true,
       graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),
       relRepo_request : None,

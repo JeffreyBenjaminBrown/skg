@@ -135,7 +135,7 @@ parent's (repo X) with each child's (id N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
     (insert "* (skg (node (repo owned2) (viewStats (homeRepoHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (repo foreign) nonMember writeProtected (rels \"aO\"))) N-original\n")
+    (insert "** (skg (node (id N) (repo foreign) noClaim writeProtected (rels \"aO\"))) N-original\n")
     (org-mode)
     (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
@@ -162,7 +162,7 @@ ordinary-save refusal on C-x C-s."
   (let ((source (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) nonMember writeProtected (rels \"aO\"))) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) noClaim writeProtected (rels \"aO\"))) N-original\n"
                     source)))
           (unwind-protect
               (with-current-buffer buf
@@ -241,7 +241,7 @@ clone) as the default, and writes the choice into the metadata."
     (insert "Some explanation.\n")
     (insert "# Suggested repo for the clone below: owned2\n")
     (insert "* (skg (node (repo PICK-A-REPO) (viewStats (homeRepoHerald ⌂:PICK-A-REPO)))) N-edited\n")
-    (insert "** (skg (node (id N) (repo foreign) nonMember writeProtected)) N-original\n")
+    (insert "** (skg (node (id N) (repo foreign) noClaim writeProtected)) N-original\n")
     (org-mode)
     (let ((offered-defaults nil))
       (cl-letf (((symbol-function 'skg--owned-repos)
@@ -263,7 +263,7 @@ clone) as the default, and writes the choice into the metadata."
 saved metadata, so the server omitted the placeholder) prompts nothing."
   (with-temp-buffer
     (insert "* (skg (node (repo owned2) (viewStats (homeRepoHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (repo foreign) nonMember writeProtected)) N-original\n")
+    (insert "** (skg (node (id N) (repo foreign) noClaim writeProtected)) N-original\n")
     (org-mode)
     (cl-letf (((symbol-function 'skg--completing-read-with-cycle)
                (lambda (&rest _)

@@ -565,7 +565,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
     let retained_e1 : &str = collateral . lines ()
       . find ( |line| line . starts_with ("**** (skg (node (id e1)")
-                      && line . contains ("nonMember") )
+                      && line . contains ("noClaim") )
       . unwrap_or_else ( || panic! (
         "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
         collateral ));
@@ -573,7 +573,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       "the retained e1 keeps its editability:\n{}", collateral );
     assert! ( collateral . lines ()
                 . any ( |line| line . starts_with ("***** (skg (node (id e11)")
-                               && ! line . contains ("nonMember") ),
+                               && ! line . contains ("noClaim") ),
       "e11 stays the retained e1's content:\n{}", collateral );
     assert! ( retained_e1 . contains ("(contains (in 1 (ancestors 1))")
               && retained_e1 . contains ("(hidesFromSubs (in 1 (ancestors 3)))"),
@@ -819,12 +819,12 @@ async fn test_subscribee_and_compoundPartnerFolders (
        *** (skg (node (id E1) (repo main) (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id hidden-in-E1) (repo main) writeProtected (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4))) (birth (contains in 2) (hidesFromSubs in 4))))) hidden-in-E1
-       ****** (skg (node (id E1) (repo main) nonMember writeProtected (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-1
+       ****** (skg (node (id E1) (repo main) noClaim writeProtected (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-1
        **** (skg (node (id E11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) E11
        *** (skg (node (id E2) (repo main) (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id hidden-in-E2) (repo main) writeProtected (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4))) (birth (contains in 2) (hidesFromSubs in 4))))) hidden-in-E2
-       ****** (skg (node (id E2) (repo main) nonMember writeProtected (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-2
+       ****** (skg (node (id E2) (repo main) noClaim writeProtected (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-2
        **** (skg (node (id E21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) E21
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id hidden-for-no-reason) (repo main) writeProtected (rels (hidesFromSubs (in 1 (ancestors 3))) (birth (hidesFromSubs in 3))))) hidden-for-no-reason
@@ -895,7 +895,7 @@ async fn test_hidden_within_but_none_without (
        *** (skg (node (id E1) (repo main) (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (repo main) writeProtected (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4))) (birth (contains in 2) (hidesFromSubs in 4))))) H
-       ****** (skg (node (id E1) (repo main) nonMember writeProtected (rels (contains (out 3 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-1
+       ****** (skg (node (id E1) (repo main) noClaim writeProtected (rels (contains (out 3 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-1
        **** (skg (node (id E11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) E11
        **** (skg (node (id E12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) E12
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
@@ -1257,13 +1257,13 @@ async fn test_overlapping_hidden_within (
        *** (skg (node (id E1) (repo main) (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (repo main) writeProtected (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4))) (birth (contains in 2) (hidesFromSubs in 4))))) H
-       ****** (skg (node (id E1) (repo main) nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-1
-       ****** (skg (node (id E2) (repo main) nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-2
+       ****** (skg (node (id E1) (repo main) noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-1
+       ****** (skg (node (id E2) (repo main) noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-2
        *** (skg (node (id E2) (repo main) (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (repo main) writeProtected (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4))) (birth (contains in 2) (hidesFromSubs in 4))))) H
-       ****** (skg (node (id E1) (repo main) nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-1
-       ****** (skg (node (id E2) (repo main) nonMember writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-2
+       ****** (skg (node (id E1) (repo main) noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-1
+       ****** (skg (node (id E2) (repo main) noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) (viewStats cycle))) subscribee-2
        ** (skg (node (id R1) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) R1
        "};
     assert_metadata_eq!(extended, expected_extended,
