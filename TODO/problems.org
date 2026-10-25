@@ -45,7 +45,7 @@
   Each was run by a throwaway test; the reports are under
   'tests/results/review18/'. The decisions are in
   'TODO/total-diff-view/18_review.org'.
-** After a switch back, the restricted placeholder stays beside its node
+** FIX PLANNED: After a switch back, the restricted placeholder stays beside its node
   Switching to 'public' turned the private node s into the anonymous
   'restrictedNode' placeholder, still holding its public child s1.
   Switching back to 'all' left the placeholder where it was and drew s
@@ -385,7 +385,7 @@ gap too. Details, options and questions:
    ForkRepoInactive on BufferValidationError) but DEFERRED the broad
    string consolidation -- it is a nice-to-have touching fs/git/diff
    layers, out of proportion to the fork work. Worth doing on its own.
-** Minor: confirmation-buffer homeRepoHerald shows the raw skgrepo name
+** FIX PLANNED: Minor: confirmation-buffer homeRepoHerald shows the raw skgrepo name
    'build_fork_confirmation_buffer' emits the clone's '(homeRepoHerald
    ⌂:NAME)' with the raw RepoName, not the configured abbreviation
    ('SkgRepo::herald_label') that every other rendered view uses.
@@ -833,7 +833,7 @@ gap too. Details, options and questions:
    glyph column, 'glyph()', and that test -- or, if a fixed per-role
    glyph is still wanted somewhere, document where. Left alone for now
    (a self-consistent const + test, out of scope for the search feature).
-** fork.rs hand-emits a (viewStats parentOverrides) atom that no longer renders
+** FIX PLANNED: fork.rs hand-emits a (viewStats parentOverrides) atom that no longer renders
    server/from_text/fork.rs:266 writes '(viewStats parentOverrides)' on
    the original under its clone-to-be in the fork-confirmation buffer,
    to mark it with the old red "pO" herald. But 'parentOverrides' is no

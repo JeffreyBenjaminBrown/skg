@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the slices of TODO/total-diff-view/19_plan.org unattended, one
+# Run the slices of TODO/simplify-refresh/04_1_plan_rewrite-refresh.org
 # fresh Claude Code session per slice, so that each slice starts with an
 # empty context. The plan, progress.org, git and the auto-memory
 # directory are the memory between slices.
@@ -28,8 +28,8 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-PLAN=TODO/total-diff-view/19_plan.org
-PROGRESS_HEADLINE='Folders, retention, and the two records'
+PLAN=TODO/simplify-refresh/04_1_plan_rewrite-refresh.org
+PROGRESS_HEADLINE='Rewrite refresh'
 PLAN_DIR=$(dirname "$PLAN")
 LOG_DIR=$PLAN_DIR/run-logs
 MODEL="${SKG_PLAN_MODEL:-claude-opus-5-5}"

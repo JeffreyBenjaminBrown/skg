@@ -1,0 +1,1074 @@
+#+title: Plan 04.1: rewrite the buffer refresh
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement this plan. It is a complete, settled specification,
+and nothing in it is open for discussion. Writing it has
+implemented nothing. It stands on its own: every term it uses
+is defined below or in 'docs/glossary.org'. The two documents
+that produced it,
+[[file:02_jeff_de-novo.org][02_jeff_de-novo.org]] and
+[[file:04_plan-tentative_rewrite-refresh.org][the tentative
+plan]], are background that nobody needs to read; where they
+and this document differ, this document wins.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the
+orientation]] and its code-change advice ('names.org',
+'formatting.org', 'ai-agents.org', 'common-gotchas.md',
+'when-to-stop.org'), 'architecture.md', and
+'commit-messages.org', before starting. Preserve unrelated
+edits. Do not change branches or git configuration. Finish
+each slice and its verification without stopping for routine
+choices; stopping to ask is for the rare conditions that
+'when-to-stop.org' describes, and this plan expects one such
+stop at most, named under slice 8. Record every deviation,
+and any question, in [[file:progress.org][progress.org]]
+beside this plan, under a top-level headline "Rewrite
+refresh" with one subheadline per slice. This plan's text
+stays as it is, except the keyword of a slice's headline.
+Write any log or scratch file of your own under
+'tests/results/', never under 'TODO/'.
+
+An agent may hand a survey (a grep-and-count, a listing of
+call sites, a check of every occurrence of a word) to a
+subagent and keep the judgment, as 'ai-agents.org' says. A
+claim about behavior that rests on reading complex code is
+confirmed by a test before the agent builds on it; the slices
+say which tests, and an agent may add a throwaway test of its
+own under 'tests/results/' and delete it after. When a suite
+fails after a slice's change, classify the failure before
+fixing it: a regression, an expected fixture adaptation (this
+plan changes what buffers contain, so many fixtures will
+change on purpose), an overlapping edit, or an unrelated
+issue; record the classification beside the first failure in
+'progress.org'.
+
+** Running it
+A note for whoever launches the run, not for the agent.
+'bash/run-plan-slices.sh' hard-codes
+a plan, its progress headline and its last slice (lines 31, 32
+and 38). They point at this file, "Rewrite refresh" and 13
+since 2026-10-25; keep that edit out of the slices' commits.
+Commit the plan and any edits under
+'TODO/' first:
+the runner treats dirty tracked files as a stopped slice's
+leftovers and tells the next agent to commit them.
+
+** Commits
+Commit granularly, one or a few commits per slice, each
+message naming the slice and this document ("Slice 4 of
+TODO/simplify-refresh/04_1_plan_rewrite-refresh.org: ...").
+A slice's last code-modifying commit also carries the
+slice's documentation changes and the change of its headline
+here from TODO to DONE; neither stands as a commit of its
+own. Commit only files the slice touched for its purpose;
+other files under 'TODO/' may carry Jeff's edits and must not
+ride in a slice's commit.
+
+** Scope
+Fourteen slices, 0 to 13, in the order they must land, chosen
+so that every suite passes at the end of every slice. The
+first eight prepare the ground without changing the walk:
+slice 0 splits "member" into the claim and the warrant, on
+the types and on the wire; slice 1 regroups the viewnode
+types; slice 2 makes a hidden node a tombstone and removes
+the restricted kind; slice 3 makes the ghost one kind that
+exists only in the diff view; slices 4, 5 and 6 rewrite the
+metadata grammar in three steps (the shape, the facts, the
+heralds), with the parser, the printer and both clients'
+readers at each step; slice 7 removes the parser's twin
+types. Slices 8 to 11 are the rewrite: the refresh module
+with its own tests, then content views on it, then the search
+buffer and the corrections channel, then the diff view, each
+step deleting the code it replaces. Slice 12 renames what the
+discussion renamed. Slice 13 rewrites the docs and runs the
+two-question check. The plan may be run as one run or as
+several ('bash/run-plan-slices.sh 0 7', then '8 11', then
+'12 13').
+
+Slices 0 to 11 edit code that still carries names slice 12
+retires ('skgid', "phantom", 'Unrestricted', 'FolderPolicy').
+They leave those names alone in existing code and write no
+new occurrence of a retired word; new code, comments, docs
+and tests use the vocabulary below.
+
+* Words this plan uses
+** the refresh
+The one operation that takes a buffer (parsed and validated)
+and the truth and returns the corrected buffer. It replaces
+today's "completion", "reconciliation", "rerender" and
+"enrichment", which name the same thing done in several
+places. In code: 'refresh_viewforest'.
+** the truth
+The gated in-Rust graph: the worktree's graph as the skgrepo
+restriction allows it to be seen. It answers, for a gnid,
+'present', 'hidden' or 'absent'. For the diff view the truth
+also includes HEAD, through the graph straddle.
+** mode
+'CompletionMode::ContentView' or 'CompletionMode::DiffView'
+('server/update_buffer/completion_mode.rs'). It decides two
+things: whether the goal of a parent includes what HEAD alone
+warrants, and whether change viewnodes are drawn.
+** gnid, vnid
+A *gnid* is a graph node's ID (today 'skgid', the type 'ID');
+a node's primary gnid is its *pid*, the others its extra IDs.
+A *vnid* names one viewnode for the buffer's lifetime.
+** occurrence
+A viewnode standing for a node the truth has (today
+'Vognode::Unrestricted', 'UnrestrictedVognode'). It is
+either *editable* or *write-protected*; one occurrence per
+node is
+editable.
+** ghost node, ghost warrant
+A *ghost* is a viewnode standing for a node HEAD has and the
+truth does not, drawn and retained only in the diff view.
+A *ghost warrant* is a position warranted by HEAD alone: a
+ghost under a parent that contained it at HEAD, or an
+occurrence whose relationship to its parent HEAD had and the
+worktree lacks (today's "removed member"). Today's deleted
+and historical phantoms both become ghosts; "phantom" is
+retired. A ghost claims membership when its parent's worktree
+list still names its gnid, so that the save keeps the list
+intact; otherwise it claims nothing.
+** unknown
+A viewnode standing for a gnid that its parent's list names
+and no node answers to, in the truth or, in the diff view, in
+HEAD either. It has no text; it claims membership, since
+removing it would edit the list.
+** tombstone
+A viewnode that says only "something stood here". It holds
+the children of the viewnode it replaced; childless, it is
+pruned at the end of every refresh, roots included.
+** folder
+A viewnode grouping the children of one kind of relationship
+of its viewparent: the twelve partner folders (ten relation
+roles and the diff view's two acquisition folders) and the
+three property folders. The two *compound partner folders*
+('hiddenInSubscribeeFolder', 'hiddenOutsideOfSubscribeeFolder')
+join three nodes; the others read one relation role. "Filter
+folder" is retired (plan 03). In code: one enum 'Folder'.
+** member
+A child of a folder or of an occurrence's content. A property
+folder's members are its *property members* (alias, id,
+flag); "entry" is retired.
+** change viewnode
+A headline the diff view adds to describe a change: the old
+text, a body diff, a home-skgrepo move, a relRepo move, a
+changeset marker (today 'Property::OldText' and the four
+beside it). In code: 'ChangeViewnode'.
+** claims membership, noClaim
+A child *claims membership* when the save will read it as an
+entry of its viewparent's list. It is a declared fact: the
+bare atom 'noClaim' (today 'nonMember') says no, its absence
+says yes. It is meaningful only under an editable occurrence
+or an editable folder; under a write-protected parent no
+child claims, whatever it carries, and the printer writes no
+atom there. In code: the bool 'claimsMembership'.
+** is warranted, noWarrant, ghostWarrant
+A child *is warranted* when the truth relates it to its
+viewparent as its position implies: content under an
+occurrence, a partner of the folder's relation in a folder,
+a container of the node above it in a chain, a property of
+the node in a property folder. In the diff view, HEAD alone
+may warrant it (a ghost warrant). A derived fact, recomputed
+at every refresh and written as the bare atom 'noWarrant'
+or 'ghostWarrant' among the view facts; nothing written means
+warranted by the truth. Roots carry no warrant fact. In code:
+'isWarranted : Warrant' with 'ByGraph', 'ByHead', 'No'.
+** declared parts, derived facts
+The two classes of metadata. *Declared parts* are what the
+client is responsible for and the save or the refresh reads:
+the kind, 'vnid', 'gnid', 'skgRepos', 'noClaim',
+'writeProtected', 'overridesHere', the requests. *Derived
+facts* are what the server computes and nobody reads back:
+everything in '(view ...)' and '(diff ...)'. Today's words
+"save input" and "display fact" are retired.
+** goal
+What the truth says a parent's children should contain: for
+an occurrence's content, its 'contains' list in file order;
+for a folder, its partners in the folder's relation (ordered
+when the viewparent's own file records them, unordered when
+recorders do); for a property folder, the node's aliases, IDs
+or true flags; in the diff view, plus what HEAD alone
+warrants. Each goal item names a gnid or a property value.
+** extent
+How much of the goal is drawn: all of it for a folder and for
+an editable occurrence's content (within the node budget);
+none of it, beyond what the buffer already shows, for a
+write-protected occurrence's content and for the chain under
+a member.
+** reinstate
+To draw a goal item that has no child.
+** the ladder
+The fixed order of corrections the refresh applies to a
+headline, weakest first, given below. A headline that no rung
+can make true is *unsayable* and is entombstoned.
+** FoldAndFocus, RelationshipEditRequest
+'FoldAndFocus { focused, folded, bodyFolded }' bundles the
+three position atoms (rename it 'BufferState' if it grows).
+'RelationshipEditRequest { RelRepo (SkgrepoName), RestoreRel }'
+is the request an occurrence, an unknown or an alias member
+may carry about its relationship; a node's own edit request
+('NodeEditRequest') stays inside 'Editability::Editable'.
+** How to say it in messages
+A headline is named as a subtree by its vnid and title. A
+correction is reported, not warned: the refresh returns the
+list of what it changed (reinstated, entombstoned, marked
+noClaim, merged), tagged with the view it changed, and the
+clients show every view's corrections in their one warnings
+buffer, under an org headline per view.
+
+* Agreed behavior
+** The model, stateless
+Everything below is decided from the buffer and the truth as
+they are now, never from what they were at an earlier save.
+*** inputs and output
+The refresh takes a validated viewforest (the parse already
+minted a gnid for every new headline and gave every headline
+a repo; validation refused a buffer with two editable
+occurrences of one gnid, 'Multiple_Defining_Viewnodes'), the
+truth, the mode, the node budget, and, in the diff view, the
+straddle and the readiness store. It returns a viewforest and
+the list of corrections. Edit requests pass through it
+untouched; view requests are fulfilled and dropped.
+*** the kinds
+Occurrence, ghost, unknown, tombstone, folder, property
+member, change viewnode, buffer root. The first three stand
+for a gnid; in code they are the three cases of 'Vognode'.
+*** the ID rule
+For a headline that stands for a gnid, the refresh asks four
+questions in order and stops at the first yes. Does the truth
+have the node? Then the headline is an occurrence. Otherwise,
+is the mode the diff view, and does HEAD have the node? Then
+it is a ghost. Otherwise, does the list of the headline's
+parent name this gnid? Then it is an unknown. Otherwise it is
+a tombstone. A hidden node answers no to every question: the
+truth answers 'hidden' rather than 'present', and the gated
+goal names no hidden member; so its headline is entombstoned,
+whatever text it carried.
+*** the two flags of a child
+Claim and warrant are independent. Under an editable parent
+at rest they coincide: the refresh marks 'noClaim' on every
+child it keeps that is unwarranted, and the next save makes
+every claim warranted. They differ only for what the user
+typed since the last save: a new child (claims, not yet
+warranted) and a child the user marked 'noClaim' to detach it
+(warranted, no claim). Under a write-protected parent the
+claim is always no and nothing is written; the warrant is
+computed and written as for any child.
+*** unsayable: the ancestry table
+'required_ancestry' ('server/update_buffer/ancestry.rs')
+gives each folder kind the chain of ancestor kinds it may
+stand under. It will gain rows for the property members
+(under their property folder) and for every change viewnode
+(under an occurrence or a ghost, as the diff view draws
+them), and its 'HistoricalPhantom' row will say 'Ghost'. A
+headline whose kind allows no viewparent of the kind it has
+is unsayable and is entombstoned; its children stay under the
+tombstone. A change viewnode whose change no longer exists is
+unsayable too. An occurrence is never unsayable.
+*** the ladder, per parent, in order
+A parent's own kind is settled before its children are
+visited; the walk is level order from the roots. For each
+parent P with children C:
+**** 1. re-kind
+Each child that stands for a gnid becomes what the ID rule
+says, where it stands, keeping its vnid, fold state, children
+and, for an occurrence, its editability. Each child that
+describes its viewparent (a folder, a property member, a
+change viewnode) is entombstoned if the ancestry table
+forbids its position or, for a change viewnode, if the change
+is gone.
+**** 2. merge
+Siblings standing for one gnid are unified, in every sibling
+set, content and folders alike (IDs are unique in each list,
+which 'DuplicatedContent' validation guarantees, so a merge
+never edits a list). The first in position survives; it is
+editable if any was; it keeps its vnid and fold state; the
+others' children are appended to it, and each appended child
+is marked 'noClaim' unless the truth warrants it under the
+survivor, whatever the survivor's editability.
+**** 3. the goal and the warrant
+The goal is computed for P (see "goal"). Each child's warrant
+is set: 'ByGraph' when the truth's part of the goal names it,
+'ByHead' when only HEAD's part does, 'No' otherwise.
+**** 4. claims
+If P is an editable occurrence or an editable folder, every
+unwarranted child that claims membership is marked 'noClaim'.
+If P is write-protected, no claim atom is written for any
+child.
+**** 5. reinstate
+Every goal item without a child is drawn, within the extent
+rule: all items for a folder and for an editable occurrence's
+content (each occurrence whose content is drawn charging the
+budget once, as today; when it is spent, newly drawn
+occurrences are write-protected); no items for a
+write-protected occurrence's content or for a chain. A
+reinstated item becomes an
+occurrence, an unknown or a ghost by the ID rule. Under a
+folder, each reinstated member that is an occurrence carries
+its containerward chain, as today; a chain node under a
+member is write-protected and, by the rule above, is never
+reinstated once drawn.
+**** 6. reorder
+Where the goal has an order (content; aliases; the outbound
+folders subscribee, overridden and hidden-from-subscribers),
+the warranted children take that order and every other child
+stays immediately after the sibling it followed. Where the
+goal has no order (the folders of recorders), nothing moves.
+**** 7. substitution
+In a content view an overridden node is shown as its
+overrider with '(overridesHere ID)', as today, except at a
+root, in a write-protected folder and in an overridden folder.
+When the override relationship is gone, the shown headline
+loses 'overridesHere', becomes unwarranted (and so, under an
+editable parent, 'noClaim'), and the overridden node is
+reinstated as a member beside it. The diff view substitutes
+nothing, as today.
+**** 8. requests
+A view request on a child is fulfilled at the child's visit
+and dropped: 'editableView' makes it the node's editable
+occurrence (first wins among occurrences the refresh itself
+draws; the input has at most one) and extends its content;
+'writeProtectedView' and 'writeProtectedSubtreeView' make it
+write-protected, alone or with its content subtree; 'flags'
+and '(folder REL)' add the folder, filled from the goal;
+'tombstone' (new; diff view only) entombstones a ghost. 'fork'
+is the save's, as today. An edit request is carried through
+unchanged unless the child's new kind has no slot for it
+(a 'delete' on what became a ghost or a tombstone), in which
+case it is dropped and reported as a correction.
+*** editability and the budget
+The input has at most one editable occurrence per gnid; the
+refresh asserts this ('debug_assert') and does not re-check.
+Among the occurrences the refresh draws, the first drawn is
+editable only when its parent is editable content and the
+budget allows; a repeat is write-protected. The "yield" rule
+(a non-claimant giving its claim to a member met later) is
+dropped: the user asks for editability where they want it.
+*** restriction
+The refresh sees the gated graph; no rule inside it mentions
+the restriction. The graph's one addition is the three-valued
+answer 'present', 'hidden', 'absent' for a gnid, so that a
+hidden node's occurrence can be entombstoned rather than
+mistaken for a vanished one. A tombstone reveals nothing of
+what stood there; there is one kind of tombstone.
+*** ghosts and the diff view
+In a content view the goal is the truth's alone and no ghost
+is drawn or kept. In the diff view the goal also holds what
+HEAD alone warrants: a ghost for a node HEAD has and the
+worktree lacks, under the parent that contained it at HEAD,
+with HEAD's title and body; and a ghost warrant on an
+occurrence whose relationship HEAD had and the worktree
+lacks. A ghost is retained in place until the user
+entombstones it ('tombstone' view request, stamped by the
+client commands 'skg-request-ghost-tombstone' on one and
+'skg-request-buffer-ghosts-tombstone' on every ghost in the
+buffer), and it becomes an occurrence again, in place, when
+its node is back. Every ghost accepts 'restoreNode'; an
+occurrence with a ghost warrant accepts 'restoreRel'. There is
+no permanence: every ghost is in HEAD. A ghost whose parent's
+worktree list still names its gnid claims membership, and the
+save keeps that gnid in the list as it keeps an unknown's;
+a ghost nothing names contributes nothing to the save.
+*** change viewnodes
+In the diff view each occurrence's change viewnodes are
+recomputed in place from the straddle: kept while the change
+exists, created when missing, entombstoned when the change is
+gone (the tombstone holds whatever the user drew under one).
+The three kinds of change, the leaves and the readiness are
+written as '(diff ...)' facts, as today; folders carry no
+'changed' spelling, since the clients compute the folder's
+label from its members' facts.
+*** the tail
+After the walk, once: compute the derived facts (the props,
+rels and birth of each occurrence; 'cycle'; 'repoBoundary';
+'omittedBody'; each child's warrant atom);
+prune every childless tombstone, roots included, so a buffer
+may end with no roots; assign a vnid to every viewnode that
+lacks one; render.
+*** a fresh render, and the search buffer
+A fresh content view is the refresh of a stub: one root per
+requested node, an editable occurrence with a '(folder
+containers)' request. The diff view's first drawing is the
+refresh of its stub over the straddle. The search buffer's
+enrichment is the refresh of a stub whose roots are the hits
+as write-protected occurrences, each with a '(folder
+containers)' request; the two-phase protocol with the client
+(results, then enrichment) is unchanged.
+*** the fixpoint
+For every buffer b, refresh (refresh (b)) equals refresh (b)
+up to vnid assignment. 'tests/idempotence' will assert it over
+the fixtures of every slice from 9 on.
+** The types
+'server/types/viewnode.rs' will read, in outline:
+#+begin_example
+  pub struct Viewnode {
+    pub foldAndFocus      : FoldAndFocus,
+    pub kind              : ViewnodeKind,
+    pub change_facts      : ChangeFacts,
+    pub vnid              : Option<ViewnodeId>,
+  }
+  pub enum ViewnodeKind {
+    Vognode (Vognode), Folder (Folder),
+    PropertyMember (PropertyMember),
+    ChangeViewnode (ChangeViewnode),
+    BufferRoot, Tombstone,
+  }
+  pub enum Vognode {
+    Occurrence (Occurrence), Ghost (Ghost), Unknown (Unknown),
+  }
+  pub struct Occurrence {
+    pub gnid, pub home_skgrepo, pub title,
+    pub claimsMembership : bool,
+    pub overridesHere    : Option<ID>,
+    pub editability      : Editability,
+    pub view_requests    : HashSet<ViewRequest>,
+    pub relationshipEditRequest
+      : Option<RelationshipEditRequest>,
+    pub graphStats, pub viewStats,
+  }
+  pub struct Ghost {
+    pub gnid, pub home_skgrepo, pub title, pub body,
+    pub restoreNode_request : bool,
+  }
+  pub struct Unknown {
+    pub gnid,
+    pub relationshipEditRequest
+      : Option<RelationshipEditRequest>,
+  }
+  pub enum Editability {
+    Editable { body, nodeEditRequest : Option<NodeEditRequest> },
+    WriteProtected,
+  }
+  pub struct ViewnodeStats {
+    pub cycle, pub repoBoundary, pub isWarranted : Warrant,
+    pub relRepo : Option<SkgrepoName>,
+    pub omittedBody, pub rel_heralds,
+  }
+#+end_example
+'ChangeFacts' gains the two moves ('homeSkgrepoMove',
+'relRepoMove') that 'ViewnodeStats' holds today. The
+readiness request leaves 'Viewnode' for the edit requests
+('NodeEditRequest::Ready (ReadinessRequest)'). 'Membership',
+'Phantom' and its three structs, 'RestrictedVognode',
+'PartnerFolder' and 'PropertyFolder' as separate enums,
+'Property', 'FolderPolicy', the generic
+'UnrestrictedVognode_Generic' and every 'Mp' type go.
+** The metadata
+One shape for every headline:
+#+begin_example
+  (skg (vnid X) [focused] [folded] [bodyFolded]
+       KIND DECLARED...
+       [(view FACT...)] [(diff FACT...)])
+#+end_example
+KIND is a bare atom: 'node', 'ghost', 'unknown', the fifteen
+folder atoms, 'alias', 'id', 'flag', 'oldText', 'bodyDiff',
+'homeSkgrepoMove', 'relRepoMove', 'changesetMarker',
+'tombstone'. Every part stands at the top level. The declared
+parts: '(gnid X)'; '(skgRepos (nodeRepo R) [(relRepo R)])' on
+a node, a ghost (nodeRepo only), an unknown and an alias
+(relRepo only), the relRepo written only when it differs from
+the default, as today; 'noClaim'; 'writeProtected';
+'(overridesHere X)';
+'(viewRequests ...)' with the new request 'tombstone';
+'(editRequest ...)' with 'delete', '(merge X)', '(relRepo R)',
+'(flag F V)', 'restoreNode', 'restoreRel' and the readiness
+requests '(ready OBJECT...)' and '(unready OBJECT...)'. The
+view facts: 'cycle', 'repoBoundary', 'noWarrant',
+'ghostWarrant', 'omittedBody', '(props (aliases N) (extraIds
+N) (flags N))', '(rels ...)' as today
+without the counts and the birth, '(birth ...)'. The diff
+facts: '(node added|removed)', '(rel added|removed)',
+'(properties changed)', '(leaves ...)', '(ready ...)', and the
+two moves. The parser reads 'vnid', the position atoms, the
+kind and the declared parts, and skips '(view ...)' and
+'(diff ...)' whole; 'metadata_canon.rs' learns the shape. The
+retired spellings ('(node ...)' as a form, '(deleted ...)',
+'(historical ...)', '(unknown ...)' as forms, 'restrictedNode',
+'(FOLDER changed)', 'nonMember', 'homeRepoHerald', '(repo R)',
+'(id X)', '(readyRequest ...)', the legacy rejections of
+top-level 'id', 'repo', 'view', 'code') are not accepted; the
+parser refuses them with a message naming this plan's grammar.
+** The heralds
+The rule table ('server/heralds.rs') moves ⊥ from 'nonMember'
+to 'noWarrant'; gives 'ghostWarrant' and the 'ghost' kind the
+glyph ᗣ first, in a style of their own in
+'shared/herald-styles.json'; renders 'repoBoundary' as
+"⌂:LABEL" with the label looked up in a table the server
+serves beside the herald rules ('(skgrepoLabels (REPO
+LABEL)...)' on the "herald rules" endpoint), so that no
+rendered text rides in the metadata; renders a pending
+detachment (a child that is 'noClaim' and warranted under an
+editable parent) as it renders a request; drops the changed
+folder rules and the restricted placeholder's. 'noClaim' has
+no glyph of its own.
+** The clients
+Both clients read the new grammar ('elisp/skg-metadata.el',
+the 'skg-sexpr' files, 'skg-readiness.el',
+'heralds-minor-mode.el'; 'nvim/lua/skg/metadata.lua',
+'sexpr/parse.lua', 'sexpr/lens.lua', 'readiness.lua',
+'heralds.lua', 'herald_rules.lua'), compute a folder's
+"changed" label from its members, render 'repoBoundary' from
+the label table, and gain the two ghost-tombstone commands.
+'shared/metadata-fields.json' describes the new declared
+parts.
+** What goes
+The deleted set ('deleted_by_this_save_pids',
+'deleted_by_this_save_extra_ids'); 'Phantom::Deleted';
+'Vognode::Restricted' and 'restrictedNode'; the two
+reconcilers ('complete_managed_children',
+'reconcile_children_with_shallowModelSubtree') and
+'KeptChildOrder'; the editability helpers
+'validate_membership_claims', 'make_member_children_nonMembers',
+'mark_view_roots_as_members',
+'mark_orphans_under_dead_parents_false',
+'take_claim_from_tentative_nonMember'; the 'convert_*' family
+and 'normalize_relationship_backed_*_unknowns'; the diff
+view's align, step and shallow model; the search buffer's own
+drawing ('render_enriched_search_buffer.rs'); the parser's
+twin; 'FolderPolicy' (the one axis it still decided, the
+order of members, becomes a method on 'Folder'); the folder
+'changed' spelling; 'homeRepoHerald'; the self-deletable list
+('is_self_deletable_when_empty'); permanence; "phantom",
+"entry", "non-member", "save input", "display fact" as words.
+** What stays as it is
+The save (its reading of the declared parts changes names,
+not rules); the straddle and its lazy build; the change
+forest and the readiness store; the four diff-view buffers
+and the sets C, R, U and D that choose their roots; the fork
+flow; the search index and the two-phase protocol; the
+node budget and its default; 'required_ancestry' as the
+form of the unsayable rule; 'vnid' assignment at the end of
+a refresh; the clients' commands other than the two added.
+
+* Pitfalls the slices must respect
+Facts about the code as it stands, with file and function,
+that an agent would otherwise rediscover or trip over.
+** validation already guarantees one editable occurrence
+'contradictory_instructions.rs' (under
+'server/from_text/buffer_to_viewnodes/validate_tree/') refuses
+a buffer with two defining occurrences of one gnid
+('Multiple_Defining_Viewnodes'), and 'validate_tree.rs'
+refuses two editable-view requests for one gnid
+('MultipleEditableViewRequestsForSameId'). The refresh may
+assume one editable occurrence per gnid in a saved buffer,
+and every other input it gets is the server's own output. Do
+not re-check; assert.
+** the save reads claims only under editable parents
+'server/from_text/local_fieldintent_collection/traverse.rs'
+collects a parent's list from the children that claim
+membership, and only when the parent is editable
+('is_editable'); it pushes an unknown's gnid into the list
+("its raw ID is load-bearing") and passes over a ghost. The
+shown overrider's 'overridesHere' is read through
+'collected_skgid'. The save never collects the members of a
+write-protected folder. So slice 0's rule "no claim atom
+under a write-protected parent" changes nothing the save
+does.
+** IDs are unique in each list
+'DuplicatedContent' ('BufferValidationError') refuses a node
+with two content children of one gnid, and the save's lists
+are sets of IDs. So the merge rule never edits a list.
+** the deleted set lives in three files
+'deleted_by_this_save_pids' and 'deleted_by_this_save_extra_ids'
+are fields of 'RerenderAfterSaveContext'
+('server/update_buffer.rs'), read in
+'server/update_buffer/complete.rs' and documented on 'Phantom'
+in 'server/types/viewnode.rs'. Nothing else reads them.
+** the straddle is lazy and the diff view's
+'current_graph_straddle_in_slot'
+('server/graph_straddle/build.rs') rebuilds the before-graph
+only when an owned HEAD moved, re-pairs it when the live
+graph changed, and otherwise reuses
+it. A content view's 'RerenderAfterSaveContext' carries 'None'
+in 'graph_straddle'; that stays.
+** the editability helpers to delete, and what each hides
+'make_writeProtected_if_repeat_then_extend_editable_map'
+('server/to_org/util.rs') also takes a tentative claim from a
+non-claimant ('take_claim_from_tentative_nonMember', the yield
+rule) and makes a repeat's children non-claimants
+('make_member_children_nonMembers');
+'validate_membership_claims' ('server/update_buffer.rs' calls
+it) flips only the claims under write-protected occurrences
+that the graph does not confirm; 'mark_view_roots_as_members'
+clears the atom on roots; 'mark_orphans_under_dead_parents_false'
+makes members under a dead parent non-claimants. The ladder
+replaces all of them.
+** two reconcilers, one walk
+'complete_managed_children' ('server/update_buffer/util.rs',
+the goal-list reconciler; content and every folder use it,
+with 'KeptChildOrder') and
+'reconcile_children_with_shallowModelSubtree'
+('server/diff_view/shallow_model_subtree.rs', the diff view's
+step and the chain use it, with 'selects' and
+'converts_when_stale'). Every function named
+'reconcile_*_children' wraps one of the two. The refresh
+module replaces both; slices 9 and 11 delete them.
+** the prune and its list
+'prune_self_deletable_when_empty'
+('server/update_buffer/complete.rs') removes, postorder, every
+childless viewnode whose kind 'is_self_deletable_when_empty'
+admits (tombstone, deleted phantom, the write-protected
+partner folders, the compound folders, the ID folder), never
+a root. The rebuild prunes childless tombstones only, roots
+included; an empty folder the goal does not warrant is
+entombstoned first by the ancestry rule or by having no goal.
+** the ancestry table
+'required_ancestry' ('server/update_buffer/ancestry.rs')
+covers folders only and has a row for the acquired-by folder
+under a historical phantom. The rebuild extends it to property
+members and change viewnodes and renames the row's kind.
+** the printer, the parser, the canon and the editor table
+'server/org_to_text.rs' ('viewnode_to_string' and one function
+per kind) writes; 'server/serve/parse_metadata_sexp.rs'
+('parse_metadata_to_viewnodemd', 'viewnode_from_metadata')
+reads, with 'fields_at' deciding form-or-top per kind and a
+rule per discarded fact; 'server/metadata_canon.rs' sorts
+parts for tests and must learn the new shape;
+'shared/metadata-fields.json' is the editor's table, checked
+by 'tests/metadata_fields_table.rs'. 'server/from_text/fork.rs'
+hand-writes metadata strings (a 'homeRepoHerald', a dead
+'(viewStats parentOverrides)') and must be rewritten to the
+grammar, not patched.
+** the herald table and its conformance test
+'server/heralds.rs' serves the rule table at connect time;
+'tests/unit/heralds.rs' checks that every atom the server
+emits has a rule and every rule an atom. Rendering cases, one
+metadata line each, live in
+'tests/shared/herald-rendering-cases.txt' (336 lines) and are
+read by both clients' tests. 'docs/heralds.org' documents the
+glyphs.
+** the fixtures write the atoms
+Files under 'tests/' writing 'nonMember': 65; '(deleted ...)':
+20; '(historical ...)': 29; 'restrictedNode': 18;
+'(viewStats ...)': 25; '(rels ...)': 33. Convert them by one
+script per slice, as plan 19's slice 7 did for 'birth'; do not
+edit them by hand. 'tests/idempotence' already holds a
+fixpoint harness.
+** the clients parse metadata themselves
+Twelve elisp files and seven Neovim files read metadata atoms;
+each client has unit tests (44 ERT files, 34 plenary specs)
+and 41 integration directories under 'tests/integration/' run
+their versions. A slice that changes what the server writes
+runs 'bash/integration-tests.sh' before it ends, whatever the
+verification section says, and the client unit suites too.
+** the parser's twin exists for one window
+'MpViewnode' and its kin
+('server/types/maybe_placed_viewnode.rs',
+'MpUnrestrictedVognode' in 'viewnode.rs') differ from the real
+types only in an optional gnid and repo, filled by
+'add_missing_info.rs' ('assign_new_skgid_if_absent'; the repo
+inherited from the nearest unrestricted ancestor) before
+'validate_tree' runs, which assumes both present.
+'EnrichmentProvenance' already records which headlines were
+invented ('new_nodes', 'inherited_skgrepo_nodes'). Sixteen
+server files and fourteen test files name the twin; most pass
+it through.
+** the compound folders' goals
+'goal_list_for_hiddenInSubscribee_folder' and its twin
+('server/to_org/complete/partner_folder/goal_list.rs')
+intersect and subtract the subscriber's hides with the
+subscribees' contents. They are goal computers and survive;
+their reconcilers do not.
+** chains
+'server/to_org/extend/containerward_chain.rs' draws a member's
+containers to 'max_roleTree_depth';
+'members_carry_containerward_chain' ('PartnerFolder') says
+which folders' members carry one.
+Chain nodes are write-protected children of a write-protected
+member, so under the extent rule they are never reinstated;
+only a freshly drawn member gets a chain.
+** the diff view's own machinery
+'complete_viewforest_with_graph_straddle'
+('server/diff_view/completion.rs') completes a stub over the
+straddle; 'visit.rs' holds the two hooks the mode switches on;
+'changes.rs' aligns members with the straddle and tags them;
+'change_viewnodes.rs' builds the change viewnodes;
+'pruned_change_view.rs' computes C, R, U and D and decides
+'charges_node_budget' from U; 'restore_requests.rs' reads
+'straddle.before' for the restore requests;
+'readiness_requests.rs' ('relationship_to_viewparent') decides
+what a readiness request names by position. The sets and the
+two request modules stay; the align, the step, the hooks and
+the shallow model go into the refresh module's diff-view
+mode.
+** the search buffer's two phases
+'server/serve/handlers/text_search.rs' answers with the hits,
+then a thread computes the enrichment and
+'render_enriched_search_buffer.rs' draws it by hand, writing
+members as 'Member' and skgrepo "search" on chain nodes the
+index does not know. Slice 10 replaces the drawing with a
+refresh of a stub and keeps the protocol.
+** the stats pass and the relRepo default
+'server/update_buffer/viewnodestats.rs' computes the rels,
+the birth facts (from the parent's kind and the claim) and
+'set_relRepo', which writes a relRepo only when it differs
+from 'default_relRepo' ('server/types/misc.rs': the recorder's
+home toward a foreign member, else the more private home). The
+rebuild keeps that rule; the fact moves into '(skgRepos ...)'.
+In diff mode the stats pass also needs the straddle, since a
+warrant may be 'ByHead'; today it takes the graph only.
+** the position check for restoreRel
+The parser and both clients accept 'restoreRel' only on a
+headline whose position carries '(rel removed)'. With ghost
+warrants that position is "an occurrence with 'ghostWarrant'";
+the check moves to the new fact.
+** the runner
+'bash/run-plan-slices.sh' is wired to plan 19; see "Running
+it".
+
+* Code map
+Sizes are as of 2026-10-25; line numbers may drift and the
+function is the anchor.
+** the refresh today, to be replaced
+'server/update_buffer/' (18 files, 4255 lines: the walk
+'complete.rs', 'completion_mode.rs', 'ancestry.rs',
+'viewnodestats.rs', 'util.rs', the reconcilers under
+'reconcile/'), 'server/update_buffer.rs' (737: the contexts,
+'update_views_after_save', 'render_initial_view',
+'rerender_view', 'finish_viewforest'), 'server/to_org/' (16
+files, 2705: the de novo helpers, the content extension,
+'util.rs' with the editability helpers, the partner folder
+goal and child data, the chain), 'server/diff_view/' (12
+files, 3770: see the pitfall).
+** the refresh to come
+'server/refresh/' (new): 'mod.rs' ('refresh_viewforest'),
+'id_rule.rs', 'goal.rs', 'ladder.rs' (re-kind, merge, warrant,
+claims, reinstate, reorder, substitution, requests),
+'extent.rs', 'ancestry.rs' (moved), 'diff_view.rs' (the goal's
+HEAD part and the change viewnodes), 'tail.rs' (stats, prune,
+vnids), 'corrections.rs'.
+** types
+'server/types/viewnode.rs' (1308), 'maybe_placed_viewnode.rs'
+(399, to delete), 'views_state.rs' ('ViewnodeIdRecord',
+'DiffViewBufferKind'), 'misc.rs' ('ID', 'SkgConfig',
+'default_relRepo'), 'errors.rs'.
+** wire
+'server/org_to_text.rs' (626),
+'server/serve/parse_metadata_sexp.rs' (1118),
+'server/metadata_canon.rs' (295), 'server/heralds.rs' (850),
+'server/herald_tokens.rs' (244), 'server/from_text/fork.rs',
+'shared/metadata-fields.json', 'shared/herald-styles.json'.
+** parse and save
+'server/from_text/buffer_to_viewnodes/' (6 files, 1947:
+'uninterpreted.rs', 'local.rs', 'add_missing_info.rs',
+'validate_tree.rs' and its 'contradictory_instructions.rs'),
+'server/from_text/local_fieldintent_collection/traverse.rs'
+(515), 'server/from_text/write_protected_edits.rs'.
+** graph
+'server/dbs/in_rust_graph/' (the gated accessors ending in
+'_gated'; the new three-valued presence answer goes beside
+them), 'server/graph_straddle/' (4 files, 516).
+** search
+'server/serve/handlers/text_search.rs' (692) and
+'text_search/render_enriched_search_buffer.rs' (194).
+** clients
+Emacs: 'elisp/skg-metadata.el', 'elisp/skg-sexpr/skg-lens.el',
+'skg-sexpr-search.el', 'skg-sexpr-org-bijection.el',
+'skg-metadata-fields.el', 'elisp/skg-readiness.el',
+'elisp/heralds-minor-mode.el', 'elisp/skg-request-views.el'
+(the two new commands beside the view requests),
+'elisp/skg-keymaps-and-aliases.el'. Neovim:
+'nvim/lua/skg/metadata.lua', 'sexpr/parse.lua',
+'sexpr/lens.lua', 'sexpr/metadata_fields.lua', 'readiness.lua',
+'heralds.lua', 'herald_rules.lua', 'view_requests.lua',
+'keymaps.lua'.
+** tests
+192 Rust test files under 'tests/' ('tests/unit/',
+'tests/new/', one directory of fixtures per test file for
+many), 'tests/shared/herald-rendering-cases.txt',
+'tests/elisp/' (44), 'tests/nvim/' (34), 'tests/integration/'
+(41 directories), 'tests/idempotence'. The suites:
+'bash/nextest.sh', 'bash/emacs-tests.sh', 'bash/nvim-tests.sh',
+'bash/integration-tests.sh', 'bash/all-tests.sh'.
+** docs
+'docs/glossary.org' (22 mentions of "phantom", 39 of
+"non-member", 18 of "restricted"), 'docs/api-and-formats.org'
+("The metadata headers", "Metadata of the diff view", "View
+requests", "Edit requests", "Stats metadata", "Content view",
+"Herald rules"), 'docs/diff-view.org' ("Rendering a buffer",
+"Completion over the straddle", "The per-visit step"),
+'docs/heralds.org', 'docs/data-model_technical.org',
+'coding-advice/architecture.md' where it names the walk.
+
+* Implementation sequence
+Each slice ends with the tests it names and leaves every
+suite green. A slice that changes what the server writes into
+a buffer (0, 2, 3, 4, 5, 6, 9, 10, 11, 12) runs
+'bash/integration-tests.sh' and both client suites before it
+ends.
+** TODO Slice 0: the claim and the warrant
+'Membership' becomes 'claimsMembership : bool' on the
+occurrence; the atom 'nonMember' becomes 'noClaim' in the
+printer, the parser, both clients, 'metadata-fields.json' and
+the fixtures (script). The printer writes 'noClaim' only under
+an editable parent. 'ViewnodeStats' gains 'isWarranted :
+Warrant', computed in the stats pass from the graph alone for
+now ('ByGraph' or 'No'; 'ByHead' arrives with slice 11): for a
+content child, the parent contains it; for a folder member,
+the folder's relation holds between it and the viewparent;
+for a chain node, it contains the node above; for a property
+member, the node has the property; roots and the rest carry
+'ByGraph'. The printer writes 'noWarrant' in '(viewStats ...)'
+for now; the herald table moves ⊥ to it; 'docs/heralds.org'
+and the rendering cases follow. Tests: a unit test per
+position kind for the warrant; the herald conformance test;
+the fixpoint harness unchanged. The old walk is untouched.
+** TODO Slice 1: regroup the types
+'FoldAndFocus' replaces the three position fields;
+'RelationshipEditRequest' replaces 'relRepo_request' and
+'restoreRel_request' on the occurrence, the unknown and the
+alias; 'Folder' replaces 'PartnerFolder' and 'PropertyFolder'
+as the kind's enum, with 'members_are_properties ()' and
+'goal_is_ordered ()' replacing 'FolderPolicy'; 'ChangeViewnode'
+takes the five change kinds out of 'Property', which becomes
+'PropertyMember { Alias, ID, Flag }'; 'RemovedAlias' and
+'RemovedID' become alias and ID members with a ghost warrant
+(written as '(diff (rel removed))' until slice 5 moves the
+fact); 'overridesHere' moves from 'ViewnodeStats' to the
+occurrence; the two moves move from 'ViewnodeStats' to
+'ChangeFacts'. The wire does not change in this slice except
+where a field's home changed its form, and the parser accepts
+the same text. Tests: the suite; the metadata-fields table
+test.
+** TODO Slice 2: hidden means tombstone
+The in-Rust graph gains a presence answer for a gnid
+('present', 'hidden', 'absent') beside the gated accessors.
+Every place that creates or converts to 'Vognode::Restricted'
+(the skgrepo-switch prepass
+'convert_and_prune_for_skgrepo_switch',
+'convert_now_restricted_phantoms', the parse of
+'restrictedNode')
+entombstones instead; the kind, the struct, the atom, the
+herald rule and the 18 fixtures go; the folder goals already
+omit hidden members. 'TODO/problems.org' line 48 ("the
+restricted placeholder stays beside its node") is fixed by
+this slice; move its entry to 'TODO/DONE/problems.org'.
+Tests: 'tests/restricted_suppression.rs' and the skgrepo-set
+tests adapted; a new test that a tightened restriction leaves
+no trace of a hidden node but a tombstone over its children;
+and a test that a save of an editable node under a
+restriction keeps its hidden members, which disk
+supplementation owns (see "New issues").
+** TODO Slice 3: one ghost, in the diff view only
+'Ghost' replaces 'PhantomDeleted' and 'PhantomHistorical';
+'Unknown' leaves the enum; 'Vognode' has the three cases.
+'(ghost (gnid X) (skgRepos (nodeRepo R)))' replaces the two
+forms (the 'gnid' and 'skgRepos' parts arrive early here, for
+the ghost only; slice 4 generalizes them). In a content view
+an occurrence whose node vanished is entombstoned, so
+'mutate_unrestrictedVognode_to_deletednode' and the deleted
+set go, and 'RerenderAfterSaveContext' loses two fields. In
+the diff view the historical phantom's code paths become the
+ghost's; 'restoreNode' is accepted on every ghost. The new
+view request 'tombstone' entombstones a ghost; the two client
+commands 'skg-request-ghost-tombstone' and
+'skg-request-buffer-ghosts-tombstone' (Emacs and Neovim) stamp
+it and save. The prune removes childless tombstones only,
+roots included. Tests: 'tests/collateral_delete',
+'tests/retain_or_entombstone_then_prune' and the diff-view
+tests adapted; a test that a deleted root in a content view
+vanishes on refresh and a buffer may end with no roots; a test
+of each client command.
+** TODO Slice 4: the grammar's shape
+The printer writes, and the parser reads, the shape under "The
+metadata", with the facts left in their old homes for now:
+'(vnid X)' first; every kind a bare atom with its parts at the
+top level ('node', 'ghost' and 'unknown' lose their list form
+and 'fields_at' goes); '(gnid X)' in place of '(id X)';
+'(skgRepos (nodeRepo R) [(relRepo R)])' on the four kinds that
+carry a repo, in place of '(repo R)' and the three homes of
+'relRepo', written as today (when it differs from the
+default); the retired spellings refused with a message naming
+the grammar; the legacy rejections gone. 'metadata_canon.rs',
+'fork.rs' (rewritten to the grammar, not patched; its dead
+'parentOverrides' atom dropped, which closes
+'TODO/problems.org' line 836), 'metadata-fields.json', both
+clients' parsers and every fixture (script) follow. Tests: the
+parser's unit tests rewritten; the metadata-fields table test;
+the fixpoint harness; both client unit suites; the integration
+suite.
+** TODO Slice 5: the grammar's facts
+'(view ...)' gathers every derived fact: 'cycle',
+'repoBoundary' in place of 'homeRepoHerald' (which closes
+'TODO/problems.org' line 388 once slice 6 renders it),
+'noWarrant' and 'ghostWarrant' from their interim place,
+'omittedBody', '(props ...)' split out of '(rels ...)', and
+'(birth ...)' moved out of it. '(diff ...)'
+holds the change facts and the two moves. The readiness
+requests become '(editRequest (ready ...))' and '(editRequest
+(unready ...))'. The folder 'changed' spelling goes. The
+parser skips '(view ...)' and '(diff ...)' whole. Both
+clients' readers of these parts ('skg-readiness.el',
+'readiness.lua', the metadata modules) follow, and every
+fixture (script). 'docs/api-and-formats.org' "The metadata
+headers", "Metadata of the diff view" and "Stats metadata" are
+rewritten to the grammar in this slice, since the old text
+would lie. Tests: the parser's unit tests; the canon; the
+fixpoint harness; both client unit suites; the integration
+suite.
+** TODO Slice 6: the heralds
+The rule table ('server/heralds.rs'): ⊥ keyed on 'noWarrant';
+ᗣ first for 'ghostWarrant' and the 'ghost' kind, in a style
+of its own in 'shared/herald-styles.json'; 'repoBoundary'
+rendered "⌂:LABEL" from a label table served beside the rules
+('(skgrepoLabels (REPO LABEL)...)' on the herald-rules
+endpoint); a pending detachment (a child that is 'noClaim' and
+warranted under an editable parent) rendered as a request;
+the changed-folder rules and the restricted placeholder's
+dropped, the clients computing a changed folder's label from
+its members. Both clients' renderers ('heralds-minor-mode.el',
+'skg-lens.el'; 'heralds.lua', 'sexpr/lens.lua',
+'herald_rules.lua'), the rendering cases and 'docs/heralds.org'
+follow. Tests: the herald conformance test; the rendering
+cases in both clients; both client unit suites; the
+integration suite.
+** TODO Slice 7: the parser's twin goes
+The parse mints a gnid for a headline without one and gives a
+headline without a repo its nearest occurrence ancestor's as
+it builds the tree, returns 'Viewnode's and the
+'EnrichmentProvenance', and 'validate_tree' runs on real
+viewnodes. 'maybe_placed_viewnode.rs', the 'Mp' types, the
+generic 'UnrestrictedVognode_Generic' and the conversions go;
+'add_missing_info.rs' shrinks to the alias treatment or goes.
+Tests: 'tests/new/local_fieldintent_collection/' and the
+parse tests adapted; the suite.
+** TODO Slice 8: the refresh module, unwired
+'server/refresh/' is written as "The model" says, for both
+modes, with the extent rules, the ladder, the merge, the
+substitution, the requests, the chain drawing and the tail,
+reusing the goal computers ('goal_list.rs', the content list,
+the property lists) and the existing stats functions. Nothing
+calls it yet. Tests: a unit suite under 'tests/refresh/', one
+file per rung, each test building a small graph and an input
+viewforest and asserting the output: re-kind (occurrence to
+unknown, to ghost in diff mode, to tombstone; hidden to
+tombstone); merge (survivor, editability, appended children
+marked 'noClaim' unless warranted); claims under editable and
+write-protected parents; reinstate by extent, with the budget;
+reorder with riders; substitution gone; each view request; an
+edit request carried, and one dropped with a correction; the
+ancestry rows for property members and change viewnodes;
+prune of a tombstone root; the fixpoint on every test's
+output. If a rule of "The model" turns out to contradict
+another when written as code, that is the one stop this plan
+expects: record the two rules and the case in 'progress.org'
+and stop.
+** TODO Slice 9: content views on it
+'render_initial_view' and 'rerender_view' call
+'refresh_viewforest' in content-view mode. The content-view
+path of the old walk goes: 'complete.rs''s content dispatch,
+the content and folder reconcilers under 'reconcile/', the
+goal-list reconciler and 'KeptChildOrder', the editability
+helpers named under "What goes", the de novo fillers in
+'server/to_org/'. The corrections replace the repair summary
+for the saved view, carried through today's warning sink
+until slice 10 replaces the channel. Tests: every content-view
+test adapted (the fixtures change where the rules changed:
+unwarranted children kept with 'noClaim' and ⊥ rather than
+entombstoned, chain nodes not reinstated, no yield);
+'tests/idempotence' over all content-view fixtures; the
+integration suite.
+** TODO Slice 10: the search buffer, and the corrections channel
+The search enrichment builds its stub (the hits as
+write-protected roots with a '(folder containers)' request)
+and calls 'refresh_viewforest';
+'render_enriched_search_buffer.rs' and the "search" skgrepo
+trick go, and a test covers a hit whose container the
+restriction hides. The save response and
+the rerender-all response carry the corrections of every view
+they refreshed, each tagged with the view's buffer name; the
+clients append them to their warnings buffer
+('*SKG Server Warnings*', 'skg-request-server-warnings.el',
+'server_warnings.lua') under one org headline per view, never
+in a buffer of their own; the warning sink and
+'CompletionWarning' go. Tests: the search tests; a test that a
+correction made in a collateral view reaches the warnings
+buffer under that view's headline; both client unit suites;
+the integration suite.
+** TODO Slice 11: the diff view on it
+'complete_viewforest_with_graph_straddle' calls
+'refresh_viewforest' in diff-view mode: the goal's HEAD part,
+'ByHead' warrants, ghosts drawn and retained, change viewnodes
+recomputed in place, the readiness facts read from the store,
+the sets C, R, U and D still choosing the roots and
+'charges_node_budget'. The save keeps the gnid of a ghost
+whose parent's worktree list names it, as it keeps an
+unknown's ('traverse.rs'), and
+'normalize_relationship_backed_*_unknowns' goes with the old
+walk. 'visit.rs', the align and tagging of
+'changes.rs', 'shallow_model_subtree.rs' and the old step go;
+'completion_mode.rs' keeps its two variants and loses the
+methods the refresh no longer asks. Tests: the diff-view tests
+adapted; 'tests/idempotence' over the diff-view fixtures; the
+integration suite.
+** TODO Slice 12: the renames
+'skgid' becomes 'gnid' everywhere ('ID' stays as the type
+name): about 2300 occurrences in the server, 1100 in tests,
+180 in elisp, 140 in Neovim, by a script with a review of the
+diff. 'Unrestricted' becomes 'Occurrence' in types and
+functions; "phantom" becomes "ghost" in code, tests and
+comments; "member"/"entry" and "non-member" in comments follow
+the vocabulary; 'FolderPolicy' and 'PartnerFolder' names
+vanish where slice 1 left them in comments. Tests: the suite;
+both client suites; the integration suite; a grep showing the
+retired words gone from 'server/', 'tests/', 'elisp/' and
+'nvim/' outside git history.
+** TODO Slice 13: docs and the two-question check
+'docs/glossary.org' (every entry that says phantom,
+non-member, entry, filter folder, save input, display fact,
+placeholder, the reconciler vocabulary),
+'docs/api-and-formats.org' (the sections not rewritten in
+slices 4 to 6), 'docs/diff-view.org' ("Rendering a buffer"
+onward),
+'docs/heralds.org', 'docs/data-model_technical.org' and
+'coding-advice/architecture.md' describe the refresh as
+built. 'metadata-format.org' and 'glossary.org' under
+'TODO/simplify-refresh/' are Jeff's notes and are left alone.
+Then the check of 'plans.org': what terms did this plan's code
+coin or reuse, and does its code cite anything under 'TODO/';
+the answer goes in 'progress.org'. Tests: none beyond reading
+the docs end to end against the code.
+
+* Verification and completion
+At the end of every slice: 'cargo check --all-targets' clean;
+'bash/nextest.sh' green. At the end of slices 0, 2, 3, 4, 5,
+6, 9, 10, 11 and 12: 'bash/emacs-tests.sh', 'bash/nvim-tests.sh'
+and 'bash/integration-tests.sh' green. At the end of slice 13:
+'bash/all-tests.sh' green, and these greps report nothing:
+#+begin_example
+  rg -n 'nonMember|restrictedNode|homeRepoHerald' \
+    server tests elisp nvim shared docs --glob '!target'
+  rg -n -i 'phantom|non-member|filter folder|save input' \
+    server tests elisp nvim shared docs --glob '!target'
+  rg -n '\bskgid\b|Unrestricted|FolderPolicy|MpViewnode' \
+    server tests elisp nvim --glob '!target'
+#+end_example
+The plan is complete when every slice headline reads DONE,
+'progress.org' holds the classification of every failure met
+and the answer to the two-question check, and
+'TODO/problems.org' lines 48, 388 and 836 have moved to
+'TODO/DONE/problems.org'.
+
+* New issues
+Things this rewrite of the plan turned up that neither the
+discussion nor the tentative plan decided. Each gives the
+problem and the solution the plan takes; Jeff may reverse it.
+** DONE a ghost named by its parent's list must keep the list intact
+Letting the ghost win over the unknown means that in the diff
+view a dangling reference to a node HEAD still has shows as a
+ghost. The save passes over a ghost today, so the next save
+would drop that gnid from the parent's list, the edit the
+unknown rule exists to prevent. The plan therefore lets such a
+ghost claim membership and has the save keep its gnid as it
+keeps an unknown's (slice 11, with a test). A ghost nothing
+names claims nothing, as before.
+** DONE the corrections ride on two responses, into one buffer
+Corrections for every refreshed view reach the client in the
+save response and the rerender-all response, tagged with the
+view's buffer name, and the clients append them to the
+existing warnings buffer under one org headline per view. That
+buffer is named for startup warnings today
+('*SKG Server Warnings*'); it will hold more. Renaming it is a
+choice the plan leaves to you; the slices keep the name.

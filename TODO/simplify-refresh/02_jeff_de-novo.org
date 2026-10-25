@@ -14,6 +14,12 @@ make "the truth" mean the worktree graph plus HEAD, always;
 the diff view would then differ only in what it asks to be
 drawn, not in what it can see. Do you accept building the
 before-graph for content views too?
+***** DONE UPDATED [Claude] HEAD is the diff view's input only
+Your decision under "a root whose node vanished" (ghosts only
+in diff mode) removes the reason to build HEAD for a content
+view: it drew ghosts and their permanence, and a content view
+now has neither. The straddle stays the diff view's input, as
+today, and the content view's refresh reads the graph alone.
 ***** DONE Jeff : Do you mean the view of the before-graph?
 The graph, before and after,
  is settled by the time we are refreshing the buffer.
@@ -72,6 +78,10 @@ else stays gated.
 ****** DONE jeff : it's especially nice
 that the tombstone won't reveal that something was hidden there --
 maybe it's some other kind of tombstone.
+******* DONE Claude says: one kind of tombstone
+A second kind would say "something hidden stood here", which
+is the fact to hide. One kind says only "something stood
+here", and that is the most a tombstone should ever say.
 **** DONE the requests in the buffer
 View requests ('editableView', '(folder containers)' and so
 on) ride in the metadata, so they arrive with the buffer,
@@ -119,6 +129,16 @@ is clobbered; an occurrence of a vanished node becomes a
 phantom; only a headline that no kind can state truthfully
 in its position is entombstoned. Your "unsayable" then has a
 definition: nothing on that ladder applies.
+***** DONE UPDATED [Claude] the ghost rung
+"An occurrence of a vanished node becomes a phantom" reads:
+in the diff view, when HEAD has the node, a ghost; otherwise
+nothing on the ladder applies and it is entombstoned.
+***** DONE UPDATED [Claude] the first two rungs in the new words
+The first rung reads: a child of an editable parent that the
+graph does not warrant is marked 'noClaim'; under a
+write-protected parent nothing is marked. The second keeps
+"a second editable occurrence becomes write-protected" and
+drops "and its children non-members", which is now implied.
 ***** DONE jeff : agreed
 And when something is made WP its children are made nonmembers.
 ****** DONE Claude says: yes; to fold into the ladder
@@ -167,6 +187,12 @@ perfect privacy is not critical. One case to keep as it is:
 a placeholder whose hidden node vanished stays a
 placeholder, since a tombstone there would reveal that
 something hidden died.
+***** DONE UPDATED [Claude] the placeholder goes
+Your "disappear it" supersedes the case kept above. An
+occurrence of a hidden node is entombstoned, childless ones
+pruned; the gated graph answers present, hidden or absent;
+'restrictedNode' leaves the metadata and 'Vognode::Restricted'
+the type.
 ***** DONE Jeff : what's the placeholder?
 I don't remember seeing that in [[./metadata-format.org][the metadata]].
 
@@ -179,15 +205,15 @@ skgrepo". It carries no ID, repo, title or body.
 also for an unknown. If restricted joins "unsayable", this
 is the kind that disappears.
 ******* DONE jeff : Yes, disappear it!
-* kinds of thing, and what they should do
-** tombstones
-*** Jeff
+* DONE kinds of thing, and what they should do
+** DONE tombstones
+*** DONE Jeff
 Things should be tombstoned if they are unsayable.
 (Let's say 'entombstone' only when the shorter form
 could be confused with a noun).
 Tombstones need be collected and pruned only once,
 after all other computations that produce the new buffer.
-*** Claude: agreed; what the prune removes, and "unsayable"
+*** DONE Claude: agreed; what the prune removes, and "unsayable"
 Pruning once, postorder, after everything else, is what
 'prune_self_deletable_when_empty' does today, and I would
 keep exactly that: a childless tombstone goes; one with
@@ -208,6 +234,12 @@ What's a filter folder? Is that a term you just invented,
   and if there's no precedent, inform me that you had to coin it.
 Agreed, one rule better than a list.
 ****** DONE Claude says: phantoms stay; the term is the code's
+******* DONE UPDATED [Claude] only in the diff view
+"Hold onto all deleted phantoms" now holds in the diff view
+only. In a content view an occurrence whose node vanished is
+entombstoned, so the prune's list is still just tombstones,
+and a vanished node's childless occurrence does disappear
+there, as it does today.
 ******* DONE Folded:
 phantoms, with children or not, leave the prune
 entirely; only tombstones are pruned, and an empty folder the
@@ -258,8 +290,7 @@ carries it. It is one mechanical slice, a rename with the
 suite run after. Shall I do it now, as a commit of its own,
 or leave it for the rebuild, which will touch most of those
 files anyway?
-*********** TODO jeff : Don't do it but please write a plan for it.
-Call it 03_plan_say-ternary.org
+*********** DONE Jeff : executed
 ******* DONE Claude says: a rename, or no name at all
 Those comments also say "compound filter folders", and
 "compound" alone says what matters (members come from
@@ -280,7 +311,7 @@ comments and the docs do.
 Noted as a standing rule: before naming a thing I check how
 the code and docs say it, and when I must coin a term I say
 so where it first appears.
-**** Claude: a definition of unsayable, to confirm
+**** DONE Claude: a definition of unsayable, to confirm
 A headline is unsayable when no kind can state it truthfully
 in its position. With the ladder under "principles", that
 leaves: a folder or property entry whose viewparent is not a
@@ -292,12 +323,12 @@ was an unknown) and no children; a duplicate occurrence
 after the merge rule has taken its children. Everything else
 is sayable: a non-member occurrence of a real node says
 something true even when nothing warrants its position.
-***** jeff : a headline on an unknown node
+***** DONE jeff : a headline on an unknown node
 should be refused at validation,
 (let's make it a validation error if it's not),
 but by the time such a headlined unknown reaches refresh,
 refresh should accept it.
-****** Claude says: already refused; I meant the viewnode
+****** DONE Claude says: already refused; I meant the viewnode
 Text on an unknown's line is a validation error today: the
 parser returns "Unknown phantom content cannot be edited." as
 a 'BufferValidationError' when an '(unknown ...)' headline
@@ -314,25 +345,57 @@ unsayable list, which makes the rule for an ID uniform: the
 graph has the node, it is an occurrence; a list names it, an
 unknown; otherwise a phantom, with whatever text the buffer
 or HEAD can give it.
-******* jeff : let's let go of an unwarranted unknown
+******* DONE jeff : let's let go of an unwarranted unknown
 Out of place, all it says is "this ID is not in the graph",
 without even saying why we thought it might be,
 so it has zero information content and should be tombstoned.
-******** Claude says: agreed; folded
+******** DONE Claude says: agreed; folded
 An unknown that no list names is entombstoned; childless, it
 is then pruned. That is today's rule
 ('convert_nonmember_unknown_children_to_tombstones'), kept.
 The rule for an ID then reads: the graph has the node, it is
-an occurrence; it has text to
-show, a phantom; its parent names it, an unknown;
-none of those, a tombstone. The last clause
-is what separates it from a precarious phantom, which also
-says only "not in the graph" but carries the text that says
-what was lost.
-********* TODO jeff : I edited the preceding paragraph
+an occurrence; its parent names it, an unknown; the view is
+the diff view and HEAD has the node, a ghost; none of those,
+a tombstone. (The third clause was "it has text to show, a
+phantom" until your decision under "a root whose node
+vanished"; folded here.)
+********* DONE jeff : I edited the preceding paragraph
 the body of your "Claude says: agreed; folded".
 If you read it back and it doesn't make sense to you now,
 let me know.
+********** DONE Claude says: it reads; one outcome changes
+The paragraph makes sense, and "its parent names it" is better
+than my "a list names it": only the viewparent's list makes a
+headline a member. But the new order decides a case the old one
+decided the other way. Take an occurrence whose node vanished
+while the parent's list still names it: it has text, and its
+parent names it. Your order makes it a phantom (text wins); mine
+made it an unknown. The difference is what the next save does.
+In 'traverse.rs' (the save's content collection) an unknown's
+ID is pushed into the parent's list ("its raw ID is
+load-bearing"), while a deleted or historical phantom is passed
+over, so the ID is dropped. Under your order, then, the save
+after a collateral deletion would silently remove the dead ID
+from the parent's list, which is the edit you refused for
+unknowns. Two ways out. Keep your order and make a phantom that
+its parent names save-relevant, so the save keeps the ID: then
+membership is a flag orthogonal to kind, and the user's
+tombstone request on such a phantom is an edit request, not a
+view request. Or keep mine: a named ID is an unknown and shows
+no text. I would take the first, since it keeps the text the
+user wants to see and the ID the list owns; it also makes
+"unknown" simply "a phantom with nothing to show". I also
+corrected the detour glossary, which called every phantom
+save-inert; an unknown's ID is kept on save.
+*********** DONE jeff : I prefer yours, not mine!
+Yours is much simpler. I hadn't understood.
+************ DONE Claude says: folded; the paragraph reads so
+The paragraph above now says: the parent names it, an
+unknown; it has text to show, a phantom. So a dead ID the
+parent's list still names is an unknown and shows no text,
+and the save keeps the ID. The proposal to make a
+parent-named phantom save-relevant is withdrawn; "a phantom
+never claims membership" stands without exception.
 ***** DONE jeff : careful, a folder can be in a folder
 The hiddenOut folder is in the subscribee folder.
 But the general principle holds: A thing that is somewhere
@@ -382,7 +445,76 @@ before redisplay.)
 
 Phantoms should be recalculated from among their parents' children,
 in-place (to make sure we don't detach interesting descendents).
+**** DONE UPDATED [Claude] diff view only; one permanence
+Ghosts exist only in the diff view (your decision under "a
+root whose node vanished"), and I propose only where HEAD has
+the node. Then every ghost is version-controlled, "precarious"
+goes, and the two tombstone requests are diff-view commands.
 *** DONE Claude says: yes to one type; what it needs
+**** DONE UPDATED [Claude] what the diff-only rule changes below
+Permanence: one value, so no fact to compute or show; the
+herald needs only the restore affordance, which every ghost
+has. Text: always HEAD's. In place, both ways: in the diff
+view only; in a content view a vanished node's occurrence
+becomes a tombstone, and a node that comes back is drawn anew
+by the goal, not re-kinded from a ghost.
+***** DONE jeff : Why not re-kind from a ghost?
+It's unlikely but the user may have drawn nonmembers
+(should we use that word for non-claimant non-warranted children?)
+under the ghost that they expect to see there
+when it is resurrected.
+****** DONE Claude says: we do, in the diff view; none elsewhere
+In the diff view the ghost stays and is re-kinded in place
+when the node returns, children and all; that is unchanged.
+The sentence you ask about is about a content view, where by
+your decision a vanished node's occurrence is a tombstone, and
+a tombstone remembers nothing: no ID, no text. So when the
+node returns the goal names an ID that no child carries, a
+fresh occurrence is created, and the tombstone stays beside
+it, still holding whatever the user drew under it. Nothing is
+lost; the children sit under a DELETED line instead of under
+the node, until the user moves them.
+******* DONE Claude says: two ways to do better, and my pick
+The tombstone could remember its node.
+In the buffer that
+means '(skg tombstone (gid X))', which collides with your
+privacy decision: a tombstone for a hidden node must carry
+nothing, and then a tombstone without a gid would itself say
+"something hidden stood here". On the server it means a map
+from viewnode ID to the gid it last stood for, kept in the
+view's record (today that record holds only a counter and the
+set of known IDs, 'ViewnodeIdRecord' in
+'server/types/views_state.rs'); a returning node would then
+reclaim the tombstone carrying its ID and be re-kinded in
+place, and the same map would let an occurrence hidden by a
+tightened restriction come back in place when the restriction
+loosens. The buffer would show nothing, so privacy holds. The
+cost is a session memory the buffer does not show, against
+the stateless rule you set for plans: decide from the buffer
+and the graph as they are now. I would accept the misplaced
+children: the case needs a deletion elsewhere, a restoration
+through the diff view or git, and notes drawn under the dead
+node meanwhile, and the notes survive. If the un-hiding case
+matters to you, the server-side map is the way, and I would
+add it as a named mechanism rather than smuggle it in.
+******** DONE jeff : retreat!
+Let's ignore the problem. Not important at all.
+Now that I know you're talking about content views,
+I prefer your original approach: draw it anew,
+do not re-kind it from a ghost.
+******* DONE AGREED : Claude says: the word
+I would not revive "non-member" for them; it is the word whose
+two senses started this. Under a write-protected parent every
+child claims nothing, so "unwarranted" says all there is to
+say; under an editable parent at rest unwarranted and noClaim
+coincide. "Unwarranted child" names them in both places, and
+"a note" is the informal word for one the user typed.
+**** DONE UPDATED [Claude] in the new words
+A phantom claims nothing. A version-controlled phantom whose
+relationship HEAD has is a warranted ghost and carries no ⊥;
+a precarious phantom is unwarranted and carries ⊥. So the
+permanence shows in the herald without a fact of its own,
+beside the restore affordance.
 **** DONE AGREED: permanence is computed, not stored
 Whether HEAD has the node changes while the buffer does not:
 a node deleted this session is in HEAD until the next commit
@@ -429,10 +561,14 @@ looks the same next session. Deriving phantoms from graph
 plus buffer gives that for free: an occurrence with text
 becomes a phantom, an ID a list names becomes an unknown,
 and no session memory is consulted.
-** unknown
+***** DONE UPDATED [Claude] still free, differently
+A foreign view of a node deleted elsewhere shows an unknown
+where a list names it and a tombstone where none does; a
+ghost only in the diff view. No session memory is consulted.
+** DONE unknown
 This should be distinct from phantoms. I believe it already is.
 It is not tombstoned -- that would be an edit.
-*** Claude says: distinct in the metadata, not in the type
+*** DONE Claude says: distinct in the metadata, not in the type
 'Phantom::Unknown' is a variant of 'Phantom' in
 'server/types/viewnode.rs', and the docs say "unknown
 phantom"; only the metadata form '(unknown ...)' sets it
@@ -443,7 +579,11 @@ is a member and save-relevant, while nothing names a
 phantom's ID, so it is save-inert. Removing an unknown's
 headline would drop the ID from the list at the next save,
 which is the edit you mean.
-**** TODO Claude says: the one crossing between the kinds
+**** DONE UPDATED [Claude] in the new words
+An unknown claims membership, since its parent names it, and
+is warranted by that list; a phantom claims nothing. The
+"member and save-relevant" above means exactly that.
+**** DONE AGREED Claude says: the one crossing between the kinds
 An occurrence whose node vanished while the parent's list
 still names it is both: it has text, and the list names it.
 Today 'normalize_relationship_backed_content_unknowns' makes
@@ -451,15 +591,104 @@ it an unknown and the text is lost. I would keep that: the
 title was the node's, the node is gone, and showing it would
 be the lie you forbid. If you want the last title kept as a
 hint, it needs a marked slot of its own. Which?
-**** today's exception
+***** DONE UPDATED [Claude] settled
+Your "I prefer yours" under tombstones answers "Which?": the
+crossing is an unknown, and the text is lost.
+**** DONE today's exception
 'convert_nonmember_unknown_children_to_tombstones'
 tombstones a non-member unknown, which edits nothing. Under
 the line above a non-member unknown cannot exist: an ID that
 nothing names and no node answers to, with no text, is
 unsayable and goes to a tombstone by the general rule.
-** folders
+** DONE jeff : gather members and warranted ghosts
+at the same time -- both are
+"things this node's children should contain"
+*** DONE Claude says: one goal per parent, and one question
+Agreed. For each parent the refresh computes one goal: the
+children the graph warrants (the members) and the children
+HEAD warrants that the worktree no longer has (the ghosts: a
+version-controlled phantom, or a removed membership of a node
+that still exists). The straddle's union walk already answers
+exactly that, each item with its existence, so the goal is
+one list with a tag per item, and "warranted" means "in that
+list", by the graph or by HEAD.
+The question is extent. Today only the diff view draws
+ghosts. If a content view's goal held every ghost HEAD
+warrants, each deletion made anywhere would leave a ghost in
+every open view of the parent until the next commit. I would
+let the goal of a content view hold only the ghosts the
+buffer already shows (kept in place and re-warranted), and
+the goal of the diff view hold them all; that is the one
+thing the completion mode would still decide. Agreed?
+**** DONE jeff : Maybe removed nodes should be phantoms too.
+If a relationship to a still-extant node vanishes,
+then that is just a phantom with a third kind of permanence,
+which I would call 'graph'. We are seeing a ghostly image
+here of someone who actually still lives in other places.
+That's in keeping with the spirit (lol) of the word phantom:
+An image here of something that was here but is no longer here.
+
+Would that be more natural?
+***** DONE Claude says: the image yes, the type no
+The picture is right: a removed member is an image here of
+something that was here and is not now. But a phantom is
+defined by having no node, and that is what lets it be
+save-inert, show HEAD's text and refuse every edit request. A
+removed member has a node, and the node is alive: the headline
+can be extended, can be the node's editable occurrence
+('counts_as_member_for_the_claim' admits it today), and can
+take 'restoreRel'. Typed as a phantom it would lose all that.
+What the two share is not the kind but the warrant: each is
+shown because HEAD, and only HEAD, relates it to its parent.
+So I would put the ghostliness on the warrant axis. A
+headline's kind says what stands there: an occurrence (the
+node exists), a ghost (it does not), an unknown (a list names
+it), a folder, a property, a tombstone. Its warrant says why
+it stands here: the graph, HEAD alone, or nothing. A removed
+member is then an occurrence with warrant HEAD, a historical
+ghost is a ghost with warrant HEAD, a precarious ghost has
+none. Your ᗣ falls out of it: the glyph marks warrant HEAD,
+whatever the kind, which is "every diff-specific headline"
+without a list of kinds. Your third permanence, 'graph', is
+the case where the node exists, which is to say an
+occurrence; for a ghost, permanence (HEAD has the node, so
+it is restorable) stays distinct from warrant (HEAD has the
+relationship), since a node added and deleted between
+commits has neither.
+****** DONE jeff : sounds good
+**** DONE jeff : ghosts only belong in completion lists
+for buffers in diff-mode. I might later make diff-mode
+something that can be applied to ordinary content buffers,
+but so far it's only available for
+views created specifically to show the diff.
+
+(I'm saying 'ghost' and 'phantom' interchangeably.
+I shouldn't do that. We should rename every phantom to ghost,
+because it's shorter, and we should clean it up
+if the two have been used to mean different things.)
+***** DONE Claude says: settled, and the rename
+That answers my question: a content view's goal is the
+graph's alone, the diff view's is the graph's plus HEAD's.
+Both keep a ghost the buffer already shows, in place, until
+the user tombstones it; in a content view such a ghost is
+unwarranted (⊥) and, when HEAD has its node, restorable.
+On the word: I had used "ghost" for anything warranted by
+HEAD alone and "phantom" for the kind, which is two meanings.
+From here on "ghost" is the kind, formerly phantom, and the
+HEAD-only warrant is called that. In code 'Phantom' becomes
+'Ghost', one struct (ID, home skgrepo, title, body) in place
+of 'PhantomDeleted' and 'PhantomHistorical', with 'Unknown'
+beside it rather than inside it; on the wire one form '(ghost
+(id X) (repo Y))' in place of '(deleted ...)' and
+'(historical ...)', its permanence a display fact. The docs
+say "phantom" in a dozen places; the rebuild's renames slice
+takes them.
+****** DONE jeff : yes and
+we can safely, I think,
+talk about 'ghost nodes' and 'ghost warrants'.
+** DONE folders
 I think these rules apply to all folder kinds!
-*** Claude says: yes, with the one axis the rules need
+*** DONE Claude says: yes, with the one axis the rules need
 The four folder policies collapse to one question: does the
 graph have an order for the members? A folder whose members
 are a list in the viewparent's own file (subscribees,
@@ -475,9 +704,241 @@ write-protected folder's members are members, not
 non-members (they carry no 'nonMember' and show ☮ without
 ⊥), so the trust assumption under "merge" is about
 occurrences of nodes, not about folders.
-*** restore members
+**** DONE UPDATED [Claude] the scoping note is moot
+With the claim and the warrant split, a write-protected
+folder's members claim nothing and are warranted, like the
+content of a write-protected occurrence; the merge rule's
+assumption holds by definition. The one axis stands: does the
+graph order the members.
+**** DONE jeff : That scoping note is a show-stopper.
+I have to solve this before I can go on with the rest of the doc.
+
+There is a muddle about what 'member' means.
+I'm not sure how to clean it up.
+If child C is a member of parent P, it can mean a few things:
+P shows you C because C bears some relationship to P;
+or C can actually affect P.
+Are there other senses?
+What decisions are made based on membership --
+both in the code as it stands,
+and as we plan in TODO/simplify-refresh/?
+***** DONE Claude says: the senses, the decisions, and a way out
+Everything below about today's code is traced, not run.
+****** DONE four senses of "member"
+******* in the graph: the partner that is not the recorder
+'members_of', 'relation_member_role', 'RelationshipMemberKey'
+('docs/glossary.org', "relation, relationship, member"). This
+sense never touches a viewnode; I would leave it alone.
+******* warrant: the graph relates C to P as the position says
+Content under a node; a partner of the folder's kind in a
+folder. The glossary's "a membership is the relationship that
+causes a node to be drawn as a member". Your first sense.
+******* claim: the save reads C as an entry of P's list
+Only under an editable occurrence or an editable folder. The
+save never collects the children of a write-protected
+occurrence ('traverse.rs', 'is_editable') nor the members of
+a write-protected folder. Your second sense.
+******* the stored flag, 'Membership' and the atom 'nonMember'
+One bit, standing for whichever of the two its writer had in
+mind. Under an editable parent it is the claim: no atom means
+"save me into P's list", the atom means "leave P's list
+alone". In a write-protected folder it is the warrant: the
+containers are members, the chain nodes under them
+non-members, and the save reads neither. Under a
+write-protected occurrence it is neither. The glossary says
+every vognode child there is a non-member whatever the graph
+says, but the code enforces that only when the occurrence
+becomes write-protected as a repeat
+('make_member_children_nonMembers'); the C-c s w path
+('makeWriteProtectedAndClobber') leaves the children's flag
+as it was, and 'validate_membership_claims' later flips only
+the members the graph does not confirm. So for the same graph
+facts a child of a write-protected occurrence is a member or
+not depending on how the occurrence got there. That is the
+muddle, and it is why the scoping note was true of folders
+and not of occurrences.
+****** DONE two vocabulary pairs that are not senses
+"Member" against "entry" (a folder member is a vognode; an
+entry is an alias, ID or flag), and the save's 'MSV', a
+folder's membership-set value, which is the claim taken at
+the level of the whole list.
+****** DONE what the code decides by the flag today
+******* the parse and its validation
+Members must have distinct IDs among content children
+('nonignored_children_have_distinct_skgids'); a member in a
+subscribee folder is a subscribee-as-such; content position
+is read from members ('local.rs', 'validate_tree.rs').
+******* the save
+Members become the parent's list ('traverse.rs'); a member of
+a subscribee or overridden folder counts for that folder
+('member_counts_for_partnerFolder'); members under a
+subscribee-as-such are the visible content from which hides
+are inferred ('unrestricted_child_counts_as_visible_content');
+the write-protected-edit check reads members
+('write_protected_edits.rs'). A non-member contributes
+nothing to any of these.
+******* editability
+A member, or a removed member, takes part in the editability
+claim ('counts_as_member_for_the_claim'); an editable-view
+request cascades to member children only; a tentative
+non-member yields its claim; a repeat's member children
+become non-members; roots are made members; members under a
+dead parent become non-members
+('mark_orphans_under_dead_parents_false').
+******* the reconcilers
+Selectors manage members of the right kind; adoption turns a
+non-member standing for a goal item into a member
+('adopt_nonMember_children_that_are_content',
+'mark_goal_children_as_folder_members'); converting a stale
+child makes it a non-member ('convert_unwarranted_child');
+'FollowsGoal' orders members and puts non-members first; a
+retained restricted placeholder is unmanaged.
+******* the diff view
+Align makes a member whose relationship the worktree dropped
+a non-member, and a non-member whose node is back a member
+('changes.rs'); tagging reads members and non-member content
+alike; the folder step collects members by ID; the pruned
+change view walks members and roots; a removed member is a
+non-member carrying '(rel removed)' ('change_viewnodes.rs').
+******* stats and rendering
+A non-member gets no birth fact and no relRepo herald, and a
+non-member under a subscribee-as-such records the
+hides-from-subs flag ('viewnodestats.rs'); the printer writes
+the atom and the clients draw ⊥; the collateral-pid walk
+skips non-members ('viewnode_graphnode.rs').
+******* the search buffer
+Hits and their folder members are created as members.
+****** DONE what the plan so far decides by it
+The merge rule trusts that children of a write-protected
+occurrence are non-members. The ladder's first rung makes a
+member the graph does not confirm a non-member. Reorder sorts
+members and lets non-members ride; retain keeps non-members
+with as little change as possible; reinstate draws missing
+members. An unknown is a member when its parent names it; a
+phantom is save-inert, with my open proposal to make a
+parent-named phantom save-relevant. Chain nodes are
+non-members. A node where its kind cannot be a member becomes
+a non-member (your "careful, a folder can be in a folder").
+Your "gather members and warranted ghosts" computes one goal
+from the graph and HEAD together, which is the warrant sense.
+******* DONE UPDATED [Claude] two items changed
+The proposal to make a parent-named phantom save-relevant is
+withdrawn (your "I prefer yours"). The merge rule's trust and
+the first rung now read as the ladder's update says.
+****** DONE a way to clean it up
+Store the claim; derive the warrant.
+******* DONE the stored atom means only "not a claim"
+'nonMember' says: the save must not read this child as an
+entry of its viewparent's list. It is meaningful only under
+an editable occurrence or an editable folder. Under a
+write-protected one no child is a claim, whatever it carries,
+and the refresh writes no atom there. Your merge invariant
+then holds by definition: nothing under a write-protected
+occurrence is a member, because a member is a claim and the
+save reads none there. The folder asymmetry goes the same
+way: a containers folder's members are warranted, not
+claimed, and nobody needs to mark them either way.
+******* DONE the warrant is a display fact
+Whether the graph (or, for a ghost, HEAD) relates C to P as
+the position says is recomputed at every refresh and written
+like 'cycle', for the clients to draw and the parser to
+discard; the herald table moves ⊥ from 'nonMember' to it. ⊥
+then marks an unwarranted child: a chain node, a retained
+note, a child a collateral save detached. Under an editable
+parent at rest, unwarranted and non-claim coincide, since the
+refresh writes the atom on every unwarranted child it keeps
+(the first rung) and the next save makes every claim
+warranted. They differ only for the two intents the user
+types: a new child (a claim, not yet warranted) and a child
+marked 'nonMember' to detach it (warranted, not a claim).
+Both last until the next save.
+******* DONE who reads what
+The save, the editability cascade and the merge read the
+claim. The reconcilers, the stats and the heralds read the
+warrant; the reconcilers read the claim only to decide order
+(claims in graph order, the rest riding along). Then
+'validate_membership_claims', 'make_member_children_nonMembers'
+and 'mark_orphans_under_dead_parents_false' collapse into the
+first rung, and the glossary's rule about write-protected
+occurrences needs no enforcing.
+******* DONE Claude says: names
+I would keep 'Membership { Member, NonMember }' and the atom
+for the claim, so the save and the clients' parsers change
+nothing, and add the warrant as a bare 'unwarranted' inside
+'(viewStats ...)', since warranted is the default and the
+form already holds the position's other facts. If you want
+the positive word stored instead, say so.
+******* DONE Jeff : brilliant!
+******** DONE vocab
+Let's say 'claims membership' and 'is warranted',
+and in the glossary clarify that 'warranted' applied to a viewnode
+means 'is warranted to be shown as a member of its parent'.
+On the wire, 'no-claim' and 'no-warrant' are fine
+(the positive variants are assumed, since they are more common).
+In prose and code, the full phrases,
+camel-casing the adjective phrases within longer snake-cased names
+to avoid confusing a reader.
+
+'entry' seems bad.
+I don't see why we can't use 'member' for properties too.
+An unwarranted property is tombstoned,
+and every property claims membership,
+so they don't need the fields, but the concepts still apply, no?
+********* DONE AGREED Claude says: adopted; the names in each place
+In prose: a child "claims membership" or not, and "is
+warranted" or not, where warranted means "warranted to be
+shown as a member of its parent", by the graph or, for a
+ghost, by HEAD. "Membership" keeps the glossary's meaning,
+the relationship the position implies, so "claims
+membership" reads "claims that relationship".
+On the wire, the file's atoms are camel-cased ('nonMember',
+'writeProtected', 'bodyFolded'), so I would write 'noClaim'
+and 'noWarrant'; the parser takes hyphens too if you prefer
+'no-claim'. In code, two bools: 'claimsMembership' replaces
+the field 'membership', and 'isWarranted' joins
+'ViewnodeStats' beside 'cycle', since it is derived; longer
+names carry them as one token ('children_that_claimMembership').
+Properties: agreed, "entry" goes. A property is a member of
+its folder; it always claims membership, and it is warranted
+or entombstoned, so it needs neither field, and the glossary
+says so in one sentence.
+******** DONE no back-compat needed
+I'm the only user and the only dev; we can afford
+to do it the right way.
+
+Let's change Membership. Elsewhere that is defined
+to be something else -- it includes the rel type,
+whereas the Membership you name is now a silly non-boolean boolean.
+********* DONE Claude says: then the type goes, and the atom
+'Membership { Member, NonMember }' becomes the bool
+'claimsMembership'; the glossary's "membership" (the
+relationship, with its relation) keeps its name and the code
+stops using the word for the flag. The atom 'nonMember'
+becomes 'noClaim' in the server, both clients, the shared
+metadata-fields table and the test fixtures, converted by one
+script as plan 19 did for 'birth'. The herald table moves ⊥
+to 'noWarrant'. One choice left: whether 'noClaim' gets a
+glyph of its own. Under an editable parent at rest it
+coincides with 'noWarrant', so ⊥ covers it; it differs only
+while a user's detachment is pending, which the client could
+show as it shows a request. I would give it none.
+********** DONE jeff : what's a user's detachment?
+*********** DONE Claude says: marking a child noClaim by hand
+Under an editable parent, a child the user marks 'noClaim'
+(today 'nonMember') stays in the buffer but leaves the
+parent's list at the next save: the headline is detached from
+the relationship without being deleted. The metadata editor
+offers the atom today ('shared/metadata-fields.json' lists
+'nonMember' as an editable field). Until that save the child
+is warranted but claims nothing, the one state where the two
+flags differ under an editable parent; that is the moment a
+'noClaim' glyph would have something to say, and I would
+still show it as a pending request rather than give the atom
+a glyph.
+************ DONE jeff : yes, better a pending request
+*** DONE restore members
 if any are missing
-**** Claude says: agreed; a name, and the warning
+**** DONE AGREED : Claude says: agreed; a name, and the warning
 "Restore" collides with the restore request ('restoreNode',
 'restoreRel'), which asks the save to undo a deletion in the
 graph. The glossary already has "reinstate" for a member the
@@ -488,10 +949,10 @@ deleted a headline that cannot be deleted. I would keep the
 report but make it the client's business: the refresh
 returns what it corrected, and the client decides what to
 say.
-*** reorder members
+*** DONE reorder members
 to match the truth, but only if there is one
 (the graph says, not the view).
-**** TODO Claude says: where the non-members go
+**** DONE Claude says: where the non-members go
 Members take the graph's order; the rule is silent on the
 non-members among them (chain nodes, notes). Today
 'KeptChildOrder::FollowsGoal' puts non-members first, then
@@ -500,8 +961,16 @@ instead that each non-member stays after the sibling it
 followed. I would take the second; it is no harder, since
 the reorder is a stable sort of the members with each
 non-member riding behind its predecessor. Agreed?
-*** retain nonmembers, with as little change as possible
-**** Claude says: what that includes, and one rule to drop
+***** DONE jeff : agreed, as little change as possible
+so don't reorder to collect nonmembers at the top
+***** DONE UPDATED [Claude] in the new words
+Warranted children take the graph's order; the rest ride
+behind their predecessor. The question stands.
+*** DONE retain nonmembers, with as little change as possible
+**** DONE UPDATED [Claude] in the new words
+The rule retains every child that claims nothing or is
+unwarranted; otherwise unchanged.
+**** DONE AGREED : Claude says: what that includes, and one rule to drop
 Keep their viewnode ID, fold state, subtree, editability and
 text; recompute their display facts (change facts, stats).
 One rule today changes a non-member for convenience rather
@@ -511,7 +980,7 @@ write-protected with its content. The graph does not dictate
 which occurrence is editable, so under your principles that
 rule goes; the user asks for editability where they want it.
 I would drop it.
-*** merge
+*** DONE merge
 If the ID for a member is repeated among its siblilngs,
 those instances should be unified.
 Buffer-refresh must be able to
@@ -539,8 +1008,8 @@ which, when refresh recurses to process the children of x, then becomes
 #+end_example
 When so unifying, if any collection is editable,
 their union is editable.
-**** Claude says: agreed; the invariant must be made first
-***** the invariant is established, not trusted
+**** DONE Claude says: agreed; the invariant must be made first
+***** DONE the invariant is established, not trusted
 Neither the parser nor the clients guarantee that the
 children of a write-protected occurrence are non-members.
 Today the walk makes the member children of a repeat
@@ -555,28 +1024,45 @@ danger it removes: a headline the user typed under a
 write-protected copy of x would otherwise become a member of
 the editable x after the union, and the next save would add
 it to x's contents.
-***** TODO Claude says: which sibling survives
+****** DONE AGREED : UPDATED [Claude] no first pass; one rule in the union
+Nothing under a write-protected occurrence claims membership,
+by definition now, so the merge needs no pass to establish
+it. The danger moves: a child carried from the write-protected
+copy to the editable one would become a claim there, since
+under an editable parent the absence of 'noClaim' is one. So
+the union marks each child it moves 'noClaim' unless the
+graph warrants it under the survivor.
+***** DONE Claude says: which sibling survives
 Your example keeps the editable one, which is also the
 first. When they differ, I would keep the first in position
 (least movement) and give it the editable one's claim, so
 that the union is editable if any was. The survivor keeps
 its viewnode ID and fold state; the others' children are
 appended. Agreed?
-***** TODO Claude says: content siblings too?
+****** DONE jeff : agreed, but
+we should make sure that even if that first one was not editable,
+if it becomes editable, then every new child it receives
+from those it was merged with is marked noClaim
+(or whatever the wire symbol is).
+***** DONE Claude says: content siblings too?
 The rule stands under "folders" but the example is content
 under 'n'. I would apply it to every sibling set, folders
 and content alike, since the key is the same. One check
 first: can a contains list name the same ID twice? If it
 can, two member occurrences are warranted, and merging them
 would edit the list at the next save.
-** diff data
+****** DONE jeff : yes and no, respectively
+Merging folders or vognodes should behave the same.
+IDs are unique in each skgnode list, I'm quite sure,
+although feel free to check.
+** DONE diff data
 This can safely be recomputed in-place
 (to make sure we don't detach interesting descendents).
 Every diff-specific node -- not just phantoms, but folders
 and maybe anything else -- should have an
 unusual-colored pac-man ghost ᗣ character as its first emoji.
-*** Claude says: agreed; how the glyph gets there
-**** the glyph is a herald rule, not metadata
+*** DONE Claude says: agreed; how the glyph gets there
+**** DONE the glyph is a herald rule, not metadata
 The server chooses no glyphs: 'server/heralds.rs' serves a
 rule table keyed by metadata atoms, and each client renders
 it. The diff-specific kinds already have atoms of their own
@@ -590,20 +1076,400 @@ and a font that lacks the block shows a box. And a removed
 member is an ordinary node with a change fact, not a
 diff-specific kind, so it gets no ghost unless you want
 every headline with a '(diff ...)' to carry one.
-**** recomputed in place, with the ladder
+***** DONE jeff
+I'm not worried about the Canadian symbol.
+What is a removed member? Is that a type?
+Can you draw the viewnode type hierarchy for me, without comments?
+(If I need, I'll be able to jump to defs with 'M-.'.)
+****** DONE Claude says: not a type; the hierarchy
+A removed member is a shape, not a type: an unrestricted
+vognode whose membership is 'NonMember' and whose change facts
+say '(rel removed)', recognised by
+'is_unrestricted_removed_member'
+([[file:../../server/diff_view/shallow_model_subtree.rs::336]]).
+The diff view draws one for a relationship HEAD has and the
+worktree lacks: the node is still there, the membership is
+not.
+The types, from 'server/types/viewnode.rs', with comments and
+derives stripped and the lines re-wrapped. The kinds tree is
+Viewnode, then ViewnodeKind, then for a vognode its three
+cases, then for a phantom its three. Membership, editability
+and the requests live on the unrestricted vognode only; change
+facts and the readiness request on every viewnode. 'Flag',
+'SkgrepoChange', 'RelationCounts' and 'ViewnodeId' are left
+out; so is the parse-time twin in 'maybe_placed_viewnode.rs',
+which mirrors this with an optional ID and repo.
+#+begin_example
+  pub struct Viewnode {
+    pub focused           : bool,
+    pub org_folded        : bool,
+    pub org_body_folded   : bool,
+    pub kind              : ViewnodeKind,
+    pub change_facts      : ChangeFacts,
+    pub readiness_request : Option<ReadinessRequest>,
+    pub viewnode_id       : Option<ViewnodeId>,
+  }
+  pub enum ViewnodeKind {
+    Vognode        (Vognode),
+    PropertyFolder (PropertyFolder),
+    Property       (Property),
+    PartnerFolder  (PartnerFolder),
+    BufferRoot,
+    Tombstone,
+  }
+  pub enum Vognode {
+    Unrestricted (UnrestrictedVognode),
+    Restricted   (RestrictedVognode),
+    Phantom      (Phantom),
+  }
+  pub struct RestrictedVognode;
+  pub enum Phantom {
+    Deleted    (PhantomDeleted),
+    Unknown    (PhantomUnknown),
+    Historical (PhantomHistorical),
+  }
+  pub struct PhantomDeleted {
+    pub skgid        : ID,
+    pub home_skgrepo : SkgrepoName,
+    pub title        : String,
+    pub body         : Option<String>,
+  }
+  pub struct PhantomUnknown {
+    pub skgid           : ID,
+    pub relRepo         : Option<SkgrepoName>,
+    pub relRepo_request : Option<SkgrepoName>,
+  }
+  pub struct PhantomHistorical {
+    pub skgid               : ID,
+    pub home_skgrepo        : SkgrepoName,
+    pub title               : String,
+    pub body                : Option<String>,
+    pub restoreNode_request : bool,
+  }
+  pub type UnrestrictedVognode =
+    UnrestrictedVognode_Generic<ID, SkgrepoName>;
+  pub type MpUnrestrictedVognode =
+    UnrestrictedVognode_Generic<Option<ID>, Option<SkgrepoName>>;
+  pub struct UnrestrictedVognode_Generic<Id, Repo> {
+    pub title              : String,
+    pub skgid              : Id,
+    pub home_skgrepo       : Repo,
+    pub membership         : Membership,
+    pub graphStats         : GraphnodeStats,
+    pub viewStats          : ViewnodeStats,
+    pub relRepo_request    : Option<SkgrepoName>,
+    pub restoreRel_request : bool,
+    pub view_requests      : HashSet<ViewRequest>,
+    pub editability        : Editability,
+  }
+  pub enum Membership { Member, NonMember }
+  pub enum Editability {
+    Editable { body         : Option<String>,
+               edit_request : Option<NodeEditRequest> },
+    WriteProtected,
+  }
+  pub enum NodeEditRequest {
+    NodeMerge (ID),
+    Delete,
+    SetFlag { flag : Flag, value : bool },
+    RestoreNode,
+    RestoreRel,
+  }
+  pub enum ViewRequest {
+    Folder (FolderRelation),
+    Flags,
+    Editable,
+    WriteProtected,
+    WriteProtectedSubtree,
+    Fork,
+  }
+  pub enum FolderRelation {
+    Aliases, Overrides, HidesFromSubs,
+    SubscribesTo, Containers, Mentioners,
+  }
+  pub struct GraphnodeStats {
+    pub aliases   : usize,
+    pub extra_ids : usize,
+    pub flags     : usize,
+    pub rels      : Option<RelationCounts>,
+  }
+  pub struct ViewnodeStats {
+    pub cycle                 : bool,
+    pub homeSkgrepoAtBoundary : bool,
+    pub rel_heralds           : Option<String>,
+    pub overridesHere         : Option<ID>,
+    pub omitted_body          : bool,
+    pub relRepo               : Option<SkgrepoName>,
+    pub home_skgrepo_move     : Option<SkgrepoChange>,
+    pub moved_like_ancestor   : Option<String>,
+  }
+  pub enum PropertyFolder {
+    ID,
+    Alias,
+    Flags { title : String, body : Option<String> },
+  }
+  pub enum Property {
+    Alias { text            : String,
+            relRepo         : Option<SkgrepoName>,
+            relRepo_request : Option<SkgrepoName> },
+    ID    { skgid : ID },
+    Flag  { flag : Flag, title : String,
+            body : Option<String> },
+    RemovedAlias    { text : String },
+    RemovedID       { skgid : ID },
+    OldText         { title : Option<String>,
+                      body  : Option<String> },
+    BodyDiff        { diff : String },
+    HomeSkgrepoMove { skgrepo_change : SkgrepoChange },
+    RelRepoMove     { skgrepo_change : SkgrepoChange },
+    ChangesetMarker { kind : ChangesetMarkerKind },
+  }
+  pub enum ChangesetMarkerKind { Content, RelRepo, OrderOnly }
+  pub enum PartnerFolder {
+    Subscribee, Subscriber, Overridden, Overrider,
+    Hider, Hidden, HiddenInSubscribee, HiddenOutsideOfSubscribee,
+    Container, Mentioner, AcquiredBy, Acquired,
+  }
+  pub enum FolderPolicy {
+    EditableSet, EditableCompound,
+    WriteProtectedSet, WriteProtectedCompound,
+  }
+  pub struct ChangeFacts {
+    pub change : DiffChange,
+    pub ready  : Option<BTreeSet<DiffObject>>,
+    pub leaves : Option<LeavesFact>,
+  }
+  pub struct DiffChange {
+    pub node       : Option<Existence>,
+    pub rel        : Option<Existence>,
+    pub properties : bool,
+  }
+  pub enum Existence  { Added, Removed }
+  pub enum DiffObject { Node, Rel, All }
+  pub struct LeavesFact {
+    pub count   : usize,
+    pub objects : BTreeSet<DiffObject>,
+  }
+  pub struct ReadinessRequest {
+    pub ready   : bool,
+    pub objects : BTreeSet<DiffObject>,
+  }
+#+end_example
+******* DONE UPDATED [Claude] in the new words
+A removed member claims nothing and is warranted by HEAD; the
+field 'membership' in the listing becomes 'claimsMembership',
+and 'ViewnodeStats' gains 'isWarranted'.
+******* DONE jeff
+We should bundle folded, bodyFolded and focused
+into a DisplayFacts struct.
+
+Why does RestrictedVognode exist?
+Wouldn't the following be as good?
+  pub enum Vognode {
+    Unrestricted (UnrestrictedVognode),
+    Restricted,
+    Phantom      (Phantom),
+  }
+
+Unknown should be distinct from Phantom. (We've planned this
+already, I believe.)
+
+Do you see other ways to make this hierarchy more natural?
+Grouping like things together and unlike things apart?
+Improving names?
+******** DONE Claude says: yes to all three, and five more
+********* DONE the bundle
+Agreed. I would not call it 'DisplayFacts': the glossary uses
+"display fact" for what the server derives and the save
+ignores (stats, change facts), and these three are the
+opposite, state the client owns and the server carries back
+untouched. 'BufferState { focused, folded, bodyFolded }' says
+that; 'FoldAndFocus' is the literal alternative.
+********** DONE jeff : FoldAndFocus
+with a comment that we should rename it to BufferState
+if it gets bigger.
+********* DONE 'RestrictedVognode'
+It is a unit struct, so your unit variant is the same thing
+with one name fewer. But the kind goes entirely under your
+"disappear it", so the question is moot.
+********* DONE unknown beside ghost
+Planned, yes: 'Unknown' leaves 'Phantom'. I would keep a
+wrapper over the kinds that stand for an ID, since much code
+asks only "which ID" of any of them, and name its cases for
+what they are:
+#+begin_example
+  pub enum Vognode {
+    Occurrence (Occurrence),
+    Ghost      (Ghost),
+    Unknown    (Unknown),
+  }
+#+end_example
+"Unrestricted" says nothing once "restricted" is gone;
+"occurrence" is the glossary's word for one viewnode standing
+for a graphnode.
+********* DONE one folder enum
+'PartnerFolder' and 'PropertyFolder' are two enums under two
+kinds, yet your folder rules are one set, and the ancestry
+table, the prune and the reconciler treat them alike. One
+'Folder' enum of fifteen, with a method saying whether its
+members are nodes or properties, groups like with like.
+********* DONE split the properties
+'Property' mixes three families: the node's own entries
+(alias, ID, flag); their removed forms ('RemovedAlias',
+'RemovedID'), which on the warrant axis are entries warranted
+by HEAD alone and so need no kinds of their own; and the diff
+view's descriptions of a change ('OldText', 'BodyDiff', the
+two moves, 'ChangesetMarker'), which describe nothing the
+node has. I would keep 'Property { Alias, ID, Flag }' and
+move the last five into a kind of their own, 'ChangeNote'.
+********** DONE jeff : yes but I think just call it Change
+That's safe, right? Or if not, maybe OneChange?
+*********** DONE Claude says: safe in Rust, costly for the reader
+No type is named 'Change', so Rust allows it. The reader pays:
+the diff view's facts are 'DiffChange' (the three kinds of
+change on one headline), 'ChangeFacts', 'NodeChanges',
+'ChangeLeaf' and the change forest, all facts about the
+graph, while this kind is a headline that describes one such
+fact. A bare 'Change' beside them reads as a fact, and
+'names.org' asks that near-synonyms not carry distinct
+technical meanings. 'OneChange' avoids the collision but not
+the reading. If you want the short word, I would take
+'Change' over 'OneChange' and accept the cost; otherwise a
+word for what it is, a headline about a change: 'ChangeNote',
+or 'ChangeViewnode', which the glossary already uses, though
+more broadly, for every headline the diff view's step adds.
+************ DONE jeff : ChnageViewnode then
+********* DONE what the occurrence carries
+Four requests sit in four places: 'view_requests',
+'edit_request' inside 'Editability::Editable',
+'relRepo_request' and 'restoreRel_request'. The first split
+is right, since only an editable occurrence may carry a node
+edit; the two relationship requests belong together as the
+position's requests. 'ViewnodeStats' hides one load-bearing
+field among display facts: 'overridesHere', which the save
+reads through 'collected_skgid'; it belongs beside 'skgid'.
+Its two moves ('home_skgrepo_move', 'moved_like_ancestor')
+are change facts and belong in 'ChangeFacts'. 'rel_heralds'
+is the '(rels ...)' text the tail computes; a stat, rightly
+placed.
+********** DONE Jeff : yes but
+relRepo_request and restoreRel_request
+are edit requests; they belong in that group.
+*********** DONE AGREED : Claude says: agreed; the type keeps one fact
+They are edit requests, and the wire already says so: all
+five ride in '(editRequest ...)'. The one thing the current
+split encodes is that a node's edit (delete, merge, flag)
+needs an editable occurrence, while the relationship's
+(relRepo, restoreRel) may sit on any occurrence, since the
+relationship is the viewparent's. I would keep that fact in
+the type and unify the naming: 'Editability::Editable' holds
+'nodeEditRequest : Option<NodeEditRequest>', and the
+occurrence holds
+'relationshipEditRequest : Option<RelationshipEditRequest>',
+an enum of 'RelRepo (SkgrepoName)' and 'RestoreRel'. The same
+enum serves the unknown and the alias member, which carry a
+relRepo request today as a bare option. "At most one edit
+request per headline" stays a parse-time rule, since the wire
+has one slot.
+********* DONE the parse-time twin
+'MpViewnode' and 'MpUnrestrictedVognode' ("maybe placed")
+mirror the real types with an optional ID and repo. The
+prefix reads as noise; 'Parsed...' says what they are. Whether
+the twin survives at all depends on whether the parse still
+needs a stage before IDs are resolved; I have not traced
+that.
+********** DONE Jeff : what do you suggest?
+*********** DONE AGREED : Claude says: remove it
+Now traced. The twin exists for one window: between the parse
+('org_to_uninterpreted_viewforest') and 'add_missing_info',
+which mints a UUID for a headline without '(id X)' and gives a
+headline without '(repo X)' its nearest unrestricted
+ancestor's repo. Validation runs after that, on a tree whose
+IDs and repos are all present, and already assumes so (the
+header of 'validate_tree.rs'). What downstream needs is not
+the absence but the provenance, and that is already a
+separate record, 'EnrichmentProvenance' ('new_nodes',
+'inherited_skgrepo_nodes'). So: let the parser mint and
+inherit as it builds the tree, return 'Viewnode's and the
+provenance, and delete 'MpViewnode', 'MpViewnodeKind',
+'MpVognode', 'MpPhantom', 'MpUnrestrictedVognode', the
+generic 'UnrestrictedVognode_Generic' and the six conversions
+in 'maybe_placed_viewnode.rs'. Sixteen server files and
+fourteen test files name the twin; most only pass it through.
+The rebuild's parser slice is the place, since the grammar
+changes there anyway.
+**** DONE recomputed in place, with the ladder
 A change viewnode is kept while its change exists, dropped
 as unsayable when the change is gone, and created when
 missing; the user's notes under one are held by the
 tombstone that replaces it. That is your phantom rule again.
-**** the 'changed' spelling of a folder
+**** DONE the 'changed' spelling of a folder
 '(FOLDER changed)' says what the folder's members already
 say (the metadata notes record this). If a changed folder is
 an ordinary folder whose members carry change facts, one
 spelling goes.
-* Let's also fix some awkwardness in the metadata.
-** props counts are in (rels ...);
+***** DONE jeff : please elaborate
+In (FOLDER changed) is FOLDER an enum? Is changed a bool?
+Where is that syntax defined (please give an Emacs relative link)?
+What do you mean by a spelling?
+****** DONE Claude says: two atoms, one bool, and where it lives
+In the metadata a folder headline reads '(skg aliasFolder)',
+or '(skg (aliasFolder changed) (diff (ready)))'. FOLDER is a
+bare atom, one of fifteen, which the parser maps to a Rust
+enum, 'PartnerFolder' or 'PropertyFolder' in 'viewnode.rs',
+through 'folder_kind_of_atom'. "changed" is a bare atom with
+no value; its presence is the bool. No viewnode field holds
+it. The printer derives it when the buffer is rendered:
+'folder_change_facts'
+([[file:../../server/org_to_text.rs::134]]) is Some when a
+member carries a '(rel ...)' change or a relRepo move, with
+'ready' true when every such change is ready, and
+'folder_atom_metadata_to_string'
+([[file:../../server/org_to_text.rs::296]]) then writes
+'(ATOM changed)' and '(diff (ready))'. The parser accepts
+exactly that pair
+([[file:../../server/serve/parse_metadata_sexp.rs::513]]) and
+discards it; nothing reads it back. The herald rule is
+'changed_folder_rules'
+([[file:../../server/heralds.rs::238]]): the label "its X
+changed".
+By "spelling" I meant a way of writing one headline in the
+metadata. A folder has two: the bare atom, and the list form
+with 'changed'. The second carries nothing the members' own
+'(diff ...)' parts do not carry, since it is computed from
+them. So the printer could always write the bare atom and the
+clients could derive the label from the members; then the
+parser's rule for the pair, the herald rule and the derivation
+go, and one spelling remains. That is the simplification I
+meant. It is small, and it is the diff view's business rather
+than the refresh's.
+******* DONE jeff
+'changed' should be in 'diff', not in the kind.
+Is that problematic?
+******** DONE Claude says: not problematic, and moot if dropped
+Nothing stops it: '(diff ...)' is per headline, and a part
+allowed only on a folder, say '(diff (members changed))', is
+one more rule in the same parser; the folder's '(ready)'
+aggregate already lives there, so the two would sit together.
+But with the simplification you accepted there is nothing to
+move: the fact is derived from the members and written
+nowhere, and the clients compute the label from the members'
+own '(diff ...)' parts. If you want it kept as a written fact
+after all, '(diff ...)' is its home and the kind form stays a
+bare atom.
+********* DONE jeff : if we don't need it, let's drop it!
+******* DONE jeff : the simplification sounds good
+* DONE Let's also fix some awkwardness in the metadata.
+** DONE UPDATED [Claude] three more changes to the metadata
+From the decisions under "folders" and "principles": the atom
+'nonMember' becomes 'noClaim'; '(viewStats ...)' gains the
+bare 'noWarrant', a display fact the parser discards; the
+kind 'restrictedNode' goes. The herald table moves ⊥ to
+'noWarrant'. 'metadata-format.org' will need the same three
+changes when the rebuild's plan is written.
+** DONE props counts are in (rels ...);
 there should be separate (props ...) and (rels ...).
-*** Claude says: agreed
+*** DONE Claude says: agreed
 '(aliases N) (extraIds N) (flags N)' describe the node, not
 a relation. A separate '(props ...)' touches the writer
 ('server/update_buffer/viewnodestats.rs'), both renderers
@@ -612,8 +1478,8 @@ a relation. A separate '(props ...)' touches the writer
 'server/herald_tokens.rs', the "Stats metadata" section of
 'docs/api-and-formats.org', and the shared cases in
 'tests/shared/herald-rendering-cases.txt'.
-** birth should be a view prop, not a graph prop
-*** Claude says: agreed
+** DONE birth should be a view prop, not a graph prop
+*** DONE Claude says: agreed
 'birth_facts' is computed from the parent's kind, the
 membership, the flags and 'overridesHere', all positional,
 so '(viewStats (birth ...))' is the honest place. The
@@ -621,8 +1487,8 @@ renderers read birth together with the relationship counts
 to decide which side a fraction's ancestors count on
 ('docs/heralds.org', "Birth"); after the move they read two
 forms of one headline, which costs nothing.
-** homeSkgRepo should be in props, not viewstats
-*** TODO Claude says: which of the three do you mean?
+** DONE homeSkgRepo should be in props, not viewstats
+*** DONE Claude says: which of the three do you mean?
 The home skgrepo itself is already in the node form, as
 '(repo SKGREPO)', which is "props" by your scheme. What
 '(viewStats ...)' holds is positional or historical: the
@@ -636,10 +1502,130 @@ label repeats '(repo ...)'; and move the home-skgrepo move
 into '(diff ...)', where the node's other changes live. The
 diff view also writes that move as a property leaf under the
 node, so this would leave it one spelling.
+**** DONE jeff
+homeRepoHerald best belongs in props -- it's not a Property
+in the reified sense, but it is a property of a node;
+it is not a relationship, and it is independent of view.
+But that's awkward, and it leaves relRepo without a good home.
+Let's make a new top-level (skgRepos) form that goes right after
+KIND. It applies only to vognodes (right?).
+Its two datums should be nodeRepo and relRepo.
+I don't know why 'herald' is mixed up in 'homeRepoHerald' --
+isn't that conflating responsibilities?
+I agree that the boundary belongs in (viewstats),
+and the diff information in (diff).
+
+Do you see more ways to improve this?
+
+***** DONE Claude says: yes; scope, the "herald", and a grammar
+****** DONE the form's scope
+Not only vognodes. Four kinds carry a repo today: an
+occurrence (its home, '(repo X)', and the relRepo of its
+position), a ghost (its home), an unknown (the relRepo only;
+it has no home) and an alias member (the relRepo recording
+the alias, beside the atom 'alias'). So '(skgRepos ...)' goes
+on those four, each writing the datums it has.
+****** DONE AGREED : nodeRepo is input, relRepo is display; both fit
+'(repo X)' is save input: where the node's file lives.
+relRepo is a display fact, written today only when it differs
+from the default, which 'default_relRepo'
+('server/types/misc.rs') computes from ownership and the
+privacy order in the config. A client cannot recompute that
+from names, so the server must keep saying it. Two ways: keep
+writing relRepo only when it is raised, so that its presence
+is the signal, as today; or always write it and add a bare
+'relRepoRaised' to the display facts. I would write it
+always, so that the form states the truth and the herald
+reads a fact of its own. The request stays
+'(editRequest (relRepo X))'.
+****** DONE why "herald" is in the name, and the fix
+The atom carries a rendered label: 'org_to_text.rs' writes
+"⌂:" followed by the skgrepo's configured herald label
+('herald_label' in the config), and the client's rule echoes
+it unread. So the server chooses both glyph and label, which
+is the conflation you see. The fix: a bare 'repoBoundary'
+among the display facts, and the table from skgrepo to label
+served to the clients once, with the herald rules at connect
+time, so that the client renders "⌂:LABEL" from 'nodeRepo'.
+****** DONE a uniform grammar, with no back-compat
+One shape for every headline:
+#+begin_example
+  (skg (vnid X) [focused] [folded] [bodyFolded]
+       KIND INPUT...
+       [(view FACT...)] [(diff FACT...)])
+#+end_example
+KIND is always a bare atom ('node', 'ghost', 'unknown', the
+fifteen folders, 'alias', 'id', 'flag', the change notes,
+'tombstone'), and every part stands at the top level, so the
+form-or-top split ('fields_at') goes. INPUT is what the save
+or the refresh reads: '(gid X)', '(skgRepos ...)', 'noClaim',
+'writeProtected', '(overridesHere X)' (today hidden in
+'viewStats', though the save reads it), '(viewRequests ...)'
+and '(editRequest ...)'. '(view ...)' holds every display
+fact: 'cycle', 'repoBoundary', 'noWarrant', 'omittedBody',
+'relRepoRaised', '(props ...)', '(rels ...)', '(birth ...)';
+the parser skips the whole form with one rule in place of a
+rule per fact. '(diff ...)' holds the change facts alone: the
+readiness request moves to '(editRequest (ready ...))', so
+every request lives in one of two forms and '(diff ...)' is
+skippable too; the two moves join it as facts. The folder's
+'changed' and 'restrictedNode' are gone already. The parser's
+work is then 'vnid', the position atoms, the kind and the
+inputs; everything else it drops unread, the legacy
+rejections of top-level 'id' and 'repo' go with the rest, and
+'metadata-format.org' shrinks to a page. With '(gid X)' as
+the part, the kind atom 'id' of an ID member collides with
+nothing.
+******* DONE jeff
+Let's actually have vnid first, not last.
+INPUT is not a sexp header name, right, just a term
+you're using here to mean all that stuff?
+If it appears in code I think it needs a less ambiguous name.
+
+I like the idea of gid rather than id, now that we have vnid too.
+What is idMember?
+******** DONE Claude says: folded, and three answers
+'(vnid X)' now comes first in the shape above, and the ID
+part is '(gid X)'.
+********* DONE INPUT is a placeholder
+Like KIND and FACT, it names a class of parts in the grammar
+and never appears on the wire. If the code groups those parts
+in a type, I would not call them inputs either, since the
+refresh reads some of them too. The glossary's pair is "save
+input" and "display fact"; a pair that covers both readers is
+"declared parts" (what the client is responsible for: the
+kind, the IDs, the repos, the claim, the protection,
+'overridesHere', the requests) and "derived facts" (what the
+server computes: everything in '(view ...)' and '(diff ...)').
+In the grammar, DECLARED and FACT; in code, 'DeclaredParts',
+if a type is needed at all.
+********* DONE gid, and the word it replaces
+'gid' is unused anywhere today, and it pairs with 'vnid'. But
+the code and the docs say 'skgid' for the same thing, and
+'names.org' asks me to report synonyms: 'gid' on the wire
+with 'skgid' in the code would be a fourth word for one idea,
+beside 'ID', 'skgid' and 'pid'. I would rename 'skgid' to
+'gid' throughout, in the renames slice; 'pid' stays as the
+primary one among a node's gids. The reach, by one grep: 2284
+occurrences in 124 server files, 1076 in 103 test files, 178
+in 14 elisp files, 143 in 15 Neovim files, 5 in the docs.
+Mechanical, and a script does it, but it is the largest
+rename the rebuild would make.
+********** DONE jeff : let's do it, but
+Let's actually use 'gnid'. One could imagine assigning IDs
+to whole repos in the future and calling those GIDs.
+This parallels vnid perfectly, for less confusion.
+********* DONE idMember was mine, and is withdrawn
+I coined it in the previous reply without saying so, which I
+had promised not to do. It named the kind atom of a headline
+in the ID folder that lists one of the node's IDs, today the
+bare atom 'id' ('Property::ID'), to keep it apart from the
+part '(id X)'. With the part named '(gid X)' the collision is
+gone and the kind stays 'id'.
 * questions for Claude
-** Are there principles I've missed?
-*** Claude says: what I would add
-**** never detach; re-kind in place
+** DONE Are there principles I've missed?
+*** DONE Claude says: what I would add
+**** DONE never detach; re-kind in place
 You state it for phantoms and for diff data. Make it the law
 for every headline: the refresh's only operations are to
 change a headline's kind or marks where it stands, to
@@ -648,21 +1634,54 @@ siblings of one key, and, once at the end, to prune
 childless tombstones. Nothing moves to another parent, and
 nothing with children is deleted. "Retain as non-member" and
 your merge rule are instances.
-**** normalize before reconciling
-The per-parent rules rely on invariants the input does not
-guarantee: one editable occurrence per node, and non-members
-under every write-protected occurrence. One pass over the
-whole buffer establishes both before any parent is
-processed; then no rule needs to re-check them. Today those
-checks are spread through the walk.
-**** a fresh render is a refresh of a stub
+**** DONE normalize before reconciling
+The per-parent rules rely on one invariant of their input:
+one editable occurrence per node. Validation refuses a
+buffer that breaks it before any save
+('Multiple_Defining_Viewnodes', from
+'contradictory_instructions.rs'), and every other input to
+the refresh is the server's own output; so the refresh
+assumes it, says so in a comment, and asserts it in debug
+builds rather than re-checking. The invariant this principle
+once also named, no claims under a write-protected
+occurrence, is definitional now; the ladder's first rung
+(mark 'noClaim' on each unwarranted child of an editable
+parent) runs per parent.
+***** DONE UPDATED [Claude] one invariant, not two
+Only "one editable occurrence per node" needs a pass over the
+whole buffer. The other invariant is definitional now, and the
+ladder's first rung (mark 'noClaim' on each unwarranted child
+of an editable parent) runs per parent.
+****** DONE jeff : I'm pretty sure this already runs
+at the validation stage, before writing to the graph.
+It would be a disaster if the graph was written to,
+and only afterward we found that there were two editable
+instances of the same node, because they could contradict
+each other.
+
+Is it standard software development practice in such circumstances
+to re-run the check? My inclination is simply to state
+somewhere in the code that x assumes y.
+******* DONE Claude says: it does; state it, assert it, no re-run
+Validation refuses a buffer with two defining occurrences of
+one ID ('Multiple_Defining_Viewnodes', found by
+'contradictory_instructions.rs'), and two editable-view
+requests for one ID ('MultipleEditableViewRequestsForSameId',
+'validate_tree.rs'), before anything is written. The refresh
+sees either a buffer that passed, or the server's own output.
+So your inclination is the standard one: check at the
+boundary, and inside say "assumes one editable occurrence
+per node" and assert it in debug builds, so a future bug
+fails loudly instead of silently; re-running the check is for
+inputs nobody validated. Folded into the principle above.
+**** DONE a fresh render is a refresh of a stub
 'render_initial_view' already completes a stub of one root
 per requested node, each with a containers-folder request;
 the diff view's first drawing completes a stub over the
 straddle. If the rebuild keeps that, there is one code path,
 and refresh (refresh (b)) = refresh (b) is the test that the
 rules are consistent.
-**** the graph dictates extent only where the buffer asked
+**** DONE the graph dictates extent only where the buffer asked
 "Recompute every value the graph dictates" must not mean
 draw everything the graph has; the graph is cyclic. The
 buffer says how much is drawn: an editable occurrence shows
@@ -671,36 +1690,52 @@ write-protected occurrence shows the children the buffer
 had, corrected, with nothing added; a folder shows all its
 members. Stating this per kind is what keeps the refresh
 finite.
-**** requests are consumed, never carried
+**** DONE requests are consumed, never carried
 The output carries no view request. A request the refresh
 cannot fulfil becomes a warning, not a headline that
 pretends.
-**** the round trip through the metadata is exact
+**** DONE the round trip through the metadata is exact
 Every headline the refresh writes parses back to the same
 viewnode, and the save reads the marks the refresh meant
-('nonMember', 'writeProtected', the kind). The notes in
+('noClaim', 'writeProtected', the kind). The notes in
 'metadata-format.org' sort each part into save input or
 display fact; the rebuild should keep that sorting as a
 checked table, since "must not lie" is addressed to the
 save's reader as much as to the user.
+***** DONE UPDATED [Claude] the atom's name
+Read 'noClaim' for 'nonMember'; the principle is unchanged.
 ** Are there cases it isn't obvious how to handle?
-
 *** Claude says: those not raised above
-**** TODO Claude says: a childless occurrence no list names
+**** DONE Claude says: a childless occurrence no list names
 Node 'n' contained 'x'; another buffer's save dropped it. In
 n's buffer, x's headline has no children. Today it is
 entombstoned and pruned, so it disappears. Under "retain
 non-members" it stays, as a non-member with ⊥. The second is
 truthful and loses nothing; it also means every removal made
-elsewhere leaves a ⊥ line behind in open buffers. Which?
-**** TODO Claude says: content under a write-protected occurrence
+elsewhere leaves a ⊥ line behind in open buffers. You chose
+to keep it: it stays, claims nothing, is unwarranted, and
+carries 'noClaim' and ⊥.
+***** DONE UPDATED [Claude] in the new words
+Kept, it claims nothing and is unwarranted, so it carries
+'noClaim' and ⊥. The question, keep or drop, stands.
+****** DONE jeff : keep
+**** DONE Claude says: content under a write-protected occurrence
 Your folder rules name members, but content under a
 write-protected occurrence is also a list the graph has. I
 read your intent as: an editable occurrence's content
 behaves like an editable folder (missing members reinstated,
 graph order), while a write-protected occurrence keeps what
 the buffer had, corrected, with nothing reinstated. Right?
-**** TODO Claude says: the containerward chain
+***** DONE Claude says: closed by the extent principle
+You agreed to "the graph dictates extent only where the
+buffer asked": an editable occurrence shows its whole content
+list, a write-protected one shows the children the buffer
+had, corrected, with nothing added. That is the reading I
+asked about, so I would mark this case DONE.
+***** DONE UPDATED [Claude] claims are settled; extent is not
+The children claim nothing, by definition. What remains open
+is whether missing content is reinstated there.
+**** DONE Claude says: the containerward chain
 Under each folder member hang its containers, under those
 theirs, as write-protected non-members. Are those dictated
 by the graph (reinstate missing containers, re-kind the
@@ -709,7 +1744,21 @@ each chain level as an implicit containers folder, so the
 folder rules apply, and a container that no longer contains
 becomes a plain non-member. Today the diff view's reconciler
 rebuilds chains, and a stale member takes its chain with it.
-**** TODO Claude says: override substitution
+***** DONE Claude says: closed by extent too; I would mark DONE
+A chain node is a child of a write-protected occurrence, so
+the extent principle answers: retained and corrected (its
+warrant and kind recomputed), nothing added. One consequence
+to accept: a member's new container appears in its chain
+only when the member is drawn afresh, not on a refresh of a
+chain already there. If you want chains kept complete, the
+chain level must be declared a folder, which would put it
+under "a folder shows all its members"; the folder rules
+would then apply to it as I proposed above.
+***** DONE UPDATED [Claude] what warrants a chain node
+A chain node is warranted when the graph has the containment
+its position in the chain implies, and claims nothing, since
+its parent is write-protected. The question stands.
+**** DONE Claude says: override substitution
 A content view shows an overrider in the place of the
 overridden node, recording '(overridesHere ID)'. When the
 override relationship vanishes, the headline stands for a
@@ -720,26 +1769,106 @@ reinstated as a member beside it. Is that acceptable, or
 should the headline flip to the overridden node and keep its
 children? The first follows your rules; the second keeps the
 user's subtree attached to the member.
-**** two editable occurrences in the input
+***** DONE jeff : the first is more than acceptable
+It's much cleaner.
+**** DONE two editable occurrences in the input
 The user yanks a subtree, so the buffer holds two editable
 copies of one node. The first wins and the second is
 write-protected, as today. The graph does not dictate it,
 but the save needs it: two editable copies would be two
 sources of one node's text. The ladder under "principles"
 covers it.
-**** a root whose node vanished
-A root is a member of nothing, so it becomes a phantom and
-stays; a deleted phantom may already stand as a root today,
-and roots are never pruned. The buffer-wide tombstone
-request would then leave a tombstone root, which the rules
-allow.
-**** a restricted placeholder with children
+***** DONE Claude says: corrected: the save refuses it
+Validation refuses a saved buffer with two editable
+occurrences of one node ('Multiple_Defining_Viewnodes'), so
+the refresh never meets this case in a saved buffer, and the
+server's own output never contains it. The ladder's rung "a
+second editable occurrence becomes write-protected" applies
+to occurrences the refresh itself draws, when extending
+content reaches a node already drawn editable.
+**** DONE a root whose node vanished
+A root is a member of nothing, so it becomes a ghost and
+stays; a deleted phantom may already stand as a root today
+('validate_tree.rs' admits deleted and historical phantoms
+and unknowns as roots), and roots are never pruned. The
+buffer-wide tombstone request would then leave a tombstone
+root, which the rules allow.
+***** DONE UPDATED [Claude] a tombstone in a content view
+By your decision just below, in a content view such a root is
+entombstoned, not made a ghost; in the diff view it is a
+ghost when HEAD has the node. Whether a childless tombstone
+root is pruned is the question in my reply below.
+***** DONE jeff : not sure I understand
+Is it true that phantoms only show up in diff view,
+but Unknowns can show up anywhere?
+This seems like a case of an Unknown if
+we're outside of the diff view.
+****** DONE Claude says: ghosts anywhere; drawn only in diff mode
+Not quite. What is diff-only is the goal: only the diff view
+draws a ghost that the buffer does not yet show. But a ghost
+can stand in any view, because the refresh never deletes a
+headline with text: when a node vanishes, each occurrence of
+it is re-kinded in place into a ghost and kept until you
+tombstone it, whether the deletion happened in this buffer
+(a delete request) or in another. That is your "left in
+place" rule, and it does not depend on the mode.
+An unknown arises anywhere too, but differently: the refresh
+draws one wherever a parent's list names an ID that no node
+answers to, since the list warrants a member there and the
+headline must say so without lying.
+A root is neither case's natural home, so the ID rule you
+chose decides it: the graph has the node, an occurrence; its
+parent names it, an unknown; it has text to show, a ghost;
+none of those, a tombstone. A root's parent is the buffer
+root, which names nothing, so the second clause never holds
+for a root; the third does, since the buffer shows the old
+title and body. So a root whose node vanished is a ghost in
+every view, precarious or, when HEAD has the node, restorable;
+and it is never an unknown, in the diff view or outside it.
+Roots carry no warrant fact, as today they carry no
+'nonMember', so the ghost root shows no ⊥.
+******* DONE jeff : ah, I had misunderstood
+Let's only retain phantoms where we are in diff mode.
+Otherwise, deleted things become tombstones,
+and so are likely to vanish on refresh.
+That's not awkward, is it?
+******** DONE Claude says: not awkward; one spot to decide
+It simplifies three things. First, "precarious" goes: if a
+ghost exists only in the diff view, I would also require that
+HEAD have the node, so that every ghost is restorable and
+shows HEAD's text; a node created and deleted between commits
+leaves a tombstone like anything else, since history never
+had it. The permanence axis then has one value and disappears.
+Second, HEAD is needed only in diff mode, as today: a content
+view's refresh reads the graph alone, and the straddle stays
+the diff view's input, which reverses the "shape" decision
+above (noted there). Third, the user's tombstone requests on
+ghosts are diff-view commands. Elsewhere a vanished node's
+occurrence is entombstoned by the general rule, since no kind
+can state it; childless, it is pruned and gone, and with
+children the tombstone holds them.
+The one spot: a root. Roots are never pruned today, so in a
+content view a root whose node vanished would leave a bare
+DELETED line that only the user can remove. I would let the
+prune take a childless tombstone root too, and accept a
+buffer that may end up with no roots, which the client can
+say in a message. Agreed?
+I have added UPDATED notes where this changes earlier text:
+"shape", "tombstones", "phantoms", the ladder, the ID rule
+under "unknown", and the root case.
+********* DONE jeff : agreed
+A tombstone root can be removed like any other leaf.
+**** DONE a restricted placeholder with children
 When the restriction changes, an occurrence becomes a
 placeholder or a placeholder becomes an occurrence, in
 place. A placeholder that holds children reveals that
 something hidden has children; by your note on privacy,
 acceptable.
-**** the search buffer
+***** DONE UPDATED [Claude] no placeholder
+With the restricted kind gone, an occurrence of a now-hidden
+node becomes a tombstone holding its children, who are their
+own nodes and meet their own fate. Nothing else changes.
+**** DONE the search buffer
 Its roots are hits, members of nothing, enriched later with
 folders and stats by a second pass. If a root needs no
 warrant, the enrichment is a refresh of a buffer whose roots
