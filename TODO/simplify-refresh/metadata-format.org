@@ -1,0 +1,392 @@
+#+title: The metadata format
+#+TODO: TODO ONGOING | DONE
+
+* [Claude] What this document is
+Every org headline the server renders carries, between its bullet
+and its title, one s-expression wrapped in '(skg ...)': the
+headline's metadata. This document gives that format in full, as
+the server writes it ('server/org_to_text.rs') and reads it back
+('server/serve/parse_metadata_sexp.rs'), kind by kind, with what
+each part means, which parts a save reads and which it ignores,
+and what the headline's own text and body mean for each kind. It
+does not describe how the clients render metadata as heralds
+('docs/heralds.org') nor what the metadata editors offer
+('shared/metadata-fields.json'). It describes the code as it
+stands; where a comment in the code disagrees with the code, the
+last section says so. The vocabulary is the glossary's
+('glossary.org').
+
+** The headline
+A headline is: the org bullet (one star per level), a space, the
+metadata, a space, the title, and under it the body, if any. The
+metadata starts with '(skg' and ends with its closing paren.
+Atoms and forms inside are separated by whitespace; extra
+whitespace is ignored. An atom that would contain whitespace or
+paren syntax is written as a quoted string
+('metadata_value_atom'); IDs and skgrepo names usually need no
+quotes.
+What the title and body mean depends on the kind. For a node and
+a phantom the title is the node's title and the body its body;
+for an alias, an ID, a removed alias or a removed ID the title is
+the entry itself and the body is not read; for a flag the title
+is empty and the herald supplies a label; for a folder and a
+tombstone the server writes no title, and discards any text the
+user types there (a folder's with a warning, a tombstone's
+silently); for the old text the body holds HEAD's text, and for a
+body diff the body holds the diff.
+** (skg [focused] [folded] [bodyFolded] KIND... [(vnid X)])
+*** focused, folded and bodyFolded
+'focused' marks the viewnode that holds the cursor; 'folded'
+marks a headline whose subtree is folded, and 'bodyFolded' one
+whose body is folded. The three are written first, each only when
+true. They belong to the viewnode, not to its kind, and every
+kind may carry them.
+*** the kind
+One kind form, or one bare kind atom, says what the headline is.
+Fourteen kinds exist; the next section gives each. A kind form
+holds the kind's own parts inside its parens ('(node (id x)
+...)'); a bare kind atom's parts, when it has any, stand beside
+it at the top level ('alias (relRepo priv)'). The shared table
+calls these 'fields_at': 'form' or 'top'.
+*** the viewnode ID
+'(vnid X)' is written last, on every kind. X is one or more
+lowercase letters and digits, from the view's counter in base 36,
+two characters at least, never spelled like a number. The server
+assigns one to each viewnode that lacks one at the end of a
+completion and never reuses one; the clients save it back
+untouched. The parser accepts it once; a second is an error; one
+the view does not know is dropped before completion and replaced.
+*** order
+Inside any form the first element is its head and must come
+first; the rest carry no order. 'server/metadata_canon.rs' states
+this rule and sorts every tail for tests; the server itself
+writes the parts in a fixed order, given below for each kind, and
+the parser accepts any order.
+** The kinds
+*** unrestricted node
+#+begin_example
+  (skg [focused] [folded] [bodyFolded]
+       (node (id ID) (repo SKGREPO)
+             [nonMember] [writeProtected] [omittedBody]
+             [(rels ...)] [(viewStats ...)]
+             [(editRequest ...)] [(viewRequests ...)]
+             [(diff ...)])
+       [(vnid X)])
+#+end_example
+The ordinary node, 'Vognode::Unrestricted'. '(id ID)' is the
+node's ID as the buffer shows it, a pid or an extra ID; the save
+resolves it. '(repo SKGREPO)' is the node's home skgrepo. The
+parser treats both as optional, but the server always writes
+them. 'nonMember' says the occurrence takes no part in its
+viewparent's membership; a member carries nothing, and so does a
+root. 'writeProtected' says the occurrence is not the node's
+editable one; 'omittedBody' rides beside it when the node has a
+body the rendering hides, and the parser discards it. The four
+forms that follow are given under "The shared forms". A node's
+title and body are save input when the occurrence is editable,
+and ignored when it is write-protected.
+#+begin_example
+  (skg (node (id x) (repo main)) (vnid 0a)) a title
+  (skg (node (id x) (repo main) nonMember writeProtected
+       (diff (rel removed) (leaves 1 rel))) (vnid 0b)) x
+#+end_example
+*** restricted node
+#+begin_example
+  (skg [focused] [folded] [bodyFolded] restrictedNode [(vnid X)])
+#+end_example
+'Vognode::Restricted': an anonymous placeholder for a node whose
+skgrepo the restriction hides. It carries no ID, repo, title or
+body, since any of them would leak what the restriction hides.
+The parser also tolerates the retired list form '(restrictedNode
+...)', discarding its parts.
+*** deleted phantom
+#+begin_example
+  (skg [focused] [folded] [bodyFolded]
+       (deleted (id ID) (repo SKGREPO) [(diff ...)]) [(vnid X)])
+#+end_example
+'Phantom::Deleted': a node this save deleted, keeping its last
+title and body. It accepts no edit request; a '(diff ...)' may
+say '(node removed)'.
+*** historical phantom
+#+begin_example
+  (skg [focused] [folded] [bodyFolded]
+       (historical (id ID) (repo SKGREPO)
+                   [(editRequest restoreNode)] [(diff ...)])
+       [(vnid X)])
+#+end_example
+'Phantom::Historical', in the diff view only: a node HEAD has and
+the worktree lacks, showing HEAD's title and body. The one edit
+request it accepts is 'restoreNode'; its '(diff ...)' carries
+'(node removed)' and, under a node, '(rel removed)'. The same
+grammar reads '(deleted ...)' and '(historical ...)'.
+*** unknown phantom
+#+begin_example
+  (skg [focused] [folded] [bodyFolded]
+       (unknown (id ID)
+                [(viewStats (relRepo SKGREPO))]
+                [(editRequest (relRepo SKGREPO))]
+                [(diff ...)])
+       [(vnid X)])
+#+end_example
+'Phantom::Unknown': an ID some list names that no node answers
+to. It has no repo, title or body. Its view stats may hold only
+the relationship's relRepo, and its one edit request is a relRepo
+request; its '(diff ...)' may carry '(rel added)' or '(rel
+removed)'.
+*** tombstone
+#+begin_example
+  (skg [focused] [folded] [bodyFolded] tombstone [(vnid X)])
+#+end_example
+'ViewnodeKind::Tombstone': no ID, no change facts, no title; the
+parser discards text typed on its line. It holds only what stands
+below it. Shown DELETED.
+*** folders
+#+begin_example
+  (skg [focused] [folded] [bodyFolded] FOLDER [(vnid X)])
+  (skg [focused] [folded] [bodyFolded] (FOLDER changed)
+       [(diff (ready))] [(vnid X)])
+#+end_example
+FOLDER is one of fifteen atoms. The property folders:
+'aliasFolder', 'idFolder', 'flagsFolder'. The partner folders:
+'subscribeeFolder', 'subscriberFolder', 'overriddenFolder',
+'overriderFolder', 'hiderFolder', 'hiddenFolder',
+'hiddenInSubscribeeFolder', 'hiddenOutsideOfSubscribeeFolder',
+'containerFolder', 'mentionerFolder', and, in the diff view only,
+'acquiredByFolder' and 'acquiredFolder'. The second form is the
+diff view's: a folder shown because some member's relationship
+changed is written '(FOLDER changed)', and when every such change
+is marked ready it carries '(diff (ready))', the objectless ready
+being the folder's aggregate. Both are display facts, derived
+from the members when the buffer is rendered. A folder's '(diff
+...)' may hold nothing but that '(ready)'. A folder has no title;
+text typed on its line is discarded with a warning.
+*** property entries
+The leaves that describe a node, standing in a property folder
+or, for the diff view's, under the node they describe. Each is a
+bare atom or a small form at the top level, and all but
+'bodyDiff' may carry a '(diff ...)'.
+#+begin_example
+  alias [(relRepo SKGREPO)] [(editRequest (relRepo SKGREPO))]
+  id
+  (flag hadId | wasOverloaded | noSearchMatching)
+  removedAlias
+  removedID
+  (oldText titleAndBody | title | body)
+  bodyDiff
+  (homeSkgrepoMove (old SKGREPO) (new SKGREPO))
+  (relRepoMove (old SKGREPO) (new SKGREPO))
+  (changesetMarker content | relRepo | orderOnly)
+#+end_example
+'alias': the title is the alias; '(relRepo SKGREPO)' is the
+skgrepo recording it when that differs from the node's home, a
+display fact; the edit request asks the save to move it. 'id':
+the title is one of the node's IDs. '(flag F)': a true flag of
+the node; the leaf has no title. 'removedAlias' and 'removedID':
+an alias or extra ID the worktree lost since HEAD, the title
+being the entry; display only, under '(rel removed)'. '(oldText
+ASPECT)': the node's text at HEAD, ASPECT saying which of title
+and body changed; the leaf's title and body hold HEAD's.
+'bodyDiff': under the old text, its body the line diff. The two
+moves: the node's home skgrepo, or the relationship to the
+viewparent, moved from 'old' to 'new'. '(changesetMarker KIND)':
+a childless stand-in for a set of changes in the parent's files,
+'content' for its content list, 'relRepo' for its content
+relationships' skgrepos, 'orderOnly' for a reorder, which is
+always ready.
+*** the buffer root
+'forestRoot' names 'ViewnodeKind::BufferRoot'. The parser accepts
+it; the server never writes it, since the buffer root is the
+invisible parent of the roots.
+** The shared forms
+*** '(diff ...)': the diff view's change facts and requests
+#+begin_example
+  (diff [(node added | removed)]
+        [(rel added | removed)]
+        [(properties changed)]
+        [(leaves N OBJECT...)]
+        [(ready OBJECT...)]
+        [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])
+#+end_example
+OBJECT is 'node', 'rel' or 'all'. The parts come in this order,
+each present only when it has something to say; '(diff)' is never
+written, and the form appears at most once. The first three are
+the three kinds of change: the node's existence, the relationship
+to the viewparent's existence, and whether the node's other
+properties changed, each true only when said. '(leaves N
+OBJECT...)' lists the objects a request on this headline may name
+and how many change-forest leaves they touch; the clients read it
+and the parser ignores it. '(ready OBJECT...)' lists the objects
+whose leaves are all marked commit-ready; a bare '(ready)' marks
+a headline that lists no object, and a folder's aggregate. The
+last part is the client's readiness request, at most one, which
+the save consumes. The form sits inside '(node ...)', '(deleted
+...)', '(historical ...)' and '(unknown ...)', and at the top
+level on 'alias', 'id', a '(flag ...)', the diff view's
+properties other than 'bodyDiff', and a changed folder, where it
+may hold only '(ready)'. Everything in it but the request is a
+display fact.
+*** '(editRequest ...)': a request that the save change the graph
+#+begin_example
+  (editRequest delete)
+  (editRequest (merge ID))
+  (editRequest (relRepo SKGREPO))
+  (editRequest (flag noSearchMatching true | false))
+  (editRequest restoreRel)
+  (editRequest restoreNode)
+#+end_example
+A headline carries at most one. Inside '(node ...)': 'delete' and
+'(merge ID)' on an editable occurrence only; '(relRepo SKGREPO)'
+on any occurrence, since the relationship is the viewparent's;
+'(flag F VALUE)' for the one mutable flag ('hadId' and
+'wasOverloaded' are refused); 'restoreRel' only beside '(diff
+(rel removed))', where the save also checks the headline's
+position. Inside '(historical ...)': 'restoreNode' alone. Inside
+'(unknown ...)' and at the top level beside 'alias': '(relRepo
+SKGREPO)' alone. A save that succeeds consumes every edit request
+in the buffer; one that stops or fails leaves them.
+*** '(viewRequests ...)': requests that completion draw something
+#+begin_example
+  (viewRequests REQUEST...)
+  REQUEST = editableView | writeProtectedView
+          | writeProtectedSubtreeView | fork | flags
+          | (folder aliases | overrides | hidesFromSubs
+                    | subscribesTo | containers | mentioners)
+#+end_example
+Only inside '(node ...)'. The server writes them sorted.
+Completion fulfils each at the node's visit and drops it:
+'editableView' makes the occurrence the node's editable one and
+extends it; 'writeProtectedView' and 'writeProtectedSubtreeView'
+make it write-protected, alone or with its content subtree;
+'flags' adds the flags folder; '(folder REL)' adds the folder of
+that relation, filled from the graph. 'fork' is consumed by the
+save instead, at fork detection.
+*** '(rels ...)': the relationship stats
+#+begin_example
+  (rels (contains (in N (ancestors GEN...))
+                  (out N (ancestors GEN...)
+                         (unintegrated N (ancestors GEN...))))
+        (linksTo (in N (ancestors GEN...)
+                        (substantive N (ancestors GEN...)))
+                 (out N (ancestors GEN...)))
+        (subscribesTo ...) (overrides ...) (hidesFromSubs ...)
+        (aliases N) (extraIds N) (flags N)
+        (birth (REL in | out [GEN])...))
+#+end_example
+Only inside '(node ...)'. The semantic form the clients render as
+heralds: for each relation, how many partners the node has on
+each side, which ancestor generations account for some of them,
+and two subset counts; then the counts of aliases, extra IDs and
+true flags; then 'birth', the relationship behind this
+occurrence's position. The server assembles it in the
+viewnode-stats pass and writes it verbatim; the parser accepts
+and discards it. Its display grammar is in
+'docs/api-and-formats.org', "Stats metadata".
+*** '(viewStats ...)': facts about the position
+#+begin_example
+  (viewStats [cycle] [(overridesHere ID)] [(relRepo SKGREPO)]
+             [(homeRepoHerald ⌂:LABEL)]
+             [(homeSkgrepoMove (old SKGREPO) (new SKGREPO))]
+             [(movedLikeAncestor LETTER)])
+#+end_example
+Inside '(node ...)', and, with 'relRepo' alone, inside '(unknown
+...)'. 'cycle' says the position repeats an ancestor's node.
+'(overridesHere ID)' says the node shown here stands for the
+overridden node ID, and is the one load-bearing part: the save
+collects ID in the container's content list rather than the shown
+node's. '(relRepo SKGREPO)' is the relationship's skgrepo when it
+was raised above the default; display only, while the request to
+change it is an edit request. The last three are written and
+discarded: the home-skgrepo herald at a skgrepo boundary, and the
+two facts of the skgrepo-changes buffer. The parser keeps
+'cycle', 'overridesHere' and 'relRepo' and drops the rest.
+** What the save reads, and what it ignores
+The glossary's rule: a display fact is derived by the view and
+read by no save; a save input is what the save acts on. Per part:
+*** save input
+The kind atom or form. '(id ID)' and '(repo SKGREPO)'.
+'nonMember' and 'writeProtected', which decide whether the
+headline's text, body and members are read. Every '(editRequest
+...)', the readiness requests, and 'restoreNode' and
+'restoreRel'. '(viewRequests ...)', consumed by the completion
+that follows the save. '(overridesHere ID)'. An alias's relRepo
+request. The title and body of an editable node, of an alias and
+of an ID entry.
+*** display facts
+'omittedBody'. The whole '(rels ...)'. In '(viewStats ...)',
+everything but 'overridesHere'. In '(diff ...)', the three kinds
+of change, '(leaves ...)' and '(ready ...)'. '(FOLDER changed)'
+and its '(diff (ready))'. The diff view's properties and their
+text. The text on a folder's or a tombstone's line. '(vnid X)' is
+neither: the save keeps it on the viewnode, and completion
+reissues the unknown ones.
+*** the position atoms
+'focused', 'folded' and 'bodyFolded' are state of the buffer the
+server keeps on the viewnode and writes back; a reconciler keeps
+them on any viewnode it keeps, and the server sets a fold only on
+a viewnode it creates.
+** What completion receives from the metadata
+The survey's "What arrives" lists the fields a parsed viewnode
+carries into completion. In the metadata's terms: its kind, from
+the kind form or atom; for a node, its ID and repo, its
+membership ('nonMember' or not), its editability
+('writeProtected' or not), its view requests, and
+'overridesHere'; its position atoms; its viewnode ID; its change
+facts and readiness request, as parsed; and the edit requests,
+which the save consumes before completion runs. Everything the
+parser discards, completion derives again.
+** Where the format lives
+The writer: 'server/org_to_text.rs' ('viewnode_to_string' and the
+functions it calls, one per kind; 'change_fact_forms' for '(diff
+...)'). The reader: 'server/serve/parse_metadata_sexp.rs'
+('parse_metadata_to_viewnodemd', one parse function per form, and
+'viewnode_from_metadata', which turns the parsed record into a
+viewnode and decides the title's meaning). The order rule and the
+test helper: 'server/metadata_canon.rs'. What the editors offer
+per kind: 'shared/metadata-fields.json'. The rendering as
+heralds: 'server/heralds.rs' and 'docs/heralds.org'. The
+rendering cases, one metadata line each:
+'tests/shared/herald-rendering-cases.txt'. The prose account of
+the parts: 'docs/api-and-formats.org', "The metadata headers",
+"Metadata of the diff view", "View requests", "Edit requests",
+"Stats metadata".
+** Observations
+These are facts about the format as it stands that bear on
+simplifying it. None is a defect.
+*** the same part is accepted in several places with several rules
+'(relRepo SKGREPO)' stands at the top level beside 'alias',
+inside a node's '(viewStats ...)', and inside an unknown's; the
+request form '(editRequest (relRepo SKGREPO))' stands beside
+'alias', inside '(node ...)' and inside '(unknown ...)', each
+with its own check. '(diff ...)' is accepted in six places with
+three rules: the full form inside the four vognode forms, the
+full form at the top level on nine property kinds, and '(ready)'
+alone on a folder.
+*** kinds split by whether their parts sit inside or beside them
+Nine kinds are bare atoms with parts beside them at the top level
+('alias', 'id', the folders, the diff view's properties), and
+five are forms with their parts inside ('node', 'deleted',
+'historical', 'unknown', the restricted node's retired list
+form). The distinction has no meaning; it is history, and the
+shared table has to record it ('fields_at').
+*** two spellings of a folder
+A folder is a bare atom, or '(FOLDER changed)' when the diff view
+shows it for a change. The second spelling says what its members'
+change facts already say, and the parser accepts it only as the
+exact pair.
+*** display facts the parser must still accept
+'omittedBody', '(rels ...)', '(leaves ...)', '(ready ...)',
+'(FOLDER changed)', the home-skgrepo herald and the two
+skgrepo-change facts are written by the server, read by nobody on
+the way back, and must each be recognised by the parser so that a
+saved buffer parses. The parser has a rule per fact.
+*** retired forms the parser tolerates or names
+The list form '(restrictedNode ...)' is accepted and emptied. The
+top-level keys 'id', 'repo', 'view' and 'code' are recognised
+only to be refused with a message about the old format.
+'forestRoot' is accepted though never written.
+*** comments that lag the code
+The parser's header comment lists a '(stats ...)' form inside
+'(node ...)' with 'containsParent', 'containers', 'contents' and
+'linksIn', and a bare 'cycle' there; the code accepts neither in
+'(node ...)': there is no 'stats' key, and 'cycle' lives inside
+'(viewStats ...)'.

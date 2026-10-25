@@ -1,0 +1,87 @@
+* Rebuild buffer-refresh from scratch.
+** shape
+The input of the refresh is a graph -- the truth -- and a buffer.
+The output of refresh is a graph.
+The graph is org format plus metadata for every headline.
+** principles
+Where the buffer contradicts the graph, it is corrected or removed.
+It must not lie.
+It should recompute every value from the graph that the graph dictates.
+It should not show restricted data -- nodes or relationships,
+although if the relationships are hard to hide, whatever,
+perfect privacy is not critical.
+* kinds of thing, and what they should do
+** tombstones
+Things should be tombstoned if they are unsayable.
+(Let's say 'entombstone' only when the shorter form
+could be confused with a noun).
+Tombstones need be collected and pruned only once,
+after all other computations that produce the new buffer.
+** phantoms
+Things deleted this session are currently one kind of phantom.
+Things dredged up from version history are another.
+We should use one type for those two things,
+and distinguish them only by their
+  Permanence = version-controlled | session-lifetime
+That permanence should show up in the heralds somehow.
+
+They should be left in place,
+and
+  skg-request-phantom-tombstone ;; entombstone one phantom
+  skg-request-buffer-phantoms-tombstone ;; all of them
+available to the user.
+(Tombstones are collected postorder after those requests are fulfilled,
+before redisplay.)
+
+Phantoms should be recalculated from among their parents' children,
+in-place (to make sure we don't detach interesting descendents).
+** unknown
+This should be distinct from phantoms. I believe it already is.
+It is not tombstoned -- that would be an edit.
+** folders
+I think these rules apply to all folder kinds!
+*** restore members
+if any are missing
+*** reorder members
+to match the truth, but only if there is one
+(the graph says, not the view).
+*** retain nonmembers, with as little change as possible
+*** merge
+If the ID for a member is repeated among its siblilngs,
+those instances should be unified.
+Buffer-refresh must be able to
+trust that the children of anything write-protected are not marked members.
+That makes collecting the children of siblings with like IDs is safe:
+#+begin_example
+  * n
+  ** (editable) x
+  *** y
+  ** (write-protected) x
+  *** (nonmember) y
+#+end_example
+becomes
+#+begin_example
+  * n
+  ** (editable) x
+  *** y
+  *** (nonmember) y
+#+end_example
+which, when refresh recurses to process the children of x, then becomes
+#+begin_example
+  * n
+  ** (editable) x
+  *** y
+#+end_example
+When so unifying, if any collection is editable,
+their union is editable.
+** diff data
+This can safely be recomputed in-place
+(to make sure we don't detach interesting descendents).
+Every diff-specific node -- not just phantoms, but folders
+and maybe anything else -- should have an
+unusual-colored pac-man ghost ᗣ character as its first emoji.
+* Let's also fix some awkwardness in the metadata.
+** props counts are in (rels ...);
+there should be separate (props ...) and (rels ...).
+** birth should be a view prop, not a graph prop
+** homeSkgRepo should be in props, not viewstats
