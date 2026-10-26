@@ -2099,3 +2099,22 @@ body.
 'mark_claims'; the plan's slice 2 does not list it.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 2 (2026-10-26)
+Launched 22:22 UTC, reported 22:49 UTC: twenty-seven minutes.
+Two corrections inserted, from the agent's own findings: under
+slice 3, the rename of 'parent_is_editable' and the two
+identical dependency functions; under slice 4, the clients'
+dead special case for 'graphStats' and the pitfall built on
+it. The deviations are sound: the unknown keeps a warrant the
+printer does not write, as the docs give every child one;
+'CompoundFolderParties' holds ancestry indices, so the stats
+pass derives its generations from it; the buffer-corrections
+rename went to every server name but the two named for the
+wire field. The 'DirectoryNotEmpty' flake showed twice in the
+nextest runs, each passing alone, as the problems entries
+slice 5 fixes describe. Suites: nextest 967 of 967, Emacs
+410, Neovim 400; the integration suite was not asked of this
+slice and the one changed integration test passed alone with
+both clients.
+

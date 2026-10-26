@@ -893,6 +893,14 @@ parser's refusals of retired atoms:
 
 ** TODO Slice 3: the server's copies and shapes
 Each item cites its report finding; read it first.
+*** Corrections carried from slice 2
+Two findings of slice 2's agent, both cheap: 'parent_is_editable'
+in 'mark_claims' ('server/refresh/ladder.rs') holds
+'parent_reads_claims' and is renamed to say so (the readability
+report's item 10 names it); 'dependencies_from_uninterpreted'
+and 'dependencies_from_registered' in
+'server/serve/handlers/save_dependencies/mod.rs' have identical
+bodies and become one function.
 *** positional booleans (readability item 3)
 'Goal::ordered' and 'Goal::unordered' constructors in place of
 'Goal::new (items, bool)' at every site; named constructors or
@@ -950,6 +958,13 @@ path in the signature.
 Emacs and Neovim together; each item names both where both are
 concerned. Read the duplication report's items 2, 11, 12 and 15
 and the user-docs report's item 2 first.
+*** Corrections carried from slice 2
+Both clients still special-case a 'graphStats' form that the
+server has not written since plan 04.1, and the forward-sexp
+pitfall in 'elisp/PITFALLs.org' argues from it. Check whether
+the special cases are dead; if so delete them and rewrite or
+delete the pitfall; if the pitfall holds for another form, say
+which.
 *** a readiness request no longer blocks skg-set-relRepo
 'skg--node-edit-request-at-point-p' ('elisp/skg-metadata.el')
 skips the readiness parts of '(editRequest ...)', using
