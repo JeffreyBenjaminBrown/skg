@@ -354,7 +354,8 @@ fn normalize_relationship_backed_partner_unknowns (
       let relRepo : Option<SkgrepoName> = child_data . get (&skgid)
         . and_then (|data| data . relRepo . clone ());
       vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Unknown (
-        Unknown { skgid, relRepo, relationshipEditRequest: None }))); })
+        Unknown { skgid, relRepo, relationshipEditRequest: None,
+                  claimsMembership: true }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 

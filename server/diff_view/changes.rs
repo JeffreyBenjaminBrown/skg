@@ -415,6 +415,20 @@ pub(crate) fn entombstone_ghost (
   treeid   : NodeId,
   straddle : &GraphStraddle,
 ) -> Result<(), Box<dyn Error>> {
+  if let ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =
+    &tree . get (treeid) . ok_or ("entombstone_ghost: node not found") ?
+    . value () . kind
+  { // The parser skips the change facts by which the diff view knows
+    // what it drew, so first match the ghost's children with its
+    // content at HEAD, which gives each such child its facts again.
+    let skgid : ID = ghost . skgid . clone ();
+    let mut model : Tree<Viewnode> = Tree::new (model_root ());
+    let root : NodeId = model . root () . id ();
+    append_historical_phantom_content (
+      &mut model, root, straddle, &skgid, &BTreeSet::new () );
+    reconcile_children_with_shallowModelSubtree (
+      tree, treeid, &model, root, &straddle . after,
+      &|_| false, &|_| true, &|_| false ) ?; }
   { let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid)
       . ok_or ("entombstone_ghost: node not found") ?;
     let viewnode : &mut Viewnode = node_mut . value ();
@@ -739,7 +753,8 @@ fn content_list (
 /// list changed ('aspects'), each holding the union of the list: the
 /// old order where the LCS puts a removed entry, + on a gained entry,
 /// - on a lost one. A lost alias or ID is a member with a ghost
-/// warrant, written '(rel removed)' ('PropertyMember').
+/// warrant, known by its '(rel removed)', which claims no membership
+/// ('PropertyMember').
 fn append_changed_property_folders (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -756,7 +771,7 @@ fn append_changed_property_folders (
       union_with_existence ( &before . alias_texts (), &after . alias_texts () )
       . into_iter ()
       . map ( |(text, existence)| entry_viewnode (
-        PropertyMember::Alias { text, relRepo : None, relationshipEditRequest : None },
+        PropertyMember::alias ( text, None, None ),
         existence ) )
       . collect () ); }
   if aspects . extra_ids {
@@ -767,7 +782,7 @@ fn append_changed_property_folders (
       tree, treeid, Folder::ID,
       union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
       . map ( |(skgid, existence)| entry_viewnode (
-        PropertyMember::ID { skgid }, existence ) )
+        PropertyMember::id (skgid), existence ) )
       . collect () ); }
   if aspects . flags {
     append_property_folder (
@@ -782,7 +797,7 @@ fn append_changed_property_folders (
             (true,  true)  => None,
             (false, false) => return None, };
         Some ( entry_viewnode (
-          PropertyMember::Flag { flag, title : String::new (), body : None },
+          PropertyMember::flag ( flag, String::new (), None ),
           existence )) } )
       . collect () ); }
   }

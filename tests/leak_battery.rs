@@ -301,7 +301,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
           & s_ref . value () . kind
         else { return Err ("S is not an Unrestricted vognode" . into ()); };
-        Ok ( t . viewStats . rel_heralds . clone () ) };
+        Ok ( t . viewStats . rel_heralds . rels . clone () ) };
       // In the semantic wire the subscription shows as a `subscribes`
       // relation; gated out at public, present under `all`. (S's only
       // subscription here is to its buffer-parent C.)

@@ -283,11 +283,11 @@ fn visit_aliasFolder (
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewnodeKind::PropertyMember (PropertyMember::Alias {
-            text, relationshipEditRequest, .. })
+            text, relationshipEditRequest, claimsMembership, .. })
             = &child . value() . kind
-          { // An alias with a ghost warrant, one the worktree lost, is
-            // not read.
-            if ! child . value () . is_ghostWarranted ()
+          { // An alias that claims no membership, one the worktree
+            // lost, is not read.
+            if *claimsMembership
                && seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
                                 RelationshipEditRequest::relRepo_of (
@@ -360,7 +360,8 @@ fn visit_hiddenOutside_folder (
               if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
               members . push (t . skgid . clone ()); },
-          ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
+          ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+            if unknown . claimsMembership => {
             if RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . skgid . clone ()); },
@@ -426,7 +427,8 @@ fn partnerFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+        if unknown . claimsMembership =>
           members . push ((unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       _ => {}, }}
@@ -451,7 +453,8 @@ fn subscribeeFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+        if unknown . claimsMembership =>
           members . push ((unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       _ => {}, }}
@@ -485,7 +488,8 @@ fn content_members (
             // the original member it is shown in place of.
             t . collected_skgid (),
             RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+        if unknown . claimsMembership =>
         // An Unknown is save-inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination skgrepo sticky.
@@ -511,7 +515,8 @@ fn visible_content_members (
           // collected_id: a shown overrider presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_skgid ()); },
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
+        if unknown . claimsMembership =>
         visible . push (unknown . skgid . clone ()),
       _ => {}, }}
   visible }

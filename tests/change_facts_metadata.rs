@@ -1,14 +1,14 @@
 // cargo nextest run --test grouped_unit -E 'test(change_facts_metadata::)'
 //
-// The diff view's metadata form '(diff ...)' -- its parts '(node
-// ...)', '(rel ...)', '(properties changed)', '(ready ...)',
-// '(readyRequest ...)' and '(unreadyRequest ...)' -- on every
-// viewnode that carries it, and a changed folder's '(diff (ready))': each
-// renders, then parses back to the same viewnode. Its '(leaves ...)'
-// renders and parses back to nothing.
+// The diff view's derived facts '(diff ...)' -- its parts '(node
+// ...)', '(rel ...)', '(properties changed)', '(leaves ...)' and
+// '(ready ...)' -- and the readiness requests '(editRequest (ready
+// ...))' and '(editRequest (unready ...))', on every viewnode that
+// carries them: each renders; the parser skips '(diff ...)' whole and
+// reads the readiness request back.
 
 use crate::git_fixture_helpers::with_facts;
-use skg::org_to_text::{FolderChangeFacts, folder_change_facts, viewnode_to_string};
+use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::maybe_placed_viewnode::MpViewnode;
@@ -16,10 +16,9 @@ use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangeFacts, DiffChange, Existence, Ghost, LeavesFact, Unknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
-  Folder, ViewnodeKind, Vognode, mk_editable_viewnode,
-  mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
+  ViewnodeKind, Vognode, mk_editable_viewnode,
+  mk_writeProtected_viewnode, viewnode_of};
 
-use ego_tree::{NodeId, Tree};
 use std::collections::{BTreeSet, HashMap};
 
 fn objects (
@@ -53,7 +52,8 @@ fn request (
   Some ( ReadinessRequest { ready, objects : objects (on) } ) }
 
 /// Render 'node', check its metadata against 'expected', parse it
-/// back, and check that the result is 'node' again.
+/// back, and check that the result is 'node' without its change
+/// facts, which the parser skips, and with its readiness request.
 fn assert_round_trip (
   node     : Viewnode,
   expected : &str,
@@ -68,10 +68,11 @@ fn assert_round_trip (
     viewnode_from_metadata (
       &metadata, node . title () . to_string (), node . body () . cloned () );
   assert_eq! ( error, None );
-  assert_eq! ( Viewnode::try_from (parsed) . unwrap (), node ); }
+  assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
+               Viewnode { change_facts : ChangeFacts::default (), .. node } ); }
 
 #[test]
-fn a_vognode_round_trips_its_change_readiness_and_request () {
+fn a_vognode_renders_its_change_and_readiness_and_round_trips_its_request () {
   assert_round_trip (
     with_facts (
       mk_editable_viewnode (
@@ -79,7 +80,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
       facts ( Some (Existence::Added), Some (Existence::Removed),
               Some (&[DiffObject::Node, DiffObject::Rel]) ),
       request (true, &[DiffObject::All]) ),
-    "node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (rel removed) (ready node rel) (readyRequest all))" );
+    "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready all)) (diff (node added) (rel removed) (ready node rel))" );
   // A readiness request is allowed on a write-protected occurrence.
   assert_round_trip (
     with_facts (
@@ -88,7 +89,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
         true ),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       request (false, &[DiffObject::Rel]) ),
-    "node (gnid b) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (ready) (unreadyRequest rel))" );
+    "node (gnid b) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready rel)) (diff (rel added) (ready))" );
   // A modified node: its other properties changed, and '(ready all)'
   // says every leaf it records is marked.
   assert_round_trip (
@@ -99,10 +100,19 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
       modified ( Some (Existence::Added),
                  Some (&[DiffObject::Rel, DiffObject::All]) ),
       request (false, &[DiffObject::Rel, DiffObject::All]) ),
-    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (ready rel all) (unreadyRequest rel all))" ); }
+    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready rel all)) (diff (rel added) (properties changed) (ready rel all))" ); }
+
+/// A node's own edit request and its readiness request share one
+/// '(editRequest ...)', the readiness request last.
+#[test]
+fn an_edit_request_and_a_readiness_request_share_one_form () {
+  let metadata : ViewnodeMetadata = parse_metadata_to_viewnodemd (
+    "(skg node (gnid a) (editRequest delete (ready node)))" ) . unwrap ();
+  assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Node]) );
+  assert! ( metadata . edit_request . is_some () ); }
 
 #[test]
-fn ghosts_and_unknowns_round_trip_their_change_facts () {
+fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
@@ -111,43 +121,59 @@ fn ghosts_and_unknowns_round_trip_their_change_facts () {
           restoreNode_request : false, tombstone_request : false, } ))),
       facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
       request (false, &[DiffObject::Node]) ),
-    "ghost (gnid d) (skgRepos (nodeRepo main)) (diff (node removed) (ready node) (unreadyRequest node))" );
+    "ghost (gnid d) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (ready node))" );
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-          skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None, } ))),
+          skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None,
+          claimsMembership : true, } ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
-    "unknown (gnid u) (diff (rel added) (readyRequest))" ); }
+    "unknown (gnid u) (editRequest (ready)) (diff (rel added))" ); }
 
 #[test]
-fn property_leaves_round_trip_their_change_facts () {
+fn property_leaves_round_trip_their_readiness_requests () {
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
-        text : "an alias" . into (), relRepo : None, relationshipEditRequest : None, } )),
+      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias (
+        "an alias" . into (), None, None ))),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       None ),
     "alias (diff (rel added) (ready))" );
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
-        skgid : ID::from ("x"), } )),
-      facts ( None, Some (Existence::Removed), None ),
+      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::id (
+        ID::from ("x") ))),
+      facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
-    "id (diff (rel removed) (readyRequest))" );
+    "id (editRequest (ready)) (diff (rel added))" );
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Flag {
-        flag : Flag::NoSearchMatching, title : String::new (), body : None, } )),
+      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::flag (
+        Flag::NoSearchMatching, String::new (), None ))),
       facts ( None, Some (Existence::Added), None ),
       None ),
     &format! ( "(flag {}) (diff (rel added))", Flag::NoSearchMatching . wire_name () )); }
 
-/// '(leaves N OBJECT...)' is written before '(ready ...)', and the
-/// parser accepts and ignores it: the view derives it again.
+/// An alias or ID the worktree lost: HEAD alone warrants it, it claims
+/// no membership, and the claim is what the parser reads back.
 #[test]
-fn the_leaves_fact_renders_and_parses_back_to_nothing () {
+fn a_ghost_warranted_property_member_claims_nothing () {
+  let lost_id : Viewnode = with_facts (
+    viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
+      skgid : ID::from ("x"),
+      claimsMembership : false,
+      isWarranted : skg::types::viewnode::Warrant::ByGraph } )),
+    facts ( None, Some (Existence::Removed), None ),
+    request (true, &[]) );
+  assert_round_trip (
+    lost_id,
+    "id noClaim (editRequest (ready)) (view ghostWarrant) (diff (rel removed))" ); }
+
+/// '(leaves N OBJECT...)' is written before '(ready ...)'; the parser
+/// skips the whole '(diff ...)'.
+#[test]
+fn the_leaves_fact_renders_and_the_parser_skips_it () {
   let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let mut change_facts : ChangeFacts =
     facts ( None, Some (Existence::Added), Some (&[DiffObject::Rel]) );
@@ -160,17 +186,14 @@ fn the_leaves_fact_renders_and_parses_back_to_nothing () {
   let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
   assert_eq! ( rendered,
                "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (ready rel))" );
-  let metadata : ViewnodeMetadata =
-    parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) ) . unwrap ();
-  assert_eq! ( metadata . change_facts,
-               facts ( None, Some (Existence::Added), Some (&[DiffObject::Rel]) ));
-  let marker : &str = "(skg (changesetMarker content) (diff (leaves 3 all) (readyRequest all)))";
-  assert! ( parse_metadata_to_viewnodemd (marker) . is_ok (), "{}", marker ); }
+  let marker : &str = "(skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 3 all)))";
+  assert_eq! ( parse_metadata_to_viewnodemd (marker) . unwrap () . readiness_request,
+               request (true, &[DiffObject::All]) ); }
 
-/// Every part of '(diff ...)' together, in their order, and each
-/// part alone; a headline with nothing to say carries no '(diff ...)'.
+/// Every part of '(diff ...)' together, in their order; a headline
+/// with nothing to say carries no '(diff ...)'.
 #[test]
-fn each_part_of_the_diff_form_round_trips_together_and_alone () {
+fn each_part_of_the_diff_form_renders_together_and_alone () {
   let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let mut change_facts : ChangeFacts =
     facts ( Some (Existence::Added), Some (Existence::Added), Some (&[DiffObject::Node]) );
@@ -182,130 +205,52 @@ fn each_part_of_the_diff_form_round_trips_together_and_alone () {
     change_facts, request (true, &[DiffObject::Rel]) );
   let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
   assert_eq! ( rendered,
-               "node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (ready node) (readyRequest rel))" );
-  let metadata : ViewnodeMetadata =
-    parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) ) . unwrap ();
-  assert_eq! ( metadata . change_facts,
-               facts ( Some (Existence::Added), Some (Existence::Added),
-                       Some (&[DiffObject::Node]) ));
-  assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Rel]) );
-  let alias = || viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
-    text : "an alias" . into (), relRepo : None, relationshipEditRequest : None, } ));
+               "node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready rel)) (diff (node added) (rel added) (leaves 2 node rel) (ready node))" );
+  let alias = || viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias (
+    "an alias" . into (), None, None )));
   assert_round_trip (
-    with_facts ( alias (), facts ( None, Some (Existence::Removed), None ), None ),
-    "alias (diff (rel removed))" );
+    with_facts ( alias (), facts ( None, Some (Existence::Added), None ), None ),
+    "alias (diff (rel added))" );
   assert_round_trip (
     with_facts ( alias (), facts ( None, None, Some (&[]) ), None ),
     "alias (diff (ready))" );
   assert_round_trip (
     with_facts ( alias (), ChangeFacts::default (), request (false, &[]) ),
-    "alias (diff (unreadyRequest))" );
+    "alias (editRequest (unready))" );
   assert_round_trip (
     with_facts ( alias (), ChangeFacts::default (), None ),
-    "alias" );
-  let marker : &str = "(skg (changesetMarker content) (diff (leaves 1 all)))";
-  assert_eq! ( parse_metadata_to_viewnodemd (marker) . unwrap () . change_facts,
-               ChangeFacts::default () ); }
+    "alias" ); }
 
+/// What the parser refuses about the derived facts and the readiness
+/// requests. Inside '(diff ...)' and '(view ...)' it reads nothing, so
+/// it refuses nothing there.
 #[test]
-fn malformed_change_facts_are_refused () {
+fn malformed_facts_and_readiness_requests_are_refused () {
   for metadata in [
     "(skg tombstone (diff (rel added)))",             // a tombstone carries none
-    "(skg aliasFolder (diff (rel added)))",           // a folder's only fact is '(ready)'
-    "(skg aliasFolder (diff (leaves 1)))",
-    "(skg (aliasFolder changed) (diff (ready all)))", // its '(ready)' names no object
-    "(skg (aliasFolder changed) (diff (readyRequest)))",
-    "(skg (aliasFolder changed) (ready))",            // a folder's ready is in '(diff ...)'
-    "(skg (aliasFolder sideways))",                   // a folder's form is '(KIND changed)'
-    "(skg node (gnid a) (diff (node added) (node removed)))", // a part twice
-    "(skg node (gnid a) (diff (rel added) (rel added)))",
-    "(skg node (gnid a) (diff (properties changed) (properties changed)))",
-    "(skg node (gnid a) (diff (node added removed)))",       // one existence
-    "(skg node (gnid a) (diff (node)))",
-    "(skg node (gnid a) (diff (rel sideways)))",
-    "(skg node (gnid a) (diff (properties)))",               // only '(properties changed)'
-    "(skg node (gnid a) (diff (properties added)))",
-    "(skg node (gnid a) (diff (readyRequest) (unreadyRequest node)))", // two requests
-    "(skg node (gnid a) (diff (readyRequest sideways)))",
-    "(skg alias (ready))",                            // a property's ready is in '(diff ...)'
-    "(skg node (gnid a) (ready node))",               // so is a node's
-    "(skg node (gnid a) (diff node))",                // a part is a list
-    "(skg node (gnid a) (diff (sideways)))",          // an unknown part
-    "(skg node (gnid a) (diff (presence rel+)))",
-    "(skg node (gnid a) (diff (ready)) (diff (rel added)))", ] { // two forms
+    "(skg aliasFolder (diff (ready)))",               // nor does a folder
+    "(skg (aliasFolder changed))",                    // a folder is its bare atom
+    "(skg bodyDiff (editRequest (ready)))",           // a body diff takes no request
+    "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (view noWarrant))",
+    "(skg node (gnid a) (editRequest (ready) (unready node)))", // two requests
+    "(skg node (gnid a) (editRequest (ready sideways)))",
+    "(skg node (gnid a) (editRequest delete (merge b)))",       // two edit requests
+    "(skg id (editRequest (relRepo main)))",          // an id takes only readiness
+    "(skg alias (ready))",                            // a request is in '(editRequest ...)'
+    "(skg node (gnid a) (ready node))",
+    "(skg node (gnid a) (diff (ready)) (diff (rel added)))", // two forms
+    "(skg node (gnid a) (view cycle) (view noWarrant))",
+    // retired spellings
+    "(skg node (gnid a) (readyRequest all))",
+    "(skg node (gnid a) (unreadyRequest node))",
+    "(skg node (gnid a) (rels (contains (in 1))))",
+    "(skg node (gnid a) (viewStats cycle))",
+    "(skg node (gnid a) writeProtected omittedBody)",
+    "(skg node (gnid a) (homeRepoHerald main))", ] {
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
-              "should refuse {}", metadata ); }}
-
-/// A changed folder's readiness, '(diff (ready))', parses; the facts
-/// of a folder are display facts, derived from its members, so its
-/// viewnode carries none.
-#[test]
-fn a_changed_folders_readiness_parses_and_is_dropped () {
-  let metadata : ViewnodeMetadata =
-    parse_metadata_to_viewnodemd ("(skg (containerFolder changed) (diff (ready)))")
-    . unwrap ();
-  let (parsed, error, _warning) : (MpViewnode, _, _) =
-    viewnode_from_metadata (&metadata, String::new (), None);
-  assert_eq! ( error, None );
-  let viewnode : Viewnode = Viewnode::try_from (parsed) . unwrap ();
-  assert_eq! ( viewnode . kind,
-               ViewnodeKind::Folder (Folder::Container) );
-  assert_eq! ( viewnode . change_facts, ChangeFacts::default () ); }
-
-/// The facts of a folder holding 'members', as the renderer derives
-/// them.
-fn facts_of_folder_holding (
-  members : &[Viewnode],
-) -> Option<FolderChangeFacts> {
-  let mut tree : Tree<Viewnode> = Tree::new (
-    viewnode_of ( ViewnodeKind::Folder (Folder::Subscribee) ));
-  let folder : NodeId = tree . root () . id ();
-  for member in members {
-    tree . get_mut (folder) . unwrap () . append (member . clone ()); }
-  folder_change_facts ( tree . get (folder) . unwrap () ) }
-
-/// A folder is shown as changed when some member carries a '(rel
-/// ...)' part, and is ready when each such membership is: a member
-/// whose '(leaves ...)' lists 'rel' when its '(ready ...)' names
-/// 'rel'; any other when it carries a '(ready ...)'. A relationship
-/// the member records nothing of leaves the folder unchanged.
-#[test]
-fn a_folder_is_ready_when_each_changed_membership_is () {
-  let rel_leaf = |ready : Option<&[DiffObject]>| -> ChangeFacts {
-    let mut change_facts : ChangeFacts = facts ( None, Some (Existence::Added), ready );
-    change_facts . leaves = Some ( LeavesFact {
-      count : 2, objects : objects (&[DiffObject::Node, DiffObject::Rel]) } );
-    change_facts };
-  let member = |id : &str| -> Viewnode {
-    mk_writeProtected_viewnode (
-      ID::from (id), SkgrepoName::from ("main"), id . into (),
-      true ) };
-  let rel_ready : Viewnode = with_facts (
-    member ("ready"), rel_leaf ( Some (&[DiffObject::Rel]) ), None );
-  let rel_unready : Viewnode = with_facts (
-    member ("unready"), rel_leaf ( Some (&[DiffObject::Node]) ), None );
-  let unknown_ready : Viewnode = {
-    let mut change_facts : ChangeFacts = facts ( None, Some (Existence::Added), Some (&[]) );
-    change_facts . leaves = Some ( LeavesFact { count : 1, objects : BTreeSet::new () } );
-    with_facts ( mk_unknown_viewnode (ID::from ("unknown")), change_facts, None ) };
-  let entry_unready : Viewnode = with_facts (
-    viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
-      text : "an alias" . into (), relRepo : None, relationshipEditRequest : None } )),
-    facts ( None, Some (Existence::Removed), None ),
-    None );
-  let unchanged : Viewnode = with_facts (
-    member ("unchanged"), facts ( Some (Existence::Added), None, Some (&[DiffObject::Node]) ),
-    None );
-  let ready   : Option<FolderChangeFacts> = Some ( FolderChangeFacts { ready : true } );
-  let unready : Option<FolderChangeFacts> = Some ( FolderChangeFacts { ready : false } );
-  assert_eq! ( facts_of_folder_holding (&[ rel_ready . clone () ]), ready );
-  assert_eq! ( facts_of_folder_holding (&[ rel_unready . clone () ]), unready );
-  assert_eq! ( facts_of_folder_holding (&[ unknown_ready . clone () ]), ready );
-  assert_eq! ( facts_of_folder_holding (&[ entry_unready . clone () ]), unready );
-  assert_eq! ( facts_of_folder_holding (&[ unchanged . clone () ]), None );
-  assert_eq! ( facts_of_folder_holding (
-                 &[ rel_ready . clone (), unknown_ready . clone (), unchanged ] ),
-               ready );
-  assert_eq! ( facts_of_folder_holding (
-                 &[ rel_ready, rel_unready, unknown_ready, entry_unready ] ),
-               unready ); }
+              "should refuse {}", metadata ); }
+  for metadata in [
+    "(skg node (gnid a) (diff (sideways)) (view (anything at all)))",
+    "(skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1)))", ] {
+    assert! ( parse_metadata_to_viewnodemd (metadata) . is_ok (),
+              "should skip the facts of {}", metadata ); }}

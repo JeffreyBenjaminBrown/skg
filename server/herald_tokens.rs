@@ -5,8 +5,9 @@
 //! colors, order, and layout (see elisp/heralds-minor-mode.el and
 //! nvim/lua/skg/heralds.lua). No presentation lives here anymore.
 //!
-//! Wire shape (a relation/side/sub-list is omitted when it would be
-//! empty apart from its key):
+//! Wire shape, three forms inside a node's '(view ...)' (a form,
+//! relation, side or sub-list is omitted when it would be empty apart
+//! from its key):
 //!   (rels
 //!     (contains          (in  COUNT (ancestors GEN...))
 //!                        (out COUNT (ancestors GEN...)))
@@ -15,11 +16,9 @@
 //!     (hidesFromSubs (in ...) (out ...))
 //!     (linksTo          (in COUNT (ancestors GEN...)
 //!                            (substantive COUNT (ancestors GEN...)))
-//!                        (out COUNT (ancestors GEN...)))
-//!     (aliases  K)
-//!     (extraIds K)
-//!     (flags K)
-//!     (birth (RELNAME SIDE [GEN])...))
+//!                        (out COUNT (ancestors GEN...))))
+//!   (props (aliases K) (extraIds K) (flags K))
+//!   (birth (RELNAME SIDE [GEN])...)
 //! GEN is an ancestor generation: 1 = viewparent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
 //! Each birth fact names a relation explaining why this occurrence is
@@ -203,11 +202,27 @@ fn links_sexp (
   if let Some (s) = out { inner . push (s); }
   Some ( format! ("(linksTo {})", inner . join (" ")) ) }
 
-/// Emit the semantic `(rels ...)` form for a node from its member
-/// counts, alias/extra-id/flag counts, ancestor flags, and birth relations.
-/// None when there is nothing to say. Relations are emitted in a fixed
-/// order for a stable wire, but order is not meaningful (the client
-/// re-orders; the tests canonicalize).
+/// The three semantic forms of a node's relationship heralds, each
+/// None when it has nothing to say.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RelationshipHeralds {
+  pub rels  : Option<String>, // '(rels ...)': the relations
+  pub props : Option<String>, // '(props ...)': the property counts
+  pub birth : Option<String>, // '(birth ...)': why it stands here
+}
+
+impl RelationshipHeralds {
+  /// The forms that have something to say, in their order on the wire.
+  pub fn forms (&self) -> impl Iterator<Item = &String> {
+    [ &self . rels, &self . props, &self . birth ]
+      . into_iter () . flatten () }
+}
+
+/// Emit the semantic '(rels ...)', '(props ...)' and '(birth ...)'
+/// forms for a node from its member counts, alias/extra-id/flag
+/// counts, ancestor flags, and birth relations. Relations are emitted
+/// in a fixed order for a stable wire, but order is not meaningful
+/// (the client re-orders; the tests canonicalize).
 pub fn relationship_heralds_sexp (
   counts    : &RelationCounts,
   aliases   : usize,
@@ -216,7 +231,10 @@ pub fn relationship_heralds_sexp (
   flags     : &AncestorFlags,
   birth     : &[BirthFact],
   unintegrated : Option<usize>,
-) -> Option<String> {
+) -> RelationshipHeralds {
+  let form = |head : &str, parts : Vec<String>| -> Option<String> {
+    ( ! parts . is_empty () )
+      . then ( || format! ("({} {})", head, parts . join (" ")) ) };
   let mut parts : Vec<String> = Vec::new ();
   if let Some (s) = contains_sexp (
     counts, flags, unintegrated) { parts . push (s); }
@@ -233,12 +251,14 @@ pub fn relationship_heralds_sexp (
   if let Some (s) = relation_sexp (
     NodeRelation::HidesFromSubs . relation_name (), counts . hiders, &flags . hides_in,
     counts . hides, &flags . hides_out) { parts . push (s); }
-  if aliases   > 0 { parts . push ( format! ("(aliases {})",  aliases) ); }
-  if extra_ids > 0 { parts . push ( format! ("(extraIds {})", extra_ids) ); }
-  if flag_count > 0 {
-    parts . push ( format! ("(flags {})", flag_count) ); }
-  if ! birth . is_empty () {
-    let facts : Vec<String> = birth . iter () . map ( |fact| fact . sexp () ) . collect ();
-    parts . push ( format! ("(birth {})", facts . join (" ")) ); }
-  if parts . is_empty () { None }
-  else { Some ( format! ("(rels {})", parts . join (" ")) ) } }
+  let props : Vec<String> =
+    [ ("aliases", aliases), ("extraIds", extra_ids), ("flags", flag_count) ]
+    . into_iter ()
+    . filter ( |(_, count)| *count > 0 )
+    . map ( |(key, count)| format! ("({} {})", key, count) )
+    . collect ();
+  RelationshipHeralds {
+    rels  : form ("rels", parts),
+    props : form ("props", props),
+    birth : form ("birth",
+                  birth . iter () . map ( |fact| fact . sexp () ) . collect () ), } }

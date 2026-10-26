@@ -139,17 +139,28 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?;
     let atoms : [&str; 14] = [
-      "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
-      "ghost (gnid gc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
-      "(diff (rel removed))) kept", // a surviving member under gone
-      "unknown (gnid ghost) (diff (rel removed))",
+      "ghost (gnid gone) (skgRepos (nodeRepo main))",
+      "ghost (gnid gc) (skgRepos (nodeRepo main))",
+      ") kept", // a surviving member under gone
+      "unknown (gnid ghost)",
       "(oldText titleAndBody)", "bodyDiff",
       "(homeSkgrepoMove (old main) (new elsewhere))",
       "(relRepoMove (old main) (new elsewhere))",
       "(changesetMarker content)", "(changesetMarker relRepo)",
       "(changesetMarker orderOnly)",
       "acquiredFolder", "acquiredByFolder",
+      "ghost (gnid acquired) (skgRepos (nodeRepo main))" ];
+    // The change facts the diff view derives. Saved as a content
+    // view, the buffer derives none, and the parser skips them, so
+    // only the buffer as drawn holds them.
+    let change_facts : [&str; 4] = [
+      "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
+      "ghost (gnid gc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
+      "(diff (rel removed))) kept",
       "ghost (gnid acquired) (skgRepos (nodeRepo main)) (diff (node removed))" ];
+    for facts in change_facts {
+      assert! ( without_viewnode_ids (&buffer) . contains (facts),
+                "the buffer should hold {}:\n{}", facts, buffer ); }
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let mut saved : String = buffer;
     for _ in 0 .. 2 {
@@ -179,9 +190,9 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?
       . replace ( "(skg (oldText titleAndBody))",
-                  "(skg (oldText titleAndBody) (diff (readyRequest)))" )
+                  "(skg (oldText titleAndBody) (editRequest (ready)))" )
       . replace ( "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
-                  "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (readyRequest node))" );
+                  "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (ready node)) (diff (node removed) (rel removed))" );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
@@ -201,7 +212,7 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     let response : SaveResponse = save ( f,
       &response . saved_view . replacen (
         "(changesetMarker content))",
-        "(changesetMarker content) (diff (readyRequest all)))", 1 )) ?;
+        "(changesetMarker content) (editRequest (ready all)))", 1 )) ?;
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     assert! ( ReadinessStore::load (&f . config . data_root) . marks
               . contains_key (&p_contains_gone) );

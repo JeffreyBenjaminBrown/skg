@@ -32,21 +32,21 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 const X_REMOVED_FROM_B : &str =
-  "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels";
+  "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (viewStats noWarrant cycle)";
+  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
   "*** (skg node (gnid s) (skgRepos (nodeRepo main)) noClaim writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
-  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (viewStats noWarrant)";
+  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant)";
 const G_UNDER_Q : &str =
   "** (skg ghost (gnid g)";
 const GC_UNDER_G : &str =
   "*** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim writeProtected";
 const GC_REMOVED_FROM_R : &str =
-  "** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim (viewStats noWarrant) (diff";
+  "** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim (view noWarrant) (diff";
 
 /// g's file at HEAD, as the save writes a node.
 const G_AT_HEAD : &str =
@@ -99,8 +99,8 @@ fn restoring_a_removed_content_member () -> Result<(), Box<dyn Error>> {
               "the request is consumed:\n{}", response . saved_view );
     assert_lines_in_order ( &response . saved_view, &[
       // b no longer differs from HEAD, and x is its member again
-      "* (skg node (gnid b) (skgRepos (nodeRepo main)) (rels (contains (out 1)))) b",
-      "** (skg node (gnid x) (skgRepos (nodeRepo main)) (rels (contains (in 3 (ancestors 1)) (out 1)) (birth (contains in 1)))) x" ] );
+      "* (skg node (gnid b) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) b",
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) (view (rels (contains (in 3 (ancestors 1)) (out 1))) (birth (contains in 1)))) x" ] );
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }
 
@@ -205,7 +205,9 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
       ( GC_REMOVED_FROM_R, "restoreNode", RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
       ( "* (skg node (gnid q) ", "restoreRel", RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ), ] {
       let refusal : String = match save ( f, &requesting (&buffer, prefix, request) ) {
-        Err (e) => e . to_string (),
+        Err (e) => match e . downcast_ref::<SaveError> () {
+          Some (save_error) => format_save_error_as_org (save_error),
+          None => e . to_string (), },
         Ok (response) => format! ( "{:?}", response . errors ), };
       assert! ( refusal . contains (message)
                 && refusal . contains ("- viewnode ID: ")
@@ -257,7 +259,7 @@ fn restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member (
       let requested : String = edit_line (
         &buffer, D_IN_THE_CHAIN_UNDER_C,
         |line : &str| line . replacen (
-          "(viewStats noWarrant))", &format! ("(viewStats noWarrant) {})", parts), 1 ));
+          "(view noWarrant))", &format! ("{} (view noWarrant))", parts), 1 ));
       assert_ne! ( requested, buffer );
       let refusal : String = match save (f, &requested) {
         Err (e) => match e . downcast_ref::<SaveError> () {

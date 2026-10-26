@@ -1,69 +1,67 @@
 /// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
 ///
 /// Format ('METADATA_GRAMMAR'): one shape for every headline,
-///   (skg (vnid X) [ ] [focused] [folded] [bodyFolded] KIND PART...)
+///   (skg (vnid X) [focused] [folded] [bodyFolded] KIND DECLARED...
+///        [(view FACT...)] [(diff FACT...)])
 /// KIND a bare atom, or for a few kinds a small form naming its
 /// parameter, and every part beside it at the top level, in any order.
-/// The kinds and the parts each takes ('parts_of_kind'):
+/// '(view ...)' and '(diff ...)' hold the derived facts the server
+/// writes, which nobody reads back: the parser skips each whole.
+/// The kinds and the declared parts each takes ('parts_of_kind'):
 ///   node [(gnid ID)] [(skgRepos [(nodeRepo REPO)] [(relRepo REPO)])]
 ///        [noClaim]          ; the occurrence claims no membership
 ///        [writeProtected]   ; marks the occurrence write-protected
 ///        [(overridesHere ID)]
-///        [omittedBody] [(rels ...)]
-///        [(viewStats [noWarrant] [cycle] [(homeRepoHerald LABEL)]
-///                    [(homeSkgrepoMove ...)] [(movedLikeAncestor X)])]
-///        [(editRequest <delete | (merge ID) | (relRepo REPO)
-///                      | (flag FLAG true|false) | restoreRel>)]
+///        [(editRequest [<delete | (merge ID) | (relRepo REPO)
+///                       | (flag FLAG true|false) | restoreRel>]
+///                      [(ready OBJECT...) | (unready OBJECT...)])]
 ///        [(viewRequests REQUEST...)]
-///        [(diff [(node added|removed)]
-///               [(rel added|removed)]
-///               [(properties changed)]
-///               [(leaves N OBJECT...)]
-///               [(ready OBJECT...)]
-///               [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]
 ///     where OBJECT is node, rel or all. A headline naming no kind is
 ///     a node.
 ///   ghost (gnid ID) (skgRepos (nodeRepo REPO))
-///         [(editRequest restoreNode)] [(viewRequests tombstone)] [(diff ...)]
-///   unknown (gnid ID) [(skgRepos (relRepo REPO))]
-///           [(editRequest (relRepo REPO))] [(diff ...)]
-///   alias [(skgRepos (relRepo REPO))] [(editRequest (relRepo REPO))]
-///         [(diff ...)]
-///   id, (flag hadId | wasOverloaded | noSearchMatching),
+///         [(editRequest [restoreNode] [READINESS])]
+///         [(viewRequests tombstone)]
+///   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
+///           [(editRequest [(relRepo REPO)] [READINESS])]
+///   alias [(skgRepos (relRepo REPO))] [noClaim]
+///         [(editRequest [(relRepo REPO)] [READINESS])]
+///   id [noClaim] [(editRequest READINESS)],
+///   (flag hadId | wasOverloaded | noSearchMatching) [(editRequest READINESS)],
 ///   and the diff view's own viewnodes
 ///     (oldText titleAndBody | title | body)
 ///     (homeSkgrepoMove (old REPO) (new REPO))
 ///     (relRepoMove (old REPO) (new REPO))
 ///     (changesetMarker content | relRepo | orderOnly)
-///   each of which may carry a '(diff ...)';
-///   bodyDiff, tombstone and forestRoot, which carry nothing;
-///   a folder, its bare atom, or '(FOLDER changed)' for one the diff
-///   view shows because of a change, which may carry '(diff (ready))'
-///   and nothing else in its diff.
-/// 'restoreRel' is valid only on a node carrying '(rel removed)': a
-/// removed member, or a folder member whose relationship to the
-/// folder's viewparent was removed. Which of those the headline is
-/// depends on where it stands, which the save checks
-/// ('validate_restoreRel_position', local.rs). It may sit beside
-/// 'writeProtected'.
+///   each of which may carry '(editRequest READINESS)';
+///   bodyDiff, tombstone, forestRoot and the folders' bare atoms,
+///   which carry nothing.
+/// READINESS is '(ready OBJECT...)' or '(unready OBJECT...)'.
+/// A node, an alias, an id and a flag may carry '(view ...)'; every
+/// kind that takes an editRequest may carry '(diff ...)'.
+/// 'restoreRel' asks to restore a removed membership; where it may
+/// stand the save checks ('restoreRel_stands_where_it_may', local.rs),
+/// and the save drops one that names no relationship HEAD records. It
+/// may sit beside 'writeProtected'.
 /// The viewnode ID, '(vnid X)', X being one or more lowercase letters
 /// and digits, comes first when written.
 /// A retired spelling ('(node ...)', '(ghost ...)' or '(unknown ...)' as
 /// a form, '(deleted ...)', '(historical ...)', '(id X)', '(repo R)', a
-/// top-level '(relRepo R)', a relRepo or overridesHere inside
-/// '(viewStats ...)', 'nonMember', 'restrictedNode') is refused with
-/// a message naming the grammar.
+/// top-level '(relRepo R)', '(FOLDER changed)', '(rels ...)',
+/// '(viewStats ...)', 'omittedBody' or '(homeRepoHerald ...)' outside
+/// '(view ...)', '(readyRequest ...)', '(unreadyRequest ...)',
+/// 'nonMember', 'restrictedNode') is refused with a message naming the
+/// grammar.
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, Existence, FoldAndFocus, ReadinessRequest,
+  ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder,
   Ghost, Unknown,
-  Editability, RelationshipEditRequest, ViewnodeId,
+  Editability, RelationshipEditRequest, ViewnodeId, Warrant,
 };
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
@@ -87,6 +85,8 @@ pub struct ViewnodeMetadata {
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
   pub skgid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
+  // False when the headline carries 'noClaim': on a node, an alias,
+  // an id or an unknown.
   pub claimsMembership: bool,
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
@@ -95,10 +95,8 @@ pub struct ViewnodeMetadata {
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
-  // The parts of the diff view's '(diff ...)' form, its facts and
-  // readiness request, on whichever vognode or property
-  // leaf carries it.
-  pub change_facts: ChangeFacts,
+  // The readiness request inside '(editRequest ...)', on whichever
+  // headline carries it.
   pub readiness_request: Option<ReadinessRequest>,
   pub property_relRepo : Option<SkgrepoName>,
   pub property_relRepo_request : Option<SkgrepoName>,
@@ -128,7 +126,6 @@ pub fn default_metadata() -> ViewnodeMetadata {
     edit_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
-    change_facts: ChangeFacts::default(),
     readiness_request: None,
     property_relRepo : None,
     property_relRepo_request : None,
@@ -167,6 +164,7 @@ pub fn viewnode_from_metadata (
               relRepo         : metadata . unknown_relRepo . clone (),
               relationshipEditRequest : metadata . unknown_relRepo_request . clone ()
                 . map (RelationshipEditRequest::RelRepo),
+              claimsMembership : metadata . claimsMembership,
             } )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
@@ -222,20 +220,20 @@ pub fn viewnode_from_metadata (
           // Use headline title for string
           MpViewnodeKind::PropertyMember (PropertyMember::Alias { .. }) =>
             MpViewnodeKind::PropertyMember (PropertyMember::Alias {
-                              text: title . clone (),
-                              relRepo:
-                                metadata . property_relRepo . clone (),
-                              relationshipEditRequest:
-                                metadata . property_relRepo_request . clone ()
-                                . map (RelationshipEditRequest::RelRepo) }),
+              text : title . clone (),
+              relRepo : metadata . property_relRepo . clone (),
+              relationshipEditRequest : metadata . property_relRepo_request . clone ()
+                . map (RelationshipEditRequest::RelRepo),
+              claimsMembership : metadata . claimsMembership,
+              isWarranted : Warrant::ByGraph }),
           MpViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
             MpViewnodeKind::PropertyMember (PropertyMember::ID {
-                              skgid: title . clone () . into () }),
+              skgid : title . clone () . into (),
+              claimsMembership : metadata . claimsMembership,
+              isWarranted : Warrant::ByGraph }),
           MpViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
-            MpViewnodeKind::PropertyMember (PropertyMember::Flag {
-              flag : *flag,
-              title    : title . clone (),
-              body     : body . clone () }),
+            MpViewnodeKind::PropertyMember (PropertyMember::flag (
+              *flag, title . clone (), body . clone () )),
           MpViewnodeKind::Folder (Folder::Flags { .. }) =>
             MpViewnodeKind::Folder (Folder::Flags {
               title : title . clone (), body : body . clone () }),
@@ -315,20 +313,11 @@ pub fn viewnode_from_metadata (
         ( node_kind,
           error, None ) }
     };
-  let never_carries_a_change : bool = // so the facts parsed are dropped
-    matches! ( kind,
-               MpViewnodeKind::Folder (_)
-               | MpViewnodeKind::BufferRoot
-               | MpViewnodeKind::Tombstone
-               | MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) );
   ( MpViewnode { foldAndFocus      : metadata . foldAndFocus,
                  kind,
-                 change_facts      :
-                   if never_carries_a_change { ChangeFacts::default () }
-                   else { metadata . change_facts . clone () },
-                 readiness_request :
-                   if never_carries_a_change { None }
-                   else { metadata . readiness_request . clone () },
+                 // derived facts, which the parser skips
+                 change_facts      : ChangeFacts::default (),
+                 readiness_request : metadata . readiness_request . clone (),
                  viewnode_id       : metadata . viewnode_id . clone () },
     error, warning ) }
 
@@ -355,10 +344,12 @@ fn maybeplaced_kind_error_label (
 /// The grammar every headline's metadata follows, named by the
 /// parser's refusal of a retired spelling.
 pub const METADATA_GRAMMAR : &str =
-  "(skg (vnid X) [focused] [folded] [bodyFolded] KIND PART...), \
+  "(skg (vnid X) [focused] [folded] [bodyFolded] KIND DECLARED... \
+   [(view FACT...)] [(diff FACT...)]), \
    KIND a bare atom (node, ghost, unknown, alias, id, tombstone, a folder, ...) \
-   and every part beside it at the top level, among them (gnid X) and \
-   (skgRepos (nodeRepo R) [(relRepo R)])";
+   and every declared part beside it at the top level, among them (gnid X), \
+   (skgRepos (nodeRepo R) [(relRepo R)]) and (editRequest ...), \
+   which holds the readiness requests (ready OBJECT...) and (unready OBJECT...)";
 
 /// The refusal of a retired spelling.
 fn retired_spelling (
@@ -385,24 +376,28 @@ fn parts_of_kind (
   match kind {
     MetadataKind::Node =>
       &[ "gnid", "skgRepos", "noClaim", "writeProtected",
-         "overridesHere", "omittedBody", "rels", "viewStats",
-         "editRequest", "viewRequests", "diff" ],
+         "overridesHere", "editRequest", "viewRequests", "view", "diff" ],
     MetadataKind::Ghost =>
       &[ "gnid", "skgRepos", "editRequest", "viewRequests", "diff" ],
     MetadataKind::Unknown =>
-      &[ "gnid", "skgRepos", "editRequest", "diff" ],
+      &[ "gnid", "skgRepos", "noClaim", "editRequest", "diff" ],
     MetadataKind::Tombstone => &[],
     MetadataKind::Other (MpViewnodeKind::PropertyMember (
       PropertyMember::Alias { .. } )) =>
-      &[ "skgRepos", "editRequest", "diff" ],
+      &[ "skgRepos", "noClaim", "editRequest", "view", "diff" ],
+    MetadataKind::Other (MpViewnodeKind::PropertyMember (
+      PropertyMember::ID { .. } )) =>
+      &[ "noClaim", "editRequest", "view", "diff" ],
+    MetadataKind::Other (MpViewnodeKind::PropertyMember (
+      PropertyMember::Flag { .. } )) =>
+      &[ "editRequest", "view", "diff" ],
     MetadataKind::Other (
-      MpViewnodeKind::PropertyMember (_)
-      | MpViewnodeKind::Folder (_)
-      | MpViewnodeKind::ChangeViewnode (
+      MpViewnodeKind::ChangeViewnode (
         ChangeViewnode::OldText { .. }
         | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
-        | ChangeViewnode::ChangesetMarker { .. } )) => &[ "diff" ],
+        | ChangeViewnode::ChangesetMarker { .. } )) =>
+      &[ "editRequest", "diff" ],
     MetadataKind::Other (_) => &[], } }
 
 /// The name of 'kind' in an error message.
@@ -461,16 +456,6 @@ pub fn parse_metadata_to_viewnodemd (
         return Err ( "An unknown requires its (gnid X)" . to_string () ); },
     MetadataKind::Tombstone => result . is_tombstone = true,
     MetadataKind::Other (other) => result . non_vognode = Some (other), }
-  let is_folder : bool = matches! ( result . non_vognode,
-    Some ( MpViewnodeKind::Folder (_) ));
-  let holds_only_an_objectless_ready : bool =
-    result . change_facts == ChangeFacts {
-      ready : Some (BTreeSet::new ()), .. ChangeFacts::default () }
-    && result . readiness_request . is_none ();
-  if is_folder && parts . iter () . any ( |(name, _)| name == "diff" )
-     && ! holds_only_an_objectless_ready
-  { return Err ( "A folder's diff may hold only an objectless (ready)"
-                 . to_string () ); }
   check_where_the_edit_request_sits (&result) ?;
   Ok (result) }
 
@@ -497,23 +482,23 @@ fn classify_metadata_element (
                           Ok (( String::new (), None )) },
         "bodyFolded" => { metadata . foldAndFocus . bodyFolded = true;
                           Ok (( String::new (), None )) },
-        "noClaim" | "writeProtected" | "omittedBody" => part (&atom),
+        "noClaim" | "writeProtected" => part (&atom),
         "node"       => a_kind (MetadataKind::Node),
         "ghost"      => a_kind (MetadataKind::Ghost),
         "unknown"    => a_kind (MetadataKind::Unknown),
         "tombstone"  => a_kind (MetadataKind::Tombstone),
         "alias"      => a_kind ( MetadataKind::Other (
-          MpViewnodeKind::PropertyMember ( PropertyMember::Alias {
-            text : String::new (), relRepo : None,
-            relationshipEditRequest : None } ))),
+          MpViewnodeKind::PropertyMember (
+            PropertyMember::alias ( String::new (), None, None ) ))),
         "id"         => a_kind ( MetadataKind::Other (
           MpViewnodeKind::PropertyMember (
-            PropertyMember::ID { skgid : ID::default () } ))),
+            PropertyMember::id ( ID::default () ) ))),
         "forestRoot" => a_kind ( MetadataKind::Other (MpViewnodeKind::BufferRoot) ),
         "bodyDiff"   => a_kind ( MetadataKind::Other (
           MpViewnodeKind::ChangeViewnode (
             ChangeViewnode::BodyDiff { diff : String::new () } ))),
-        "nonMember" | "restrictedNode" => Err ( retired_spelling (&atom) ),
+        "nonMember" | "restrictedNode" | "omittedBody" =>
+          Err ( retired_spelling (&atom) ),
         folder_atom if folder_kind_of_atom (folder_atom) . is_some () =>
           a_kind ( MetadataKind::Other (
             folder_kind_of_atom (folder_atom) . expect ("a folder") )),
@@ -528,8 +513,8 @@ fn classify_metadata_element (
           metadata . viewnode_id = Some ( ViewnodeId::parse (
             & single_argument (&head, args) ? ) ? );
           Ok (( String::new (), None )) },
-        "gnid" | "skgRepos" | "rels" | "viewStats" | "overridesHere"
-          | "editRequest" | "viewRequests" | "diff" => part (&head),
+        "gnid" | "skgRepos" | "overridesHere"
+          | "editRequest" | "viewRequests" | "view" | "diff" => part (&head),
         "oldText" => {
           let aspect : String = single_argument (&head, args) ?;
           let (title_changed, body_changed) : (bool, bool) =
@@ -565,21 +550,13 @@ fn classify_metadata_element (
           let flag : Flag = Flag::from_wire_name (&name)
             . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
           a_kind ( MetadataKind::Other ( MpViewnodeKind::PropertyMember (
-            PropertyMember::Flag {
-              flag, title : String::new (), body : None } ))) },
+            PropertyMember::flag ( flag, String::new (), None ) ))) },
         "node" | "ghost" | "unknown" | "deleted" | "historical"
-          | "id" | "repo" | "relRepo" =>
+          | "id" | "repo" | "relRepo" | "rels" | "viewStats"
+          | "homeRepoHerald" | "readyRequest" | "unreadyRequest" =>
           Err ( retired_spelling ( &format! ( "({} ...)", head )) ),
-        folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
-          // '(KIND changed)': a folder the diff view shows
-          // because of a change. A display fact, like its '(diff
-          // (ready))'.
-          if args . len () != 1
-            || atom_to_string (&args[0]) ? != "changed" {
-            return Err ( format! (
-              "A folder form must be ({} changed)", folder_atom )); }
-          a_kind ( MetadataKind::Other (
-            folder_kind_of_atom (folder_atom) . expect ("a folder") )) },
+        folder_atom if folder_kind_of_atom (folder_atom) . is_some () =>
+          Err ( retired_spelling ( &format! ( "({} ...)", folder_atom )) ),
         _ => Err ( format! ( "Unknown metadata key: {}", head )), }},
     _ => Err ( format! ( "Unexpected element in metadata sexp: {:?}",
                          element )), }}
@@ -602,7 +579,7 @@ fn read_metadata_part (
       metadata . claimsMembership = false,
     "writeProtected" =>
       metadata . writeProtected = true,
-    "omittedBody" | "rels" => {}, // derived facts the view regenerates
+    "view" | "diff" => {}, // derived facts, skipped whole
     "gnid" => {
       let gnid : ID = ID::from ( single_argument (name, args) ? );
       if matches! (kind, MetadataKind::Unknown) {
@@ -628,8 +605,6 @@ fn read_metadata_part (
           if matches! (kind, MetadataKind::Unknown) {
             metadata . unknown_relRepo = relRepo;
           } else { metadata . property_relRepo = relRepo; }}, }},
-    "viewStats" =>
-      parse_viewstats_sexp ( args, &mut metadata . viewStats ) ?,
     "overridesHere" =>
       // Load-bearing: save extraction round-trips the original ID
       // through it.
@@ -650,18 +625,26 @@ fn read_metadata_part (
         if let Some (message) = misplaced_restore_request_message (
              &request_metadata . edit_request, false ) {
           return Err (message); }
-        if request_metadata . edit_request . is_some () {
+        let takes_a_relRepo_request : bool =
+          matches! ( kind,
+            MetadataKind::Unknown
+            | MetadataKind::Other ( MpViewnodeKind::PropertyMember (
+                PropertyMember::Alias { .. } )));
+        if request_metadata . edit_request . is_some ()
+           || ( request_metadata . relRepo_request . is_some ()
+                && ! takes_a_relRepo_request ) {
           return Err ( format! (
-            "A headline of kind {} accepts only an editRequest relRepo",
-            kind_name (kind) )); }
+            "A headline of kind {} accepts no edit request but {}",
+            kind_name (kind),
+            if takes_a_relRepo_request { "(relRepo R) and a readiness request" }
+            else { "a readiness request" } )); }
+        metadata . readiness_request = request_metadata . readiness_request;
         if matches! (kind, MetadataKind::Unknown) {
           metadata . unknown_relRepo_request = request_metadata . relRepo_request;
         } else {
           metadata . property_relRepo_request = request_metadata . relRepo_request; }}, },
     "viewRequests" =>
       parse_viewrequests_sexp ( args, &mut metadata . view_requests ) ?,
-    "diff" =>
-      parse_diff_form ( args, metadata ) ?,
     other => return Err ( format! ( "Unknown metadata part: {}", other )), }
   Ok (( )) }
 
@@ -697,9 +680,8 @@ fn misplaced_restore_request_message (
 
 /// A ghost carries no edit request but restoreNode, and no view
 /// request but tombstone, which nothing else carries; restoreRel sits
-/// only on an unrestricted vognode that carries '(rel removed)', and
-/// the save checks its position. The other requests keep the places
-/// their own checks give them.
+/// only on an unrestricted vognode, and the save checks its position.
+/// The other requests keep the places their own checks give them.
 fn check_where_the_edit_request_sits (
   metadata : &ViewnodeMetadata,
 ) -> Result<(), String> {
@@ -719,9 +701,7 @@ fn check_where_the_edit_request_sits (
   match &metadata . edit_request {
     Some (NodeEditRequest::RestoreNode) if metadata . is_ghost =>
       Ok (( )),
-    Some (NodeEditRequest::RestoreRel)
-      if is_unrestricted_vognode
-      && metadata . change_facts . change . rel == Some (Existence::Removed) =>
+    Some (NodeEditRequest::RestoreRel) if is_unrestricted_vognode =>
       Ok (( )),
     request @ Some (NodeEditRequest::RestoreNode | NodeEditRequest::RestoreRel) =>
       Err ( misplaced_restore_request_message (
@@ -801,107 +781,103 @@ fn parse_skgRepos (
                  . to_string () ); }
   Ok (( nodeRepo, relRepo )) }
 
-/// Parse the (viewStats ...) s-expression contents: the bare-atom
-/// 'cycle' stat, the discarded bare atom 'noWarrant', and the
-/// discarded keyed 'homeRepoHerald' / 'homeSkgrepoMove' /
-/// 'movedLikeAncestor' sub-forms. Relationship stats are semantic
-/// display-only '(rels ...)' facts, parsed and discarded beside it.
-fn parse_viewstats_sexp (
-  items         : &[Sexp],
-  stats         : &mut ViewnodeStats,
-) -> Result<(), String> {
-  for element in items {
-    match element {
-      Sexp::Atom (_) => {
-        let bare_value : String =
-          atom_to_string (element) ?;
-        match bare_value . as_str () {
-          "cycle"          => stats . cycle = true,
-          "noWarrant"      => {}, // output-only, silently discard
-          _ => {
-            return Err ( format! ( "Unknown viewStats value: {}",
-                                    bare_value )); }} },
-      Sexp::List (form) if form . first () . is_some_and (
-        |head| matches! ( atom_to_string (head) . as_deref (),
-                          Ok ("homeSkgrepoMove") | Ok ("movedLikeAncestor") )) => {
-        // Output-only facts of the diff view's skgrepo-changes
-        // buffer, recomputed after completion: silently discard.
-      },
-      Sexp::List (kv_pair) if kv_pair . len () == 2 => {
-        let key : String = atom_to_string ( &kv_pair[0] ) ?;
-        match key . as_str () {
-          "homeRepoHerald" => {}, // output-only, silently discard
-          "overridesHere" | "relRepo" =>
-            return Err ( retired_spelling ( &format! (
-              "(viewStats ({} ...))", key )) ),
-          _ => { return Err ( format! (
-            "Unknown viewStats key: {}", key )); }} },
-      _ => { return Err ( "Unexpected element in viewStats"
-                           . to_string () ); }} }
-  Ok (( )) }
-
-
-/// Parse the (editRequest ...) s-expression contents.
+/// Parse the (editRequest ...) s-expression contents: at most one
+/// edit request, and at most one readiness request, '(ready
+/// OBJECT...)' or '(unready OBJECT...)'.
 fn parse_editrequest_sexp (
   items : &[Sexp],
   metadata : &mut ViewnodeMetadata
 ) -> Result<(), String> {
-  if items . len () != 1 {
-    return Err ( "editRequest requires exactly one request" . to_string () ); }
+  if items . is_empty () {
+    return Err ( "editRequest requires a request" . to_string () ); }
+  let mut edit_requests : usize = 0;
   for element in items {
-    match element {
-      Sexp::List (subitems) if subitems . len () == 2 => {
-        let key : String =
-          atom_to_string ( &subitems[0] ) ?;
-        if key == "merge" {
-          let id_str : String =
-            atom_to_string ( &subitems[1] ) ?;
-          metadata . edit_request = Some (
-            NodeEditRequest::NodeMerge ( ID::from (id_str)));
-        } else if key == "relRepo" {
-          let skgrepo : String = atom_to_string ( &subitems[1] ) ?;
-          metadata . relRepo_request =
-            Some ( SkgrepoName::from (skgrepo) );
-        } else {
-          return Err ( format! ( "Unknown editRequest key: {}", key )); }
-      },
-      Sexp::List (subitems) if subitems . len () == 3 => {
-        let key : String = atom_to_string (&subitems [0]) ?;
-        if key != "flag" {
-          return Err ( format! (
-            "Unknown three-part editRequest key: {}", key )); }
-        let flag_name : String = atom_to_string (&subitems [1]) ?;
-        let flag : Flag =
-          Flag::from_wire_name (&flag_name)
-          . ok_or_else (|| format! (
-            "Unknown flag: {}", flag_name )) ?;
-        if ! flag . is_mutable () {
-          return Err ( format! (
-            "Flag {} is write-protected provenance and cannot be changed",
-            flag_name )); }
-        let value_name : String = atom_to_string (&subitems [2]) ?;
-        let value : bool = match value_name . as_str () {
-          "true"  => true,
-          "false" => false,
-          _ => return Err ( format! (
-            "Flag value must be true or false, got: {}", value_name )), };
+    if let Some (request) = readiness_request_of (element) ? {
+      if metadata . readiness_request . is_some () {
+        return Err ( "A viewnode may carry only one readiness request"
+                     . to_string () ); }
+      metadata . readiness_request = Some (request);
+      continue; }
+    edit_requests += 1;
+    if edit_requests > 1 {
+      return Err ( "editRequest holds at most one request beside a readiness request"
+                   . to_string () ); }
+    parse_one_edit_request (element, metadata) ?; }
+  Ok (( )) }
+
+/// The readiness request 'element' is, if it is '(ready OBJECT...)'
+/// or '(unready OBJECT...)'.
+fn readiness_request_of (
+  element : &Sexp,
+) -> Result<Option<ReadinessRequest>, String> {
+  let Sexp::List (items) = element else { return Ok (None); };
+  let Some (head) : Option<&Sexp> = items . first () else { return Ok (None); };
+  let head : String = atom_to_string (head) ?;
+  if head != "ready" && head != "unready" { return Ok (None); }
+  let atoms : Vec<String> =
+    items [1..] . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
+  Ok ( Some ( ReadinessRequest {
+    ready   : head == "ready",
+    objects : readiness_objects_from_atoms (&atoms) ?, } )) }
+
+/// Parse one edit request inside (editRequest ...).
+fn parse_one_edit_request (
+  element : &Sexp,
+  metadata : &mut ViewnodeMetadata
+) -> Result<(), String> {
+  match element {
+    Sexp::List (subitems) if subitems . len () == 2 => {
+      let key : String =
+        atom_to_string ( &subitems[0] ) ?;
+      if key == "merge" {
+        let id_str : String =
+          atom_to_string ( &subitems[1] ) ?;
         metadata . edit_request = Some (
-          NodeEditRequest::SetFlag { flag, value });
-      },
-      Sexp::Atom (_) => {
-        let bare_value : String =
-          atom_to_string (element) ?;
-        match bare_value . as_str () {
-          "delete" => metadata . edit_request = Some (NodeEditRequest::Delete),
-          "restoreNode" =>
-            metadata . edit_request = Some (NodeEditRequest::RestoreNode),
-          "restoreRel" =>
-            metadata . edit_request = Some (NodeEditRequest::RestoreRel),
-          _ => {
-            return Err ( format! ( "Unknown editRequest value: {}",
-                                    bare_value )); }} },
-      _ => { return Err ( "Unexpected element in editRequest"
-                           . to_string () ); }} }
+          NodeEditRequest::NodeMerge ( ID::from (id_str)));
+      } else if key == "relRepo" {
+        let skgrepo : String = atom_to_string ( &subitems[1] ) ?;
+        metadata . relRepo_request =
+          Some ( SkgrepoName::from (skgrepo) );
+      } else {
+        return Err ( format! ( "Unknown editRequest key: {}", key )); }
+    },
+    Sexp::List (subitems) if subitems . len () == 3 => {
+      let key : String = atom_to_string (&subitems [0]) ?;
+      if key != "flag" {
+        return Err ( format! (
+          "Unknown three-part editRequest key: {}", key )); }
+      let flag_name : String = atom_to_string (&subitems [1]) ?;
+      let flag : Flag =
+        Flag::from_wire_name (&flag_name)
+        . ok_or_else (|| format! (
+          "Unknown flag: {}", flag_name )) ?;
+      if ! flag . is_mutable () {
+        return Err ( format! (
+          "Flag {} is write-protected provenance and cannot be changed",
+          flag_name )); }
+      let value_name : String = atom_to_string (&subitems [2]) ?;
+      let value : bool = match value_name . as_str () {
+        "true"  => true,
+        "false" => false,
+        _ => return Err ( format! (
+          "Flag value must be true or false, got: {}", value_name )), };
+      metadata . edit_request = Some (
+        NodeEditRequest::SetFlag { flag, value });
+    },
+    Sexp::Atom (_) => {
+      let bare_value : String =
+        atom_to_string (element) ?;
+      match bare_value . as_str () {
+        "delete" => metadata . edit_request = Some (NodeEditRequest::Delete),
+        "restoreNode" =>
+          metadata . edit_request = Some (NodeEditRequest::RestoreNode),
+        "restoreRel" =>
+          metadata . edit_request = Some (NodeEditRequest::RestoreRel),
+        _ => {
+          return Err ( format! ( "Unknown editRequest value: {}",
+                                  bare_value )); }} },
+    _ => { return Err ( "Unexpected element in editRequest"
+                         . to_string () ); }}
   Ok (( )) }
 
 
@@ -942,71 +918,6 @@ fn parse_viewrequests_sexp (
     requests . insert (request); }
   Ok (( )) }
 
-
-/// Parse the diff view's '(diff PART...)' form, whose parts are
-/// 'args', into 'metadata'. It may appear once.
-fn parse_diff_form (
-  args     : &[Sexp],
-  metadata : &mut ViewnodeMetadata,
-) -> Result<(), String> {
-  if metadata . change_facts != ChangeFacts::default ()
-     || metadata . readiness_request . is_some () {
-    return Err ( "diff may appear only once" . to_string () ); }
-  for part in args {
-    match part {
-      Sexp::List (items) if ! items . is_empty () => {
-        let head : String = atom_to_string (&items[0]) ?;
-        parse_change_fact_part ( &head, &items[1..], metadata ) ?; },
-      _ => return Err ( "Each part of diff must be a list" . to_string () ), }}
-  Ok (( )) }
-
-/// Parse one part of the diff view's '(diff ...)' form -- '(node
-/// added|removed)', '(rel added|removed)', '(properties changed)',
-/// '(leaves N OBJECT...)', '(ready OBJECT...)', '(readyRequest
-/// OBJECT...)' or '(unreadyRequest OBJECT...)' -- whose head is 'key'
-/// and whose arguments are 'args', into 'metadata'. Each may appear once; a viewnode carries at most
-/// one readiness request. '(leaves ...)' is accepted and ignored: it
-/// serves only the clients' gestures, and the view derives it again.
-fn parse_change_fact_part (
-  key      : &str,
-  args     : &[Sexp],
-  metadata : &mut ViewnodeMetadata,
-) -> Result<(), String> {
-  let atoms : Vec<String> =
-    args . iter () . map (atom_to_string) . collect::<Result<_, _>> () ?;
-  match key {
-    "node" | "rel" => {
-      let existence : Existence = match atoms . as_slice () {
-        [ atom ] => Existence::from_wire_name (atom),
-        _ => None, }
-        . ok_or_else ( || format! (
-          "{} must be ({} added) or ({} removed)", key, key, key )) ?;
-      let slot : &mut Option<Existence> =
-        if key == "node" { &mut metadata . change_facts . change . node }
-        else { &mut metadata . change_facts . change . rel };
-      if slot . replace (existence) . is_some () {
-        return Err ( format! ( "{} may appear only once", key )); }},
-    "properties" => {
-      if atoms != [ "changed" ] {
-        return Err ( "properties must be (properties changed)" . to_string () ); }
-      if metadata . change_facts . change . properties {
-        return Err ( "properties may appear only once" . to_string () ); }
-      metadata . change_facts . change . properties = true; },
-    "ready" => {
-      if metadata . change_facts . ready . is_some () {
-        return Err ( "ready may appear only once" . to_string () ); }
-      metadata . change_facts . ready =
-        Some ( readiness_objects_from_atoms (&atoms) ? ); },
-    "leaves" => {},
-    "readyRequest" | "unreadyRequest" => {
-      if metadata . readiness_request . is_some () {
-        return Err ( "A viewnode may carry only one readiness request"
-                     . to_string () ); }
-      metadata . readiness_request = Some ( ReadinessRequest {
-        ready   : key == "readyRequest",
-        objects : readiness_objects_from_atoms (&atoms) ?, } ); },
-    other => return Err ( format! ( "Unknown part of diff: {}", other )), }
-  Ok (( )) }
 
 fn readiness_objects_from_atoms (
   atoms : &[String],

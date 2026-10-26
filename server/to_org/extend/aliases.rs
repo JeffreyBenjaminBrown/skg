@@ -67,11 +67,12 @@ pub fn build_and_integrate_aliases (
     insert_non_vognode_as_child (
       tree, aliasfolder_skgid,
       ViewnodeKind::PropertyMember (
-        PropertyMember::Alias { text: alias . member . clone (),
-                      relRepo: home . as_ref ()
-                        .and_then ( |home|
-                          if &alias . relRepo == home { None }
-                          else { Some (alias . relRepo . clone ()) } ),
-                      relationshipEditRequest: None } ),
+        PropertyMember::alias (
+          alias . member . clone (),
+          home . as_ref ()
+            .and_then ( |home|
+              if &alias . relRepo == home { None }
+              else { Some (alias . relRepo . clone ()) } ),
+          None ) ),
       false ) ?; }
   Ok (( )) }

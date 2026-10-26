@@ -2,7 +2,7 @@ use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::{SkgConfig, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
+  ChangeFacts, FoldAndFocus, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, UnrestrictedVognode,
   Ghost, Unknown, NodeEditRequest,
   RelationshipEditRequest,
@@ -91,10 +91,8 @@ fn render_view_roots_to_string <'a> (
     level    : usize,
     config   : &SkgConfig,
   ) -> Result < String, Box<dyn Error> > {
-    let viewnode : &Viewnode = node_ref . value ();
     let mut out : String =
-      viewnode_to_text_with_folder_facts (
-        level, viewnode, folder_change_facts (node_ref), config )?;
+      viewnode_to_text ( level, node_ref . value (), config )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
@@ -117,70 +115,8 @@ pub fn viewnode_to_text (
   viewnode : &Viewnode,
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
-  viewnode_to_text_with_folder_facts (level, viewnode, None, config) }
-
-/// The diff view's facts about a folder, derived from its
-/// members when the buffer is rendered: it is shown because of a
-/// change when some member carries one, and ready when every such
-/// membership's change is ready. Rendered '(KIND changed)' in place of
-/// the bare folder atom, then '(diff (ready))' when ready.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct FolderChangeFacts {
-  pub ready : bool,
-}
-
-/// None unless 'node_ref' is a folder some member of which carries a
-/// change of its relationship to the folder's viewparent: a '(rel
-/// ...)' part, or (on a member) a relRepo move.
-pub fn folder_change_facts (
-  node_ref : NodeRef<Viewnode>,
-) -> Option<FolderChangeFacts> {
-  if ! matches! ( &node_ref . value () . kind,
-                  ViewnodeKind::Folder (_) ) {
-    return None; }
-  let membership_changes : Vec<bool> = // whether each changed membership is ready
-    node_ref . children ()
-    . filter_map ( |member| {
-      let relRepo_move_ready : Option<bool> =
-        member . children () . find_map ( |child| match &child . value () . kind {
-          ViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { .. }) =>
-            Some ( child . value () . change_facts . ready . is_some () ),
-          _ => None, } );
-      let rel_ready : Option<bool> =
-        membership_change_ready (&member . value () . change_facts);
-      match (rel_ready, relRepo_move_ready) {
-        (None, None) => None,
-        (a, b) => Some ( a . unwrap_or (true) && b . unwrap_or (true) ), } } )
-    . collect ();
-  if membership_changes . is_empty () { return None; }
-  Some ( FolderChangeFacts {
-    ready : membership_changes . iter () . all ( |ready| *ready ) } ) }
-
-/// Some (whether ready) when a folder member's relationship to the
-/// folder's viewparent changed, which its '(rel ...)' part says. The
-/// membership is ready when
-/// the member's '(ready ...)' names 'rel' if its '(leaves ...)' lists 'rel',
-/// and otherwise when it carries any '(ready ...)'.
-fn membership_change_ready (
-  facts : &ChangeFacts,
-) -> Option<bool> {
-  facts . change . rel ?;
-  let rel_is_listed : bool =
-    facts . leaves . as_ref () . is_some_and (
-      |leaves| leaves . objects . contains (&DiffObject::Rel) );
-  Some ( match &facts . ready {
-    None => false,
-    Some (objects) => ! rel_is_listed
-                      || objects . contains (&DiffObject::Rel), } ) }
-
-fn viewnode_to_text_with_folder_facts (
-  level        : usize,
-  viewnode     : &Viewnode,
-  folder_facts : Option<FolderChangeFacts>,
-  config       : &SkgConfig,
-) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    viewnode_to_string_with_folder_facts (viewnode, folder_facts, config)?;
+    viewnode_to_string (viewnode, config)?;
   let title : &str = viewnode . title ();
   let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
@@ -207,44 +143,38 @@ fn viewnode_to_text_with_folder_facts (
         result . push ('\n'); }} }
   Ok (result) }
 
-pub fn viewnode_to_string (
-  viewnode : &Viewnode,
-  config   : &SkgConfig,
-) -> Result < String, Box<dyn Error> > {
-  viewnode_to_string_with_folder_facts (viewnode, None, config) }
-
 /// The parts of a viewnode's '(skg ...)' wrapper, its viewnode ID
 /// first:
-///   (vnid X) [focused] [folded] [bodyFolded] KIND PART...
-/// every part standing at the top level.
-fn viewnode_to_string_with_folder_facts (
-  viewnode     : &Viewnode,
-  folder_facts : Option<FolderChangeFacts>,
-  config       : &SkgConfig,
+///   (vnid X) [focused] [folded] [bodyFolded] KIND DECLARED...
+///            [(view FACT...)] [(diff FACT...)]
+/// every part standing at the top level, the derived facts gathered
+/// in '(view ...)' and '(diff ...)'.
+pub fn viewnode_to_string (
+  viewnode : &Viewnode,
+  _config  : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   let parts_but_the_viewnode_id : String =
-    viewnode_to_string_without_viewnode_id (viewnode, folder_facts, config) ?;
+    viewnode_to_string_without_viewnode_id (viewnode) ?;
   Ok ( match &viewnode . viewnode_id {
     None      => parts_but_the_viewnode_id,
     Some (viewnode_id) => format! ("(vnid {}) {}", viewnode_id, parts_but_the_viewnode_id), } ) }
 
 fn viewnode_to_string_without_viewnode_id (
   viewnode     : &Viewnode,
-  folder_facts : Option<FolderChangeFacts>,
-  config       : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
+  let facts   : &ChangeFacts = &viewnode . change_facts;
+  let request : &Option<ReadinessRequest> = &viewnode . readiness_request;
   match &viewnode . kind {
     ViewnodeKind::Folder (folder) =>
-      Ok ( folder_atom_metadata_to_string (
-        viewnode . foldAndFocus, folder . repr_in_client (), folder_facts )),
+      Ok ( non_vognode_atom_metadata_to_string (
+        viewnode . foldAndFocus, folder . repr_in_client () )),
     ViewnodeKind::PropertyMember (member) =>
       Ok ( propertyMember_metadata_to_string (
         viewnode . foldAndFocus, member,
-        &viewnode . change_facts, &viewnode . readiness_request )),
+        viewnode . is_ghostWarranted (), facts, request )),
     ViewnodeKind::ChangeViewnode (change) =>
       Ok ( changeViewnode_metadata_to_string (
-        viewnode . foldAndFocus, change,
-        &viewnode . change_facts, &viewnode . readiness_request )),
+        viewnode . foldAndFocus, change, facts, request )),
     ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewnodeKind::Tombstone =>
@@ -252,16 +182,13 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus )),
     ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
       Ok ( unrestrictedVognode_metadata_to_string (
-        viewnode . foldAndFocus, unrestrictedVognode,
-        &viewnode . change_facts, &viewnode . readiness_request, config )),
+        viewnode . foldAndFocus, unrestrictedVognode, facts, request )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( phantomUnknown_metadata_to_string (
-        viewnode . foldAndFocus, unknown_node,
-        &viewnode . change_facts, &viewnode . readiness_request )),
+        viewnode . foldAndFocus, unknown_node, facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
-        viewnode . foldAndFocus, ghost,
-        &viewnode . change_facts, &viewnode . readiness_request )), } }
+        viewnode . foldAndFocus, ghost, facts, request )), } }
 
 /// The position atoms a headline carries, in their order on the wire.
 fn foldAndFocus_atoms (
@@ -283,43 +210,40 @@ fn non_vognode_atom_metadata_to_string (
   parts . push (atom . to_string ());
   parts . join (" ") }
 
-/// A folder's atom, or, when it is shown because of a change,
-/// '(ATOM changed)', then '(diff (ready))' if that change is ready:
-/// the objectless '(ready)' is the folder's aggregate.
-fn folder_atom_metadata_to_string (
-  foldAndFocus    : FoldAndFocus,
-  atom            : &str,
-  folder_facts    : Option<FolderChangeFacts>,
-) -> String {
-  match folder_facts {
-    None => non_vognode_atom_metadata_to_string (
-      foldAndFocus, atom ),
-    Some (facts) => {
-      let mut metadata : String = non_vognode_atom_metadata_to_string (
-        foldAndFocus, &format! ("({} changed)", atom) );
-      if facts . ready { metadata . push_str (" (diff (ready))"); }
-      metadata }, } }
-
 fn propertyMember_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   member          : &PropertyMember,
+  ghostWarranted  : bool,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
+  let isWarranted : Warrant = match member {
+    PropertyMember::Alias { isWarranted, .. }
+      | PropertyMember::ID { isWarranted, .. }
+      | PropertyMember::Flag { isWarranted, .. } => *isWarranted, };
+  let warrant_atom : Option<String> = // a ghost warrant first: HEAD warrants it
+    if ghostWarranted { Some ( "ghostWarrant" . to_string () ) }
+    else if isWarranted == Warrant::No { Some ( "noWarrant" . to_string () ) }
+    else { None };
   match member {
-    PropertyMember::Alias { relRepo, relationshipEditRequest, .. } => {
+    PropertyMember::Alias { relRepo, relationshipEditRequest,
+                            claimsMembership, .. } => {
       parts . push ( "alias" . to_string () );
       parts . extend ( skgRepos_form ( None, relRepo . as_ref () ));
-      parts . extend ( relationshipEditRequest . as_ref ()
-                       . map (relationshipEditRequest_form) );
-      parts . extend ( change_fact_forms (facts, request) ); }
-    PropertyMember::ID { .. } => {
+      parts . extend ( noClaim_atom (*claimsMembership) );
+      parts . extend ( editRequest_form (
+        relationshipEditRequest . as_ref () . map (relationshipEditRequest_element),
+        request )); }
+    PropertyMember::ID { claimsMembership, .. } => {
       parts . push ( "id" . to_string () );
-      parts . extend ( change_fact_forms (facts, request) ); }
+      parts . extend ( noClaim_atom (*claimsMembership) );
+      parts . extend ( editRequest_form ( None, request )); }
     PropertyMember::Flag { flag, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
-      parts . extend ( change_fact_forms (facts, request) ); } }
+      parts . extend ( editRequest_form ( None, request )); } }
+  parts . extend ( view_form ( warrant_atom . into_iter () . collect () ));
+  parts . extend ( diff_form (facts) );
   parts . join (" ") }
 
 fn changeViewnode_metadata_to_string (
@@ -330,25 +254,25 @@ fn changeViewnode_metadata_to_string (
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   match change {
-    ChangeViewnode::OldText { title, body } => {
+    ChangeViewnode::OldText { title, body } =>
       parts . push ( format! ( "(oldText {})",
         match (title . is_some (), body . is_some ()) {
           (true, true)  => "titleAndBody",
           (true, false) => "title",
-          _             => "body", } ));
-      parts . extend ( change_fact_forms (facts, request) ); }
-    ChangeViewnode::BodyDiff { .. } =>
-      parts . push ( "bodyDiff" . to_string () ),
+          _             => "body", } )),
+    ChangeViewnode::BodyDiff { .. } => {
+      parts . push ( "bodyDiff" . to_string () );
+      return parts . join (" "); }
     ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
-      | ChangeViewnode::RelRepoMove { skgrepo_change } => {
+      | ChangeViewnode::RelRepoMove { skgrepo_change } =>
       parts . push ( format! ( "({} (old {}) (new {}))",
         change . repr_in_client (),
         metadata_value_atom (&skgrepo_change . old),
-        metadata_value_atom (&skgrepo_change . new) ));
-      parts . extend ( change_fact_forms (facts, request) ); }
-    ChangeViewnode::ChangesetMarker { kind } => {
-      parts . push ( format! ( "(changesetMarker {})", kind . wire_name () ));
-      parts . extend ( change_fact_forms (facts, request) ); } }
+        metadata_value_atom (&skgrepo_change . new) )),
+    ChangeViewnode::ChangesetMarker { kind } =>
+      parts . push ( format! ( "(changesetMarker {})", kind . wire_name () )), }
+  parts . extend ( editRequest_form ( None, request ));
+  parts . extend ( diff_form (facts) );
   parts . join (" ") }
 
 /// '(skgRepos [(nodeRepo R)] [(relRepo R)])': the home skgrepo of the
@@ -370,105 +294,132 @@ pub(crate) fn skgRepos_form (
   if repos . is_empty () { None }
   else { Some ( format! ( "(skgRepos {})", repos . join (" ") )) } }
 
-/// '(editRequest (relRepo R))' or '(editRequest restoreRel)'.
-fn relationshipEditRequest_form (
+/// 'noClaim' for a child that claims no membership; a claimant
+/// carries nothing.
+fn noClaim_atom (
+  claimsMembership : bool,
+) -> Option<String> {
+  ( ! claimsMembership ) . then ( || "noClaim" . to_string () ) }
+
+/// '(relRepo R)' or 'restoreRel', inside '(editRequest ...)'.
+fn relationshipEditRequest_element (
   request : &RelationshipEditRequest,
 ) -> String {
   match request {
     RelationshipEditRequest::RelRepo (skgrepo) => format! (
-      "(editRequest (relRepo {}))", metadata_value_atom (skgrepo) ),
+      "(relRepo {})", metadata_value_atom (skgrepo) ),
     RelationshipEditRequest::RestoreRel =>
-      "(editRequest restoreRel)" . to_string (), } }
+      "restoreRel" . to_string (), } }
 
-/// The diff view's one form for a viewnode, '(diff (node
-/// added|removed) (rel added|removed) (properties changed) (leaves N
-/// OBJECT...) (ready OBJECT...) REQUEST)', each part present only
-/// when it has something to say (the first three only when true).
-/// None outside the diff view, and wherever no part has: '(diff)' is
-/// never written.
-fn change_fact_forms (
-  facts   : &ChangeFacts,
-  request : &Option<ReadinessRequest>,
+/// '(editRequest [REQUEST] [(ready OBJECT...) | (unready OBJECT...)])':
+/// the headline's one edit request, if any, then its readiness
+/// request, if any. None when it has neither.
+fn editRequest_form (
+  edit_request : Option<String>,
+  readiness    : &Option<ReadinessRequest>,
 ) -> Option<String> {
-  let form = |head : &str, atoms : Vec<&str>| -> String {
-    if atoms . is_empty () { format! ("({})", head) }
-    else { format! ("({} {})", head, atoms . join (" ")) } };
+  let elements : Vec<String> =
+    edit_request . into_iter ()
+    . chain ( readiness . as_ref () . map ( |request| sexp_form (
+      request . form_head (),
+      request . objects . iter () . map ( |object| object . wire_name () )
+      . collect () )))
+    . collect ();
+  ( ! elements . is_empty () ) . then ( || format! (
+    "(editRequest {})", elements . join (" ") )) }
+
+/// '(HEAD ATOM...)', or '(HEAD)' when there are no atoms.
+fn sexp_form (
+  head  : &str,
+  atoms : Vec<&str>,
+) -> String {
+  if atoms . is_empty () { format! ("({})", head) }
+  else { format! ("({} {})", head, atoms . join (" ")) } }
+
+/// '(view FACT...)', the derived facts of a headline's position, or
+/// None when there are none: '(view)' is never written.
+fn view_form (
+  facts : Vec<String>,
+) -> Option<String> {
+  ( ! facts . is_empty () ) . then ( || format! (
+    "(view {})", facts . join (" ") )) }
+
+/// The diff view's change facts for a viewnode, '(diff (node
+/// added|removed) (rel added|removed) (properties changed) (leaves N
+/// OBJECT...) (ready OBJECT...) (homeSkgrepoMove (old R) (new R))
+/// (movedLikeAncestor X))', each part present only when it has
+/// something to say (the first three only when true). None outside
+/// the diff view, and wherever no part has: '(diff)' is never
+/// written.
+fn diff_form (
+  facts : &ChangeFacts,
+) -> Option<String> {
   let mut parts : Vec<String> = Vec::new ();
   parts . extend ( facts . change . forms () );
   if let Some (leaves) = &facts . leaves {
     let count : String = leaves . count . to_string ();
-    parts . push ( form ( "leaves",
+    parts . push ( sexp_form ( "leaves",
       once ( count . as_str () )
       . chain ( leaves . objects . iter () . map ( |object| object . wire_name () ))
       . collect () )); }
   if let Some (objects) = &facts . ready {
-    parts . push ( form ( "ready",
+    parts . push ( sexp_form ( "ready",
       objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
-  if let Some (request) = request {
-    parts . push ( form ( request . form_head (),
-      request . objects . iter () . map ( |object| object . wire_name () )
-      . collect () )); }
-  if parts . is_empty () { None }
-  else { Some ( format! ( "(diff {})", parts . join (" ") )) } }
+  if let Some (home_skgrepo_move) = &facts . home_skgrepo_move {
+    parts . push ( format! (
+      "(homeSkgrepoMove (old {}) (new {}))",
+      metadata_value_atom (&home_skgrepo_move . old),
+      metadata_value_atom (&home_skgrepo_move . new) )); }
+  if let Some (letter) = &facts . moved_like_ancestor {
+    parts . push ( format! (
+      "(movedLikeAncestor {})", metadata_value_atom (letter) )); }
+  ( ! parts . is_empty () ) . then ( || format! (
+    "(diff {})", parts . join (" ") )) }
 
 /// Render metadata for an UnrestrictedVognode:
 ///   [focused] [folded] [bodyFolded] node (gnid X)
 ///   (skgRepos (nodeRepo R) [(relRepo R)]) [noClaim] [writeProtected]
-///   [(overridesHere X)] [omittedBody] [(rels ...)] [(viewStats ...)]
-///   [(editRequest ...)] [(viewRequests ...)] [(diff ...)]
+///   [(overridesHere X)] [(editRequest ...)] [(viewRequests ...)]
+///   [(view [omittedBody] [(rels ...)] [(props ...)] [(birth ...)]
+///          [noWarrant] [cycle] [repoBoundary])]
+///   [(diff ...)]
 fn unrestrictedVognode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   unrestrictedVognode : & UnrestrictedVognode,
   facts               : & ChangeFacts,
   request             : & Option<ReadinessRequest>,
-  config              : & SkgConfig,
 ) -> String {
   fn node_parts (
     unrestrictedVognode : & UnrestrictedVognode,
     facts     : & ChangeFacts,
     request   : & Option<ReadinessRequest>,
-    config    : & SkgConfig,
   ) -> Vec < String > {
-    fn rels_herald ( unrestrictedVognode : & UnrestrictedVognode ) -> Option < String > {
-      // The semantic (rels ...) sexp, assembled in the viewnodestats
-      // pass (server/herald_tokens.rs); emitted verbatim.
-      unrestrictedVognode . viewStats . rel_heralds . clone () }
-    fn view_stats (
+    fn view_facts (
       unrestrictedVognode : & UnrestrictedVognode,
-      facts     : & ChangeFacts,
-      config    : & SkgConfig,
-    ) -> Option < String > {
-      let mut parts : Vec < String > = Vec::new ();
-      if unrestrictedVognode . viewStats . isWarranted == Warrant::No {
-        parts . push ( "noWarrant" . to_string () ); }
-      if unrestrictedVognode . viewStats . cycle {
-        parts . push ( "cycle" . to_string () ); }
-      if unrestrictedVognode . viewStats . homeSkgrepoAtBoundary {
-        if let Some (src_config)
-        = config . skgrepos . get ( &unrestrictedVognode . home_skgrepo )
-        { parts . push ( format! (
-            "(homeRepoHerald {})",
-            metadata_value_atom (
-              & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
-      if let Some (home_skgrepo_move) =
-        &facts . home_skgrepo_move {
-        parts . push ( format! (
-          "(homeSkgrepoMove (old {}) (new {}))",
-          metadata_value_atom (&home_skgrepo_move . old),
-          metadata_value_atom (&home_skgrepo_move . new) )); }
-      if let Some (letter) =
-        &facts . moved_like_ancestor {
-        parts . push ( format! (
-          "(movedLikeAncestor {})", metadata_value_atom (letter) )); }
-      if parts . is_empty () { None }
-      else { Some ( format! (
-               "(viewStats {})", parts . join (" ") )) }}
+    ) -> Vec < String > {
+      let stats = &unrestrictedVognode . viewStats;
+      let atoms = |atoms : Vec<(bool, &str)>| -> Vec<String> {
+        atoms . into_iter ()
+          . filter ( |(carried, _)| *carried )
+          . map ( |(_, atom)| atom . to_string () )
+          . collect () };
+      [ // The rendering is hiding a body (herald "B" on the ☮).
+        atoms ( vec! [ ( unrestrictedVognode . is_writeProtected ()
+                         && stats . omitted_body, "omittedBody" ) ] ),
+        // The semantic (rels ...), (props ...) and (birth ...) sexps,
+        // assembled in the viewnodestats pass
+        // (server/herald_tokens.rs); emitted verbatim.
+        stats . rel_heralds . forms () . cloned () . collect (),
+        atoms ( vec! [ ( stats . isWarranted == Warrant::No, "noWarrant" ),
+                       ( stats . cycle,                       "cycle" ),
+                       ( stats . repoBoundary,                "repoBoundary" ) ] ) ]
+        . concat () }
     fn edit_request ( unrestrictedVognode : & UnrestrictedVognode
                     ) -> Option < String > {
       if let Some (request) = &unrestrictedVognode . relationshipEditRequest {
-        return Some ( relationshipEditRequest_form (request) ); }
+        return Some ( relationshipEditRequest_element (request) ); }
       unrestrictedVognode . edit_request () . map ( | edit_req | {
-        let edit_str : String = match edit_req {
+        match edit_req {
           NodeEditRequest::NodeMerge (skgid) => format! ( "(merge {})", skgid . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
           NodeEditRequest::SetFlag { flag, value } =>
@@ -476,8 +427,7 @@ fn unrestrictedVognode_metadata_to_string (
               flag . wire_name (), value ),
           // Parsed into fields outside 'Editability', never kept here.
           NodeEditRequest::RestoreNode => "restoreNode" . to_string (),
-          NodeEditRequest::RestoreRel  => "restoreRel" . to_string () };
-        format! ( "(editRequest {})", edit_str ) } ) }
+          NodeEditRequest::RestoreRel  => "restoreRel" . to_string () } } ) }
     fn view_requests ( unrestrictedVognode : & UnrestrictedVognode
                      ) -> Option < String > {
       if unrestrictedVognode . view_requests . is_empty () { return None; }
@@ -494,9 +444,7 @@ fn unrestrictedVognode_metadata_to_string (
     parts . extend ( skgRepos_form (
       Some (&unrestrictedVognode . home_skgrepo),
       unrestrictedVognode . viewStats . relRepo . as_ref () ));
-    // A claimant carries nothing, being the default.
-    if ! unrestrictedVognode . claimsMembership {
-      parts . push ( "noClaim" . to_string () ); }
+    parts . extend ( noClaim_atom (unrestrictedVognode . claimsMembership) );
     if unrestrictedVognode . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
@@ -506,27 +454,19 @@ fn unrestrictedVognode_metadata_to_string (
       unrestrictedVognode . overridesHere {
       parts . push ( format! ("(overridesHere {})",
                                original . 0 )); }
-    if unrestrictedVognode . is_writeProtected ()
-       && unrestrictedVognode . viewStats . omitted_body {
-      // The rendering is hiding a body (herald "B" on the ☮).
-      parts . push ( "omittedBody" . to_string () ); }
-    if let Some (s) = rels_herald (unrestrictedVognode)
-    { parts . push (s); }
-    if let Some (s) = view_stats (unrestrictedVognode, facts, config)
-    { parts . push (s); }
-    if let Some (s) = edit_request (unrestrictedVognode)
-    { parts . push (s); }
-    if let Some (s) = view_requests (unrestrictedVognode)
-    { parts . push (s); }
-    parts . extend ( change_fact_forms (facts, request) );
+    parts . extend ( editRequest_form (
+      edit_request (unrestrictedVognode), request ));
+    parts . extend ( view_requests (unrestrictedVognode) );
+    parts . extend ( view_form ( view_facts (unrestrictedVognode) ));
+    parts . extend ( diff_form (facts) );
     parts }
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . extend ( node_parts (unrestrictedVognode, facts, request, config));
+  parts . extend ( node_parts (unrestrictedVognode, facts, request));
   parts . join (" ") }
 
 /// Render metadata for a ghost:
 ///   [focused] [folded] [bodyFolded] ghost (gnid X)
-///   (skgRepos (nodeRepo R)) [(editRequest restoreNode)]
+///   (skgRepos (nodeRepo R)) [(editRequest [restoreNode] [READINESS])]
 ///   [(viewRequests tombstone)] [(diff ...)]
 fn ghost_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
@@ -540,16 +480,18 @@ fn ghost_metadata_to_string (
       format! ("(gnid {})", ghost . skgid . 0) ]
     . into_iter ()
     . chain ( skgRepos_form ( Some (&ghost . home_skgrepo), None ))
-    . chain ( ghost . restoreNode_request . then (
-      || "(editRequest restoreNode)" . to_string () ))
+    . chain ( editRequest_form (
+      ghost . restoreNode_request . then ( || "restoreNode" . to_string () ),
+      request ))
     . chain ( ghost . tombstone_request . then (
       || "(viewRequests tombstone)" . to_string () ))
-    . chain ( change_fact_forms (facts, request) ) );
+    . chain ( diff_form (facts) ) );
   parts . join (" ") }
 
 /// Render metadata for an unknown:
 ///   [focused] [folded] [bodyFolded] unknown (gnid X)
-///   [(skgRepos (relRepo R))] [(editRequest (relRepo R))] [(diff ...)]
+///   [(skgRepos (relRepo R))] [noClaim]
+///   [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
 /// Triggered when a referenced ID resolved to nothing in any db.
 fn phantomUnknown_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
@@ -561,9 +503,12 @@ fn phantomUnknown_metadata_to_string (
   parts . push ( "unknown" . to_string () );
   parts . push ( format! ("(gnid {})", unknown_node . skgid . 0) );
   parts . extend ( skgRepos_form ( None, unknown_node . relRepo . as_ref () ));
-  parts . extend ( unknown_node . relationshipEditRequest . as_ref ()
-                   . map (relationshipEditRequest_form) );
-  parts . extend ( change_fact_forms (facts, request) );
+  parts . extend ( noClaim_atom (unknown_node . claimsMembership) );
+  parts . extend ( editRequest_form (
+    unknown_node . relationshipEditRequest . as_ref ()
+      . map (relationshipEditRequest_element),
+    request ));
+  parts . extend ( diff_form (facts) );
   parts . join (" ") }
 
 /// Render metadata for a tombstone:

@@ -564,7 +564,7 @@ fn the_command_makes_a_member_under_a_historical_phantom_editable (
 fn the_command_makes_a_removed_member_under_a_live_vognode_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
-    let x_under_b : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels";
+    let x_under_b : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (x_under_b), "{}", buffer );
     let requested : String = buffer . replacen (

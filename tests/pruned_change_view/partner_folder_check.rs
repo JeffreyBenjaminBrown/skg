@@ -58,7 +58,7 @@ fn a_dangling_removed_member_is_not_counted (
     let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
       &buffer, &[ "(skg node (gnid x2) (skgRepos (nodeRepo main)) writeProtected) x",
                   "(skg unknown (gnid ghost))",
-                  "(skg unknown (gnid gone) (diff (rel removed)))" ] )) ?;
+                  "(skg unknown (gnid gone) noClaim (diff (rel removed)))" ] )) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 

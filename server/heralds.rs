@@ -245,12 +245,15 @@ fn diffView_property_rules (
           ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
       . collect () ) ] }
 
-/// The label of a folder the diff view shows because of a
-/// change, '(KIND changed)', which takes the place of the folder's
-/// ordinary label: "its X changed (this file)" for a folder of the
-/// node's own lists, "(other files)" for one of its recorders. A
-/// write-protected folder's label starts with ☮, as its ordinary one
-/// does.
+/// The label of a folder the diff view shows because of a change,
+/// which takes the place of the folder's ordinary label: "its X
+/// changed (this file)" for a folder of the node's own lists, "(other
+/// files)" for one of its recorders. A write-protected folder's label
+/// starts with ☮, as its ordinary one does. The server writes no
+/// such spelling: a client that finds a member of the folder carrying
+/// a change of its relationship hands the lens '(KIND changed)' in
+/// place of the folder's atom, then '(diff (ready))' when every such
+/// change is ready.
 fn changed_folder_rules (
 ) -> Vec<RuleChild> {
   let changed = |atom : &'static str, write_protected : bool,
@@ -308,9 +311,16 @@ fn change_fact_rules_for_two_objects (
         leaf_styled_as ("existence", "added",   "~+"),
         leaf_styled_as ("existence", "removed", "~-") ]),
       rule ("ready", vec! [ leaf_abut_styled_as ("ready", "rel", "✓") ]),
-      vac ("leaves"),
-      readiness_request_rule ("readyRequest",   "request:ready"),
-      readiness_request_rule ("unreadyRequest", "request:unready") ]) ] }
+      vac ("leaves") ]) ] }
+
+/// The readiness request inside '(editRequest ...)', rendered after
+/// the change facts it acts on.
+fn readiness_request_rules (
+) -> Vec<RuleChild> {
+  vec! [
+    rule ("editRequest", vec! [
+      readiness_request_rule ("readyRequest",   "ready",   "request:ready"),
+      readiness_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
 
 /// The same for a leaf with a single diff object (a property leaf, an
 /// unknown), whose '(ready)' names no object, or
@@ -330,16 +340,16 @@ fn change_fact_rules_for_one_object (
       existence ("node"),
       existence ("rel"),
       rule ("ready", vec! [ any_abut_styled_as ("ready", "✓") ]),
-      vac ("leaves"),
-      readiness_request_rule ("readyRequest",   "request:ready"),
-      readiness_request_rule ("unreadyRequest", "request:unready") ]) ] }
+      vac ("leaves") ]) ] }
 
-/// "request:ready", then ":OBJECT" for each object the request names.
+/// "request:ready", then ":OBJECT" for each object the request names,
+/// styled under 'node_heralds_key'.
 fn readiness_request_rule (
-  label  : &'static str,
-  prefix : &'static str,
+  node_heralds_key : &'static str,
+  label            : &'static str,
+  prefix           : &'static str,
 ) -> RuleChild {
-  crule ( label,
+  crule_styled_as ( node_heralds_key, label,
           [ vec! [ s (prefix) ],
             DiffObject::ALL . into_iter ()
             . map ( |object| rule ( object . wire_name (), vec! [ s (
@@ -357,13 +367,15 @@ fn any (
 
 fn s ( text : &'static str ) -> RuleChild { RuleChild::Str (text) }
 
-/// The placeholder token the `rels` rule emits. The relationship
-/// heralds are per-character styled spans the lens engine cannot style,
-/// so the rule only positions them: it emits this sentinel where the
-/// relationship heralds belong, and the client
-/// (`heralds-from-metadata`) replaces the sentinel token with the
-/// spans it renders itself from the `(rels ...)` payload. Kept in sync
-/// with `heralds--rels-sentinel` in elisp/heralds-minor-mode.el.
+/// The placeholder token the `rels` and `props` rules emit. The
+/// relationship heralds are per-character styled spans the lens engine
+/// cannot style, so the rules only position them: each emits this
+/// sentinel where the relationship heralds belong, and the client
+/// (`heralds-from-metadata`) replaces the first sentinel token with
+/// the spans it renders itself from the `(rels ...)`, `(props ...)`
+/// and `(birth ...)` payloads of `(view ...)`, dropping any other.
+/// Kept in sync with `heralds--rels-sentinel` in
+/// elisp/heralds-minor-mode.el.
 pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 
 //
@@ -461,11 +473,19 @@ pub fn herald_rule_table () -> HeraldRule {
         . collect ()) ],
       diffView_property_rules (),
       changed_folder_rules (),
+      // A property member the graph does not relate to the node
+      // above its folder; one with a ghost warrant (HEAD alone
+      // warrants it) shows only its change facts.
+      vec! [ when ( &[ "alias", "id", "flag" ], vec! [
+        rule ("view", vec! [
+          leaf ("noWarrant", "⊥"),
+          vac ("ghostWarrant") ]) ]) ],
       // The diff view's facts on a property leaf: + and - for
-      // its existence in its folder, ✓ when ready; and a changed
-      // folder's '(diff (ready))'.
+      // its existence in its folder, ✓ when ready, then its readiness
+      // request; and a changed folder's '(diff (ready))'.
       vec! [ when ( &kinds_whose_diff_has_one_object (),
-                    change_fact_rules_for_one_object ("+", "-") ) ],
+                    [ change_fact_rules_for_one_object ("+", "-"),
+                      readiness_request_rules () ] . concat () ) ],
       vec! [
       crule ("tombstone", vec! [ s ("DELETED") ]),
       when ( &[ "unknown" ], [
@@ -478,7 +498,8 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("editRequest", vec! [
             crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
               any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
-        change_fact_rules_for_one_object ("~+", "~-") ] . concat () ),
+        change_fact_rules_for_one_object ("~+", "~-"),
+        readiness_request_rules () ] . concat () ),
       // A ghost is write-protected; its two objects are
       // its existence (∃-) and its relationship to its viewparent.
       when ( &[ "ghost" ], [
@@ -489,7 +510,8 @@ pub fn herald_rule_table () -> HeraldRule {
           // Its one edit request, beside its change facts.
           rule ("editRequest", vec! [
             leaf ("restoreNode", "restore node") ]) ],
-        change_fact_rules_for_two_objects () ] . concat () ),
+        change_fact_rules_for_two_objects (),
+        readiness_request_rules () ] . concat () ),
       when ( &[ "node" ], [ vec! [
         vac ("node"),
         vac ("gnid"),
@@ -499,17 +521,20 @@ pub fn herald_rule_table () -> HeraldRule {
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
         leaf_abut ("writeProtected", "☮"),
-        // Emitted only on a write-protected node whose graphnode has a
-        // body -- one the rendering hides. ABUT so the B rides the ☮.
-        leaf_abut ("omittedBody", "B"),
-        // The relationship heralds are per-character styled spans that
-        // the lens cannot style, so the server assembles semantic
-        // (rels ...) facts and the client renders them. This rule only positions them: the
-        // ANY child makes it match the (rels ...) list form and consumes
-        // the span sub-forms, and it emits the sentinel token, which the
-        // client swaps for the rendered spans.
-        rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
-        rule ("viewStats", vec! [
+        rule ("view", vec! [
+          // Emitted only on a write-protected node whose graphnode has a
+          // body -- one the rendering hides. ABUT so the B rides the ☮.
+          leaf_abut ("omittedBody", "B"),
+          // The relationship heralds are per-character styled spans
+          // that the lens cannot style, so the server assembles
+          // semantic (rels ...), (props ...) and (birth ...) facts and
+          // the client renders them. These rules only position them:
+          // the ANY child makes each match its list form and consume
+          // the sub-forms, and emit the sentinel token, which the
+          // client swaps for the rendered spans.
+          rule ("rels",  vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
+          rule ("props", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
+          vac ("birth"),
           // The graph does not relate the node to its viewparent as
           // its position implies (see 'Warrant').
           leaf ("noWarrant", "⊥"),
@@ -520,15 +545,18 @@ pub fn herald_rule_table () -> HeraldRule {
         vac ("overridesHere"),
         rule ("skgRepos", vec! [
           vac ("nodeRepo"),
-          // relRepo is a display fact, not a save request.  It
+          // relRepo is a derived fact, not a save request.  It
           // echoes its own value directly:
           // "~" + the skgrepo name, ugly, immediately before the ⌂
-          // homeRepoHerald below (table order is presentation order,
+          // of repoBoundary below (table order is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
           crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
-        rule ("viewStats", vec! [
-          crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]),
+        rule ("view", vec! [
+          // The node's home skgrepo differs from its nearest
+          // occurrence ancestor's, or it is a root.
+          leaf ("repoBoundary", "⌂") ]),
+        rule ("diff", vec! [
           // The skgrepo-changes buffer of the diff view: the
           // node's home skgrepo move, "-OLD +NEW", then "Δ⌂=a" when its
           // nearest moved vognode ancestor (here a) moved the same way.
@@ -562,7 +590,8 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("editableView", vec! [ s ("req:editable") ]),
           rule ("writeProtectedView", vec! [ s ("req:write-protected") ]),
           rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]) ]) ],
-        change_fact_rules_for_two_objects () ] . concat ()) ] ] . concat (),
+        change_fact_rules_for_two_objects (),
+        readiness_request_rules () ] . concat ()) ] ] . concat (),
   }}
 
 /// The kinds whose '(diff ...)' renders a single diff object: the
@@ -732,12 +761,16 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "tombstone", "ghost",
     // The parts beside them:
     "gnid", "skgRepos", "nodeRepo",
-    "writeProtected", "omittedBody",
-    // The assembled relationship-herald atom, a payload of styled spans
-    // (server/herald_tokens.rs); its span sub-forms are value position,
+    "writeProtected",
+    // The two forms of derived facts.
+    "view", "diff",
+    // The assembled relationship-herald forms inside '(view ...)'
+    // (server/herald_tokens.rs); their sub-forms are value position,
     // consumed by the client's renderer, so they are not match atoms.
-    "rels",
-    "viewStats", "editRequest", "viewRequests",
+    "rels", "props", "birth",
+    "editRequest", "viewRequests",
+    // The readiness requests inside '(editRequest ...)'.
+    "ready", "unready",
     // NodeEditRequest atoms. The flag form's name and desired value
     // are matched literally so its herald can describe the complete state
     // change rather than echoing two context-free arguments.
@@ -755,7 +788,15 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( property_and_folder_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . extend ( change_fact_atoms () );
+  atoms . extend ( client_computed_atoms () );
   atoms . into_iter () . collect () }
+
+/// Atoms no wire carries, which the clients write into a headline's
+/// metadata before they hand it to the lens: '(KIND changed)' in place
+/// of a folder's atom when a member of the folder carries a change of
+/// its relationship ('changed_folder_rules').
+fn client_computed_atoms () -> Vec<&'static str> {
+  vec! [ "changed" ] }
 
 /// The diff view's form, from org_to_text.rs's 'change_fact_forms':
 /// its head, the heads of its parts and their atoms, and the diff
@@ -767,15 +808,14 @@ fn change_fact_atoms () -> Vec<&'static str> {
       change : _,   // -> node, rel, properties, with DiffChange::EMITTABLE_ATOMS
       ready : _,    // -> ready, with the objects
       leaves : _,   // -> leaves, with the objects
-      home_skgrepo_move : _,   // -> the homeSkgrepoMove atom, in viewstats_atoms
-      moved_like_ancestor : _, // -> the movedLikeAncestor atom, in viewstats_atoms
+      home_skgrepo_move : _,   // -> the homeSkgrepoMove atom, below
+      moved_like_ancestor : _, // -> the movedLikeAncestor atom, below
     } = facts;
     match object { // compile error here = update DiffObject::ALL
       DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
   let _ = guard;
-  [ vec! [ "diff", "ready", "leaves", "readyRequest",
-           "unreadyRequest",
-           "changed" ], // the head of a changed folder's form
+  [ vec! [ "diff", "ready", "leaves",
+           "homeSkgrepoMove", "movedLikeAncestor" ],
     DiffChange::EMITTABLE_ATOMS . to_vec (),
     DiffObject::ALL . into_iter () . map (DiffObject::wire_name)
       . collect () ] . concat () }
@@ -796,28 +836,32 @@ fn graphstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [] }
 
-/// The match atoms of '(viewStats ...)', from
-/// unrestrictedVognode_metadata_to_string's view_stats (org_to_text.rs):
-/// ViewnodeStats's, the occurrence's 'overridesHere' and the two
-/// moves of its change facts. Birth and relationship facts are
-/// node-level '(rels ...)' data, not viewStats sub-forms.
+/// The match atoms of ViewnodeStats, from
+/// unrestrictedVognode_metadata_to_string (org_to_text.rs): the
+/// facts of '(view ...)', the relRepo of '(skgRepos ...)', and the
+/// occurrence's 'overridesHere'; and the property members' warrant
+/// atoms. The relationship facts are the forms named in
+/// 'emittable_metadata_atoms'.
 fn viewstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ViewnodeStats;
   fn guard ( v : ViewnodeStats ) {
     let ViewnodeStats {
       cycle : _,
-      homeSkgrepoAtBoundary : _, // -> the homeRepoHerald atom
+      repoBoundary : _,     // -> the repoBoundary atom
       isWarranted : _,      // -> the noWarrant atom
-      rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
-      omitted_body : _,      // -> the node-level omittedBody atom
-      relRepo : _,       // -> the relRepo display-fact atom and herald
+      rel_heralds : _,      // -> the rels, props and birth forms
+      omitted_body : _,     // -> the omittedBody atom
+      relRepo : _,          // -> the relRepo atom and herald
     } = v; }
   let _ = guard;
-  vec! [ "cycle", "homeRepoHerald", "noWarrant", "overridesHere", "relRepo",
-         "homeSkgrepoMove", "movedLikeAncestor" ] }
+  vec! [ "cycle", "repoBoundary", "noWarrant", "omittedBody",
+         "overridesHere", "relRepo",
+         // A property member's ghost warrant ('Viewnode::is_ghostWarranted').
+         "ghostWarrant" ] }
 
-/// The claim atom the serializer can emit: 'noClaim' on an occurrence
-/// that does not claim membership (one that claims carries nothing).
+/// The claim atom the serializer can emit: 'noClaim' on an occurrence,
+/// an alias, an id or an unknown that does not claim membership (one
+/// that claims carries nothing).
 fn claim_emitted_atoms () -> Vec<&'static str> {
   vec! [ "noClaim" ] }
 

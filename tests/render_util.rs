@@ -2,6 +2,7 @@
 
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
+use skg::herald_tokens::RelationshipHeralds;
 use skg::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, ViewnodeStats, default_unrestrictedVognode };
@@ -65,7 +66,7 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
     default_unrestrictedVognode (
       ID::from ("cheese-node"), skgrepo . clone (),
       "Cooking" . to_string () );
-  unrestricted_node . viewStats . homeSkgrepoAtBoundary = true;
+  unrestricted_node . viewStats . repoBoundary = true;
   let node : Viewnode =
     viewnode_of ( ViewnodeKind::Vognode (
       Vognode::Unrestricted (unrestricted_node) ));
@@ -80,7 +81,7 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
     . expect ("UnrestrictedVognode rendering never fails");
   assert_eq! (
     rendered,
-    "* (skg node (gnid cheese-node) (skgRepos (nodeRepo \"Mr Cheese\")) (viewStats (homeRepoHerald \"⌂:Mr Cheese\"))) Cooking\n" );
+    "* (skg node (gnid cheese-node) (skgRepos (nodeRepo \"Mr Cheese\")) (view repoBoundary)) Cooking\n" );
   let metadata = parse_metadata_to_viewnodemd (
     rendered
       . split_once (" Cooking")
@@ -105,7 +106,7 @@ fn test_metadata_ordering () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (viewStats cycle)) Test\n" ); }
+  assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (view cycle)) Test\n" ); }
 
 #[test]
 fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
@@ -121,21 +122,21 @@ fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (viewStats noWarrant cycle)) Test\n" );
+  assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (view noWarrant cycle)) Test\n" );
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd (
-      "(skg node (gnid xyz) (skgRepos (nodeRepo main)) (viewStats noWarrant cycle))" )
+      "(skg node (gnid xyz) (skgRepos (nodeRepo main)) (view noWarrant cycle))" )
     . expect ("noWarrant parses");
   assert_eq! ( metadata . viewStats . isWarranted, Warrant::ByGraph ); }
 
 #[test]
 fn test_rel_heralds_emitted () {
-  // The semantic (rels ...) string round-trips verbatim; a node with
-  // none emits no rels atom.
-  let mk = | rels : Option<&str> | -> String {
+  // The semantic (rels ...), (props ...) and (birth ...) strings are
+  // emitted verbatim inside (view ...); a node with none emits no view.
+  let mk = | heralds : RelationshipHeralds | -> String {
     let t : UnrestrictedVognode = UnrestrictedVognode {
       viewStats : ViewnodeStats {
-        rel_heralds : rels . map ( |s| s . to_string () ),
+        rel_heralds : heralds,
         .. ViewnodeStats::default () },
       .. default_unrestrictedVognode ( ID::from ("n"),
                             SkgrepoName::from ("main"),
@@ -144,11 +145,13 @@ fn test_rel_heralds_emitted () {
     viewnode_to_text (
       1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
       . unwrap () };
-  let with_rels : String =
-    mk ( Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))") );
-  assert! ( with_rels . contains (
-    "(rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))" ),
-            "rels not emitted verbatim: {}", with_rels );
-  let neither : String = mk ( None );
-  assert! ( ! neither . contains ("(rels ") );
+  let with_rels : String = mk ( RelationshipHeralds {
+    rels  : Some ("(rels (contains (in 2 (ancestors 1)) (out 1)))" . to_string ()),
+    props : Some ("(props (aliases 2))" . to_string ()),
+    birth : Some ("(birth (contains in 1))" . to_string ()) } );
+  assert_eq! ( with_rels,
+    "* (skg node (gnid n) (skgRepos (nodeRepo main)) (view (rels (contains (in 2 (ancestors 1)) (out 1))) (props (aliases 2)) (birth (contains in 1)))) N\n",
+    "rels not emitted verbatim: {}", with_rels );
+  let neither : String = mk ( RelationshipHeralds::default () );
+  assert! ( ! neither . contains ("(view ") );
   assert_metadata_eq! ( neither, "* (skg node (gnid n) (skgRepos (nodeRepo main))) N\n" ); }

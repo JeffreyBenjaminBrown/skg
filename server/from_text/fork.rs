@@ -13,7 +13,7 @@
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use crate::org_to_text::{metadata_value_atom, skgRepos_form};
+use crate::org_to_text::skgRepos_form;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
@@ -278,7 +278,8 @@ pub fn build_fork_confirmation_buffer (
   out }
 
 /// The headline of a clone-to-be, in the metadata grammar: a node
-/// with no gnid yet, its home skgrepo, and the home skgrepo's herald.
+/// with no gnid yet, its home skgrepo, and the fact that it stands at
+/// a skgrepo boundary (it is a root).
 fn fork_clone_headline (
   skgrepo : &SkgrepoName,
   title   : &str,
@@ -286,8 +287,7 @@ fn fork_clone_headline (
   let parts : Vec<String> =
     once ( "node" . to_string () )
     . chain ( skgRepos_form ( Some (skgrepo), None ))
-    . chain ( once ( format! ( "(viewStats (homeRepoHerald {}))",
-      metadata_value_atom ( &format! ("⌂:{}", skgrepo) )) ))
+    . chain ( once ( "(view repoBoundary)" . to_string () ))
     . collect ();
   format! ( "* (skg {}) {}\n", parts . join (" "), title ) }
 

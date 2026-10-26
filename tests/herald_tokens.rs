@@ -1,10 +1,12 @@
 // cargo nextest run -E 'test(herald_tokens::)'
 //
 // The server now emits semantic relationship facts; presentation lives
-// in the clients. These pin the wire the emitter produces.
+// in the clients. These pin the wire the emitter produces: the forms
+// '(rels ...)', '(props ...)' and '(birth ...)', joined here by a space.
 
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use skg::herald_tokens::{relationship_heralds_sexp, AncestorFlags, BirthFact, Side};
+use skg::herald_tokens::{
+  relationship_heralds_sexp, AncestorFlags, BirthFact, RelationshipHeralds, Side};
 use skg::types::viewnode::RelationCounts;
 
 fn counts () -> RelationCounts { RelationCounts::default () }
@@ -16,7 +18,16 @@ fn emit (
   f     : &AncestorFlags,
   birth : &[BirthFact],
 ) -> Option<String> {
-  relationship_heralds_sexp (c, al, ex, 0, f, birth, None) }
+  joined ( relationship_heralds_sexp (c, al, ex, 0, f, birth, None) ) }
+
+/// The forms that have something to say, joined by a space; None when
+/// none has.
+fn joined (
+  heralds : RelationshipHeralds,
+) -> Option<String> {
+  let forms : Vec<&String> = heralds . forms () . collect ();
+  ( ! forms . is_empty () ) . then ( || forms . iter ()
+    . map ( |form| form . as_str () ) . collect::<Vec<&str>> () . join (" ") ) }
 
 #[test]
 fn contains_birth () {
@@ -28,7 +39,7 @@ fn contains_birth () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::Contains, Side::In, Some (1))])
       . as_deref (),
-    Some ("(rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))") );
+    Some ("(rels (contains (in 1 (ancestors 1)))) (birth (contains in 1))") );
 }
 
 #[test]
@@ -41,7 +52,7 @@ fn contains_both_sides_and_multi () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::Contains, Side::In, Some (1))])
       . as_deref (),
-    Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))") );
+    Some ("(rels (contains (in 2 (ancestors 1)) (out 1))) (birth (contains in 1))") );
 }
 
 #[test]
@@ -63,7 +74,7 @@ fn subscribee_as_such () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::SubscribesTo, Side::In, Some (2))])
       . as_deref (),
-    Some ("(rels (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2)))") );
+    Some ("(rels (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2))") );
 }
 
 #[test]
@@ -74,12 +85,12 @@ fn contextual_content_distinguishes_applicable_zero_from_absent () {
   f . contents_unintegrated_out . push (2);
   let normal = emit (&c, 0, 0, &f, &[]) . unwrap ();
   assert_eq! (normal, "(rels (contains (in 2) (out 8 (ancestors 2))))");
-  let contextual = relationship_heralds_sexp (
-    &c, 0, 0, 0, &f, &[], Some (2)) . unwrap ();
+  let contextual = joined ( relationship_heralds_sexp (
+    &c, 0, 0, 0, &f, &[], Some (2)) ) . unwrap ();
   assert_eq! (contextual,
     "(rels (contains (in 2) (out 8 (ancestors 2) (unintegrated 2 (ancestors 2)))))");
-  let zero = relationship_heralds_sexp (
-    &c, 0, 0, 0, &AncestorFlags::default (), &[], Some (0)) . unwrap ();
+  let zero = joined ( relationship_heralds_sexp (
+    &c, 0, 0, 0, &AncestorFlags::default (), &[], Some (0)) ) . unwrap ();
   assert_eq! (zero, "(rels (contains (in 2) (out 8 (unintegrated 0))))");
 }
 
@@ -93,7 +104,7 @@ fn overrider_as_such_out_side () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::Overrides, Side::Out, Some (2))])
       . as_deref (),
-    Some ("(rels (overrides (out 1 (ancestors 2))) (birth (overrides out 2)))") );
+    Some ("(rels (overrides (out 1 (ancestors 2)))) (birth (overrides out 2))") );
 }
 
 #[test]
@@ -111,8 +122,8 @@ fn compoundPartnerFolder_two_births_in_fixed_order () {
             BirthFact::new (NodeRelation::Contains, Side::In, Some (2))])
       . as_deref (),
     Some ("(rels (contains (in 1 (ancestors 2))) \
-           (hidesFromSubs (in 1 (ancestors 4))) \
-           (birth (hidesFromSubs in 4) (contains in 2)))") );
+           (hidesFromSubs (in 1 (ancestors 4)))) \
+           (birth (hidesFromSubs in 4) (contains in 2))") );
 }
 
 #[test]
@@ -142,7 +153,7 @@ fn mentioner_birth_out_only () {
     emit (&c, 0, 0, &f,
           &[BirthFact::new (NodeRelation::LinksTo, Side::Out, Some (1))])
       . as_deref (),
-    Some ("(rels (linksTo (out 1 (ancestors 1))) (birth (linksTo out 1)))") );
+    Some ("(rels (linksTo (out 1 (ancestors 1)))) (birth (linksTo out 1))") );
 }
 
 #[test]
@@ -165,16 +176,16 @@ fn aliases_and_extra_ids () {
   let c = RelationCounts { containers : 2, contents : 5, .. counts () };
   assert_eq! (
     emit (&c, 3, 1, &AncestorFlags::default (), &[]) . as_deref (),
-    Some ("(rels (contains (in 2) (out 5)) (aliases 3) (extraIds 1))") );
+    Some ("(rels (contains (in 2) (out 5))) (props (aliases 3) (extraIds 1))") );
 }
 
 #[test]
 fn true_flags_are_counted_and_zero_is_omitted () {
   assert_eq! (
-    relationship_heralds_sexp (
-      &counts (), 0, 0, 2, &AncestorFlags::default (), &[], None)
+    joined ( relationship_heralds_sexp (
+      &counts (), 0, 0, 2, &AncestorFlags::default (), &[], None) )
       . as_deref (),
-    Some ("(rels (flags 2))") );
+    Some ("(props (flags 2))") );
   assert_eq! (emit (&counts (), 0, 0, &AncestorFlags::default (), &[]),
               None); }
 

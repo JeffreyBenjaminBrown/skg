@@ -638,7 +638,7 @@ fn search_enrichment_truncates_containers_folder_before_restricted_container (
     "unrestricted ancestry should render, in the folder: {}",
     rendered );
   assert! (
-    rendered . contains ("(homeRepoHerald ⌂:public)"),
+    rendered . contains ("repoBoundary"),
     "enriched search results should show the repo herald at the \
      repo boundary (the restriction-repo root): {}",
     rendered );

@@ -135,7 +135,7 @@ fn property_member_is_warranted (
   match property {
     PropertyMember::Alias { text, .. } =>
       members_of (node . aliases . or_default ()) . contains (text),
-    PropertyMember::ID { skgid } =>
+    PropertyMember::ID { skgid, .. } =>
       node . pid == *skgid || node . extra_ids . contains (skgid),
     PropertyMember::Flag { flag, .. } =>
       flag_is_true (&node . flags, *flag), } }

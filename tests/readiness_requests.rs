@@ -55,9 +55,9 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
     { // The relationship object of a member, and an alias leaf.
       let response : SaveResponse = save (f, "\
 * (skg node (gnid r) (skgRepos (nodeRepo main))) r, retitled
-** (skg node (gnid a) (skgRepos (nodeRepo main)) (diff (readyRequest rel))) a
+** (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest (ready rel))) a
 *** (skg aliasFolder)
-**** (skg alias (diff (readyRequest))) ay
+**** (skg alias (editRequest (ready))) ay
 ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
       assert_eq! ( marked_keys (f),
@@ -74,7 +74,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
             &key, straddle . change_leaves () . leaf_fingerprint (&key) . unwrap () )); }} }
     { // 'all' on a node names every leaf it owns.
       save (f, "\
-* (skg node (gnid r) (skgRepos (nodeRepo main)) (diff (readyRequest all))) r, retitled
+* (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (ready all))) r, retitled
 ** (skg node (gnid a) (skgRepos (nodeRepo main))) a
 ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
@@ -83,7 +83,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
                    . into_iter () . collect () ); }
     { // Unmarking.
       save (f, "\
-* (skg node (gnid r) (skgRepos (nodeRepo main)) (diff (unreadyRequest all))) r, retitled
+* (skg node (gnid r) (skgRepos (nodeRepo main)) (editRequest (unready all))) r, retitled
 ** (skg node (gnid a) (skgRepos (nodeRepo main))) a
 ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
@@ -93,7 +93,7 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
       let response : SaveResponse = save (f, "\
 * (skg node (gnid r) (skgRepos (nodeRepo main))) r, retitled
 ** (skg node (gnid a) (skgRepos (nodeRepo main))) a
-** (skg (vnid 0z) node (gnid b) (skgRepos (nodeRepo main)) (diff (readyRequest rel))) b
+** (skg (vnid 0z) node (gnid b) (skgRepos (nodeRepo main)) (editRequest (ready rel))) b
 ") ?;
       assert_eq! ( marked_keys (f),
                    [ a_alias () ] . into_iter () . collect () );

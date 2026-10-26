@@ -1,5 +1,6 @@
 // Each of the diff view's viewnodes renders its metadata, then
-// parses back to the same viewnode.
+// parses back to the same viewnode, less its change facts, which the
+// parser skips.
 
 use crate::git_fixture_helpers::with_facts;
 use skg::org_to_text::viewnode_to_string;
@@ -11,7 +12,7 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
-  ViewnodeKind, Vognode, mk_editable_viewnode,
+  ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
 use std::collections::{BTreeSet, HashMap};
@@ -31,7 +32,7 @@ fn request_all () -> Option<ReadinessRequest> {
 
 /// Render 'node', check its metadata against 'expected', parse it
 /// back with its headline and body, and check that the result is
-/// 'node' again.
+/// 'node' again, less its change facts.
 fn assert_round_trip (
   node     : Viewnode,
   expected : &str,
@@ -47,7 +48,8 @@ fn assert_round_trip (
       &metadata, node . title () . to_string (), node . body () . cloned () );
   assert_eq! ( error, None );
   assert_eq! ( warning, None );
-  assert_eq! ( Viewnode::try_from (parsed) . unwrap (), node ); }
+  assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
+               Viewnode { change_facts : ChangeFacts::default (), .. node } ); }
 
 fn change_viewnode (
   change            : ChangeViewnode,
@@ -100,7 +102,7 @@ fn skgrepo_moves_round_trip () {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("a repo") } },
       ChangeFacts::default (), request_all () ),
-    "(relRepoMove (old pub) (new \"a repo\")) (diff (readyRequest all))" ); }
+    "(relRepoMove (old pub) (new \"a repo\")) (editRequest (ready all))" ); }
 
 #[test]
 fn changeset_markers_round_trip () {
@@ -114,7 +116,8 @@ fn changeset_markers_round_trip () {
 
 #[test]
 /// An alias or ID the worktree lost since HEAD is a member with a
-/// ghost warrant, written '(rel removed)'.
+/// ghost warrant, written '(view ghostWarrant)' beside its '(rel
+/// removed)', which claims no membership.
 fn ghost_warranted_aliases_and_ids_round_trip () {
   let removed : ChangeFacts = ChangeFacts {
     change   : DiffChange { rel : Some (Existence::Removed), .. DiffChange::default () },
@@ -124,13 +127,17 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
   assert_round_trip (
     property_member ( PropertyMember::Alias { text : "an old alias" . into (),
                                               relRepo : None,
-                                              relationshipEditRequest : None },
+                                              relationshipEditRequest : None,
+                                              claimsMembership : false,
+                                              isWarranted : Warrant::ByGraph },
                       removed . clone (), None ),
-    "alias (diff (rel removed) (ready))" );
+    "alias noClaim (view ghostWarrant) (diff (rel removed) (ready))" );
   assert_round_trip (
-    property_member ( PropertyMember::ID { skgid : ID::from ("old-id") },
+    property_member ( PropertyMember::ID { skgid : ID::from ("old-id"),
+                                           claimsMembership : false,
+                                           isWarranted : Warrant::ByGraph },
                       removed, request_all () ),
-    "id (diff (rel removed) (ready) (readyRequest all))" ); }
+    "id noClaim (editRequest (ready all)) (view ghostWarrant) (diff (rel removed) (ready))" ); }
 
 #[test]
 fn a_ghost_round_trips () {
@@ -149,7 +156,7 @@ fn a_ghost_round_trips () {
         leaves   : None,
         .. ChangeFacts::default () },
       request_all () ),
-    "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node) (readyRequest all))" ); }
+    "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (ready all)) (diff (node removed) (rel removed) (ready node))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {
@@ -230,7 +237,9 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
       expected ); }}
 
 /// Each restore request is refused on a headline of the wrong kind,
-/// with the text the clients show.
+/// with the text the clients show. A restoreRel on a node is the
+/// save's to check, by where the node stands
+/// ('restore_requests_on_the_wrong_kind_stop_the_save').
 #[test]
 fn restore_requests_on_the_wrong_kind_are_refused () {
   for (metadata, message) in [
@@ -240,11 +249,7 @@ fn restore_requests_on_the_wrong_kind_are_refused () {
       RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
     ( "(skg unknown (gnid x) (editRequest restoreNode))",
       RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
-    ( "(skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreRel))",
-      RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
-    ( "(skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (rel added)))",
-      RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
-    ( "(skg unknown (gnid x) (editRequest restoreRel) (diff (rel removed)))",
+    ( "(skg unknown (gnid x) noClaim (editRequest restoreRel) (diff (rel removed)))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ), ] {
     assert_eq! ( parse_metadata_to_viewnodemd (metadata),
                  Err ( message . to_string () ),

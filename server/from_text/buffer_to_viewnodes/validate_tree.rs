@@ -114,8 +114,8 @@ pub fn find_buffer_errors_for_saving (
 /// plus extra_ids). Reordering passes (the order is view-local:
 /// the rerender keeps it); adding, deleting or text-editing an ID property fails,
 /// with a message naming the escape hatch (edit the .skg file
-/// directly). In the diff view, an ID entry tagged '(rel removed)'
-/// is a lost ID, not a membership claim, and is excluded before
+/// directly). In the diff view, an ID entry carrying 'noClaim' is a
+/// lost ID, not a membership claim, and is excluded before
 /// comparing. An absent idFolder means no opinion, as
 /// for other folders. Shapes that other validations reject (an idFolder
 /// without an UnrestrictedVognode parent, a parent without an ID) are skipped
@@ -145,9 +145,9 @@ fn idFolder_membership_errors (
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          // An ID with a ghost warrant is one the worktree lost.
-          MpViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. })
-            if ! child . value () . is_ghostWarranted ()
+          // An ID that claims no membership is one the worktree lost.
+          MpViewnodeKind::PropertyMember (PropertyMember::ID {
+            skgid, claimsMembership : true, .. })
             => Some ( skgid . clone () ),
           _ => None } )
       . collect ();

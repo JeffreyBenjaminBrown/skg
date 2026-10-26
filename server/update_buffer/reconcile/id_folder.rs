@@ -54,8 +54,7 @@ pub fn reconcile_idFolder_children (
                  . to_string() ), };
   let create_skgid = |skgid: &ID| -> Result<Viewnode, String> {
     Ok ( viewnode_of (ViewnodeKind::PropertyMember (
-        PropertyMember::ID {
-          skgid: skgid . clone() } )) ) };
+        PropertyMember::id ( skgid . clone() ) )) ) };
   complete_managed_children_in_viewforest(
     tree,
     idfolder_treeid,

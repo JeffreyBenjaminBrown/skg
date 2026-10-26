@@ -25,7 +25,8 @@
 //!
 //! CAVEAT: this deliberately makes sibling order invisible everywhere in
 //! metadata, including the ordered relationship-herald spans inside a
-//! `(rels ...)` form. Span display-order is pinned separately by the
+//! `(rels ...)` form, and the derived facts inside '(view ...)' and
+//! '(diff ...)'. Span display-order is pinned separately by the
 //! `herald_tokens` unit tests, which assert the assembled order directly.
 //!
 //! Both ignore the viewnode IDs: '(vnid X)' differs from one rendering to
@@ -263,14 +264,36 @@ mod tests {
                  canonicalize_metadata_ordering (c) ); }
 
   #[test]
-  fn homerepoherald_atom_with_colon_and_nonascii_round_trips () {
-    // The ⌂:LABEL homeRepoHerald and the ☮/⟳ glyphs must survive parse +
+  fn colon_and_nonascii_atoms_round_trip () {
+    // An atom with a colon or a non-ASCII character must survive parse +
     // canon (bytes preserved, just possibly reordered).
     let s : &str =
-      "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (viewStats cycle (homeRepoHerald ⌂:main))) t\n";
+      "* (skg node (gnid 1) (skgRepos (nodeRepo ⌂:main)) (view cycle repoBoundary)) t\n";
     let c : String = canonicalize_metadata_ordering (s);
     assert! ( c . contains ("⌂:main"), "got: {}", c );
     assert! ( c . contains ("cycle") ); }
+
+  #[test]
+  fn the_facts_in_view_and_diff_are_unordered () {
+    // The derived facts sit in '(view ...)' and '(diff ...)', whose
+    // tails are as unordered as the top level's.
+    let a : &str = concat! (
+      "* (skg (vnid 0a) node (gnid 1) (skgRepos (nodeRepo main))",
+      " (view noWarrant cycle (props (aliases 2)) (rels (contains (in 1))))",
+      " (diff (rel added) (leaves 1 rel))) t\n" );
+    let b : &str = concat! (
+      "* (skg (vnid 0a) (diff (leaves 1 rel) (rel added)) node",
+      " (view (rels (contains (in 1))) cycle (props (aliases 2)) noWarrant)",
+      " (gnid 1) (skgRepos (nodeRepo main))) t\n" );
+    assert_eq! ( canonicalize_metadata_ordering (a),
+                 canonicalize_metadata_ordering (b) );
+    // a fact moved from '(view ...)' to '(diff ...)' is still caught
+    let c : &str = concat! (
+      "* (skg (vnid 0a) node (gnid 1) (skgRepos (nodeRepo main))",
+      " (view cycle (props (aliases 2)) (rels (contains (in 1))))",
+      " (diff noWarrant (rel added) (leaves 1 rel))) t\n" );
+    assert_ne! ( canonicalize_metadata_ordering (a),
+                 canonicalize_metadata_ordering (c) ); }
 
   #[test]
   fn without_viewnode_ids_drops_each_viewnode_id_and_its_space () {

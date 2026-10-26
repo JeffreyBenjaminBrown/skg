@@ -56,12 +56,10 @@ fn each_kind_prints_its_parts_beside_its_atom (
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
       skgid : ID::from ("u"), relRepo : Some ( SkgrepoName::from ("pub") ),
-      relationshipEditRequest : None } )))),
+      relationshipEditRequest : None, claimsMembership : true } )))),
     "unknown (gnid u) (skgRepos (relRepo pub))" );
   assert_eq! (
-    rendered ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
-      text : "an alias" . into (), relRepo : Some ( SkgrepoName::from ("pub") ),
-      relationshipEditRequest : None } ))),
+    rendered ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::alias ( "an alias" . into (), Some ( SkgrepoName::from ("pub") ), None ) ))),
     "alias (skgRepos (relRepo pub))" ); }
 
 #[test]

@@ -9,6 +9,7 @@
 use super::errors::HeadlineName;
 use super::misc::{ID, SkgrepoChange, SkgrepoName};
 use super::nodes::complete::Flag;
+use crate::herald_tokens::RelationshipHeralds;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -31,14 +32,14 @@ pub struct ChangeFacts {
   /// view, on an occurrence whose node's home skgrepo moved from OLD
   /// to NEW since HEAD. The buffer's pass sets it after completion
   /// ('set_homeSkgrepoMove_facts_in_viewforest'); the printer writes
-  /// it as '(homeSkgrepoMove (old OLD) (new NEW))' in '(viewStats ...)',
-  /// and the parser discards it. Herald "-OLD +NEW".
+  /// it as '(homeSkgrepoMove (old OLD) (new NEW))' in '(diff ...)',
+  /// which the parser skips. Herald "-OLD +NEW".
   pub home_skgrepo_move   : Option<SkgrepoChange>,
   /// Some(LETTER) beside 'home_skgrepo_move' when the nearest vognode
   /// ancestor whose home moved moved the same way. LETTER names that
   /// ancestor as the relationship heralds name ancestors: a for the
   /// viewparent, b for the grandparent, and so on. Written, and
-  /// discarded, like 'home_skgrepo_move'. Herald "Δ⌂=LETTER".
+  /// skipped, like 'home_skgrepo_move'. Herald "Δ⌂=LETTER".
   pub moved_like_ancestor : Option<String>,
 }
 
@@ -89,13 +90,14 @@ pub enum DiffObject {
   All,
 }
 
-/// '(readyRequest OBJECTS)' or '(unreadyRequest OBJECTS)': save intent that
+/// '(editRequest (ready OBJECTS))' or '(editRequest (unready OBJECTS))':
+/// save intent that
 /// sets or clears the commit-readiness marks of the viewnode's
 /// leaves on those objects. No objects means the viewnode's only
 /// change-forest leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadinessRequest {
-  pub ready   : bool, // true for readyRequest, false for unreadyRequest
+  pub ready   : bool, // true for (ready ...), false for (unready ...)
   pub objects : BTreeSet<DiffObject>,
 }
 
@@ -211,6 +213,12 @@ pub struct Unknown {
   /// viewparent (only a relRepo change: the parser refuses
   /// restoreRel here), consumed only by save.
   pub relationshipEditRequest : Option<RelationshipEditRequest>,
+  /// Whether the save reads its raw ID into its viewparent's list.
+  /// False, written 'noClaim', only on one whose relationship HEAD
+  /// alone warrants (the stats pass sets it from
+  /// 'Viewnode::is_ghostWarranted'): a dangling partner the worktree
+  /// lost.
+  pub claimsMembership : bool,
 }
 
 /// A ghost: a node that the before-graph of the diff view's graph
@@ -280,7 +288,7 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   /// wherever this fact appears, so a substituted child
   /// round-trips to the original ID instead of rewriting the
   /// parent's contains. Serialized as the keyed form
-  /// '(overridesHere N)' in '(viewStats ...)'; tamper-checked at
+  /// '(overridesHere N)' at the top level; tamper-checked at
   /// buffer validation (the carrier's ID must equal the
   /// visibility-ungated 'resolve_override (N).effective').
   pub overridesHere    : Option<ID>,
@@ -367,22 +375,22 @@ pub enum Warrant {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeStats {
   pub cycle                 : bool,
-  pub homeSkgrepoAtBoundary : bool, // True if a root or if skgrepo differs from skgrepo of nearest unrestrictedVognode ancestor.
+  /// True if a root or if skgrepo differs from skgrepo of nearest
+  /// unrestrictedVognode ancestor. Written '(view repoBoundary)'.
+  pub repoBoundary          : bool,
   /// Computed by the stats pass ('set_warrant'); written as
-  /// 'noWarrant' when 'Warrant::No'. Display-only: the parser
-  /// accepts and discards it.
+  /// '(view noWarrant)' when 'Warrant::No'. A derived fact: the
+  /// parser skips '(view ...)'.
   pub isWarranted           : Warrant,
-  /// The relationship heralds as the semantic `(rels ...)` sexp string
-  /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
-  /// member counts and which tracked ancestors are members on each side,
-  /// plus the birth facts. None when there is nothing to say. The
-  /// client parses this and decides all presentation (letters, colors,
-  /// order). See 'docs/heralds.org'.
-  pub rel_heralds           : Option<String>,
+  /// The relationship heralds as the semantic sexp strings
+  /// '(rels ...)', '(props ...)' and '(birth ...)'
+  /// (server/herald_tokens.rs 'relationship_heralds_sexp'), written
+  /// inside '(view ...)'. The client parses them and decides all
+  /// presentation (letters, colors, order). See 'docs/heralds.org'.
+  pub rel_heralds           : RelationshipHeralds,
   /// True iff the node is shown write-protected here while its graph
   /// node has a body -- a body the rendering hides. Herald "B",
-  /// hugging the ☮. Display-only, like the assembled
-  /// herald strings; the parser accepts and discards it.
+  /// hugging the ☮. Written '(view omittedBody)', a derived fact.
   pub omitted_body           : bool,
   /// Some(NAME) when the relationship instance this position's
   /// binding relationship to its viewparent represents (=contains= for an
@@ -402,7 +410,7 @@ pub struct ViewnodeStats {
   /// This is a display fact, unlike a requested replacement stored in
   /// 'UnrestrictedVognode_Generic::relationshipEditRequest'.  Save extraction never
   /// treats this value as a fieldIntent.
-  /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
+  /// Herald: red "~NAME" immediately before the ⌂ of repoBoundary
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
 }
@@ -410,23 +418,33 @@ pub struct ViewnodeStats {
 /// A member of a property folder: one alias, extra ID or true flag
 /// of the folder's viewparent.
 ///
-/// In the diff view an alias or ID the worktree lost since HEAD is a
-/// member with a ghost warrant: HEAD alone warrants it. Until property
-/// members carry view facts, that warrant is written, and read, as the
-/// change fact '(diff (rel removed))' ('Viewnode::is_ghostWarranted');
-/// the alias reader and the ID check skip such a member, and its
+/// 'isWarranted' is set by the stats pass ('warrant_of_viewnode') and
+/// written '(view noWarrant)' when 'Warrant::No'.
+///
+/// In the diff view an alias, ID or flag the worktree lost since HEAD
+/// is a member with a ghost warrant: HEAD alone warrants it. 'Warrant'
+/// has no word for that yet, so the server knows it by the change
+/// fact '(rel removed)' ('Viewnode::is_ghostWarranted') and writes it
+/// '(view ghostWarrant)'. An alias or ID with a ghost warrant claims no
+/// membership ('claimsMembership', set by the stats pass, written
+/// 'noClaim'): the alias reader and the ID check skip it, and its
 /// change-forest leaf is that alias or ID.
 #[derive( Debug, Clone, PartialEq )]
 pub enum PropertyMember {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<SkgrepoName>,
-          relationshipEditRequest: Option<RelationshipEditRequest> },
-  ID { skgid: ID }, // an ID of grandparent (the parent being an IDFolder)
+          relationshipEditRequest: Option<RelationshipEditRequest>,
+          claimsMembership: bool,
+          isWarranted: Warrant },
+  ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
+       claimsMembership: bool,
+       isWarranted: Warrant },
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
     flag : Flag,
     title    : String,
-    body     : Option<String>, },
+    body     : Option<String>,
+    isWarranted : Warrant, },
 }
 
 /// A headline the diff view adds to describe a change. Display-only
@@ -763,6 +781,34 @@ impl PropertyMember {
     match self {
       PropertyMember::Flag { body, .. } => body . as_ref (),
       PropertyMember::Alias { .. } | PropertyMember::ID { .. } => None, } }
+
+  /// An alias member that claims membership and is warranted, until
+  /// the stats pass says otherwise.
+  pub fn alias (
+    text                    : String,
+    relRepo                 : Option<SkgrepoName>,
+    relationshipEditRequest : Option<RelationshipEditRequest>,
+  ) -> PropertyMember {
+    PropertyMember::Alias { text, relRepo, relationshipEditRequest,
+                            claimsMembership : true,
+                            isWarranted      : Warrant::ByGraph } }
+
+  /// An ID member, as 'alias' makes an alias member.
+  pub fn id (
+    skgid : ID,
+  ) -> PropertyMember {
+    PropertyMember::ID { skgid,
+                         claimsMembership : true,
+                         isWarranted      : Warrant::ByGraph } }
+
+  /// A flag member, warranted until the stats pass says otherwise.
+  pub fn flag (
+    flag  : Flag,
+    title : String,
+    body  : Option<String>,
+  ) -> PropertyMember {
+    PropertyMember::Flag { flag, title, body,
+                           isWarranted : Warrant::ByGraph } }
 }
 
 impl ChangeViewnode {
@@ -902,7 +948,7 @@ impl ReadinessRequest {
   pub fn form_head (
     &self,
   ) -> &'static str {
-    if self . ready { "readyRequest" } else { "unreadyRequest" } }
+    if self . ready { "ready" } else { "unready" } }
 }
 
 impl ViewRequest {
@@ -1051,9 +1097,9 @@ impl Viewnode {
     }}
 
   /// Whether HEAD alone warrants this viewnode where it stands: for
-  /// now, whether it carries the change fact '(rel removed)', which
-  /// is how a property member's ghost warrant is written until
-  /// property members carry view facts ('PropertyMember').
+  /// now, whether it carries the change fact '(rel removed)', since
+  /// 'Warrant' has no word for that yet ('PropertyMember'). Only the
+  /// server's own trees carry change facts: the parser skips them.
   pub fn is_ghostWarranted (&self) -> bool {
     self . change_facts . change . rel == Some (Existence::Removed) }
 
@@ -1144,9 +1190,9 @@ impl Default for ViewnodeStats {
   fn default () -> Self {
     ViewnodeStats {
       cycle             : false,
-      homeSkgrepoAtBoundary  : false,
+      repoBoundary      : false,
       isWarranted       : Warrant::ByGraph,
-      rel_heralds       : None,
+      rel_heralds       : RelationshipHeralds::default (),
       omitted_body      : false,
       relRepo        : None,
     }} }
@@ -1201,7 +1247,8 @@ pub fn mk_unknown_viewnode (
   viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown ( Unknown {
       skgid,
       relRepo         : None,
-      relationshipEditRequest : None, } )) ) }
+      relationshipEditRequest : None,
+      claimsMembership : true, } )) ) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.

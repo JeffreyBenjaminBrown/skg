@@ -58,9 +58,7 @@ fn conversion_and_retention () {
   let aliases : NodeId = t . get_mut (kept) . unwrap ()
     . append (folder (Folder::Alias)) . id ();
   t . get_mut (aliases) . unwrap ()
-    . append (viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
-      text : "kept's alias" . into (), relRepo : None,
-      relationshipEditRequest : None })));
+    . append (viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::alias ( "kept's alias" . into (), None, None ))));
   let graph : InRustGraph = graph_of (&[
     ("parent", "public"), ("gone", "private"),
     ("kept", "private"), ("survivor", "public") ]);

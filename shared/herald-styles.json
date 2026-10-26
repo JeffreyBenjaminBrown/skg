@@ -46,7 +46,7 @@
     "omittedBody":                     "high",
     "cycle":                           "medium",
     "relRepo":                         "ugly",
-    "homeRepoHerald":                  "normal",
+    "repoBoundary":                    "normal",
     "ready":                           "go",
     "changed":                         "message",
     "existence":                       "nonstandard",

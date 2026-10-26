@@ -625,8 +625,7 @@ fn validate_unrestrictedVognode (
   { errors . push ( RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP . to_string () ); }
   errors }
 
-/// Whether a restoreRel request, on a headline the parser found
-/// carrying '(rel removed)', stands where it may: on a member of a
+/// Whether a restoreRel request stands where it may: on a member of a
 /// partner folder (whose removed members are non-members), or on a
 /// removed member, a non-member under a vognode that is no node of the
 /// containerward chain ('mp_is_in_containerward_chain'). A chain node

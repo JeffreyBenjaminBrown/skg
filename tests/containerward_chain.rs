@@ -208,7 +208,7 @@ async fn a_folder_request_draws_the_chain_under_its_members (
     *** m writeProtected
     "}, "{}", buffer );
   let saved : String = save_view (
-    &requesting_at (&buffer, "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (rels",
+    &requesting_at (&buffer, "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view (rels",
                     "(folder containers)"),
     config, tantivy, &graph, &mut views_state, "view of d" ) . await ?;
   assert_eq! ( outline (&saved), indoc! {"

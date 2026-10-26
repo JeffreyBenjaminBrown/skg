@@ -5,9 +5,10 @@
 // 'relations_match_the_shared_relations_file' checks
 // 'shared/relations.json' against 'NodeRelation': the table names
 // every kind the parser knows; each value it offers parses where it
-// offers it, under the conditions it states and no others; nothing it
-// does not offer parses; and its values name every edit request and
-// view request the parser knows.
+// offers it, under the conditions it states and no others (but
+// 'removedMember', which the save checks, by where the headline
+// stands); nothing it does not offer parses; and its values name every
+// edit request and view request the parser knows.
 
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
@@ -49,11 +50,9 @@ fn every_kind_atom (
     SkgrepoChange { old : SkgrepoName::from ("a"),
                     new : SkgrepoName::from ("b") };
   let members : Vec<PropertyMember> = vec! [
-    PropertyMember::Alias { text : String::new (), relRepo : None,
-                      relationshipEditRequest : None },
-    PropertyMember::ID { skgid : ID::default () },
-    PropertyMember::Flag { flag : Flag::NoSearchMatching,
-                     title : String::new (), body : None } ];
+    PropertyMember::alias ( String::new (), None, None ),
+    PropertyMember::id ( ID::default () ),
+    PropertyMember::flag ( Flag::NoSearchMatching, String::new (), None ) ];
   for member in &members {
     match member {
       PropertyMember::Alias { .. } | PropertyMember::ID { .. }
@@ -274,11 +273,6 @@ fn each_offered_value_parses_under_its_conditions_and_no_others () {
           let sexp : String = with_field (&base, &written . text);
           assert! ( parse_cleanly (&sexp) . is_ok (),
                     "{}: {:?}", sexp, parse_cleanly (&sexp) );
-          if removed_member {
-            let elsewhere : String =
-              with_field (&example, &written . text);
-            assert! ( parse_cleanly (&elsewhere) . is_err (),
-                      "{} parsed without '(rel removed)'", elsewhere ); }
           if has_writeProtected && written . field_name != "writeProtected" {
             let write_protected : String =
               with_field (&sexp, "writeProtected");

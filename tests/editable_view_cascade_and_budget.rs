@@ -208,25 +208,25 @@ async fn test_editable_view_ample_budget (
 
       // With an ample budget, all children should be extended
       let expected = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 3)))) 1
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1)))) 12
+        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
+        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
+        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
         12 body
-        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1)))) 121
+        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 2))) (birth (contains in 1)))) 121
         121 body
-        **** (skg node (gnid 1211) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1211
+        **** (skg node (gnid 1211) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1211
         1211 body
-        **** (skg node (gnid 1212) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1212
+        **** (skg node (gnid 1212) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1212
         1212 body
-        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
+        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
         122 body
-        **** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1221
+        **** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1221
         1221 body
-        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 123
+        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
         123 body
-        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 124
+        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
         124 body
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
@@ -303,33 +303,33 @@ async fn test_editable_view_limit_5_or_6 (
       // and showed its whole group 121..124, but the budget hit 0 at 13, so when
       // 121..124 are visited they stay write-protected (none extends -> no gen-3).
       let expected_5 = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 3)))) 1
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1)))) 12
+        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
+        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
+        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
         12 body
-        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1)))) 121
-        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
-        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 123
-        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 124
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 2))) (birth (contains in 1)))) 121
+        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
+        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
+        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
       // limit=6: one more extension than limit=5 -- 121 (the 6th) now extends and
       // shows its whole gen-3 group 1211,1212 (both then write-protected, budget
       // spent); 122..124 remain write-protected.
       let expected_6 = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 3)))) 1
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1)))) 12
+        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
+        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
+        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
         12 body
-        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1)))) 121
+        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 2))) (birth (contains in 1)))) 121
         121 body
-        **** (skg node (gnid 1211) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1211
-        **** (skg node (gnid 1212) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1212
-        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
-        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 123
-        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 124
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+        **** (skg node (gnid 1211) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1211
+        **** (skg node (gnid 1212) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1212
+        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
+        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
+        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
@@ -405,10 +405,10 @@ async fn test_editable_view_limit_1_to_4 (
       // all three are then write-protected (budget spent), so 12 never extends and
       // none of 121.. is created. Root 2 still extends (root exemption).
       let expected_1 = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 3)))) 1
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1)))) 12
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
+        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
+        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
       // omittedBody marks only 12: the saved buffer showed 11 and 13
@@ -418,15 +418,15 @@ async fn test_editable_view_limit_1_to_4 (
       // whole group 121..124, all write-protected (budget spent); 13 is reached
       // after the budget is gone, so it too is write-protected.
       let expected_4 = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 3)))) 1
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1)))) 12
+        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
+        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
+        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
         12 body
-        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1)))) 121
-        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
-        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 123
-        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 124
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 2))) (birth (contains in 1)))) 121
+        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
+        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
+        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
@@ -454,7 +454,7 @@ async fn test_editable_view_conflicting (
       let input_org_text = indoc! {"
         * (skg node (gnid 1) (skgRepos (nodeRepo main))) 1
         ** (skg node (gnid 12)) 12
-        *** (skg node (gnid 122) writeProtected omittedBody) 122
+        *** (skg node (gnid 122) writeProtected (view omittedBody)) 122
         * (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) 12
       "};
 
@@ -483,13 +483,13 @@ async fn test_editable_view_conflicting (
         // The second 12 (root with request) should be extended.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
-        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 1)))) 1
-         ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 12
-         *** (skg node (gnid 122) (skgRepos (nodeRepo main)) noClaim writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)))) 122
-         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1) (out 1)))) 12
-         ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
+        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) 1
+         ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12
+         *** (skg node (gnid 122) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
+         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 1))))) 12
+         ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
          122 body
-         *** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1221
+         *** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1221
          1221 body
       "};
 
@@ -534,11 +534,11 @@ async fn test_editable_view_with_cycle (
 
       // a should extend to show b, and b's child a should be marked as cycle
       let expected = indoc! {"
-        * (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) (rels (contains (in 1) (out 1)))) cyc-a
+        * (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 1))))) cyc-a
         cyc-a body
-        ** (skg node (gnid cyc-b) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1)))) cyc-b
+        ** (skg node (gnid cyc-b) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)))) cyc-b
         cyc-b body
-        *** (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1))) (viewStats cycle)) cyc-a
+        *** (skg node (gnid cyc-a) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)) cycle)) cyc-a
       "};
 
       assert_metadata_eq!(result, expected,
@@ -588,17 +588,17 @@ async fn test_editable_view_with_repeat (
         // and so clobbers the Tentative bare root 121 (§5.2). So the bare
         // root 121 is now write-protected and 12's child 121 is the editable
         // occurrence (childless, since the save emptied 121's contains).
-        "* (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1)))) 121
-         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1) (out 4)))) 12
+        "* (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1))))) 121
+         * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 4))))) 12
          12 body
-         ** (skg node (gnid 121) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 121
-         ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
+         ** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121
+         ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
          122 body
-         *** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 1221
+         *** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1221
          1221 body
-         ** (skg node (gnid 123) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 123
+         ** (skg node (gnid 123) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
          123 body
-         ** (skg node (gnid 124) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 124
+         ** (skg node (gnid 124) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
          124 body
       "};
 
@@ -760,17 +760,17 @@ async fn test_editable_view_request_on_an_editable_node (
         response . saved_view };
       println! ("Result of a request on an editable node:\n{}", result);
       let expected = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 3)))) 1
+        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
         1 body
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11
+        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
         11 body
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1)))) 12
+        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
         12 body
-        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1)))) 121
-        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 122
-        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 123
-        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 124
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+        *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 2))) (birth (contains in 1)))) 121
+        *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
+        *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
+        *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
       "};
       assert_metadata_eq!(result, expected,
         "a request on editable 1 extends its content within the budget");
@@ -896,12 +896,12 @@ async fn test_budget_aliasfolder_is_neutral (
       println!("alias-budget (budget 3):\n{}", result);
 
       let expected = indoc! {"
-        * (skg node (gnid r) (skgRepos (nodeRepo main)) (rels (contains (out 1)) (aliases 2))) r
+        * (skg node (gnid r) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))) (props (aliases 2)))) r
         ** (skg aliasFolder)
         *** (skg alias) first alias
         *** (skg alias) second alias
-        ** (skg node (gnid c1) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) c1
-        *** (skg node (gnid c2) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) c2
+        ** (skg node (gnid c1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) c1
+        *** (skg node (gnid c2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) c2
       "};
       assert_metadata_eq!(result, expected,
         "budget 3 extends the whole content chain; the AliasFolder is whole + budget-neutral");
@@ -1248,7 +1248,7 @@ async fn test_a_request_claimed_elsewhere_leaves_no_member (
       let input : &str = indoc! {"
         * (skg node (gnid 1) (skgRepos (nodeRepo main)) (viewRequests editableView)) 1
         ** (skg node (gnid 12)) 12
-        *** (skg node (gnid 122) writeProtected omittedBody) 122
+        *** (skg node (gnid 122) writeProtected (view omittedBody)) 122
         * (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) 12
       "};
       let mut saved : Vec<String> = Vec::new ();

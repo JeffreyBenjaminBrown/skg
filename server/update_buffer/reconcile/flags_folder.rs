@@ -35,10 +35,8 @@ pub fn reconcile_flags_folder_children (
       ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) => Ok (*flag),
       _ => Err ("managed child is not a Flag" . to_string ()), },
     &goals,
-    |flag| Ok (viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Flag {
-        flag : *flag,
-        title    : String::new (),
-        body     : None, })))) ?;
+    |flag| Ok (viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::flag (
+        *flag, String::new (), None ))))) ?;
   // The key-based reconciler retains an existing leaf. Restore its generated
   // titleless shape too, so title edits never linger after a refresh.
   treat_certain_children (

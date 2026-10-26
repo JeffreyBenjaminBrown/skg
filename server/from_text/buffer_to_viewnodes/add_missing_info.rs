@@ -156,11 +156,12 @@ fn make_alias_if_appropriate(
         = &org . kind
       else { unreachable!() };
       org . kind = MpViewnodeKind::PropertyMember (
-        PropertyMember::Alias { text: t . title . clone(),
-                      relRepo: t . viewStats . relRepo . clone (),
-                      relationshipEditRequest: // an alias takes no restoreRel
-                        t . relationshipEditRequest . clone () . filter ( |request|
-                          matches! (request, RelationshipEditRequest::RelRepo (_)) ) } ); }}
+        PropertyMember::alias (
+          t . title . clone(),
+          t . viewStats . relRepo . clone (),
+          // an alias takes no restoreRel
+          t . relationshipEditRequest . clone () . filter ( |request|
+            matches! (request, RelationshipEditRequest::RelRepo (_)) ) )); }}
   Ok (( )) }
 
 /// Inherit a skgrepo if both:

@@ -1,7 +1,7 @@
 * (skg (gnid 1) (view (rels (contents 3)))) 1
 ** (skg (gnid 11)) 11
 ** (skg (gnid 12) (view (rels (contents 1)))) 12
-*** (skg (gnid 1) (view (rels notInParent containsParent (contents 3))) (code noClaim writeProtected)) 1
-**** (skg (gnid 0) (view (rels notInParent containsParent (containers 0) (contents 1))) (code noClaim writeProtected)) 0
+*** (skg (gnid 1) (code noClaim writeProtected) (view (rels notInParent containsParent (contents 3)))) 1
+**** (skg (gnid 0) (code noClaim writeProtected) (view (rels notInParent containsParent (containers 0) (contents 1)))) 0
 *** (skg (gnid 121)) 121
 ** (skg (gnid 13)) 13

@@ -2,11 +2,12 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
-use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_sexp};
+use crate::herald_tokens::{
+  AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-  GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
+  GraphnodeStats, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
 use crate::update_buffer::warrant::warrant_of_viewnode;
@@ -69,7 +70,9 @@ fn set_viewnodestats_recursive (
       set_relRepo (tree, treeid, graph, config);
       set_warrant (tree, treeid, graph, config, restriction);
       Some (node_pid)
-    } else { None };
+    } else {
+      set_member_claim_and_warrant (tree, treeid, graph, config, restriction);
+      None };
   let was_new : bool =
     if let Some ( ref pid ) = opt_pid
     { ancestor_skgids . insert ( pid . clone() ) }
@@ -174,7 +177,7 @@ fn set_herald_strings_in_viewnode (
     } else { None };
   let birth_facts : Vec<BirthFact> =
     birth_facts (&parent_kind, claimsMembership, &flags, overridesHere);
-  let rel_heralds : Option<String> = relationship_heralds_sexp (
+  let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
@@ -386,6 +389,40 @@ fn set_warrant (
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . isWarranted = warrant; }}
 
+/// On a property member, sets 'isWarranted' (as 'set_warrant' does on
+/// an occurrence); on an alias, an ID or an unknown, sets
+/// 'claimsMembership' to whether HEAD alone does not warrant it
+/// ('Viewnode::is_ghostWarranted'), since the save must not read one
+/// the worktree lost. Anything else is left alone.
+fn set_member_claim_and_warrant (
+  tree        : &mut Tree<Viewnode>,
+  treeid      : NodeId,
+  graph       : Option<&InRustGraph>,
+  config      : &SkgConfig,
+  restriction : Option<&SkgrepoRestriction>,
+) {
+  let (claims, warrant) : (bool, Warrant) = {
+    let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
+    if ! matches! ( &node . value () . kind,
+                    ViewnodeKind::PropertyMember (_)
+                    | ViewnodeKind::Vognode (Vognode::Unknown (_)) )
+    { return; }
+    ( ! node . value () . is_ghostWarranted (),
+      match graph {
+        Some (graph) => warrant_of_viewnode (node, graph, config, restriction),
+        None => Warrant::ByGraph, } ) };
+  match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
+    ViewnodeKind::PropertyMember (
+      PropertyMember::Alias { claimsMembership, isWarranted, .. }
+      | PropertyMember::ID { claimsMembership, isWarranted, .. } ) => {
+      *claimsMembership = claims;
+      *isWarranted = warrant; },
+    ViewnodeKind::PropertyMember (PropertyMember::Flag { isWarranted, .. }) =>
+      *isWarranted = warrant,
+    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+      unknown . claimsMembership = claims,
+    _ => {}, }}
+
 /// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one
 /// the rendering hides. Herald "B" on the ☮. False
@@ -544,7 +581,7 @@ mod relationship_default_tests {
   }
 }
 
-/// Sets homeRepoAtBoundary on the unrestricted vognode at treeid.
+/// Sets repoBoundary on the unrestricted vognode at treeid.
 /// True if no unrestricted vognode ancestor exists (i.e. a root),
 /// or if the nearest unrestricted vognode ancestor has a different skgrepo.
 fn set_skgrepo_at_boundary (
@@ -564,7 +601,7 @@ fn set_skgrepo_at_boundary (
       Some (s) => s != node_skgrepo };
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . homeSkgrepoAtBoundary = at_boundary; }}
+  { t . viewStats . repoBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
 /// the nearest unrestricted vognode ancestor's skgrepo.

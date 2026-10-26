@@ -73,7 +73,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Child1 body
             * (skg node noClaim writeProtected) independent root node
             ParentIgnores body
-            * (skg node (viewStats cycle)) cycling node
+            * (skg node (view cycle)) cycling node
             This node has cycle flag
         "};
 
@@ -107,7 +107,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
       MpVognode::Unrestricted (t)) => t,
     _ => panic!("expected UnrestrictedVognode") };
   assert_eq!(cycle_node . title(), "cycling node");
-  assert_eq!(cycle_t . viewStats . cycle, true);
+  // 'cycle' is a derived fact, in '(view ...)', which the parser skips.
+  assert_eq!(cycle_t . viewStats . cycle, false);
   assert_eq!(cycle_node . body(),
              Some(&"This node has cycle flag" . to_string()));
 }

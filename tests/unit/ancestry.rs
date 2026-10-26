@@ -20,10 +20,7 @@ fn property_folder (qc : Folder) -> Viewnode {
   viewnode_of (ViewnodeKind::Folder (qc)) }
 
 fn alias_property (text : &str) -> Viewnode {
-  viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
-      text : text . to_string (),
-      relRepo : None,
-      relationshipEditRequest : None })) }
+  viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::alias ( text . to_string (), None, None ))) }
 
 fn child (
   tree : &mut Tree<Viewnode>, parent : NodeId, vn : Viewnode

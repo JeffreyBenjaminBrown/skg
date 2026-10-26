@@ -7,7 +7,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{RelationshipEditRequest, Existence, Folder, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -120,16 +120,16 @@ fn partnerFolder_differences_from_graph (
 /// claims the node has that partner now, which the check compares
 /// with the graph:
 /// - an unrestricted vognode that affects the folder;
-/// - an unknown phantom (a partner no node has), unless its
-///   relationship was removed ('(rel removed)').
+/// - an unknown phantom (a partner no node has) that claims
+///   membership.
 /// Every other child is the user's or the diff view's and is not
 /// counted. In particular a removed member, of either kind, is not:
 /// it stands for a relationship the before-graph had and the
 /// after-graph lacks, so counting it would refuse the folder the diff
 /// view rendered. The diff view shows a removed member as a non-member
 /// unrestricted vognode with '(rel removed)', or, when the partner
-/// is dangling, as an unknown phantom with that part; the first is
-/// excluded by its non-membership, the second by that part.
+/// is dangling, as an unknown phantom with that part; each carries
+/// 'noClaim', which excludes it.
 fn partnerFolder_members_in_view (
   folder : NodeRef<Viewnode>,
   graph  : &InRustGraph,
@@ -140,8 +140,7 @@ fn partnerFolder_members_in_view (
         if member . claimsMembership =>
         RelationshipEditRequest::relRepo_of (&member . relationshipEditRequest) . cloned (),
       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-        if child . value () . change_facts . change . rel
-           != Some (Existence::Removed) =>
+        if unknown . claimsMembership =>
         RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned (),
       _ => return None, };
     Some (( skgid_a_folder_child_stands_for (child . value (), graph) ?,
@@ -176,9 +175,10 @@ fn aliases_of_occurrence (
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewnodeKind::Folder (Folder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
-      let ViewnodeKind::PropertyMember (PropertyMember::Alias { text, relationshipEditRequest, .. }) =
+      let ViewnodeKind::PropertyMember (PropertyMember::Alias {
+        text, relationshipEditRequest, claimsMembership, .. }) =
         &alias . value () . kind else { return None; };
-      if alias . value () . is_ghostWarranted () { // one the worktree lost
+      if ! claimsMembership { // one the worktree lost
         return None; }
       Some ((text . clone (),
              RelationshipEditRequest::relRepo_of (relationshipEditRequest) . cloned ()))
@@ -625,10 +625,11 @@ mod tests {
   }
 
   /// A dangling removed member, as the diff view shows one (an
-  /// unknown phantom with '(rel removed)'), is not counted: the
-  /// folder beside it says what the graph says, and passes. The same
-  /// phantom without that part is a member, compared by its raw ID as
-  /// any unknown member is, and recorder does not list it.
+  /// unknown phantom with 'noClaim' and '(rel removed)'), is not
+  /// counted: the folder beside it says what the graph says, and
+  /// passes. The same phantom claiming membership is a member,
+  /// compared by its raw ID as any unknown member is, and recorder
+  /// does not list it.
   #[test]
   fn an_unknown_phantom_whose_relationship_was_removed_is_not_counted () {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
@@ -641,7 +642,7 @@ mod tests {
 ", gone ) };
     assert_eq! (
       errors_for_writeProtected_occurrences (
-        &forest (&text_with ("(skg unknown (gnid gone) (diff (rel removed)))")),
+        &forest (&text_with ("(skg unknown (gnid gone) noClaim (diff (rel removed)))")),
         &graph, &config (), None ),
       vec! [] );
     assert_eq! (

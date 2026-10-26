@@ -39,16 +39,22 @@
           "values": [ { "value": "tombstone" } ] } ] },
     { "kind": "unknown phantom", "atoms": [ "unknown" ],
       "fields": [
+        { "name": "noClaim", "shape": "atom", "default": "false",
+          "values": [ { "value": "true" } ] },
         { "name": "editRequest", "shape": "one", "default": "none",
           "values": [ { "value": "relRepo",
                         "arguments": [ { "of": "skgrepo" } ] } ] } ] },
     { "kind": "alias", "atoms": [ "alias" ],
       "fields": [
+        { "name": "noClaim", "shape": "atom", "default": "false",
+          "values": [ { "value": "true" } ] },
         { "name": "editRequest", "shape": "one", "default": "none",
           "values": [ { "value": "relRepo",
                         "arguments": [ { "of": "skgrepo" } ] } ] } ] },
     { "kind": "ID", "atoms": [ "id" ],
-      "fields": [] },
+      "fields": [
+        { "name": "noClaim", "shape": "atom", "default": "false",
+          "values": [ { "value": "true" } ] } ] },
     { "kind": "flag", "atoms": [ "flag" ],
       "fields": [] },
     { "kind": "the diff view's change viewnodes",

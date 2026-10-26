@@ -26,9 +26,9 @@ use std::error::Error;
 
 const REMOVED_X_UNDER_E : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
-  "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (rels (contains (in 2) (out 1))";
+  "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))";
 const RETAINED_X_UNDER_E : &str = // retained as non-member, still editable
-  "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels ";
+  "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
 /// rerender stream that follows sends it.
@@ -71,7 +71,7 @@ fn a_commit_converts_what_the_diff_view_showed (
   with_fixture ("commit_leftovers", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_lines_in_order (&buffer, &[
-      "* (skg node (gnid e)", REMOVED_X_UNDER_E, "(containerFolder changed)",
+      "* (skg node (gnid e)", REMOVED_X_UNDER_E, "containerFolder",
       "*** (skg node (gnid xc) ",
       "* (skg ghost (gnid h)", "** (skg node (gnid hm)",
       "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b)", REMOVED_X_UNDER_B ]);

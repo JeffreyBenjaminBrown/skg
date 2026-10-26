@@ -62,7 +62,8 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       Unknown {
         skgid : ID::from ("unknown"),
         relRepo : None,
-        relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), }))) };
+        relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))),
+        claimsMembership : true, }))) };
   unknown . consume_edit_request_after_save ();
   assert_eq! (unknown . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::Unknown (unknown)) = &unknown . kind
@@ -72,10 +73,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut alias : Viewnode = Viewnode {
     readiness_request : Some (ReadinessRequest {
       ready : false, objects : BTreeSet::new () }),
-    .. viewnode_of ( ViewnodeKind::PropertyMember (PropertyMember::Alias {
-      text : "alias" . into (),
-      relRepo : None,
-      relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), })) };
+    .. viewnode_of ( ViewnodeKind::PropertyMember (PropertyMember::alias ( "alias" . into (), None, Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))) ))) };
   alias . consume_edit_request_after_save ();
   assert_eq! (alias . readiness_request, None);
   let ViewnodeKind::PropertyMember (PropertyMember::Alias { relationshipEditRequest, .. }) =
@@ -171,8 +169,7 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
     viewnode_of (ViewnodeKind::Tombstone),
     viewnode_of (ViewnodeKind::Folder (Folder::Container)),
     viewnode_of (ViewnodeKind::Folder (Folder::Alias)),
-    viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
-      text : "an alias" . into (), relRepo : None, relationshipEditRequest : None })),
+    viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::alias ( "an alias" . into (), None, None ))),
     viewnode_of (ViewnodeKind::Vognode (Vognode::Ghost (
       Ghost { skgid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
               title : "g" . into (), body : None,

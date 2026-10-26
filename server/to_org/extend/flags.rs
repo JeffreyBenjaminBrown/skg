@@ -48,10 +48,8 @@ pub fn build_and_integrate_flags (
       if flag_is_true (&node . flags, flag) {
         insert_non_vognode_as_child (
           tree, folder,
-          ViewnodeKind::PropertyMember (PropertyMember::Flag {
-            flag,
-            title : String::new (),
-            body  : None, }),
+          ViewnodeKind::PropertyMember (PropertyMember::flag (
+            flag, String::new (), None )),
           false ) ?; } } }
   Ok (())
 }

@@ -252,7 +252,7 @@ pub fn set_diffView_facts_in_viewforest (
 /// On each unrestricted vognode whose home skgrepo moved: the move,
 /// and, when the nearest vognode ancestor whose home moved moved the
 /// same way, that ancestor's letter. Computed like
-/// 'homeSkgrepoAtBoundary', against the nearest moved ancestor. On
+/// 'repoBoundary', against the nearest moved ancestor. On
 /// every other unrestricted vognode, neither (a rerender may follow
 /// a commit that made a move part of HEAD).
 pub fn set_homeSkgrepoMove_facts_in_viewforest (

@@ -113,8 +113,7 @@ fn a_requested_alias_folder_becomes_the_changed_one (
     let changed : String = saved ( f, &insert_after_line_starting (
       &requested, "** (skg aliasFolder", "*** (skg alias) xa2" )) ?;
     assert_one_child_with (&changed, ROOT_X, "aliasFolder");
-    assert_one_child_with (&changed, ROOT_X, "(aliasFolder changed)");
-    assert_eq! ( children_of (&changed, "** (skg (aliasFolder changed)"), vec! [
+    assert_eq! ( children_of (&changed, "** (skg aliasFolder"), vec! [
       "*** (skg alias (diff (rel added) (leaves 1))) xa2" . to_string (),
       "*** (skg alias) xa1" . to_string () ],
       "{}", changed );
@@ -133,8 +132,8 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
       line . replacen ("(skgRepos (nodeRepo main))", REQUESTED_ALIASES, 1) )) ?;
     let collateral : String = edit_in_a_content_view ( f, "x", &requested,
       |text : &str| format! ( "{}** (skg aliasFolder)\n*** (skg alias) xa2\n", text )) ?;
-    assert_eq! ( children_of (&collateral, "** (skg (aliasFolder changed)"), vec! [
-      "*** (skg alias (diff (rel removed) (leaves 1))) xa1" . to_string (),
+    assert_eq! ( children_of (&collateral, "** (skg aliasFolder"), vec! [
+      "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) xa1" . to_string (),
       "*** (skg alias (diff (rel added) (leaves 1))) xa2" . to_string () ],
       "{}", collateral );
     assert_one_child_with (&collateral, ROOT_X, "aliasFolder");

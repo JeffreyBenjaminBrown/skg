@@ -93,8 +93,8 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
   set_viewnodestats_in_viewforest (
     // Mirror the production enrichment path (handle_snapshot_response):
     // compute view-relative stats so the rendered buffer carries the
-    // homeRepoHerald at skgrepo boundaries. Empty containment maps suffice
-    // here -- homeRepoAtBoundary is derived from the tree alone; the maps
+    // repoBoundary at skgrepo boundaries. Empty containment maps suffice
+    // here -- repoBoundary is derived from the tree alone; the maps
     // only feed the containsParent stat, which this test does not assert.
     &mut viewforest,
     graph,
@@ -685,8 +685,6 @@ pub fn build_search_viewforest (
           let mut aliasfolder_mut : NodeMut<Viewnode> =
             viewforest . get_mut (aliasfolder_skgid) . unwrap ();
           aliasfolder_mut . append ( viewnode_of (
-            ViewnodeKind::PropertyMember ( PropertyMember::Alias {
-              text            : title . clone (),
-              relRepo         : None,
-              relationshipEditRequest : None } )) ); }} }
+            ViewnodeKind::PropertyMember ( PropertyMember::alias (
+              title . clone (), None, None ))) ); }} }
   (viewforest, search_results) }

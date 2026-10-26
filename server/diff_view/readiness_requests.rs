@@ -6,7 +6,8 @@
 //!
 //! A save consumes the readiness requests of the buffer it saves, in
 //! any buffer ('consume_readiness_requests'): after the graph edits
-//! succeed, each '(readyRequest ...)' or '(unreadyRequest ...)' sets or
+//! succeed, each '(editRequest (ready ...))' or '(editRequest (unready
+//! ...))' sets or
 //! clears the marks of the leaves it names, at their fingerprints in
 //! the graph straddle brought up to date with the save. A request that
 //! names no current change is dropped with a warning. A save that stops

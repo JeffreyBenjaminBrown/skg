@@ -67,13 +67,14 @@ pub fn reconcile_aliasFolder_children (
       _ => Err ( "reconcile_aliasFolder_children: managed child is not an alias"
                  . to_string() ), }; // managed means PropertyMember::Alias
   let create_alias = |text: &String| -> Result<Viewnode, String> {
-    Ok ( viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias { text : text . clone(),
-                                               relRepo : alias_relRepos
-                                                 . get (text)
-                                                 . and_then ( |relRepo|
-                                                   if relRepo == &parent_graphnode . home_skgrepo { None }
-                                                   else { Some (relRepo . clone ()) } ),
-                                               relationshipEditRequest : None } )))};
+    Ok ( viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::alias (
+      text . clone(),
+      alias_relRepos
+        . get (text)
+        . and_then ( |relRepo|
+          if relRepo == &parent_graphnode . home_skgrepo { None }
+          else { Some (relRepo . clone ()) } ),
+      None ) )))};
   complete_managed_children_in_viewforest(
     tree,
     aliasfolder_treeid,

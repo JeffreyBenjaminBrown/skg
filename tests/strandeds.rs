@@ -172,7 +172,7 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
     { // The first save asks, and changes nothing, consuming no request.
       let (response, _) : (SaveResponse, HashMap<String, String>) =
         save ( &mut f,
-               &moved . replace ("(skgRepos (nodeRepo public))", "(skgRepos (nodeRepo public)) (diff (readyRequest all))"),
+               &moved . replace ("(skgRepos (nodeRepo public))", "(skgRepos (nodeRepo public)) (editRequest (ready all))"),
                &view_n, &StrandedsReview::NotReviewed ) ?;
       let stranded = response . strandeds_confirmation
         . expect ("the move strands q's relationship to n");

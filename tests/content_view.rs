@@ -57,7 +57,7 @@ async fn test_multi_root_view_logic (
   let expected = indoc! {"* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1
                           1 has a body
                           * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
-                          * (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected omittedBody) 1
+                          * (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody)) 1
                           "};
                           // 'omittedBody': node 1 has a body, and this
                           // (repeated, hence write-protected) occurrence of it
@@ -81,11 +81,11 @@ async fn test_single_root_view_with_cycle (
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg node (gnid a) (skgRepos (nodeRepo main)) (rels (contains (out 1)))) a
-                              ** (skg node (gnid b) (skgRepos (nodeRepo main)) (rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))) b
+      let expected = indoc! {"* (skg node (gnid a) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) a
+                              ** (skg node (gnid b) (skgRepos (nodeRepo main)) (view (rels (contains (in 2 (ancestors 1)) (out 1))) (birth (contains in 1)))) b
                               b has a body
-                              *** (skg node (gnid c) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1)))) c
-                              **** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 2 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1))) (viewStats cycle)) b
+                              *** (skg node (gnid c) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)))) c
+                              **** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 2 (ancestors 1)) (out 1 (ancestors 1)))) (birth (contains in 1)) cycle)) b
                               "};
       assert_metadata_eq!(result, expected,
                  "Single root view should detect cycle and mark repeated node");
@@ -115,19 +115,19 @@ async fn test_multi_root_view_with_shared_nodes (
       // containers folder, whose one write-protected member is node 1;
       // node 1 has no container, so no chain hangs under it.
       let expected = indoc! {
-        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 2)) (hidesFromSubs (out 2)))) title 1
+        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1) (birth (contains in 1)))) title 2
-         ** (skg node (gnid 5) (skgRepos (nodeRepo main)) (overridesHere 3) (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1))) (extraIds 1) (birth (overrides out)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 2
+         ** (skg node (gnid 5) (skgRepos (nodeRepo main)) (overridesHere 3) (view (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1)))) (props (extraIds 1)) (birth (overrides out)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1))) title 2
+         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
-         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2)) (birth (contains out 2)))) title 1
+         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2))) (birth (contains out 2)))) title 1
          ** (skg subscribeeFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (subscribesTo in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (subscribesTo in 2)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -162,19 +162,19 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + default folders (folders are not budget-bound);
       // subscribee members are write-protected.
       let expected = indoc! {
-        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 2)) (hidesFromSubs (out 2)))) title 1
+        "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2)) (hidesFromSubs (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1) (birth (contains in 1)))) title 2
-         ** (skg node (gnid 5) (skgRepos (nodeRepo main)) (overridesHere 3) (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1))) (extraIds 1) (birth (overrides out)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2))) (props (extraIds 1)) (birth (contains in 1)))) title 2
+         ** (skg node (gnid 5) (skgRepos (nodeRepo main)) (overridesHere 3) (view (rels (linksTo (in 1 (substantive 1)) (out 3)) (subscribesTo (in 2)) (overrides (out 2)) (hidesFromSubs (in 1 (ancestors 1)))) (props (extraIds 1)) (birth (overrides out)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2)) (extraIds 1))) title 2
+         * (skg node (gnid 2) (skgRepos (nodeRepo main)) (view (rels (contains (in 1)) (linksTo (in 1 (substantive 1))) (subscribesTo (out 2))) (props (extraIds 1)))) title 2
          this one string could span pages
          ** (skg containerFolder)
-         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2)) (birth (contains out 2)))) title 1
+         *** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 2 (ancestors 2))) (hidesFromSubs (out 2))) (birth (contains out 2)))) title 1
          ** (skg subscribeeFolder)
-         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1)) (extraIds 1) (birth (subscribesTo in 2)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg node (gnid 4) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 2 (ancestors 2))) (overrides (in 1)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (subscribesTo in 2)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg node (gnid 5) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (out 0 (unintegrated 0))) (linksTo (in 1 (substantive 1)) (out 3 (ancestors 2))) (subscribesTo (in 2 (ancestors 2))) (overrides (out 2)) (hidesFromSubs (in 1))) (props (extraIds 1)) (birth (subscribesTo in 2)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");
@@ -211,16 +211,16 @@ async fn test_limit_with_multiple_sibling_groups (
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 2)))) 1
+      let expected = indoc! {"* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2))))) 1
                               1 body
-                              ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1)))) 11
+                              ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 2))) (birth (contains in 1)))) 11
                               11 body
-                              *** (skg node (gnid 111) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 111
+                              *** (skg node (gnid 111) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 111
                               111 body
-                              *** (skg node (gnid 112) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 112
-                              ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 12
+                              *** (skg node (gnid 112) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 112
+                              ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12
                               12 body
-                              *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected omittedBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 121
+                              *** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121
                               "};
       assert_metadata_eq!(result, expected,
                  "limit=4: whole groups shown (111,112 and 121); extension stops at the budget");

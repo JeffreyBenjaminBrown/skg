@@ -71,7 +71,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
   let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
     else { panic! ("expected UnrestrictedVognode") };
-  assert! ( ! t . viewStats . homeSkgrepoAtBoundary,
+  assert! ( ! t . viewStats . repoBoundary,
             "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
@@ -111,6 +111,6 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
   let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
     else { panic! ("expected UnrestrictedVognode") };
-  assert! ( t . viewStats . homeSkgrepoAtBoundary,
+  assert! ( t . viewStats . repoBoundary,
             "Different repo across non-content boundary \
              should be at boundary" ); }
