@@ -27,7 +27,7 @@ local sexpr = require('skg.sexpr.parse')
 ---(depth type title) triples for every headline in BUF that carries
 ---skg metadata; headlines without metadata are skipped. Type is
 ---derived from the second element of the (skg ...) form: node,
----deleted, tombstone, aliasFolder, etc. The port of
+---ghost, tombstone, aliasFolder, etc. The port of
 ---save_collateral_break_cycle/test-helpers.el's
 ---headline-types-and-titles.
 ---@param buf integer
@@ -220,18 +220,18 @@ require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 4: save response arrived')
 
 print('=== PHASE 5: Verify both buffers after delete ===')
--- Buffer 2: '11' became DeletedNode, 'subee' is unchanged.
+-- Buffer 2: '11', a root the save deleted, became a childless
+-- tombstone, which the prune removed; 'subee' is unchanged.
 T.check(vim.api.nvim_buf_is_valid(buf2), 'Buffer 2 still exists')
 print('Buffer 2 after delete:\n' .. T.buffer_text(buf2))
 assert_headline_types_and_titles(buf2,
-  { { 1, 'deleted', '11' },
-    { 1, 'node', 'subee' },
+  { { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' } },
   'phase 5: buffer 2 after delete')
 -- Buffer 1 (collateral): the delete of 11 propagates to node 1
 -- (which contained it). 1.skg's contains has had 11 stripped, so on
 -- rerender the 11-subtree is gone entirely from buffer 1 -- no
--- DeletedNode, no Tombstone descendants.
+-- tombstone, nor anything under one.
 T.check(vim.api.nvim_buf_is_valid(buf1), 'Buffer 1 still exists')
 print('Buffer 1 after collateral delete:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
@@ -272,8 +272,7 @@ assert_headline_types_and_titles(buf1,
 T.check(vim.api.nvim_buf_is_valid(buf2), 'Buffer 2 still exists')
 print('Buffer 2 after collateral update:\n' .. T.buffer_text(buf2))
 assert_headline_types_and_titles(buf2,
-  { { 1, 'deleted', '11' },
-    { 1, 'node', 'subee' },
+  { { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' },
     { 2, 'node', 'subee-2' } },
   'phase 7: buffer 2 after updating collateral view')

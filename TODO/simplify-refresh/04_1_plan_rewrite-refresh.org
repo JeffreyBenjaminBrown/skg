@@ -851,7 +851,7 @@ no trace of a hidden node but a tombstone over its children;
 and a test that a save of an editable node under a
 restriction keeps its hidden members, which disk
 supplementation owns (see "New issues").
-** TODO Slice 3: one ghost, in the diff view only
+** DONE Slice 3: one ghost, in the diff view only
 'Ghost' replaces 'PhantomDeleted' and 'PhantomHistorical';
 'Unknown' leaves the enum; 'Vognode' has the three cases.
 '(ghost (gnid X) (skgRepos (nodeRepo R)))' replaces the two

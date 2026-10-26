@@ -333,7 +333,7 @@ end
 local markers = { focused = true, folded = true, bodyFolded = true }
 
 ---The kind of the headline at LINE_NUMBER, as the atom that heads its
----metadata after the markers (node, deleted, tombstone,
+---metadata after the markers (node, ghost, tombstone,
 ---aliasFolder, alias ...), or nil for a headline without metadata.
 ---Mirrors skg--headline-kind-at-point.
 ---@param line_number integer
@@ -352,10 +352,10 @@ end
 ---Whether the save can give the headline at LINE_NUMBER a skgrepo by
 ---inheritance, as the server's walk rootward decides
 ---('skgrepo_of_nearest_unrestricted_ancestor'): it passes through
----phantoms and folders, and through headlines without metadata, which
----inherit the same way; the first other ancestor must be an
----unrestricted vognode. A root cannot inherit, nor can a headline
----whose walk ends at a tombstone or a property.
+---unknowns, ghosts and folders, and through headlines without
+---metadata, which inherit the same way; the first other ancestor must
+---be an unrestricted vognode. A root cannot inherit, nor can a
+---headline whose walk ends at a tombstone or a property.
 ---Mirrors skg--headline-can-inherit-skgrepo-p.
 ---@param line_number integer
 ---@return boolean
@@ -368,8 +368,7 @@ function M.headline_can_inherit_skgrepo_p (line_number)
     local kind = M.headline_kind_atom(line)
     if kind == 'node' then return true end
     if not (kind == nil
-            or kind == 'deleted' or kind == 'unknown'
-            or kind == 'historical'
+            or kind == 'unknown' or kind == 'ghost'
             or kind:match('Folder$')) then
       return false end
   end

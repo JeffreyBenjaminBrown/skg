@@ -76,7 +76,7 @@ do
   for _, expected in ipairs({
       '(oldText title)',                    -- t's text edit
       '(homeSkgrepoMove (old alpha) (new beta))',  -- m's move
-      '(historical (id d)',                 -- d's deletion
+      '(ghost (gnid d)',                    -- d's deletion
       'acquiredFolder' }) do                -- x's nodeMerge
     T.check(text:find(expected, 1, true) ~= nil,
             'the "all changes" buffer shows ' .. expected)

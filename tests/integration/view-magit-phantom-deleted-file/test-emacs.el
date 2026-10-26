@@ -1,13 +1,12 @@
-;;; Integration test: skg-goto-in-magit on a phantom whose file is
+;;; Integration test: skg-goto-in-magit on a ghost whose file is
 ;;; gone from disk.
 ;;;
 ;;; HEAD:       a contains [b]; a.skg and b.skg both committed.
 ;;; Worktree:   a no longer contains b; b.skg deleted from disk.
 ;;;
 ;;; Phase 1: Open the diff view.
-;;; Phase 2: In its "all changes" buffer, b appears as a historical
-;;;          phantom.
-;;; Phase 3: Call skg-goto-in-magit on the phantom b.
+;;; Phase 2: In its "all changes" buffer, b appears as a ghost.
+;;; Phase 3: Call skg-goto-in-magit on the ghost b.
 ;;; Phase 4: Verify magit opened on the skg-data skgrepo (not the outer
 ;;;          skg project skgrepo), and that point is on b.skg.
 
@@ -61,17 +60,17 @@
   (let ((content (with-current-buffer (find-content-view-buffer)
                    (buffer-substring-no-properties
                     (point-min) (point-max)))))
-    (unless (string-match-p "(historical (id b)" content)
-      (test-fail "No historical phantom b in buffer. Content:\n%s" content))
-    (test-pass "Historical phantom b present")))
+    (unless (string-match-p "(ghost (gnid b)" content)
+      (test-fail "No ghost b in buffer. Content:\n%s" content))
+    (test-pass "Ghost b present")))
 
 (defun phase-3-call-view-magit-on-phantom-b ()
   (setq integration-test-phase "phase-3")
   (let ((buf (find-content-view-buffer)))
     (switch-to-buffer buf)
     (goto-char (point-min))
-    (unless (re-search-forward "(historical (id b)" nil t)
-      (test-fail "Could not find phantom b line"))
+    (unless (re-search-forward "(ghost (gnid b)" nil t)
+      (test-fail "Could not find ghost b line"))
     (beginning-of-line)
     (message "  Positioned on: %s"
              (buffer-substring-no-properties

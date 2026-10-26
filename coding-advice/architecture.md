@@ -34,12 +34,13 @@ Viewnodes are not all graphnodes:
 ```
 viewnode = vognode | propertyFolder | property | partnerFolder
          | bufferRoot | tombstone
-vognode  = unrestricted | restricted | phantom
+vognode  = unrestricted | ghost | unknown
 ```
 
-A vognode represents a graphnode, which need not exist. Unrestricted and restricted
-vognodes represent current graphnodes; phantoms represent missing or
-historical occurrences. Property folders and partner folders carry aliases,
+A vognode represents a graphnode, which need not exist. An unrestricted
+vognode represents a current graphnode; a ghost, only in the diff view,
+a node HEAD has and the worktree lacks; an unknown, a reference that
+resolves to nothing. Property folders and partner folders carry aliases,
 IDs, flags, or relationships.
 New editable nodes may lack an ID until save preparation assigns one.
 Editability, viewnode kind, and relationship context determine how text is

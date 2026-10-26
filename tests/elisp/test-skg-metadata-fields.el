@@ -18,7 +18,7 @@
 bare or heading a list, after any marker; nil for no kind."
   (dolist (case '(((skg (node (id abc) (repo jeff))) . "unrestricted node")
                   ((skg focused (node (id abc))) . "unrestricted node")
-                  ((skg (historical (id g) (repo r))) . "historical phantom")
+                  ((skg (ghost (gnid g) (skgRepos (nodeRepo r)))) . "ghost")
                   ((skg alias (relRepo r)) . "alias")
                   ((skg (flag noSearchMatching)) . "flag")
                   ((skg (subscribeeFolder changed)) . "folder")
@@ -518,9 +518,9 @@ atom; filling in shows it at its default and stripping drops it."
                    sexp))))
 
 (ert-deftest test-fillIn-leaves-a-kind-without-fields-alone ()
-  "A deleted phantom has no field a user may set: filling in and
-stripping change nothing."
-  (let* ((sexp '(skg (deleted (id d) (repo r))))
+  "A tombstone has no field a user may set: filling in and stripping
+change nothing."
+  (let* ((sexp '(skg folded tombstone))
          (kind (skg-metadata-fields-kind-of-sexp sexp))
          (org-text (sexp-to-org sexp)))
     (should (equal (skg-metadata-fields-fillIn-defaults-in-org org-text kind)

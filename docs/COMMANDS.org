@@ -487,13 +487,15 @@ and edits the acquirer's metadata to request a merge.
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
 *** C-c s n : skg-restore-deleted-node
-In a buffer of the diff view, on a historical phantom (a node deleted
-since HEAD, shown =☮ ∃-=), requests that the save write the node back
+In a buffer of the diff view, on a ghost (a node deleted since HEAD,
+shown =☮ ∃-=), requests that the save write the node back
 as HEAD had it: its file in its home skgrepo, its own relationships
 included, and its place in each list that recorded it at HEAD (at its
 index there, in the skgrepo that recorded it), unless that recorder is
 itself deleted. The headline shows =restore node= until the save. On
-any other headline it refuses at once. It does not save. Save the view
+any other headline it refuses at once, with "Only a node deleted
+since HEAD can be restored; restoreNode belongs on a ghost
+(skg-restore-deleted-node)". It does not save. Save the view
 afterward to apply it. See "Restoring what a change removed" in
 [[./diff-view.org][the diff view's docs]].
 *** C-c s l : skg-restore-removed-membership
@@ -501,7 +503,7 @@ In a buffer of the diff view, on a removed member, or on a member of
 a partner folder whose relationship to the folder's viewparent was removed
 (=~-=), editable or write-protected, requests that the save re-add that
 one relationship as HEAD recorded it. The headline shows =restore
-membership= until the save. On a historical phantom it refuses with
+membership= until the save. On a ghost it refuses with
 "This node is deleted; restore it first (skg-restore-deleted-node)",
 and on any other headline likewise at once. It does not save. Save the view
 afterward to apply it. A relationship whose other end is still deleted
@@ -608,7 +610,7 @@ moved to the new default.
 
 The command only edits metadata in the current buffer.
 Save the view afterward to apply the changes.
-** C-c r : commit readiness, in the diff view
+** C-c r : commit readiness and ghosts, in the diff view
 *** preamble
 In a buffer of the diff view (C-c v d), each change can be
 marked commit-ready. A mark approves the change as it is now: editing
@@ -703,6 +705,20 @@ unready change".
 *** C-c r p r : skg-diffView-goto-previous-ready-change
 Like C-c r n r, backward. Before the first one it says "No earlier
 ready change".
+*** C-c r t : skg-request-ghost-tombstone
+In a buffer of the diff view, on a ghost (a node deleted since HEAD,
+shown =☮ ∃-=), entombstones it, then saves. A ghost stays where the
+diff view drew it, across saves, until it is entombstoned (or its
+node comes back). The save replaces it with a tombstone, keeping
+what you put under it and dropping what the diff view drew there; a
+tombstone left with no children vanishes. On any other headline it
+refuses at once, with "Only a ghost can be entombstoned; the
+tombstone view request belongs on a ghost
+(skg-request-ghost-tombstone)".
+*** C-c r T : skg-request-buffer-ghosts-tombstone
+Like C-c r t, on every ghost in the buffer at once, then saves once.
+With no ghost in the buffer it says "No ghost in this buffer." and
+does not save.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
@@ -779,7 +795,7 @@ it through the values that kind takes,
 as 'shared/metadata-fields.json' lists them:
 a write-protected node is offered no delete, merge or flag request,
 a removed member is also offered restoreRel,
-a historical phantom restoreNode.
+a ghost restoreNode and the tombstone view request.
 A value that needs more (merge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied

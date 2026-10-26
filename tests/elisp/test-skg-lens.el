@@ -101,8 +101,8 @@ before each output that the rule's list children produce."
 
 (ert-deftest test-skg-transform-sexp-flat-string-prefix-no-children-match-emits-prefix ()
   "If no list child fires, a string-literal prefix is emitted alone.
-This lets rules like (STOP deleted \"DELETED\" (id) (repo)) serve
-as a label even when their sub-rules are vacuous."
+This lets rules like (CRUCIAL ghost \"☮\" (gnid) (skgRepos (nodeRepo)))
+serve as a label even when their sub-rules are vacuous."
   (should
     (equal
       (skg-transform-sexp-flat

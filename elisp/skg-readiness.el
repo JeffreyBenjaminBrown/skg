@@ -12,7 +12,7 @@
 ;;; form, beside '(ready ...)'. The OBJECTs
 ;;; are those a request on the headline may name: 'node' (∃, its
 ;;; existence) and/or 'rel' (~, its relationship to its viewparent) on
-;;; a vognode or phantom, each worth one leaf; 'all' on a modified node
+;;; a vognode (a ghost among them), each worth one leaf; 'all' on a modified node
 ;;; (M, every leaf its file records, beside 'rel' when that names a
 ;;; leaf) and on a commit readiness aggregate (a changeset marker); none
 ;;; on a headline that names one leaf. N is how many distinct leaves a
@@ -105,9 +105,9 @@ its move. Works on write-protected occurrences too."
 
 (defun skg--readiness-host (metadata-sexp)
   "The list in METADATA-SEXP that holds its '(diff ...)' form: the
-form among its elements that holds one, as a vognode's or a
-phantom's does, if one does, else the whole sexp, as a property's or
-a changed folder's."
+form among its elements that holds one, as a vognode's (a ghost's
+among them) does, if one does, else the whole sexp, as a property's
+or a changed folder's."
   (or (seq-find (lambda (element)
                   (and (consp element)
                        (assq 'diff (cdr element))))
@@ -293,8 +293,8 @@ On refusal, write nothing and return nil."
   "Replace the readiness request of the headline at point with one
 that marks (READY non-nil) or unmarks the leaves on OBJECTS. The
 request is the last part of the headline's '(diff ...)' form, which
-lies under '(node ...)' or another phantom's form, or at top level
-on a property. A headline without the form gets one."
+lies under '(node ...)', '(ghost ...)' or another vognode's form, or
+at top level on a property. A headline without the form gets one."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
          (host (skg--readiness-host metadata-sexp))
          (request (cons (if ready 'readyRequest 'unreadyRequest) objects))

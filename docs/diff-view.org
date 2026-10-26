@@ -154,9 +154,11 @@ changes completion so:
   reconciled by the per-visit step from the straddle; any other is
   refreshed from the live graph at its own visit, as in every view;
 - a partner folder shows the union of the straddle;
-- a deleted phantom whose node the before-graph has becomes its
-  historical phantom, and a historical phantom in content position
-  adds its old content;
+- an occurrence whose node the live graph lacks becomes its ghost
+  when the before-graph has the node, and a tombstone when it does
+  not; a ghost in content position adds its old content, and a ghost
+  carrying '(viewRequests tombstone)' becomes a tombstone ("Dismissing
+  a ghost");
 - the node budget is charged only as "Editability in the diff view"
   says;
 - each editable node's visit ends in the per-visit step;
@@ -268,7 +270,8 @@ same mark. The relRepo changeset marker, "some content relationships
 changed skgrepo", sits under the recorder when a content relationship
 moved. Mentions have no relRepo.
 *** deleted and new nodes
-A deleted node is shown as its historical phantom: write-protected,
+A deleted node is shown as its ghost, written '(ghost (gnid ID)
+(skgRepos (nodeRepo REPO)) ...)': write-protected,
 with HEAD's title and body, under each former container. Its old
 content stands beneath it, recursing into deleted members. Its
 existence is one leaf. An acquiree's phantom holds a derived,
@@ -289,8 +292,8 @@ too); any other child by its kind (a folder entry by its entry). A
 key is matched among all the children of the viewnode, whoever drew
 them. A matched child is adopted: kept, with its fold state, and its
 kind and change facts are updated in place: a member that loses its
-relationship becomes a removed member and back, a deleted phantom
-becomes a historical phantom and back, a graft or a copy the user
+relationship becomes a removed member and back, an occurrence whose
+node was deleted becomes its ghost and back, a graft or a copy the user
 pasted becomes the removed member of its node. A second child of a
 matched key is a duplicate: of the copies the editable one is
 adopted, else the first in buffer order, and each other is retained
@@ -307,9 +310,11 @@ fold state only on a viewnode it creates (a context node's body and a
 container folder start folded, the rest open).
 
 A root stays until the buffer is closed, whatever becomes of the
-changes under it. A commit is an ordinary rerender: the roots stand
-as plain context with their change viewnodes gone, and a root whose
-node the commit deleted is shown as a deleted phantom. A removed
+changes under it, or until the user entombstones its ghost
+("Dismissing a ghost"). A commit is an ordinary rerender: the roots stand
+as plain context with their change viewnodes gone, and a ghost root
+whose node the commit deleted, now in neither graph, becomes a
+tombstone, pruned when it holds nothing of the user's. A removed
 member that held content, or any change viewnode that held
 something of the user's, stays as a non-member, keeping its
 editability, or a tombstone holding it.
@@ -655,7 +660,7 @@ after the skgsave-commit; a save that stops for a confirmation or fails
 leaves them in the buffer.
 ** '(editRequest restoreNode)': a deleted node
 C-c s n ('skg-restore-deleted-node'; Neovim '<localleader>sn',
-':SkgRestoreDeletedNode') writes it into a historical phantom, the only
+':SkgRestoreDeletedNode') writes it into a ghost, the only
 headline that accepts it (herald "restore node"). The save writes the
 node's file from the before-graph's copy of it (title, body, aliases,
 extra IDs, flags, home skgrepo, and its four relationship lists with
@@ -677,7 +682,7 @@ containerward chain), or a member of a partner folder whose
 relationship to the folder's viewparent was removed, editable or
 write-protected (herald "restore membership"). The command and the
 save both refuse it anywhere else, by where the headline stands, with
-"Only a removed membership can be restored". On a historical phantom it refuses with "This
+"Only a removed membership can be restored". On a ghost it refuses with "This
 node is deleted; restore it first (skg-restore-deleted-node)". The save
 re-adds the one relationship the headline stands for (the readiness
 requests' 'relationship_to_viewparent' names it), as HEAD recorded it:
@@ -694,12 +699,27 @@ save. A relationship that a restored node records is restored with its
 file.
 ** The rerender
 The save's rerender shows the result as any save's does: the
-historical phantom of a restored node becomes the node again, and a
+ghost of a restored node becomes the node again, and a
 removed member whose relationship returned becomes a member again. A
 change that no longer differs from HEAD leaves the change view; what
 the buffer still holds of it is kept or converted as "What a
 reconciler keeps" describes.
 
+* Dismissing a ghost
+A ghost stays where it stands until the user dismisses it. C-c r t
+('skg-request-ghost-tombstone'; Neovim '<localleader>rt',
+':SkgRequestGhostTombstone') writes '(viewRequests tombstone)' into
+the ghost at point and saves; C-c r T
+('skg-request-buffer-ghosts-tombstone'; Neovim '<localleader>rT',
+':SkgRequestBufferGhostsTombstone') does it to every ghost in the
+buffer, in one save. The request is a view request: the save changes
+no file, and its rerender makes the ghost a tombstone, which keeps
+what the user put under it and drops what the diff view drew there
+(its old content, its acquisition folder); left childless, it is
+pruned. The parser refuses the request on anything but a ghost. A
+ghost root, once gone, is not drawn again; a ghost under a node that
+contained it at HEAD is, at that node's next rerender, since the node's
+removed members are recomputed from the straddle at every visit.
 * Stage and commit
 C-c r c ('skg-stage-and-commit') prompts once for a message and sends
 "stage and commit". The server stages the changed '.skg' files of

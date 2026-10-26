@@ -152,7 +152,7 @@ end
 ---When any list child fires, the prefix is concatenated (no
 ---separator) before each of its outputs. When no list child fires but
 ---the prefix is non-empty, the prefix is emitted alone -- so rules
----like (STOP deleted "DELETED" (id) (repo)) serve as a label for the
+---like (CRUCIAL ghost "☮" (gnid) (skgRepos (nodeRepo))) serve as a label for the
 ---structure even when their sub-rules are vacuous.
 ---@param object any[]
 ---@param header table

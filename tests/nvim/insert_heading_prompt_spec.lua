@@ -105,7 +105,8 @@ describe('the skgrepo prompt after inserting a headline', function ()
        function ()
       for _, case in ipairs({
         { '** (skg subscribeeFolder)', false },
-        { '** (skg (deleted (id d) (repo public))) d', false },
+        { '** (skg (ghost (gnid d) (skgRepos (nodeRepo public)))) d', false },
+        { '** (skg (unknown (id u)))', false },
         { '** (skg bodyFolded (node (id m) (repo public))) m', false },
         { '** (skg tombstone)', true } }) do
         content_view_with(table.concat({

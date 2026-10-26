@@ -103,8 +103,8 @@ describe('skg.readiness', function ()
       run({ '* (skg (node (id m) (repo r) (diff (rel added) (properties changed) (leaves 3 rel all) (ready rel)))) m' },
           1, readiness.cycle_commit_ready))
     assert.are.same(
-      { '* (skg (historical (id d) (repo r) (diff (node removed) (leaves 1 node) (readyRequest node)))) d' },
-      run({ '* (skg (historical (id d) (repo r) (diff (node removed) (leaves 1 node)))) d' },
+      { '* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node) (readyRequest node)))) d' },
+      run({ '* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node)))) d' },
           1, readiness.cycle_commit_ready))
   end)
 
@@ -158,7 +158,7 @@ describe('skg.readiness', function ()
     assert.are.same({
       '* (skg (node (id r) (repo r) (diff (leaves 3 all) (readyRequest all)))) r',
       '** (skg (changesetMarker content) (diff (leaves 2 all)))',
-      '** (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel) (readyRequest node rel)))) d',
+      '** (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (readyRequest node rel)))) d',
       '*** (skg (node (id k) (repo r) writeProtected)) k',
       '** (skg (node (id c) (repo r) writeProtected (diff (rel added) (leaves 1 rel) (readyRequest rel)))) c',
       '** (skg (node (id m) (repo r) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all) (readyRequest rel)))) m',
@@ -166,7 +166,7 @@ describe('skg.readiness', function ()
       '** (skg (oldText title) (diff (leaves 1))) other' },
       run({ '* (skg (node (id r) (repo r) (diff (leaves 3 all)))) r',
             '** (skg (changesetMarker content) (diff (leaves 2 all)))',
-            '** (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel)))) d',
+            '** (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel)))) d',
             '*** (skg (node (id k) (repo r) writeProtected)) k',
             '** (skg (node (id c) (repo r) writeProtected (diff (rel added) (leaves 1 rel)))) c',
             '** (skg (node (id m) (repo r) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all)))) m',
@@ -228,12 +228,12 @@ describe('skg.readiness', function ()
 
   it('asks before a wide unmark, and writes nothing on refusal', function ()
     local lines = {
-      '* (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel)))) d',
+      '* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel)))) d',
       '** (skg (oldText title) (diff (leaves 1) (ready))) d' }
     assert.are.same(lines,
       run(lines, 1, readiness.cycle_commit_ready_recursive, 'no'))
     assert.are.same({
-      '* (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel) (unreadyRequest node rel)))) d',
+      '* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel) (unreadyRequest node rel)))) d',
       '** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) d' },
       run(lines, 1, readiness.cycle_commit_ready_recursive, 'yes'))
     -- Unmarking a modified node unmarks every leaf it records: two here.

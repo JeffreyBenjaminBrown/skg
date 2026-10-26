@@ -43,7 +43,7 @@ describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
     for sexp_text, kind_name in pairs({
         ['(skg (node (id abc) (repo jeff)))'] = 'unrestricted node',
         ['(skg focused (node (id abc)))'] = 'unrestricted node',
-        ['(skg (historical (id g) (repo r)))'] = 'historical phantom',
+        ['(skg (ghost (gnid g) (skgRepos (nodeRepo r))))'] = 'ghost',
         ['(skg alias (relRepo r))'] = 'alias',
         ['(skg (flag noSearchMatching))'] = 'flag',
         ['(skg (subscribeeFolder changed))'] = 'folder',
@@ -339,7 +339,7 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
   end)
 
   it('leaves a kind without fields alone', function ()
-    local sexp = sexpr.read('(skg (deleted (id d) (repo r)))')
+    local sexp = sexpr.read('(skg (flag noSearchMatching))')
     local kind = fields.kind_of_sexp(sexp)
     local org_text = bijection.sexp_to_org(sexp)
     assert.are.equal(org_text,

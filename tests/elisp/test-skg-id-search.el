@@ -392,9 +392,10 @@ the first occurrence of AFTER (or at buffer start), then return
 
 (provide 'test-skg-id-search)
 
-(ert-deftest test-skg-id-and-repo-of-a-historical-phantom ()
-  "A historical phantom's metadata yields its id and repo."
-  (let ((sexp '(skg (historical (id gone) (repo main) (diff (node removed) (rel removed))))))
+(ert-deftest test-skg-id-and-repo-of-a-ghost ()
+  "A ghost's metadata yields its id, from '(gnid X)', and its repo,
+from '(skgRepos (nodeRepo R))'."
+  (let ((sexp '(skg (ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))))))
     (should (skg--metadata-sexp-contains-id-p sexp))
     (should (equal (skg--extract-id-from-metadata-sexp sexp) "gone"))
     (should (equal (skg--extract-repo-from-metadata-sexp sexp) "main"))))

@@ -274,3 +274,77 @@ question slice 1 made 'goal_is_ordered' answer. Noted for the
 review: the alias saved outside the diff view (slice 1), the
 flaky "Directory not empty" cleanup in two tests under
 parallel runs, and 'import-md-and-org' failing before the plan.
+** Slice 3: one ghost, in the diff view only
+*** What's done
+'Vognode' has the three cases 'Unrestricted', 'Ghost' and
+'Unknown'; 'Phantom', 'PhantomDeleted' and 'MpPhantom' are
+gone. The ghost is written '(ghost (gnid X) (skgRepos (nodeRepo
+R)) ...)'; '(deleted ...)' and '(historical ...)' are refused
+as unknown keys. An occurrence whose node the graph lacks is
+entombstoned at its visit, or, in the diff view, becomes its
+ghost when HEAD has the node; the deleted set, its two context
+fields and 'mutate_unrestrictedVognode_to_deletednode' are
+gone. The view request 'tombstone' (ghost only) entombstones a
+ghost; both clients stamp it ('skg-request-ghost-tombstone',
+C-c r t; 'skg-request-buffer-ghosts-tombstone', C-c r T;
+Neovim 'rt', 'rT') and save. The prune
+('prune_childless_tombstones') prunes view roots too.
+*** Deviations from the plan's "how"
+**** the prune still removes the emptied folders
+The slice says the prune removes childless tombstones only.
+It removes those, roots included, and also the childless
+folders the old list named ('folder_is_entombstoned_when_empty':
+the write-protected partner folders, the two compound folders,
+the ID folder), less the deleted phantom. Until slice 9 gives
+a folder with no goal its tombstone, dropping them would leave
+empty write-protected folders in every buffer.
+**** vanished means absent from the graph
+The check is the presence answer ('gnid_presence_gated' says
+'Absent') at the occurrence's visit, not the deleted set, so
+any occurrence whose node the graph lacks is entombstoned,
+whoever deleted it. With the extra IDs gone, an occurrence of
+P shown where its parent names P's extra ID X is no longer
+turned into the unknown X in place: P is entombstoned and the
+reconciler draws the unknown X, as the ID rule says.
+**** a ghost in a content view is left alone
+The old walk does not visit a ghost outside the diff view, and
+this slice keeps that; slice 9's ID rule makes it a tombstone.
+Entombstoning it here broke the round trip of the diff view's
+viewnodes saved as a content view
+('a_buffer_of_the_new_viewnodes_saves_back_unchanged').
+**** the request's home and its fulfillment
+'ViewRequest::Tombstone' exists for the parse; the ghost keeps
+it as 'Ghost::tombstone_request', which the diff view's step
+preserves ('give_model_facts_to') so the ghost's own visit
+fulfills it ('entombstone_ghost'). Entombstoning drops what the
+diff view drew under the ghost and keeps the user's notes, as
+the old "in neither graph" path did; that path now makes a
+tombstone too, so a committed deletion's ghost root, childless,
+is pruned. No herald renders the request; slice 6 may add one.
+**** a dismissed member ghost comes back
+A ghost under a node that held it at HEAD is drawn again at
+that node's next rerender (confirmed by a throwaway test). The
+plan's ladder does the same; reported in 'TODO/problems.org'.
+**** smaller choices
+The ghost keeps the field 'skgid' and the ancestry row
+'HistoricalPhantom' its name (slices 12 and 8 rename them).
+'update_views_after_save' lost 'node_instructions', which only
+the deleted set read, and 'PreparedSave::apply' returns '()'.
+Three tests of removed behavior were deleted: the deleted
+phantom of a restricted node (with its fixture 'restricted'),
+and the two extra-ID normalizations. The shared rendering case
+of the deleted placeholder went; the other became a ghost's.
+Both client editors write a ghost's 'gnid' and 'skgRepos'
+first. Scripts: 'tests/results/slice3/*.py'.
+*** Suite failures and their classification
+**** first failure: 8 Rust tests
+Expected fixture adaptation: they wrote '(deleted ...)' or
+'(historical ...)', expected a deleted phantom where a
+tombstone (pruned when childless) now stands, or read the
+stale 'tests/shared/herald-rules.sexp' (regenerated).
+**** client unit suites: 4 ERT tests, 5 plenary specs
+Expected fixture adaptation: the metadata-fields table and the
+shared rendering cases named the old kinds.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 2; the other 34
+integration tests pass.

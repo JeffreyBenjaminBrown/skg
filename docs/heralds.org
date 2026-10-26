@@ -188,9 +188,9 @@ or =request:search matching=, and in the diff view =restore membership=
 and =restore node=, are save requests.
 
 An unknown node is labeled =Reference to unknown node.=. =DELETED=
-marks a deleted node, or a tombstone: a viewnode whose node was
-deleted, or that stands where a node the skgrepo restriction now
-hides stood, which reveals no node title or skgrepo.
+marks a tombstone: a viewnode that stands where a node a save deleted,
+or a node the skgrepo restriction now hides, stood, which reveals no
+node title or skgrepo.
 
 ** Diff heralds
 In the diff view (see the glossary's "Terms a user meets in the
@@ -204,8 +204,7 @@ those. A folder member shows them as a content member does, so a
 modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
 flag entry, which has one diff object, the same change facts read =+= and
-=-=; a deleted phantom's one object reads =∃+= or =∃-=, and an unknown
-phantom's =~+= or =~-=. A =✓= after a diff object's change facts says its
+=-=, and an unknown phantom's one object reads =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A commit readiness aggregate (a
@@ -225,7 +224,7 @@ its =(diff (ready))=. The rules match the ready part once per diff
 object, so a =✓= follows its own object whatever the raw order of the
 parts.
 
-A historical phantom (a node the worktree lacks, shown with HEAD's
+A ghost (a node the worktree lacks, shown with HEAD's
 text) carries =☮=. The properties the view adds are labels: =old title
 and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
 +NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, and the

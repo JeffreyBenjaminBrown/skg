@@ -444,14 +444,16 @@ since the command searches the current buffer.
     is kept, with
     its =folded= and =bodyFolded=, its kind and change facts updated in place
     (a member that loses its relationship becomes a removed member, a
-    deleted node a historical phantom, and back); one it does not is
+    deleted node its ghost, and back); one it does not is
     converted, and pruned once it holds nothing (the glossary's
     "retain as non-member or tombstone, then prune"); the rest is
     created.
     The server sets a fold state only on a viewnode it creates: a
     context node's body starts folded. A root stays until the
-    buffer is closed; a root whose node a commit deleted is shown
-    as a deleted phantom.
+    buffer is closed, or until the user entombstones its ghost
+    (=tombstone= under "View requests"); a ghost root whose node a
+    commit deleted, now in neither graph, becomes a tombstone, pruned
+    when it holds nothing.
   - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
     (=pruned_change_view.rs=, =changes.rs=).
 
@@ -765,10 +767,9 @@ one automatically.
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set: nodes whose skgrepo
        became restricted are converted and pruned (a restricted node
-       with unrestricted viewchildren is retained, write-protected), a
-       deleted phantom whose home skgrepo became restricted, or an
-       unknown phantom whose relRepo (else its recorder's home) did,
-       becomes a tombstone, pruned unless it holds something, and
+       with unrestricted viewchildren is retained, write-protected), an
+       unknown phantom whose relRepo (else its recorder's home) became
+       restricted becomes a tombstone, pruned unless it holds something, and
        PartnerFolders regenerate per the new set, so widening the set
        reveals members and folders.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
@@ -940,6 +941,15 @@ node's heralds.
   node into a private fork that overrides it. Consumed on the save path
   at fork detection (not during view completion), then dropped. Emitted
   by =skg-fork-node= (=C-c m f=).
+- =tombstone= — in the diff view, on a ghost only (the parser refuses
+  it elsewhere, and refuses any other view request on a ghost): make
+  the ghost a tombstone, which keeps what the user put under it and
+  drops what the diff view drew there, and is pruned when that leaves
+  it childless. A ghost under a node that contained it at HEAD is drawn
+  again by a later rerender of that node; a ghost root is not. Emitted
+  by =skg-request-ghost-tombstone= (=C-c r t=) on the ghost at point
+  and =skg-request-buffer-ghosts-tombstone= (=C-c r T=) on every ghost
+  in the buffer; each saves.
 
 ** Edit requests: (editRequest ...)
 
@@ -948,7 +958,7 @@ the graph. A save that succeeds consumes every request in the buffer
 it saves, after its graph edits; a save that stops for a confirmation
 or fails leaves them in the buffer. A headline carries at most one. The
 heralds are nonstandard. The five requests on a =(node ...)=, and the
-one on a historical phantom:
+one on a ghost:
 
 - =delete= — delete the node. Herald "delete". Written by =skg-delete=
   (=C-c <backspace>=). Only an editable occurrence carries it.
@@ -987,15 +997,15 @@ one on a historical phantom:
   =skg-restore-removed-membership= (=C-c s l=). Like the relRepo request it
   concerns that relationship, so a write-protected occurrence carries it
   too. On a headline not carrying =(rel removed)= it is a parse error
-  (on a historical phantom "This node is deleted; restore it first
+  (on a ghost "This node is deleted; restore it first
   (skg-restore-deleted-node)"); on one carrying it that stands
   elsewhere, as a member under a vognode or a node of the
   containerward chain, the save refuses it as a local structure
   violation, "Only a removed membership can be restored".
-- =(historical ... (editRequest restoreNode))= — in the diff view, write
-  back the node this historical phantom stands for, as HEAD had it.
+- =(ghost ... (editRequest restoreNode))= — in the diff view, write
+  back the node this ghost stands for, as HEAD had it.
   Herald "restore node". Written by =skg-restore-deleted-node=
-  (=C-c s n=). The only edit request a phantom accepts; =restoreNode= on
+  (=C-c s n=). The only edit request a ghost accepts; =restoreNode= on
   anything else is a parse error.
 
 What the save does with the two restore requests is described in
@@ -1415,8 +1425,11 @@ or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 A tombstone is written =(skg tombstone (vnid X))=: it has
 no ID, no change facts and no title (the parser discards text typed on
 its line), and holds only what stands below it. A reconciler
-makes one of a child the graph no longer warrants, and the prune
-removes it once it is childless (the glossary's "tombstone"
+makes one of a child the graph no longer warrants, an occurrence
+whose node a save deleted becomes one (in the diff view, its ghost
+instead, when HEAD has the node), and the prune
+removes it once it is childless, a view root included, so a buffer
+may end with no headlines (the glossary's "tombstone"
 and "retain as non-member or tombstone, then prune"). Herald
 "DELETED".
 
@@ -1441,13 +1454,12 @@ first three parts are the three kinds of change, and say only what is
 true. The parts come in that order, and a part is absent when it has
 nothing to say; a headline with nothing to say carries no =(diff
 ...)=, and =(diff)= is never written. The form sits inside =(node
-...)=, =(deleted ...)=, =(unknown ...)= and =(historical ...)=, and at
+...)=, =(unknown ...)= and =(ghost ...)=, and at
 top level on alias, id and flag leaves, on the properties below other
 than =bodyDiff=, and on a changed folder (below).
 **** =(node added)=, =(node removed)= -- the node's existence
 The node HEAD lacks (=added=) or the worktree lacks (=removed=). On a
-member, a removed member, a folder member, a root, and a deleted or
-historical phantom.
+member, a removed member, a folder member, a root, and a ghost.
 **** =(rel added)=, =(rel removed)= -- the existence of the relationship to the viewparent
 The relationship that HEAD lacks (=added=) or the worktree lacks
 (=removed=). Under a vognode it is the viewparent's content; in a partner
@@ -1533,11 +1545,14 @@ it marks its file.
 Its headline is the alias or the ID, carrying
 =(diff (rel removed) ...)=: a member with a ghost warrant. Saving
 reads no alias from it and does not count it among the node's IDs.
-**** =(historical (id ID) (repo REPO) ...)= -- a historical phantom
+**** =(ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...)= -- a ghost
 It is a node HEAD has and the worktree lacks, with HEAD's title and
-body. It has the grammar of =(deleted ...)=, and may also carry
-=(editRequest restoreNode)= (see "Edit requests: (editRequest ...)"),
-which a deleted phantom may not.
+body, drawn only in the diff view. Its ID is written =(gnid ID)= and
+its home skgrepo =(skgRepos (nodeRepo REPO))=, the spellings every
+kind that stands for a node will take; the other kinds still write
+=(id ID)= and =(repo REPO)=. It may carry =(editRequest restoreNode)=
+(see "Edit requests: (editRequest ...)") and =(viewRequests
+tombstone)= (see "View requests: (viewRequests ...)").
 **** =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
 It sits under a node whose text changed; its headline is the old
 title, its body the old body.
@@ -1573,7 +1588,7 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 (skg (node (id 9) (repo main) noClaim writeProtected (diff (rel removed) (leaves 1 rel))))
 (skg alias (diff (rel added) (leaves 1) (readyRequest)))
 (skg alias (diff (rel removed) (leaves 1) (ready)))
-(skg (historical (id 4) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel))))
+(skg (ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))))
 (skg (oldText title) (diff (leaves 1) (ready)))
 (skg (changesetMarker content) (diff (leaves 3 all) (ready all)))
 (skg (changesetMarker content) (diff (leaves 3 all) (readyRequest all)))

@@ -87,6 +87,11 @@ M.commands = {
                          desc = 'Request writing back this deleted node (diff view)' },
   RestoreRemovedMembership = { module = 'skg.metadata', fn = 'restore_removed_membership',
                                desc = 'Request re-adding this removed membership (diff view)' },
+  RequestGhostTombstone = { module = 'skg.view_requests', fn = 'request_ghost_tombstone',
+                            desc = 'Request entombstoning this ghost (diff view; auto-saves)' },
+  RequestBufferGhostsTombstone = { module = 'skg.view_requests',
+                                   fn = 'request_buffer_ghosts_tombstone',
+                                   desc = 'Request entombstoning every ghost in the buffer (diff view; auto-saves)' },
   SetRepo = { module = 'skg.metadata', fn = 'set_repo',
                 desc = "Change the node's repo (in-buffer; save applies)" },
   SetRepoRecursive = { module = 'skg.metadata', fn = 'set_repo_recursive',
@@ -272,6 +277,8 @@ M.content_view_bindings = {
   { 'rH', 'ToggleHomeSkgrepoMoveCommitReadyRecursive' }, -- C-u C-c r h
   { 'ru', 'DiffViewIntegrateUnshownChanges' }, -- C-c r u
   { 'rc', 'StageAndCommit' },            -- C-c r c
+  { 'rt', 'RequestGhostTombstone' },     -- C-c r t
+  { 'rT', 'RequestBufferGhostsTombstone' }, -- C-c r T
   { 'rnc', 'DiffViewGotoNextChange' },            -- C-c r n c
   { 'rnu', 'DiffViewGotoNextUnreadyChange' },     -- C-c r n u
   { 'rnr', 'DiffViewGotoNextReadyChange' },       -- C-c r n r

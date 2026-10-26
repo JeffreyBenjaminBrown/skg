@@ -438,11 +438,12 @@ when its membership returns is adopted (see "adopt").
 *** phantom
 
 A vognode standing for something that is not a current graph member
-('Phantom' in 'server/types/viewnode.rs'). There are three kinds:
-*Historical* (in the diff view, a node HEAD has and the worktree
-lacks; it shows HEAD's title and body), *Deleted* (a save just deleted
-it; it keeps its last title and body), and *Unknown* (a reference that
-resolves to nothing; see "unknown node"). Phantoms are save-inert.
+('Vognode::Ghost' and 'Vognode::Unknown' in 'server/types/viewnode.rs').
+There are two kinds: the *ghost* (in the diff view only, a node HEAD
+has and the worktree lacks; it shows HEAD's title and body), and the
+*unknown* (a reference that resolves to nothing; see "unknown node").
+An occurrence whose node a save deleted becomes a tombstone, or, in
+the diff view, its ghost. Phantoms are save-inert.
 
 *** unknown node, dangling ID
 
@@ -1219,10 +1220,9 @@ each other copy with a subtree is retained write-protected, its
 members made non-members, whatever its editability was, since the
 save refuses two editable occurrences of one node.
 After every completion the postorder *prune*
-('prune_self_deletable_when_empty' in
+('prune_childless_tombstones' in
 'server/update_buffer/complete.rs') removes the childless
-tombstones (and childless deleted phantoms and empty
-write-protected folders), never a view root. Whatever stands below a
+tombstones (and empty write-protected folders), view roots included. Whatever stands below a
 converted child survives under it, so a child no reconciler converts
 as stale -- a non-member the user typed or pasted -- holds its
 ancestors alive. It is converted as a duplicate when a reconciler

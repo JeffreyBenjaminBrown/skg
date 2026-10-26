@@ -91,9 +91,9 @@ describe('skg.id_search navigation', function ()
     assert.are.equal('link-id', id_search.id_at_point().id)
   end)
 
-  it('reads the id and repo of a historical phantom', function ()
+  it('reads the gnid and repo of a ghost', function ()
     local sexp = require('skg.sexpr.parse').read(
-      '(skg (historical (id gone) (repo main) (diff (node removed) (rel removed))))')
+      '(skg (ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))))')
     assert.are.equal('gone', id_search.extract_id_from_metadata_sexp(sexp))
     assert.are.equal('main', id_search.extract_repo_from_metadata_sexp(sexp))
   end)

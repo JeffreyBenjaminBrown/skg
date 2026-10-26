@@ -144,7 +144,8 @@ which takes priority over subee.skg on disk."
   (message "=== PHASE 5: Verify both buffers after delete ===")
   (setq integration-test-phase "phase-5-verify-after-delete")
 
-  ;; Verify buffer 2: '11' became DeletedNode, 'subee' is unchanged
+  ;; Verify buffer 2: '11', a root the save deleted, became a
+  ;; childless tombstone, which the prune removed; 'subee' is unchanged
   (let ((buf2 (get-buffer "*skg-test-buf2*")))
     (unless buf2
       (message "✗ FAIL [phase 5]: Buffer 2 no longer exists")
@@ -154,15 +155,14 @@ which takes priority over subee.skg on disk."
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-types-and-titles
      buf2
-     '((1 deleted "11")
-       (1 node "subee")
+     '((1 node "subee")
        (2 node "subee-1"))
      "phase 5: buffer 2 after delete"))
 
   ;; Verify buffer 1 (collateral): the delete of 11 propagates to
   ;; node 1 (which contained it). 1.skg's contains has had 11
   ;; stripped, so on rerender the 11-subtree is gone entirely from
-  ;; buffer 1 -- no DeletedNode, no Tombstone descendants.
+  ;; buffer 1 -- no tombstone, nor anything under one.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
@@ -239,8 +239,7 @@ which takes priority over subee.skg on disk."
                 (point-min) (point-max))))
     (assert-headline-types-and-titles
      buf2
-     '((1 deleted "11")
-       (1 node "subee")
+     '((1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2"))
      "phase 7: buffer 2 after updating collateral view")))

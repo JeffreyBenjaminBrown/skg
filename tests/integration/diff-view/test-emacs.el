@@ -77,7 +77,7 @@
       (test-fail "Expected the merges and skgrepo-changes buffers, got %S" names))
     (dolist (expected '("(oldText title)"        ; t's text edit
                         "(homeSkgrepoMove (old alpha) (new beta))" ; m's move
-                        "(historical (id d)"     ; d's deletion
+                        "(ghost (gnid d)"        ; d's deletion
                         "acquiredFolder"))       ; x's nodeMerge
       (unless (string-match-p (regexp-quote expected) all-changes)
         (test-fail "The \"all changes\" buffer lacks %s:\n%s"

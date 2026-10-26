@@ -43,7 +43,7 @@ end
 
 ---The list in METADATA_SEXP that holds its '(diff ...)' form: the
 ---form among its elements that holds one, as a vognode's or a
----phantom's does, if one does, else the whole sexp, as a property's
+---ghost's does, if one does, else the whole sexp, as a property's
 ---or a changed folder's.
 ---@param metadata_sexp any
 ---@return any
@@ -288,7 +288,7 @@ end
 ---Replace the readiness request of the headline at LINE_NUMBER with
 ---one that marks (READY true) or unmarks the leaves on OBJECTS. The
 ---request is the last part of the headline's '(diff ...)' form, which
----lies under '(node ...)' or another phantom's form, or at top level
+---lies under '(node ...)' or a ghost's form, or at top level
 ---on a property. A headline without the form gets one.
 ---@param line_number integer
 ---@param ready boolean

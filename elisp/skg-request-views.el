@@ -124,4 +124,62 @@ with C-c C-k."
        `(skg (node (viewRequests fork)))))
     (skg-request-save-buffer)))
 
+;;; The diff view's ghosts ('docs/diff-view.org'). A ghost stands where
+;;; the diff view drew it, for a node HEAD has and the worktree lacks,
+;;; until the user entombstones it: these commands stamp the 'tombstone'
+;;; view request into its ghost form and save. The save keeps what the
+;;; user put under the ghost and drops what the diff view drew there; a
+;;; childless tombstone is pruned. The server refuses the request
+;;; anywhere but on a ghost, with the same text.
+
+(defconst skg--tombstone-request-off-a-ghost
+  "Only a ghost can be entombstoned; the tombstone view request belongs on a ghost (skg-request-ghost-tombstone)"
+  "Why `skg-request-ghost-tombstone' refuses anything but a ghost.")
+
+(defun skg-request-ghost-tombstone ()
+  "Entombstone the ghost at point, then save.
+Stamps '(viewRequests tombstone)' into the headline's ghost form and
+saves. The headline must be a ghost: a node of the diff view deleted
+since HEAD."
+  (interactive)
+  (save-excursion
+    (unless (and (ignore-errors (org-back-to-heading t) t)
+                 (skg--ghost-sexp-p (skg--metadata-sexp-at-point-or-nil)))
+      (user-error "%s" skg--tombstone-request-off-a-ghost))
+    (skg--stamp-ghost-tombstone-request))
+  (skg-request-save-buffer))
+
+(defun skg-request-buffer-ghosts-tombstone ()
+  "Entombstone every ghost in the buffer, then save once.
+Stamps '(viewRequests tombstone)' into each ghost headline's ghost
+form. With no ghost in the buffer, says so and does not save."
+  (interactive)
+  (let (( ghost-count (save-excursion
+                        (skg--stamp-every-ghost-tombstone-request)) ))
+    (if (zerop ghost-count)
+        (message "No ghost in this buffer.")
+      (message "Entombstoning %d ghost(s)." ghost-count)
+      (skg-request-save-buffer))))
+
+(defun skg--stamp-every-ghost-tombstone-request ()
+  "Stamp the tombstone request on every ghost headline in the buffer.
+Returns how many it stamped."
+  (let (( ghost-count 0 ))
+    (goto-char (point-min))
+    (unless (org-at-heading-p)
+      (outline-next-heading))
+    (while (and (not (eobp))
+                (org-at-heading-p))
+      (when (skg--ghost-sexp-p (skg--metadata-sexp-at-point-or-nil))
+        (skg--stamp-ghost-tombstone-request)
+        (setq ghost-count (1+ ghost-count)))
+      (outline-next-heading))
+    ghost-count))
+
+(defun skg--stamp-ghost-tombstone-request ()
+  "Stamp '(viewRequests tombstone)' into the ghost form of the headline
+at point."
+  (skg-edit-metadata-at-point
+   '(skg (ghost (viewRequests tombstone)))))
+
 (provide 'skg-request-views)

@@ -195,12 +195,14 @@ title display group."
 (defun skg-metadata-fields--fillIn-and-reorder
     (children child-level kind default-skgrepo)
   "CHILDREN (headline groups at CHILD-LEVEL) in canonical order, flat,
-each of KIND's fields filled in. In a form the canonical order is id,
-repo, then the fields, and the other children follow; beside the
-kind's atom, at top level, the other children (the markers and the
-atom, which say what the headline is) lead and the fields follow."
+each of KIND's fields filled in. In a form the canonical order is the
+id and the repo (a ghost's gnid and skgRepos), then the fields, and
+the other children follow; beside the kind's atom, at top level, the
+other children (the markers and the atom, which say what the headline
+is) lead and the fields follow."
   (let* (( in-form (equal (alist-get 'fields_at kind) "form") )
-         ( canonical (append (when in-form '("id" "repo"))
+         ( canonical (append (when in-form
+                                '("id" "gnid" "repo" "skgRepos"))
                              (skg-metadata-fields-field-names kind)) )
          ( field-map (mapcar (lambda (group)
                                (cons (string-trim (cdr (car group))) group))

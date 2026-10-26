@@ -619,16 +619,18 @@ end
 M.restore_rel_on_a_deleted_node =
   'This node is deleted; restore it first (skg-restore-deleted-node)'
 M.restore_node_on_a_node_not_deleted =
-  'Only a node deleted since HEAD can be restored'
+  'Only a node deleted since HEAD can be restored;'
+  .. ' restoreNode belongs on a ghost (skg-restore-deleted-node)'
 M.restore_rel_without_a_removed_membership =
   'Only a removed membership can be restored'
 
 ---@param metadata_sexp any
----@return boolean is it a historical phantom?
-function M.historical_sexp_p (metadata_sexp)
+---@return boolean is it a ghost: a node HEAD has and the worktree
+---lacks, drawn only in the diff view?
+function M.ghost_sexp_p (metadata_sexp)
   return metadata_sexp ~= nil
          and compare.subtree_p(metadata_sexp,
-                               { SKG, { sexpr.symbol('historical') } })
+                               { SKG, { sexpr.symbol('ghost') } })
 end
 
 ---@param metadata_sexp any
@@ -671,12 +673,12 @@ function M.partner_folder_atom (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it a vognode's: an UnrestrictedVognode or a phantom
----(deleted, unknown or historical)?
+---@return boolean is it a vognode's: an UnrestrictedVognode, an unknown
+---phantom or a ghost?
 function M.vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
   if M.unrestrictedNode_sexp_p(metadata_sexp) then return true end
-  for _, head in ipairs({ 'deleted', 'unknown', 'historical' }) do
+  for _, head in ipairs({ 'unknown', 'ghost' }) do
     if compare.subtree_p(metadata_sexp,
                          { SKG, { sexpr.symbol(head) } }) then
       return true end
@@ -744,13 +746,13 @@ function M.restoreRel_position_p (line_number)
 end
 
 ---Ask the next save to write back the deleted node at point, a
----historical phantom: its file as HEAD had it, and its place in the
+---ghost: its file as HEAD had it, and its place in the
 ---lists of the nodes that recorded it at HEAD. Does not save.
 function M.restore_deleted_node ()
-  if not M.historical_sexp_p(M.metadata_sexp_at_line_or_nil(nil)) then
+  if not M.ghost_sexp_p(M.metadata_sexp_at_line_or_nil(nil)) then
     error(M.restore_node_on_a_node_not_deleted, 0) end
   M.edit_metadata_at_point(sexpr.read(
-    '(skg (historical (DELETE (editRequest)) (editRequest restoreNode)))'))
+    '(skg (ghost (DELETE (editRequest)) (editRequest restoreNode)))'))
   vim.notify('Restore request set. Save to apply.')
 end
 
@@ -760,7 +762,7 @@ end
 ---depends on where it stands (M.restoreRel_position_p). Does not save.
 function M.restore_removed_membership ()
   local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
-  if M.historical_sexp_p(metadata_sexp) then
+  if M.ghost_sexp_p(metadata_sexp) then
     error(M.restore_rel_on_a_deleted_node, 0) end
   if not (M.removed_membership_p(metadata_sexp)
           and M.restoreRel_position_p(nil)) then

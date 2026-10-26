@@ -1,6 +1,7 @@
 -- Mirrors tests/elisp/test-skg-biggest-branch.el, the
 -- replace-content<->link cases of test-skg-metadata.el, the
--- view-request command shapes, and the metadata edit buffer's
+-- view-request command shapes (the ghost tombstone requests
+-- included), and the metadata edit buffer's
 -- apply/cycle round trips (test-skg-insert-heading.el's empty-node
 -- view cases and test-skg-metadata-editing.el's spirit).
 
@@ -234,6 +235,74 @@ describe('skg.view_requests', function ()
     assert.is_truthy(tostring(notified):find('Save the buffer'))
     assert.are.equal(0, saved_count)
     vim.bo[buf].modified = false
+  end)
+
+  -- The diff view's ghost tombstone requests, the ports of
+  -- skg-request-ghost-tombstone and skg-request-buffer-ghosts-tombstone.
+  local ghost = '(skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+    .. ' (diff (node removed) (rel removed))) (vnid 0g))'
+  local ghost_stamped = '(skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+    .. ' (diff (node removed) (rel removed)) (viewRequests tombstone))'
+    .. ' (vnid 0g))'
+
+  it('request_ghost_tombstone stamps the ghost form and saves', function ()
+    buffer_with('* ' .. ghost .. ' g\nits body')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 }) -- in the body
+    view_requests.request_ghost_tombstone()
+    assert.are.equal('* ' .. ghost_stamped .. ' g\nits body',
+                     buffer_text())
+    assert.are.equal(1, saved_count)
+  end)
+
+  it('request_ghost_tombstone refuses any other headline', function ()
+    for _, text in ipairs({
+        '* (skg (node (id n) (repo main) (diff (node removed)))) n',
+        '* (skg (unknown (id u)))',
+        '* (skg tombstone)',
+        '* no metadata' }) do
+      buffer_with(text)
+      local ok, err = pcall(view_requests.request_ghost_tombstone)
+      assert.is_false(ok, text)
+      assert.are.equal(view_requests.not_a_ghost, err, text)
+      assert.are.equal(text, buffer_text())
+      vim.api.nvim_buf_delete(0, { force = true })
+    end
+    assert.are.equal(0, saved_count)
+  end)
+
+  it('request_buffer_ghosts_tombstone stamps every ghost, saves once',
+     function ()
+    local node = '(skg (node (id n) (repo main)))'
+    local other_ghost = '(skg (ghost (gnid h) (skgRepos (nodeRepo main))))'
+    buffer_with(table.concat({
+      '* ' .. node .. ' n',
+      '** ' .. ghost .. ' g',
+      '*** (skg (unknown (id u)))',
+      '*** ' .. other_ghost .. ' h',
+      '* (skg tombstone)' }, '\n'))
+    view_requests.request_buffer_ghosts_tombstone()
+    assert.are.equal(table.concat({
+      '* ' .. node .. ' n',
+      '** ' .. ghost_stamped .. ' g',
+      '*** (skg (unknown (id u)))',
+      '*** (skg (ghost (gnid h) (skgRepos (nodeRepo main))'
+        .. ' (viewRequests tombstone))) h',
+      '* (skg tombstone)' }, '\n'), buffer_text())
+    assert.are.equal(1, saved_count)
+  end)
+
+  it('request_buffer_ghosts_tombstone without a ghost says so, no save',
+     function ()
+    local text = '* (skg (node (id n) (repo main))) n\n** plain'
+    buffer_with(text)
+    local notified = nil
+    local original_notify = vim.notify
+    vim.notify = function (msg) notified = msg end
+    view_requests.request_buffer_ghosts_tombstone()
+    vim.notify = original_notify
+    assert.are.equal(view_requests.no_ghost_in_buffer, notified)
+    assert.are.equal(text, buffer_text())
+    assert.are.equal(0, saved_count)
   end)
 end)
 

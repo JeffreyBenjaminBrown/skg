@@ -635,22 +635,22 @@ leaving the buffer as it was."
       (should (equal (buffer-string) headlines))
       refusal)))
 
-(ert-deftest test-skg-restore-deleted-node-marks-a-historical-phantom ()
-  "The request goes inside the historical phantom's form."
+(ert-deftest test-skg-restore-deleted-node-marks-a-ghost ()
+  "The request goes inside the ghost's form."
   (should (skg-sexp-subtree-p
            (test-skg--metadata-after
-            "* (skg (historical (id g) (repo main) (diff (node removed) (rel removed))) (vnid 0d)) g"
+            "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) (vnid 0d)) g"
             #'skg-restore-deleted-node)
-           '(skg (historical (id g) (editRequest restoreNode))))))
+           '(skg (ghost (gnid g) (editRequest restoreNode))))))
 
 (ert-deftest test-skg-restore-removed-membership-marks-a-removed-member ()
-  "An editable removed member, under a node or a historical phantom,
+  "An editable removed member, under a node or a ghost,
 and a write-protected folder member carrying '(rel removed)' all take
 the request."
   (dolist (headline
            '("* (skg (node (id r) (repo main))) r
 ** (skg (node (id x) (repo main) noClaim (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
-             "* (skg (historical (id g) (repo main) (diff (node removed)))) g
+             "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed)))) g
 ** (skg (node (id x) (repo main) noClaim (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
              "* (skg (node (id r) (repo main))) r
 ** (skg (node (id c) (repo main))) c
@@ -664,7 +664,7 @@ the request."
 (ert-deftest test-skg-restore-commands-refuse-the-wrong-kind ()
   "Each command refuses a headline of the wrong kind at once."
   (should (equal (test-skg--refusal-of
-                  "* (skg (historical (id g) (repo main) (diff (node removed) (rel removed)))) g"
+                  "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))) g"
                   #'skg-restore-removed-membership)
                  "This node is deleted; restore it first (skg-restore-deleted-node)"))
   (dolist (headline
@@ -690,9 +690,10 @@ the request."
                    "Only a removed membership can be restored")))
   (dolist (headline
            '("* (skg (node (id x) (repo main) (diff (rel removed)))) x"
-             "* (skg (deleted (id x) (repo main))) x"))
+             "* (skg (unknown (id u)))"
+             "* (skg tombstone)"))
     (should (equal (test-skg--refusal-of headline #'skg-restore-deleted-node)
-                   "Only a node deleted since HEAD can be restored"))))
+                   "Only a node deleted since HEAD can be restored; restoreNode belongs on a ghost (skg-restore-deleted-node)"))))
 
 (defun test-skg--with-metadata-editor-on (headline body-fn)
   "Open the metadata editor on HEADLINE, the only line of an org
@@ -733,7 +734,7 @@ show FIELD with its value on the next line."
 fields 'shared/metadata-fields.json' gives that kind, each at its
 default when absent; cycles each through the values the headline may
 take (a write-protected node is offered no delete, merge or flag, a
-removed member restoreRel, a historical phantom restoreNode); shows
+removed member restoreRel, a ghost restoreNode and tombstone); shows
 no field on a kind that has none; and saves an untouched view
 unchanged."
   (require 'skg-sexpr-edit)
@@ -753,13 +754,14 @@ unchanged."
                ("* (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x"
                 ("editRequest" . ("none (default)" "delete" "merge"
                                   "relRepo" "flag" "restoreRel")))
-               ("* (skg (historical (id g) (repo main) (diff (node removed)))) g"
-                ("editRequest" . ("none (default)" "restoreNode")))
+               ("* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed)))) g"
+                ("editRequest" . ("none (default)" "restoreNode"))
+                ("viewRequests" . ("none (default)" "tombstone")))
                ("* (skg (unknown (id u)))"
                 ("editRequest" . ("none (default)" "relRepo")))
                ("* (skg alias) an alias"
                 ("editRequest" . ("none (default)" "relRepo")))
-               ("* (skg (deleted (id d) (repo main))) d")
+               ("* (skg tombstone)")
                ("* (skg subscribeeFolder)")
                ("* (skg (flag noSearchMatching)) no search matching")))
       (test-skg--with-metadata-editor-on
@@ -787,8 +789,10 @@ the value as a list; an untouched default is stripped on every kind."
               "* (skg alias (editRequest (relRepo r))) an alias")
              ("* (skg (unknown (id u)))" ("editRequest") 1
               "* (skg (unknown (id u) (editRequest (relRepo r))))")
-             ("* (skg (historical (id g) (repo main))) g" ("editRequest") 1
-              "* (skg (historical (id g) (repo main) (editRequest restoreNode))) g")
+             ("* (skg (ghost (gnid g) (skgRepos (nodeRepo main)))) g" ("editRequest") 1
+              "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode))) g")
+             ("* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed)))) g" ("viewRequests") 1
+              "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed)))) g")
              ("* (skg (node (id x) (repo main))) x" ("viewRequests") 6
               "* (skg (node (id x) (repo main) (viewRequests (folder containers)))) x")
              ("* (skg (node (id x) (repo main))) x" ("editRequest") 4

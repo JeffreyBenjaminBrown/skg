@@ -459,32 +459,27 @@ title comes from the stack entry."
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
   "Return t if SEXP contains an id under the UnrestrictedVognode shape
-(skg (node (id ...))), the Deleted-phantom shape
-(skg (deleted (id ...))), or the historical-phantom shape
-(skg (historical (id ...)))."
-  (or (skg-sexp-subtree-p sexp '(skg (node        (id))))
-      (skg-sexp-subtree-p sexp '(skg (deleted     (id))))
-      (skg-sexp-subtree-p sexp '(skg (historical  (id))))))
+(skg (node (id ...))) or the ghost shape (skg (ghost (gnid ...)))."
+  (or (skg-sexp-subtree-p sexp '(skg (node  (id))))
+      (skg-sexp-subtree-p sexp '(skg (ghost (gnid))))))
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
   "Extract the id value from SEXP. Accepts the UnrestrictedVognode shape
-(skg (node (id X) ...)), the Deleted-phantom shape
-(skg (deleted (id X) ...)), or the historical-phantom shape
-(skg (historical (id X) ...)). Returns the id as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        id)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     id)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg historical  id))))))
+(skg (node (id X) ...)) or the ghost shape (skg (ghost (gnid X) ...)).
+Returns the id as a string, or nil."
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node  id)))
+                 (car (skg-sexp-cdr-at-path sexp '(skg ghost gnid))))))
     (when val (format "%s" val))))
 
 (defun skg--extract-repo-from-metadata-sexp (sexp)
   "Extract the repo value from SEXP. Accepts the UnrestrictedVognode shape
-(skg (node (repo X) ...)), the Deleted-phantom shape
-(skg (deleted (repo X) ...)), or the historical-phantom shape
-(skg (historical (repo X) ...)). Returns the repo as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node        repo)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg deleted     repo)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg historical  repo))))))
+(skg (node (repo X) ...)) or the ghost shape
+(skg (ghost (skgRepos (nodeRepo X)) ...)). Returns the repo as a
+string, or nil."
+  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node repo)))
+                 (car (skg-sexp-cdr-at-path
+                       sexp '(skg ghost skgRepos nodeRepo))))))
     (when val (format "%s" val))))
 
 (defun skg--point-in-link-p ()

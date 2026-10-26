@@ -23,8 +23,8 @@ Does not save; call `skg-request-save-buffer' afterward."
 
 (defun skg-delete-recursive ()
   "Mark the headline at point, and every unrestrictedNode viewdescendant of it,
-for deletion. Descendent headlines that are not unrestrictedNodes (phantoms,
-aliasFolder, id-folder, etc.) are skipped. Does not save;
+for deletion. Descendent headlines that are not unrestrictedNodes (ghosts,
+unknowns, aliasFolder, id-folder, etc.) are skipped. Does not save;
 call `skg-request-save-buffer' afterward."
   (interactive)
   (unless (org-at-heading-p)
@@ -709,11 +709,11 @@ Does not save; call `skg-request-save-buffer' afterward."
 
 (defconst skg--restore-rel-on-a-deleted-node
   "This node is deleted; restore it first (skg-restore-deleted-node)"
-  "Why a removed membership cannot be restored on a historical phantom.")
+  "Why a removed membership cannot be restored on a ghost.")
 
 (defconst skg--restore-node-on-a-node-not-deleted
-  "Only a node deleted since HEAD can be restored"
-  "Why `skg-restore-deleted-node' refuses anything but a historical phantom.")
+  "Only a node deleted since HEAD can be restored; restoreNode belongs on a ghost (skg-restore-deleted-node)"
+  "Why `skg-restore-deleted-node' refuses anything but a ghost.")
 
 (defconst skg--restore-rel-without-a-removed-membership
   "Only a removed membership can be restored"
@@ -721,17 +721,16 @@ Does not save; call `skg-request-save-buffer' afterward."
 
 (defun skg-restore-deleted-node ()
   "Ask the next save to write back the deleted node at point.
-The headline must be a historical phantom: a node of the diff view
-deleted since HEAD. The save writes its file as HEAD had it, and
+The headline must be a ghost: a node of the diff view deleted since
+HEAD. The save writes its file as HEAD had it, and
 re-adds it to the lists of the nodes that recorded it at HEAD.
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
-  (unless (skg-sexp-subtree-p (skg--metadata-sexp-at-point-or-nil)
-                              '(skg (historical)))
+  (unless (skg--ghost-sexp-p (skg--metadata-sexp-at-point-or-nil))
     (user-error "%s" skg--restore-node-on-a-node-not-deleted))
   (skg-edit-metadata-at-point
-   '(skg (historical (DELETE (editRequest))
-                     (editRequest restoreNode))))
+   '(skg (ghost (DELETE (editRequest))
+                (editRequest restoreNode))))
   (message "Restore request set. Save to apply."))
 
 (defun skg-restore-removed-membership ()
@@ -745,7 +744,7 @@ The save re-adds it as HEAD recorded it.
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
   (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
-    (cond ((skg-sexp-subtree-p metadata '(skg (historical)))
+    (cond ((skg--ghost-sexp-p metadata)
            (user-error "%s" skg--restore-rel-on-a-deleted-node))
           ((not (and (skg--removed-membership-p metadata)
                      (skg--restoreRel-position-at-point-p)))
@@ -828,13 +827,18 @@ else nil."
                  (cdr metadata-sexp))))
 
 (defun skg--vognode-sexp-p (metadata-sexp)
-  "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode or
-a phantom (deleted, unknown or historical)."
+  "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode,
+a ghost or an unknown."
   (and (consp metadata-sexp)
        (or (skg--unrestrictedNode-sexp-p metadata-sexp)
-           (skg-sexp-subtree-p metadata-sexp '(skg (deleted)))
-           (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))
-           (skg-sexp-subtree-p metadata-sexp '(skg (historical))))))
+           (skg--ghost-sexp-p metadata-sexp)
+           (skg-sexp-subtree-p metadata-sexp '(skg (unknown))))))
+
+(defun skg--ghost-sexp-p (metadata-sexp)
+  "Non-nil iff METADATA-SEXP is a ghost's: a node of the diff view that
+HEAD has and the worktree lacks, '(skg (ghost (gnid X) ...))'."
+  (and (consp metadata-sexp)
+       (skg-sexp-subtree-p metadata-sexp '(skg (ghost)))))
 
 (defun skg--read-id-or-link (prompt)
   "Read an ID or link with linkstack paste/pop bindings in the minibuffer."

@@ -185,10 +185,10 @@ prevent a view from opening."
         (let* ((start (match-beginning 0))
                (sexp-start (string-match "(skg\\_>" org-text start))
                (sexp (car (read-from-string org-text sexp-start)))
-               (kind (or (assoc 'node (cdr sexp))
-                         (assoc 'deleted (cdr sexp))
-                         (assoc 'historical (cdr sexp))))
-               (skgrepo (and kind (cadr (assoc 'repo (cdr kind))))))
+               (skgrepo (car (or (skg-sexp-cdr-at-path
+                                  sexp '(skg node repo))
+                                 (skg-sexp-cdr-at-path
+                                  sexp '(skg ghost skgRepos nodeRepo))))))
           (when skgrepo (format "%s" skgrepo))))
     (error nil)))
 

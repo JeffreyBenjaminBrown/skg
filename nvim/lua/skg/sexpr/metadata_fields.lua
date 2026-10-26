@@ -241,10 +241,11 @@ function M.maybe_prepend_title (headlines, display_title)
 end
 
 ---CHILDREN (headline groups at CHILD_LEVEL) in canonical order, flat,
----each of KIND's fields filled in. In a form the canonical order is id,
----repo, then the fields, and the other children follow; beside the
----kind's atom, at top level, the other children (the markers and the
----atom, which say what the headline is) lead and the fields follow.
+---each of KIND's fields filled in. In a form the canonical order is id
+---and repo (a ghost's gnid and skgRepos), then the fields, and the
+---other children follow; beside the kind's atom, at top level, the
+---other children (the markers and the atom, which say what the
+---headline is) lead and the fields follow.
 ---@param children table[][]
 ---@param child_level integer
 ---@param kind table
@@ -253,7 +254,7 @@ end
 function M.fillIn_and_reorder (children, child_level, kind,
                                default_skgrepo)
   local in_form = kind.fields_at == 'form'
-  local canonical = in_form and { 'id', 'repo' } or {}
+  local canonical = in_form and { 'id', 'gnid', 'repo', 'skgRepos' } or {}
   for _, name in ipairs(M.field_names(kind)) do
     table.insert(canonical, name) end
   local group_by_name = {}

@@ -101,31 +101,41 @@ function M.metadata_sexp_contains_id_p (sexp)
   return M.extract_id_from_metadata_sexp(sexp) ~= nil
 end
 
----The id from SEXP, accepting the UnrestrictedVognode, diff-phantom,
----Deleted-phantom and historical-phantom shapes. Nil when absent.
+---Where each shape that bears an id keeps it: an UnrestrictedVognode
+---in '(node (id X))', a ghost in '(ghost (gnid X))'.
+local id_paths = { { 'skg', 'node', 'id' }, { 'skg', 'ghost', 'gnid' } }
+
+---Where the same shapes keep their skgrepo: '(node (repo R))' and
+---'(ghost (skgRepos (nodeRepo R)))'.
+local repo_paths = { { 'skg', 'node', 'repo' },
+                     { 'skg', 'ghost', 'skgRepos', 'nodeRepo' } }
+
+---The first atom at any of PATHS in SEXP, or nil.
 ---@param sexp any
+---@param paths string[][]
 ---@return string|nil
-function M.extract_id_from_metadata_sexp (sexp)
-  for _, holder in ipairs({ 'node', 'deleted', 'historical' }) do
-    local values = metadata.sexp_cdr_at_path(sexp,
-                                             { 'skg', holder, 'id' })
+local function first_atom_at_paths (sexp, paths)
+  for _, path in ipairs(paths) do
+    local values = metadata.sexp_cdr_at_path(sexp, path)
     if values and values[1] ~= nil then
       return sexpr.atom_text(values[1]) end
   end
   return nil
 end
 
+---The id from SEXP, accepting the UnrestrictedVognode and ghost
+---shapes. Nil when absent.
+---@param sexp any
+---@return string|nil
+function M.extract_id_from_metadata_sexp (sexp)
+  return first_atom_at_paths(sexp, id_paths)
+end
+
 ---The skgrepo from SEXP, same shapes as the id extractor.
 ---@param sexp any
 ---@return string|nil
 function M.extract_repo_from_metadata_sexp (sexp)
-  for _, holder in ipairs({ 'node', 'deleted', 'historical' }) do
-    local values = metadata.sexp_cdr_at_path(
-      sexp, { 'skg', holder, 'repo' })
-    if values and values[1] ~= nil then
-      return sexpr.atom_text(values[1]) end
-  end
-  return nil
+  return first_atom_at_paths(sexp, repo_paths)
 end
 
 ---If LINE_NUMBER's line has metadata bearing an id, the 0-based byte

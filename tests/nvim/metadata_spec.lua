@@ -304,21 +304,25 @@ describe('skg.metadata commands', function ()
     return err
   end
 
-  it('restore_deleted_node marks a historical phantom', function ()
-    buffer_with('* (skg (historical (id g) (repo main)'
+  it('restore_deleted_node marks a ghost, inside its form', function ()
+    buffer_with('* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
                 .. ' (diff (node removed) (rel removed))) (vnid 0d)) g')
     metadata.restore_deleted_node()
-    assert.is_true(subtree_p(first_metadata_sexp(),
-      '(skg (historical (id g) (editRequest restoreNode)))'))
+    assert.are.equal(
+      '* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+        .. ' (diff (node removed) (rel removed)) (editRequest restoreNode))'
+        .. ' (vnid 0d)) g',
+      buffer_text())
   end)
 
   it('restore_removed_membership marks a removed member, under a node'
-     .. ' or a historical phantom, and a folder member', function ()
+     .. ' or a ghost, and a folder member', function ()
     local removed_member = '** (skg (node (id x) (repo main) noClaim'
       .. ' (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x'
     for _, headline in ipairs({
       '* (skg (node (id r) (repo main))) r\n' .. removed_member,
-      '* (skg (historical (id g) (repo main) (diff (node removed)))) g\n'
+      '* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+        .. ' (diff (node removed)))) g\n'
         .. removed_member,
       '* (skg (node (id r) (repo main))) r\n'
         .. '** (skg (node (id c) (repo main))) c\n'
@@ -336,7 +340,7 @@ describe('skg.metadata commands', function ()
   it('the restore commands refuse the wrong kind of headline', function ()
     assert.are.equal(
       'This node is deleted; restore it first (skg-restore-deleted-node)',
-      refusal_of('* (skg (historical (id g) (repo main)'
+      refusal_of('* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
                  .. ' (diff (node removed) (rel removed)))) g',
                  metadata.restore_removed_membership))
     for _, headline in ipairs({
@@ -366,8 +370,12 @@ describe('skg.metadata commands', function ()
     end
     for _, headline in ipairs({
       '* (skg (node (id x) (repo main) (diff (rel removed)))) x',
-      '* (skg (deleted (id x) (repo main))) x' }) do
-      assert.are.equal('Only a node deleted since HEAD can be restored',
+      '* (skg (node (id x) (repo main) (diff (node removed)))) x',
+      '* (skg (unknown (id x))) x',
+      '* (skg tombstone) x' }) do
+      assert.are.equal('Only a node deleted since HEAD can be restored;'
+                       .. ' restoreNode belongs on a ghost'
+                       .. ' (skg-restore-deleted-node)',
         refusal_of(headline, metadata.restore_deleted_node))
     end
   end)
@@ -413,13 +421,15 @@ describe('skg.metadata commands', function ()
       { '* (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x',
         { editRequest = { 'none (default)', 'delete', 'merge',
                           'relRepo', 'flag', 'restoreRel' } } },
-      { '* (skg (historical (id g) (repo main) (diff (node removed)))) g',
-        { editRequest = { 'none (default)', 'restoreNode' } } },
+      { '* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+          .. ' (diff (node removed)))) g',
+        { editRequest = { 'none (default)', 'restoreNode' },
+          viewRequests = { 'none (default)', 'tombstone' } } },
       { '* (skg (unknown (id u)))',
         { editRequest = { 'none (default)', 'relRepo' } } },
       { '* (skg alias) an alias',
         { editRequest = { 'none (default)', 'relRepo' } } },
-      { '* (skg (deleted (id d) (repo main))) d', {} },
+      { '* (skg tombstone)', {} },
       { '* (skg subscribeeFolder)', {} },
       { '* (skg (flag noSearchMatching)) no search matching', {} } }) do
       with_metadata_editor_on(case[1], function (source)
@@ -458,8 +468,10 @@ describe('skg.metadata commands', function ()
           '* (skg alias (editRequest (relRepo r))) an alias' },
         { '* (skg (unknown (id u)))', 'editRequest', 1,
           '* (skg (unknown (id u) (editRequest (relRepo r))))' },
-        { '* (skg (historical (id g) (repo main))) g', 'editRequest', 1,
-          '* (skg (historical (id g) (repo main) (editRequest restoreNode))) g' },
+        { '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)))) g', 'editRequest', 1,
+          '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode))) g' },
+        { '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)))) g', 'viewRequests', 1,
+          '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone))) g' },
         { '* (skg (node (id x) (repo main))) x', 'viewRequests', 6,
           '* (skg (node (id x) (repo main) (viewRequests (folder containers)))) x' },
         { '* (skg (node (id x) (repo main))) x', 'editRequest', 4,
@@ -525,6 +537,8 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('SetMergeRequest', by_lhs['sm'])
     assert.are.equal('RestoreDeletedNode', by_lhs['sn'])
     assert.are.equal('RestoreRemovedMembership', by_lhs['sl'])
+    assert.are.equal('RequestGhostTombstone', by_lhs['rt'])
+    assert.are.equal('RequestBufferGhostsTombstone', by_lhs['rT'])
   end)
 
   it("opens the container folder with '<localleader>lc'", function ()

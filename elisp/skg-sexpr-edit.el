@@ -253,9 +253,9 @@ buffer.  (The full metadata view is reserved for an explicit
   "Whether the save can give the headline at point a skgrepo by
 inheritance, as the server's walk rootward decides
 ('skgrepo_of_nearest_unrestricted_ancestor'): it passes through
-phantoms and folders, and through headlines without metadata, which
-inherit the same way; the first other ancestor must be an
-unrestricted vognode.  A root cannot inherit, nor can a headline whose
+ghosts, unknowns and folders, and through headlines without
+metadata, which inherit the same way; the first other ancestor must
+be an unrestricted vognode.  A root cannot inherit, nor can a headline whose
 walk ends at a tombstone or a property."
   (save-excursion
     (catch 'answer
@@ -263,7 +263,7 @@ walk ends at a tombstone or a property."
         (let (( kind (skg--headline-kind-at-point) ))
           (cond ((eq kind 'node) (throw 'answer t))
                 ((or (null kind)
-                     (memq kind '(deleted unknown historical))
+                     (memq kind '(ghost unknown))
                      (string-suffix-p "Folder" (symbol-name kind))))
                 (t (throw 'answer nil)))))
       nil)))
@@ -271,7 +271,7 @@ walk ends at a tombstone or a property."
 (defun skg--headline-kind-at-point ()
   "The kind of the headline at point, as the symbol that heads its
 metadata after the markers 'focused', 'folded' and 'bodyFolded'
-(node, deleted, tombstone, aliasFolder, alias ...), or nil for a
+(node, ghost, tombstone, aliasFolder, alias ...), or nil for a
 headline without metadata."
   (let* (( split (skg-split-as-stars-metadata-title
                   (skg-get-current-headline-text)) )

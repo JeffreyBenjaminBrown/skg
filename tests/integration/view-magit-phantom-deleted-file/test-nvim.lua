@@ -1,4 +1,4 @@
--- Integration test: skg-goto-in-magit on a phantom whose file is gone
+-- Integration test: skg-goto-in-magit on a ghost whose file is gone
 -- from disk, nvim client. The Lua mirror of test-emacs.el in this
 -- directory.
 --
@@ -6,7 +6,7 @@
 -- Worktree:   a no longer contains b; b.skg deleted from disk.
 --
 -- Phase 1: Open the diff view.
--- Phase 2: Its "all changes" buffer shows b as a historical phantom.
+-- Phase 2: Its "all changes" buffer shows b as a ghost.
 -- Phase 3: Resolve b's on-disk path and open its plain diff.
 -- Phase 4: Verify the resolved path is exactly skg-data/b.skg (not
 --          the outer skg project skgrepo, and not a double-prefixed
@@ -80,39 +80,38 @@ if not all_changes then
   T.fail('Timeout waiting for the "all changes" buffer') end
 T.check(true, 'The "all changes" buffer loaded')
 
--- PHASE 2: verify the historical phantom b (b.skg is deleted from
--- disk).
-print('=== PHASE 2: Verify phantom b ===')
+-- PHASE 2: verify the ghost b (b.skg is deleted from disk).
+print('=== PHASE 2: Verify ghost b ===')
 do
   local content = T.buffer_text(all_changes)
-  T.check(content:find('(historical (id b)', 1, true) ~= nil,
-          string.format('No historical phantom b. Content: %s', content))
+  T.check(content:find('(ghost (gnid b)', 1, true) ~= nil,
+          string.format('No ghost b. Content: %s', content))
 end
 
--- PHASE 3: resolve phantom b's path and open its plain diff.
-print('=== PHASE 3: Resolve path and open diff for phantom b ===')
+-- PHASE 3: resolve ghost b's path and open its plain diff.
+print('=== PHASE 3: Resolve path and open diff for ghost b ===')
 vim.api.nvim_set_current_buf(all_changes)
 do
   local lines = vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)
-  local phantom_line = nil
+  local ghost_line = nil
   for lnum, line in ipairs(lines) do
-    if line:find('(historical (id b)', 1, true) then
-      phantom_line = lnum break end
+    if line:find('(ghost (gnid b)', 1, true) then
+      ghost_line = lnum break end
   end
-  if not phantom_line then T.fail('Could not find phantom b line') end
-  vim.api.nvim_win_set_cursor(0, { phantom_line, 0 })
-  print('  Positioned on: ' .. lines[phantom_line])
+  if not ghost_line then T.fail('Could not find ghost b line') end
+  vim.api.nvim_win_set_cursor(0, { ghost_line, 0 })
+  print('  Positioned on: ' .. lines[ghost_line])
 end
 
 local info = goto_git.node_info_at_point()
-T.check(info ~= nil, 'node info (id, repo) extracted at phantom b')
+T.check(info ~= nil, 'node info (id, repo) extracted at ghost b')
 
 local resolved_path
 goto_git.request_file_path(info.id, info.repo,
   function (path) resolved_path = path end)
 T.check(T.wait_for_response(20),
         'Timeout waiting for get-file-path response')
-T.check(resolved_path ~= nil, 'a path was resolved for phantom b')
+T.check(resolved_path ~= nil, 'a path was resolved for ghost b')
 print('  Resolved path: ' .. tostring(resolved_path))
 
 -- PHASE 4: verify the resolved path and the opened diff buffer.

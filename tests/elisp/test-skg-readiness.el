@@ -90,9 +90,9 @@ without the form gets one."
                  '("* (skg (node (id m) (repo r) (diff (rel added) (properties changed) (leaves 3 rel all) (ready rel) (readyRequest rel all)))) m")))
   ;; With one object, likewise.
   (should (equal (test-skg-readiness--run
-                  '("* (skg (historical (id d) (repo r) (diff (node removed) (leaves 1 node)))) d")
+                  '("* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node)))) d")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg (historical (id d) (repo r) (diff (node removed) (leaves 1 node) (readyRequest node)))) d"))))
+                 '("* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node) (readyRequest node)))) d"))))
 
 (ert-deftest test-skg-cycle-commit-ready-a-modified-node-toggles-by-its-own-ready ()
   ;; '(ready all)': ready, so the gesture unmarks.
@@ -144,7 +144,7 @@ without the form gets one."
   (should (equal (test-skg-readiness--run
                   '("* (skg (node (id r) (repo r) (diff (leaves 3 all)))) r"
                     "** (skg (changesetMarker content) (diff (leaves 2 all)))"
-                    "** (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel)))) d"
+                    "** (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel)))) d"
                     "*** (skg (node (id k) (repo r) writeProtected)) k"
                     "** (skg (node (id c) (repo r) writeProtected (diff (rel added) (leaves 1 rel)))) c"
                     "** (skg (node (id m) (repo r) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all)))) m"
@@ -153,7 +153,7 @@ without the form gets one."
                   1 #'skg-cycle-commit-ready '(4))
                  '("* (skg (node (id r) (repo r) (diff (leaves 3 all) (readyRequest all)))) r"
                    "** (skg (changesetMarker content) (diff (leaves 2 all)))"
-                   "** (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel) (readyRequest node rel)))) d"
+                   "** (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (readyRequest node rel)))) d"
                    "*** (skg (node (id k) (repo r) writeProtected)) k"
                    "** (skg (node (id c) (repo r) writeProtected (diff (rel added) (leaves 1 rel) (readyRequest rel)))) c"
                    "** (skg (node (id m) (repo r) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all) (readyRequest rel)))) m"
@@ -210,7 +210,7 @@ without the form gets one."
                    "** (skg (oldText title) (diff (leaves 1) (ready))) txt"))))
 
 (ert-deftest test-skg-readiness-a-wide-unmark-asks-first ()
-  (let ((lines '("* (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel)))) d"
+  (let ((lines '("* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel)))) d"
                  "** (skg (oldText title) (diff (leaves 1) (ready))) d")))
     ;; Refused: nothing is written, nothing saved.
     (should (equal (test-skg-readiness--run
@@ -218,7 +218,7 @@ without the form gets one."
                    lines))
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-cycle-commit-ready '(4) 'yes)
-                   '("* (skg (historical (id d) (repo r) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel) (unreadyRequest node rel)))) d"
+                   '("* (skg (ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel) (unreadyRequest node rel)))) d"
                      "** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) d"))))
   ;; Unmarking a modified node unmarks every leaf it records: two here.
   (should (equal (test-skg-readiness--run
