@@ -69,9 +69,9 @@ buffer or string. Currently:
 - =skg-sexp-at-or-after-point= — returns the sexp at/after point
 - =skg-split-as-stars-metadata-title= — splits a headline into
   stars, metadata and title
-- =skg--metadata-sexp-on-line= — reads a headline's metadata in any
-  buffer
-- =heralds-minor-mode.el= — finds metadata extent for overlays
+- =skg--metadata-from= — reads the metadata at a position, and so
+  every headline's metadata (=skg--metadata-on-line=,
+  =skg--metadata-sexp-at-point-or-nil=) and the heralds' overlays
 * Strip Emacs properties from text before sending them to the server.
 
 They are gibberish outside Emacs.

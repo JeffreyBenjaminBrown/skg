@@ -258,17 +258,10 @@ or in a link like [[id:X][label]],
   "If current line has metadata with id, return position of its opening paren.
 Otherwise return nil."
   ;; todo ? speed : Is verifying that it has an ID over-cautious?
-  (save-excursion
-    (beginning-of-line)
-    (when (looking-at "^\\*+ (skg")
-      (let* ( ( skg-start (- (match-end 0) 4) )
-              ( after-bullet (buffer-substring-no-properties
-                              skg-start (line-end-position) )))
-        (condition-case nil
-            (let (( sexp (read after-bullet) ))
-              (when (skg--metadata-sexp-contains-id-p sexp)
-                skg-start ))
-          (error nil) )) )))
+  (let (( metadata (skg--metadata-on-line) ))
+    (when (and metadata
+               (skg--metadata-sexp-contains-id-p (nth 2 metadata)) )
+      (nth 0 metadata) )))
 
 (defun skg-id-push ()
   "Push an ID and its title/label to `skg-linkstack'.
@@ -435,26 +428,19 @@ title comes from the stack entry."
 
 (defun skg--point-in-metadata-p ()
   "If point is within metadata, return (id . title). Otherwise nil."
-  (save-excursion
-    (let (( pos (point) ))
-      (beginning-of-line)
-      (when (looking-at "^\\*+ (skg")
-        (let* ( ( skg-start (- (match-end 0) 4))
-                ( after-bullet (buffer-substring-no-properties
-                                skg-start (line-end-position)) ))
-          (condition-case nil
-              (let* ( ( sexp (read after-bullet) )
-                      ( sexp-len (length (format "%S" sexp)) )
-                      ( skg-end (+ skg-start sexp-len) ))
-                (when (and (>= pos skg-start)
-                           (< pos skg-end)
-                           (skg--metadata-sexp-contains-id-p sexp) )
-                  (let ( (gnid (skg--extract-id-from-metadata-sexp sexp))
-                         (title (string-trim
-                                 (buffer-substring-no-properties
-                                  skg-end (line-end-position)) )) )
-                    (cons gnid title)) ))
-            (error nil) )) )) ))
+  (let* (( pos (point) )
+         ( metadata (skg--metadata-on-line) )
+         ( skg-start (nth 0 metadata) )
+         ( skg-end (nth 1 metadata) )
+         ( sexp (nth 2 metadata) ))
+    (when (and metadata
+               (>= pos skg-start)
+               (< pos skg-end)
+               (skg--metadata-sexp-contains-id-p sexp) )
+      (cons (skg--extract-id-from-metadata-sexp sexp)
+            (string-trim
+             (buffer-substring-no-properties
+              skg-end (line-end-position) )) )) ))
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)

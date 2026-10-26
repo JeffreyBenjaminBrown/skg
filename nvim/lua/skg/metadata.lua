@@ -161,13 +161,21 @@ end
 
 -- ── metadata reading helpers ───────────────────────────────────────
 
----The parsed metadata sexp of the headline at LINE_NUMBER, or nil.
+---The parsed metadata sexp of the headline at LINE_NUMBER of the
+---current buffer, or nil.
 ---@param line_number integer|nil
 ---@return any|nil
 function M.metadata_sexp_at_line_or_nil (line_number)
-  if not M.at_headline_p(line_number) then return nil end
-  local split = M.split_as_stars_metadata_title(
-    M.line_text(line_number))
+  return M.metadata_sexp_of_line(M.line_text(line_number))
+end
+
+---The parsed metadata sexp of LINE, a buffer line's text, when it is
+---a headline carrying metadata that reads; else nil.
+---@param line string|nil
+---@return any|nil
+function M.metadata_sexp_of_line (line)
+  if not (line and line:match('^%*+%s')) then return nil end
+  local split = M.split_as_stars_metadata_title(line)
   if not split or split.metadata == '' then return nil end
   local ok, sexp = pcall(sexpr.read, split.metadata)
   return ok and sexp or nil

@@ -88,13 +88,8 @@ If there is no active region, do nothing."
   "Return the parsed skg metadata sexp for the headline at point."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
-  (let* ((headline (skg-get-current-headline-text))
-         (split (skg-split-as-stars-metadata-title headline))
-         (metadata-str (and split (cadr split))))
-    (unless (and metadata-str
-                 (not (string-empty-p metadata-str)))
-      (user-error "Headline has no skg metadata"))
-    (read metadata-str)))
+  (or (skg--metadata-sexp-at-point-or-nil)
+      (user-error "Headline has no skg metadata")))
 
 (defun skg--current-node-repo ()
   "Return the repo string for the occurrence headline at point."
@@ -859,7 +854,7 @@ headline levels by their stars, so it works in any buffer."
     (beginning-of-line)
     (let ((level (skg--headline-level-on-line)))
       (when (and level
-                 (skg--folder-atom (skg--metadata-sexp-on-line)))
+                 (skg--folder-atom (skg--metadata-sexp-at-point-or-nil)))
         (skg--folder-change-readiness
          (skg--folder-members-below level))))))
 
@@ -875,11 +870,11 @@ headlines, nil where a headline carries none. Moves point."
         (cond ((null level))
               ((<= level folder-level) (setq done t))
               ((= level (1+ folder-level))
-               (push (list (skg--metadata-sexp-on-line)) members))
+               (push (list (skg--metadata-sexp-at-point-or-nil)) members))
               ((and members (= level (+ 2 folder-level)))
                (setcdr (car members)
                        (append (cdar members)
-                               (list (skg--metadata-sexp-on-line))))))))
+                               (list (skg--metadata-sexp-at-point-or-nil))))))))
     (nreverse members)))
 
 
@@ -930,7 +925,7 @@ does not list as write-protected whose anchor is such a node."
   "`skg--pending-detachment-p' of the headline on the line at point.
 Reads headline levels by their stars, so it works in any buffer, and
 looks for the parents only of a headline carrying 'noClaim'."
-  (let ((metadata (skg--metadata-sexp-on-line)))
+  (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
     (when (memq 'noClaim (cdr-safe metadata))
       (let ((ancestors (skg--ancestor-metadata-sexps-on-line 2)))
         (skg--pending-detachment-p metadata (nth 0 ancestors)
@@ -951,7 +946,7 @@ is none. Reads headline levels by their stars."
                   (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
                   nil t))
             (progn (setq level (skg--headline-level-on-line))
-                   (push (skg--metadata-sexp-on-line) ancestors))
+                   (push (skg--metadata-sexp-at-point-or-nil) ancestors))
           (setq level nil)
           (push nil ancestors)))
       (nreverse ancestors))))
@@ -964,19 +959,31 @@ when the line is no headline."
     (when (looking-at "\\(\\*+\\)\\(?: \\|$\\)")
       (length (match-string 1)))))
 
-(defun skg--metadata-sexp-on-line ()
-  "The '(skg ...)' metadata of the headline on the line at point, read,
-or nil when it has none or it does not read."
+(defun skg--metadata-on-line ()
+  "The '(skg ...)' metadata of the headline on the line at point, as
+`skg--metadata-from' gives it, or nil when the line is no headline or
+its headline carries none. Reads the headline by its stars, so it
+works in any buffer."
   (save-excursion
     (beginning-of-line)
     (when (looking-at "\\*+ +(skg[ )]")
-      (let* ((start (- (match-end 0) 5))
-             (text (buffer-substring-no-properties
-                    start (line-end-position)))
-             (end (skg-find-sexp-end text)))
-        (when end
-          (ignore-errors
-            (car (read-from-string (substring text 0 end)))))))))
+      (skg--metadata-from (- (match-end 0) 5)))))
+
+(defun skg--metadata-from (start)
+  "The '(skg ...)' that begins at START: (START END SEXP), END the
+position after its closing parenthesis and SEXP what it reads as; or
+nil when its parentheses do not close on that line or it does not
+read. Finds END by counting parentheses (`skg-find-sexp-end'; see
+'elisp/PITFALLs.org')."
+  (let* ((text (buffer-substring-no-properties
+                start (save-excursion (goto-char start)
+                                      (line-end-position))))
+         (end (skg-find-sexp-end text))
+         (sexp (and end
+                    (ignore-errors
+                      (car (read-from-string (substring text 0 end)))))))
+    (when sexp
+      (list start (+ start end) sexp))))
 
 (defun skg--vognode-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a vognode's: an occurrence,
@@ -1076,14 +1083,10 @@ OLD-REPO. Restores point afterward."
       (outline-next-heading))))
 
 (defun skg--metadata-sexp-at-point-or-nil ()
-  "Return the parsed skg metadata sexp for the headline at point, or nil."
-  (when (org-at-heading-p)
-    (let* ((headline (skg-get-current-headline-text))
-           (split (skg-split-as-stars-metadata-title headline))
-           (metadata-str (and split (cadr split))))
-      (when (and metadata-str
-                 (not (string-empty-p metadata-str)))
-        (read metadata-str)))))
+  "The '(skg ...)' metadata of the headline on the line at point, read,
+or nil when the line is no headline, its headline carries none, or it
+does not read (`skg--metadata-on-line')."
+  (nth 2 (skg--metadata-on-line)))
 
 (defun skg--occurrence-sexp-p (metadata-sexp)
   "Return non-nil if METADATA-SEXP describes an occurrence."

@@ -249,7 +249,7 @@ members and on their children."
                     (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
                     nil t))
           (setq level (skg--headline-level-on-line))
-          (when (skg--folder-atom (skg--metadata-sexp-on-line))
+          (when (skg--folder-atom (skg--metadata-sexp-at-point-or-nil))
             (heralds-clear-overlays-in-region (line-beginning-position)
                                               (line-end-position))
             (heralds-apply-to-line)))))))
@@ -262,18 +262,16 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
           (eol (line-end-position)))
       (goto-char bol)
       (when (search-forward "(skg" eol t)
-        (let* ((start (- (point) 4))
-               (remaining-text (buffer-substring-no-properties start eol))
-               (sexp-end-pos (skg-find-sexp-end remaining-text)))
-          (when sexp-end-pos
-            (let* ((end (+ start sexp-end-pos -1))
-                   (skg-sexp (buffer-substring-no-properties start (1+ end)))
+        (let ((metadata (skg--metadata-from (- (point) 4))))
+          (when metadata
+            (let* ((start (nth 0 metadata))
+                   (end (nth 1 metadata))
                    (heralds (heralds-from-metadata
-                             skg-sexp
+                             (buffer-substring-no-properties start end)
                              (skg--folder-change-readiness-at-point)
                              (skg--pending-detachment-at-point-p))))
               (when heralds
-                (let ((ov (make-overlay start (1+ end))))
+                (let ((ov (make-overlay start end)))
                   (overlay-put ov 'display heralds)
                   (overlay-put ov 'heralds t)
                   (overlay-put ov 'evaporate t)

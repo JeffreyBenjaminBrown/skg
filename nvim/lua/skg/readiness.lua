@@ -161,16 +161,6 @@ local function headline_level (line)
   return stars and #stars or nil
 end
 
----The parsed metadata of the headline LINE, or nil.
----@param line string
----@return any|nil
-local function headline_sexp (line)
-  local split = metadata.split_as_stars_metadata_title(line)
-  if not split or split.metadata == '' then return nil end
-  local ok, sexp = pcall(sexpr.read, split.metadata)
-  return ok and sexp or nil
-end
-
 ---Whether the folder whose headline is LINES[INDEX] is changed, and
 ---if so whether it is ready. LINES are a buffer's lines, 1-based. The
 ---folder is changed when one of its members (its direct child
@@ -183,7 +173,7 @@ end
 ---@return table|nil
 function M.folder_change_in_lines (lines, index)
   local level = headline_level(lines[index])
-  if not (level and metadata.folder_atom(headline_sexp(lines[index]))) then
+  if not (level and metadata.folder_atom(metadata.metadata_sexp_of_line(lines[index]))) then
     return nil end
   local members = {} -- each { sexp, child_sexps }
   for i = index + 1, #lines do
@@ -191,10 +181,10 @@ function M.folder_change_in_lines (lines, index)
     if line_level then
       if line_level <= level then break end
       if line_level == level + 1 then
-        table.insert(members, { sexp = headline_sexp(lines[i]),
+        table.insert(members, { sexp = metadata.metadata_sexp_of_line(lines[i]),
                                 child_sexps = {} })
       elseif line_level == level + 2 and #members > 0 then
-        local child = headline_sexp(lines[i])
+        local child = metadata.metadata_sexp_of_line(lines[i])
         if child then
           table.insert(members[#members].child_sexps, child) end
       end
@@ -283,7 +273,7 @@ end
 ---@param index integer
 ---@return boolean
 function M.pending_detachment_in_lines (lines, index)
-  local metadata_sexp = headline_sexp(lines[index])
+  local metadata_sexp = metadata.metadata_sexp_of_line(lines[index])
   if not (metadata_sexp and not metadata.node_member_p(metadata_sexp)) then
     return false end
   local ancestors = M.ancestor_sexps_in_lines(lines, index, 2)
@@ -308,7 +298,7 @@ function M.ancestor_sexps_in_lines (lines, index, count)
           or (headline_level(lines[ancestor_index]) or level) < level
     if ancestor_index < 1 then break end
     level = headline_level(lines[ancestor_index])
-    ancestors[generation] = headline_sexp(lines[ancestor_index])
+    ancestors[generation] = metadata.metadata_sexp_of_line(lines[ancestor_index])
   end
   return ancestors
 end
