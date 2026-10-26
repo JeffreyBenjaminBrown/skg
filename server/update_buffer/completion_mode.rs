@@ -5,6 +5,7 @@
 //! it changes.
 
 use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::misc::ID;
 use crate::types::views_state::DiffViewBufferKind;
@@ -16,9 +17,11 @@ pub enum CompletionMode<'a> {
   /// The refresh of the buffer of kind 'buffer_kind' of the diff view,
   /// over 'straddle'. Its goals are the union of the straddle: the
   /// members of either graph, each tagged with the change of its node
-  /// and of its relationship.
-  DiffView { straddle    : &'a GraphStraddle,
-             buffer_kind : DiffViewBufferKind },
+  /// and of its relationship. 'readiness_store' gives the readiness
+  /// facts.
+  DiffView { straddle        : &'a GraphStraddle,
+             buffer_kind     : DiffViewBufferKind,
+             readiness_store : &'a ReadinessStore },
 }
 
 impl<'a> CompletionMode<'a> {
@@ -36,7 +39,7 @@ impl<'a> CompletionMode<'a> {
   ) -> bool {
     match self {
       CompletionMode::ContentView => true,
-      CompletionMode::DiffView { straddle, buffer_kind } =>
+      CompletionMode::DiffView { straddle, buffer_kind, .. } =>
         had_editableViewRequest
         && ! prunedChangeView_sets_of_buffer (straddle, *buffer_kind)
              . u . contains (pid), } }

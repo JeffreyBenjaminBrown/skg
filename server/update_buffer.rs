@@ -24,9 +24,8 @@ pub use graphnodestats::{
   set_graphnodestats_in_viewforest_with_skgrepo_set};
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use completion_mode::CompletionMode;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::refresh::{Refreshed, Truth, refresh_viewforest};
+use crate::refresh::{Refreshed, Truth, refresh_content_viewforest};
 use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, ViewBufferCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::completion::rerender_diffView_buffer;
@@ -364,13 +363,10 @@ pub fn render_initial_view (
 ) -> Result<(ViewForest, String), Box<dyn Error>> {
   let mut viewforest : ViewForest = stub_of_fresh_content_view (
     root_gnids, &runtime . graph );
-  let truth : Truth = Truth { graph       : &runtime . graph,
-                              config      : &runtime . config,
-                              restriction, };
-  let refreshed : Refreshed = refresh_viewforest (
-    &mut viewforest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, runtime . config . initial_node_limit,
-    None, &BufferCorrectionPolicy::default () ) ?;
+  let refreshed : Refreshed = refresh_content_viewforest (
+    &mut viewforest, &mut ViewnodeIdRecord::default (),
+    &Truth::of_runtime (runtime, restriction),
+    &BufferCorrectionPolicy::default () ) ?;
   Ok (( viewforest, refreshed . text )) }
 
 /// One root per requested node: an editable occurrence of the node
@@ -476,10 +472,7 @@ fn refresh_content_view (
   viewnode_id_record : &mut ViewnodeIdRecord,
   context            : &mut RerenderAfterSaveContext<'_>,
 ) -> Result<Refreshed, Box<dyn Error>> {
-  let truth : Truth = Truth { graph       : &context . runtime . graph,
-                              config      : &context . runtime . config,
-                              restriction : context . skgrepo_restriction, };
-  refresh_viewforest (
-    viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
-    context . runtime . config . initial_node_limit, None,
+  refresh_content_viewforest (
+    viewforest, viewnode_id_record,
+    &Truth::of_runtime (&context . runtime, context . skgrepo_restriction),
     &context . buffer_correction_policy ) }

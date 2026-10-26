@@ -7,7 +7,6 @@
 //! the ladder set are kept: the stats pass does not recompute them.
 
 use crate::diff_view::pruned_change_view::set_diffView_facts_in_viewforest;
-use crate::diff_view::readiness_store::ReadinessStore;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, Walk};
 use crate::refresh::ladder::folder_goes_when_empty;
@@ -31,17 +30,15 @@ pub(crate) fn finish (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   walk               : &Walk,
-  readiness_store    : Option<&ReadinessStore>,
 ) -> Result<String, Box<dyn Error>> {
-  set_derived_facts (viewforest, walk, readiness_store) ?;
+  set_derived_facts (viewforest, walk) ?;
   prune_childless_tombstones (viewforest . as_internal_tree_mut ()) ?;
   viewnode_id_record . assign_viewnode_ids (viewforest . as_internal_tree_mut ());
   viewforest_to_string (viewforest, walk . truth . config) }
 
 fn set_derived_facts (
-  viewforest      : &mut ViewForest,
-  walk            : &Walk,
-  readiness_store : Option<&ReadinessStore>,
+  viewforest : &mut ViewForest,
+  walk       : &Walk,
 ) -> Result<(), Box<dyn Error>> {
   let truth : &Truth = walk . truth;
   let (container_to_contents, content_to_containers)
@@ -55,11 +52,9 @@ fn set_derived_facts (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,
     truth . config, truth . restriction );
-  if let CompletionMode::DiffView { straddle, buffer_kind } = walk . mode {
-    let store : &ReadinessStore = readiness_store
-      . ok_or ("refresh_viewforest: the diff view needs the readiness store") ?;
+  if let CompletionMode::DiffView { straddle, buffer_kind, readiness_store } = walk . mode {
     set_diffView_facts_in_viewforest (
-      viewforest, straddle, buffer_kind, store, truth . graph ); }
+      viewforest, straddle, buffer_kind, readiness_store, truth . graph ); }
   Ok (( )) }
 
 /// Remove every childless tombstone, a root included, postorder, so

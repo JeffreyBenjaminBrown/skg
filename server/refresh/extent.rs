@@ -92,7 +92,7 @@ pub(crate) fn drawn_occurrence_is_editable (
   && ! walk . editable_gnids . contains (pid)
   && match walk . mode {
     CompletionMode::ContentView => walk . node_budget > 0,
-    CompletionMode::DiffView { straddle, buffer_kind } =>
+    CompletionMode::DiffView { straddle, buffer_kind, .. } =>
       prunedChangeView_sets_of_buffer (straddle, buffer_kind) . u
         . contains (pid)
       || ( walk . had_editableView_request . contains (&parent)

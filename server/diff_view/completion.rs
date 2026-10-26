@@ -45,13 +45,12 @@ pub fn complete_viewforest_with_graph_straddle (
   viewforest           : &mut ViewForest,
   viewnode_id_record   : &mut ViewnodeIdRecord,
 ) -> Result<Refreshed, Box<dyn Error>> {
-  let truth : Truth = Truth { graph  : &runtime . graph,
-                              config : &runtime . config,
-                              restriction, };
   refresh_viewforest (
-    viewforest, viewnode_id_record, &truth,
-    CompletionMode::DiffView { straddle, buffer_kind : diffView_buffer_kind },
-    runtime . config . initial_node_limit, Some (store), buffer_correction_policy ) }
+    viewforest, viewnode_id_record, &Truth::of_runtime (runtime, restriction),
+    CompletionMode::DiffView { straddle,
+                               buffer_kind     : diffView_buffer_kind,
+                               readiness_store : store },
+    runtime . config . initial_node_limit, buffer_correction_policy ) }
 
 /// Rerender a buffer of the diff view: bring the straddle in
 /// 'graph_straddle_slot' up to date, and refresh the buffer over it.

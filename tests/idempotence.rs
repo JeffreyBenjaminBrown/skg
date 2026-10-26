@@ -33,14 +33,13 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
-use skg::refresh::{Refreshed, Truth, refresh_viewforest};
+use skg::refresh::{Refreshed, Truth, refresh_content_viewforest};
 use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::test_utils::{graph_from_config, prefer_owned_subdir};
 use skg::types::env::RuntimeGeneration;
 use skg::types::misc::{Skgrepo, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::ViewnodeIdRecord;
-use skg::update_buffer::completion_mode::CompletionMode;
 use skg::update_buffer::render_initial_view;
 
 use crate::git_fixture::{OwnedSkgrepos, git_fixture, graph_straddle};
@@ -166,13 +165,9 @@ fn refreshes_unchanged (
     . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
   if ! errors . is_empty () {
     return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
-  let truth : Truth = Truth { graph       : &runtime . graph,
-                              config      : &runtime . config,
-                              restriction : None, };
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let again : Refreshed = refresh_viewforest (
-    &mut forest, &mut record, &truth,
-    CompletionMode::ContentView, runtime . config . initial_node_limit, None,
+  let again : Refreshed = refresh_content_viewforest (
+    &mut forest, &mut record, &Truth::of_runtime (runtime, None),
     &BufferCorrectionPolicy::default () )
     . map_err ( |e| format! ("the second refresh failed: {}", e) ) ?;
   if again . text != text {

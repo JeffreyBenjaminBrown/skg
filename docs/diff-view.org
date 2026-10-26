@@ -145,9 +145,9 @@ either graph and their containerward chains
 A buffer of the diff view is drawn, and redrawn after every save,
 rerender and commit, by the one refresh every view uses
 ('refresh_viewforest', 'server/refresh/'), in diff-view mode: the
-mode is 'CompletionMode::DiffView', which carries the straddle and
-the buffer kind ('server/update_buffer/completion_mode.rs'), and the
-refresh reads the readiness store for its readiness facts
+mode is 'CompletionMode::DiffView', which carries the straddle, the
+buffer kind and the readiness store, from which the refresh reads
+its readiness facts ('server/update_buffer/completion_mode.rs')
 ('complete_viewforest_with_graph_straddle' and
 'rerender_diffView_buffer' in 'server/diff_view/completion.rs').
 The diff-view mode ('server/refresh/diff_view.rs') changes the

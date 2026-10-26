@@ -32,7 +32,7 @@ fn a_fresh_view_reports_nothing () {
     &[ ID::from ("p"), ID::from ("b") ], &graph );
   let refreshed : Refreshed = refresh_viewforest (
     &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100, None,
+    CompletionMode::ContentView, 100,
     &BufferCorrectionPolicy::default () ) . unwrap ();
   assert! ( refreshed . text . contains ("(gnid a1)")
             && refreshed . text . contains ("containerFolder"),
@@ -125,7 +125,7 @@ fn a_tombstone_the_save_left_is_not_reported () {
       HashSet::from ([ ID::from ("x") ]) );
   let refreshed : Refreshed = refresh_viewforest (
     &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100, None, &policy ) . unwrap ();
+    CompletionMode::ContentView, 100, &policy ) . unwrap ();
   assert_eq! ( outline (&forest), "\
 node p
   node c
@@ -154,7 +154,7 @@ fn a_member_drawn_after_a_restriction_change_is_not_reported () {
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let refreshed : Refreshed = refresh_viewforest (
     &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100, None,
+    CompletionMode::ContentView, 100,
     &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
   assert! ( refreshed . text . contains ("(gnid b)"), "b is drawn:\n{}", refreshed . text );
   assert! ( refreshed . buffer_corrections . is_empty (), "{:?}", refreshed . buffer_corrections ); }

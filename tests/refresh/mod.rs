@@ -8,6 +8,7 @@
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
+use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{
@@ -132,16 +133,15 @@ pub(super) fn run_in (
 ) -> Run {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph, config : &config, restriction };
-  let store : ReadinessStore = ReadinessStore::default ();
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let first : Refreshed = refresh_viewforest (
-    &mut forest, &mut record, &truth, mode, budget, Some (&store),
+    &mut forest, &mut record, &truth, mode, budget,
     &BufferCorrectionPolicy::default () )
     . unwrap ();
   let mut again : ViewForest = parse (&first . text, IdResolution::ThroughGraph (graph));
   let second : Refreshed = refresh_viewforest (
-    &mut again, &mut record, &truth, mode, budget, Some (&store),
+    &mut again, &mut record, &truth, mode, budget,
     &BufferCorrectionPolicy::default () )
     . unwrap ();
   assert_eq! ( second . text, first . text,

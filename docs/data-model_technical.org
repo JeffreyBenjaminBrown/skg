@@ -159,8 +159,8 @@ headline already has a gnid and a skgrepo), the *truth* (=Truth=: the
 in-Rust graph as the skgrepo restriction lets it be seen, with the
 config), the mode (=CompletionMode= in
 =server/update_buffer/completion_mode.rs=: a content view, or a buffer of
-the diff view over the graph straddle), the node budget
-(=initial_node_limit=) and, in the diff view, the readiness store. It
+the diff view over the graph straddle, with the readiness store) and
+the node budget (=initial_node_limit=). It
 returns the buffer's text and the list of what it corrected
 (=Refreshed=). A fresh content view is the refresh of a stub
 (=stub_of_fresh_content_view= in =server/update_buffer.rs=: one

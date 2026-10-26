@@ -59,7 +59,7 @@ fn diff_view_of<'a> (
   walk : &Walk<'a>,
 ) -> Option<(&'a GraphStraddle, DiffViewBufferKind)> {
   match walk . mode {
-    CompletionMode::DiffView { straddle, buffer_kind } => Some ((straddle, buffer_kind)),
+    CompletionMode::DiffView { straddle, buffer_kind, .. } => Some ((straddle, buffer_kind)),
     CompletionMode::ContentView => None, } }
 
 fn sets<'a> (

@@ -106,9 +106,10 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     &Truth { graph       : &f . runtime . graph,
              config      : &f . runtime . config,
              restriction : None },
-    CompletionMode::DiffView { straddle    : &f . straddle,
-                               buffer_kind : DiffViewBufferKind::AllChanges },
-    100, Some (&ReadinessStore::default ()),
+    CompletionMode::DiffView { straddle        : &f . straddle,
+                               buffer_kind     : DiffViewBufferKind::AllChanges,
+                               readiness_store : &ReadinessStore::default () },
+    100,
     &BufferCorrectionPolicy::default () ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (forest . get (folder) . unwrap ()), vec! [

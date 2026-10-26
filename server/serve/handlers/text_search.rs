@@ -17,7 +17,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
-use crate::refresh::{Truth, refresh_viewforest};
+use crate::refresh::{Truth, refresh_content_viewforest};
 use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
@@ -36,7 +36,6 @@ use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ FoldAndFocus, Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
 use crate::types::viewnode::{Folder, FolderRelation, PropertyMember, ViewRequest, Vognode, viewnode_of};
-use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -387,10 +386,10 @@ pub fn enrich_search_viewforest (
     viewforest . nodes () . map ( |node| node . id () ) . collect ();
   for hit in &hits {
     stub_root_of_hit (viewforest, *hit, graph, restriction); }
-  { let truth : Truth = Truth { graph, config, restriction : Some (restriction) };
-    refresh_viewforest (
-      viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
-      config . initial_node_limit, None, &BufferCorrectionPolicy::default () ) ?; }
+  refresh_content_viewforest (
+    viewforest, viewnode_id_record,
+    &Truth { graph, config, restriction : Some (restriction) },
+    &BufferCorrectionPolicy::default () ) ?;
   for hit in &hits {
     let drawn : Vec<NodeId> =
       viewforest . get (*hit) . unwrap () . children ()

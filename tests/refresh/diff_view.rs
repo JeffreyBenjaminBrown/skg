@@ -13,9 +13,11 @@ fn diff_run (
   text     : &str,
   straddle : &GraphStraddle,
 ) -> Run {
+  let readiness_store : ReadinessStore = ReadinessStore::default ();
   run_in ( text, &straddle . after, None,
            CompletionMode::DiffView { straddle,
-                                      buffer_kind : DiffViewBufferKind::AllChanges },
+                                      buffer_kind : DiffViewBufferKind::AllChanges,
+                                      readiness_store : &readiness_store },
            100 ) }
 
 #[test]

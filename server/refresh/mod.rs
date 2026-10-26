@@ -29,8 +29,8 @@ mod tail;
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
-use crate::diff_view::readiness_store::ReadinessStore;
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -60,22 +60,41 @@ pub struct Refreshed {
   pub buffer_corrections : Vec<BufferCorrection>,
 }
 
+impl<'a> Truth<'a> {
+  /// The truth of a runtime generation, under 'restriction'.
+  pub fn of_runtime (
+    runtime     : &'a RuntimeGeneration,
+    restriction : Option<&'a SkgrepoRestriction>,
+  ) -> Truth<'a> {
+    Truth { graph : &runtime . graph, config : &runtime . config, restriction } }
+}
+
+/// Refresh the content view 'viewforest' against 'truth', drawing at
+/// most the config's 'initial_node_limit' extensions of new editable
+/// content: what every content view's refresh shares.
+pub fn refresh_content_viewforest (
+  viewforest               : &mut ViewForest,
+  viewnode_id_record       : &mut ViewnodeIdRecord,
+  truth                    : &Truth,
+  buffer_correction_policy : &BufferCorrectionPolicy,
+) -> Result<Refreshed, Box<dyn Error>> {
+  refresh_viewforest (
+    viewforest, viewnode_id_record, truth, CompletionMode::ContentView,
+    truth . config . initial_node_limit, buffer_correction_policy ) }
+
 /// Refresh 'viewforest' against 'truth', in 'mode', drawing at most
 /// 'node_budget' extensions of new editable content
-/// ('extent.rs'). In the diff view 'readiness_store' gives the
-/// readiness facts; a content view passes None. 'viewnode_id_record'
-/// assigns the vnids of the viewnodes the refresh draws.
-/// 'buffer_correction_policy' says which changes are no buffer corrections.
-/// Edit requests pass through untouched; view requests are fulfilled
-/// and dropped.
+/// ('extent.rs'). 'viewnode_id_record' assigns the vnids of the
+/// viewnodes the refresh draws. 'buffer_correction_policy' says which
+/// changes are no buffer corrections. Edit requests pass through
+/// untouched; view requests are fulfilled and dropped.
 pub fn refresh_viewforest (
-  viewforest         : &mut ViewForest,
-  viewnode_id_record : &mut ViewnodeIdRecord,
-  truth              : &Truth,
-  mode               : CompletionMode,
-  node_budget        : usize,
-  readiness_store    : Option<&ReadinessStore>,
-  buffer_correction_policy  : &BufferCorrectionPolicy,
+  viewforest               : &mut ViewForest,
+  viewnode_id_record       : &mut ViewnodeIdRecord,
+  truth                    : &Truth,
+  mode                     : CompletionMode,
+  node_budget              : usize,
+  buffer_correction_policy : &BufferCorrectionPolicy,
 ) -> Result<Refreshed, Box<dyn Error>> {
   let mut walk : Walk = Walk::new (truth, mode, node_budget, buffer_correction_policy);
   { let tree : &mut Tree<Viewnode> = viewforest . as_internal_tree_mut ();
@@ -86,7 +105,7 @@ pub fn refresh_viewforest (
     walk . editable_gnids = editable_gnids_in (tree);
     walk_in_level_order (tree, &mut walk) ?; }
   let text : String = tail::finish (
-    viewforest, viewnode_id_record, &walk, readiness_store ) ?;
+    viewforest, viewnode_id_record, &walk ) ?;
   let buffer_corrections : Vec<BufferCorrection> =
     walk . buffer_corrections . into_buffer_corrections (viewforest . as_internal_tree_mut ());
   Ok ( Refreshed { text, buffer_corrections } ) }
