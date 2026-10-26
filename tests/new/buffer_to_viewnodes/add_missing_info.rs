@@ -42,9 +42,9 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
         &s . config ) . await ?;
-      s . reset ("test_new_headline_inherits_through_phantoms_and_folders",
+      s . reset ("test_new_headline_inherits_through_ghosts_and_folders",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_new_headline_inherits_through_phantoms_and_folders (
+      test_new_headline_inherits_through_ghosts_and_folders (
         &s . config ) . await ?;
       s . reset ("test_new_headline_at_top_level_is_refused",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
@@ -117,16 +117,16 @@ fn new_note_skgrepo_and_membership (
 
 /// A headline without '(skgRepos (nodeRepo NAME))' inherits the skgrepo of its
 /// nearest ancestor that is an occurrence, through a
-/// historical phantom or a partner folder. A non-member note in a
+/// ghost or a partner folder. A non-member note in a
 /// folder stays a non-member. Below a write-protected occurrence the
 /// skgrepo is the one its ID will have after the save, as for a
 /// child. (Fixture node 'root-pid' lives in 'main'; 'alt' is a skgrepo
 /// no fixture node has, so only inheritance can supply it.)
-async fn test_new_headline_inherits_through_phantoms_and_folders (
+async fn test_new_headline_inherits_through_ghosts_and_folders (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   for (input, expected_skgrepo, expected_membership) in [
-    ( // Under a historical phantom under an editable node.
+    ( // Under a ghost under an editable node.
       indoc! {"
         * (skg node (gnid editable) (skgRepos (nodeRepo alt))) editable
         ** (skg ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) gone

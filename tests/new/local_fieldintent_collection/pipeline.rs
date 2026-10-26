@@ -88,9 +88,9 @@ fn all_tests
                  "tests/merge/merge_nodes/fixtures") ?;
       pipeline_restricted_subtree (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("pipeline_phantom_subtree",
+      s . reset ("pipeline_ghost_subtree",
                  "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_phantom_subtree (
+      pipeline_ghost_subtree (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_nodeMerge_requests",
                  "tests/merge/merge_nodes/fixtures") ?;
@@ -246,7 +246,7 @@ async fn pipeline_restricted_subtree (
          (see tests/repo_sets.rs)" );
       Ok (( )) }
 
-async fn pipeline_phantom_subtree (
+async fn pipeline_ghost_subtree (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -262,7 +262,7 @@ async fn pipeline_phantom_subtree (
           &forest, config, None)?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
-        // survivor is on the new recursion surface; the phantom
+        // survivor is on the new recursion surface; the ghost
         // itself emits nothing and is not content of its parent.
         vec![ ID::from ("root"), ID::from ("survivor") ]);
       assert_eq!(

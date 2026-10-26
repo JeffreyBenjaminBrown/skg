@@ -253,7 +253,7 @@ fn buffer_validation_error_text (
       format!("Local structure violation:\n- ID: {}\n- {}\n",
               gnid . 0, msg) },
     BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, _) => {
-      format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a editable view of it first (C-c g RET).\n",
+      format!("Edit request on a write-protected (possibly a ghost or an unknown) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a editable view of it first (C-c g RET).\n",
               gnid . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
       gnid, title, changes, .. } => {

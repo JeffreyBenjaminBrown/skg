@@ -291,7 +291,7 @@ async fn extraction_honors_overridesHere (
             "tampered fact must abort the save; got: {:?}",
             other . map ( |v| v . len () ) ), }}
       { // Subscribee-as-such: the visible-content signal speaks of
-        // the original, so no phantom hide of N is inferred.
+        // the original, so no spurious hide of N is inferred.
         let buffer = indoc! {"
           * (skg node (gnid S) (skgRepos (nodeRepo main))) S
           ** (skg subscribeeFolder)

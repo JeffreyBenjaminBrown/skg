@@ -22,8 +22,8 @@ use std::error::Error;
 /// A headline that names change-forest leaves says which, in
 /// '(diff (leaves N OBJECT...))'. With ctx removed from ct in the buffer
 /// too, ct's content changeset marker gathers three content
-/// relationships (k1 and ctx removed, k2 added); the historical
-/// phantom of gone, in orph's subscriber folder, names a leaf on each
+/// relationships (k1 and ctx removed, k2 added); the
+/// ghost of gone, in orph's subscriber folder, names a leaf on each
 /// of its objects; an old text names its one leaf.
 #[test]
 fn a_headline_carries_the_leaves_it_names (

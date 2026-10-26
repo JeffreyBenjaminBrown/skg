@@ -34,7 +34,7 @@ pub struct GraphnodeDiff {
   pub status: GitDiffStatus,
   /// The "before" state of this stage: HEAD for staged, index for
   /// unstaged. Populated only for Deleted status; read by
-  /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
+  /// 'collect_deleted_nodes_for_both' to resolve ghosts' titles.
   /// Name reflects the stage's baseline rather than always-HEAD.
   pub before_node: Option<Graphnode>,
   /// The "after" state of this stage: index for staged, worktree for

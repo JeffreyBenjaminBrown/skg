@@ -1,7 +1,7 @@
 //! The diff view's own viewnodes, made from the graph straddle
 //! ('docs/diff-view.org', "What each kind of change
 //! looks like"): the old text and its body diff, the home and relRepo
-//! moves, the changeset markers, the historical phantom of a node
+//! moves, the changeset markers, the ghost of a node
 //! the after-graph lacks, and the two derived acquisition folders.
 //! Each is save-inert. The kinds of change they show are set here;
 //! readiness is read from the store where they are placed.
@@ -122,7 +122,7 @@ pub fn mk_historical_viewnode (
         isWarranted         : Warrant::ByHead } ))) } ) }
 
 /// Under 'parent' (the acquirer 'pid'), an "it acquired" folder of
-/// the historical phantoms of the nodes it acquired since HEAD. None
+/// the ghosts of the nodes it acquired since HEAD. None
 /// (and nothing appended) when it acquired none.
 pub fn append_acquired_folder (
   tree     : &mut Tree<Viewnode>,
@@ -136,7 +136,7 @@ pub fn append_acquired_folder (
     viewnode_of ( ViewnodeKind::Folder (
       Folder::Acquired ))) . id ();
   for acquiree in &acquirees {
-    if let Some (phantom) = mk_historical_viewnode (straddle, acquiree, None) {
-      tree . get_mut (folder) ? . append (phantom); }}
+    if let Some (ghost) = mk_historical_viewnode (straddle, acquiree, None) {
+      tree . get_mut (folder) ? . append (ghost); }}
   Some (folder) }
 

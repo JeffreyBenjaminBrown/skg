@@ -422,13 +422,13 @@ fn the_removed_partners_buffer_saves_back_unchanged (
   saves_back_unchanged ("removed_partners", &["main"], DiffViewBufferKind::AllChanges) }
 
 /// In the 'historical_content' fixture h, which contained m, was
-/// deleted: h's historical phantom holds its old content m as a
+/// deleted: h's ghost holds its old content m as a
 /// removed member, a non-member with '(diff (rel removed))', beside
 /// '(properties changed)' since m was retitled. It is m's first occurrence, so it is
 /// editable, its old title beneath it. A buffer showing it saves back
 /// unchanged.
 #[test]
-fn a_historical_phantoms_old_content_is_shown_as_removed_members (
+fn a_ghosts_old_content_is_shown_as_removed_members (
 ) -> Result<(), Box<dyn Error>> {
   let mut buffer : String = String::new ();
   with_fixture ("historical_content", &["main"], |f| {

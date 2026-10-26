@@ -126,7 +126,7 @@ fn write_protect_drops_the_editable_request_and_keeps_membership () {
   assert_eq! (t . claimsMembership, false); }
 
 // 'editable_occurrences' collects the IDs of the editable
-// occurrences at any depth, and no write-protected one, phantom or
+// occurrences at any depth, and no write-protected one, ghost or
 // folder.
 #[test]
 fn editable_occurrences_are_those_not_write_protected () {

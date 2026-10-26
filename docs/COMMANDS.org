@@ -56,7 +56,7 @@ of the node at point. Descendent headlines that are not occurrences
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
 *** C-c d a : skg-delete-references-to-absent-node
-On an Unknown phantom, removes that exact raw ID from every owned
+On an unknown, removes that exact raw ID from every owned
 structured relationship in every retained telescope.  It never edits
 foreign telescopes or text links.  If owned title/body text links point at
 the same absent ID, Skg shows a retained warning buffer and asks before the
@@ -514,7 +514,7 @@ is not restored; the save says so.
 Sets the relRepo of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's
 relation for a writable PartnerFolder member, or the alias membership
-for an alias headline. An Unknown phantom in one of those writable
+for an alias headline. An unknown in one of those writable
 positions is supported too: it carries only its raw relationship member ID,
 never a node edit. (Formerly
 =skg-privatize-relationship=; renamed because the gesture now moves

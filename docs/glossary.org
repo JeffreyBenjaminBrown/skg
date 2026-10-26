@@ -132,7 +132,7 @@ it while completing the view and then drops it. (=fork= is also
 written as a view request, but the save consumes it.) An *edit
 request* (=(editRequest ...)=: =delete=, =merge=, =flag=, =relRepo=, and in
 the diff view =restoreRel= on a removed membership and =restoreNode= on a
-historical phantom) asks the save to change the graph; a successful save
+ghost) asks the save to change the graph; a successful save
 consumes it, and a failed save leaves it in the buffer. The two restore
 requests are described in 'docs/diff-view.org', "Restoring what a change
 removed". A *readiness request* (see
@@ -263,9 +263,9 @@ each join three relationships -- subscription, hiding and containment:
 
 The diff view adds two more, for nodeMerges since HEAD:
 - an *acquiredByFolder* ("it was acquired by"), under an acquiree's
-  historical phantom, holds its acquirer;
+  ghost, holds its acquirer;
 - an *acquiredFolder* ("it acquired"), under an acquirer, holds the
-  historical phantoms of the nodes it acquired.
+  ghosts of the nodes it acquired.
 
 Membership edits in the subscribee, overridden and
 hidden-outside-of-subscribee folders are graph edits. The others are
@@ -452,7 +452,7 @@ the diff view, its ghost. Phantoms are save-inert.
 An *unknown node* is an ID that some node's contains, subscribesTo,
 hidesFromSubs or overrides list names but that no node of the graph
 answers to, as primary or extra ID; such an ID is *dangling*. A view
-shows it as an unknown phantom ("Reference to unknown node.").
+shows it as an unknown ("Reference to unknown node.").
 The "investigate unknown node" request says what git history knows of
 it, and the delete-references-to-absent-node command removes the
 references.
@@ -843,11 +843,11 @@ A *removed member* is an unrestricted vognode, a
 [[*non-member, 'noClaim'][non-member]], with the change fact '(rel removed)': its
 node survives, but its relationship to its viewparent exists in
 the before-graph only. It is encoded so in content, in a partner
-folder and in a historical phantom's old content alike. In
+folder and in a ghost's old content alike. In
 content position it follows the editability rule as a member
 does: editable at its node's first occurrence in level order,
 write-protected at a later one. A *former member* is any viewnode
-standing for such a before-only relationship, historical phantoms
+standing for such a before-only relationship, ghosts
 included. These phrases, like "stale member" and "new member",
 name the node by its membership's fate.
 
@@ -919,7 +919,7 @@ includes it.
 
 A buffer *makes a node's changes editable* when it holds an
 editable occurrence of the node, wherever it sits, or the node's
-historical phantom in content position
+ghost in content position
 ('nodes_editable_in_diffView'). The change-forest leaves those
 nodes record are the changes editable in the buffer.
 
@@ -944,7 +944,7 @@ headlines, then saves.
 **** restore request
 
 Either of the two edit requests that undo a removal in the diff
-view. '(editRequest restoreNode)', on a historical phantom,
+view. '(editRequest restoreNode)', on a ghost,
 writes its node back as HEAD had it, in-links included;
 '(editRequest restoreRel)', on a removed membership (a removed
 member in content position, or a member of a partner folder
@@ -1173,7 +1173,7 @@ an entry of a property folder, the entry itself; for any other
 viewnode, its kind. In the older reconciler it is the key of a
 goal item ('Orderkey' in 'complete_managed_children'). The diff
 view's reconciler calls it the *match key* ('MatchKey'), and
-matches an unknown phantom by its raw ID and a historical phantom
+matches an unknown by its raw ID and a ghost
 by its ID at HEAD. It matches a key among all the children of a
 node, whoever drew them: a child of a key its model has is
 adopted, and a second child of that key is a duplicate, converted
@@ -1252,7 +1252,7 @@ refused, and so are two members, in a content list or a folder.
 The orphaned folder ('entombstone_generalized_orphan_folder') and the
 skgrepo-set switch ('convert_and_prune_for_skgrepo_switch')
 convert by the same rule: a member of a folder whose viewparent
-died, and a deleted or unknown phantom that a now restricted
+died, and a deleted or unknown that a now restricted
 skgrepo records.
 
 *** save-inert
@@ -1474,8 +1474,8 @@ marked change unmarks it.
 **** content position
 
 A viewnode is in *content position* when its viewparent is the buffer
-root, an unrestricted vognode, or a historical phantom that is itself
-in content position ('in_content_position'). A historical phantom in
+root, an unrestricted vognode, or a ghost that is itself
+in content position ('in_content_position'). A ghost in
 content position holds its old content under it.
 
 **** change viewnode

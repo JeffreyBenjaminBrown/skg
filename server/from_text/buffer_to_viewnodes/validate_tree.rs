@@ -278,7 +278,7 @@ fn validate_editable_view_requests (
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &Viewnode =
         node_ref . value();
-      // Only an occurrence carries view_requests; a phantom never can,
+      // Only an occurrence carries view_requests; a ghost or an unknown never can,
       // so the Editable-request validations below apply to occurrences only.
       if let ViewnodeKind::Vognode (
         Vognode::Occurrence (t))

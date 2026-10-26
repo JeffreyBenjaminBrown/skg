@@ -30,8 +30,8 @@ pub fn convert_and_prune_for_skgrepo_switch (
   graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
-  // The phantoms first, while their recorders are still occurrences.
-  convert_now_restricted_phantoms (tree, restriction);
+  // The unknowns first, while their recorders are still occurrences.
+  entombstone_now_restricted_unknowns (tree, restriction);
   entombstone_hidden_occurrences (tree, graph, restriction);
   let root : NodeId = tree . root () . id ();
   prune_children_postorder (tree, root) ?;
@@ -41,12 +41,12 @@ pub fn convert_and_prune_for_skgrepo_switch (
 /// skgrepo records becomes a tombstone:
 /// the prune below removes it if it is a leaf, and otherwise
 /// it stays, titleless, holding what is under it.
-fn convert_now_restricted_phantoms (
+fn entombstone_now_restricted_unknowns (
   tree        : &mut Tree<Viewnode>,
   restriction : &SkgrepoRestriction,
 ) {
   if restriction . is_all () { return; }
-  let phantoms : Vec<NodeId> =
+  let unknowns : Vec<NodeId> =
     tree . root () . descendants ()
     . filter ( |node| match &node . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
@@ -56,12 +56,12 @@ fn convert_now_restricted_phantoms (
         _ => false } )
     . map ( |node| node . id () )
     . collect ();
-  for phantom in phantoms {
-    tree . get_mut (phantom) . unwrap () . value ()
+  for unknown in unknowns {
+    tree . get_mut (unknown) . unwrap () . value ()
       . replace_kind (ViewnodeKind::Tombstone); }}
 
 /// The home skgrepo of the occurrence that records the
-/// relationship an unknown phantom without a relRepo stands in: its
+/// relationship an unknown without a relRepo stands in: its
 /// viewparent, or, in a folder, the folder's viewparent.
 fn recorder_home_skgrepo (
   node : NodeRef<Viewnode>,

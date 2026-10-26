@@ -110,11 +110,11 @@ fn folded_change_folders_and_old_text_stay_folded (
     assert_kinds_folds_stay (&saved);
     Ok (( )) }) }
 
-/// A folded historical phantom (its old content hidden, its body
+/// A folded ghost (its old content hidden, its body
 /// folded) stays folded after a save that changes nothing and after
 /// one that adds a container above it.
 #[test]
-fn a_folded_historical_phantom_stays_folded (
+fn a_folded_ghost_stays_folded (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -179,7 +179,7 @@ fn a_removed_member_keeps_its_fold_state_and_its_place (
     assert_eq! ( saved, folded );
     Ok (( )) }) }
 
-/// A node a save deletes becomes a historical phantom, in place, whose
+/// A node a save deletes becomes a ghost, in place, whose
 /// subtree keeps its folding; restored, it becomes a live member, in
 /// place, whose subtree keeps its folding too.
 #[test]
@@ -199,7 +199,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
     assert_eq! ( deleted . lines ()
                  . filter ( |line| line . starts_with ("*** ") && line . contains ("(gnid cy2)") )
                  . count (), 1,
-      "the former member is the phantom's old content, not beside it:\n{}", deleted );
+      "the former member is the ghost's old content, not beside it:\n{}", deleted );
     let restoring : String = edit_line (
       &deleted, "** (skg bodyFolded ghost (gnid cy1)",
       |_| "** (skg bodyFolded node (gnid cy1) (skgRepos (nodeRepo main))) cy1" . to_string () );

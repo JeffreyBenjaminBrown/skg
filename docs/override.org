@@ -138,7 +138,7 @@ node rather than an automatic substitute:
 - content-view roots;
 - search-result roots and the members of their folders;
 - PartnerFolder members and the containerward chain;
-- historical phantoms.
+- ghosts.
 
 When a node with an owned overrider is deliberately shown raw, its
 immediate content children are also shown raw.  Substitution resumes at

@@ -66,7 +66,7 @@ Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
 <localleader>dR, or as ':SkgDeleteRecursive'.
 *** <localleader>da : :SkgDeleteReferencesToAbsentNode
-On an Unknown phantom, remove that exact raw ID from owned structured
+On an unknown, remove that exact raw ID from owned structured
 relationships throughout retained telescopes, then refresh only views which
 show a changed recorder or that exact raw ID.
 The command refuses while a view is dirty.  Text links are reported but left

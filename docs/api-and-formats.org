@@ -221,7 +221,7 @@ So far there are these endpoints:
        are recorded by nodes whose changes the buffer does not make editable. A
        buffer makes a node's changes editable where it has an editable
        occurrence of it, in content or in a partner folder, or a
-       historical phantom of it in content position: under the buffer
+       ghost of it in content position: under the buffer
        root or an unrestricted vognode, or in the old content of such a
        phantom. The buffer is reconciled over the graph straddle, not
        rebuilt: its roots, and every headline it holds editable, stay as
@@ -254,7 +254,7 @@ So far there are these endpoints:
     its relation as a set of node IDs, under the save's skgrepo
     restriction, not counting a member the diff view shows as
     removed; a member shown by an extra ID counts as its node, and an
-    unknown phantom by its raw ID, as the folder reconciler matches
+    unknown by its raw ID, as the folder reconciler matches
     them; a member carrying a relRepo request differs. A present
     flags folder, under any node, must likewise equal the node's flags.
   - Before mutation, the server computes the update-relevant neighborhood of
@@ -808,7 +808,7 @@ one automatically.
        is re-rendered in place under the new set: nodes whose skgrepo
        became restricted are converted and pruned (a restricted node
        with unrestricted viewchildren is retained, write-protected), an
-       unknown phantom whose relRepo (else its recorder's home) became
+       unknown whose relRepo (else its recorder's home) became
        restricted becomes a tombstone, pruned unless it holds something, and
        PartnerFolders regenerate per the new set, so widening the set
        reveals members and folders.

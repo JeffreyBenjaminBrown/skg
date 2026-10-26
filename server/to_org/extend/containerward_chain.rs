@@ -20,7 +20,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_gnid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, Tree};
@@ -116,7 +116,7 @@ fn insert_containerward_chain_recursive (
   Ok (( )) }
 
 /// Prepend 'container' under 'parent', which it contains, as a
-/// write-protected non-member, or an unknown phantom if no graph
+/// write-protected non-member, or an unknown if no graph
 /// knows it. None, and nothing prepended, when the skgrepo
 /// restriction hides the container or the relationship: the
 /// containment is recorded by the container, perhaps in a more

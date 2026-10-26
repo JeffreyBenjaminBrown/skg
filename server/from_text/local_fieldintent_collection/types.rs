@@ -20,7 +20,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
-  UnderVognode { // The node's parent is a vognode, a phantom, or a tombstone.
+  UnderVognode { // The node's parent is an occurrence, a ghost, an unknown, or a tombstone.
     parent_if_editable : Option<ID>, }, // This is Some iff the parent is save-eligible.
   UnderDefiningFolder ( // The node is inside an AliasFolder, a SubscribeeFolder, or an OverriddenFolder.
     DefiningFolderRecorder ),

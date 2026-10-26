@@ -614,7 +614,7 @@ fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
     Vec::<(ID, SubscribeeVisibility)>::new()); }
 
 #[test]
-fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
+fn subscribee_hiderel_intent_excludes_non_content_delete_and_ghost_children (
 ) {
   let input : &str =
     indoc! {"
@@ -624,7 +624,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             **** (skg node (gnid keep) (skgRepos (nodeRepo main))) keep
             **** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
             **** (skg node (gnid delete-me) (skgRepos (nodeRepo main)) (editRequest delete)) delete me
-            **** (skg ghost (gnid phantom) (skgRepos (nodeRepo main)) noClaim) phantom
+            **** (skg ghost (gnid gone) (skgRepos (nodeRepo main)) noClaim) gone
             "};
   let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);

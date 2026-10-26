@@ -655,7 +655,7 @@ never stranded. The client writes only the new home; the analysis is
 the server's.
 
 * Investigating an unknown node
-An unknown phantom stands for an ID nothing in the graph answers to.
+An unknown stands for an ID nothing in the graph answers to.
 C-c t r ('skg-investigate-unknown-node') asks the server what git
 history knows of it: when it was last present, the commit it vanished
 at, its title and relations then, and what referred to it (the API

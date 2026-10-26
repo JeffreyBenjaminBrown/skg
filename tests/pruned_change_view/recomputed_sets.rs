@@ -489,14 +489,14 @@ fn a_root_the_command_appended_stays_once_outside_u (
 
 /// The 'historical_content' fixture (one skgrepo, main): at HEAD r
 /// contains h and k, and h contains m. Since then h was deleted and m
-/// retitled, so the buffer shows h as a historical phantom under r,
+/// retitled, so the buffer shows h as a ghost under r,
 /// holding its old content m, a node of U, as an editable removed
 /// member.
 /// Once m is write-protected there, the walk that finds the
-/// occurrences to make editable passes through a historical phantom
+/// occurrences to make editable passes through a ghost
 /// in content position, so it makes m editable there again.
 #[test]
-fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
+fn the_occurrences_made_editable_include_a_member_under_a_ghost (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
@@ -535,7 +535,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 /// command makes it editable there again, so every change is
 /// editable in the buffer, and m stays editable through a save of it.
 #[test]
-fn the_command_makes_a_member_under_a_historical_phantom_editable (
+fn the_command_makes_a_member_under_a_ghost_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
     let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";

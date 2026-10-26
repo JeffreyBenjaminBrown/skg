@@ -6,7 +6,7 @@
 //! skgsave-commit; a save that stops for a confirmation or fails leaves
 //! them in the buffer.
 //!
-//! '(editRequest restoreNode)', on a historical phantom, writes the
+//! '(editRequest restoreNode)', on a ghost, writes the
 //! node back from the before-graph of the graph straddle, out-links
 //! included, and re-adds its in-links: each recorder at HEAD gains the
 //! node in that list, at the index it had at HEAD (clamped to the
@@ -121,7 +121,7 @@ struct RestoredRelationship {
   relRepo       : SkgrepoName,
 }
 
-/// Push a Save of each node a historical phantom's restoreNode names,
+/// Push a Save of each node a ghost's restoreNode names,
 /// as the before-graph holds it. Returns the restored pids. A request
 /// whose node the live graph has (as a node or an extra ID), or whose
 /// node the save already writes, is dropped with a warning.

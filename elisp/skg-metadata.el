@@ -581,7 +581,7 @@ command, but does not edit anything."
               (outline-next-heading))
              ((skg--writable-folder-sexp-p meta)
               (outline-next-heading))
-             (t ;; write-protected folders, alias/ID folders, and other phantoms.
+             (t ;; write-protected folders, alias/ID folders, ghosts and unknowns.
               (skg--goto-next-headline-after-subtree))))))
       (nreverse targets))))
 
@@ -1117,7 +1117,7 @@ METADATA-SEXP is not an occurrence's)."
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-headline-p (metadata-sexp)
-  "Return non-nil when METADATA-SEXP is an Unknown phantom."
+  "Return non-nil when METADATA-SEXP is an unknown."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg unknown))))
 
@@ -1128,7 +1128,7 @@ METADATA-SEXP is not an occurrence's)."
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-node-id-at-point ()
-  "The ID of the unknown phantom whose headline is at point, or nil."
+  "The ID of the unknown whose headline is at point, or nil."
   (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
     (when (skg--unknown-headline-p metadata)
       (skg--metadata-gnid metadata))))

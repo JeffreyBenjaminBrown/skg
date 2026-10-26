@@ -70,7 +70,7 @@ local function find_all_changes_buffer (timeout_secs)
   end, timeout_secs)
 end
 
-print('=== SKG View-Magit-Phantom-Deleted-File Integration Test ===')
+print('=== SKG View-Magit-Ghost-Deleted-File Integration Test ===')
 
 -- PHASE 1: open the diff view.
 print('=== PHASE 1: Open the diff view ===')
@@ -140,5 +140,5 @@ if resolved_path then
 end
 
 print('')
-print('All view-magit-phantom-deleted-file tests passed!')
+print('All view-magit-ghost-deleted-file tests passed!')
 T.pass()

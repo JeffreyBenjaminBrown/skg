@@ -7,7 +7,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::tantivy::title_and_skgrepo_by_gnid;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 
 use std::sync::{Arc, OnceLock};
 use std::sync::Mutex as SyncMutex;

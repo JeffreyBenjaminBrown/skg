@@ -297,7 +297,7 @@ function M.node_id (metadata_sexp)
   return nil
 end
 
----@return string|nil the ID of the unknown phantom whose headline is
+---@return string|nil the ID of the unknown whose headline is
 ---at point
 function M.unknown_id_at_point ()
   local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
@@ -403,7 +403,7 @@ function M.delete ()
 end
 
 ---Mark the headline at point, and every occurrence viewdescendant,
----for deletion. Non-occurrence descendants (phantoms, folders, ...) are
+---for deletion. Non-occurrence descendants (ghosts, folders, ...) are
 ---skipped. Does not save.
 function M.delete_recursive ()
   if not M.at_headline_p() then error('Not on a headline') end
@@ -702,7 +702,7 @@ end
 
 ---@param metadata_sexp any
 ---@return boolean is it a vognode's: an occurrence, an unknown
----phantom or a ghost?
+---or a ghost?
 function M.vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
   if M.occurrence_sexp_p(metadata_sexp) then return true end

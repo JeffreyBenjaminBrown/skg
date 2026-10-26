@@ -9,7 +9,7 @@
 // Its "all changes" buffer holds, among other roots: e, holding x as
 // a removed member, editable, with x's content xc and its changed
 // container folder; p, holding b, holding x as a write-protected,
-// childless removed member; and h, a historical phantom root holding
+// childless removed member; and h, a ghost root holding
 // its old content hm.
 
 use crate::pruned_change_view::common::{

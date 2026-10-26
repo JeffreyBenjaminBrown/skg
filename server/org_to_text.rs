@@ -210,7 +210,7 @@ fn viewnode_to_string_without_viewnode_id (
       Ok ( occurrence_metadata_to_string (
         viewnode . foldAndFocus, occurrence, claims_are_read, facts, request )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
-      Ok ( phantomUnknown_metadata_to_string (
+      Ok ( unknown_metadata_to_string (
         viewnode . foldAndFocus, unknown_node, claims_are_read, facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
@@ -531,7 +531,7 @@ fn ghost_metadata_to_string (
 ///   [(skgRepos (relRepo R))] [noClaim]
 ///   [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
 /// Triggered when a referenced ID resolved to nothing in any db.
-fn phantomUnknown_metadata_to_string (
+fn unknown_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   unknown_node    : &Unknown,
   claims_are_read : bool,

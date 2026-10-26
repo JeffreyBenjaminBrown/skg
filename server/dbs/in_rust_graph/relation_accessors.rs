@@ -277,7 +277,7 @@ impl InRustGraph {
   /// links live in the text. Members whose relRepo is outside the
   /// skgrepo restriction are left out; pass None for every member.
   /// Rendering code reads the tag (an unresolved member is shown as an
-  /// unknown phantom); comparisons take the ID from either variant.
+  /// unknown); comparisons take the ID from either variant.
   pub fn outbound_member_keys_for_relation_gated (
     &self,
     pid         : &ID,
@@ -305,7 +305,7 @@ impl InRustGraph {
 
   /// Raw outbound member IDs whose relRepo is in the skgrepo restriction. Unlike the
   /// PID-oriented accessor, this retains unresolved stored IDs so rendering
-  /// can preserve them as Unknown phantoms.
+  /// can preserve them as unknowns.
   pub fn outbound_gnids_for_relation_gated (
     &self,
     pid      : &ID,
@@ -357,7 +357,7 @@ impl InRustGraph {
   /// The relRepo of one exact, stored outbound member ID.
   /// Unlike 'relRepo', this deliberately does not canonicalize the
   /// target: an unresolved raw ID has no PID, but is still a real stored
-  /// relationship member and can be edited from an Unknown phantom.
+  /// relationship member and can be edited from an unknown.
   pub fn relRepo_for_stored_member (
     &self,
     recorder    : &ID,

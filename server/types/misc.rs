@@ -266,7 +266,7 @@ pub struct SkgrepoName ( pub String );
 
 impl SkgrepoName {
   /// Reserved sentinel skgrepo for a viewnode *not an occurrence* (e.g. a
-  /// historical phantom) whose skgrepo could not be determined. It renders like
+  /// ghost) whose skgrepo could not be determined. It renders like
   /// any other skgrepo -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
   /// (see the glossary's "unknown node, dangling ID"). An occurrence's skgrepo failures are caught by

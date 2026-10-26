@@ -145,10 +145,10 @@ fn dependencies_from_uninterpreted (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      ViewnodeKind::Vognode (Vognode::Unknown (phantom)) => {
-        result . insert (phantom . gnid . clone ()); }
-      ViewnodeKind::Vognode (Vognode::Ghost (phantom)) => {
-        result . insert (phantom . gnid . clone ()); }
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
+        result . insert (unknown . gnid . clone ()); }
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
+        result . insert (ghost . gnid . clone ()); }
       ViewnodeKind::PropertyMember (
         PropertyMember::ID { gnid, .. }) => {
         result . insert (gnid . clone ()); }
@@ -169,10 +169,10 @@ fn dependencies_from_registered (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      ViewnodeKind::Vognode (Vognode::Unknown (phantom)) => {
-        result . insert (phantom . gnid . clone ()); }
-      ViewnodeKind::Vognode (Vognode::Ghost (phantom)) => {
-        result . insert (phantom . gnid . clone ()); }
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
+        result . insert (unknown . gnid . clone ()); }
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
+        result . insert (ghost . gnid . clone ()); }
       ViewnodeKind::PropertyMember (
         PropertyMember::ID { gnid, .. }) => {
         result . insert (gnid . clone ()); }

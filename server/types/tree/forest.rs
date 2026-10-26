@@ -41,7 +41,7 @@ pub fn editable_occurrences (
     . collect () }
 
 /// Whether 'node' stands where content does: its parent is the buffer
-/// root, an occurrence, or a historical phantom that is
+/// root, an occurrence, or a ghost that is
 /// itself in content position. (Whether it is a member there, its
 /// 'membership', is a separate question.)
 pub fn in_content_position (

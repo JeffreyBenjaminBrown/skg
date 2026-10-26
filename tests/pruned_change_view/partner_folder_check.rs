@@ -31,7 +31,7 @@ fn with_subscribee_folder_under_recorder (
     . collect::<Vec<String>> () . join ("\n") ), 1 ) }
 
 /// x shown by its extra ID x2, as recorder lists it, and ghost shown
-/// as an unknown phantom with its raw ID: the folder says what the
+/// as an unknown with its raw ID: the folder says what the
 /// graph says, and the buffer saves.
 #[test]
 fn a_member_shown_by_an_extra_id_and_an_unknown_member_pass (
@@ -45,7 +45,7 @@ fn a_member_shown_by_an_extra_id_and_an_unknown_member_pass (
     Ok (( )) }) }
 
 /// A dangling removed member, as the diff view shows one in a
-/// write-protected folder (an unknown phantom with '(rel removed)'),
+/// write-protected folder (an unknown with '(rel removed)'),
 /// is not counted: beside the members recorder lists, the folder
 /// saves unchanged.
 #[test]
@@ -60,7 +60,7 @@ fn a_dangling_removed_member_is_not_counted (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 
-/// An unknown phantom with an ID recorder does not list claims
+/// An unknown with an ID recorder does not list claims
 /// nothing in the folder of a write-protected occurrence: the buffer
 /// saves.
 #[test]

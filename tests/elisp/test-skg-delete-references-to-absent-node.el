@@ -9,7 +9,7 @@
 (require 'skg-request-delete-references-to-absent-node)
 
 (defun test--with-unknown-view (body)
-  "Run BODY at a PhantomUnknown headline in a temporary SKG view."
+  "Run BODY at an unknown headline in a temporary SKG view."
   (with-temp-buffer
     (insert "* (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder\n"
             "** (skg unknown (gnid gone))\n")

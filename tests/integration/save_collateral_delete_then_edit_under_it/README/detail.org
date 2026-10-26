@@ -1,5 +1,5 @@
 Since slice 3 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
-there is no deleted phantom: an occurrence whose node a save deleted
+no ghost stands outside the diff view: an occurrence whose node a save deleted
 becomes a tombstone, which the prune removes when childless, view
 roots included. Where this file says =DeletedNode= or =(deleted ...)=,
 read a tombstone; buffer 2 no longer shows 11 ('brief.org').
@@ -394,15 +394,15 @@ Expected headline-titles (approximately):
 =server/update_buffer/complete_parent_first/truenode.rs=,
 function =build_child_creation_data= (around line 450).
 
-Currently, for a non-phantom child not already in the tree,
+Currently, for a child that is neither a ghost nor an unknown, not already in the tree,
 the function errors: "no repo for X (not in map, not a child)".
 This prevents collateral updates from picking up new children
 created by another buffer's save.
 
 The fix: when =child_repos.get(id)= returns =None=, fall back
 to =home_from_disk(id, config)= (defined in
-=server/types/phantom.rs=). This mirrors the fallback chain in
-=repo_for_phantom= (same file).
+=server/types/disk_home.rs=). This mirrors the fallback chain
+that file once used for a ghost's skgrepo.
 
 Current code (lines ~451-455):
 
@@ -415,8 +415,8 @@ Current code (lines ~451-455):
       id.0 )) ?;
 #+end_example
 
-Replacement — follow the same chain as =repo_for_phantom=
-(=server/types/phantom.rs=), which already does
+Replacement — follow the same chain as that file's former
+ghost-skgrepo lookup, which did
 =existing_children → deleted_since_head_pid_src_map → map → disk=.
 All four parameters are already available in
 =build_child_creation_data=:
@@ -440,7 +440,7 @@ Note: the variable changes from =&RepoName= to =RepoName=
 =&child_repo= there.
 
 Import =home_from_disk= at the top of the file from
-=crate::types::phantom::home_from_disk=.
+=crate::types::disk_home::home_from_disk=.
 
 * Files to create
 

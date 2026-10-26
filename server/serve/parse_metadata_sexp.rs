@@ -107,7 +107,7 @@ pub struct ViewnodeMetadata {
   pub is_ghost: bool,
   // When true, this is a tombstone.
   pub is_tombstone: bool,
-  // When Some, this is a Unknown (a phantom for a missing
+  // When Some, this is an unknown (a viewnode for a missing
   // referent). Carries only the id; no skgrepo/title/body apply.
   pub unknown_node_gnid: Option<ID>,
   pub unknown_relRepo : Option<SkgrepoName>,
@@ -191,7 +191,7 @@ pub fn viewnode_from_metadata (
             } )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
-              "Unknown phantom content cannot be edited.",
+              "unknown content cannot be edited.",
               &[ headline . clone () ] )))
           } else { None },
           None )

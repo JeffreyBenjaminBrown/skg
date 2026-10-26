@@ -63,20 +63,20 @@ fn treeid_of (
     . unwrap_or_else ( || panic! ("no vognode {} in the view", gnid) )
     . id () }
 
-/// Under 'parent', the historical phantom of 'pid' with its old
+/// Under 'parent', the ghost of 'pid' with its old
 /// content, a deleted member of which with its own.
-fn append_historical_phantom (
+fn append_ghost (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
   rel      : Option<Existence>,
 ) -> Option<NodeId> {
-  let phantom : NodeId = tree . get_mut (parent) ? . append (
+  let ghost : NodeId = tree . get_mut (parent) ? . append (
     mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
-  append_old_content (tree, phantom, straddle, pid) ?;
+  append_old_content (tree, ghost, straddle, pid) ?;
   let deleted_members : Vec<(NodeId, ID)> =
-    tree . get (phantom) ? . children ()
+    tree . get (ghost) ? . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
         Some (( child . id (), h . gnid . clone () )),
@@ -84,22 +84,22 @@ fn append_historical_phantom (
     . collect ();
   for (member, gnid) in deleted_members {
     append_old_content (tree, member, straddle, &gnid) ?; }
-  Some (phantom) }
+  Some (ghost) }
 
-/// Under the ghost 'phantom' of 'pid', what the diff view shows there:
+/// Under 'ghost', the ghost of 'pid', what the diff view shows there:
 /// if a nodeMerge acquired it, an "it was acquired by" folder holding
 /// its acquirer; then its content at HEAD, a deleted member as its
 /// ghost, a surviving one as a write-protected occurrence whose
 /// relationship HEAD alone has, and a dangling one as an unknown.
 fn append_old_content (
   tree     : &mut Tree<Viewnode>,
-  phantom  : NodeId,
+  ghost  : NodeId,
   straddle : &GraphStraddle,
   pid      : &ID,
 ) -> Option<()> {
   if let Some (acquirer) = straddle . acquirer_of (pid) {
     let node = straddle . after . get (&acquirer) ?;
-    let folder : NodeId = tree . get_mut (phantom) ? . append (
+    let folder : NodeId = tree . get_mut (ghost) ? . append (
       viewnode_of ( ViewnodeKind::Folder (Folder::AcquiredBy) )) . id ();
     tree . get_mut (folder) ? . append ( mk_writeProtected_viewnode (
       acquirer . clone (), node . home_skgrepo . clone (), node . title . clone (), true )); }
@@ -116,7 +116,7 @@ fn append_old_content (
         member . change_facts . change =
           straddle . node_change (&partner . id, Some (Existence::Removed));
         member };
-    tree . get_mut (phantom) ? . append (member); }
+    tree . get_mut (ghost) ? . append (member); }
   Some (( )) }
 
 /// The view of p, with every one of the diff view's viewnodes
@@ -131,7 +131,7 @@ fn buffer_with_every_new_viewnode (
   let p : NodeId = treeid_of (&tree, "p");
   let b : NodeId = treeid_of (&tree, "b");
   { // gone, a removed member of p, where it stood: before b.
-    let gone : NodeId = append_historical_phantom (
+    let gone : NodeId = append_ghost (
       &mut tree, p, &straddle, &ID::from ("gone"), Some (Existence::Removed) )
       . expect ("gone is in the before-graph only");
     move_before (&mut tree, b, gone) ?; }
@@ -157,7 +157,7 @@ fn buffer_with_every_new_viewnode (
     move_to_first_child (&mut tree, acq, folder) ?; }
   { // The acquiree, a second root.
     let root : NodeId = tree . root () . id ();
-    append_historical_phantom (
+    append_ghost (
       &mut tree, root, &straddle, &ID::from ("acquired"), None )
       . expect ("'acquired' is in the before-graph only"); }
   Ok ( viewforest_tree_to_string (&tree, &f . config) ? ) }
@@ -215,7 +215,7 @@ fn the_new_viewnodes_cross_the_wire (
     Ok (( )) }) }
 
 /// A readiness request on the old text names the node's text leaf;
-/// on a historical phantom's node object, its existence; on the content
+/// on a ghost's node object, its existence; on the content
 /// changeset marker ('all'), the relationship leaves of its node's
 /// content.
 #[test]

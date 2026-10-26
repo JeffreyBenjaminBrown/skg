@@ -66,7 +66,7 @@ pub enum BufferValidationError {
   WriteProtectAndEditableViewRequestsOnOneOccurrence (ID, HeadlineName), // One occurrence asks to become both write-protected and the editable one. (On different occurrences of a node, the two requests move editability, and are allowed.)
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID, HeadlineName), // (error message, nearest ancestor ID, the headline violating)
-  EditRequestOnWriteProtectedOccurrence      (ID, HeadlineName), // Write-protected nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit an editable view of the node first.
+  EditRequestOnWriteProtectedOccurrence      (ID, HeadlineName), // Write-protected nodes -- ghosts and unknowns in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit an editable view of the node first.
   EditedWriteProtectedOccurrence {
     gnid    : ID,
     title    : String,
@@ -255,7 +255,7 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::IDFolder_Edited(recorder, buffer_gnids, real_gnids, headline) =>
         write!(f, "The idFolder under node {:?} ({}) was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", recorder, headline, buffer_gnids, real_gnids),
       BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, headline) =>
-        write!(f, "Edit request on write-protected (phantom) node {:?} ({}). Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", gnid, headline),
+        write!(f, "Edit request on write-protected node {:?} ({}). Ghosts and unknowns are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", gnid, headline),
       BufferValidationError::EditedWriteProtectedOccurrence {
         gnid, title, changes, headline } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",

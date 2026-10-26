@@ -138,7 +138,7 @@ fn load_from_disk (
                        &s, "worktree", abs_path) ) }
 
 /// Collect Graphnodes for files that were deleted in either stage.
-/// Used to look up titles and bodies for phantom nodes.
+/// Used to look up titles and bodies for ghosts.
 fn collect_deleted_nodes_for_both (
   staged   : &HashMap<PathBuf, GraphnodeDiff>,
   unstaged : &HashMap<PathBuf, GraphnodeDiff>,

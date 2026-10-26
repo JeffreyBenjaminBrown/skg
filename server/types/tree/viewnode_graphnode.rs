@@ -141,7 +141,7 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
-                          // A phantom has no membership field and is implicitly
+                          // A ghost or an unknown has no membership field and is implicitly
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     ViewnodeKind::Vognode (Vognode::Occurrence (t))

@@ -298,8 +298,8 @@ fn ancestor_letter (
 
 /// The nodes a buffer of the diff view makes editable: those it
 /// has an editable occurrence of, wherever it sits, and the deleted
-/// nodes it shows as historical phantoms in content position. A
-/// historical phantom in content position counts, since its old
+/// nodes it shows as ghosts in content position. A
+/// ghost in content position counts, since its old
 /// content is editable nowhere and shown there. The change-forest
 /// leaves these nodes record are the changes editable in the buffer.
 pub fn nodes_editable_in_diffView (
@@ -468,8 +468,8 @@ pub fn ensure_editableOccurrences_exist (
 
 /// The viewforest's occurrences in content position
 /// ('in_content_position') that are roots, members or removed members
-/// there, in level order. The walk passes through a historical
-/// phantom in content position, to its old content, the removed
+/// there, in level order. The walk passes through a ghost
+/// in content position, to its old content, the removed
 /// members under it.
 fn content_occurrences_in_level_order (
   viewforest : &ViewForest,

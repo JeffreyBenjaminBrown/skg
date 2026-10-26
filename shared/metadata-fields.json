@@ -39,7 +39,7 @@
           "values": [ { "value": "restoreNode" } ] },
         { "name": "viewRequests", "shape": "some", "default": "none",
           "values": [ { "value": "tombstone" } ] } ] },
-    { "kind": "unknown phantom", "atoms": [ "unknown" ],
+    { "kind": "unknown", "atoms": [ "unknown" ],
       "fields": [
         { "name": "noClaim", "shape": "atom", "default": "false",
           "values": [ { "value": "true" } ] },

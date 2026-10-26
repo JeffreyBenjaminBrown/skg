@@ -22,7 +22,7 @@ use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text::supplement_from_disk::hide_skgrepo;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 use crate::types::save::{NodeInstruction, SaveNode, SkgrepoMove};
 
 use std::collections::{HashMap, HashSet};

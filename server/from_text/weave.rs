@@ -21,7 +21,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;

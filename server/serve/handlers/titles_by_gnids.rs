@@ -14,7 +14,7 @@ use crate::skgrepo_sets::{
   SkgrepoSetName,
   titles_for_skgrepo_set_for_test,
 };
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 use crate::types::git::SkgrepoDiff;
 use crate::types::misc::{ID, SkgrepoName, SkgConfig, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;

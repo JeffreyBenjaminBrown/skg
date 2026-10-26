@@ -38,22 +38,22 @@ fn a_note_under_a_changed_folders_member_survives (
     assert_eq! ( without_viewnode_ids (&saved) . matches (GRAFT_P) . count (), 1, "{}", saved );
     Ok (( )) }) }
 
-/// A note under a historical phantom survives beside its old content,
-/// and survives the phantom going stale: once stage-and-commit makes
-/// the deletion part of HEAD, the phantom is entombstoned, holding the
+/// A note under a ghost survives beside its old content,
+/// and survives the ghost going stale: once stage-and-commit makes
+/// the deletion part of HEAD, the ghost is entombstoned, holding the
 /// note but not its old content.
 #[test]
-fn a_note_under_a_historical_phantom_survives (
+fn a_note_under_a_ghost_survives (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let phantom : &str = "** (skg ghost (gnid h)";
+    let ghost : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
       "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
-      &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;
-    assert! ( parent_line_of (&saved, "a note under h") . starts_with (phantom), "{}", saved );
-    assert_lines_in_order (&saved, &[ phantom, " a note under h\n", old_member ]);
+      &insert_after_line_starting ( &buffer, ghost, &note (3, "a note under h") )) ?;
+    assert! ( parent_line_of (&saved, "a note under h") . starts_with (ghost), "{}", saved );
+    assert_lines_in_order (&saved, &[ ghost, " a note under h\n", old_member ]);
     let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
     let response : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"commit\") (confirmed . t))\n" ) ?;
@@ -64,7 +64,7 @@ fn a_note_under_a_historical_phantom_survives (
     Ok (( )) }) }
 
 /// A note placed in the "it acquired" folder survives beside the
-/// acquiree's phantom.
+/// acquiree's ghost.
 #[test]
 fn a_note_in_the_acquired_folder_survives (
 ) -> Result<(), Box<dyn Error>> {

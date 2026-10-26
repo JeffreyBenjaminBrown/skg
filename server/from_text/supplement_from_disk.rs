@@ -16,7 +16,7 @@ use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoChange, SkgrepoName, members_of, rel_partners_at_relRepo};
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 use crate::types::nodes::complete::{
   Graphnode, empty_graphnode, set_flag};
 use crate::types::save::{NodeInstruction, SaveNode, SkgrepoMove};

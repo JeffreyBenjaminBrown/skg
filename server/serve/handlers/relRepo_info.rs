@@ -64,7 +64,7 @@ fn relRepo_info_response_body (
 /// the default is the more private endpoint home. From an owned
 /// recorder to a foreign or unresolved member, it is the recorder's home.
 /// The current relRepo is None when the graph records no such exact raw
-/// member.  This lets an Unknown phantom edit a stored dangling relationship.
+/// member.  This lets an unknown edit a stored dangling relationship.
 pub fn relRepo_info (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &crate::types::misc::SkgConfig,

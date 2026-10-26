@@ -1,7 +1,7 @@
 // The diff view's two restore requests ('docs/diff-view.org',
 // "Restoring what a change removed"): '(editRequest restoreRel)' on a
-// removed membership, '(editRequest restoreNode)' on a historical
-// phantom.
+// removed membership, '(editRequest restoreNode)' on a
+// ghost.
 //
 // In the 'removed_partners' fixture b, d and e drop x or c from their
 // content and s drops its subscribee s2. Its "all changes" buffer holds
@@ -12,7 +12,7 @@
 // In the 'restore' fixture g, deleted since HEAD, was contained by q
 // (between q1 and q2), subscribed to by t, and contained gc and gd; gd
 // is deleted too, and r dropped gc from its content. Its buffer holds
-// q with g as a historical phantom (gc and gd under it), r with gc as
+// q with g as a ghost (gc and gd under it), r with gc as
 // a removed member (g, historical, in gc's container folder), and t
 // with g in its subscribee folder.
 

@@ -85,7 +85,7 @@ pub struct RequestedReadiness {
 
 /// Every readiness request in the saved buffer, with the leaves it
 /// names. IDs resolve through 'graph' (the graph after the save),
-/// falling back to the ID as written, except a historical phantom's,
+/// falling back to the ID as written, except a ghost's,
 /// which names a node of the before-graph.
 pub fn readiness_requests_in_viewforest (
   viewforest : &ViewForest,
@@ -117,7 +117,7 @@ pub struct NamedLeaves {
 
 /// The leaves that a request naming the diff objects 'objects' at
 /// 'node' names. No objects on a vognode means both of its objects
-/// (only 'rel' on an unknown phantom); a property leaf has one object.
+/// (only 'rel' on an unknown); a property leaf has one object.
 /// None for a viewnode that names no leaf, among them a node of the
 /// containerward chain, which shows no change.
 fn leaves_named_at (
@@ -286,7 +286,7 @@ pub fn set_ready_facts_in_viewforest (
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
 /// on an occurrence whose node's other properties changed
 /// (modified), 'all', beside 'rel' when that names a leaf of 'forest'; on any
-/// other occurrence or a historical phantom, each of 'node'
+/// other occurrence or a ghost, each of 'node'
 /// and 'rel' that names a leaf, or else 'all' if its node records any
 /// leaf; on anything else, 'all' when a bare request names a commit
 /// readiness aggregate (a changeset marker), else no object. N is how many
@@ -340,7 +340,7 @@ fn keys_named_at (
     . map ( |named| keys_in_forest (&named, forest) )
     . unwrap_or_default () }
 
-/// The ID a vognode's leaves are keyed by: a historical phantom's as
+/// The ID a vognode's leaves are keyed by: a ghost's as
 /// written (a node of the before-graph), any other's resolved by
 /// 'pid_of'. None for a non-vognode.
 pub(crate) fn vognode_leaf_pid (

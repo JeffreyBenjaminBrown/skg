@@ -1,5 +1,5 @@
 /// Finding the home of a node the graph may not know,
-/// such as one a phantom stands for.
+/// such as one a ghost stands for.
 
 use std::path::PathBuf;
 
@@ -37,5 +37,5 @@ pub fn home_from_disk (
   None }
 
 #[cfg(test)]
-#[path = "../../tests/unit/types_phantom.rs"]
+#[path = "../../tests/unit/types_disk_home.rs"]
 mod tests;

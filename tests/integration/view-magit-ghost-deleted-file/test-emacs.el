@@ -55,7 +55,7 @@
     (test-fail "Timeout waiting for the \"all changes\" buffer"))
   (test-pass "The \"all changes\" buffer loaded"))
 
-(defun phase-2-verify-phantom-b ()
+(defun phase-2-verify-ghost-b ()
   (setq integration-test-phase "phase-2")
   (let ((content (with-current-buffer (find-content-view-buffer)
                    (buffer-substring-no-properties
@@ -64,7 +64,7 @@
       (test-fail "No ghost b in buffer. Content:\n%s" content))
     (test-pass "Ghost b present")))
 
-(defun phase-3-call-view-magit-on-phantom-b ()
+(defun phase-3-call-view-magit-on-ghost-b ()
   (setq integration-test-phase "phase-3")
   (let ((buf (find-content-view-buffer)))
     (switch-to-buffer buf)
@@ -123,13 +123,13 @@
       (test-pass "Point is on the b.skg line in magit"))))
 
 (defun run-all-tests ()
-  (message "=== SKG View-Magit-Phantom-Deleted-File Integration Test ===")
+  (message "=== SKG View-Magit-Ghost-Deleted-File Integration Test ===")
   (phase-1-open-the-diff-view)
-  (phase-2-verify-phantom-b)
-  (phase-3-call-view-magit-on-phantom-b)
+  (phase-2-verify-ghost-b)
+  (phase-3-call-view-magit-on-ghost-b)
   (phase-4-verify-magit-root-folder-and-point-position)
   (message "")
-  (test-pass "All view-magit-phantom-deleted-file tests passed!")
+  (test-pass "All view-magit-ghost-deleted-file tests passed!")
   (kill-emacs 0))
 
 (progn

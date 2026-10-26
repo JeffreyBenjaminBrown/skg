@@ -396,8 +396,8 @@ pub fn assert_lines_in_order (
                        lines, line, buffer ), }}}
 
 /// A new headline of the user's that affects no parent, 'stars' deep.
-/// It names no skgrepo: it inherits that of its nearest unrestricted
-/// ancestor, through a phantom or a folder.
+/// It names no skgrepo: it inherits that of its nearest occurrence
+/// ancestor, through a ghost or a folder.
 pub fn note (
   stars : usize,
   title : &str,

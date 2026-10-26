@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::phantom::home_from_disk;
+use crate::types::disk_home::home_from_disk;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::types::viewnode::Folder;
 

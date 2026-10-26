@@ -220,7 +220,7 @@ fn validate_hiddenInSubscribee_folder (
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::Unknown (_)) )))
     { errors . push(
-        "HiddenInSubscribeeFolder's children can only be Occurrences or Unknown phantoms (to hide)."
+        "HiddenInSubscribeeFolder's children can only be Occurrences or unknowns (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
@@ -264,7 +264,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::Unknown (_)) )))
-    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences or Unknown phantoms." . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences or unknowns." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
@@ -350,7 +350,7 @@ fn validate_relation_folder (
                               ViewnodeKind::Vognode (Vognode::Unknown (_)) ))
            || matches!(&node . kind, // a former member, in the diff view; save-inert
                        ViewnodeKind::Vognode (Vognode::Ghost (_)))))
-    { errors . push(format!("{}'s children must include only Occurrences, tombstones, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
+    { errors . push(format!("{}'s children must include only Occurrences, tombstones, ghosts, or (for OverriddenFolder) unknowns.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
@@ -568,16 +568,16 @@ fn validate_id_property (
     { errors . push("ID property must have an IDFolder parent." . to_string()); }
   errors }
 
-/// The identity + child-structure checks shared by an Occurrence and a phantom:
+/// The identity + child-structure checks shared by an Occurrence and a ghost:
 /// id present, no
 /// wrong-structure child, and distinct content-child ids. `label` ("Occurrence"
-/// / "Phantom") is woven into the messages so each kind reports itself.
+/// / "Ghost") is woven into the messages so each kind reports itself.
 /// Repo validity is not checked here: skgrepo is load-bearing only for a
 /// Occurrence (it is the node's .skg file path), so validate_occurrence adds that
-/// check; a phantom writes nothing and is ignored at save, so its skgrepo --
+/// check; a ghost writes nothing and is ignored at save, so its skgrepo --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
 /// save-inert and goes unchecked. (validate_occurrence also appends the
-/// editable-title check; a phantom is title-exempt, being write-protected.)
+/// editable-title check; a ghost is title-exempt, being write-protected.)
 fn validate_vognode_identity_and_structure (
   tree       : &Tree<Viewnode>,
   treeid     : NodeId,

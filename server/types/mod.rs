@@ -5,7 +5,7 @@ pub mod env;
 pub mod errors;
 pub mod git;
 pub mod list;
-pub mod phantom;
+pub mod disk_home;
 pub mod viewnode;
 pub mod nodes;
 pub mod many_to_many;

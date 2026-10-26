@@ -69,12 +69,12 @@ fn no_duplicated_content_error_when_different_gnids (
     |config, tantivy| Box::pin ( test_no_duplicated_content_error_when_different_gnids (config, tantivy) )) }
 
 #[test]
-fn no_duplicated_content_error_for_phantom_siblings (
+fn no_duplicated_content_error_for_ghost_siblings (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-validate-tree-no-duplicated-content-error-for-phantom-siblings", FIXTURES,
-    "/tmp/tantivy-test-validate-tree-no-duplicated-content-error-for-phantom-siblings",
-    |config, tantivy| Box::pin ( test_no_duplicated_content_error_for_phantom_siblings (config, tantivy) )) }
+    "skg-test-validate-tree-no-duplicated-content-error-for-ghost-siblings", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-no-duplicated-content-error-for-ghost-siblings",
+    |config, tantivy| Box::pin ( test_no_duplicated_content_error_for_ghost_siblings (config, tantivy) )) }
 
 #[test]
 fn root_without_skgrepo_validation (
@@ -458,18 +458,18 @@ async fn test_no_duplicated_content_error_when_different_gnids (
       Ok(())
 }
 
-async fn test_no_duplicated_content_error_for_phantom_siblings (
+async fn test_no_duplicated_content_error_for_ghost_siblings (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // A phantom sibling (a historical phantom) sharing an ID with a
-      // real sibling should not trigger a duplicate error: a phantom is
+      // A ghost sibling sharing an ID with a
+      // real sibling should not trigger a duplicate error: a ghost is
       // not a member of its parent.
       let input: &str =
         indoc! {"
                 * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
                 ** (skg node (gnid 1) (skgRepos (nodeRepo main))) real child
-                ** (skg ghost (gnid 1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) phantom child
+                ** (skg ghost (gnid 1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) ghost child
             "};
 
       let viewforest: ViewForest =
@@ -485,7 +485,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
         . collect();
 
       assert_eq!(duplicated_content_errors . len(), 0,
-                 "Phantom siblings should not trigger duplicate ID errors");
+                 "Ghost siblings should not trigger duplicate ID errors");
       Ok(())
 }
 
@@ -716,7 +716,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let input_delete: &str =
     indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
-      ** (skg node (gnid phantom) (skgRepos (nodeRepo main)) writeProtected (editRequest delete)) phantom child
+      ** (skg node (gnid protected) (skgRepos (nodeRepo main)) writeProtected (editRequest delete)) protected child
     "};
   let (_viewforest, parsing_errors, _warnings, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
@@ -725,7 +725,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
     parsing_errors . iter ()
     . filter ( |e| matches! (
       e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, _)
-         if gnid . 0 == "phantom" ))
+         if gnid . 0 == "protected" ))
     . collect ();
   assert_eq! ( matching . len (), 1,
     "(editRequest delete) on a write-protected node should produce exactly one EditRequestOnWriteProtectedOccurrence error. Parse errors: {:?}",
@@ -735,7 +735,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let input_merge: &str =
     indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
-      ** (skg node (gnid phantom) (skgRepos (nodeRepo main)) writeProtected (editRequest (merge other))) phantom child
+      ** (skg node (gnid protected) (skgRepos (nodeRepo main)) writeProtected (editRequest (merge other))) protected child
     "};
   let (_viewforest2, parsing_errors2, _warnings__viewforest2, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
@@ -744,7 +744,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
       e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, _)
-         if gnid . 0 == "phantom" ))
+         if gnid . 0 == "protected" ))
     . collect ();
   assert_eq! ( matching2 . len (), 1,
     "(editRequest (merge X)) on a write-protected node should also produce EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",

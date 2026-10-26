@@ -217,7 +217,7 @@ fn editable_child_of_tombstone_emits () {
                membership" ); }
 
 #[test]
-fn editable_node_inside_historical_phantom_subtree_emits () {
+fn editable_node_inside_ghost_subtree_emits () {
   let input : &str =
     indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
@@ -228,12 +228,12 @@ fn editable_node_inside_historical_phantom_subtree_emits () {
   let collected : CollectedFieldIntents =
     collect_instructions_locally (&forest) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("fading")) . is_none(),
-           "the phantom itself emits nothing" );
+           "the ghost itself emits nothing" );
   { let survivor : &FieldIntentsForOneId = entry (&collected, "survivor");
     assert!( survivor . title_and_body . is_some(),
-             "a editable node beneath a phantom emits for itself" ); }
+             "an editable node beneath a ghost emits for itself" ); }
   assert_eq!( entry (&collected, "root") . contains, Some (vec![]),
-              "the phantom is not content of its parent" ); }
+              "the ghost is not content of its parent" ); }
 
 #[test]
 fn a_ghost_that_claims_keeps_its_gnid_in_its_parents_list () {
