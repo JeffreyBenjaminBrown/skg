@@ -26,10 +26,10 @@ use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
-use crate::from_text::weave::member_is_visible;
+use crate::from_text::weave::{member_is_visible, relationship_member_is_visible};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, members_of};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::PostSkgsaveCommitNoticeCandidate;
 
@@ -100,7 +100,10 @@ pub fn resolve_visibility (
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* viewnodes are replaceable: restricted
 /// relationship members and viewnodes classified inside a subscribee remain owned
-/// by the graph and survive an edit of this compound partner folder.
+/// by the graph and survive an edit of this compound partner folder. A hide is
+/// visible, and so replaceable, only when the restriction holds both its relRepo
+/// and its member's home skgrepo ('relationship_member_is_visible'): a folder
+/// saved under a restriction never unhides a member it could not show.
 fn apply_hiddenoutside_edits (
   lowered                : &mut LoweredNodeIntents,
   edits                  : &[(ID, HiddenOutsideEdit)],
@@ -122,6 +125,10 @@ fn apply_hiddenoutside_edits (
 
     let key = |gnid : &ID| -> ID {
       graph . pid_of (gnid) . unwrap_or_else (|| gnid . clone ()) };
+    let is_visible = |member : &RelPartner<ID>| -> bool {
+      skgrepo_restriction . map_or (
+        true, |restriction| relationship_member_is_visible (
+          graph, member, config, restriction )) };
     let subscribee_gnids : Vec<ID> =
       lowered . subscriber_subscribes_after_save (&subscriber_from_disk);
     let mut inside : HashSet<ID> = HashSet::new ();
@@ -130,8 +137,7 @@ fn apply_hiddenoutside_edits (
         opt_graphnode_by_gnid (graph, config, &subscribee_gnid) ?
       else { continue; };
       for member in &subscribee . contains {
-        if skgrepo_restriction . map_or (
-          true, |restriction| restriction . contains_skgrepo (&member . relRepo))
+        if is_visible (member)
         { inside . insert (key (&member . member)); }} }
 
     // The replacement domain is intentionally built from disk, rather than
@@ -140,8 +146,7 @@ fn apply_hiddenoutside_edits (
     let replaceable_outside : HashSet<ID> =
       subscriber_from_disk . hidesFromSubs . or_default ()
       . iter ()
-      . filter (|member| skgrepo_restriction . map_or (
-        true, |restriction| restriction . contains_skgrepo (&member . relRepo)))
+      . filter (|member| is_visible (member))
       .map (|member| key (&member . member))
       .filter (|member_key| ! inside . contains (member_key))
       .collect ();

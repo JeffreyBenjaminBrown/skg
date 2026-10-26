@@ -8,9 +8,10 @@
 // tombstone over its children.
 //
 // The fixture, written by the test:
-//   public  : r contains a, h, b and subscribes to hs; a; b; s1.
+//   public  : r contains a, h, b and subscribes to hs; a; b; s1; hv.
 //   private : h ("h secret", aliased "h alias secret") contains s1;
-//             hs ("hs secret").
+//             hs ("hs secret"); hh ("hh secret").
+// Some tests have r hide hh, or hh and hv, from its subscribers.
 
 use crate::git_fixture::{Fixture, OwnedSkgrepos, with_git_fixture};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
@@ -94,6 +95,38 @@ fn a_save_under_a_restriction_keeps_the_hidden_members (
         assert_eq! ( members_of ( r . subscribesTo . or_default () ),
                      vec! [ ID::from ("hs") ],
                      "the hidden subscribee hs stays" ); }
+      Ok (( )) } ) }
+
+/// r hides hh (private) and hv (public) from its subscribers. A view
+/// of r drawn under "all" and switched to "public" keeps the folder of
+/// what r hides outside its subscribees, holding hv alone; saved with
+/// an edit, it leaves r's hide of hh, which it could not show.
+#[test]
+fn a_save_under_a_restriction_keeps_the_restricted_hides (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture_where_r_hides (case . path (), &["hh", "hv"]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let public : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "public" . into ()) ?;
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      open_view_of_r (f, None) ?;
+      let switched : String = switch (f, &mut restriction, "public") ?;
+      assert_no_trace_of_the_hidden_nodes ("the switched view", &switched);
+      assert! ( switched . contains ("hiddenOutsideOfSubscribeeFolder")
+                && switched . contains ("(gnid hv)"),
+                "the folder of r's hides holds hv:\n{}", switched );
+      let edited : String = switched . replacen ( ")) r\n", ")) r edited\n", 1 );
+      assert_ne! ( edited, switched );
+      save_under (f, &edited, &public) ?;
+      let r : GraphnodeInRust = node_in_graph (f, "r");
+      assert_eq! ( r . title, "r edited" );
+      assert_eq! ( members_of ( r . hidesFromSubs . or_default () ),
+                   vec! [ ID::from ("hh"), ID::from ("hv") ],
+                   "the save keeps the hide of hh, which it could not show" );
       Ok (( )) } ) }
 
 /// A view of r drawn under "all", switched to "public": where h stood
