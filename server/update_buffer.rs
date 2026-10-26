@@ -13,7 +13,6 @@
 //! - 'update_views_after_save' rerenders the saved view and then the
 //!   collateral ones, streaming each to the client.
 
-pub mod skgrepo_switch;
 pub mod completion_mode;
 pub mod reconcile;
 pub mod graphnodestats;

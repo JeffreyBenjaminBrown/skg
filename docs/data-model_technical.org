@@ -362,7 +362,12 @@ relRepo where it differs from the default), and in the diff view the
 readiness facts from the store and the home skgrepo moves; every
 childless tombstone is pruned, postorder and roots included, so a
 buffer may end with no roots, and so is a folder the pruning leaves
-empty that goes when empty; every viewnode that lacks a viewnode ID
+empty that goes when empty, and an empty editable folder whose goal
+the skgrepo restriction emptied (the goal computers omitted members
+and kept none), unless this refresh drew it on request: so the
+refresh alone brings a view under a new restriction, and a folder
+empty under any restriction, where the user can add, stays; every
+viewnode that lacks a viewnode ID
 gets one; and the viewforest is rendered.
 
 *** Corrections

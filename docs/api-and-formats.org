@@ -813,14 +813,16 @@ one automatically.
        =Content-Length: N\r\n\r\n(("response-type" "skgrepo-restriction") ("restriction" "NAME") ("content" "Skgrepo restriction: NAME"))=
     2. The rerender stream, as in "rerender all views":
        rerender-lock → rerender-view* → rerender-done. Each open view
-       is re-rendered in place under the new set
-       ('convert_and_prune_for_skgrepo_switch', then the refresh): every
-       occurrence of a node the new set hides becomes a tombstone, which
-       keeps its viewchildren; an unknown whose relRepo (else its
-       recorder's home) became restricted becomes a tombstone too; a
-       tombstone is pruned unless it holds something; and the refresh
-       fills every folder per the new set, so widening the set reveals
-       members and folders.
+       is re-rendered in place under the new set by the refresh alone:
+       every occurrence of a node the new set hides becomes a
+       tombstone, which keeps its viewchildren; so does an unknown,
+       since under a set other than =all= no goal names one; a
+       tombstone is pruned unless it holds something; an editable
+       folder the new set empties (its goal had members and the set
+       hides them all) is pruned when empty; and the refresh fills
+       every folder per the new set, so widening the set reveals
+       members and folders. When the set changed, none of this is
+       reported as a buffer correction.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
@@ -1779,8 +1781,10 @@ Saving preserves what rendering omitted: an omitted relationship
 member cannot be deleted (or even seen), so the save merges the
 buffer's visible lists with the disk lists -- order-preserving (the
 anchored weave) for =contains= and =subscribesTo=, set-difference
-for =overrides=. Edits to visible members, including
-deletions, are honored. A hidden member needs no headline for this:
+for =overrides=; and the folder of what a subscriber hides outside
+its subscribees replaces only the hides it could show, those whose
+relRepo and member's home the set both holds. Edits to visible
+members, including deletions, are honored. A hidden member needs no headline for this:
 the disk supplies it.
 
 When a skgrepo-set switch is applied to an open view (an
@@ -1795,7 +1799,8 @@ its visible descendants are not orphaned:
 A tombstone says nothing of what stood there: no id, skgrepo or
 title, so nothing the user hid by restricting the skgrepo-set leaks.
 A childless one is pruned, as are the property members and change
-viewnodes of the node it replaced and the folders that prune empties.
+viewnodes of the node it replaced and the folders that prune empties;
+so is an editable folder whose members the new set hides.
 It is save-inert: it emits no fieldIntent (a hidden node's membership
 in its parent's list is owned entirely by disk supplementation, not
 the buffer), and it is not a collateral re-render target. Its

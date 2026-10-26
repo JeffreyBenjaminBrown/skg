@@ -56,13 +56,12 @@ pub(crate) fn prepare_rerender_views (
   env                 : &SkgEnv,
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   buffer_correction_policy : BufferCorrectionPolicy,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
 ) -> PreparedRerenders {
   let runtime = env . runtime_snapshot ();
   prepare_rerender_views_with_runtime (
-    env, runtime, views_state, skgrepo_restriction, prepass,
+    env, runtime, views_state, skgrepo_restriction,
     buffer_correction_policy, rerender_options)
 }
 
@@ -71,12 +70,11 @@ pub(crate) fn prepare_rerender_views_with_runtime (
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   buffer_correction_policy : BufferCorrectionPolicy,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
-    env, runtime, views_state, skgrepo_restriction, prepass,
+    env, runtime, views_state, skgrepo_restriction,
     buffer_correction_policy, rerender_options, |_, _| true )
 }
 
@@ -92,7 +90,6 @@ pub(crate) fn prepare_rerender_views_where (
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   buffer_correction_policy : BufferCorrectionPolicy,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
   include             : impl Fn (&ViewforestId, &ViewState) -> bool,
@@ -120,12 +117,6 @@ pub(crate) fn prepare_rerender_views_where (
           continue; } };
     let mut viewnode_id_record : ViewnodeIdRecord =
       views_state . open_views . viewnode_id_record_of (viewforest_id);
-    if let Some (prepass) = prepass {
-      if let Err (e) = prepass (&mut viewforest) {
-        context . errors . push ( format! (
-          "View {}: {}",
-          viewforest_id . repr_in_client (), e ));
-        continue; }}
     match block_on ( async {
       let _span : tracing::span::EnteredSpan =
         tracing::info_span! (

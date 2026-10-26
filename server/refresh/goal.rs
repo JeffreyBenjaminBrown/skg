@@ -31,7 +31,7 @@ use crate::types::tree::forest::in_content_position;
 use crate::types::viewnode::{
   Existence, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant};
 use crate::update_buffer::reconcile::content::unintegrated_content_gnids;
-use crate::update_buffer::reconcile::omit_restricted_members;
+use crate::update_buffer::reconcile::{RestrictedGoalList, omit_restricted_members};
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -70,6 +70,10 @@ pub(crate) struct GoalItem {
 pub(crate) struct Goal {
   pub items   : Vec<GoalItem>,
   pub ordered : bool,
+  /// For a folder: whether the skgrepo restriction emptied its goal,
+  /// omitting members and keeping none. Such a folder, left empty, is
+  /// pruned at the tail ('Walk::emptied_folders').
+  pub emptied_by_the_restriction : bool,
   index       : HashMap<GoalMember, usize>,
 }
 
@@ -92,7 +96,16 @@ impl Goal {
       if index . contains_key (&item . member) { continue; }
       index . insert ( item . member . clone (), unique . len () );
       unique . push (item); }
-    Goal { items : unique, ordered, index } }
+    Goal { items : unique, ordered, index,
+           emptied_by_the_restriction : false } }
+
+  /// This goal, marked emptied by the skgrepo restriction when 'list'
+  /// was ('RestrictedGoalList::emptied').
+  pub fn emptied_as (
+    self,
+    list : &RestrictedGoalList,
+  ) -> Goal {
+    Goal { emptied_by_the_restriction : list . emptied (), .. self } }
 
   pub fn item_for (
     &self,
@@ -172,7 +185,7 @@ fn chain_goal (
   let containers : Vec<ID> = omit_hidden (
     graph . inbound_pids_for_relation_gated (
       pid, NodeRelation::Contains, walk . truth . restriction ),
-    walk );
+    walk ) . members;
   Goal::new ( containers . into_iter ()
               . map ( |gnid| GoalItem::by_graph (GoalMember::Gnid (gnid)) )
               . collect (),
@@ -210,7 +223,7 @@ fn content_goal (
     unintegrated ( members . into_iter ()
                    . map ( |member| member . member . into_id () )
                    . collect () ),
-    walk );
+    walk ) . members;
   gnid_goal (contents, &relRepos, true) }
 
 /// When the occurrence at 'treeid' is a subscribee as such (a member
@@ -246,13 +259,16 @@ fn folder_goal (
     Folder::AcquiredBy | Folder::Acquired =>
       Some ( diff_view::acquisition_goal (tree, folder, kind, walk)
              . unwrap_or_else ( || Goal::new (Vec::new (), false) )),
-    Folder::HiddenInSubscribee =>
-      Some ( gnid_goal ( hidden_in_subscribee (
-                           &ancestor_pid (0) ?, &ancestor_pid (2) ?, walk ),
-                         &HashMap::new (), false )),
-    Folder::HiddenOutsideOfSubscribee =>
-      Some ( gnid_goal ( hidden_outside_of_subscribees (&ancestor_pid (1) ?, walk),
-                         &HashMap::new (), true )),
+    Folder::HiddenInSubscribee => {
+      let list : RestrictedGoalList = hidden_in_subscribee (
+        &ancestor_pid (0) ?, &ancestor_pid (2) ?, walk );
+      Some ( gnid_goal ( list . members . clone (), &HashMap::new (), false )
+             . emptied_as (&list) ) },
+    Folder::HiddenOutsideOfSubscribee => {
+      let list : RestrictedGoalList =
+        hidden_outside_of_subscribees (&ancestor_pid (1) ?, walk);
+      Some ( gnid_goal ( list . members . clone (), &HashMap::new (), true )
+             . emptied_as (&list) ) },
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
@@ -262,7 +278,7 @@ fn folder_goal (
       if let Some (goal) =
         diff_view::folder_goal (kind, &anchor, member_role, walk)
       { return Some (goal); }
-      let members : Vec<ID> = partnerFolder_members_in_graph (
+      let list : RestrictedGoalList = partnerFolder_members_in_graph (
         graph, walk . truth . config, &anchor, kind, walk . truth . restriction ) ?;
       let relRepos : HashMap<ID, SkgrepoName> =
         if member_role . opposite_role () . is_first_role () {
@@ -272,7 +288,8 @@ fn folder_goal (
             &graph . outbound_member_keys_for_relation_gated (
               &anchor, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
-      Some ( gnid_goal (members, &relRepos, kind . goal_is_ordered ()) ) }, } }
+      Some ( gnid_goal ( list . members . clone (), &relRepos, kind . goal_is_ordered () )
+             . emptied_as (&list) ) }, } }
 
 /// What 'subscriber' hides in the content of 'subscribee', less what
 /// the restriction hides: the goal of the compound folder
@@ -281,7 +298,7 @@ pub(crate) fn hidden_in_subscribee (
   subscribee : &ID,
   subscriber : &ID,
   walk       : &Walk,
-) -> Vec<ID> {
+) -> RestrictedGoalList {
   let graph : &InRustGraph = walk . truth . graph;
   let goal : Vec<ID> = goal_list_for_hiddenInSubscribee_folder (
     graph,
@@ -297,7 +314,7 @@ pub(crate) fn hidden_in_subscribee (
 pub(crate) fn hidden_outside_of_subscribees (
   subscriber : &ID,
   walk       : &Walk,
-) -> Vec<ID> {
+) -> RestrictedGoalList {
   let graph : &InRustGraph = walk . truth . graph;
   let goal : Vec<ID> = goal_list_for_hiddenOutsideOfSubscribee_folder (
     graph,
@@ -370,21 +387,24 @@ fn unknown_members_relRepos (
                        member . relRepo . clone () ))
     . collect () }
 
-/// Each ID as the graph resolves it: its pid, or itself when nothing
-/// answers to it.
+/// Each member as the graph resolves it: its pid, or itself when
+/// nothing answers to it.
 fn resolve_all (
-  gnids : Vec<ID>,
+  list  : RestrictedGoalList,
   graph : &InRustGraph,
-) -> Vec<ID> {
-  gnids . into_iter ()
-    . map ( |gnid| graph . relationship_member_key (&gnid) . into_id () )
-    . collect () }
+) -> RestrictedGoalList {
+  RestrictedGoalList {
+    members : list . members . into_iter ()
+      . map ( |gnid| graph . relationship_member_key (&gnid) . into_id () )
+      . collect (),
+    .. list } }
 
-/// 'gnids' less what the skgrepo restriction hides.
+/// 'gnids' less what the skgrepo restriction hides, and whether it hid
+/// any.
 fn omit_hidden (
   gnids : Vec<ID>,
   walk  : &Walk,
-) -> Vec<ID> {
+) -> RestrictedGoalList {
   let graph : &InRustGraph = walk . truth . graph;
   omit_restricted_members (
     gnids, walk . truth . restriction,

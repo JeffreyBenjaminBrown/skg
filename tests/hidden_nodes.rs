@@ -170,14 +170,12 @@ fn a_tightened_restriction_leaves_a_tombstone_over_the_hidden_nodes_children (
                   "the tombstone stays:\n{}", back ); }
       Ok (( )) } ) }
 
-/// The buffers a switch draws, compared with the text captured
-/// before the switch's own entombstone-and-prune phase was deleted
-/// (TODO/simplify-refresh/06_plan_tidy-refresh.org, slice 1): the
-/// refresh alone draws a switched view as that phase and the refresh
-/// together did, the subscribee folder the restriction empties
-/// pruned.
+/// The exact buffers of a view of r switched to "public" and back to
+/// "all": narrowed, the subscribee folder the restriction empties is
+/// pruned and h's occurrence is a tombstone holding s1; widened, h is
+/// drawn again beside the tombstone, and the pruned folder is not.
 #[test]
-fn a_switch_draws_the_view_as_the_switchs_own_phase_did (
+fn a_switch_and_its_reverse_draw_these_buffers (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_fixture (case . path ()) ?;

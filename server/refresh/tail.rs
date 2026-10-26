@@ -34,7 +34,7 @@ pub(crate) fn finish (
   readiness_store    : Option<&ReadinessStore>,
 ) -> Result<String, Box<dyn Error>> {
   set_derived_facts (viewforest, walk, readiness_store) ?;
-  prune_childless_tombstones (viewforest . as_internal_tree_mut ()) ?;
+  prune_childless_tombstones (viewforest . as_internal_tree_mut (), walk) ?;
   viewnode_id_record . assign_viewnode_ids (viewforest . as_internal_tree_mut ());
   viewforest_to_string (viewforest, walk . truth . config) }
 
@@ -66,8 +66,11 @@ fn set_derived_facts (
 /// that a tombstone left childless by the removal of its last child
 /// goes too, and so does a folder the removals leave childless that
 /// goes when empty ('folder_goes_when_empty'), as it would have been
-/// entombstoned had it been childless at its visit. Focus moves to the
-/// parent of what is removed.
+/// entombstoned had it been childless at its visit. An editable folder
+/// whose goal the skgrepo restriction emptied goes too when childless,
+/// unless this refresh added it ('Walk::emptied_folders'); one empty
+/// under any restriction stays, since the user can add to it. Focus
+/// moves to the parent of what is removed.
 ///
 /// A tombstone that holds anything stays, even when all it holds is
 /// tombstones: nested tombstones after a deletion are by design.
@@ -75,6 +78,7 @@ fn set_derived_facts (
 /// could confuse the user about what stood where.
 fn prune_childless_tombstones (
   tree : &mut Tree<Viewnode>,
+  walk : &Walk,
 ) -> Result<(), Box<dyn Error>> {
   let mut prunable : Vec<NodeId> = Vec::new ();
   let root : NodeId = tree . root () . id ();
@@ -83,7 +87,9 @@ fn prune_childless_tombstones (
     false, // postorder
     &mut |node| {
       if matches! ( node . value () . kind, ViewnodeKind::Tombstone )
-         || folder_goes_when_empty ( node . value () ) {
+         || folder_goes_when_empty ( node . value () )
+         || ( walk . emptied_folders . contains (&node . id ())
+              && ! walk . added_folders . contains (&node . id ()) ) {
         prunable . push (node . id ()); }
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;

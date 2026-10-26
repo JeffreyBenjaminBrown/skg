@@ -74,7 +74,7 @@ fn integrate_unshown_changes (
       viewforest_id . repr_in_client () )); }
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, BufferCorrectionPolicy::default (),
+    Some (skgrepo_restriction), BufferCorrectionPolicy::default (),
     RerenderOptions::for_integrating_unshown_changes,
     |registered_viewforest_id, _| *registered_viewforest_id == viewforest_id );
   let (Some (view), Some (straddle)) :

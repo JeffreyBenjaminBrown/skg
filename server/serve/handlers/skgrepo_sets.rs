@@ -1,7 +1,7 @@
 use crate::refresh::corrections::BufferCorrectionPolicy;
-use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
+  PreparedRerenders,
   authorize_prepared_rerenders,
   prepare_rerender_views_with_runtime,
   stream_empty_rerender,
@@ -19,9 +19,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::misc::SkgConfig;
-use crate::types::tree::forest::ViewForest;
 use crate::update_buffer::RerenderOptions;
-use crate::update_buffer::skgrepo_switch::convert_and_prune_for_skgrepo_switch;
 
 use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
@@ -57,15 +55,14 @@ pub fn handle_skgrepo_set_request (
       refuse_unwinding (stream, skgrepo_restriction, &e), }}
 
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a repo-set switch
-/// re-renders open views in place rather than closing them.  Each
-/// view gets the convert-and-prune prepass (occurrences of now-hidden
-/// nodes become tombstones; childless tombstones, the properties of the
-/// nodes they replaced and the folders these leave empty are pruned,
-/// and the rest keeps its viewnode IDs), then completion with
-/// Partner folder creation
-/// enabled, because a switch can also activate skgrepos, revealing
-/// members and folders.  Results stream via the rerender-all message
-/// flow (lock, per-view, done).
+/// re-renders open views in place rather than closing them. The
+/// refresh brings each view under the new restriction: it entombstones
+/// the occurrences the restriction keeps out, draws no restricted
+/// member, prunes childless tombstones and the folders the restriction
+/// empties, and draws what a widening reveals; the rest keeps its
+/// viewnode IDs. When the restriction changed, none of that is a
+/// buffer correction ('BufferCorrectionPolicy'). Results stream via
+/// the rerender-all message flow (lock, per-view, done).
 fn set_skgrepo_restriction (
   stream           : &mut TcpStream,
   request          : &str,
@@ -89,19 +86,12 @@ fn set_skgrepo_restriction (
         refuse_unwinding (
           stream, skgrepo_restriction, &e . to_string ());
         return; }};
-  let mut prepared =
-  { let target : SkgrepoRestriction = restriction . clone ();
-    let graph : Arc<InRustGraph> = Arc::clone (&runtime . graph);
-    let prepass = |viewforest : &mut ViewForest|
-      -> Result<(), Box<dyn std::error::Error>> {
-      convert_and_prune_for_skgrepo_switch (
-        viewforest . as_internal_tree_mut (), &graph, &target ) };
+  let mut prepared : PreparedRerenders =
     prepare_rerender_views_with_runtime (
-      env, runtime, views_state,
-      Some (&target), Some (&prepass),
+      env, runtime, views_state, Some (&restriction),
       BufferCorrectionPolicy::after_a_switch (
         restriction != *skgrepo_restriction ),
-      RerenderOptions::ordinary ) };
+      RerenderOptions::ordinary );
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (&restriction),
     "repo-set-switch-rerender",

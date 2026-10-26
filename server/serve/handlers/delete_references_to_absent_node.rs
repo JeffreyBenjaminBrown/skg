@@ -103,7 +103,7 @@ fn stream_rerender_views_after_absent_reference_cleanup (
 ) {
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, BufferCorrectionPolicy::default (),
+    Some (skgrepo_restriction), BufferCorrectionPolicy::default (),
     RerenderOptions::ordinary,
     |_, state| view_can_display_absent_reference_change (
       &state . viewforest, raw_gnid, affected_recorder_pids ));

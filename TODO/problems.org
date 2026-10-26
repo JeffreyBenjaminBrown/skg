@@ -12,6 +12,22 @@
   unknown 'missing-pub' of its fixture, recorded by r in public,
   is drawn under "all" and gone under "public". Not explained.
   Plan 06, slice 1, finds the cause and records it.
+  Cause (slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org',
+  confirmed by a throwaway test): 'omit_restricted_members'
+  ('server/update_buffer/reconcile/mod.rs') keeps a member only when
+  its resolver names a home skgrepo the restriction holds, and an
+  unknown resolves to no node, hence no home, so every unknown is
+  omitted under any restriction but "all", whatever skgrepo records
+  it; the parent's goal then names no such gnid, and the ID rule
+  entombstones the headline. Its doc comment makes that deliberate
+  ("it might be private, and rendering must not leak"). The goal
+  computers ('omit_hidden' in 'server/refresh/goal.rs',
+  'partnerFolder_members_in_graph') hand it bare IDs, having dropped
+  each member's relRepo, so the fix is not one line: carry the
+  relRepo into the omission and keep an unresolved member whose
+  record the restriction holds, as the save's
+  'relationship_member_is_visible' ('server/from_text/weave.rs')
+  already does. Left as it is.
 * Problems noticed while executing plan 04.1, slice 6 (2026-10-26)
 ** FIX PLANNED: Emacs: a readiness request blocks skg-set-relRepo
   Found by the same review ('05_1_review-reports/duplication.org',
