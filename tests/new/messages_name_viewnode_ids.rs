@@ -9,8 +9,8 @@
 // ('docs/api-and-formats.org', "How a message names a headline").
 
 use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
-use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   headline_to_triple, org_to_viewforest};
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
@@ -62,7 +62,7 @@ fn parse_errors_and_warnings (
 ) -> (Vec<BufferValidationError>, Vec<String>) {
   let (_viewforest, errors, warnings, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
-    = org_to_viewforest (buffer, &InRustGraph::new ()) . unwrap ();
+    = org_to_viewforest (buffer, IdResolution::AsWritten) . unwrap ();
   (errors, warnings) }
 
 #[test]
@@ -112,7 +112,7 @@ async fn one_headline_at_validation (
     "};
   let errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (
-      &org_to_viewforest (buffer, &InRustGraph::new ()) . unwrap () . 0,
+      &org_to_viewforest (buffer, IdResolution::AsWritten) . unwrap () . 0,
       config ) ?;
   assert! ( errors . contains (
               &BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (
@@ -136,7 +136,7 @@ fn messages_about_several_occurrences_name_each_as_a_subheadline () {
     org_to_viewforest (indoc! {"
       * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a
       * (skg (vnid 0b) node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete)) a again
-      "}, &InRustGraph::new ()) . unwrap () . 0;
+      "}, IdResolution::AsWritten) . unwrap () . 0;
   let (ambiguous_deletions, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
   let both : Vec<HeadlineName> =
@@ -177,7 +177,7 @@ fn a_headline_without_a_viewnode_id_is_not_yet_saved () {
       * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a
       * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a copied
       * (skg node (gnid a) (skgRepos (nodeRepo main))) a typed
-      "}, &InRustGraph::new ()) . unwrap () . 0;
+      "}, IdResolution::AsWritten) . unwrap () . 0;
   let (_, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
   let names : Vec<HeadlineName> = vec! [

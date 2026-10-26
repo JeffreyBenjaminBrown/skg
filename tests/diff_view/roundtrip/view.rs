@@ -16,6 +16,7 @@ use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole, RelationshipKey};
 use skg::graph_straddle::types::{GraphStraddle, Partner};
 use skg::dbs::in_rust_graph::InRustGraph;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::org_to_text::{viewforest_to_string, viewforest_tree_to_string};
 use skg::diff_view::readiness_store::ReadinessStore;
@@ -196,7 +197,7 @@ fn the_new_viewnodes_cross_the_wire (
     let graph : Arc<InRustGraph> = f . graph . load_full ();
     let across_the_wire = |text : &str| -> String {
       let (forest, errors, _warnings, _provenance) =
-        org_to_viewforest (text, &graph) . unwrap ();
+        org_to_viewforest (text, IdResolution::ThroughGraph (&graph)) . unwrap ();
       assert! ( errors . is_empty (), "{:?}\n\nbuffer:\n{}", errors, text );
       viewforest_to_string (&forest, &f . config) . unwrap () };
     let printed : String = across_the_wire (&buffer);

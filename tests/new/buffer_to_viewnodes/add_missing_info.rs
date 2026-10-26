@@ -1,7 +1,7 @@
 // cargo test test_add_missing_info_comprehensive
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_viewnode_tree,
   org_to_viewforest};
@@ -78,7 +78,7 @@ async fn test_provenance_records_what_the_parse_invented (
   let (viewforest, errors, _warnings, provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>,
        EnrichmentProvenance)
-    = org_to_viewforest (input, &graph_from_config (config) ?) ?;
+    = org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   assert! (errors . is_empty (), "{:?}", errors);
   let gnid_of = |title : &str| -> ID {
     viewforest . nodes ()
@@ -147,7 +147,7 @@ async fn test_new_headline_inherits_through_ghosts_and_folders (
         **** (skg node noClaim) new note
       "}, "main", false ), ] {
     let viewforest : ViewForest =
-      org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
+      org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
     assert_eq! ( new_note_skgrepo_and_membership (&viewforest),
                  ( SkgrepoName::from (expected_skgrepo),
                    expected_membership ),
@@ -161,7 +161,7 @@ async fn test_new_headline_at_top_level_is_refused (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let viewforest : ViewForest =
-    org_to_viewforest ("* new note\n", &graph_from_config (config) ?) . unwrap() . 0;
+    org_to_viewforest ("* new note\n", IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
   assert_eq! ( new_note_skgrepo_and_membership (&viewforest) . 0,
                SkgrepoName::not_found () );
   let errors : Vec<BufferValidationError> =
@@ -194,7 +194,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
         *** new child
       "}, "main" ), ] {
     let viewforest : ViewForest =
-      org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
+      org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
     let new_child_skgrepo : SkgrepoName =
       viewforest . nodes ()
       . find_map ( |node_ref| match &node_ref . value () . kind {
@@ -231,7 +231,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
             *** (skg node (gnid root) writeProtected) subscribee reference
         "};
   let viewforest : ViewForest =
-    org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
+    org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
   let recorder = viewforest . root() . first_child() . unwrap();
   let folder   = recorder . first_child() . unwrap();
   let member = folder . first_child() . unwrap();
@@ -283,9 +283,9 @@ async fn test_add_missing_info_logic (
             *** (skg node (gnid unpredictable) (skgRepos (nodeRepo main))) also no id
         "};
   let after_adding_missing_info : ViewForest =
-    org_to_viewforest (with_missing_info, &graph_from_config (config) ?) . unwrap() . 0;
+    org_to_viewforest (with_missing_info, IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
   let expected_viewforest: Tree<Viewnode> =
-    org_to_viewnode_tree (without_missing_info, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (without_missing_info, IdResolution::AsWritten) . unwrap() . 0;
   assert_eq!(
     tree_forest_root_gnids (&expected_viewforest) . len(),
     1,
@@ -346,9 +346,9 @@ async fn test_skgrepo_inheritance_logic (
         "};
 
   let actual_viewforest : ViewForest =
-    org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
+    org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) . unwrap() . 0;
   let expected_viewforest: Tree<Viewnode> =
-    org_to_viewnode_tree (expected, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (expected, IdResolution::AsWritten) . unwrap() . 0;
 
   assert!(
     compare_viewnode_trees(

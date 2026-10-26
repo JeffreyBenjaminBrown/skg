@@ -1,10 +1,10 @@
 // cargo test contradictory_instructions
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use skg::types::tree::forest::ViewForest;
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
@@ -22,7 +22,7 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let viewforest_consistent: ViewForest =
-    org_to_viewforest (input_consistent, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewforest (input_consistent, IdResolution::AsWritten) . unwrap() . 0;
   let (inconsistent_ids_consistent, _) =
     find_inconsistent_instructions (&viewforest_consistent);
   assert_eq!(inconsistent_ids_consistent . len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
@@ -38,7 +38,7 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let viewforest_inconsistent: ViewForest =
-    org_to_viewforest (input_inconsistent, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewforest (input_inconsistent, IdResolution::AsWritten) . unwrap() . 0;
   let (inconsistent_gnids, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
   assert_eq!(inconsistent_gnids . len(), 2, "Should find exactly 2 conflicting IDs");
@@ -54,7 +54,7 @@ fn test_find_inconsistent_toDelete_instructions() {
         "};
 
   let viewforest_no_gnids: ViewForest =
-    org_to_viewforest (input_no_gnids, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewforest (input_no_gnids, IdResolution::AsWritten) . unwrap() . 0;
   let (inconsistent_no_gnids, _) = find_inconsistent_instructions (&viewforest_no_gnids);
   assert_eq!(inconsistent_no_gnids . len(), 0, "Should have no conflicts when only one node has each ID");
 
@@ -90,7 +90,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
             "};
 
       let viewforest: ViewForest =
-        org_to_viewforest (input_with_multiple_defining_containers, &InRustGraph::new ()) . unwrap() . 0;
+        org_to_viewforest (input_with_multiple_defining_containers, IdResolution::AsWritten) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 

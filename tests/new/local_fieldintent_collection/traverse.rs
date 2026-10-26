@@ -3,9 +3,9 @@
 /// (server/from_text/local_fieldintent_collection/traverse.rs).
 /// The traversal is pure and synchronous, so these tests need no db.
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use indoc::indoc;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use skg::types::errors::HeadlineName;
@@ -28,7 +28,7 @@ fn forest_from_org (
   input : &str,
 ) -> ViewForest {
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   ViewForest::from_internal_tree (
     viewforest ) }
 

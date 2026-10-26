@@ -22,6 +22,7 @@ use crate::types::save::{NodeMerge, NodeInstruction, SavePlan};
 use crate::types::tree::forest::ViewForest;
 
 use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use buffer_to_viewnodes::add_missing_info::IdResolution;
 use buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
 use fork::{
   CloneSkgrepoInputs,
@@ -90,7 +91,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         // Parse the raw buffer, supplying missing gnids and skgrepos,
         // which the validators need: they compare nodes by pid,
         // and expect skgrepos to be inherited/resolved.
-        org_to_viewforest (buffer_text, graph) }
+        org_to_viewforest (buffer_text, IdResolution::ThroughGraph (graph)) }
           . map_err (SaveError::ParseError) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =

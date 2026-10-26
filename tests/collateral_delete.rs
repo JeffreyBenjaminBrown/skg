@@ -7,7 +7,6 @@
 // is open; a second view of L alone is saved with (editRequest
 // delete) on L.
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
@@ -27,6 +26,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::ID;
 use skg::types::viewnode::Viewnode;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use ego_tree::Tree;
 use skg::metadata_canon::without_viewnode_ids;
@@ -162,7 +162,7 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
              ** (skg node (gnid X) (skgRepos (nodeRepo main)) noClaim) X\n\
              * (skg node (gnid P) (skgRepos (nodeRepo main))) P\n\
              ** (skg node (gnid L) (skgRepos (nodeRepo main)) writeProtected) [[id:X][to X]]\n",
-            &InRustGraph::new () ) ? . 0;
+            IdResolution::AsWritten ) ? . 0;
         views_state . open_views . register_view (
           &graph . load_full (), both_viewforest_id . clone (), stored,
           &[ID::from ("L"), ID::from ("P")] ); }

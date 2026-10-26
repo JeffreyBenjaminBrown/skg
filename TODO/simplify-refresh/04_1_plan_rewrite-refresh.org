@@ -1105,7 +1105,7 @@ the old diff walk expects after a content-view refresh; it goes
 with the old walk in this slice, and a grep confirms it. Slice
 9 also listed in 'progress.org' what of the old walk stays for
 this slice and why; that list is the deletion list here.
-** TODO Slice 12: the renames
+** DONE Slice 12: the renames
 'skgid' becomes 'gnid' everywhere ('ID' stays as the type
 name): about 2300 occurrences in the server, 1100 in tests,
 180 in elisp, 140 in Neovim, by a script with a review of the

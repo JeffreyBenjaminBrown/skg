@@ -1,7 +1,6 @@
 /// DANGER: This was vibe-coded without much oversight.
 /// I *believe* the tests constrain its behavior sufficiently.
 
-use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
@@ -10,6 +9,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{Viewnode, ViewnodeId, ViewnodeKind};
 use super::add_missing_info::{
   EnrichmentProvenance,
+  IdResolution,
   complete_occurrence_skgrepo,
   make_occurrence_an_alias,
   replace_gnid_with_pid,
@@ -38,22 +38,22 @@ struct ViewnodeLineCol {
 /// As 'org_to_viewforest', but returning the internal tree,
 /// the parsing errors, and nothing else.
 pub fn org_to_viewnode_tree (
-  input : &str,
-  graph : &InRustGraph,
+  input         : &str,
+  id_resolution : IdResolution,
 ) -> Result < ( Tree<Viewnode>,
                 Vec<BufferValidationError> ),
               String > {
   let (viewforest, parsing_errors, _warnings, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>,
        EnrichmentProvenance) =
-    org_to_viewforest (input, graph)?;
+    org_to_viewforest (input, id_resolution)?;
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
 /// Parse org text into a view forest.
 /// Each level-1 headline becomes a forest root.
 /// The tree is the buffer's, but complete: as the parse builds it,
 /// it supplies what a headline may leave out ('add_missing_info.rs'):
-/// an occurrence's gnid becomes its pid (per GRAPH), an occurrence
+/// an occurrence's gnid becomes its pid (per ID_RESOLUTION), an occurrence
 /// without one gets a fresh one, an occurrence without a skgrepo gets
 /// one where one can be found, and an occurrence typed under an alias
 /// folder becomes an alias.
@@ -71,8 +71,8 @@ pub fn org_to_viewnode_tree (
 /// (For instance, Alias and AliasFolder cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_viewforest (
-  input : &str,
-  graph : &InRustGraph,
+  input         : &str,
+  id_resolution : IdResolution,
 ) -> Result < ( ViewForest,
                 Vec<BufferValidationError>,
                 Vec<String>,
@@ -103,13 +103,13 @@ pub fn org_to_viewforest (
       // parse ('drop_unknown_viewnode_ids_in_parsed_viewforest').
       if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
         metadata . viewnode_id = None; }}
-    replace_gnid_with_pid (metadata, graph); }
+    replace_gnid_with_pid (metadata, id_resolution); }
   let mut provenance : EnrichmentProvenance =
     EnrichmentProvenance::new (
       skgrepos_after_save_of_writeProtected_occurrences (
         viewnode_line_cols . iter ()
           . filter_map ( |line_col| line_col . headline . 1 . as_ref () ),
-        graph ));
+        id_resolution ));
   for viewnode_line_col in &mut viewnode_line_cols {
     let level : usize = viewnode_line_col . headline . 0;
     // Adjust treeid_stack to proper level
@@ -139,7 +139,7 @@ pub fn org_to_viewforest (
       = complete_linecol_to_viewnode (
           viewnode_line_col,
           viewforest . get (parent_treeid) . unwrap (),
-          graph, &mut provenance )?;
+          id_resolution, &mut provenance )?;
     if let Some (error) = error_opt {
       parsing_errors . push (error); }
     if let Some (warning) = warning_opt {
@@ -159,7 +159,7 @@ pub fn org_to_viewforest (
 fn complete_linecol_to_viewnode (
   viewnode_line_col : &mut ViewnodeLineCol,
   viewparent        : NodeRef<Viewnode>,
-  graph             : &InRustGraph,
+  id_resolution     : IdResolution,
   provenance        : &mut EnrichmentProvenance,
 ) -> Result < ( Viewnode,
                 Option<BufferValidationError>,
@@ -173,7 +173,7 @@ fn complete_linecol_to_viewnode (
   let skgrepo_inherited : bool =
     ! is_alias
     && complete_occurrence_skgrepo (
-         metadata, viewparent, graph,
+         metadata, viewparent, id_resolution,
          & provenance . writeProtected_skgrepos_after_save );
   let gnid_minted : bool =
     metadata . names_an_occurrence () && metadata . gnid . is_none ();

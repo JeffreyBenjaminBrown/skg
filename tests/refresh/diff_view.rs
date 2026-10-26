@@ -89,7 +89,7 @@ fn a_tombstone_request_entombstones_a_ghost () {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &straddle . after, config : &config,
                               restriction : None };
-  let mut forest : ViewForest = parse (&input, &straddle . after);
+  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&straddle . after));
   let refreshed : Refreshed = refresh_viewforest (
     &mut forest, &mut ViewnodeIdRecord::default (), &truth,
     CompletionMode::DiffView { straddle : &straddle,

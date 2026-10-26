@@ -31,6 +31,7 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::refresh::{Refreshed, Truth, refresh_viewforest};
 use skg::test_utils::{graph_from_config, prefer_owned_subdir};
@@ -160,7 +161,7 @@ fn refreshes_unchanged (
     render_initial_view (runtime, &[ pid . clone () ], None)
     . map_err ( |e| format! ("the fresh view failed: {}", e) ) ?;
   let (mut forest, errors, _warnings, _provenance) =
-    org_to_viewforest (&text, &runtime . graph)
+    org_to_viewforest (&text, IdResolution::ThroughGraph (&runtime . graph))
     . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
   if ! errors . is_empty () {
     return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
@@ -288,7 +289,7 @@ fn diff_view_buffer_refreshes_unchanged (
   text        : &str,
 ) -> Result<(), String> {
   let (mut forest, errors, _warnings, _provenance) =
-    org_to_viewforest (text, &runtime . graph)
+    org_to_viewforest (text, IdResolution::ThroughGraph (&runtime . graph))
     . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
   if ! errors . is_empty () {
     return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }

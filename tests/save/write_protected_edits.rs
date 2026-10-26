@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_saves -E 'test(save::write_protected_edits::)'
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use skg::dbs::filesystem::one_node::graphnode_from_gnid;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted
   ::org_to_viewforest;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
@@ -68,7 +68,7 @@ fn whitespace_only_body_under_writeProtected_is_not_an_edit () {
   let input : &str =
     "* (skg node (gnid shown) (skgRepos (nodeRepo main)) writeProtected) shown\n\n";
   let (_viewforest, parsing_errors, _warnings, _provenance) =
-    org_to_viewforest (input, &InRustGraph::new ()) . unwrap ();
+    org_to_viewforest (input, IdResolution::AsWritten) . unwrap ();
   assert! ( ! parsing_errors . iter () . any ( |error| matches! (
     error, BufferValidationError::EditedWriteProtectedOccurrence { .. }) ),
     "Blank separator lines do not edit a write-protected occurrence: {:?}",

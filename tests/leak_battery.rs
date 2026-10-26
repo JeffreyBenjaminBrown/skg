@@ -24,6 +24,7 @@ use std::error::Error;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
@@ -41,7 +42,7 @@ use std::collections::HashMap;
 fn viewforest_from_org (
   input : &str,
 ) -> Result<Tree<Viewnode>, Box<dyn Error>> {
-  Ok ( org_to_viewnode_tree (input, &InRustGraph::new ())? . 0 ) }
+  Ok ( org_to_viewnode_tree (input, IdResolution::AsWritten)? . 0 ) }
 
 fn first_child_gnid (
   tree : &Tree<Viewnode>,

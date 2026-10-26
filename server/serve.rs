@@ -13,6 +13,7 @@ pub mod rerender_stream;
 pub mod util;
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
+use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
@@ -388,7 +389,7 @@ fn enrich_search_buffer_snapshot (
                           payload . terms, terms )); }
   let parse_result : Result<(Tree<Viewnode>,
                              Vec<BufferValidationError>), String>
-    = org_to_viewnode_tree (buffer_text, &runtime . graph);
+    = org_to_viewnode_tree (buffer_text, IdResolution::ThroughGraph (&runtime . graph));
   let mut viewforest : ViewForest = match parse_result {
     Ok (( viewforest, _errors )) => ViewForest::from_internal_tree (viewforest),
     Err (e) => {

@@ -14,7 +14,6 @@
 // x, x contains xc, p contains b; al has the aliases one and two; d
 // contains e and f, e contains ec.
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use std::error::Error;
 use std::io::BufReader;
@@ -22,6 +21,7 @@ use std::net::TcpStream;
 
 use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, without_lines_containing};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
@@ -433,7 +433,7 @@ fn rerendered_stored_view (
   graph         : &InRustGraphHandle,
   views_state   : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let stored_tree : Tree<Viewnode> = org_to_viewnode_tree (stored, &InRustGraph::new ()) ? . 0;
+  let stored_tree : Tree<Viewnode> = org_to_viewnode_tree (stored, IdResolution::AsWritten) ? . 0;
   views_state . open_views . register_view (
     &graph . load_full (), viewforest_id . clone (), stored_tree, &[ID::from ("d")] );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, graph);

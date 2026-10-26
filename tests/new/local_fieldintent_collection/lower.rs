@@ -3,9 +3,9 @@
 /// turns CollectedFieldIntents into ordered NodeIntents plus extracted
 /// signals.
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use indoc::indoc;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput };
@@ -22,7 +22,7 @@ fn collected_from_org (
   input : &str,
 ) -> CollectedFieldIntents {
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let forest : ViewForest =
     ViewForest::from_internal_tree (
       viewforest );

@@ -7,9 +7,9 @@
 /// "new recursion surface" are the deliberate behavior changes.
 
 use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
-use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use indoc::indoc;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_viewnode_tree,
   org_to_viewforest };
@@ -33,7 +33,7 @@ fn placed_forest_from_org (
   input : &str,
 ) -> ViewForest {
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   ViewForest::from_internal_tree (
     viewforest ) }
 
@@ -45,7 +45,7 @@ async fn placed_forest_from_org_with_disk (
 ) -> Result<ViewForest, Box<dyn Error>> {
   let (viewforest, _parsing_errors, _warnings, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
-    org_to_viewforest (input, &graph_from_config (config) ?) ?;
+    org_to_viewforest (input, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   Ok ( viewforest ) }
 
 fn save_gnids (

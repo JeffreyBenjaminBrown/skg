@@ -97,7 +97,7 @@ fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
     * {} p
     ** {} b
     ", occ ("p", ""), occ ("b", "writeProtected") );
-  let mut forest : ViewForest = parse (&input, &InRustGraph::new ());
+  let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,
@@ -120,7 +120,7 @@ fn of_two_editable_occurrences_a_nodeMerge_made_one_nodes_the_first_stays_editab
     * {} b
     ** {} a
     ", occ ("b", ""), occ ("a", "") );
-  let mut forest : ViewForest = parse (&input, &InRustGraph::new ());
+  let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,

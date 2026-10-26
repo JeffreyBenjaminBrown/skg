@@ -17,6 +17,42 @@ use ego_tree::NodeRef;
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
 
+/// How the parse reads the gnids a buffer writes.
+/// 'ThroughGraph' resolves each through the graph: an occurrence's
+/// gnid becomes its pid, and where the parse supplies a node's home
+/// skgrepo it reads the graph's. 'AsWritten' keeps every gnid as the
+/// text writes it and consults no graph, for a caller that reads
+/// only what the text says (the dirty-view dependency scan, tests of
+/// fully written text).
+#[derive(Clone, Copy)]
+pub enum IdResolution<'a> {
+  ThroughGraph (&'a InRustGraph),
+  AsWritten,
+}
+
+impl IdResolution<'_> {
+  /// The pid of the node 'gnid' names, if resolving through a graph
+  /// that knows it.
+  pub fn pid_of (
+    &self,
+    gnid : &ID,
+  ) -> Option<ID> {
+    match self {
+      IdResolution::ThroughGraph (graph) => graph . pid_of (gnid),
+      IdResolution::AsWritten            => None, }}
+
+  /// The home skgrepo of the node 'gnid' names, if resolving through
+  /// a graph that knows it.
+  pub fn home_skgrepo_of (
+    &self,
+    gnid : &ID,
+  ) -> Option<SkgrepoName> {
+    match self {
+      IdResolution::ThroughGraph (graph) =>
+        graph . pid_and_skgrepo (gnid) . map ( |(_pid, skgrepo)| skgrepo ),
+      IdResolution::AsWritten => None, }}
+}
+
 /// Which nodes the parse invented data for, as opposed to reading it
 /// from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
 /// 'inherited_skgrepo_nodes' had no skgrepo (so they inherited that of
@@ -59,17 +95,18 @@ impl EnrichmentProvenance {
       self . inherited_skgrepo_nodes . insert (gnid . clone ()); }}
 }
 
-/// Replace an occurrence's gnid with its pid, if the graph knows it.
+/// Replace an occurrence's gnid with its pid, if resolving through a
+/// graph that knows it.
 /// (Otherwise two headlines might refer to the same node, yet appear
 /// not to.) Precedes everything else the parse supplies.
 pub fn replace_gnid_with_pid (
-  metadata : &mut ViewnodeMetadata,
-  graph    : &InRustGraph,
+  metadata      : &mut ViewnodeMetadata,
+  id_resolution : IdResolution,
 ) {
   if ! metadata . names_an_occurrence () { return; }
   let pid : Option<ID> =
     metadata . gnid . as_ref ()
-    . and_then ( |gnid| graph . pid_of (gnid) );
+    . and_then ( |gnid| id_resolution . pid_of (gnid) );
   if let Some (pid) = pid {
     metadata . gnid = Some (pid); }}
 
@@ -83,8 +120,8 @@ pub fn replace_gnid_with_pid (
 /// Reads the headlines as written (gnids already pids), before the
 /// parse supplies any skgrepo.
 pub fn skgrepos_after_save_of_writeProtected_occurrences<'a> (
-  headlines : impl Iterator<Item = &'a ViewnodeMetadata>,
-  graph     : &InRustGraph,
+  headlines     : impl Iterator<Item = &'a ViewnodeMetadata>,
+  id_resolution : IdResolution,
 ) -> HashMap<ID, SkgrepoName> {
   let mut editable_skgrepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   let mut writeProtected_gnids : HashSet<ID> = HashSet::new ();
@@ -99,8 +136,7 @@ pub fn skgrepos_after_save_of_writeProtected_occurrences<'a> (
     . filter_map ( |gnid| {
       let skgrepo : Option<SkgrepoName> =
         editable_skgrepos . get (&gnid) . cloned ()
-        . or_else ( || graph . pid_and_skgrepo (&gnid)
-                         . map ( |(_pid, skgrepo)| skgrepo ) );
+        . or_else ( || id_resolution . home_skgrepo_of (&gnid) );
       skgrepo . map ( |skgrepo| (gnid, skgrepo) ) } )
     . collect () }
 
@@ -119,7 +155,7 @@ pub fn skgrepos_after_save_of_writeProtected_occurrences<'a> (
 pub fn complete_occurrence_skgrepo (
   metadata                           : &mut ViewnodeMetadata,
   viewparent                         : NodeRef<Viewnode>,
-  graph                              : &InRustGraph,
+  id_resolution                      : IdResolution,
   writeProtected_skgrepos_after_save : &HashMap<ID, SkgrepoName>,
 ) -> bool {
   if ! metadata . names_an_occurrence ()
@@ -127,8 +163,7 @@ pub fn complete_occurrence_skgrepo (
   let from_graph : Option<SkgrepoName> =
     if metadata . writeProtected {
       metadata . gnid . as_ref ()
-      . and_then ( |gnid| graph . pid_and_skgrepo (gnid) )
-      . map ( |(_pid, skgrepo)| skgrepo )
+      . and_then ( |gnid| id_resolution . home_skgrepo_of (gnid) )
     } else { None };
   if from_graph . is_some () {
     metadata . home_skgrepo = from_graph;

@@ -1,7 +1,7 @@
 use crate::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
-use crate::dbs::in_rust_graph::InRustGraph;
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::org_to_text::viewnode_to_string;
 use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use crate::types::errors::BufferValidationError;
@@ -207,7 +207,7 @@ fn a_repeated_viewnode_id_stays_with_its_first_headline () {
       "* (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a\n",
       "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",
       "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",
-      "** typed\n" ), &InRustGraph::new ()) . unwrap ();
+      "** typed\n" ), IdResolution::AsWritten) . unwrap ();
   assert! ( errors . is_empty (), "{:?}", errors );
   let viewnode_ids : Vec<Option<ViewnodeId>> =
     forest . nodes () . map ( |node| node . value () . viewnode_id . clone () ) . collect ();

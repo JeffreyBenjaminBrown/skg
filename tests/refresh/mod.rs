@@ -7,6 +7,7 @@
 
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{
@@ -132,12 +133,12 @@ pub(super) fn run_in (
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph, config : &config, restriction };
   let store : ReadinessStore = ReadinessStore::default ();
-  let mut forest : ViewForest = parse (text, graph);
+  let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let first : Refreshed = refresh_viewforest (
     &mut forest, &mut record, &truth, mode, budget, Some (&store) )
     . unwrap ();
-  let mut again : ViewForest = parse (&first . text, graph);
+  let mut again : ViewForest = parse (&first . text, IdResolution::ThroughGraph (graph));
   let second : Refreshed = refresh_viewforest (
     &mut again, &mut record, &truth, mode, budget, Some (&store) )
     . unwrap ();
@@ -149,11 +150,11 @@ pub(super) fn run_in (
   Run { forest, text : first . text, corrections : first . corrections } }
 
 pub(super) fn parse (
-  text  : &str,
-  graph : &InRustGraph,
+  text          : &str,
+  id_resolution : IdResolution,
 ) -> ViewForest {
   let (forest, errors, _warnings, _provenance) =
-    org_to_viewforest (text, graph) . unwrap ();
+    org_to_viewforest (text, id_resolution) . unwrap ();
   assert! ( errors . is_empty (), "parse errors: {:?}", errors );
   forest }
 

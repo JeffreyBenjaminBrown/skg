@@ -2,7 +2,6 @@
 //
 // Tests of skgrepo-sets ('docs/api-and-formats.org', "skgrepo-sets").
 
-use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
 
@@ -19,6 +18,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::{set_skgrepo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::org_to_text::viewforest_to_string;
 use skg::to_org::extend::containerward_chain::{
@@ -235,7 +235,7 @@ fn saved_or_graph_node_by_gnid (
 fn viewforest_from_org (
   input : &str,
 ) -> Result<Tree<Viewnode>, Box<dyn Error>> {
-  Ok ( org_to_viewnode_tree (input, &InRustGraph::new ())? . 0 ) }
+  Ok ( org_to_viewnode_tree (input, IdResolution::AsWritten)? . 0 ) }
 
 fn first_child_gnid (
   tree : &Tree<Viewnode>,

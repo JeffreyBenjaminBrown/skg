@@ -1,5 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::save::PreparedSave;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::ClientViewSnapshot;
@@ -115,8 +116,7 @@ fn dependencies_from_text (
   viewforest_id : &ViewforestId,
 ) -> Result<HashSet<ID>, String> {
   let (forest, errors, _, _) =
-    // An empty graph: the IDs as the text writes them.
-    org_to_viewforest (text, &InRustGraph::new ())
+    org_to_viewforest (text, IdResolution::AsWritten)
     .map_err (|error| format! (
       "Cannot inspect dirty view {}: {}. Run its recovery command before saving.",
       viewforest_id . repr_in_client (), error)) ?;

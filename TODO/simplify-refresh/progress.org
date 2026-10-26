@@ -1404,3 +1404,92 @@ refreshes twice when it appends roots; a ghost's claim and
 warrant are now stored fields. The three open questions for
 Jeff stand.
 
+** Slice 12: the renames
+*** What's done
+Five commits, each green: 'skgid' becomes 'gnid' (e06bb087);
+the occurrence is 'Occurrence' (c6ffde1a); "phantom" is
+retired (9717070c); comments and tests speak the plan's
+vocabulary (25eb79ee); the parse's 'IdResolution' (the last,
+which carries this report). Each rename was a script under
+'tests/results/slice12/scripts/' plus exact edits, and its
+diff was reviewed; a save and rerender round trip on a scratch
+server passed after each.
+**** counts of the renames, by area (occurrences)
+- skgid: server 1741, tests 937, elisp 178, nvim 143,
+  tools 8, docs 1.
+- Unrestricted: server 352, tests 175, elisp 63, nvim 33,
+  shared 1, docs 14.
+- phantom: server 69, tests 94, elisp 3, nvim 3, shared 1,
+  docs 21.
+- non-member, entry, PartnerFolder, display fact, save
+  input: server 38, tests 67, elisp 10, nvim 3.
+**** the greps
+Before (7fbe22c3) and after, in matching lines: A 101 to 15,
+B 324 to 75, C 1841 to 0. Outside docs only A matches, in the
+exceptions below; B's 75 are all in docs, for slice 13.
+Surveys: 'tests/results/slice12/survey-before.txt' and
+'survey-after.txt'.
+*** Exceptions: words kept in another sense
+- The parser refuses retired atoms by name ('nonMember',
+  'restrictedNode', 'homeRepoHerald', in
+  'parse_metadata_sexp.rs'), and four test files check the
+  refusal or the atoms' absence: 12 lines in all. They name
+  the retired wire spellings on purpose, so the plan's grep A
+  cannot be empty at slice 13 unless that refusal goes.
+- "unrestricted" in the skgrepo restriction's sense (an
+  unrestricted skgrepo, relationship or home;
+  'pid_skgrepo_is_unrestricted' and kin) stays; the
+  case-sensitive 'Unrestricted' is gone.
+- "entry" in its other senses (a map entry, an org entry, an
+  entry of a relationship list) stays.
+*** Deviations from the plan's "how"
+**** "phantom" split by sense
+A historical or deleted phantom became a ghost; an unknown
+phantom became an unknown; where "phantom" meant either, the
+text says "a ghost or an unknown". The printer's
+'phantomUnknown_metadata_to_string' is
+'unknown_metadata_to_string', and
+'convert_now_restricted_phantoms' (which entombstones
+unknowns) is 'entombstone_now_restricted_unknowns'.
+**** 'types/phantom.rs' is 'types/disk_home.rs'
+It holds only 'home_from_disk'; "ghost.rs" would suggest the
+'Ghost' type, so the module is named for what it holds. Its
+unit tests moved with it ('tests/unit/types_disk_home.rs').
+**** the ancestry row was already 'Ghost'
+'ExpectedAncestor::Ghost' existed; no 'HistoricalPhantom'
+remained to rename.
+**** client-visible labels
+The kind labels in 'shared/metadata-fields.json' are
+"occurrence" (was "unrestricted node") and "unknown" (was
+"unknown phantom"); the clients' messages say "occurrence".
+The wire is unchanged: no atom or request name held a
+retired word.
+**** files renamed
+'titles_by_skgids.rs', 'types/phantom.rs', the integration
+test 'view-magit-phantom-deleted-file' and the save test
+'nonMember_and_write_protected' (with its fixtures) carry the
+new words.
+**** the mechanical rules reached docs
+The scripts ran over 'docs/' too, so identifier references
+there follow the code, and "historical phantom" and "unknown
+phantom" became "ghost" and "unknown" in 'docs/'. The rest of
+the docs' prose is slice 13's.
+**** IdResolution
+'IdResolution { ThroughGraph (&InRustGraph), AsWritten }'
+lives in 'add_missing_info.rs' beside the helpers that read
+it ('pid_of', 'home_skgrepo_of'). The dirty-view dependency
+scan and 86 test calls pass 'AsWritten'; the refresh
+tests' 'parse' helper takes an 'IdResolution', so no caller
+builds an empty graph for the parse.
+**** synonyms noticed
+Comments still name folders by the old type names
+('SubscribeeFolder', 'AliasFolder', 'OverriddenFolder',
+'PropertyFolder', 58 lines in 'server/') where the code says
+'Folder::Subscribee' and so on. The plan does not retire
+them; left as they are.
+*** Suite failures and their classification
+**** first failure: integration import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 11, with either
+client, after every commit; the other 34 pass with each. No
+other failure: 'bash/nextest.sh' 956 of 956, ERT 414 of 414,
+plenary 403 of 403, after each commit.

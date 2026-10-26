@@ -262,13 +262,14 @@ mod tests {
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::from_text::buffer_to_viewnodes::uninterpreted
     ::org_to_viewforest;
+  use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
   use crate::types::misc::{MSV, rel_partners_at_relRepo};
   use crate::types::nodes::complete::empty_graphnode;
   use indoc::indoc;
 
   fn forest (text : &str) -> ViewForest {
     let (forest, errors, _warnings, _provenance) =
-      org_to_viewforest (text, &InRustGraph::new ()) . unwrap ();
+      org_to_viewforest (text, IdResolution::AsWritten) . unwrap ();
     assert! (errors . is_empty (), "unexpected parse errors: {:?}", errors);
     forest
   }
@@ -416,7 +417,7 @@ mod tests {
       indoc! {"
         * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
         body that would otherwise disappear
-      "}, &InRustGraph::new ()) . unwrap ();
+      "}, IdResolution::AsWritten) . unwrap ();
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
         gnid, title, changes, .. }] if gnid == &ID::from ("recorder")

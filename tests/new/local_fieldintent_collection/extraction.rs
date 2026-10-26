@@ -4,9 +4,9 @@
 // ones that changed (the new recursion surface) say so in comments.
 
 use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
-use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use ego_tree::Tree;
+use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_viewnode_tree,
   org_to_viewforest};
@@ -53,7 +53,7 @@ fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<Viewnode> {
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   viewforest }
 
 /// This runs collection plus lowering, with no disk involved: the
@@ -134,7 +134,7 @@ async fn nodeInstructions_from_org_with_disk (
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
   let (viewforest, _parsing_errors, _warnings, _provenance)
     : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
-    org_to_viewforest (org_text, &graph_from_config (config) ?) ?;
+    org_to_viewforest (org_text, IdResolution::ThroughGraph (&graph_from_config (config) ?)) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (
       &viewforest, config, None)?;
@@ -153,7 +153,7 @@ fn test_extract_nonmergeSavePlan_basic() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -204,7 +204,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -243,7 +243,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -302,7 +302,7 @@ fn test_extract_nonmergeSavePlan_multiple_alias_folders() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let result : Result<Vec<NodeInstruction>, String> =
     nodeInstructions_from_tree (viewforest);
 
@@ -325,7 +325,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -352,7 +352,7 @@ fn extraction_preserves_content_and_independent_children (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -377,7 +377,7 @@ fn extraction_skips_alias_and_id_display_nodes (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -407,7 +407,7 @@ fn extraction_collects_subscribees_without_hidden_branches (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -442,7 +442,7 @@ fn extraction_collects_overridden_folder (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -470,7 +470,7 @@ fn empty_overridden_folder_means_empty_override_set (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -495,7 +495,7 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -680,7 +680,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -722,7 +722,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1197,7 +1197,7 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1235,7 +1235,7 @@ fn test_parse_mints_a_gnid_for_a_headline_without_one() {
             * node without ID
         "};
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let gnids : Vec<ID> =
     viewforest . root () . children ()
     . filter_map ( |root| root . value () . occurrence_gnid () . cloned () )
@@ -1266,7 +1266,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
         "};
 
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1297,7 +1297,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
             ** (skg node (gnid ref_section) (skgRepos (nodeRepo main)) noClaim) Reference Section
         "};
   let viewforest : Tree<Viewnode> =
-    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+    org_to_viewnode_tree (input, IdResolution::AsWritten) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
