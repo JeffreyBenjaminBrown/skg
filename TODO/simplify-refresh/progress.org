@@ -661,3 +661,9 @@ printed all 32 files, 396 specs, none failing.
 Unrelated and pre-existing, as in slices 0 to 5, with either
 client; the other 34 pass with each, 'herald-rules' among them,
 which now checks "⌂:m" from the served label table.
+** Orchestrator's correction after slice 6 (2026-10-26)
+Inserted under slice 13: document the three atoms the clients
+synthesize for the lens and the label table the herald-rules
+endpoint serves. No correction to code. The run paused here at
+Jeff's request (machine restart); slice 7 not yet launched.
+

@@ -1103,6 +1103,12 @@ part, '(flag F)', '(oldText ASPECT)', '(homeSkgrepoMove ...)',
 and one readiness request, and a lost alias, ID or unknown
 carries 'noClaim', set by the stats pass, which the save reads
 in place of the '(diff (rel removed))' the parser now skips.
+From slice 6: the clients hand the lens three things the server
+never writes, '(FOLDER changed)', 'pendingDetachment' and
+'(repoBoundary LABEL)'; 'docs/heralds.org' must list them as
+the clients' own, beside the served rules and the label table,
+and 'docs/api-and-formats.org' must say that the herald-rules
+endpoint also serves '(skgrepoLabels ...)'.
 * Verification and completion
 At the end of every slice: 'cargo check --all-targets' clean;
 'bash/nextest.sh' green. At the end of slices 0, 2, 3, 4, 5,
