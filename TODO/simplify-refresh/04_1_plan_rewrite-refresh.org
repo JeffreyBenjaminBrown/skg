@@ -924,7 +924,7 @@ its members. Both clients' renderers ('heralds-minor-mode.el',
 follow. Tests: the herald conformance test; the rendering
 cases in both clients; both client unit suites; the
 integration suite.
-*** Corrections carried from slices 0 and 2
+*** Corrections carried from slices 0, 2 and 3
 Two display facts the earlier slices left wrong, for this
 slice to set right with the rest of the table. First, ⊥ moved
 from the front of a node's heralds to after the relationship
@@ -937,7 +937,10 @@ false over a hidden node's children (slice 2;
 children reads DELETED"); since there is one kind of tombstone
 and it says only that something stood here, its label will
 read "something stood here", styled as "DELETED" is today, and
-that problem entry moves to 'TODO/DONE/problems.org'.
+that problem entry moves to 'TODO/DONE/problems.org'. Third, a
+ghost carrying a pending 'tombstone' view request (slice 3)
+shows no herald for it; it will show one as the other view
+requests do ("req:tombstone").
 ** TODO Slice 7: the parser's twin goes
 The parse mints a gnid for a headline without one and gives a
 headline without a repo its nearest occurrence ancestor's as
@@ -969,7 +972,7 @@ output. If a rule of "The model" turns out to contradict
 another when written as code, that is the one stop this plan
 expects: record the two rules and the case in 'progress.org'
 and stop.
-*** Correction carried from slice 1
+*** Corrections carried from slices 1 and 3
 Slice 1 replaced 'FolderPolicy' with 'goal_is_ordered' and,
 where the save asked "does the save read this folder's
 membership", made it ask 'goal_is_ordered' too, which answers
@@ -979,6 +982,13 @@ folder is one whose membership the save reads: the subscribee,
 overridden, hidden-outside and alias folders), so this slice
 will give 'Folder' an 'is_editable' method and use it at the
 save's sites in place of 'goal_is_ordered'.
+From slice 3: the ID rule re-kinds in place. Slice 3, working
+in the old walk, entombstones an occurrence of P whose parent's
+list names P's extra ID X and lets the reconciler draw the
+unknown X beside the tombstone. The module will turn that
+occurrence into the unknown X where it stands, keeping its
+vnid, fold state and children, as "re-kind" says; a unit test
+in 'tests/refresh/' covers the extra-ID case.
 ** TODO Slice 9: content views on it
 'render_initial_view' and 'rerender_view' call
 'refresh_viewforest' in content-view mode. The content-view
@@ -994,6 +1004,16 @@ unwarranted children kept with 'noClaim' and ⊥ rather than
 entombstoned, chain nodes not reinstated, no yield);
 'tests/idempotence' over all content-view fixtures; the
 integration suite.
+*** Correction carried from slice 3
+Slice 3 left a ghost met in a content view alone, because the
+old walk never visits one there. The ID rule gives a content
+view no ghost clause, so this slice entombstones such a ghost
+(its parent's list naming it makes it an unknown instead). The
+test 'a_buffer_of_the_new_viewnodes_saves_back_unchanged'
+saves the diff view's viewnodes through a content-view save
+and expects them back unchanged; it will become a test of the
+wire alone (parse then print) or a diff-view save, since a
+content-view refresh will not keep ghosts.
 ** TODO Slice 10: the search buffer, and the corrections channel
 The search enrichment builds its stub (the hits as
 write-protected roots with a '(folder containers)' request)

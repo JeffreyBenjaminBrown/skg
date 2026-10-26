@@ -348,3 +348,22 @@ shared rendering cases named the old kinds.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 to 2; the other 34
 integration tests pass.
+** Orchestrator's corrections after slice 3 (2026-10-26)
+Inserted into the plan: under slice 6, a herald for a pending
+'tombstone' request; under slice 8, the extra-ID case re-kinds
+in place (slice 3 entombstoned and redrew); under slice 9, a
+ghost met in a content view is entombstoned and the round-trip
+test becomes a wire test or a diff-view save.
+** Open question for Jeff: a dismissed ghost comes back
+Slice 3 found, and tested, that a ghost under a node that held
+it at HEAD is drawn again at the node's next rerender, because
+the diff view's goal reinstates every HEAD-warranted item
+without a child; the plan's ladder does the same. So the two
+ghost-tombstone commands last one rerender except on a root.
+Slices 4 to 10 do not depend on the answer; slice 11 does, and
+so do the two commands slice 3 added. The orchestrator asked
+Jeff in the session and recommended dropping the request and
+the commands: in the diff view a ghost is a pending change,
+shown until it is restored or committed, and the stateless rule
+leaves no honest place to remember a dismissal.
+
