@@ -6,7 +6,8 @@
 // its children.
 
 use super::*;
-use crate::refresh::ancestry::{is_unsayable, required_ancestry, ExpectedAncestor};
+use crate::refresh::ancestry::{
+  ExpectedAncestor, described_node, is_unsayable, required_ancestor_of, required_ancestry};
 use crate::types::viewnode::{ChangesetMarkerKind, Folder};
 use indoc::formatdoc;
 
@@ -75,6 +76,86 @@ fn a_body_diff_stands_only_under_an_old_text () {
     . map ( |node| is_unsayable (&forest, node . id ()) )
     . collect ();
   assert_eq! ( unsayable, vec! [ false, true ] ); }
+
+/// The deepest rows: the folder of what a subscriber hides in one
+/// subscribee needs that subscribee, the subscribee folder and the
+/// subscriber above it; the folder of what it hides outside its
+/// subscribees needs the subscribee folder and the subscriber. Where
+/// the subscriber is a ghost, both are unsayable, though their
+/// viewparents are of the right kinds.
+#[test]
+fn the_deep_rows_of_the_hidden_folders_reach_the_subscriber () {
+  let chain = |subscriber : &str| -> ViewForest { parse ( &formatdoc! ("
+    * {} s
+    ** (skg subscribeeFolder)
+    *** {} e
+    **** (skg hiddenInSubscribeeFolder)
+    *** (skg hiddenOutsideOfSubscribeeFolder)
+    ", subscriber, occurrence_metadata ("e", "writeProtected") ),
+    IdResolution::AsWritten ) };
+  let folder = |forest : &ViewForest, wanted : Folder| -> NodeId {
+    forest . nodes ()
+    . find ( |node| matches! ( &node . value () . kind, ViewnodeKind::Folder (folder)
+                               if *folder == wanted ))
+    . unwrap () . id () };
+  { let forest : ViewForest = chain (&occurrence_metadata ("s", ""));
+    let hidden_in : NodeId = folder (&forest, Folder::HiddenInSubscribee);
+    let hidden_outside : NodeId = folder (&forest, Folder::HiddenOutsideOfSubscribee);
+    assert! ( ! is_unsayable (&forest, hidden_in) );
+    assert! ( ! is_unsayable (&forest, hidden_outside) );
+    let title_at = |treeid : Option<NodeId>| -> Option<String> {
+      treeid . map ( |treeid| outline_line (&forest, treeid) ) };
+    assert_eq! ( title_at ( required_ancestor_of (&forest, hidden_in, 0) ),
+                 Some ("node e wp" . to_string ()) );
+    assert_eq! ( title_at ( required_ancestor_of (&forest, hidden_in, 1) ),
+                 Some ("subscribeeFolder" . to_string ()) );
+    assert_eq! ( title_at ( required_ancestor_of (&forest, hidden_in, 2) ),
+                 Some ("node s" . to_string ()) );
+    assert_eq! ( required_ancestor_of (&forest, hidden_in, 3), None );
+    assert_eq! ( title_at ( described_node (&forest, hidden_in) ),
+                 Some ("node e wp" . to_string ()) );
+    assert_eq! ( title_at ( described_node (&forest, hidden_outside) ),
+                 Some ("node s" . to_string ()) ); }
+  { let forest : ViewForest = chain (
+      "(skg (vnid ss) ghost (gnid s) (skgRepos (nodeRepo main)))" );
+    assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenInSubscribee) ),
+              "its viewparent is an occurrence, but its subscriber is a ghost" );
+    assert! ( is_unsayable ( &forest, folder (&forest, Folder::HiddenOutsideOfSubscribee) ),
+              "its viewparent is a subscribee folder, but that folder's is a ghost" ); }}
+
+/// An occurrence has no row: wherever it stands it stays an
+/// occurrence, so it keeps standing for its node. Here its viewparents
+/// become tombstones (a hidden-outside folder not in a subscribee
+/// folder, which is unsayable, and an old text, which describes
+/// nothing in a content view); it does not.
+#[test]
+fn an_occurrence_is_never_unsayable () {
+  let graph : InRustGraph = graph (&[ node ("p"), node ("c") ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg hiddenOutsideOfSubscribeeFolder)
+    *** {} c
+    ** (skg (oldText title)) old
+    *** {} c
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected") );
+  let forest : ViewForest = parse (&input, IdResolution::AsWritten);
+  let unsayable : Vec<String> = forest . nodes ()
+    . map ( |node| format! ( "{} {}", outline_line (&forest, node . id ()),
+                             is_unsayable (&forest, node . id ()) ))
+    . collect ();
+  assert_eq! ( unsayable, vec! [ "node p false",
+                                 "hiddenOutsideOfSubscribeeFolder true",
+                                 "node c wp false",
+                                 "oldText false",
+                                 "node c wp false" ] );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
+  assert_eq! ( run . outline (), "\
+node p
+  tombstone
+    node c wp noClaim
+  tombstone
+    node c wp noClaim" ); }
 
 trait KindName { fn kind_name (&self) -> &'static str; }
 impl KindName for Viewnode {

@@ -21,7 +21,7 @@ use crate::types::viewnode::{
   ChangeViewnode, PropertyMember, ViewnodeId, VognodeKind, Warrant};
 use crate::types::views_state::DiffViewBufferKind;
 
-use ego_tree::NodeRef;
+use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -188,6 +188,13 @@ pub(super) fn outline (
   for root in forest . roots () {
     outline_subtree (root, 0, &mut lines); }
   lines . join ("\n") }
+
+/// The outline's line for the viewnode at 'treeid', unindented.
+pub(super) fn outline_line (
+  forest : &ViewForest,
+  treeid : NodeId,
+) -> String {
+  describe ( forest . get (treeid) . unwrap () . value () ) }
 
 fn outline_subtree (
   node  : NodeRef<Viewnode>,

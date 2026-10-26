@@ -217,6 +217,43 @@ node p
   oldText
     bodyDiff" ); }
 
+/// What a content view adds unasked, the diff view does not: s's
+/// subscribee folder, though an editable-view request extends s, and
+/// the folder of what s hides in e, though e is an editable subscribee
+/// as such.
+#[test]
+fn the_diff_view_adds_no_default_folders () {
+  let graph_nodes : Vec<Graphnode> = vec! [
+    Graphnode { subscribesTo  : msv_ids (&["e"]),
+                hidesFromSubs : msv_ids (&["h"]), .. node ("s") },
+    Graphnode { contains : ids (&["h"]), .. node ("e") },
+    node ("h"),
+    Graphnode { subscribesTo : msv_ids (&["e"]), .. node ("u") }, ];
+  let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg subscribeeFolder)
+    *** {} e
+    * {} u
+    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", ""),
+       occurrence_metadata ("u", "(viewRequests editableView)") );
+  assert_eq! ( diff_run_asserting_fixpoint (&input, &straddle) . outline (), "\
+node s
+  subscribeeFolder
+    node e
+node u" );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph (&graph_nodes)) . outline (), "\
+node s
+  subscribeeFolder
+    node e
+      hiddenInSubscribeeFolder
+        node h wp noClaim folded
+          node e wp noClaim
+node u
+  subscribeeFolder
+    node e wp",
+    "a content view adds both" ); }
+
 #[test]
 fn the_diff_view_substitutes_nothing () {
   let graph_nodes : Vec<Graphnode> = vec! [

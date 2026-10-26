@@ -163,3 +163,40 @@ fn a_member_drawn_after_a_restriction_change_is_not_reported () {
     &mut forest, &graph, &BufferCorrectionPolicy::after_a_switch (true) );
   assert! ( refreshed . text . contains ("(gnid b)"), "b is drawn:\n{}", refreshed . text );
   assert! ( refreshed . buffer_corrections . is_empty (), "{:?}", refreshed . buffer_corrections ); }
+
+/// n, which o overrides, is shown as o where it stood: the truth
+/// asks for the substitution, so the buffer was not wrong.
+#[test]
+fn a_substitution_is_not_reported () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["n"]), .. node ("p") },
+    node ("n"),
+    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} n
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("n", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
+  assert_eq! ( run . outline (), "\
+node p
+  node o wp (overridesHere n)" );
+  assert! ( run . buffer_corrections . is_empty (), "{:?}", run . buffer_corrections ); }
+
+/// q, which contained p, was deleted. p's containers folder loses its
+/// one member, whose entombstoning is reported; the folder, left
+/// empty and going with it, is not.
+#[test]
+fn an_emptied_folder_is_not_reported () {
+  let graph : InRustGraph = graph (&[ node ("p") ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg containerFolder)
+    *** {} q
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
+  assert_eq! ( run . outline (), "node p" );
+  let reported : Vec<(BufferCorrectionKind, &str)> =
+    run . buffer_corrections . iter ()
+    . map ( |c| ( c . kind, c . title . as_str () ))
+    . collect ();
+  assert_eq! ( reported, vec! [ ( BufferCorrectionKind::Entombstoned, "q" ) ] ); }

@@ -35,7 +35,8 @@ use skg::refresh::{Truth, refresh_content_viewforest};
 use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::test_utils::{graph_from_config, prefer_owned_subdir, refresh_reaches_fixpoint};
 use skg::types::env::RuntimeGeneration;
-use skg::types::misc::{Skgrepo, SkgrepoName};
+use skg::skgrepo_sets::SkgrepoRestriction;
+use skg::types::misc::{Skgrepo, SkgrepoName, SkgrepoSetName};
 use skg::types::tree::forest::ViewForest;
 use skg::update_buffer::render_initial_view;
 
@@ -48,7 +49,7 @@ use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::cleanup_test_tantivy;
 use skg::types::views_state::DiffViewBufferKind;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -117,8 +118,10 @@ async fn rerender_is_a_fixpoint_impl (
 // the graph"): for each fixture folder under 'tests/' and each node in
 // it, the fresh content view of the node, parsed and refreshed again
 // over the same graph, comes back as it was, and the second refresh
-// corrects nothing. A fixture folder whose graph does not load (one
-// built to be refused, or holding no '.skg' files) is passed over.
+// corrects nothing. Where the fixture has several skgrepos, that
+// holds under each restriction too, for each node it shows. A fixture
+// folder whose graph does not load (one built to be refused, or
+// holding no '.skg' files) is passed over.
 
 #[test]
 fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
@@ -126,6 +129,7 @@ fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
   let mut failures : Vec<String> = Vec::new ();
   let mut views : usize = 0;
   let mut folders : usize = 0;
+  let mut restricted_folders : HashSet<PathBuf> = HashSet::new ();
   for folder in fixture_folders (Path::new ("tests")) {
     let Some (config) = fixture_config (&folder) else { continue; };
     let Ok (graph) = graph_from_config (&config) else { continue; };
@@ -138,30 +142,58 @@ fn every_content_view_fixture_is_a_fixpoint_of_the_refresh (
       generation    : 0, };
     let mut pids : Vec<ID> = runtime . graph . nodes . keys () . cloned () . collect ();
     pids . sort ();
-    for pid in pids {
-      views += 1;
-      if let Err (failure) = refreshes_unchanged (&runtime, &pid) {
-        failures . push ( format! ( "{} {}: {}", folder . display (), pid . 0, failure )); }}}
-  println! ("{} views over {} fixture folders", views, folders);
+    for restriction in restrictions_of (&runtime . config) {
+      if restriction . is_some () { restricted_folders . insert (folder . clone ()); }
+      for pid in &pids {
+        if runtime . graph . restriction_keeps_out (pid, restriction . as_ref ()) {
+          continue; }
+        views += 1;
+        if let Err (failure) = refreshes_unchanged (&runtime, pid, restriction . as_ref ()) {
+          failures . push ( format! (
+            "{} {} under {}: {}", folder . display (), pid . 0,
+            restriction . as_ref () . map_or ("no restriction" . to_string (),
+                                              |r| format! ("'{}'", r . name . 0) ),
+            failure )); }}}}
+  println! ( "{} views over {} fixture folders, {} of them restricted",
+             views, folders, restricted_folders . len () );
   assert! ( folders > 40, "too few fixture folders were read: {}", folders );
+  assert! ( restricted_folders . len () > 5,
+            "too few fixture folders were read under a restriction: {}",
+            restricted_folders . len () );
   assert! ( failures . is_empty (),
             "{} of {} views over {} fixture folders are not fixpoints:\n\n{}",
             failures . len (), views, folders, failures . join ("\n\n") );
   Ok (( )) }
 
-/// Whether the fresh view of 'pid' refreshes to itself: Err says how not.
+/// Whether the fresh view of 'pid' under 'restriction' refreshes to
+/// itself: Err says how not.
 fn refreshes_unchanged (
-  runtime : &RuntimeGeneration,
-  pid     : &ID,
+  runtime     : &RuntimeGeneration,
+  pid         : &ID,
+  restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(), String> {
   let (_, text) : (ViewForest, String) =
-    render_initial_view (runtime, &[ pid . clone () ], None)
+    render_initial_view (runtime, &[ pid . clone () ], restriction)
     . map_err ( |e| format! ("the fresh view failed: {}", e) ) ?;
   refresh_reaches_fixpoint (
     &text, &runtime . graph,
     |forest, record| refresh_content_viewforest (
-      forest, record, &Truth::of_runtime (runtime, None),
+      forest, record, &Truth::of_runtime (runtime, restriction),
       &BufferCorrectionPolicy::default () )) }
+
+/// No restriction, then the restriction through each skgrepo but the
+/// most private (through which it would be no restriction).
+fn restrictions_of (
+  config : &SkgConfig,
+) -> Vec<Option<SkgrepoRestriction>> {
+  let ordered : Vec<SkgrepoName> = config . ordered_skgrepos ();
+  let narrower : usize = ordered . len () . saturating_sub (1);
+  std::iter::once (None)
+    . chain ( ordered . into_iter () . take (narrower)
+              . filter_map ( |skgrepo| SkgrepoRestriction::named (
+                  config, SkgrepoSetName ( skgrepo . 0 . clone () ))
+                . ok () . map (Some) ))
+    . collect () }
 
 /// Every folder named 'fixtures' under 'root', but the test results.
 fn fixture_folders (

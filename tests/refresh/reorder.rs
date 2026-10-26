@@ -68,3 +68,45 @@ node p
   hiddenFolder
     node a wp noClaim
     node b wp noClaim" ); }
+
+/// Another buffer's save reordered p's aliases, subscribees and
+/// overridden nodes; this collateral view still holds the old orders.
+/// Its editable folders take the new ones, since its next save would
+/// write the order it shows.
+#[test]
+fn the_editable_ordered_folders_take_the_goals_order () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { aliases      : MSV::Specified ( rel_partners_at_relRepo (
+                  &SkgrepoName::from ("main"),
+                  vec! [ "x" . to_string (), "y" . to_string () ] )),
+                subscribesTo : msv_ids (&["a", "b"]),
+                overrides    : msv_ids (&["c", "d"]),
+                .. node ("p") },
+    node ("a"), node ("b"), node ("c"), node ("d"), ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg aliasFolder)
+    *** (skg alias) y
+    *** (skg alias) x
+    ** (skg subscribeeFolder)
+    *** {} b
+    *** {} a
+    ** (skg overriddenFolder)
+    *** {} d
+    *** {} c
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("b", "writeProtected"),
+       occurrence_metadata ("a", "writeProtected"),
+       occurrence_metadata ("d", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
+node p
+  aliasFolder
+    alias x
+    alias y
+  subscribeeFolder
+    node a wp
+    node b wp
+  overriddenFolder
+    node c wp
+    node d wp" ); }
