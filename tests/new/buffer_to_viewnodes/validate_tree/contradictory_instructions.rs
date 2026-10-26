@@ -39,24 +39,24 @@ fn test_find_inconsistent_toDelete_instructions() {
 
   let viewforest_inconsistent: ViewForest =
     org_to_viewforest (input_inconsistent, &InRustGraph::new ()) . unwrap() . 0;
-  let (inconsistent_skgids, _) = find_inconsistent_instructions (&viewforest_inconsistent);
+  let (inconsistent_gnids, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
-  assert_eq!(inconsistent_skgids . len(), 2, "Should find exactly 2 conflicting IDs");
-  assert!(inconsistent_skgids . iter () . any ( |(skgid, _)| skgid == &ID::from ("conflict1")), "Should include conflict1 ID");
-  assert!(inconsistent_skgids . iter () . any ( |(skgid, _)| skgid == &ID::from ("conflict2")), "Should include conflict2 ID");
+  assert_eq!(inconsistent_gnids . len(), 2, "Should find exactly 2 conflicting IDs");
+  assert!(inconsistent_gnids . iter () . any ( |(gnid, _)| gnid == &ID::from ("conflict1")), "Should include conflict1 ID");
+  assert!(inconsistent_gnids . iter () . any ( |(gnid, _)| gnid == &ID::from ("conflict2")), "Should include conflict2 ID");
 
   // Test case with nodes that have no IDs (should be skipped)
-  let input_no_skgids: &str =
+  let input_no_gnids: &str =
     indoc! {"
             * (skg node (editRequest delete)) node without id (should be skipped)
             * regular node without any metadata
             * (skg node (gnid valid_node)) only node with id
         "};
 
-  let viewforest_no_skgids: ViewForest =
-    org_to_viewforest (input_no_skgids, &InRustGraph::new ()) . unwrap() . 0;
-  let (inconsistent_no_skgids, _) = find_inconsistent_instructions (&viewforest_no_skgids);
-  assert_eq!(inconsistent_no_skgids . len(), 0, "Should have no conflicts when only one node has each ID");
+  let viewforest_no_gnids: ViewForest =
+    org_to_viewforest (input_no_gnids, &InRustGraph::new ()) . unwrap() . 0;
+  let (inconsistent_no_gnids, _) = find_inconsistent_instructions (&viewforest_no_gnids);
+  assert_eq!(inconsistent_no_gnids . len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty viewforest (just BufferRoot, no tree roots)
   let empty_viewforest: ViewForest =
@@ -102,7 +102,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                  "Should find exactly 1 Multiple_Defining_Viewnodes error for the problematic ID");
 
       // Check that the error points to the correct ID
-      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid, _) = multiple_defining_errors[0] {
-        assert_eq!(skgid . 0, "duplicate",
+      if let BufferValidationError::Multiple_Defining_Viewnodes (gnid, _) = multiple_defining_errors[0] {
+        assert_eq!(gnid . 0, "duplicate",
                    "Multiple_Defining_Viewnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }

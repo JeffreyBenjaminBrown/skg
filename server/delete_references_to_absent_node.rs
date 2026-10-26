@@ -33,7 +33,7 @@ pub struct StructuralOccurrence {
   pub recorder_skgrepo : SkgrepoName,
   pub recorder_title   : String,
   pub field            : StructuredField,
-  pub raw_skgid        : ID,
+  pub raw_gnid        : ID,
   pub relRepo          : SkgrepoName,
 }
 
@@ -51,7 +51,7 @@ pub struct LinkOccurrence {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Preview {
-  pub raw_skgid       : ID,
+  pub raw_gnid       : ID,
   pub structural   : Vec<StructuralOccurrence>,
   pub links   : Vec<LinkOccurrence>,
 }
@@ -73,7 +73,7 @@ impl Preview {
       rows . push (format! ("S{}{}{}{}{}{}",
         encode (&o . recorder_pid . 0), encode (&o . recorder_skgrepo . 0),
         encode (&o . recorder_title), encode (o . field . label ()),
-        encode (&o . raw_skgid . 0), encode (&o . relRepo . 0))); }
+        encode (&o . raw_gnid . 0), encode (&o . relRepo . 0))); }
     for o in &self . links {
       rows . push (format! ("T{}{}{:?}:{}{}",
         encode (&o . recorder_pid . 0), encode (&o . recorder_skgrepo . 0),
@@ -90,12 +90,12 @@ pub fn preview_warning_org (
   preview : &Preview,
 ) -> String {
   let mut text : String = format! (
-    "* References to absent ID {}\n\n", preview . raw_skgid);
+    "* References to absent ID {}\n\n", preview . raw_gnid);
   if ! preview . structural . is_empty () {
     text . push_str ("** Structured relationships to remove\n");
     for o in &preview . structural {
       text . push_str (&format! ("- {} / {} / {} (repo {})\n",
-        o . recorder_pid, o . field . label (), o . raw_skgid, o . relRepo)); }}
+        o . recorder_pid, o . field . label (), o . raw_gnid, o . relRepo)); }}
   if ! preview . links . is_empty () {
     text . push_str ("** Text links left unchanged\n");
     for o in &preview . links {
@@ -124,22 +124,22 @@ pub fn result_org (
 pub fn preview (
   graph     : &InRustGraph,
   config    : &SkgConfig,
-  raw_skgid : &ID,
+  raw_gnid : &ID,
 ) -> Result<Preview, String> {
-  if graph . pid_of (raw_skgid) . is_some () {
+  if graph . pid_of (raw_gnid) . is_some () {
     return Err (format! (
-      "Cannot remove references to {}: it currently resolves to a graphnode.", raw_skgid)); }
-  let mut result : Preview = Preview { raw_skgid : raw_skgid . clone (), ..Preview::default () };
+      "Cannot remove references to {}: it currently resolves to a graphnode.", raw_gnid)); }
+  let mut result : Preview = Preview { raw_gnid : raw_gnid . clone (), ..Preview::default () };
   for node in graph . nodes . values () {
     if ! config . skgrepo_is_owned (&node . home_skgrepo) { continue; }
     let mut record = |field : StructuredField, members : &[RelPartner<ID>]| {
-      for member in members . iter () . filter (|m| &m . member == raw_skgid) {
+      for member in members . iter () . filter (|m| &m . member == raw_gnid) {
         result . structural . push (StructuralOccurrence {
           recorder_pid       : node . pid . clone (),
           recorder_skgrepo    : node . home_skgrepo . clone (),
           recorder_title     : node . title . clone (),
           field,
-          raw_skgid          : raw_skgid . clone (),
+          raw_gnid          : raw_gnid . clone (),
           relRepo : member . relRepo . clone (), }); }};
     record (StructuredField::Contains, &node . contains);
     record (StructuredField::SubscribesTo, node . subscribesTo . or_default ());
@@ -147,10 +147,10 @@ pub fn preview (
             node . hidesFromSubs . or_default ());
     record (StructuredField::Overrides,
             node . overrides . or_default ());
-    record_links (&mut result . links, node, raw_skgid, TextField::Title,
+    record_links (&mut result . links, node, raw_gnid, TextField::Title,
                        &node . title);
     if let Some (body) = &node . body {
-      record_links (&mut result . links, node, raw_skgid, TextField::Body,
+      record_links (&mut result . links, node, raw_gnid, TextField::Body,
                          body); }}
   result . structural . sort_by (|a, b|
     (&a . recorder_pid, a . field, &a . relRepo)
@@ -164,12 +164,12 @@ pub fn preview (
 fn record_links (
   occurrences : &mut Vec<LinkOccurrence>,
   node        : &crate::types::nodes::rust::GraphnodeInRust,
-  raw_skgid   : &ID,
+  raw_gnid   : &ID,
   field       : TextField,
   text        : &str,
 ) {
   for (range, link) in links_with_ranges_from_text (text) . into_iter ()
-    . filter (|(_, link)| &link . skgid == raw_skgid) {
+    . filter (|(_, link)| &link . gnid == raw_gnid) {
     let start : usize = range . start;
     occurrences . push (LinkOccurrence {
       recorder_pid    : node . pid . clone (),
@@ -187,7 +187,7 @@ pub fn rewrite (
   config : &SkgConfig,
   preview : &Preview,
 ) -> Result<Vec<NodeInstruction>, String> {
-  let fresh : Preview = self::preview (graph, config, &preview . raw_skgid) ?;
+  let fresh : Preview = self::preview (graph, config, &preview . raw_gnid) ?;
   if &fresh != preview {
     return Err ("Cleanup preview is stale; rescan before rewriting." . to_string ()); }
   let affected : std::collections::BTreeSet<ID> = fresh . structural . iter ()
@@ -197,25 +197,25 @@ pub fn rewrite (
     let node = graph . get (&pid)
       .ok_or_else (|| format! ("Cleanup recorder disappeared: {}", pid))?;
     let mut rewritten = graphnode_from_graphnodeInRust (node);
-    rewritten . contains . retain (|m| m . member != fresh . raw_skgid);
+    rewritten . contains . retain (|m| m . member != fresh . raw_gnid);
     rewritten . subscribesTo = remove_exact (
-      &rewritten . subscribesTo, &fresh . raw_skgid);
+      &rewritten . subscribesTo, &fresh . raw_gnid);
     rewritten . hidesFromSubs = remove_exact (
-      &rewritten . hidesFromSubs, &fresh . raw_skgid);
+      &rewritten . hidesFromSubs, &fresh . raw_gnid);
     rewritten . overrides = remove_exact (
-      &rewritten . overrides, &fresh . raw_skgid);
+      &rewritten . overrides, &fresh . raw_gnid);
     writes . push (NodeInstruction::Save (SaveNode (rewritten))); }
   Ok (writes)
 }
 
 fn remove_exact (
   members : &MSV<RelPartner<ID>>,
-  raw_skgid  : &ID,
+  raw_gnid  : &ID,
 ) -> MSV<RelPartner<ID>> {
   match members {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (members) => MSV::Specified (
-      members . iter () . filter (|m| &m . member != raw_skgid)
+      members . iter () . filter (|m| &m . member != raw_gnid)
         . cloned () . collect ()), }
 }
 
@@ -227,9 +227,9 @@ mod tests {
   use std::collections::HashMap;
   use std::path::PathBuf;
 
-  fn skgid (text : &str) -> ID { ID::from (text) }
+  fn gnid (text : &str) -> ID { ID::from (text) }
   fn member (skgrepo : &str, raw : &str) -> RelPartner<ID> {
-    RelPartner::at_relRepo (SkgrepoName::from (skgrepo), skgid (raw)) }
+    RelPartner::at_relRepo (SkgrepoName::from (skgrepo), gnid (raw)) }
 
   fn config () -> SkgConfig {
     let skgrepo = |name : &str, owned : bool| Skgrepo {
@@ -244,7 +244,7 @@ mod tests {
 
   fn node (pid : &str, skgrepo : &str) -> Graphnode {
     let mut node : Graphnode = empty_graphnode ();
-    node . pid = skgid (pid);
+    node . pid = gnid (pid);
     node . home_skgrepo = SkgrepoName::from (skgrepo);
     node . title = format! ("{} [[id:gone][title label]]", pid);
     node . body = Some ( // the verbatim example is not a reference
@@ -265,14 +265,14 @@ mod tests {
     foreign . contains = vec! [member ("foreign", "gone")];
     let graph = InRustGraph::from_graphnodes (&[owned, foreign]);
 
-    let scanned = preview (&graph, &config (), &skgid ("gone")) . unwrap ();
+    let scanned = preview (&graph, &config (), &gnid ("gone")) . unwrap ();
     assert_eq! (scanned . structural . len (), 4);
     assert_eq! (scanned . links . len (), 2);
     assert! (scanned . structural . iter ()
-              . all (|occurrence| occurrence . recorder_pid == skgid ("owned")));
+              . all (|occurrence| occurrence . recorder_pid == gnid ("owned")));
     assert_eq! (scanned . links [1] . line, 3);
     let approval = scanned . opaque_approval ();
-    assert_eq! (approval, preview (&graph, &config (), &skgid ("gone"))
+    assert_eq! (approval, preview (&graph, &config (), &gnid ("gone"))
                 . unwrap () . opaque_approval ());
 
     let rewrites = rewrite (&graph, &config (), &scanned) . unwrap ();
@@ -284,14 +284,14 @@ mod tests {
     assert_eq! (rewritten . hidesFromSubs,
                 MSV::Specified (Vec::new ()));
     assert_eq! (rewritten . overrides, MSV::Specified (Vec::new ()));
-    assert_eq! (graph . get (&skgid ("foreign")) . unwrap () . contains,
+    assert_eq! (graph . get (&gnid ("foreign")) . unwrap () . contains,
                 vec! [member ("foreign", "gone")]);
   }
 
   #[test]
-  fn rejects_a_raw_skgid_that_currently_resolves () {
+  fn rejects_a_raw_gnid_that_currently_resolves () {
     let graph = InRustGraph::from_graphnodes (&[node ("gone", "main")]);
-    assert! (preview (&graph, &config (), &skgid ("gone")) . is_err ());
+    assert! (preview (&graph, &config (), &gnid ("gone")) . is_err ());
   }
 
   #[test]
@@ -299,9 +299,9 @@ mod tests {
     let mut owned = node ("owned", "main");
     owned . contains = vec! [member ("main", "gone")];
     let graph = InRustGraph::from_graphnodes (&[owned]);
-    let scanned = preview (&graph, &config (), &skgid ("gone")) . unwrap ();
+    let scanned = preview (&graph, &config (), &gnid ("gone")) . unwrap ();
     let mut changed = graph . clone ();
-    changed . nodes . get_mut (&skgid ("owned")) . unwrap () . title =
+    changed . nodes . get_mut (&gnid ("owned")) . unwrap () . title =
       "changed after preview" . to_string ();
     assert_eq! (rewrite (&changed, &config (), &scanned),
                 Err ("Cleanup preview is stale; rescan before rewriting." . to_string ()));

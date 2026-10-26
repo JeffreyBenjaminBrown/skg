@@ -75,7 +75,7 @@ impl GraphnodeOnDisk {
   ) -> SectionSlices {
     let nonempty_items = |v : Vec<ListItem>| -> Option<Vec<ListItem>> {
       if v . is_empty () { None } else { Some (v) }};
-    let nonempty_skgids = |v : Vec<ID>| -> Option<Vec<ID>> {
+    let nonempty_gnids = |v : Vec<ID>| -> Option<Vec<ID>> {
       if v . is_empty () { None } else { Some (v) }};
     SectionSlices {
       title                        : self . title,
@@ -88,9 +88,9 @@ impl GraphnodeOnDisk {
       subscribesTo                 :
         nonempty_items ( self . subscribesTo ),
       hidesFromSubs                :
-        nonempty_skgids ( self . hidesFromSubs ),
+        nonempty_gnids ( self . hidesFromSubs ),
       overrides                    :
-        nonempty_skgids ( self . overrides ), }}
+        nonempty_gnids ( self . overrides ), }}
 
   /// Treat one section as a whole node: exact for single-section
   /// telescopes; the per-file git/diff paths use it as interim
@@ -105,12 +105,12 @@ impl GraphnodeOnDisk {
     let members_only = |items : Vec<ListItem>| -> Vec<ID> {
       items . into_iter ()
         . filter_map ( |i| match i {
-          ListItem::Member (skgid) => Some (skgid),
+          ListItem::Member (gnid) => Some (gnid),
           ListItem::Anchor { .. } => None } )
         . collect () };
-    let msv_skgids = |skgids : Vec<ID>| -> MSV<ID> {
-      if skgids . is_empty () { MSV::Unspecified }
-      else { MSV::Specified (skgids) }};
+    let msv_gnids = |gnids : Vec<ID>| -> MSV<ID> {
+      if gnids . is_empty () { MSV::Unspecified }
+      else { MSV::Specified (gnids) }};
     Graphnode {
       title                        :
         self . title . unwrap_or_default (),
@@ -125,12 +125,12 @@ impl GraphnodeOnDisk {
       contains                     : rel_partners_at_relRepo (
         &skgrepo, members_only ( self . contains ) ),
       subscribesTo                 : rel_partners_at_relRepo_msv (
-        &skgrepo, msv_skgids ( members_only ( self . subscribesTo ) ) ),
+        &skgrepo, msv_gnids ( members_only ( self . subscribesTo ) ) ),
       hidesFromSubs                : rel_partners_at_relRepo_msv (
         &skgrepo,
-        msv_skgids ( self . hidesFromSubs ) ),
+        msv_gnids ( self . hidesFromSubs ) ),
       overrides                    : rel_partners_at_relRepo_msv (
-        &skgrepo, msv_skgids ( self . overrides ) ),
+        &skgrepo, msv_gnids ( self . overrides ) ),
       flags                         : self . flags,
       home_skgrepo: skgrepo,
     }}

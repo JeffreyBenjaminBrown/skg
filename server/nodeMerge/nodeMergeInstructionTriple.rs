@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::{graphnode_by_skgid, opt_graphnode_by_skgid};
+use crate::dbs::node_lookup::{graphnode_by_gnid, opt_graphnode_by_gnid};
 use crate::from_text::local_fieldintent_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
@@ -44,24 +44,24 @@ pub fn nodeMerge_instructions_from_pairs (
 ) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
   let mut merges : Vec<NodeMerge> =
     Vec::with_capacity (pairs . len());
-  for (acquirer_skgid, acquiree_skgid) in pairs {
+  for (acquirer_gnid, acquiree_gnid) in pairs {
     merges . push (
       nodeMerge_from_acquirer_and_acquiree (
-        acquirer_skgid, acquiree_skgid, graph, config ) ? ); }
+        acquirer_gnid, acquiree_gnid, graph, config ) ? ); }
   Ok (merges) }
 
 fn nodeMerge_from_acquirer_and_acquiree (
-  acquirer_skgid : &ID,
-  acquiree_skgid : &ID,
+  acquirer_gnid : &ID,
+  acquiree_gnid : &ID,
   graph          : &InRustGraph,
   config         : &SkgConfig,
 ) -> Result<NodeMerge, Box<dyn Error>> {
   let acquirer_from_disk : Graphnode =
-    graphnode_by_skgid (
-      graph, config, acquirer_skgid )?;
+    graphnode_by_gnid (
+      graph, config, acquirer_gnid )?;
   let acquiree_from_disk : Graphnode =
-    graphnode_by_skgid (
-      graph, config, &acquiree_skgid )?;
+    graphnode_by_gnid (
+      graph, config, &acquiree_gnid )?;
   let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
@@ -70,10 +70,10 @@ fn nodeMerge_from_acquirer_and_acquiree (
     // so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      skgids_shown_through_subscriptions (
+      gnids_shown_through_subscriptions (
         &acquirer_from_disk, graph, config ) ?;
     shown . extend (
-      skgids_shown_through_subscriptions (
+      gnids_shown_through_subscriptions (
         &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : Graphnode =
@@ -89,7 +89,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
       SaveNode (updated_acquirer),
     acquiree_to_delete :
       DeleteNode {
-        skgid           : acquiree_skgid . clone(),
+        gnid           : acquiree_gnid . clone(),
         home_skgrepo : acquiree_from_disk . home_skgrepo . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.
@@ -166,10 +166,10 @@ fn three_nodeMerged_graphnodes(
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
           & acquirer_from_disk . contains,
           & acquiree_from_disk . contains ] );
-    let own_skgids : Vec<ID> =
-      updated_acquirer . all_skgids() . cloned() . collect::<Vec<_>>();
+    let own_gnids : Vec<ID> =
+      updated_acquirer . all_gnids() . cloned() . collect::<Vec<_>>();
     combined . retain ( // prevent acquirer from containing itself
-      |m| ! own_skgids . contains ( &m . member ));
+      |m| ! own_gnids . contains ( &m . member ));
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
@@ -225,7 +225,7 @@ fn three_nodeMerged_graphnodes(
 /// its own contents (the subscribee-as-such display rule,
 /// docs/sharing-model.org). A subscribee with no disk entry
 /// contributes nothing.
-fn skgids_shown_through_subscriptions (
+fn gnids_shown_through_subscriptions (
   node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -235,14 +235,14 @@ fn skgids_shown_through_subscriptions (
     members_of ( node . hidesFromSubs . or_default () );
   let contains : Vec<ID> =
     members_of ( & node . contains );
-  for subscribee_skgid in members_of ( node . subscribesTo . or_default () ) {
-    let Some (subscribee) = opt_graphnode_by_skgid (
-      graph, config, &subscribee_skgid ) ?
+  for subscribee_gnid in members_of ( node . subscribesTo . or_default () ) {
+    let Some (subscribee) = opt_graphnode_by_gnid (
+      graph, config, &subscribee_gnid ) ?
     else { continue; };
-    for skgid in members_of ( & subscribee . contains ) {
-      if ! hides . contains (&skgid)
-        && ! contains . contains (&skgid)
-      { shown . insert ( skgid ); }} }
+    for gnid in members_of ( & subscribee . contains ) {
+      if ! hides . contains (&gnid)
+        && ! contains . contains (&gnid)
+      { shown . insert ( gnid ); }} }
   Ok (shown) }
 
 /// The title a nodeMerge gives the acquiree's text preserver.

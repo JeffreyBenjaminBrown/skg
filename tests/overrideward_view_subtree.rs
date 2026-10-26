@@ -17,7 +17,7 @@ use ego_tree::{NodeRef, Tree};
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, enrich_search_viewforest,
-  suppressed_result_skgids};
+  suppressed_result_gnids};
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
@@ -27,9 +27,9 @@ use skg::types::views_state::ViewnodeIdRecord;
 
 /// One search hit, as a MatchGroups entry.
 fn hit (
-  skgid : &str, skgrepo : &str, title : &str,
+  gnid : &str, skgrepo : &str, title : &str,
 ) -> (ID, (SkgrepoName, Vec<(f32, String)>)) {
-  ( ID::from (skgid),
+  ( ID::from (gnid),
     ( SkgrepoName::from (skgrepo),
       vec![ (1.0_f32, title . to_string ()) ] ) ) }
 
@@ -74,7 +74,7 @@ fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   ] . into_iter () . collect ();
   // Phase 1: suppression, then build the top-level viewforest.
   let suppressed : HashSet<ID> =
-    suppressed_result_skgids ( &matches, &graph, config, restriction );
+    suppressed_result_gnids ( &matches, &graph, config, restriction );
   let (mut viewforest, search_results)
     : (ViewForest, Vec<ID>) =
     build_search_viewforest ( "cooking", &matches, &suppressed );
@@ -125,9 +125,9 @@ fn suppression_anchors_at_owned (
     hit ("E",  "foreign", "exciting original"),
   ] . into_iter () . collect ();
   let suppressed : HashSet<ID> =
-    suppressed_result_skgids ( &matches, &graph, config, restriction );
+    suppressed_result_gnids ( &matches, &graph, config, restriction );
   let mut got : Vec<String> =
-    suppressed . iter () . map ( |skgid| skgid . 0 . clone () ) . collect ();
+    suppressed . iter () . map ( |gnid| gnid . 0 . clone () ) . collect ();
   got . sort ();
   assert_eq! (
     got, vec![ "F".to_string (), "G".to_string () ],
@@ -207,21 +207,21 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
 
 fn find_result_root<'a> (
   tree : &'a Tree<Viewnode>,
-  skgid   : &str,
+  gnid   : &str,
 ) -> Option<NodeRef<'a, Viewnode>> {
   tree . root () . children ()
-    . find ( |c| unrestricted_skgid_is (*c, skgid) ) }
+    . find ( |c| unrestricted_gnid_is (*c, gnid) ) }
 
 fn find_child<'a> (
   parent : NodeRef<'a, Viewnode>,
-  skgid     : &str,
+  gnid     : &str,
 ) -> Option<NodeRef<'a, Viewnode>> {
-  parent . children () . find ( |c| unrestricted_skgid_is (*c, skgid) ) }
+  parent . children () . find ( |c| unrestricted_gnid_is (*c, gnid) ) }
 
-fn unrestricted_skgid_is (
+fn unrestricted_gnid_is (
   node : NodeRef<Viewnode>,
-  skgid   : &str,
+  gnid   : &str,
 ) -> bool {
   matches! ( &node . value () . kind,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      if t . skgid == ID::from (skgid) ) }
+      if t . gnid == ID::from (gnid) ) }

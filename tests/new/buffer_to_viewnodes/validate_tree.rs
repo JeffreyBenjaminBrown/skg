@@ -61,12 +61,12 @@ fn duplicated_content_error (
     |config, tantivy| Box::pin ( test_duplicated_content_error (config, tantivy) )) }
 
 #[test]
-fn no_duplicated_content_error_when_different_skgids (
+fn no_duplicated_content_error_when_different_gnids (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-validate-tree-no-duplicated-content-error-when-different-skgids", FIXTURES,
-    "/tmp/tantivy-test-validate-tree-no-duplicated-content-error-when-different-skgids",
-    |config, tantivy| Box::pin ( test_no_duplicated_content_error_when_different_skgids (config, tantivy) )) }
+    "skg-test-validate-tree-no-duplicated-content-error-when-different-gnids", FIXTURES,
+    "/tmp/tantivy-test-validate-tree-no-duplicated-content-error-when-different-gnids",
+    |config, tantivy| Box::pin ( test_no_duplicated_content_error_when_different_gnids (config, tantivy) )) }
 
 #[test]
 fn no_duplicated_content_error_for_phantom_siblings (
@@ -259,9 +259,9 @@ async fn test_find_buffer_errors_for_saving (
           . collect();
         assert_eq!(ambiguous_deletion_errors . len(), 1,
                    "Should find 1 AmbiguousDeletion error");
-        if let BufferValidationError::AmbiguousDeletion (skgid, _)
+        if let BufferValidationError::AmbiguousDeletion (gnid, _)
           = ambiguous_deletion_errors[0] {
-          assert_eq!(skgid . 0, "conflict",
+          assert_eq!(gnid . 0, "conflict",
                      "AmbiguousDeletion error should come from conflicting ID"); }}
 
       // Multiple_Defining_Viewnodes
@@ -270,9 +270,9 @@ async fn test_find_buffer_errors_for_saving (
           . collect();
         assert_eq!(multiple_defining_errors . len(), 1,
                    "Should find 1 Multiple_Defining_Viewnodes error");
-        if let BufferValidationError::Multiple_Defining_Viewnodes (skgid, _)
+        if let BufferValidationError::Multiple_Defining_Viewnodes (gnid, _)
           = multiple_defining_errors[0] {
-          assert_eq!(skgid . 0, "conflict",
+          assert_eq!(gnid . 0, "conflict",
                      "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
 
       // Repo validation (alias_child has no skgrepo)
@@ -425,14 +425,14 @@ async fn test_duplicated_content_error (
       assert_eq!(duplicated_content_errors . len(), 1,
                  "Should find exactly 1 duplicate children error");
 
-      if let BufferValidationError::LocalStructureViolation(_, skgid, _) = duplicated_content_errors[0] {
-        assert_eq!(skgid . 0, "root",
+      if let BufferValidationError::LocalStructureViolation(_, gnid, _) = duplicated_content_errors[0] {
+        assert_eq!(gnid . 0, "root",
                    "Duplicate error should be reported at the parent node (root)");
       }
       Ok(())
 }
 
-async fn test_no_duplicated_content_error_when_different_skgids (
+async fn test_no_duplicated_content_error_when_different_gnids (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -515,9 +515,9 @@ async fn test_root_without_skgrepo_validation (
       assert_eq!(skgrepo_errors . len(), 1,
                  "Should find 1 repo validation error");
 
-      if let BufferValidationError::LocalStructureViolation(_, skgid, _)
+      if let BufferValidationError::LocalStructureViolation(_, gnid, _)
         = skgrepo_errors[0]
-      { assert_eq!(skgid . 0, "root2",
+      { assert_eq!(gnid . 0, "root2",
                    "Repo error should be for root2"); }
       Ok(( )) }
 
@@ -552,16 +552,16 @@ async fn test_nonexistent_skgrepo_validation (
         { // Check first error (child1, with skgrepo 'nonexistent')
           let found_child_error: bool =
             nonexistent_skgrepo_errors . iter() . any(|e| {
-              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid, _)
-                       if skgrepo_re . is_match (msg) && skgid . 0 == "child1") });
+              matches!(e, BufferValidationError::LocalStructureViolation(msg, gnid, _)
+                       if skgrepo_re . is_match (msg) && gnid . 0 == "child1") });
           assert!(found_child_error,
                   "Should find repo error for child1"); }
 
         { // Check second error (root2, with skgrepo 'invalid_repo')
           let found_root_error: bool =
             nonexistent_skgrepo_errors . iter() . any(|e| {
-              matches!(e, BufferValidationError::LocalStructureViolation(msg, skgid, _)
-                       if skgrepo_re . is_match (msg) && skgid . 0 == "root2") });
+              matches!(e, BufferValidationError::LocalStructureViolation(msg, gnid, _)
+                       if skgrepo_re . is_match (msg) && gnid . 0 == "root2") });
           assert!(found_root_error,
                   "Should find repo error for root2"); }}
       Ok(( )) }
@@ -591,9 +591,9 @@ async fn test_empty_title_rejected_for_editable_node (
         . collect();
       assert_eq!(empty_title_errors . len(), 1,
                  "Should find 1 empty title error");
-      if let BufferValidationError::LocalStructureViolation(_, skgid, _)
+      if let BufferValidationError::LocalStructureViolation(_, gnid, _)
         = empty_title_errors[0]
-      { assert_eq!(skgid . 0, "no-title",
+      { assert_eq!(gnid . 0, "no-title",
                    "Empty title error should be for no-title"); }
       Ok(( )) }
 
@@ -666,8 +666,8 @@ async fn test_two_editable_view_requests_for_one_node_are_rejected (
           &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
-          e, BufferValidationError::MultipleEditableViewRequestsForSameId (skgid, _)
-            if skgid . 0 == "parent" ))
+          e, BufferValidationError::MultipleEditableViewRequestsForSameId (gnid, _)
+            if gnid . 0 == "parent" ))
         . collect ();
       assert_eq! ( hits . len (), 1,
         "Two requests for 'parent' should trigger exactly one \
@@ -692,8 +692,8 @@ async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected 
             config ) ?;
         assert! ( matches! (
           &errors [..],
-          [ BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid, _) ]
-            if skgid . 0 == "parent" ),
+          [ BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (gnid, _) ]
+            if gnid . 0 == "parent" ),
           "{}: {:?}", request, errors );
         let moving : String = format! (
           "* (skg node (gnid parent) (skgRepos (nodeRepo main)) (viewRequests {})) parent\n\
@@ -724,8 +724,8 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, _)
-         if skgid . 0 == "phantom" ))
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, _)
+         if gnid . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching . len (), 1,
     "(editRequest delete) on a write-protected node should produce exactly one EditRequestOnWriteProtectedOccurrence error. Parse errors: {:?}",
@@ -743,8 +743,8 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, _)
-         if skgid . 0 == "phantom" ))
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, _)
+         if gnid . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching2 . len (), 1,
     "(editRequest (merge X)) on a write-protected node should also produce EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
@@ -820,10 +820,10 @@ fn a_tombstone_does_not_collide_with_content () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  let root_skgid = viewforest . first_root ()
+  let root_gnid = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
-  validate_local_structure (&viewforest, root_skgid, &config)
+  validate_local_structure (&viewforest, root_gnid, &config)
     . expect ("a tombstone must not collide with content");
 }
 
@@ -850,8 +850,8 @@ fn duplicate_members_of_defining_folders_pass_validation () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  for folder_skgid in partner_folder_treeids (&viewforest) {
-    validate_local_structure (&viewforest, folder_skgid, &config)
+  for folder_gnid in partner_folder_treeids (&viewforest) {
+    validate_local_structure (&viewforest, folder_gnid, &config)
       . expect ("duplicate members of a defining folder should pass validation"); }}
 
 /// Under a write-protected folder no member claims membership, so the
@@ -874,8 +874,8 @@ fn duplicate_members_of_write_protected_folders_pass_validation () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  for folder_skgid in partner_folder_treeids (&viewforest) {
-    validate_local_structure (&viewforest, folder_skgid, &config)
+  for folder_gnid in partner_folder_treeids (&viewforest) {
+    validate_local_structure (&viewforest, folder_gnid, &config)
       . expect ("duplicate members of a write-protected folder should pass validation"); }}
 
 fn partner_folder_treeids (

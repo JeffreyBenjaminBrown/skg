@@ -150,7 +150,7 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
                       removed . clone (), None ),
     "alias noClaim (view ghostWarrant) (diff (rel removed) (ready))" );
   assert_round_trip (
-    property_member ( PropertyMember::ID { skgid : ID::from ("old-id"),
+    property_member ( PropertyMember::ID { gnid : ID::from ("old-id"),
                                            claimsMembership : false,
                                            isWarranted : Warrant::ByHead },
                       removed, request_all () ),
@@ -161,7 +161,7 @@ fn a_ghost_round_trips () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
-          skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
+          gnid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : Some ("its body\n" . into ()),
           restoreNode_request : false,
           tombstone_request : false,
@@ -213,7 +213,7 @@ fn a_ghost_round_trips_with_its_restore_request () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
-          skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
+          gnid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : None,
           restoreNode_request : true,
           tombstone_request : false,

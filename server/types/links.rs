@@ -26,7 +26,7 @@ static LINK_LABEL_PATTERN : LazyLock<Regex> =
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
   // Links are represented in, and must be parsed from, the raw text fields `title` and `body`.
-  pub skgid: ID,
+  pub gnid: ID,
   pub label: String,
 }
 
@@ -35,10 +35,10 @@ pub struct Link {
 //
 
 impl Link {
-  pub fn new ( skgid : impl Into<String>,
+  pub fn new ( gnid : impl Into<String>,
                label  : impl Into<String>)
              -> Self {
-    Link { skgid    : ID ( skgid . into () ),
+    Link { gnid    : ID ( gnid . into () ),
                label : label . into (),
     }} }
 
@@ -48,7 +48,7 @@ impl fmt::Display for Link {
   fn fmt ( &self,
             f : &mut fmt::Formatter <'_> )
             -> fmt::Result {
-    write! ( f, "[[id:{}][{}]]", self . skgid, self . label ) }}
+    write! ( f, "[[id:{}][{}]]", self . gnid, self . label ) }}
 
 impl FromStr for Link {
   type Err = LinkParseError;
@@ -62,10 +62,10 @@ impl FromStr for Link {
     let interior : &str = &text [5 .. text . len () - 2];
 
     if let Some (idx) = interior . find ("][") {
-      let skgid : &str = &interior [0..idx];
+      let gnid : &str = &interior [0..idx];
       let label  : &str = &interior [idx+2..];
       Ok ( Link {
-        skgid    : ID ( skgid . to_string () ),
+        gnid    : ID ( gnid . to_string () ),
         label : label . to_string (),
       } )
     } else {

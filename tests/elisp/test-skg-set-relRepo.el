@@ -457,11 +457,11 @@ write-protected-but-true member (e) over content (f), a
 subscribeeFolder member (g) over subscribee-as-such content (h), and an
 aliasFolder.")
 
-(defun test--line-of-id (skgid)
+(defun test--line-of-id (gnid)
   "Return the text of the buffer line whose metadata carries ID."
   (save-excursion
     (goto-char (point-min))
-    (search-forward (format "(gnid %s)" skgid))
+    (search-forward (format "(gnid %s)" gnid))
     (buffer-substring-no-properties
      (line-beginning-position) (line-end-position))))
 
@@ -478,12 +478,12 @@ subscribee-as-such member are pruned, and folder members are untouched."
      (let ((count (skg--set-relRepo-recursive-walk
                    'content "trusted")))
        (should (= count 3)) ;; a, b, e
-       (dolist (skgid '("a" "b" "e"))
+       (dolist (gnid '("a" "b" "e"))
          (should (string-match-p "(relRepo trusted)"
-                                 (test--line-of-id skgid))))
-       (dolist (skgid '("r" "c" "d" "f" "g" "h"))
+                                 (test--line-of-id gnid))))
+       (dolist (gnid '("r" "c" "d" "f" "g" "h"))
          (should-not (string-match-p "relRepo"
-                                     (test--line-of-id skgid))))))))
+                                     (test--line-of-id gnid))))))))
 
 (ert-deftest test-recursive-walk-subscribee ()
   "Kind `subscribee' hits only subscribeeFolder members, leaving content
@@ -498,9 +498,9 @@ children and subscribee-as-such content untouched."
        (should (= count 1)) ;; g
        (should (string-match-p "(relRepo private)"
                                (test--line-of-id "g")))
-       (dolist (skgid '("r" "a" "b" "c" "d" "e" "f" "h"))
+       (dolist (gnid '("r" "a" "b" "c" "d" "e" "f" "h"))
          (should-not (string-match-p "relRepo"
-                                     (test--line-of-id skgid))))))))
+                                     (test--line-of-id gnid))))))))
 
 (ert-deftest test-recursive-walk-root-relationship-inclusive ()
   "Starting the walk below the view root includes the start node's
@@ -564,9 +564,9 @@ member's content children are not reached."
      (goto-char (point-min))
      (should (= 0 (skg--set-relRepo-recursive-walk
                    'content "trusted")))
-     (dolist (skgid '("s" "sc"))
+     (dolist (gnid '("s" "sc"))
        (should-not (string-match-p "relRepo"
-                                   (test--line-of-id skgid)))))))
+                                   (test--line-of-id gnid)))))))
 
 (ert-deftest test-recursive-walk-write-protected-folder-anchor ()
   "A writable folder under an WRITE_PROTECTED anchor is not collected at
@@ -609,9 +609,9 @@ the subtree, while preserving display facts."
      (goto-char (point-min))
      (should (= 2 (skg--set-relRepo-recursive-walk
                    'content skg--relRepo-no-override)))
-     (dolist (skgid '("a" "b"))
+     (dolist (gnid '("a" "b"))
        (should-not (string-match-p "editRequest"
-                                   (test--line-of-id skgid)))))))
+                                   (test--line-of-id gnid)))))))
 
 ;; --- The kind menu: skg--select-relationship-kind ---
 
@@ -680,9 +680,9 @@ window plumbing are stubbed as in the other handler tests."
                (skg-set-relRepo-recursive)
                (test--choose-menu-role "** content"))
              (with-current-buffer view-buffer
-               (dolist (skgid '("a" "b" "e"))
+               (dolist (gnid '("a" "b" "e"))
                  (should (string-match-p "(relRepo trusted)"
-                                         (test--line-of-id skgid))))
+                                         (test--line-of-id gnid))))
                (should-not (string-match-p "relRepo"
                                            (test--line-of-id "g")))))
          (when (get-buffer "*skg-relationship-kinds*")
@@ -733,9 +733,9 @@ what a move strands, the save decides."
                                   (string-match-p "refuse" m)))
                            msgs))))
      (should (string-match-p "(skgRepos (nodeRepo private))" (test--line-of-id "e")))
-     (dolist (skgid '("r" "f"))
+     (dolist (gnid '("r" "f"))
        (should (string-match-p "(skgRepos (nodeRepo public))"
-                               (test--line-of-id skgid)))))))
+                               (test--line-of-id gnid)))))))
 
 (ert-deftest test-set-repo-recursive-repeat-follows-its-editable-occurrence ()
   "A write-protected repeat of a node whose editable occurrence the move

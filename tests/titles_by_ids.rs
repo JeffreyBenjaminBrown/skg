@@ -1,9 +1,9 @@
 use crate::git_fixture_helpers::{commit_all, configure_git_user};
 use skg::dbs::init::wipe_then_init_tantivy_db;
-use skg::serve::handlers::titles_by_skgids::{
-  add_deleted_node_titles_by_skgids,
-  handle_titles_by_skgids_request,
-  handle_titles_by_skgids_request_with_skgrepo_set};
+use skg::serve::handlers::titles_by_gnids::{
+  add_deleted_node_titles_by_gnids,
+  handle_titles_by_gnids_request,
+  handle_titles_by_gnids_request_with_skgrepo_set};
 use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
@@ -19,7 +19,7 @@ use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
-fn titles_by_skgids_handler_sends_parseable_titles (
+fn titles_by_gnids_handler_sends_parseable_titles (
 ) -> Result<(), Box<dyn Error>> {
   let mut node : Graphnode =
     empty_graphnode ();
@@ -55,7 +55,7 @@ fn titles_by_skgids_handler_sends_parseable_titles (
     "((request . \"titles by ids\") \
       (ids \"11111111-1111-4111-8111-111111111111\" \
            \"44444444-4444-4444-8444-444444444444\"))";
-  handle_titles_by_skgids_request (
+  handle_titles_by_gnids_request (
     &mut server,
     request,
     &InRustGraph::new (),
@@ -117,7 +117,7 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")?;
     let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
     let (mut server, _) = listener . accept ()?;
-    handle_titles_by_skgids_request_with_skgrepo_set (
+    handle_titles_by_gnids_request_with_skgrepo_set (
       &mut server, request, &index, &config, &restriction, &graph );
     drop (server);
     Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
@@ -158,7 +158,7 @@ fn deleted_titles_supplement_tantivy_title_map (
       (SkgrepoName::from ("main"), skgrepo_diff) ]);
   let mut title_map : HashMap<ID, String> =
     HashMap::new ();
-  add_deleted_node_titles_by_skgids (
+  add_deleted_node_titles_by_gnids (
     &mut title_map,
     &[pid . clone (), extra_id . clone ()],
     &skgrepo_diffs );
@@ -171,9 +171,9 @@ fn deleted_titles_supplement_tantivy_title_map (
   Ok (( )) }
 
 #[test]
-fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
+fn titles_by_gnids_finds_deleted_git_file_title_without_diff_mode (
 ) -> Result<(), Box<dyn Error>> {
-  let skgid : ID =
+  let gnid : ID =
     ID::new ("a782564f-029a-45d7-b96e-1986d8759924");
   let skgrepo_name : SkgrepoName =
     SkgrepoName::from ("main");
@@ -185,11 +185,11 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
     git2::Repository::init (skgrepo_dir)?;
   configure_git_user (&gitrepo);
   fs::write (
-    skgrepo_dir . join (format! ("{}.skg", skgid . 0)),
-    format! ("title: Deleted From Git\npid: {}\n", skgid . 0))?;
+    skgrepo_dir . join (format! ("{}.skg", gnid . 0)),
+    format! ("title: Deleted From Git\npid: {}\n", gnid . 0))?;
   commit_all (&gitrepo, "initial commit");
   fs::remove_file (
-    skgrepo_dir . join (format! ("{}.skg", skgid . 0)))?;
+    skgrepo_dir . join (format! ("{}.skg", gnid . 0)))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &Vec::<Graphnode>::new (),
@@ -213,8 +213,8 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
   let request : String =
     format! (
       "((request . \"titles by ids\") (ids \"{}\"))",
-      skgid . 0);
-  handle_titles_by_skgids_request (
+      gnid . 0);
+  handle_titles_by_gnids_request (
     &mut server,
     &request,
     &InRustGraph::new (),
@@ -232,9 +232,9 @@ fn titles_by_skgids_finds_deleted_git_file_title_without_diff_mode (
   Ok (( )) }
 
 #[test]
-fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
+fn titles_by_gnids_finds_untracked_git_file_title_without_diff_mode (
 ) -> Result<(), Box<dyn Error>> {
-  let skgid : ID =
+  let gnid : ID =
     ID::new ("abf5bac1-de1c-4026-868a-60a51a5a3176");
   let skgrepo_name : SkgrepoName =
     SkgrepoName::from ("main");
@@ -248,8 +248,8 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
   fs::write (skgrepo_dir . join ("README.md"), "initial\n")?;
   commit_all (&gitrepo, "initial commit");
   fs::write (
-    skgrepo_dir . join (format! ("{}.skg", skgid . 0)),
-    format! ("title: Untracked Title\npid: {}\n", skgid . 0))?;
+    skgrepo_dir . join (format! ("{}.skg", gnid . 0)),
+    format! ("title: Untracked Title\npid: {}\n", gnid . 0))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &Vec::<Graphnode>::new (),
@@ -273,8 +273,8 @@ fn titles_by_skgids_finds_untracked_git_file_title_without_diff_mode (
   let request : String =
     format! (
       "((request . \"titles by ids\") (ids \"{}\"))",
-      skgid . 0);
-  handle_titles_by_skgids_request (
+      gnid . 0);
+  handle_titles_by_gnids_request (
     &mut server,
     &request,
     &InRustGraph::new (),

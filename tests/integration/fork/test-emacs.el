@@ -12,19 +12,19 @@
   (apply #'message (concat "✗ FAIL: " message) args)
   (kill-emacs 1))
 
-(defun fork-test--buffer-showing (skgid)
+(defun fork-test--buffer-showing (gnid)
   "Return a live skg view buffer whose text mentions (gnid ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-id) skg-view-id
-                 (string-match-p (regexp-quote (format "(gnid %s)" skgid))
+                 (string-match-p (regexp-quote (format "(gnid %s)" gnid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))
 
-(defun fork-test--root-buffer (skgid)
+(defun fork-test--root-buffer (gnid)
   "Return a live skg view buffer whose first headline is ID."
   (seq-find
    (lambda (b)
@@ -37,7 +37,7 @@
                                 (line-beginning-position)
                                 (line-end-position))))
                      (string-match-p
-                      (regexp-quote (format "(gnid %s)" skgid)) line)))))))
+                      (regexp-quote (format "(gnid %s)" gnid)) line)))))))
    (buffer-list)))
 
 (defun fork-test--line-containing (needle)
@@ -52,8 +52,8 @@
   "Drive the structural edit -> confirm -> approve -> fork flow."
   (message "Starting structural fork integration test...")
   (let ((test-port (getenv "SKG_TEST_PORT"))
-        (k-skgid nil)
-        (n-skgid nil)
+        (k-gnid nil)
+        (n-gnid nil)
         (fork-buffer nil))
     (when test-port (setq skg-port (string-to-number test-port)))
 
@@ -160,11 +160,11 @@
                        (string-match-p "(overrides (out 1))" k-line))
             (test-fail "K lacks its expected F relationships:\n%s"
                        (buffer-string)))
-        (setq k-skgid (match-string 1 k-line)))
+        (setq k-gnid (match-string 1 k-line)))
       (unless (re-search-forward
                "^\\*\\* .*?(gnid \\([^ )]+\\)).* N-new$" nil t)
         (test-fail "K does not contain the new N:\n%s" (buffer-string)))
-      (setq n-skgid (match-string 1))
+      (setq n-gnid (match-string 1))
       (unless (re-search-forward "^\\*\\*\\* .*?(gnid O).* O-original$"
                                  nil t)
         (test-fail "N does not contain O:\n%s" (buffer-string)))
@@ -192,7 +192,7 @@
     ;; than issuing a request which would merely switch back to the same view.
     (let ((k-buf fork-buffer))
       (unless (and (buffer-live-p k-buf)
-                   (eq k-buf (fork-test--root-buffer k-skgid)))
+                   (eq k-buf (fork-test--root-buffer k-gnid)))
         (test-fail "the fork buffer is not registered as K's root view"))
       (with-current-buffer k-buf
         (unless (and (string-match-p "F-original" (buffer-string))
@@ -202,9 +202,9 @@
           (test-fail "K is not F-with-N-in-place-of-O:\n%s"
                      (buffer-string)))))
 
-    (skg-request-single-root-content-view-from-id n-skgid)
+    (skg-request-single-root-content-view-from-id n-gnid)
     (let ((n-buf
-           (skg-test-wait-for (lambda () (fork-test--root-buffer n-skgid)) 10)))
+           (skg-test-wait-for (lambda () (fork-test--root-buffer n-gnid)) 10)))
       (unless n-buf (test-fail "fresh N view never appeared"))
       (with-current-buffer n-buf
         (unless (string-match-p "^\\*\\* .*?(gnid O).* O-original$"

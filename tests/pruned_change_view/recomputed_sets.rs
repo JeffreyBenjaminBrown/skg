@@ -509,16 +509,16 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
     let m_under_h = |viewforest : &ViewForest| -> Option<NodeId> {
       viewforest . nodes () . find_map ( |node| match &node . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . skgid == ID::from ("m")
+          if t . gnid == ID::from ("m")
           && node . parent () . is_some_and ( |parent| matches! (
                &parent . value () . kind,
                ViewnodeKind::Vognode (Vognode::Ghost (h))
-                 if h . skgid == ID::from ("h") )) =>
+                 if h . gnid == ID::from ("h") )) =>
           Some ( node . id () ),
         _ => None, } ) };
     let m_under_h_is_editable = |viewforest : &ViewForest| -> Option<bool> {
       m_under_h (viewforest) . map ( |m| viewforest . get (m) . unwrap ()
-                                           . value () . editable_skgid () . is_some () ) };
+                                           . value () . editable_gnid () . is_some () ) };
     assert_eq! ( m_under_h_is_editable (&viewforest), Some (true),
                  "m is editable under h" );
     let m : NodeId = m_under_h (&viewforest) . unwrap ();

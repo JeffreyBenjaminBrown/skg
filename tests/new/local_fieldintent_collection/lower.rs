@@ -81,8 +81,8 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
     NodeInstruction::Save (SaveNode (node))
       if node . pid == ID::from ("visible") ));
   assert!( matches!( &nodeInstructions [3],
-    NodeInstruction::Delete (DeleteNode { skgid, .. })
-      if skgid == &ID::from ("doomed") )); }
+    NodeInstruction::Delete (DeleteNode { gnid, .. })
+      if gnid == &ID::from ("doomed") )); }
 
 #[test]
 fn nodeMerge_pairs_come_from_the_map_in_order () {

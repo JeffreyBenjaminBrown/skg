@@ -196,12 +196,12 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           vec![ ID::from ("ovr-sub-original") ],
           "the container keeps the original in contains, not R" ); }
       assert! (
-        ! save_skgids (&plan . node_instructions)
+        ! save_gnids (&plan . node_instructions)
           . contains (&ID::from ("ovr-sub-overrider")),
         "the restricted overrider produces no SaveNode" );
       Ok (( )) } )) }
 
-fn save_skgids (
+fn save_gnids (
   instructions : &[NodeInstruction],
 ) -> Vec<ID> {
   instructions . iter() . filter_map (|instruction| match instruction {
@@ -209,27 +209,27 @@ fn save_skgids (
     NodeInstruction::Delete (_) => None,
   }) . collect() }
 
-fn saved_node_by_skgid<'a> (
+fn saved_node_by_gnid<'a> (
   instructions : &'a [NodeInstruction],
-  skgid           : &str,
+  gnid           : &str,
 ) -> &'a Graphnode {
   for instruction in instructions {
     if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (skgid) {
+      if node . pid == ID::from (gnid) {
         return node; }}}
-  panic! ("SaveNode not found: {}", skgid) }
+  panic! ("SaveNode not found: {}", gnid) }
 
-fn saved_or_graph_node_by_skgid (
+fn saved_or_graph_node_by_gnid (
   instructions : &[NodeInstruction],
-  skgid        : &str,
+  gnid        : &str,
   graph        : &skg::dbs::in_rust_graph::InRustGraph,
 ) -> Graphnode {
   instructions . iter () . find_map (|instruction| match instruction {
-    NodeInstruction::Save (SaveNode (node)) if node . pid == ID::from (skgid) =>
+    NodeInstruction::Save (SaveNode (node)) if node . pid == ID::from (gnid) =>
       Some (node . clone ()),
     _ => None, })
-    . or_else (|| graphnode_from_graph (graph, &ID::from (skgid)))
-    . unwrap_or_else (|| panic! ("Node not found in plan or graph: {}", skgid))
+    . or_else (|| graphnode_from_graph (graph, &ID::from (gnid)))
+    . unwrap_or_else (|| panic! ("Node not found in plan or graph: {}", gnid))
 }
 
 fn viewforest_from_org (
@@ -237,19 +237,19 @@ fn viewforest_from_org (
 ) -> Result<Tree<Viewnode>, Box<dyn Error>> {
   Ok ( org_to_viewnode_tree (input, &InRustGraph::new ())? . 0 ) }
 
-fn first_child_skgid (
+fn first_child_gnid (
   tree : &Tree<Viewnode>,
 ) -> NodeId {
   tree . root () . first_child () . unwrap () . id () }
 
-fn true_child_skgids (
+fn true_child_gnids (
   tree         : &Tree<Viewnode>,
-  parent_skgid : NodeId,
+  parent_gnid : NodeId,
 ) -> BTreeSet<ID> {
-  tree . get (parent_skgid) . unwrap () . children ()
+  tree . get (parent_gnid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
-        => Some (node . skgid . clone ()),
+        => Some (node . gnid . clone ()),
       _ => None, })
     . collect () }
 
@@ -408,15 +408,15 @@ async fn search_filters_restricted_skgrepos_before_ranking_and_truncation (
         SkgrepoRestriction::named (
           &config,
           SkgrepoSetName::from ("public"))?;
-      let skgids : Vec<ID> =
-        skg::serve::handlers::text_search::search_skgids_for_skgrepo_set_for_test (
+      let gnids : Vec<ID> =
+        skg::serve::handlers::text_search::search_gnids_for_skgrepo_set_for_test (
           &tantivy,
           &config,
           &restriction,
           "shared ranking term",
           2 )?;
       assert_eq! (
-        skgids,
+        gnids,
         vec![ID::from ("active-search-hit")],
         "restricted high-scoring hits must be filtered before ranking \
          and display truncation" );
@@ -450,13 +450,13 @@ async fn tombstone_in_buffer_does_not_drive_contains (
           . 1 . node_instructions;
         let graph = graph_handle_from_config (config)? . load_full ();
         assert_eq! (
-          members_of (& saved_or_graph_node_by_skgid (
+          members_of (& saved_or_graph_node_by_gnid (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
           "moving a tombstone must not move the hidden disk member" );
         assert! (
-          ! save_skgids (&instructions) . contains (&ID::from ("private-a")),
+          ! save_gnids (&instructions) . contains (&ID::from ("private-a")),
           "the hidden node must not produce a SaveNode" ); }
       Ok (( )) }
 
@@ -468,15 +468,15 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
         SkgrepoRestriction::named (
           &config,
           SkgrepoSetName::from ("public"))?;
-      let skgids : Vec<ID> =
-        skg::serve::handlers::text_search::search_skgids_for_skgrepo_set_for_test (
+      let gnids : Vec<ID> =
+        skg::serve::handlers::text_search::search_gnids_for_skgrepo_set_for_test (
           tantivy,
           &config,
           &restriction,
           "shared ranking term",
           10 )?;
       assert_eq! (
-        skgids,
+        gnids,
         vec![ID::from ("active-search-hit")],
         "restricted search should only return unrestricted-repo hits" );
       let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
@@ -499,17 +499,17 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
         . 1 . node_instructions;
       let graph = graph_handle_from_config (config)? . load_full ();
       assert_eq! (
-        members_of (& saved_or_graph_node_by_skgid (
+        members_of (& saved_or_graph_node_by_gnid (
           &instructions, "root", &graph) . contains),
         vec![ ID::from ("active-a"), ID::from ("private-a"),
               ID::from ("active-b") ],
         "restricted save should preserve the omitted restricted member \
          via the weave" );
       assert! (
-        ! save_skgids (&instructions) . contains (&ID::from ("private-a")),
+        ! save_gnids (&instructions) . contains (&ID::from ("private-a")),
         "restricted save should not write restricted-skgrepo nodes" );
       assert_eq! (
-        saved_node_by_skgid (&instructions, "active-b") . title,
+        saved_node_by_gnid (&instructions, "active-b") . title,
         "active-b edited through restricted view",
         "restricted save should still write unrestricted-repo edits" );
       Ok (( )) }
@@ -527,16 +527,16 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
         viewforest_from_org (indoc! {"
           * (skg node (gnid child-for-backpath) (skgRepos (nodeRepo public))) child-for-backpath
         "})?;
-      let child_skgid : NodeId = first_child_skgid (&viewforest);
+      let child_gnid : NodeId = first_child_gnid (&viewforest);
       attach_containerward_chains_under_members (
         &mut viewforest,
-        &[child_skgid],
+        &[child_gnid],
         &graph,
         config,
         Some (&restriction),
         ContainerwardChainPartners::LiveGraph ) ?;
       let child_children : BTreeSet<ID> =
-        true_child_skgids (&viewforest, child_skgid);
+        true_child_gnids (&viewforest, child_gnid);
       assert_eq! (
         child_children,
         BTreeSet::from ([ID::from ("active-container")]),
@@ -594,9 +594,9 @@ fn search_enrichment_omits_the_containers_the_restriction_hides (
   set_skgrepo_retagging_relRepos ( &mut private_container, &SkgrepoName::from ("private") );
   let graph = skg::dbs::in_rust_graph::InRustGraph::from_graphnodes (
     &[result_node, unrestricted_container, private_container]);
-  let mut matches_by_skgid =
+  let mut matches_by_gnid =
     skg::serve::handlers::text_search::MatchGroups::new ();
-  matches_by_skgid . insert (
+  matches_by_gnid . insert (
     ID::from ("active-search-hit"),
     ( SkgrepoName::from ("public"),
       vec![(1.0, "unrestricted search hit" . to_string ())] ));
@@ -606,7 +606,7 @@ fn search_enrichment_omits_the_containers_the_restriction_hides (
         &graph,
         &config,
         "search term",
-        &matches_by_skgid,
+        &matches_by_gnid,
         &restriction)?;
   assert! (
     rendered . lines () . any ( |line|
@@ -639,7 +639,7 @@ fn search_enrichment_omits_the_containers_the_restriction_hides (
   Ok (( )) }
 
 #[test]
-fn titles_by_skgids_omits_restricted_skgrepo_titles (
+fn titles_by_gnids_omits_restricted_skgrepo_titles (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
@@ -648,7 +648,7 @@ fn titles_by_skgids_omits_restricted_skgrepo_titles (
       &config,
       SkgrepoSetName::from ("public"))?;
   let titles =
-    skg::serve::handlers::titles_by_skgids::titles_by_skgids_for_skgrepo_set_for_test (
+    skg::serve::handlers::titles_by_gnids::titles_by_gnids_for_skgrepo_set_for_test (
       &config,
       &restriction,
       &[ ID::from ("active-a"),
@@ -711,7 +711,7 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
         . 1 . node_instructions;
       assert_eq! (
         members_of (
-          saved_node_by_skgid (&instructions, "root")
+          saved_node_by_gnid (&instructions, "root")
             . subscribesTo . or_default () ),
         vec! [ ID::from ("active-b") ],
         "the tombstone must not be a subscribee member" );
@@ -742,7 +742,7 @@ async fn weave_preserves_omitted_restricted_content_members (
             buffer, config, Some (&restriction) )  ?
           . 1 . node_instructions;
         assert_eq! (
-          members_of (& saved_or_graph_node_by_skgid (
+          members_of (& saved_or_graph_node_by_gnid (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
@@ -759,7 +759,7 @@ async fn weave_preserves_omitted_restricted_content_members (
             buffer, config, Some (&restriction) )  ?
           . 1 . node_instructions;
         assert_eq! (
-          members_of (& saved_or_graph_node_by_skgid (
+          members_of (& saved_or_graph_node_by_gnid (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-b"), ID::from ("active-a"),
                 ID::from ("private-a") ],
@@ -775,7 +775,7 @@ async fn weave_preserves_omitted_restricted_content_members (
             buffer, config, Some (&restriction) )  ?
           . 1 . node_instructions;
         assert_eq! (
-          members_of (& saved_or_graph_node_by_skgid (
+          members_of (& saved_or_graph_node_by_gnid (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("private-a"), ID::from ("active-b") ],
           "visible deletion lands; invisible member survives" ); }
@@ -798,8 +798,8 @@ async fn restricted_save_preserves_invisible_override_targets (
           &config, SkgrepoSetName::from ("public") )?;
       let override_set = |node : &Graphnode| -> Vec<ID> {
         match &node . overrides {
-          MSV::Specified (skgids) => {
-            let mut v : Vec<ID> = members_of (skgids); v . sort (); v }
+          MSV::Specified (gnids) => {
+            let mut v : Vec<ID> = members_of (gnids); v . sort (); v }
           MSV::Unspecified => Vec::new (), } };
       { // Unmodified restricted save: the invisible target is preserved.
         // (If the merge reproduces disk exactly the recorder is a no-op and
@@ -831,7 +831,7 @@ async fn restricted_save_preserves_invisible_override_targets (
             deleted, &config, Some (&restriction) ) ?
           . 1 . node_instructions;
         assert_eq! (
-          override_set ( saved_node_by_skgid (&instructions, "ovr-owner") ),
+          override_set ( saved_node_by_gnid (&instructions, "ovr-owner") ),
           vec![ID::from ("ovr-inactive")],
           "deleting the visible override member must leave exactly the \
            invisible one" ); }

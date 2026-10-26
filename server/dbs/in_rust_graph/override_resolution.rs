@@ -63,11 +63,11 @@ pub fn resolve_override (
   config : &SkgConfig,
   graph  : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
-  skgid  : &ID,
+  gnid  : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
-    graph . pid_of (skgid)
-    . unwrap_or_else ( || skgid . clone () );
+    graph . pid_of (gnid)
+    . unwrap_or_else ( || gnid . clone () );
   let mut seen : HashSet<ID> =
     HashSet::from ( [ input_pid . clone () ] );
   let mut current : ID = input_pid . clone ();

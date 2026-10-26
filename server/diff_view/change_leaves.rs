@@ -397,21 +397,21 @@ fn recorders_of_reresolved_members (
     graph . get (pid)
       . map ( |node| node . extra_ids . iter () . cloned () . collect () )
       . unwrap_or_default () };
-  let member_key_in = |graph : &InRustGraph, skgid : &ID| -> ID {
-    graph . relationship_member_key (skgid) . into_id () };
+  let member_key_in = |graph : &InRustGraph, gnid : &ID| -> ID {
+    graph . relationship_member_key (gnid) . into_id () };
   let reresolved : BTreeSet<ID> =
     differing . iter ()
     . flat_map ( |pid|
       extra_ids_in (&straddle . before, pid)
       . symmetric_difference ( &extra_ids_in (&straddle . after, pid) )
       . cloned () . collect::<Vec<ID>> () )
-    . filter ( |skgid| member_key_in (&straddle . before, skgid)
-                       != member_key_in (&straddle . after, skgid) )
+    . filter ( |gnid| member_key_in (&straddle . before, gnid)
+                       != member_key_in (&straddle . after, gnid) )
     . collect ();
   let mut recorders : BTreeSet<ID> = BTreeSet::new ();
-  for skgid in &reresolved {
+  for gnid in &reresolved {
     for graph in [ &straddle . before, &straddle . after ] {
-      let member : ID = member_key_in (graph, skgid);
+      let member : ID = member_key_in (graph, gnid);
       for role in ROLES_OF_LISTED_MEMBERS {
         recorders . extend (
           graph . inbound_pids_for_relation (&member, role . relation) ); }} }

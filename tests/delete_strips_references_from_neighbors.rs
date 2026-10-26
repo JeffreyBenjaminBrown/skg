@@ -471,7 +471,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   let node_defs : Vec<NodeInstruction> = vec! [
     NodeInstruction::Save ( SaveNode (container_nc) ),
     NodeInstruction::Delete ( DeleteNode {
-      skgid: ID::from ("victim"),
+      gnid: ID::from ("victim"),
       home_skgrepo: main . clone (), } ), ];
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;

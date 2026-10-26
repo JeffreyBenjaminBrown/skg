@@ -85,7 +85,7 @@ pub fn parse_org_file (
     build_section_viewforest (sections, lines . len());
   for st in &mut viewforest {
     insert_super_indentation_groups (st);
-    assign_missing_skgids (st); }
+    assign_missing_gnids (st); }
   let mut nodes : Vec<Graphnode> = Vec::new();
   for st in &viewforest {
     collect_graphnodes (st, &lines, &mut nodes); }
@@ -259,13 +259,13 @@ fn group_children_by_level (
 // Graphnode collection
 //
 
-fn assign_missing_skgids (
+fn assign_missing_gnids (
   tree : &mut SectionTree,
 ) {
   if tree . section . id . is_none() {
     tree . section . id = Some (Uuid::new_v4() . to_string()); }
   for child in &mut tree . children {
-    assign_missing_skgids (child); }}
+    assign_missing_gnids (child); }}
 
 fn collect_graphnodes (
   tree  : &SectionTree,
@@ -284,7 +284,7 @@ fn graphnode_from_section_tree (
   // All sections have IDs after assign_missing_ids pre-pass.
   let id_str : &str =
     tree . section . id . as_ref() . unwrap();
-  let contained_skgids : Vec<ID> =
+  let contained_gnids : Vec<ID> =
     tree . children . iter() . map (|child| {
       let cid : &str =
         child . section . id . as_ref() . unwrap();
@@ -310,7 +310,7 @@ fn graphnode_from_section_tree (
   let aliases : MSV<RelPartner<String>> =
     rel_partners_at_relRepo_msv (&skgrepo, aliases_msv);
   let contains : Vec<RelPartner<ID>> =
-    rel_partners_at_relRepo (&skgrepo, contained_skgids);
+    rel_partners_at_relRepo (&skgrepo, contained_gnids);
   Graphnode {
     title    : tree . section . headline . clone(),
     overPrivateText_telescope : false,

@@ -23,7 +23,7 @@ use std::error::Error;
 /// Deletes and re-adds each document with the new prominence_source.
 pub fn update_prominence_sources (
   tantivy_index          : &TantivyIndex,
-  prominence_sources_by_skgid : &HashMap<ID, String>,
+  prominence_sources_by_gnid : &HashMap<ID, String>,
 ) -> Result<usize, Box<dyn Error>> {
   let searcher : Searcher =
     tantivy_index . reader . searcher ();
@@ -33,7 +33,7 @@ pub fn update_prominence_sources (
     tantivy_index . index . writer (
       TANTIVY_WRITER_BUFFER_BYTES) ?;
   let mut updated_count : usize = 0;
-  for (pid, prominence_source) in prominence_sources_by_skgid {
+  for (pid, prominence_source) in prominence_sources_by_gnid {
     let query : Box < dyn Query > =
       // Find all documents with this ID.
       Box::new ( tantivy::query::TermQuery::new (

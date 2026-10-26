@@ -1,11 +1,11 @@
-use skg::dbs::filesystem::one_node::graphnode_from_skgid;
+use skg::dbs::filesystem::one_node::graphnode_from_gnid;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use skg::nodeMerge::merge_nodes;
 use skg::save::{update_graph_including_nodeMerges,
                 update_graph_minus_nodeMerges};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores,
-                      tantivy_contains_skgid};
+                      tantivy_contains_gnid};
 use skg::types::env::new_mutation_gate;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SkgrepoName};
 use skg::types::nodes::complete::Graphnode;
@@ -48,12 +48,12 @@ async fn exercise_second_phase_preflight (
     . path . join ("ordinary.skg");
   let before_bytes : Vec<u8> = fs::read (&ordinary_path) ?;
   let mut ordinary : Graphnode =
-    graphnode_from_skgid (config, &ID::from ("ordinary")) ?;
+    graphnode_from_gnid (config, &ID::from ("ordinary")) ?;
   ordinary . title = "would have changed" . to_string ();
   let acquiree : Graphnode =
-    graphnode_from_skgid (config, &ID::from ("acquiree")) ?;
+    graphnode_from_gnid (config, &ID::from ("acquiree")) ?;
   let mut foreign_acquirer : Graphnode =
-    graphnode_from_skgid (config, &ID::from ("foreign-acquirer")) ?;
+    graphnode_from_gnid (config, &ID::from ("foreign-acquirer")) ?;
   foreign_acquirer . extra_ids = vec![ID::from ("acquiree")];
   let mut preserver : Graphnode = acquiree;
   preserver . pid = ID::from ("preserver");
@@ -62,7 +62,7 @@ async fn exercise_second_phase_preflight (
     acquiree_text_preserver : SaveNode (preserver),
     updated_acquirer        : SaveNode (foreign_acquirer),
     acquiree_to_delete      : DeleteNode {
-      skgid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main"),
+      gnid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main"),
     },
   };
   let result = update_graph_including_nodeMerges (
@@ -86,10 +86,10 @@ async fn exercise_rejected_merge_override (
     . iter () . map (|name| skgrepo_path . join (name)) . collect ();
   let before_bytes : Vec<Vec<u8>> = paths . iter ()
     . map (fs::read) . collect::<Result<Vec<Vec<u8>>, _>> () ?;
-  let mut n1 : Graphnode = graphnode_from_skgid (config, &ID::from ("N1")) ?;
+  let mut n1 : Graphnode = graphnode_from_gnid (config, &ID::from ("N1")) ?;
   n1 . extra_ids = vec![ID::from ("N2")];
   let mut preserver : Graphnode =
-    graphnode_from_skgid (config, &ID::from ("N2")) ?;
+    graphnode_from_gnid (config, &ID::from ("N2")) ?;
   preserver . pid = ID::from ("preserver");
   preserver . extra_ids . clear ();
   preserver . overrides = skg::types::misc::MSV::Unspecified;
@@ -97,7 +97,7 @@ async fn exercise_rejected_merge_override (
     acquiree_text_preserver : SaveNode (preserver),
     updated_acquirer        : SaveNode (n1),
     acquiree_to_delete      : DeleteNode {
-      skgid : ID::from ("N2"), home_skgrepo : SkgrepoName::from ("main"),
+      gnid : ID::from ("N2"), home_skgrepo : SkgrepoName::from ("main"),
     },
   };
   let result : Result<Option<TantivyIndex>, Box<dyn Error>> = merge_nodes (
@@ -127,8 +127,8 @@ async fn exercise_rejected_revocation (
   let path : PathBuf = config . skgrepos [&SkgrepoName::from ("main")] . path
     . join ("P.skg");
   let before_bytes : Vec<u8> = fs::read (&path) ?;
-  let before_search : bool = tantivy_contains_skgid (tantivy, "P", "P") ?;
-  let mut saved : Graphnode = graphnode_from_skgid (config, &ID::from ("P")) ?;
+  let before_search : bool = tantivy_contains_gnid (tantivy, "P", "P") ?;
+  let mut saved : Graphnode = graphnode_from_gnid (config, &ID::from ("P")) ?;
   saved . extra_ids . clear ();
 
   let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
@@ -146,6 +146,6 @@ async fn exercise_rejected_revocation (
   assert_eq! (before_bytes, fs::read (&path) ?);
   assert_eq! (
     before_search,
-    tantivy_contains_skgid (tantivy, "P", "P") ?);
+    tantivy_contains_gnid (tantivy, "P", "P") ?);
   Ok (( ))
 }

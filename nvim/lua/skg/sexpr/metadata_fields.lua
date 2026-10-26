@@ -520,8 +520,8 @@ end
 ---@return string
 function M.extract_id_from_text (text)
   local trimmed = vim.trim(text)
-  local skgid = trimmed:match('%[%[id:([^%]]+)%]%[')
-  return skgid or trimmed
+  local gnid = trimmed:match('%[%[id:([^%]]+)%]%[')
+  return gnid or trimmed
 end
 
 ---@param ... table[] headline lists

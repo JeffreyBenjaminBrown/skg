@@ -26,26 +26,26 @@ use std::error::Error;
 const FIXTURES : &str =
   "tests/merge/merge_nodes/fixtures";
 
-/// The name of a headline titled 'title', showing graphnode 'skgid',
+/// The name of a headline titled 'title', showing graphnode 'gnid',
 /// with viewnode ID 'viewnode_id'.
 fn named (
   title       : &str,
-  skgid       : &str,
+  gnid       : &str,
   viewnode_id : &str,
 ) -> HeadlineName {
   HeadlineName::of ( Some ( &ViewnodeId (viewnode_id . to_string ()) ),
-                     Some ( &ID::from (skgid) ),
+                     Some ( &ID::from (gnid) ),
                      title ) }
 
 /// The subheadline naming a headline with a graphnode ID and a
 /// viewnode ID.
 fn subheadline (
   title       : &str,
-  skgid       : &str,
+  gnid       : &str,
   viewnode_id : &str,
 ) -> String {
   format! ( "*** {}\n- graphnode ID: {}\n- viewnode ID: {}. To find it: C-c g v {}\n",
-            title, skgid, viewnode_id, viewnode_id ) }
+            title, gnid, viewnode_id, viewnode_id ) }
 
 /// The org form a save refusal of 'errors' shows the client.
 fn org_form_of (

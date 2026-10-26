@@ -17,10 +17,10 @@
 The ID is the one of the unknown headline at point; elsewhere, it is
 read from the minibuffer."
   (interactive)
-  (let ((skgid (or (skg--unknown-node-id-at-point)
+  (let ((gnid (or (skg--unknown-node-id-at-point)
                    (read-string "Investigate ID: ")))
         (tcp-proc (skg-tcp-connect-to-rust)))
-    (when (string-empty-p skgid)
+    (when (string-empty-p gnid)
       (user-error "No ID to investigate"))
     (skg-register-response-handler
      'investigate-unknown-node
@@ -29,13 +29,13 @@ read from the minibuffer."
     (skg-lp-reset)
     (process-send-string
      tcp-proc
-     (skg--investigate-unknown-node-request-string skgid))))
+     (skg--investigate-unknown-node-request-string gnid))))
 
-(defun skg--investigate-unknown-node-request-string (skgid)
-  "The request sexp string investigating SKGID."
+(defun skg--investigate-unknown-node-request-string (gnid)
+  "The request sexp string investigating GNID."
   (concat (prin1-to-string
            `((request . "investigate unknown node")
-             (id . ,skgid)))
+             (id . ,gnid)))
           "\n"))
 
 (defun skg--investigate-unknown-node-handler (_tcp-proc payload)

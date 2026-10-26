@@ -84,13 +84,13 @@
                     (point)) )
            ( line3-end (line-end-position) ))
       (progn ;; Anywhere on a metadata line pushes that line's metadata ID
-        (dolist (skgid '("1" "3" "6" "7"))
+        (dolist (gnid '("1" "3" "6" "7"))
           (let (( len-before (length skg-linkstack) ))
             (goto-char (point-min))
-            (search-forward (format "(skg node (gnid %s))" skgid))
+            (search-forward (format "(skg node (gnid %s))" gnid))
             (skg-id-push)
             (should (equal (length skg-linkstack) (1+ len-before)))
-            (should (equal (caar skg-linkstack) skgid)) )) )
+            (should (equal (caar skg-linkstack) gnid)) )) )
       (progn ;; From the title area, still finds metadata ID
         (let (( len-before (length skg-linkstack) ))
           (goto-char (point-min))

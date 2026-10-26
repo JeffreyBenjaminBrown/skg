@@ -34,7 +34,7 @@ impl From<&Graphnode> for GraphnodeInRust {
     let linksTo : Vec<ID> =
       links_from_node (c)
       . into_iter ()
-      . map ( |tl| tl . skgid )
+      . map ( |tl| tl . gnid )
       . collect ();
     GraphnodeInRust {
       pid                          : c . pid . clone (),

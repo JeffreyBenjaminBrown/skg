@@ -7,9 +7,9 @@ fn test_do_everywhere_adding_parent() {
   let mut tree = tree_from_org_text (initial_text) . unwrap();
   let expected_text = include_str!("generic/fixtures/after-adding-parent.txt");
   let expected_tree = tree_from_org_text (expected_text) . unwrap();
-  let root_skgid = tree . root() . id();
+  let root_gnid = tree . root() . id();
   do_everywhere_in_tree_dfs(
-    &mut tree, root_skgid, true,
+    &mut tree, root_gnid, true,
     &mut |mut node| { // Have a parent? Then append its title to yours.
       let current_title = node . value() . clone();
       let parent_title: Option<String> =
@@ -29,9 +29,9 @@ fn test_do_everywhere_adding_grandchild() {
   let mut tree = tree_from_org_text (initial_text) . unwrap();
   let expected_text = include_str!("generic/fixtures/after-adding-grandchild.txt");
   let expected_tree = tree_from_org_text (expected_text) . unwrap();
-  let root_skgid = tree . root() . id();
+  let root_gnid = tree . root() . id();
   do_everywhere_in_tree_dfs(
-    &mut tree, root_skgid, true,
+    &mut tree, root_gnid, true,
     &mut |mut node| { // Have a grandchild? Then append your first one's title to yours.
       let current_title = node . value() . clone();
       let treeid = node . id();
@@ -56,10 +56,10 @@ fn test_do_everywhere_adding_grandchild() {
 fn test_do_everywhere_postorder() {
   let initial_text = include_str!("generic/fixtures/initial.txt");
   let mut tree = tree_from_org_text (initial_text) . unwrap();
-  let root_skgid = tree . root() . id();
+  let root_gnid = tree . root() . id();
   let mut visited : Vec<String> = Vec::new();
   do_everywhere_in_tree_dfs(
-    &mut tree, root_skgid, false,
+    &mut tree, root_gnid, false,
     &mut |mut node| {
       visited . push ( node . value() . clone() );
       Ok(()) }

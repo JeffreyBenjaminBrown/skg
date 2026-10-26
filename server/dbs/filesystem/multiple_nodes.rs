@@ -165,9 +165,9 @@ fn compose_grouped_sections (
         for extra in &node_fs . extra_ids {
           m . insert ( extra . clone (), pid . clone () ); }} }
     m };
-  let resolve = |skgid : &ID| -> ID {
-    pid_of . get (skgid) . cloned ()
-      . unwrap_or_else ( || skgid . clone () ) };
+  let resolve = |gnid : &ID| -> ID {
+    pid_of . get (gnid) . cloned ()
+      . unwrap_or_else ( || gnid . clone () ) };
   let mut all_nodes : Vec<Graphnode> = Vec::new ();
   let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
@@ -198,7 +198,7 @@ fn compose_grouped_sections (
 /// report (to stderr for ≤10, to an org file otherwise) and returns
 /// a summary error. (Callers pass post-fold nodes, one per
 /// telescope.)
-pub fn error_unless_each_skgid_names_one_node (
+pub fn error_unless_each_gnid_names_one_node (
   nodes     : &[Graphnode],
   data_root : &Path,
 ) -> io::Result<()> {
@@ -206,8 +206,8 @@ pub fn error_unless_each_skgid_names_one_node (
     // Maps each ID to the (pid, home) of every node claiming it
     HashMap::new();
   for node in nodes {
-    for skgid in node . all_skgids() {
-      claimants . entry (skgid . clone())
+    for gnid in node . all_gnids() {
+      claimants . entry (gnid . clone())
         . or_insert_with (Vec::new)
         . push ((node . pid . clone(), node . home_skgrepo . clone())); }}
   let contested: HashMap<ID, Vec<(ID, SkgrepoName)>> =
@@ -217,14 +217,14 @@ pub fn error_unless_each_skgid_names_one_node (
         recorders . iter() . map ( |(pid, _)| pid ) . collect();
       distinct_pids . len() > 1 } )
     . collect();
-  report_skgids_claimed_by_two_nodes (&contested, data_root) ?;
+  report_gnids_claimed_by_two_nodes (&contested, data_root) ?;
   if contested . is_empty() {
     return Ok (( )); }
   let msg: String =
     if contested . len() <= 10 {
       // Include details in error message for small numbers
       let ids_list: Vec<String> = contested . keys()
-        . map ( |skgid| format! ("'{}'", skgid) )
+        . map ( |gnid| format! ("'{}'", gnid) )
         . collect();
       format! ("{} id(s) claimed by more than one node: {}",
                contested . len(),
@@ -269,7 +269,7 @@ pub fn read_recently_modified_skgfiles_from_skgrepos (
   since  : std::time::SystemTime,
 ) -> io::Result<Vec<Graphnode>> {
   let mut modified_pids : Vec<ID> = Vec::new();
-  let mut seen_skgids      : HashSet<ID> = HashSet::new();
+  let mut seen_gnids      : HashSet<ID> = HashSet::new();
   for (_skgrepo_name, skgrepo) in config . skgrepos . iter() {
     let entries : ReadDir =
       fs::read_dir (&skgrepo . path) ?;
@@ -288,7 +288,7 @@ pub fn read_recently_modified_skgfiles_from_skgrepos (
       validate_pid_matches_filename (&node_fs, &path) ?;
       let pid : ID =
         node_fs . pid . clone();
-      if seen_skgids . insert (pid . clone()) {
+      if seen_gnids . insert (pid . clone()) {
         modified_pids . push (pid); }} }
   let mut all_nodes : Vec<Graphnode> = Vec::new();
   for pid in modified_pids {
@@ -305,7 +305,7 @@ pub fn read_recently_modified_skgfiles_from_skgrepos (
 /// Otherwise writes a detailed report to an org file, and for ≤10
 /// also lists each conflict on stderr; for >10, logs the count and
 /// the file path.
-fn report_skgids_claimed_by_two_nodes(
+fn report_gnids_claimed_by_two_nodes(
   contested : &HashMap<ID, Vec<(ID, SkgrepoName)>>,
   data_root : &Path,
 ) -> io::Result<()> {
@@ -331,12 +331,12 @@ fn report_skgids_claimed_by_two_nodes(
     content . push_str( &format!(
       "{} id(s) claimed by more than one node. Same-id files across repos are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
-    let mut sorted_skgids: Vec<(&ID, &Vec<(ID, SkgrepoName)>)> =
+    let mut sorted_gnids: Vec<(&ID, &Vec<(ID, SkgrepoName)>)> =
       // for deterministic output
       contested . iter() . collect();
-    sorted_skgids . sort_by_key(|(skgid, _)| *skgid);
-    for (skgid, claimants) in sorted_skgids {
-      content . push_str(&format!("* {}\n", skgid));
+    sorted_gnids . sort_by_key(|(gnid, _)| *gnid);
+    for (gnid, claimants) in sorted_gnids {
+      content . push_str(&format!("* {}\n", gnid));
       for line in claimant_lines (claimants) {
         content . push_str(&format!("** {}\n", line)); }}
     content };
@@ -344,9 +344,9 @@ fn report_skgids_claimed_by_two_nodes(
   if count <= 10 {
     tracing::error!("{} id(s) claimed by more than one node:",
               count);
-    for (skgid, claimants) in contested . iter() {
+    for (gnid, claimants) in contested . iter() {
       tracing::error!("  - ID '{}' claimed by: {}",
-                skgid, claimant_lines (claimants) . join (", ")); }
+                gnid, claimant_lines (claimants) . join (", ")); }
   } else {
     tracing::error!("{} id(s) claimed by more than one node.",
               count);

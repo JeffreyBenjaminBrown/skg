@@ -100,8 +100,8 @@ pub fn prunedChangeView_sets_over (
   straddle : &GraphStraddle,
   c        : BTreeSet<ID>,
 ) -> PrunedChangeViewSets {
-  let containers_of = |skgid : &ID| -> Vec<ID> {
-    union_containers (straddle, skgid) };
+  let containers_of = |gnid : &ID| -> Vec<ID> {
+    union_containers (straddle, gnid) };
   let mut r : BTreeSet<ID> = BTreeSet::new ();
   let mut u : BTreeSet<ID> = c . clone ();
   for changed in &c {
@@ -158,9 +158,9 @@ fn leaf_is_a_skgrepo_change (
 /// The containers of a node in either graph of the straddle, sorted by ID.
 pub fn union_containers (
   straddle : &GraphStraddle,
-  skgid    : &ID,
+  gnid    : &ID,
 ) -> Vec<ID> {
-  straddle . partners (skgid, RelationRole::CONTAINER) . into_iter ()
+  straddle . partners (gnid, RelationRole::CONTAINER) . into_iter ()
     . map ( |partner| partner . id )
     . collect () }
 
@@ -258,7 +258,7 @@ pub fn set_homeSkgrepoMove_facts_in_viewforest (
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         &node . value () . kind else { return None; };
       let home_skgrepo_move : Option<SkgrepoChange> =
-        straddle . node_changes (&t . skgid) . home;
+        straddle . node_changes (&t . gnid) . home;
       let moved_like_ancestor : Option<String> =
         home_skgrepo_move . as_ref () . and_then ( |home_skgrepo_move|
           nearest_moved_vognode_ancestor (node, straddle)
@@ -283,7 +283,7 @@ fn nearest_moved_vognode_ancestor (
   node . ancestors () . enumerate ()
     . find_map ( |(index, ancestor)| match &ancestor . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        straddle . node_changes (&t . skgid) . home
+        straddle . node_changes (&t . gnid) . home
         . map ( |home_skgrepo_move| (index + 1, home_skgrepo_move) ),
       _ => None, } ) }
 
@@ -309,7 +309,7 @@ pub fn nodes_editable_in_diffView (
     viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Ghost (h))
         if in_content_position (node) =>
-        Some ( h . skgid . clone () ),
+        Some ( h . gnid . clone () ),
       _ => None, } )
     . collect ();
   editable_occurrences (viewforest) . into_iter ()
@@ -346,7 +346,7 @@ fn append_stub_root (
   viewforest           : &mut ViewForest,
   root                 : &ID,
 ) -> Result<NodeId, Box<dyn Error>> {
-  let buffer_root : NodeId = viewforest . internal_root_skgid ();
+  let buffer_root : NodeId = viewforest . internal_root_gnid ();
   let stub : Viewnode = match runtime . graph . get (root) {
     None => mk_historical_viewnode (straddle, root, None)
       . ok_or_else ( || format! (
@@ -387,8 +387,8 @@ pub fn contentOrigins_missing_from_buffer (
 ) -> Vec<ID> {
   let sets : &PrunedChangeViewSets =
     prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind);
-  let containers_of = |skgid : &ID| -> Vec<ID> {
-    union_containers (straddle, skgid) };
+  let containers_of = |gnid : &ID| -> Vec<ID> {
+    union_containers (straddle, gnid) };
   let editable : HashSet<ID> = nodes_editable_in_diffView (viewforest);
   kept_content_origins (&sets . r, &sets . u, &containers_of, standing_roots)
     . into_iter ()
@@ -412,12 +412,12 @@ pub fn append_contentOrigins_to_buffer (
     . collect () }
 
 /// The IDs of the buffer's roots, whatever kind of vognode each is.
-pub fn root_skgids_of_buffer (
+pub fn root_gnids_of_buffer (
   viewforest : &ViewForest,
 ) -> BTreeSet<ID> {
   viewforest . roots ()
     . filter_map ( |root| match &root . value () . kind {
-      ViewnodeKind::Vognode (vognode) => Some ( vognode . skgid () . clone () ),
+      ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () . clone () ),
       _ => None, } )
     . collect () }
 
@@ -448,11 +448,11 @@ pub fn ensure_editableOccurrences_exist (
   for treeid in occurrences {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
       &mut viewforest . get_mut (treeid) . unwrap () . value () . kind
-    { if ! u . contains (&occurrence . skgid)
-         || editable . contains (&occurrence . skgid) { continue; }
+    { if ! u . contains (&occurrence . gnid)
+         || editable . contains (&occurrence . gnid) { continue; }
       occurrence . editability = Editability::Editable { // the refresh gives it its body
         body : None, edit_request : None };
-      editable . insert ( occurrence . skgid . clone () ); }
+      editable . insert ( occurrence . gnid . clone () ); }
     else { continue; }
     let children : Vec<NodeId> = viewforest . get (treeid) . unwrap () . children ()
       . map ( |child| child . id () ) . collect ();

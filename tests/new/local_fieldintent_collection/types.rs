@@ -136,7 +136,7 @@ fn combineable_intents_always_combine () {
   assert_eq!( entry . text_claims . len(), 1 ); }
 
 #[test]
-fn order_records_first_emission_per_skgid () {
+fn order_records_first_emission_per_gnid () {
   let mut acc : CollectedFieldIntents =
     CollectedFieldIntents::new();
   acc . instructionMerge_fieldIntent (

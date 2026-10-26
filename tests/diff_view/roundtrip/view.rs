@@ -52,15 +52,15 @@ fn with_fixture (
 ) -> Result<(), Box<dyn Error>> {
   with_git_fixture ( Path::new (FIXTURES), OwnedSkgrepos::OnlyMain, &[], body ) }
 
-/// The first vognode of 'tree' that represents 'skgid'.
+/// The first vognode of 'tree' that represents 'gnid'.
 fn treeid_of (
   tree  : &Tree<Viewnode>,
-  skgid : &str,
+  gnid : &str,
 ) -> NodeId {
   tree . root () . descendants ()
     . find ( |node| matches! ( &node . value () . kind,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . skgid . 0 == skgid ))
-    . unwrap_or_else ( || panic! ("no vognode {} in the view", skgid) )
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . gnid . 0 == gnid ))
+    . unwrap_or_else ( || panic! ("no vognode {} in the view", gnid) )
     . id () }
 
 /// Under 'parent', the historical phantom of 'pid' with its old
@@ -79,11 +79,11 @@ fn append_historical_phantom (
     tree . get (phantom) ? . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
-        Some (( child . id (), h . skgid . clone () )),
+        Some (( child . id (), h . gnid . clone () )),
       _ => None, } )
     . collect ();
-  for (member, skgid) in deleted_members {
-    append_old_content (tree, member, straddle, &skgid) ?; }
+  for (member, gnid) in deleted_members {
+    append_old_content (tree, member, straddle, &gnid) ?; }
   Some (phantom) }
 
 /// Under the ghost 'phantom' of 'pid', what the diff view shows there:

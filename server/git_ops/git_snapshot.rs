@@ -286,9 +286,9 @@ fn git_snapshot_from_sections (
         for extra in &node_fs . extra_ids {
           m . insert ( extra . clone (), pid . clone () ); }} }
     m };
-  let resolve = |skgid : &ID| -> ID {
-    pid_of . get (skgid) . cloned ()
-      . unwrap_or_else ( || skgid . clone () ) };
+  let resolve = |gnid : &ID| -> ID {
+    pid_of . get (gnid) . cloned ()
+      . unwrap_or_else ( || gnid . clone () ) };
   let mut by_pid : HashMap<ID, Graphnode> =
     HashMap::new ();
   for (pid, telescope_sections) in sections_by_pid {

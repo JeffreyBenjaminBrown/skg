@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
-use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_skgid, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_gnid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, viewforest_root_viewnode, viewnode_of, default_unrestrictedVognode};
@@ -24,14 +24,14 @@ use std::time::SystemTime;
 
 fn mk_test_viewnode (
   title        : &str,
-  skgid        : &str,
+  gnid        : &str,
   edit_request : Option<NodeEditRequest>,
 ) -> Viewnode {
   let t : UnrestrictedVognode = UnrestrictedVognode {
     editability : Editability::Editable {
       body         : None,
       edit_request },
-    .. default_unrestrictedVognode ( ID::from (skgid),
+    .. default_unrestrictedVognode ( ID::from (gnid),
                           SkgrepoName::from ("main"),
                           title . to_string() ) };
   viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (t))) }
@@ -128,9 +128,9 @@ fn verify_filesystem_after_merge_2_into_1(
   assert_eq!( node_1 . contains . len(), 7,
               "Node 1 should contain 7 items (with overlap deduplicated)");
 
-  let acquiree_text_preserver_skgid: &ID =
+  let acquiree_text_preserver_gnid: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
-  assert_eq!(&node_1 . contains[0] . member, acquiree_text_preserver_skgid,
+  assert_eq!(&node_1 . contains[0] . member, acquiree_text_preserver_gnid,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_1 . contains[1] . member, &ID::from ("11"));
   assert_eq!(&node_1 . contains[2] . member, &ID::from ("12"));
@@ -176,13 +176,13 @@ fn verify_filesystem_after_merge_2_into_1(
   let acquiree_text_preserver_path: String =
     path_from_pid_and_skgrepo ( config,
                                &SkgrepoName::from ("main"),
-                               acquiree_text_preserver_skgid . clone() ) ?;
+                               acquiree_text_preserver_gnid . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
   let acquiree_text_preserver: Graphnode =
     graphnode_from_pid_and_skgrepo( config,
-                                 acquiree_text_preserver_skgid . clone(),
+                                 acquiree_text_preserver_gnid . clone(),
                                  &SkgrepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
   assert_eq!(acquiree_text_preserver . title, "MERGED: 2");
@@ -208,21 +208,21 @@ fn verify_tantivy_after_merge_2_into_1(
 
   // Search for node 2 - should not find it (it was merged and deleted)
   let found_node_2: bool =
-    tantivy_contains_skgid(tantivy_index, "2", "2")?;
+    tantivy_contains_gnid(tantivy_index, "2", "2")?;
   assert!(!found_node_2,
           "Node 2 should NOT be in Tantivy index after being merged");
 
   // Search for node 1 - should find it (it's the acquirer)
   let found_node_1: bool =
-    tantivy_contains_skgid(tantivy_index, "1", "1")?;
+    tantivy_contains_gnid(tantivy_index, "1", "1")?;
   assert!(found_node_1,
           "Node 1 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - should find it
-  let acquiree_text_preserver_skgid: &ID =
+  let acquiree_text_preserver_gnid: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let found_acquiree_text_preserver: bool =
-    tantivy_contains_skgid(tantivy_index, "MERGED: 2", &acquiree_text_preserver_skgid . 0)?;
+    tantivy_contains_gnid(tantivy_index, "MERGED: 2", &acquiree_text_preserver_gnid . 0)?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
   Ok (( )) }
 
@@ -305,9 +305,9 @@ fn verify_filesystem_after_merge_1_into_2(
   // Note: "overlap" should appear only once (deduplicated) even though it was in both nodes
   assert_eq!( node_2 . contains . len(), 7,
               "Node 2 should contain 7 items (with overlap deduplicated)");
-  let acquiree_text_preserver_skgid: &ID =
+  let acquiree_text_preserver_gnid: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
-  assert_eq!(&node_2 . contains[0] . member, acquiree_text_preserver_skgid,
+  assert_eq!(&node_2 . contains[0] . member, acquiree_text_preserver_gnid,
              "First content should be acquiree_text_preserver");
   assert_eq!(&node_2 . contains[1] . member, &ID::from ("21"));
   assert_eq!(&node_2 . contains[2] . member, &ID::from ("22"));
@@ -353,13 +353,13 @@ fn verify_filesystem_after_merge_1_into_2(
   let acquiree_text_preserver_path: String =
     path_from_pid_and_skgrepo( config,
                               &SkgrepoName::from ("main"),
-                              acquiree_text_preserver_skgid . clone() ) ?;
+                              acquiree_text_preserver_gnid . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
   let acquiree_text_preserver: Graphnode =
     graphnode_from_pid_and_skgrepo( config,
-                                 acquiree_text_preserver_skgid . clone(),
+                                 acquiree_text_preserver_gnid . clone(),
                                  &SkgrepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
   assert_eq!(acquiree_text_preserver . title, "MERGED: 1");
@@ -387,22 +387,22 @@ fn verify_tantivy_after_merge_1_into_2(
 ) -> Result<(), Box<dyn Error>> {
 
   // Search for node 1 - should not find it (it was merged and deleted)
-  let found_node_1: bool = tantivy_contains_skgid(
+  let found_node_1: bool = tantivy_contains_gnid(
     tantivy_index, "1", "1" )?;
   assert!(!found_node_1,
           "Node 1 should NOT be in Tantivy index after being merged");
 
   // Search for node 2 - should find it (it's the acquirer)
-  let found_node_2: bool = tantivy_contains_skgid(
+  let found_node_2: bool = tantivy_contains_gnid(
     tantivy_index, "2", "2")?;
   assert!(found_node_2,
           "Node 2 SHOULD be in Tantivy index after merge");
 
   // Search for acquiree_text_preserver - should find it
-  let acquiree_text_preserver_skgid: &ID =
+  let acquiree_text_preserver_gnid: &ID =
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
-  let found_acquiree_text_preserver: bool = tantivy_contains_skgid(
-    tantivy_index, "MERGED: 1", &acquiree_text_preserver_skgid . 0 )?;
+  let found_acquiree_text_preserver: bool = tantivy_contains_gnid(
+    tantivy_index, "MERGED: 1", &acquiree_text_preserver_gnid . 0 )?;
   assert!(found_acquiree_text_preserver, "acquiree_text_preserver SHOULD be in Tantivy index");
 
   Ok (( )) }

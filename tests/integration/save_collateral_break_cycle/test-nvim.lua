@@ -123,14 +123,14 @@ local function headline_structure (buf)
         local ok, parsed = pcall(sexpr.read, split.metadata)
         if ok then sexp = parsed end
       end
-      local skgid = sexp and metadata.node_id(sexp) or nil
+      local gnid = sexp and metadata.node_id(sexp) or nil
       local depth = #(split.stars:match('^%*+'))
       pop_to(stack, depth)
       local record, claims_nothing = position_of(stack, depth, sexp, split.metadata)
       table.insert(stack, record)
-      if skgid then
+      if gnid then
         table.insert(result,
-          { depth, relation_from_sexp(sexp, claims_nothing, record.chain_node), skgid })
+          { depth, relation_from_sexp(sexp, claims_nothing, record.chain_node), gnid })
       end
     end
   end

@@ -158,12 +158,12 @@ pub fn update_views_after_save (
   // below covers nodes introduced by completion.
   if let Some (restriction) = skgrepo_restriction {
     let mut input_candidates : Vec<ID> =
-      unrestricted_skgids_in_viewforest (&saved_view_mut);
+      unrestricted_gnids_in_viewforest (&saved_view_mut);
     for viewforest_id in &collateral_viewforest_ids {
       if let Some (viewforest) = views_state . open_views
           . viewforest_id_to_view (viewforest_id) {
         input_candidates . extend (
-          unrestricted_skgids_in_viewforest (viewforest) ); }}
+          unrestricted_gnids_in_viewforest (viewforest) ); }}
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &input_candidates,
       &context . graph_snap, text_approved_pids );
@@ -201,10 +201,10 @@ pub fn update_views_after_save (
   // Everything textual is now staged in memory. Decide before changing the
   // open-view registry or streaming the first view.
   let mut release_candidates : Vec<ID> =
-    unrestricted_skgids_in_viewforest (&saved_view_mut);
+    unrestricted_gnids_in_viewforest (&saved_view_mut);
   for collateral in &collateral_views {
     release_candidates . extend (
-      unrestricted_skgids_in_viewforest (&collateral . viewforest) ); }
+      unrestricted_gnids_in_viewforest (&collateral . viewforest) ); }
   if let Some (restriction) = skgrepo_restriction {
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &release_candidates,
@@ -257,13 +257,13 @@ pub fn update_views_after_save (
     readiness_summary,
     corrections, } ) }
 
-fn unrestricted_skgids_in_viewforest (
+fn unrestricted_gnids_in_viewforest (
   viewforest : &ViewForest,
 ) -> Vec<ID> {
   viewforest . nodes ()
     .filter_map ( |node| match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
-        Some ( restriction . skgid . clone () ),
+        Some ( restriction . gnid . clone () ),
       _ => None,
     } )
     .collect ()
@@ -279,24 +279,24 @@ fn replace_saved_view_fork_roots (
   fork_specs : &[ForkSpec],
 ) -> Result<(), Box<dyn Error>> {
   if fork_specs . is_empty () { return Ok (()); }
-  let root_skgids : Vec<NodeId> = viewforest . root_skgids ();
-  for root_skgid in root_skgids {
+  let root_gnids : Vec<NodeId> = viewforest . root_gnids ();
+  for root_gnid in root_gnids {
     let original : Option<ID> =
-      viewforest . get (root_skgid) . and_then (|root| match
+      viewforest . get (root_gnid) . and_then (|root| match
         &root . value () . kind {
           ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
-            Some (restriction . skgid . clone ()),
+            Some (restriction . gnid . clone ()),
           _ => None, });
     let Some (original) = original else { continue; };
     let Some (spec) = fork_specs . iter ()
-      . find (|spec| spec . original_skgid == original)
+      . find (|spec| spec . original_gnid == original)
     else { continue; };
     let clone = & spec . clone . 0;
-    let mut root = viewforest . get_mut (root_skgid)
+    let mut root = viewforest . get_mut (root_gnid)
       . ok_or ("replace_saved_view_fork_roots: root not found") ?;
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
       &mut root . value () . kind
-    { restriction . skgid = clone . pid . clone ();
+    { restriction . gnid = clone . pid . clone ();
       restriction . home_skgrepo = clone . home_skgrepo . clone ();
       restriction . title = clone . title . clone ();
       if let Editability::Editable { body, .. } = &mut restriction . editability
@@ -349,11 +349,11 @@ fn rerender_collateral_view (
 /// correction: there was nothing the user could have made otherwise.
 pub fn render_initial_view (
   runtime     : &RuntimeGeneration,
-  root_skgids : &[ID],
+  root_gnids : &[ID],
   restriction : Option<&SkgrepoRestriction>,
 ) -> Result<(ViewForest, String), Box<dyn Error>> {
   let mut viewforest : ViewForest = stub_of_fresh_content_view (
-    root_skgids, &runtime . graph );
+    root_gnids, &runtime . graph );
   let truth : Truth = Truth { graph       : &runtime . graph,
                               config      : &runtime . config,
                               restriction, };
@@ -372,12 +372,12 @@ pub fn render_initial_view (
 /// its first root only. A gnid no node answers to is an unknown, which
 /// the refresh entombstones.
 pub(crate) fn stub_of_fresh_content_view (
-  root_skgids : &[ID],
+  root_gnids : &[ID],
   graph       : &InRustGraph,
 ) -> ViewForest {
   let mut viewforest : ViewForest = ViewForest::new ();
   let mut editable : HashSet<ID> = HashSet::new ();
-  for gnid in root_skgids {
+  for gnid in root_gnids {
     let root : Viewnode =
       match graph . pid_of (gnid) . and_then ( |pid| graph . get (&pid) ) {
         None => mk_unknown_viewnode ( gnid . clone () ),

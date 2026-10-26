@@ -216,12 +216,12 @@ end
 
 ---The absolute path of ID.skg within REPO's directory, or nil if
 ---REPO is not declared in the config.
----@param skgid string
+---@param gnid string
 ---@param skgrepo string
 ---@return string|nil
-function M.abs_path_for_id_and_repo (skgid, skgrepo)
+function M.abs_path_for_id_and_repo (gnid, skgrepo)
   local dir = M.repo_dir(skgrepo)
-  if dir then return dir .. '/' .. skgid .. '.skg' end
+  if dir then return dir .. '/' .. gnid .. '.skg' end
   return nil
 end
 

@@ -151,7 +151,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
     _ => panic!("expected UnrestrictedVognode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
-  assert!( ! first_t . skgid . 0 . is_empty (),
+  assert!( ! first_t . gnid . 0 . is_empty (),
            "the parse mints a gnid for a headline without one" );
   assert_eq!(first_t . home_skgrepo, SkgrepoName::not_found (),
              "nothing supplies a top-level headline's skgrepo" );
@@ -245,13 +245,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let meta_node = tree_roots[0] . value();
   assert_eq!(meta_node . title(), "simple node with metadata");
   assert_eq!(meta_node . body(), Some(&"Node body" . to_string()));
-  assert_eq!(meta_node . unrestricted_skgid (), Some(&ID::from ("test")));
+  assert_eq!(meta_node . unrestricted_gnid (), Some(&ID::from ("test")));
   assert_eq!(meta_node . foldAndFocus . folded, true);
 
   // Test node without metadata (should have defaults)
   let regular_node = tree_roots[1] . value();
   assert_eq!(regular_node . title(), "regular node without metadata");
-  assert!(regular_node . unrestricted_skgid ()
+  assert!(regular_node . unrestricted_gnid ()
           . is_some_and ( |gnid| ! gnid . 0 . is_empty ()
                                  && *gnid != ID::from ("test") ),
           "the parse mints a fresh gnid for a headline without one" );

@@ -86,12 +86,12 @@ Returns the parsed s-expression or nil if not found."
                   result)))))
     (nreverse result)))
 
-(defun test-skg--metadata-sexp-by-id (skgid)
+(defun test-skg--metadata-sexp-by-id (gnid)
   "Return the first metadata sexp whose node id is ID."
   (cl-find-if
    (lambda (sexp)
      (equal (skg-sexp-cdr-at-path sexp '(skg gnid))
-            (list (intern skgid))))
+            (list (intern gnid))))
    (test-skg--all-metadata-sexps)))
 
 (ert-deftest test-skg-request-write-protected ()
@@ -344,28 +344,28 @@ its herald, as they were: the save recomputes them."
                  (should (equal current-skgrepo "public"))
                  "private")))
       (skg-set-repo-recursive))
-    (dolist (skgid '("root"
+    (dolist (gnid '("root"
                   "content-child"
                   "content-grandchild"
                   "public-under-mismatch"))
       (should (skg-sexp-subtree-p
-               (test-skg--metadata-sexp-by-id skgid)
+               (test-skg--metadata-sexp-by-id gnid)
                '(skg node (skgRepos (nodeRepo private)))))
-      (should-not (assq 'view (cdr (test-skg--metadata-sexp-by-id skgid)))))
+      (should-not (assq 'view (cdr (test-skg--metadata-sexp-by-id gnid)))))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-sexp-by-id "mismatched-content")
              '(skg node (skgRepos (nodeRepo foreign)))))
     (should-not (skg-sexp-subtree-p
                  (test-skg--metadata-sexp-by-id "mismatched-content")
                  '(skg node (skgRepos (nodeRepo private)))))
-    (dolist (skgid '("link-child"
+    (dolist (gnid '("link-child"
                   "under-link"
                   "under-non-vognode"))
       (should (skg-sexp-subtree-p
-               (test-skg--metadata-sexp-by-id skgid)
+               (test-skg--metadata-sexp-by-id gnid)
                '(skg node (skgRepos (nodeRepo public)))))
       (should-not (skg-sexp-subtree-p
-                   (test-skg--metadata-sexp-by-id skgid)
+                   (test-skg--metadata-sexp-by-id gnid)
                    '(skg node (skgRepos (nodeRepo private))))))))
 
 (ert-deftest test-skg-replace-content-with-link-from-body ()

@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
-use crate::dbs::node_lookup::opt_graphnode_by_skgid;
+use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
@@ -51,16 +51,16 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // each ID belongs to an IDFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion and defining containers)
-    let (ambiguous_deletion_skgids,
-         problematic_defining_skgids) =
+    let (ambiguous_deletion_gnids,
+         problematic_defining_gnids) =
       find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
-      for (skgid, headlines) in ambiguous_deletion_skgids {
+      for (gnid, headlines) in ambiguous_deletion_gnids {
         errors . push (
-          BufferValidationError::AmbiguousDeletion (skgid, headlines)); }
-      for (skgid, headlines) in problematic_defining_skgids {
+          BufferValidationError::AmbiguousDeletion (gnid, headlines)); }
+      for (gnid, headlines) in problematic_defining_gnids {
         errors . push(
-          BufferValidationError::Multiple_Defining_Viewnodes (skgid, headlines)); }} }
+          BufferValidationError::Multiple_Defining_Viewnodes (gnid, headlines)); }} }
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =
@@ -81,17 +81,17 @@ pub fn find_buffer_errors_for_saving_in_graph (
   writeProtected_relRepo_request_errors (
     viewforest, &mut errors );
   { // local structure validation
-    let root_skgids : Vec<NodeId> =
-      viewforest . root_skgids ();
-    for root_skgid in root_skgids {
+    let root_gnids : Vec<NodeId> =
+      viewforest . root_gnids ();
+    for root_gnid in root_gnids {
       let _ = do_everywhere_in_tree_dfs_readonly(
-        viewforest, root_skgid, true,
+        viewforest, root_gnid, true,
         &mut |node_ref| {
           if let Err (e) = local::validate_local_structure(
                  viewforest, node_ref . id(), config) {
             errors . push(
               BufferValidationError::LocalStructureViolation(
-                e . message, e . skgid, e . headline )); }
+                e . message, e . gnid, e . headline )); }
           Ok(( )) }); }}
   Ok (errors) }
 
@@ -137,28 +137,28 @@ fn idFolder_membership_errors (
       match node_ref . parent ()
         . map ( |p| (p . value (), &p . value () . kind) ) {
         Some ((parent, ViewnodeKind::Vognode (Vognode::Unrestricted (t))))
-          => (t . skgid . clone (), parent . headline_name ()),
+          => (t . gnid . clone (), parent . headline_name ()),
         _ => continue };
-    let mut buffer_skgids : Vec<ID> =
+    let mut buffer_gnids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          ViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. })
-            => Some ( skgid . clone () ),
+          ViewnodeKind::PropertyMember (PropertyMember::ID { gnid, .. })
+            => Some ( gnid . clone () ),
           _ => None } )
       . collect ();
-    let real_skgids : Option<Vec<ID>> =
-      opt_graphnode_by_skgid (graph, config, &recorder)
+    let real_gnids : Option<Vec<ID>> =
+      opt_graphnode_by_gnid (graph, config, &recorder)
  ?
-      . map ( |nc| nc . all_skgids () . cloned () . collect () );
-    match real_skgids {
+      . map ( |nc| nc . all_gnids () . cloned () . collect () );
+    match real_gnids {
       None =>
         errors . push ( BufferValidationError::IDFolder_Edited (
-          recorder, buffer_skgids, Vec::new (), recorder_headline )),
+          recorder, buffer_gnids, Vec::new (), recorder_headline )),
       Some (real) => {
-        buffer_skgids . sort ();
-        if real . iter () . any ( |id| ! buffer_skgids . contains (id) ) {
+        buffer_gnids . sort ();
+        if real . iter () . any ( |id| ! buffer_gnids . contains (id) ) {
           errors . push ( BufferValidationError::IDFolder_Edited (
-            recorder, buffer_skgids, real, recorder_headline )); }}, }}
+            recorder, buffer_gnids, real, recorder_headline )); }}, }}
   Ok (( )) }
 
 /// Tamper validation for the '(overridesHere N)' fact
@@ -191,7 +191,7 @@ fn overridesHere_fact_errors (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           match &t . overridesHere {
             Some (original) =>
-              ( t . skgid . clone (), original . clone () ),
+              ( t . gnid . clone (), original . clone () ),
             None => continue },
         _ => continue };
     let chain_ok : bool =
@@ -222,23 +222,23 @@ fn validate_fork_view_requests (
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
 ) {
-  for (skgid, headlines) in
+  for (gnid, headlines) in
     occurrences_requesting (viewforest, &ViewRequest::Fork)
   { if headlines . len () > 1 {
       errors . push (
         BufferValidationError::ForkRequestMultiple (
-          skgid . clone (), headlines . clone () )); }
-    if graph . pid_of (&skgid) . is_none () {
+          gnid . clone (), headlines . clone () )); }
+    if graph . pid_of (&gnid) . is_none () {
       // Not in the graph: an unsaved headline cannot be forked.
       errors . push (
         BufferValidationError::ForkRequestOnUnknownNode (
-          skgid, headlines [0] . clone () ));
+          gnid, headlines [0] . clone () ));
       continue; }
     if let Some (existing) =
-      existing_owned_overrider_of (config, graph, &skgid) {
+      existing_owned_overrider_of (config, graph, &gnid) {
       errors . push (
         BufferValidationError::ForkAlreadyExists (
-          skgid, existing )); }} }
+          gnid, existing )); }} }
 
 fn validate_view_roots (
   viewforest : &ViewForest,
@@ -269,11 +269,11 @@ fn validate_editable_view_requests (
   viewforest : &ViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
-  for (skgid, headlines) in
+  for (gnid, headlines) in
     occurrences_requesting (viewforest, &ViewRequest::Editable)
   { if headlines . len () > 1
     { errors . push( BufferValidationError::MultipleEditableViewRequestsForSameId(
-        skgid, headlines )); }}
+        gnid, headlines )); }}
   for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &Viewnode =
@@ -284,11 +284,11 @@ fn validate_editable_view_requests (
         Vognode::Unrestricted (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Editable)
-        { { let skgid : &ID = &t . skgid;
+        { { let gnid : &ID = &t . gnid;
           if t . view_requests . contains (&ViewRequest::WriteProtected)
              || t . view_requests . contains (&ViewRequest::WriteProtectedSubtree)
           { errors . push( BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence(
-            skgid . clone(), viewnode . headline_name () )); }} }}} }}
+            gnid . clone(), viewnode . headline_name () )); }} }}} }}
 
 /// For each ID some Unrestricted occurrence of which carries
 /// 'request', in buffer order of first appearance: the names of those
@@ -297,24 +297,24 @@ fn occurrences_requesting (
   viewforest : &ViewForest,
   request    : &ViewRequest,
 ) -> Vec<(ID, Vec<HeadlineName>)> {
-  let mut skgids_in_order : Vec<ID> = Vec::new ();
-  let mut headlines_by_skgid : HashMap<ID, Vec<HeadlineName>> =
+  let mut gnids_in_order : Vec<ID> = Vec::new ();
+  let mut headlines_by_gnid : HashMap<ID, Vec<HeadlineName>> =
     HashMap::new ();
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & node_ref . value () . kind else { continue; };
     if ! t . view_requests . contains (request) { continue; }
-    let skgid : &ID = & t . skgid;
-    if ! headlines_by_skgid . contains_key (skgid) {
-      skgids_in_order . push (skgid . clone ()); }
-    headlines_by_skgid . entry (skgid . clone ()) . or_default ()
+    let gnid : &ID = & t . gnid;
+    if ! headlines_by_gnid . contains_key (gnid) {
+      gnids_in_order . push (gnid . clone ()); }
+    headlines_by_gnid . entry (gnid . clone ()) . or_default ()
       . push (node_ref . value () . headline_name ()); }
-  skgids_in_order . into_iter ()
-    . map ( |skgid| {
+  gnids_in_order . into_iter ()
+    . map ( |gnid| {
       let headlines : Vec<HeadlineName> =
-        headlines_by_skgid . remove (&skgid) . unwrap_or_default ();
-      (skgid, headlines) } )
+        headlines_by_gnid . remove (&gnid) . unwrap_or_default ();
+      (gnid, headlines) } )
     . collect () }
 
 /// A relRepo request describes the relationship from a node's view-parent
@@ -342,7 +342,7 @@ fn writeProtected_relRepo_request_errors (
       errors . push ( BufferValidationError::Other ( with_org_subheadlines (
         &format! (
           "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
-          t . skgid . 0 ),
+          t . gnid . 0 ),
         &[ headline ] ))); }} }
 
 /// Whether save reads the relRepo request on this Unrestricted node:

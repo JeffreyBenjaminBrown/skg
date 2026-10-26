@@ -87,7 +87,7 @@ pub fn next_in_generation<T>(
 /// If effective_root is None, uses the true tree root.
 /// Returns an empty Vec if the generation doesn't exist.
 /// Returns an error if effective_root is not in the tree.
-pub fn collect_generation_skgids<T>(
+pub fn collect_generation_gnids<T>(
   tree           : &Tree<T>,
   generation     : usize,
   effective_root : Option<NodeId>,

@@ -49,7 +49,7 @@ fn node (
         rel_partners_at_relRepo (
           &node . home_skgrepo,
           overrides . iter ()
-          . map ( |skgid| ID::from (*skgid) )
+          . map ( |gnid| ID::from (*gnid) )
           . collect () ) )
     };
   node }
@@ -72,16 +72,16 @@ fn affected_and_full (
   let touched : HashSet<ID> = nodeInstructions . iter () . map (|nodeInstruction|
     match nodeInstruction {
       NodeInstruction::Save (SaveNode (node)) => node . pid . clone (),
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone (),
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone (),
     }) . collect ();
-  let mut affected_skgids : HashSet<ID> = touched . clone ();
+  let mut affected_gnids : HashSet<ID> = touched . clone ();
   for pid in &touched {
     if let Some (old) = base . nodes . get (pid) {
-      affected_skgids . extend (old . extra_ids . iter () . cloned ()); }
+      affected_gnids . extend (old . extra_ids . iter () . cloned ()); }
     if let Some (final_node) = candidate . nodes . get (pid) {
-      affected_skgids . extend (final_node . extra_ids . iter () . cloned ()); }}
+      affected_gnids . extend (final_node . extra_ids . iter () . cloned ()); }}
   let scope = derive_affected_override_scope (
-    &base, &candidate, &touched, &affected_skgids);
+    &base, &candidate, &touched, &affected_gnids);
   (validate_affected_override_invariants (&config (), &candidate, &scope),
    validate_override_invariants (&config (), &candidate))
 }
@@ -285,7 +285,7 @@ fn relationship_and_target_deletions_do_not_create_override_errors () {
       node ("repo", "owned", &["target"]),
     ],
     vec![NodeInstruction::Delete (DeleteNode {
-      skgid : ID::from ("target"), home_skgrepo : SkgrepoName::from ("owned"),
+      gnid : ID::from ("target"), home_skgrepo : SkgrepoName::from ("owned"),
     })]);
   assert_eq! (delete_affected, delete_full);
   assert! (delete_affected . is_empty ());
@@ -314,7 +314,7 @@ proptest! {
     target_index in 0usize..5,
     owned in any::<bool> (),
   ) {
-    let skgids : [&str; 4] = ["A", "B", "C", "D"];
+    let gnids : [&str; 4] = ["A", "B", "C", "D"];
     let base : Vec<Graphnode> = vec![
       node ("A", "owned", &["B"]),
       node ("B", "owned", &["C"]),
@@ -323,9 +323,9 @@ proptest! {
     ];
     let targets : Vec<&str> =
       if target_index == 4 { Vec::new () }
-      else { vec![skgids [target_index]] };
+      else { vec![gnids [target_index]] };
     let changed : Graphnode = node (
-      skgids [changed_index],
+      gnids [changed_index],
       if owned { "owned" } else { "foreign" },
       &targets);
     let (affected, full) = affected_and_full (

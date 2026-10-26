@@ -13,15 +13,15 @@ fn restriction_public () -> SkgrepoRestriction {
     name    : SkgrepoSetName ("public" . to_string ()),
     skgrepos : BTreeSet::from ([ SkgrepoName::from ("public") ]) }}
 
-fn def (skgid : &str, skgrepo : &str) -> Viewnode {
+fn def (gnid : &str, skgrepo : &str) -> Viewnode {
   mk_editable_viewnode (
-    ID::from (skgid), SkgrepoName::from (skgrepo),
-    skgid . to_string (), None ) }
+    ID::from (gnid), SkgrepoName::from (skgrepo),
+    gnid . to_string (), None ) }
 
-fn writeProtected (skgid : &str, skgrepo : &str) -> Viewnode {
+fn writeProtected (gnid : &str, skgrepo : &str) -> Viewnode {
   mk_writeProtected_viewnode (
-    ID::from (skgid), SkgrepoName::from (skgrepo),
-    skgid . to_string (), true ) }
+    ID::from (gnid), SkgrepoName::from (skgrepo),
+    gnid . to_string (), true ) }
 
 fn folder (kind : Folder) -> Viewnode {
   viewnode_of (ViewnodeKind::Folder (kind)) }

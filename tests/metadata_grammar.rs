@@ -49,14 +49,14 @@ fn each_kind_prints_its_parts_beside_its_atom (
     "node (gnid w) (skgRepos (nodeRepo main)) noClaim writeProtected" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
-      skgid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
+      gnid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
       title : "g" . into (), body : None,
       restoreNode_request : true, tombstone_request : false,
       claimsMembership : true, isWarranted : Warrant::ByGraph } )))),
     "ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-      skgid : ID::from ("u"), relRepo : Some ( SkgrepoName::from ("pub") ),
+      gnid : ID::from ("u"), relRepo : Some ( SkgrepoName::from ("pub") ),
       relationshipEditRequest : None, claimsMembership : true } )))),
     "unknown (gnid u) (skgRepos (relRepo pub))" );
   assert_eq! (
@@ -74,7 +74,7 @@ fn the_declared_parts_parse_back_in_any_order (
      (skgRepos (relRepo pub) (nodeRepo main)) noClaim (gnid n) node folded (vnid 1a))" )
     . unwrap ();
   assert_eq! ( in_print_order, shuffled );
-  assert_eq! ( in_print_order . skgid, Some ( ID::from ("n") ));
+  assert_eq! ( in_print_order . gnid, Some ( ID::from ("n") ));
   assert_eq! ( in_print_order . home_skgrepo, Some ( SkgrepoName::from ("main") ));
   assert_eq! ( in_print_order . viewStats . relRepo, Some ( SkgrepoName::from ("pub") ));
   assert_eq! ( in_print_order . overridesHere, Some ( ID::from ("o") ));
@@ -140,5 +140,5 @@ fn a_headline_naming_no_kind_is_a_node (
     parse_metadata_to_viewnodemd ("(skg focused)") . unwrap ();
   assert! ( metadata . non_vognode . is_none () && ! metadata . is_ghost
             && ! metadata . is_tombstone
-            && metadata . unknown_node_skgid . is_none ()
+            && metadata . unknown_node_gnid . is_none ()
             && metadata . foldAndFocus . focused ); }

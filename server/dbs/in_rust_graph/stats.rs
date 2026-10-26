@@ -236,12 +236,12 @@ mod tests {
   use crate::skgrepo_sets::SkgrepoSetName;
 
   fn node (
-    skgid : &str,
+    gnid : &str,
     title : &str,
     body  : Option<&str>,
   ) -> Graphnode {
     Graphnode {
-      pid : ID::from (skgid),
+      pid : ID::from (gnid),
       title : title . to_string (),
       body : body . map (str::to_string),
       .. empty_graphnode () } }

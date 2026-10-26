@@ -184,14 +184,14 @@ fn at_most_one_editable_occurrence_per_gnid (
 ) -> bool {
   let mut seen : HashSet<&ID> = HashSet::new ();
   tree . root () . descendants ()
-    . filter_map ( |node| node . value () . editable_skgid () )
+    . filter_map ( |node| node . value () . editable_gnid () )
     . all ( |gnid| seen . insert (gnid) ) }
 
 fn editable_gnids_in (
   tree : &Tree<Viewnode>,
 ) -> HashSet<ID> {
   tree . root () . descendants ()
-    . filter_map ( |node| node . value () . editable_skgid () . cloned () )
+    . filter_map ( |node| node . value () . editable_gnid () . cloned () )
     . collect () }
 
 /// Two editable occurrences in the input may stand for one node when
@@ -209,7 +209,7 @@ fn keep_the_first_editable_occurrence_of_each_node (
     VecDeque::from ([ tree . root () . id () ]);
   while let Some (treeid) = queue . pop_front () {
     let node = tree . get (treeid) . unwrap ();
-    if let Some (gnid) = node . value () . editable_skgid () {
+    if let Some (gnid) = node . value () . editable_gnid () {
       let pid : ID = match walk . truth . graph . gnid_presence_gated (
                              gnid, walk . truth . restriction ) {
         GnidPresence::Present => walk . truth . graph . pid_of (gnid)
@@ -235,14 +235,14 @@ fn fulfill_editableView_requests (
     . filter_map ( |node| match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
         if occurrence . view_requests . contains (&ViewRequest::Editable) =>
-        Some (( node . id (), occurrence . skgid . clone () )),
+        Some (( node . id (), occurrence . gnid . clone () )),
       _ => None, } )
     . collect ();
   for (treeid, gnid) in requested {
     let others : Vec<NodeId> =
       tree . root () . descendants ()
       . filter ( |node| node . id () != treeid
-                        && node . value () . editable_skgid () == Some (&gnid) )
+                        && node . value () . editable_gnid () == Some (&gnid) )
       . map ( |node| node . id () )
       . collect ();
     for other in others {
@@ -269,7 +269,7 @@ pub(crate) fn write_protect_occurrence (
         if ! occurrence . is_writeProtected () => {
         let dropped : bool = occurrence . edit_request () . is_some ();
         occurrence . write_protect ();
-        ( Some ( occurrence . skgid . clone () ), dropped ) },
+        ( Some ( occurrence . gnid . clone () ), dropped ) },
       _ => (None, false), };
   if dropped {
     walk . corrections . record (

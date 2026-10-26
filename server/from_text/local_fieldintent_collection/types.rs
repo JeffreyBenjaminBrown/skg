@@ -40,7 +40,7 @@ pub enum LocalContext {
 /// guard.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DefiningFolderRecorder {
-  pub skgid              : ID,
+  pub gnid              : ID,
   pub headline        : HeadlineName, // the recorder's occurrence, which emits the folder's fieldIntents
   pub is_editable     : bool, // True iff the recorder is Unrestricted and editable.
   pub is_saveEligible : bool, // True iff the recorder is editable, Unrestricted, carries no Delete request, and is not in subscribee-as-such position.

@@ -68,7 +68,7 @@ pub fn compose_telescope_collecting_warnings (
       io::ErrorKind::InvalidData,
       format! ("Telescope '{}' has no title in any section.",
                pid ))) ?;
-  node . normalize_skgids ();
+  node . normalize_gnids ();
   Ok (( node, warnings )) }
 
 /// 'fold_telescope_collecting_warnings', with the warnings logged
@@ -262,39 +262,39 @@ fn compose_ordered (
               // Fallback: keep writing into whatever preceded this
               // run -- the previous run's queue, or the prepend.
             }}
-          ListItem::Member (skgid) => {
+          ListItem::Member (gnid) => {
             match &dest {
-              Dest::Prepend    => prepend . push ( skgid . clone () ),
+              Dest::Prepend    => prepend . push ( gnid . clone () ),
               Dest::Queue (k)  =>
                 queues . get_mut (k) . expect ("queue exists")
-                . push ( skgid . clone () ), }} }} }
+                . push ( gnid . clone () ), }} }} }
     // Dedup against the composition so far and within this section.
     let mut seen : std::collections::HashSet<ID> =
       effective . iter ()
       . map ( |m| resolve ( &m . member ) )
       . collect ();
-    let mut keep = |skgid : &ID, warnings : &mut Vec<CompositionWarning>|
+    let mut keep = |gnid : &ID, warnings : &mut Vec<CompositionWarning>|
     -> bool {
-      if seen . insert ( resolve (skgid) ) { true }
+      if seen . insert ( resolve (gnid) ) { true }
       else {
         warnings . push ( CompositionWarning::DuplicateMember {
-          member : skgid . clone () } );
+          member : gnid . clone () } );
         false }};
     let mut next : Vec<RelPartner<ID>> =
       Vec::with_capacity ( effective . len ()
                            + prepend . len () );
-    for skgid in prepend {
-      if keep (&skgid, warnings) {
+    for gnid in prepend {
+      if keep (&gnid, warnings) {
         next . push ( RelPartner::at_relRepo (
-          skgrepo . clone (), skgid )); }}
+          skgrepo . clone (), gnid )); }}
     for m in effective {
       let key : ID = resolve ( &m . member );
       next . push (m);
       if let Some (queue) = queues . remove (&key) {
-        for skgid in queue {
-          if keep (&skgid, warnings) {
+        for gnid in queue {
+          if keep (&gnid, warnings) {
             next . push ( RelPartner::at_relRepo (
-              skgrepo . clone (), skgid )); }} }}
+              skgrepo . clone (), gnid )); }} }}
     effective = next; }
   effective }
 
@@ -311,11 +311,11 @@ fn compose_unordered (
   let mut out : Vec<RelPartner<ID>> = Vec::new ();
   for (skgrepo, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
-    for skgid in members {
-      if seen . insert ( resolve (skgid) ) {
+    for gnid in members {
+      if seen . insert ( resolve (gnid) ) {
         out . push ( RelPartner::at_relRepo (
-          skgrepo . clone (), skgid . clone () ));
+          skgrepo . clone (), gnid . clone () ));
       } else {
         warnings . push ( CompositionWarning::DuplicateMember {
-          member : skgid . clone () } ); }}}
+          member : gnid . clone () } ); }}}
   out }

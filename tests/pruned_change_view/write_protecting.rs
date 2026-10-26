@@ -340,8 +340,8 @@ fn a_writeProtected_occurrence_with_another_home_skgrepo_is_refused (
     assert! ( matches! (
       &errors [..],
       [ BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid, changes, .. } ]
-      if *skgid == ID::from ("ctx")
+          gnid, changes, .. } ]
+      if *gnid == ID::from ("ctx")
          && *changes == vec! [
            "home skgrepo private differs from the graph's public" . to_string () ] ),
       "{:?}", errors );
@@ -376,8 +376,8 @@ fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
       f, &with_folder ("*** (skg flagsFolder)\n**** (skg (flag noSearchMatching))") );
     assert! ( matches! (
       &errors [..],
-      [ BufferValidationError::FlagsSurfaceEdited { recorder_skgid, .. } ]
-      if *recorder_skgid == ID::from ("ctx") ),
+      [ BufferValidationError::FlagsSurfaceEdited { recorder_gnid, .. } ]
+      if *recorder_gnid == ID::from ("ctx") ),
       "{:?}", errors );
     Ok (( )) }) }
 

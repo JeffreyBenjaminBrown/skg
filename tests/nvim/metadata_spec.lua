@@ -28,10 +28,10 @@ local function first_metadata_sexp ()
 end
 
 ---The metadata sexp whose node id is ID, from any line.
-local function metadata_sexp_by_id (skgid)
+local function metadata_sexp_by_id (gnid)
   for line = 1, vim.api.nvim_buf_line_count(0) do
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-    if sexp and metadata.node_id(sexp) == skgid then return sexp end
+    if sexp and metadata.node_id(sexp) == gnid then return sexp end
   end
   return nil
 end
@@ -164,22 +164,22 @@ describe('skg.metadata commands', function ()
     end
     metadata.set_repo_recursive()
     picker.prompt_for_repo_change = original
-    for _, skgid in ipairs({ 'root', 'content-child',
+    for _, gnid in ipairs({ 'root', 'content-child',
                           'content-grandchild',
                           'public-under-mismatch' }) do
-      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg node (skgRepos (nodeRepo private)))'), skgid)
-      assert.is_nil(metadata.sexp_cdr_at_path(metadata_sexp_by_id(skgid),
-                                              { 'skg', 'view' }), skgid)
+      assert.is_true(subtree_p(metadata_sexp_by_id(gnid),
+        '(skg node (skgRepos (nodeRepo private)))'), gnid)
+      assert.is_nil(metadata.sexp_cdr_at_path(metadata_sexp_by_id(gnid),
+                                              { 'skg', 'view' }), gnid)
     end
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
       '(skg node (skgRepos (nodeRepo foreign)))'))
-    for _, skgid in ipairs({ 'link-child', 'under-link',
+    for _, gnid in ipairs({ 'link-child', 'under-link',
                           'under-non-vognode' }) do
-      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg node (skgRepos (nodeRepo public)))'), skgid)
-      assert.is_false(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg node (skgRepos (nodeRepo private)))'), skgid)
+      assert.is_true(subtree_p(metadata_sexp_by_id(gnid),
+        '(skg node (skgRepos (nodeRepo public)))'), gnid)
+      assert.is_false(subtree_p(metadata_sexp_by_id(gnid),
+        '(skg node (skgRepos (nodeRepo private)))'), gnid)
     end
   end)
 
@@ -223,9 +223,9 @@ describe('skg.metadata commands', function ()
                                        'refuse'))
     assert.is_true(subtree_p(metadata_sexp_by_id('e'),
       '(skg node (skgRepos (nodeRepo private)))'))
-    for _, skgid in ipairs({ 'r', 'f' }) do
-      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg node (skgRepos (nodeRepo public)))'), skgid)
+    for _, gnid in ipairs({ 'r', 'f' }) do
+      assert.is_true(subtree_p(metadata_sexp_by_id(gnid),
+        '(skg node (skgRepos (nodeRepo public)))'), gnid)
     end
   end)
 

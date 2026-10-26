@@ -62,11 +62,11 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
           // then stop -- never walk past it.
           let ancestor_skgrepo : &SkgrepoName =
             if pt . is_writeProtected () {
-              writeProtected_skgrepos_after_save . get (& pt . skgid)
+              writeProtected_skgrepos_after_save . get (& pt . gnid)
               . unwrap_or (& pt . home_skgrepo)
             } else { & pt . home_skgrepo };
           if config . skgrepo_is_owned (ancestor_skgrepo) {
-            map . entry ( t . skgid . clone () )
+            map . entry ( t . gnid . clone () )
               . or_insert_with ( || ancestor_skgrepo . clone () ); }
           break; }
         ViewnodeKind::Tombstone =>
@@ -102,7 +102,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
   for node in viewforest . nodes () {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
-    if ! new_nodes_with_inherited_skgrepos . contains (& t . skgid)
+    if ! new_nodes_with_inherited_skgrepos . contains (& t . gnid)
       { continue; }
     if config . skgrepo_is_owned (& t . home_skgrepo)
       { continue; } // an owned inheritance is an ordinary creation
@@ -110,12 +110,12 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (pt)) => {
-          if new_nodes_with_inherited_skgrepos . contains (& pt . skgid) {
+          if new_nodes_with_inherited_skgrepos . contains (& pt . gnid) {
             // Another new headline in the same chain: keep climbing.
             current = parent;
             continue; }
           if ! config . skgrepo_is_owned (& pt . home_skgrepo) {
-            map . insert ( t . skgid . clone (), pt . skgid . clone () ); }
+            map . insert ( t . gnid . clone (), pt . gnid . clone () ); }
           break; }
         ViewnodeKind::Tombstone =>
           break,
@@ -198,17 +198,17 @@ pub fn explicit_new_child_skgrepos_for_foreign_vognodes (
       let ViewnodeKind::Vognode (Vognode::Unrestricted (ct))
         = & child . value () . kind
         else { continue; };
-      if ! new_nodes_with_explicit_skgrepos . contains (& ct . skgid)
+      if ! new_nodes_with_explicit_skgrepos . contains (& ct . gnid)
         { continue; }
       if ! config . skgrepo_is_owned (& ct . home_skgrepo)
         { continue; } // an explicitly-foreign new child is an error elsewhere, not a specification
-      match map . get (& t . skgid) {
+      match map . get (& t . gnid) {
         Some (prior) if prior != & ct . home_skgrepo =>
-          { ambiguous . insert ( t . skgid . clone () ); }
+          { ambiguous . insert ( t . gnid . clone () ); }
         _ =>
-          { map . insert ( t . skgid . clone (),
+          { map . insert ( t . gnid . clone (),
                            ct . home_skgrepo . clone () ); }} }}
-  for skgid in &ambiguous { map . remove (skgid); }
+  for gnid in &ambiguous { map . remove (gnid); }
   map }
 
 /// The sentinel skgrepo the confirmation buffer pre-fills for a
@@ -273,7 +273,7 @@ pub fn build_fork_confirmation_buffer (
     out . push_str ( &fork_clone_headline (
       &SkgrepoName::from (shown_skgrepo), &spec . clone . 0 . title ));
     out . push_str ( &forked_original_headline (
-      &spec . original_skgid, &spec . original_skgrepo,
+      &spec . original_gnid, &spec . original_skgrepo,
       &spec . original_title )); }
   out }
 
@@ -339,16 +339,16 @@ pub fn validate_fork_specs_in_graph (
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for spec in fork_specs {
     if let Some (existing) = existing_owned_overrider_of (
-        config, graph, & spec . original_skgid )
+        config, graph, & spec . original_gnid )
       { errors . push (
           BufferValidationError::ForkAlreadyExists (
-            spec . original_skgid . clone (), existing ));
+            spec . original_gnid . clone (), existing ));
         continue; }
     let clone_skgrepo : &SkgrepoName = & spec . clone . 0 . home_skgrepo;
     if ! config . skgrepo_is_owned (clone_skgrepo) {
       errors . push (
         BufferValidationError::ForkSkgrepoNotOwned (
-          spec . original_skgid . clone (),
+          spec . original_gnid . clone (),
           clone_skgrepo . clone () ));
       continue; }
     let unrestricted : bool =
@@ -357,7 +357,7 @@ pub fn validate_fork_specs_in_graph (
     if ! unrestricted {
       errors . push (
         BufferValidationError::ForkSkgrepoRestricted (
-          spec . original_skgid . clone (),
+          spec . original_gnid . clone (),
           clone_skgrepo . clone () )); }}
   errors }
 
@@ -393,7 +393,7 @@ pub fn build_fork_clone (
   clone_skgrepo     : SkgrepoName,
   skgrepo_confirmed : bool, // whether clone_repo was user-specified (vs inferred or defaulted)
 ) -> ForkSpec {
-  let buffer_contains_skgids : Vec<ID> =
+  let buffer_contains_gnids : Vec<ID> =
     members_of (& buffer_node . contains);
   let clone : Graphnode = Graphnode {
     title         : buffer_node . title . clone (),
@@ -403,14 +403,14 @@ pub fn build_fork_clone (
     extra_ids     : Vec::new (),
     body          : buffer_node . body . clone (),
     contains      : rel_partners_at_relRepo (
-      &clone_skgrepo, buffer_contains_skgids . clone () ),
+      &clone_skgrepo, buffer_contains_gnids . clone () ),
     subscribesTo  : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
     hidesFromSubs : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo,
       // The children the forking edit deleted.
       disk_contains . iter ()
-        . filter ( |skgid| ! buffer_contains_skgids . contains (skgid) )
+        . filter ( |gnid| ! buffer_contains_gnids . contains (gnid) )
         . cloned () . collect () )),
     overrides : MSV::Specified ( rel_partners_at_relRepo (
       &clone_skgrepo, vec! [ buffer_node . pid . clone () ] )),
@@ -424,7 +424,7 @@ pub fn build_fork_clone (
   };
   ForkSpec {
     clone           : SaveNode (clone),
-    original_skgid  : buffer_node . pid . clone (),
+    original_gnid  : buffer_node . pid . clone (),
     // The original title (N's disk title), distinct from the clone's
     // edited title above -- the two-level confirmation buffer shows both.
     original_title   : disk_title . to_string (),

@@ -1152,7 +1152,7 @@ show, and may convert it
 ([[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]]).
 The content reconciler manages a node's member vognode children, and
 a folder's reconciler the folder's members, removed members and
-phantoms ('skgid_a_folder_child_stands_for' in
+phantoms ('gnid_a_folder_child_stands_for' in
 'server/to_org/complete/partner_folder/child_data.rs'): each finds
 them by predicates on kind and membership
 ('complete_managed_children'), and first adopts a non-member of a key

@@ -258,7 +258,7 @@ impl<'de> Deserialize<'de> for ListItem {
       B (bool),
     }
     impl Scalar {
-      fn into_skgid (self) -> ID {
+      fn into_gnid (self) -> ID {
         match self {
           Scalar::S (s) => ID (s),
           Scalar::I (i) => ID ( i . to_string () ),
@@ -272,9 +272,9 @@ impl<'de> Deserialize<'de> for ListItem {
     }
     Ok ( match Raw::deserialize (deserializer) ? {
       Raw::Anchor { anchor } =>
-        ListItem::Anchor { anchor : anchor . into_skgid () },
+        ListItem::Anchor { anchor : anchor . into_gnid () },
       Raw::Member (s) =>
-        ListItem::Member ( s . into_skgid () ), } ) }}
+        ListItem::Member ( s . into_gnid () ), } ) }}
 
 /// What one section contributes to its node, in section-local form.
 /// This is the parsed shape of a section file's list fields; the

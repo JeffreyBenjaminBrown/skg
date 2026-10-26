@@ -40,7 +40,7 @@ pub struct SaveNode(pub Graphnode);
 /// A Delete nodeInstruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DeleteNode {
-  pub skgid: ID,
+  pub gnid: ID,
   pub home_skgrepo: SkgrepoName,
 }
 
@@ -84,7 +84,7 @@ pub enum PostSkgsaveCommitNoticeCandidate {
 #[derive(Debug, Clone)]
 pub struct ForkSpec {
   pub clone            : SaveNode,
-  pub original_skgid   : ID,
+  pub original_gnid   : ID,
   pub original_title   : String,
   pub original_skgrepo : SkgrepoName,
   /// True iff the clone's skgrepo was specified by the user (in the
@@ -180,95 +180,95 @@ fn buffer_validation_error_text (
     BufferValidationError::Body_of_NonVognode(title, kind, _) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
-    BufferValidationError::IDFolder_Edited(recorder, buffer_skgids, real_skgids, _) => {
-      let fmt_skgids = |skgids : &Vec<ID>| -> String {
-        skgids . iter() . map(|i| i . 0 . as_str())
+    BufferValidationError::IDFolder_Edited(recorder, buffer_gnids, real_gnids, _) => {
+      let fmt_gnids = |gnids : &Vec<ID>| -> String {
+        gnids . iter() . map(|i| i . 0 . as_str())
           . collect::<Vec<&str>>() . join(", ") };
-      if real_skgids . is_empty() {
+      if real_gnids . is_empty() {
         format!("Node {} is not in the graph, so it cannot carry an idFolder:\n- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
-                recorder . 0, fmt_skgids(buffer_skgids))
+                recorder . 0, fmt_gnids(buffer_gnids))
       } else {
         format!("The idFolder under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
-                recorder . 0, fmt_skgids(buffer_skgids), fmt_skgids(real_skgids)) }},
+                recorder . 0, fmt_gnids(buffer_gnids), fmt_gnids(real_gnids)) }},
     BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, _) => {
-      let fmt_opt = |skgid : &Option<ID>| -> String {
-        skgid . as_ref () . map ( |i| i . 0 . clone () )
+      let fmt_opt = |gnid : &Option<ID>| -> String {
+        gnid . as_ref () . map ( |i| i . 0 . clone () )
           . unwrap_or_else ( || "<none>" . to_string () ) };
       format!("Invalid (overridesHere ...) fact; saving it would rewrite a contains list, so the save was aborted:\n- the node carrying the fact: {}\n- the original the fact claims it stands for: {}\n- what the server would show in place of that original: {}\n- The fact looks hand-edited or stale. Re-render the view (close and reopen, or C-c g RET) and retry.\n",
               fmt_opt (carrier), original . 0, fmt_opt (effective)) },
-    BufferValidationError::Multiple_Defining_Viewnodes (skgid, _) => {
+    BufferValidationError::Multiple_Defining_Viewnodes (gnid, _) => {
       format!("ID has multiple defining containers:\n- ID: {}\n",
-              skgid . 0) },
-    BufferValidationError::AmbiguousDeletion (skgid, _) => {
+              gnid . 0) },
+    BufferValidationError::AmbiguousDeletion (gnid, _) => {
       format!("ID has ambiguous deletion instructions:\n- ID: {}\n",
-              skgid . 0) },
-    BufferValidationError::DuplicatedContent (skgid) => {
+              gnid . 0) },
+    BufferValidationError::DuplicatedContent (gnid) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
-              skgid . 0) },
-    BufferValidationError::ModifiedForeignNode(skgid, skgrepo) => {
+              gnid . 0) },
+    BufferValidationError::ModifiedForeignNode(gnid, skgrepo) => {
       format!("Cannot modify node from foreign repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
-              skgid . 0, skgrepo) },
-    BufferValidationError::CreatedForeignNode(skgid, skgrepo) => {
+              gnid . 0, skgrepo) },
+    BufferValidationError::CreatedForeignNode(gnid, skgrepo) => {
       format!("Cannot create node in foreign repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
-              skgid . 0, skgrepo) },
-    BufferValidationError::CannotMoveToOrFromForeignSkgrepo(skgid, disk_skgrepo, buffer_skgrepo) => {
+              gnid . 0, skgrepo) },
+    BufferValidationError::CannotMoveToOrFromForeignSkgrepo(gnid, disk_skgrepo, buffer_skgrepo) => {
       format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign.\n",
-              skgid . 0, disk_skgrepo, buffer_skgrepo) },
-    BufferValidationError::CannotMoveAndMergeSimultaneously(skgid) => {
+              gnid . 0, disk_skgrepo, buffer_skgrepo) },
+    BufferValidationError::CannotMoveAndMergeSimultaneously(gnid) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
-              skgid . 0) },
-    BufferValidationError::SkgrepoNotInConfig(skgid, skgrepo) => {
+              gnid . 0) },
+    BufferValidationError::SkgrepoNotInConfig(gnid, skgrepo) => {
       format!("Node references a repo that does not exist in config:\n- ID: {}\n- Repo: {}\n- Please check your config file and ensure this repo is defined.\n",
-              skgid . 0, skgrepo) },
-    BufferValidationError::ForkSkgrepoUnresolved(skgid) => {
+              gnid . 0, skgrepo) },
+    BufferValidationError::ForkSkgrepoUnresolved(gnid) => {
       format!("Cannot fork a foreign node -- no owned repo for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a repo from.\n- Set the clone's repo in the fork-confirmation buffer (C-c s s), then approve.\n",
-              skgid . 0) },
+              gnid . 0) },
     BufferValidationError::ForkAlreadyExists(original, existing) => {
       format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one owned override. Edit the existing clone instead.\n",
               original . 0, existing . 0) },
-    BufferValidationError::ForkSkgrepoRestricted(skgid, skgrepo) => {
+    BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) => {
       format!("Cannot fork into a restricted repo:\n- Foreign node: {}\n- Clone's resolved repo: {}\n- That repo is not in the skgrepo restriction. Activate it first; an invisible clone is never created silently.\n",
-              skgid . 0, skgrepo) },
-    BufferValidationError::ForkSkgrepoNotOwned(skgid, skgrepo) => {
+              gnid . 0, skgrepo) },
+    BufferValidationError::ForkSkgrepoNotOwned(gnid, skgrepo) => {
       format!("Cannot fork into a repo you do not own:\n- Foreign node: {}\n- Clone's chosen repo: {}\n- Pick an owned repo for the clone (C-c s s in the confirmation buffer).\n",
-              skgid . 0, skgrepo) },
-    BufferValidationError::ForkRequestOnUnknownNode(skgid, _) => {
+              gnid . 0, skgrepo) },
+    BufferValidationError::ForkRequestOnUnknownNode(gnid, _) => {
       format!("Cannot fork an unsaved node:\n- Node: {}\n- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
-              skgid . 0) },
-    BufferValidationError::ForkRequestMultiple(skgid, _) => {
+              gnid . 0) },
+    BufferValidationError::ForkRequestMultiple(gnid, _) => {
       format!("Multiple fork requests for the same node:\n- Node: {}\n- At most one fork request per node is allowed.\n",
-              skgid . 0) },
+              gnid . 0) },
     BufferValidationError::OverrideInvariantViolation(msg) => {
       format!("{}\n", msg) },
-    BufferValidationError::MultipleEditableViewRequestsForSameId (skgid, _) => {
+    BufferValidationError::MultipleEditableViewRequestsForSameId (gnid, _) => {
       format!("Multiple editable view requests for the same ID:\n- ID: {}\n- At most one editable view request per ID is allowed.\n",
-              skgid . 0) },
-    BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid, _) => {
+              gnid . 0) },
+    BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (gnid, _) => {
       format!("Contradictory view requests on one occurrence:\n- ID: {}\n- It requests both write-protection and an editable view.\n- To move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).\n",
-              skgid . 0) },
-    BufferValidationError::EmptyTitle(skgid) => {
+              gnid . 0) },
+    BufferValidationError::EmptyTitle(gnid) => {
       format!("Node has an empty title:\n- ID: {}\n- Every editable node must have a non-empty title.\n",
-              skgid . 0) },
-    BufferValidationError::LocalStructureViolation(msg, skgid, _) => {
+              gnid . 0) },
+    BufferValidationError::LocalStructureViolation(msg, gnid, _) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
-              skgid . 0, msg) },
-    BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, _) => {
+              gnid . 0, msg) },
+    BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, _) => {
       format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a editable view of it first (C-c g RET).\n",
-              skgid . 0) },
+              gnid . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
-      skgid, title, changes, .. } => {
+      gnid, title, changes, .. } => {
       format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s d).\n",
-              skgid . 0, title, changes . join ("; ")) },
+              gnid . 0, title, changes . join ("; ")) },
     BufferValidationError::FlagsSurfaceEdited {
-      recorder_skgid, recorder_title, changes, .. } => {
+      recorder_gnid, recorder_title, changes, .. } => {
       format!("Edited server-owned flags surface:\n- Recorder ID: {}\n- Recorder title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
-              recorder_skgid . 0, recorder_title, changes . join ("; ")) },
-    BufferValidationError::FlagEditOnForeignNode (skgid, skgrepo) => {
+              recorder_gnid . 0, recorder_title, changes . join ("; ")) },
+    BufferValidationError::FlagEditOnForeignNode (gnid, skgrepo) => {
       format!("Cannot change a flag on a foreign node:\n- ID: {}\n- Repo: {}\n- Flag changes never create an implicit fork. Visit an owned node instead.\n",
-              skgid . 0, skgrepo) },
-    BufferValidationError::FlagEditOnUnknownNode (skgid) => {
+              gnid . 0, skgrepo) },
+    BufferValidationError::FlagEditOnUnknownNode (gnid) => {
       format!("Cannot change a flag on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the flag setter.\n",
-              skgid . 0) },
+              gnid . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
 
@@ -316,16 +316,16 @@ impl NodeMerge {
       self . acquiree_to_delete . clone() . into(),
     ] }
 
-  pub fn acquirer_skgid (
+  pub fn acquirer_gnid (
     &self
   ) -> &ID {
     &self . updated_acquirer . 0 . pid
   }
 
-  pub fn acquiree_skgid (
+  pub fn acquiree_gnid (
     &self
   ) -> &ID {
-    &self . acquiree_to_delete . skgid
+    &self . acquiree_to_delete . gnid
   }
 
   /// Extracts the three targets from a NodeMerge:
@@ -337,6 +337,6 @@ impl NodeMerge {
   ) -> (&Graphnode, &Graphnode, (&ID, &SkgrepoName)) {
     ( &self . acquiree_text_preserver . 0,
       &self . updated_acquirer . 0,
-      (&self . acquiree_to_delete . skgid, &self . acquiree_to_delete . home_skgrepo) )
+      (&self . acquiree_to_delete . gnid, &self . acquiree_to_delete . home_skgrepo) )
   }
 }

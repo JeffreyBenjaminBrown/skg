@@ -83,28 +83,28 @@ pub struct RequestedRelRepos {
 /// Strip the per-member explicit-repo payload down to plain IDs, by
 /// reference (read-only consumers, e.g.
 /// 'nodeSaveIntents_with_specified_contains').
-fn skgids_only_msv_ref (
+fn gnids_only_msv_ref (
   msv : &MSV<(ID, Option<SkgrepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
-      v . iter () . map ( |(skgid, _)| skgid . clone () ) . collect () ), }}
+      v . iter () . map ( |(gnid, _)| gnid . clone () ) . collect () ), }}
 
 /// As 'ids_only_msv_ref', consuming.
-fn skgids_only_msv (
+fn gnids_only_msv (
   msv : MSV<(ID, Option<SkgrepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
-      v . into_iter () . map ( |(skgid, _)| skgid ) . collect () ), }}
+      v . into_iter () . map ( |(gnid, _)| gnid ) . collect () ), }}
 
 /// As above, for the non-MSV 'contains' slice.
-fn skgids_only (
+fn gnids_only (
   list : &[(ID, Option<SkgrepoName>)],
 ) -> Vec<ID> {
-  list . iter () . map ( |(skgid, _)| skgid . clone () ) . collect () }
+  list . iter () . map ( |(gnid, _)| gnid . clone () ) . collect () }
 
 impl NodeIntent {
   pub fn pid (
@@ -112,7 +112,7 @@ impl NodeIntent {
   ) -> &ID {
     match self {
       NodeIntent::Save (intent) => &intent . pid,
-      NodeIntent::Delete (intent) => &intent . skgid, }}
+      NodeIntent::Delete (intent) => &intent . gnid, }}
 
   pub fn apply_hiderel_delta (
     &mut self,
@@ -195,7 +195,7 @@ impl NodeSaveIntent {
       // ever comes from a buffer headline's own '(relRepo ...)').
       self . contains =
         MSV::Specified ( contains . iter () . cloned ()
-                          . map ( |skgid| (skgid, None) ) . collect () ); }}
+                          . map ( |gnid| (gnid, None) ) . collect () ); }}
 
   /// The skgrepos the buffer explicitly requested (its headlines'
   /// '(relRepo NAME)' atoms), read out before 'into_graphnode'
@@ -207,8 +207,8 @@ impl NodeSaveIntent {
       list : &[(ID, Option<SkgrepoName>)],
     ) -> HashMap<ID, SkgrepoName> {
       list . iter ()
-        . filter_map ( |(skgid, skgrepo)| skgrepo . clone ()
-                       . map ( |s| (skgid . clone (), s) ) )
+        . filter_map ( |(gnid, skgrepo)| skgrepo . clone ()
+                       . map ( |s| (gnid . clone (), s) ) )
         . collect () }
     RequestedRelRepos {
       contains          : collect (self . contains . or_default ()),
@@ -242,16 +242,16 @@ impl NodeSaveIntent {
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
         rel_partners_at_relRepo (
-          &skgrepo, skgids_only (self . contains . or_default ()) ),
+          &skgrepo, gnids_only (self . contains . or_default ()) ),
       subscribesTo                 :
-        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . subscribesTo)),
+        rel_partners_at_relRepo_msv (&skgrepo, gnids_only_msv (self . subscribesTo)),
       hidesFromSubs                :
         rel_partners_at_relRepo_msv (&skgrepo, self . hidesFromSubs),
       overrides                    :
-        rel_partners_at_relRepo_msv (&skgrepo, skgids_only_msv (self . overrides)),
+        rel_partners_at_relRepo_msv (&skgrepo, gnids_only_msv (self . overrides)),
       flags                         : self . flags,
     };
-    node . normalize_skgids ();
+    node . normalize_gnids ();
     node }
 
   fn apply_hiderel_delta (
@@ -266,10 +266,10 @@ impl NodeSaveIntent {
       } else {
         self . hidesFromSubs . or_default() . to_vec()
       };
-    hides . retain ( |skgid| ! inferred_unhides . contains (skgid) );
-    for skgid in inferred_hides {
-      if ! hides . contains (skgid) {
-        hides . push (skgid . clone()); }}
+    hides . retain ( |gnid| ! inferred_unhides . contains (gnid) );
+    for gnid in inferred_hides {
+      if ! hides . contains (gnid) {
+        hides . push (gnid . clone()); }}
     self . hidesFromSubs =
       MSV::Specified (hides); }}
 
@@ -364,7 +364,7 @@ fn lower_one_entry (
 ) -> Result<NodeIntent, String> {
   if entry . delete {
     return Ok (NodeIntent::Delete (DeleteNode {
-      skgid           : pid . clone(),
+      gnid           : pid . clone(),
       home_skgrepo : entry . home_skgrepo . ok_or_else ( || format!(
         "lower_collected_fieldIntents: delete entry for {} lacks a repo",
         pid )) ?, } )); }
@@ -427,8 +427,8 @@ impl LoweredNodeIntents {
               MSV::Specified (contains) => Some ((
                 pid . clone (),
                 intent . home_skgrepo . clone (),
-                skgids_only (contains),
-                skgids_only_msv_ref (&intent . subscribesTo) )),
+                gnids_only (contains),
+                gnids_only_msv_ref (&intent . subscribesTo) )),
               _ => None },
           _ => None })
       . collect () }
@@ -443,7 +443,7 @@ impl LoweredNodeIntents {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent)) =>
         intent . contains . or_default () . iter ()
-        . map ( |(skgid, _)| skgid . clone () ) . collect (),
+        . map ( |(gnid, _)| gnid . clone () ) . collect (),
       _ =>
         members_of (&subscriber_from_disk . contains)
         . into_iter() . collect(),
@@ -460,7 +460,7 @@ impl LoweredNodeIntents {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
         if ! intent . subscribesTo . is_unspecified () =>
-          skgids_only (intent . subscribesTo . or_default ()),
+          gnids_only (intent . subscribesTo . or_default ()),
       _ =>
         members_of (
           subscriber_from_disk . subscribesTo . or_default () ),

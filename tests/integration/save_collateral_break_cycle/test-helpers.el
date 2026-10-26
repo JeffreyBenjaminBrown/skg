@@ -94,7 +94,7 @@ without metadata are skipped."
                      (id-list (when (and (consp sexp)
                                          (memq 'node (cdr sexp)))
                                 (skg-sexp-cdr-at-path sexp '(skg gnid))))
-                     (skgid (when id-list
+                     (gnid (when id-list
                            (format "%s" (car id-list))))
                      (position (progn
                                  (while (and stack (>= (caar stack) depth))
@@ -106,8 +106,8 @@ without metadata are skipped."
                 (push (list depth (nth 0 position) (nth 1 position)
                             (nth 3 position))
                       stack)
-                (when skgid
-                  (push (list depth relation skgid) result)))))
+                (when gnid
+                  (push (list depth relation gnid) result)))))
           (forward-line 1))))
       (nreverse result))))
 

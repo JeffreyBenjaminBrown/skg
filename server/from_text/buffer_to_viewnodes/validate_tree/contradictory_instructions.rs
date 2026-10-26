@@ -42,24 +42,24 @@ pub fn find_inconsistent_instructions(
       Vec<(ID, Vec<HeadlineName>)>) // IDs with multiple defining nodes
 { let (id_toDelete_instructions, mut id_to_definers) =
     collect_instructions (viewforest);
-  let mut inconsistent_deletion_skgids: Vec<(ID, Vec<HeadlineName>)> = Vec::new();
-  let mut problematic_defining_skgids: Vec<(ID, Vec<HeadlineName>)> = Vec::new();
+  let mut inconsistent_deletion_gnids: Vec<(ID, Vec<HeadlineName>)> = Vec::new();
+  let mut problematic_defining_gnids: Vec<(ID, Vec<HeadlineName>)> = Vec::new();
   { // filter to problematic instructions
     { // Collect inconsistent deletion instructions
-      for (skgid, delete_set) in id_toDelete_instructions {
+      for (gnid, delete_set) in id_toDelete_instructions {
         if delete_set . len() == 2 {
           // Size 2 means both Delete and DoNotDelete are present.
           let definers : Vec<HeadlineName> =
-            id_to_definers . get (&skgid) . cloned ()
+            id_to_definers . get (&gnid) . cloned ()
             . unwrap_or_default ();
-          inconsistent_deletion_skgids . push ((skgid, definers)); }} }
+          inconsistent_deletion_gnids . push ((gnid, definers)); }} }
     { // Collect multiple defining containers
-      for (skgid, definers) in id_to_definers . drain () {
+      for (gnid, definers) in id_to_definers . drain () {
         if definers . len () > 1 {
           // Multiple defining containers for this ID
-          problematic_defining_skgids . push ((skgid, definers)); }} }}
-  ( inconsistent_deletion_skgids,
-    problematic_defining_skgids ) }
+          problematic_defining_gnids . push ((gnid, definers)); }} }}
+  ( inconsistent_deletion_gnids,
+    problematic_defining_gnids ) }
 
 /// Collect delete instructions and defining containers.
 fn collect_instructions(
@@ -77,7 +77,7 @@ fn collect_instructions(
     let viewnode : &Viewnode = node_ref . value();
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       = &viewnode . kind
-    { { let skgid : &ID = &t . skgid;
+    { { let gnid : &ID = &t . gnid;
         if ! t . is_writeProtected () { // write-protected nodes contribute no instructions
           let delete_instruction : WhetherToDelete =
             if matches!(t . edit_request (),
@@ -85,10 +85,10 @@ fn collect_instructions(
               WhetherToDelete::Delete
             } else { WhetherToDelete::DoNotDelete };
           id_toDelete_instructions // record delete_instruction
-            . entry(skgid . clone())
+            . entry(gnid . clone())
             . or_insert_with (HashSet::new)
             . insert (delete_instruction);
-          id_definers . entry(skgid . clone())
+          id_definers . entry(gnid . clone())
             // record this defining container
             . or_default ()
             . push (viewnode . headline_name ()); }}}

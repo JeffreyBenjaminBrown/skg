@@ -69,7 +69,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       ready : true, objects : BTreeSet::new () }),
     .. viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown (
       Unknown {
-        skgid : ID::from ("unknown"),
+        gnid : ID::from ("unknown"),
         relRepo : None,
         relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))),
         claimsMembership : true, }))) };
@@ -131,11 +131,11 @@ fn write_protect_drops_the_editable_request_and_keeps_membership () {
 #[test]
 fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
   let mut viewforest : ViewForest = ViewForest::new ();
-  let buffer_root : ego_tree::NodeId = viewforest . internal_root_skgid ();
+  let buffer_root : ego_tree::NodeId = viewforest . internal_root_gnid ();
   let tree : &mut ego_tree::Tree<Viewnode> = viewforest . as_internal_tree_mut ();
-  let editable = |skgid : &str| -> Viewnode {
-    mk_editable_viewnode ( ID::from (skgid), SkgrepoName::from ("public"),
-                           skgid . into (), None ) };
+  let editable = |gnid : &str| -> Viewnode {
+    mk_editable_viewnode ( ID::from (gnid), SkgrepoName::from ("public"),
+                           gnid . into (), None ) };
   let root : ego_tree::NodeId =
     tree . get_mut (buffer_root) . unwrap () . append (editable ("root")) . id ();
   let folder : ego_tree::NodeId = tree . get_mut (root) . unwrap ()
@@ -180,7 +180,7 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
     viewnode_of (ViewnodeKind::Folder (Folder::Alias)),
     viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::alias ( "an alias" . into (), None, None ))),
     viewnode_of (ViewnodeKind::Vognode (Vognode::Ghost (
-      Ghost { skgid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
+      Ghost { gnid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
               title : "g" . into (), body : None,
               restoreNode_request : false, tombstone_request : false,
               claimsMembership : false, isWarranted : Warrant::ByHead } ))) ];

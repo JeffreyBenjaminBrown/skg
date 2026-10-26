@@ -58,13 +58,13 @@
   "Open views *a*, *b*, and *solo*."
   (message "=== PHASE 1: Open three overlapping views ===")
   (setq integration-test-phase "phase-1-open-three-views")
-  (dolist (skgid '("a" "b" "solo"))
-    (skg-request-single-root-content-view-from-id skgid)
-    (skg-test-wait-for-buffer (format "*%s*" skgid))
-    (unless (get-buffer (format "*%s*" skgid))
-      (message "✗ FAIL [phase 1]: buffer *%s* was not created" skgid)
+  (dolist (gnid '("a" "b" "solo"))
+    (skg-request-single-root-content-view-from-id gnid)
+    (skg-test-wait-for-buffer (format "*%s*" gnid))
+    (unless (get-buffer (format "*%s*" gnid))
+      (message "✗ FAIL [phase 1]: buffer *%s* was not created" gnid)
       (kill-emacs 1))
-    (message "✓ opened view *%s*" skgid)))
+    (message "✓ opened view *%s*" gnid)))
 
 (defun phase-2-edit-and-save-a ()
   "Edit a's title in *a* and save it."

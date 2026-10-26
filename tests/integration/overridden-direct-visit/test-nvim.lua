@@ -9,8 +9,8 @@ local content_view = require('skg.content_view')
 local buffer = require('skg.buffer')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
-local function raw_view_buffer_showing (skgid)
-  local needle = '(gnid ' .. skgid .. ')'
+local function raw_view_buffer_showing (gnid)
+  local needle = '(gnid ' .. gnid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) then
       local view_id = vim.b[buf].skg_view_id

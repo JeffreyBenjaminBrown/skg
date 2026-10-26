@@ -31,12 +31,12 @@ fn flag_state_response_body (
   env     : &SkgEnv,
 ) -> Result<String, String> {
   let runtime = env . runtime_snapshot ();
-  let skgid : ID = ID::from (value_from_request_sexp ("id", request) ?);
+  let gnid : ID = ID::from (value_from_request_sexp ("id", request) ?);
   let flag_name : String = value_from_request_sexp ("flag", request) ?;
   let flag : Flag = Flag::from_wire_name (&flag_name)
     . ok_or_else (|| format! ("unknown flag '{}'", flag_name)) ?;
   let (pid, skgrepo, value, owned) = flag_state (
-    &runtime . graph, &runtime . config, &skgid, flag) ?;
+    &runtime . graph, &runtime . config, &gnid, flag) ?;
   Ok (format! (
     "(id {}) (flag {}) (value {}) (repo {}) (owned {})",
     quote_sexp_string (&pid . 0), quote_sexp_string (flag . wire_name ()),
@@ -48,11 +48,11 @@ fn flag_state_response_body (
 pub fn flag_state (
   graph    : &InRustGraph,
   config   : &SkgConfig,
-  skgid    : &ID,
+  gnid    : &ID,
   flag : Flag,
 ) -> Result<(ID, SkgrepoName, bool, bool), String> {
-  let (pid, skgrepo) : (ID, SkgrepoName) = graph . pid_and_skgrepo (skgid)
-    . ok_or_else (|| format! ("id '{}' is not in the graph", skgid)) ?;
+  let (pid, skgrepo) : (ID, SkgrepoName) = graph . pid_and_skgrepo (gnid)
+    . ok_or_else (|| format! ("id '{}' is not in the graph", gnid)) ?;
   let node = graphnode_from_graph (graph, &pid)
     . ok_or_else (|| format! ("canonical id '{}' is not in the graph", pid)) ?;
   let value : bool = flag_is_true (&node . flags, flag);

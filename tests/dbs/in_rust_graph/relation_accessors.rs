@@ -24,22 +24,22 @@ fn node (
   node . title = pid . to_string ();
   node . home_skgrepo = SkgrepoName::from ("main");
   node . extra_ids =
-    extra_ids . iter () . map ( |skgid| ID::from (*skgid) ) . collect ();
+    extra_ids . iter () . map ( |gnid| ID::from (*gnid) ) . collect ();
   node . subscribesTo =
     if subscribes . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
-      subscribes . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
+      subscribes . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
   node . hidesFromSubs =
     if hides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
-      hides . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
+      hides . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
   node . overrides =
     if overrides . is_empty () { MSV::Unspecified }
     else { MSV::Specified ( rel_partners_at_relRepo (
       &node . home_skgrepo,
-      overrides . iter () . map ( |skgid| ID::from (*skgid) ) . collect ())) };
+      overrides . iter () . map ( |gnid| ID::from (*gnid) ) . collect ())) };
   node }
 
 fn node_with_all_relations (
@@ -54,18 +54,18 @@ fn node_with_all_relations (
     node (pid, &[], subscribes, hides, overrides);
   result . contains = rel_partners_at_relRepo (
     &result . home_skgrepo,
-    contains . iter () . map (|skgid| ID::from (*skgid)) . collect ());
+    contains . iter () . map (|gnid| ID::from (*gnid)) . collect ());
   if ! links . is_empty () {
     result . body = Some (links . iter ()
-      . map (|skgid| format! ("[[id:{}][{}]]", skgid, skgid))
+      . map (|gnid| format! ("[[id:{}][{}]]", gnid, gnid))
       . collect::<Vec<String>> () . join (" ")); }
   result
 }
 
-fn skgid_set (
-  skgids : &[&str],
+fn gnid_set (
+  gnids : &[&str],
 ) -> std::collections::HashSet<ID> {
-  skgids . iter () . map (|skgid| ID::from (*skgid)) . collect ()
+  gnids . iter () . map (|gnid| ID::from (*gnid)) . collect ()
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
         relRepo : SkgrepoName::from ("main"), },
     ] );
   assert_eq! (
-    graph . outbound_skgids_for_relation_gated (
+    graph . outbound_gnids_for_relation_gated (
       &ID::from ("recorder"), NodeRelation::Contains, None ),
     vec![ ID::from ("known-extra"), ID::from ("absent-raw") ] );
   assert_eq! (
@@ -162,7 +162,7 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
     ] ); }
 
 #[test]
-fn relationship_member_key_canonicalizes_only_resolved_skgids () {
+fn relationship_member_key_canonicalizes_only_resolved_gnids () {
   let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node ("known", &["known-extra"], &[], &[], &[]),
   ]);
@@ -190,7 +190,7 @@ fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    skgid_set (&[
+    gnid_set (&[
       "seed", "contained", "container", "subscribee", "subscriber",
       "hidden", "hider", "link-dest", "link-source", "dangling-link",
     ]));
@@ -208,7 +208,7 @@ fn update_relevant_neighborhood_walks_override_directions_independently () {
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    skgid_set (&[
+    gnid_set (&[
       "seed", "above-2", "above-3", "above-branch", "below-1", "below-2",
     ]));
 }
@@ -227,7 +227,7 @@ fn update_relevant_neighborhood_neither_reverses_nor_mixes_paths () {
   ]);
   assert_eq! (
     graph . update_relevant_neighborhood ([ID::from ("seed")]),
-    skgid_set (&["seed", "above", "ordinary", "below"]));
+    gnid_set (&["seed", "above", "ordinary", "below"]));
 }
 
 #[test]
@@ -240,7 +240,7 @@ fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
   assert_eq! (
     graph . update_relevant_neighborhood (
       [ID::from ("alias"), ID::from ("unknown")]),
-    skgid_set (&["known", "unknown", "points-at-unknown"]));
+    gnid_set (&["known", "unknown", "points-at-unknown"]));
 }
 
 // A node the restriction excludes is hidden, by its pid or an extra

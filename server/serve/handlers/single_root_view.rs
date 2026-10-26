@@ -40,10 +40,10 @@ pub fn handle_single_root_view_request (
   let runtime = env . runtime_snapshot ();
   let viewforest_id_result : Result<ViewforestId, String> =
     viewforest_id_from_request (request);
-  match node_skgid_from_single_root_view_request (request) {
-    Ok (skgid) => {
-      match skgrepo_restriction . skgid_skgrepo_is_unrestricted (
-        &runtime . graph, &runtime . config, &skgid ) {
+  match node_gnid_from_single_root_view_request (request) {
+    Ok (gnid) => {
+      match skgrepo_restriction . gnid_skgrepo_is_unrestricted (
+        &runtime . graph, &runtime . config, &gnid ) {
         Ok (true) => {},
         Ok (false) => {
           let response_sexp : String =
@@ -51,7 +51,7 @@ pub fn handle_single_root_view_request (
               &String::new (),
               &vec! [format! (
                 "Node {} is not in skgrepo restriction {}",
-                skgid,
+                gnid,
                 skgrepo_restriction . name )],
               &[] );
           send_response_with_length_prefix (
@@ -73,7 +73,7 @@ pub fn handle_single_root_view_request (
           return; }}
       if let Some (existing_viewforest_id)
         = views_state . open_views
-          . content_viewforest_id_for_root_skgid ( &skgid )
+          . content_viewforest_id_for_root_gnid ( &gnid )
         { // Following a link to a root that is already open lands in
           // that ordinary content buffer.
           let switch_sexp : String =
@@ -96,7 +96,7 @@ pub fn handle_single_root_view_request (
         block_on ( async {
             match multi_root_view_via_runtime (
               &runtime,
-              &[skgid . clone ()],
+              &[gnid . clone ()],
               Some (skgrepo_restriction) )
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 let release = decide_text_release (
@@ -148,7 +148,7 @@ pub fn handle_single_root_view_request (
         & tag_text_response (
           TcpToClient::ContentView, &error_msg )); } } }
 
-pub fn node_skgid_from_single_root_view_request (
+pub fn node_gnid_from_single_root_view_request (
   request : &str
 ) -> Result<ID, String> {
   extract_v_from_kv_pair_in_sexp (

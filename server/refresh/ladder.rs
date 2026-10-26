@@ -99,13 +99,13 @@ fn extend_requested_content (
   walk   : &mut Walk,
 ) {
   if ! walk . had_editableView_request . contains (&parent)
-     || tree . get (parent) . unwrap () . value () . editable_skgid () . is_none ()
+     || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
   { return; }
   for child in children_of (tree, parent) {
     let gnid : ID = match &tree . get (child) . unwrap () . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
         if occurrence . is_writeProtected () && occurrence . claimsMembership =>
-        occurrence . skgid . clone (),
+        occurrence . gnid . clone (),
       _ => continue, };
     if ! drawn_occurrence_is_editable (tree, parent, &gnid, walk) { continue; }
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
@@ -130,7 +130,7 @@ fn add_default_folders (
   walk   : &mut Walk,
 ) {
   if walk . is_diff_view () { return; }
-  let Some (pid) = tree . get (parent) . unwrap () . value () . editable_skgid () . cloned ()
+  let Some (pid) = tree . get (parent) . unwrap () . value () . editable_gnid () . cloned ()
     else { return; };
   if walk . had_editableView_request . contains (&parent)
      && partnerFolder_members_in_graph (
@@ -237,13 +237,13 @@ fn merge_into (
         // the survivor stands for another node (a node and its shown
         // overrider stand for one gnid) whose editable occurrence is
         // elsewhere.
-        walk . editable_gnids . remove (&merged . skgid);
+        walk . editable_gnids . remove (&merged . gnid);
         let takes_it : bool = kept . is_writeProtected ()
-          && ! walk . editable_gnids . contains (&kept . skgid);
+          && ! walk . editable_gnids . contains (&kept . gnid);
         if takes_it {
           kept . editability = merged . editability . clone (); }
         if ! kept . is_writeProtected () {
-          walk . editable_gnids . insert ( kept . skgid . clone () ); }
+          walk . editable_gnids . insert ( kept . gnid . clone () ); }
         if walk . drawn_editable . remove (&other) && takes_it {
           walk . drawn_editable . insert (survivor); }}}}
   let goal : Option<Goal> = goal_of_parent (tree, survivor, walk);
@@ -431,7 +431,7 @@ fn after_drawing (
   treeid : NodeId,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_skgid () . cloned () {
+  if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_gnid () . cloned () {
     walk . editable_gnids . insert (gnid);
     walk . drawn_editable . insert (treeid);
     if walk . had_editableView_request . contains (&parent) {
@@ -494,7 +494,7 @@ fn draw_item (
             .. ghost } )))),
       IdRuleAnswer::Unknown =>
         Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-          skgid                   : gnid . clone (),
+          gnid                   : gnid . clone (),
           relRepo                 : item . relRepo . clone (),
           relationshipEditRequest : None,
           claimsMembership        : claims, } )))),
@@ -508,7 +508,7 @@ fn draw_item (
         isWarranted             : item . warrant, } ))),
     GoalMember::Id (id) =>
       Some ( viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
-        skgid            : id . clone (),
+        gnid            : id . clone (),
         claimsMembership : claims,
         isWarranted      : item . warrant, } ))),
     GoalMember::Flag (flag) =>
@@ -590,14 +590,14 @@ fn substitute_overriders (
 ) -> Result<(), Box<dyn Error>> {
   let Some (goal) = goal else { return Ok (( )); };
   if walk . is_diff_view ()
-     || tree . get (parent) . unwrap () . value () . editable_skgid () . is_none ()
+     || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
      || is_overridden_and_shown_raw (tree, parent, walk)
   { return Ok (( )); }
   for child in children_of (tree, parent) {
     let (gnid, overridesHere, warrant) : (ID, Option<ID>, Warrant) =
       match &tree . get (child) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-          ( occurrence . skgid . clone (), occurrence . overridesHere . clone (),
+          ( occurrence . gnid . clone (), occurrence . overridesHere . clone (),
             occurrence . viewStats . isWarranted ),
         _ => continue, };
     match overridesHere {
@@ -632,10 +632,10 @@ fn show_overrider (
   let node : &GraphnodeInRust = walk . truth . graph . get (shown)
     . ok_or ("show_overrider: the truth lacks the overrider") ?;
   let was_editable_as : Option<ID> =
-    tree . get (child) . unwrap () . value () . editable_skgid () . cloned ();
+    tree . get (child) . unwrap () . value () . editable_gnid () . cloned ();
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
-  { occurrence . skgid         = shown . clone ();
+  { occurrence . gnid         = shown . clone ();
     occurrence . title         = node . title . clone ();
     occurrence . home_skgrepo  = node . home_skgrepo . clone ();
     occurrence . overridesHere = overridesHere;
@@ -703,7 +703,7 @@ fn is_overridden_and_shown_raw (
   raw_position
   && occurrence . overridesHere . is_none ()
   && resolve_override ( walk . truth . config, walk . truth . graph, None,
-                        &occurrence . skgid ) . effective != occurrence . skgid }
+                        &occurrence . gnid ) . effective != occurrence . gnid }
 
 //
 // 8. requests

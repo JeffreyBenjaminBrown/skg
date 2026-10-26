@@ -65,7 +65,7 @@ pub fn candidates_from_disk (
   // touched telescope even though the primary nodeInstruction for its old PID is
   // Delete, not Save.
   for node_merge in node_merges {
-    touched . insert ( node_merge . acquiree_skgid () . clone () ); }
+    touched . insert ( node_merge . acquiree_gnid () . clone () ); }
   let mut touched : Vec<ID> = touched . into_iter () . collect ();
   touched . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
 
@@ -81,7 +81,7 @@ pub fn candidates_from_disk (
           "Refusing to offer Hoist for '{}': its selected home '{}' is not owned.",
           pid, home ))); }
     let (node, _warnings) = compose_telescope_collecting_warnings (
-      telescope, & |skgid : &ID| skgid . clone () ) ?;
+      telescope, & |gnid : &ID| gnid . clone () ) ?;
     if node . overPrivateText_telescope {
       candidates . push ( HoistCandidate { pid, home } ); }}
   Ok (candidates)
@@ -110,7 +110,7 @@ pub fn repair_saves_for_unwritten_candidates (
     let Some (telescope) = telescope_from_disk (
         config, &candidate . pid) ? else { continue; };
     let (mut node, _warnings) = compose_telescope_collecting_warnings (
-      telescope, & |skgid : &ID| skgid . clone () ) ?;
+      telescope, & |gnid : &ID| gnid . clone () ) ?;
     node . overPrivateText_telescope = false;
     repairs . push ( NodeInstruction::Save (SaveNode (node)) ); }
   Ok (repairs)

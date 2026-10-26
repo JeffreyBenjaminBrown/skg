@@ -7,22 +7,22 @@ use crate::types::nodes::complete::Graphnode;
 
 use std::error::Error;
 
-pub fn graphnode_by_skgid (
+pub fn graphnode_by_gnid (
   graph  : &InRustGraph,
   _config : &SkgConfig,
-  skgid     : &ID,
+  gnid     : &ID,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  if let Some (n) = graphnode_from_graph (graph, skgid) { return Ok (n); }
-  Err (format! ("Node '{}' not found in captured graph generation", skgid) . into ()) }
+  if let Some (n) = graphnode_from_graph (graph, gnid) { return Ok (n); }
+  Err (format! ("Node '{}' not found in captured graph generation", gnid) . into ()) }
 
 /// Like graphnode_by_id, but gives None if not found.
 /// id-based. Preserves 'optgraphnode_from_id' not-found behavior.
-pub fn opt_graphnode_by_skgid (
+pub fn opt_graphnode_by_gnid (
   graph  : &InRustGraph,
   _config : &SkgConfig,
-  skgid     : &ID,
+  gnid     : &ID,
 ) -> Result<Option<Graphnode>, Box<dyn Error>> {
-  Ok (graphnode_from_graph (graph, skgid)) }
+  Ok (graphnode_from_graph (graph, gnid)) }
 
 pub fn graphnode_graphFirst_by_pid_and_skgrepo (
   graph  : &InRustGraph,
@@ -35,9 +35,9 @@ pub fn graphnode_graphFirst_by_pid_and_skgrepo (
 
 pub fn graphnode_from_graph (
   graph : &InRustGraph,
-  skgid    : &ID,
+  gnid    : &ID,
 ) -> Option<Graphnode> {
-  let pid : ID = graph . pid_of (skgid) ?;
+  let pid : ID = graph . pid_of (gnid) ?;
   let rust = graph . nodes . get (&pid) ?;
   Some ( Graphnode {
     pid                          : rust . pid . clone (),

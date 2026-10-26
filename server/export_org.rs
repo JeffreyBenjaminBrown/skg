@@ -317,7 +317,7 @@ fn discover_roots (
   restriction  : &SkgrepoRestriction,
   warnings     : &mut Vec<String>,
 ) -> (HashMap<ID, ExportRoot>, HashSet<ID>) {
-  let marker_skgid : ID = ID::from (EXPORT_MARKER_ID);
+  let marker_gnid : ID = ID::from (EXPORT_MARKER_ID);
   // Sorted, so warnings and "first wins" are deterministic.
   let mut sorted : Vec<&Graphnode> = nodes . iter () . collect ();
   sorted . sort_by ( |a, b| a . pid . cmp (&b . pid) );
@@ -325,7 +325,7 @@ fn discover_roots (
   let mut marker_pids   : HashSet<ID> = HashSet::new ();
   let mut marker_target : HashMap<ID, String> = HashMap::new ();
   for n in &sorted {
-    if ! title_links_to (n, &marker_skgid, alias_to_pid) { continue; }
+    if ! title_links_to (n, &marker_gnid, alias_to_pid) { continue; }
     match parse_target_filepath (n . body . as_deref ()) {
       Ok (Some (t)) => {
         marker_pids . insert (n . pid . clone ());
@@ -384,11 +384,11 @@ fn discover_roots (
 /// still recognized.
 fn title_links_to (
   node         : &Graphnode,
-  skgid        : &ID,
+  gnid        : &ID,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> bool {
   LINK_PATTERN . captures_iter (&node . title)
-    . any ( |c| resolve_pid (&ID::from (&c[1]), alias_to_pid) == *skgid ) }
+    . any ( |c| resolve_pid (&ID::from (&c[1]), alias_to_pid) == *gnid ) }
 
 /// Tolerant parse of a marker body. Accepts `target_filepath = X`
 /// where X is bare or quoted. A bare value with whitespace is
@@ -559,7 +559,7 @@ fn custom_id_link_targets (
             [ &node . title, node . body . as_deref () . unwrap_or ("") ];
           for text in texts {
             for link in links_from_text (text) {
-              let pid : ID = resolve_pid (&link . skgid, alias_to_pid);
+              let pid : ID = resolve_pid (&link . gnid, alias_to_pid);
               linked . push (
                 if homes . contains_key (&pid) { pid }
                 else { sink_pid . clone () } ); }} }, }}
@@ -626,7 +626,7 @@ fn rewrite_links (
   for (range, link) in links_with_ranges_from_text (text) {
     out . push_str (&text [copied_up_to .. range . start]);
     copied_up_to = range . end;
-    let uid : ID = link . skgid;
+    let uid : ID = link . gnid;
     let label : &str = &link . label;
     let pid : ID =
       alias_to_pid . get (&uid) . cloned () . unwrap_or (uid);
@@ -735,10 +735,10 @@ fn defuse_headline_lines (
 //
 
 fn resolve_pid (
-  skgid           : &ID,
+  gnid           : &ID,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> ID {
-  alias_to_pid . get (skgid) . cloned () . unwrap_or_else (|| skgid . clone ()) }
+  alias_to_pid . get (gnid) . cloned () . unwrap_or_else (|| gnid . clone ()) }
 
 fn node_unrestricted (
   node   : &Graphnode,

@@ -186,28 +186,28 @@ character."
            (positions (skg-link-annotations--scan))
            (unknown (delete-dups
                      (cl-loop for position in positions
-                              for skgid = (nth 3 position)
-                              unless (gethash skgid skg-link-annotations--cache)
-                              collect skgid))))
+                              for gnid = (nth 3 position)
+                              unless (gethash gnid skg-link-annotations--cache)
+                              collect gnid))))
       (skg-link-annotations--paint positions)
       (when unknown
         (skg-link-annotations--request unknown buffer-generation tick)))))
 
-(defun skg-link-annotations--request (skgids buffer-generation tick)
+(defun skg-link-annotations--request (gnids buffer-generation tick)
   "Request the status of IDS for this buffer's BUFFER-GENERATION and TICK."
   (let ((process (and (boundp 'skg-rust-tcp-proc) skg-rust-tcp-proc)))
     (if (not (and process (process-live-p process)))
         (progn
-          (dolist (skgid skgids)
-            (puthash skgid '(lookup-failed) skg-link-annotations--cache))
+          (dolist (gnid gnids)
+            (puthash gnid '(lookup-failed) skg-link-annotations--cache))
           (skg-link-annotations--paint (skg-link-annotations--scan)))
       (let* ((request-id (format "links-%s" (cl-incf skg-link-annotations--next-request)))
              (entry (list (current-buffer) buffer-generation tick
-                          skg-link-annotations--epoch skgids))
+                          skg-link-annotations--epoch gnids))
              (request (concat (prin1-to-string
                                `((request . "link statuses")
                                  (request-id . ,request-id)
-                                 (ids ,@skgids))) "\n")))
+                                 (ids ,@gnids))) "\n")))
         (skg-register-response-handler
          'link-statuses #'skg-link-annotations--handle-response nil)
         (puthash request-id entry skg-link-annotations--requests)
@@ -217,8 +217,8 @@ character."
           (error
            (remhash request-id skg-link-annotations--requests)
            (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))
-           (dolist (skgid skgids)
-             (puthash skgid '(lookup-failed) skg-link-annotations--cache))
+           (dolist (gnid gnids)
+             (puthash gnid '(lookup-failed) skg-link-annotations--cache))
            (skg-link-annotations--paint (skg-link-annotations--scan))))))))
 
 (defun skg-link-annotations--handle-response (_process payload)
@@ -237,9 +237,9 @@ character."
                        (= buffer-generation skg-link-annotations--buffer-generation)
                        (= tick (buffer-chars-modified-tick)))
               (dolist (row (cadr (assq 'results response)))
-                (let ((skgid (car row)))
-                  (when (member skgid ids)
-                    (puthash skgid
+                (let ((gnid (car row)))
+                  (when (member gnid ids)
+                    (puthash gnid
                              (pcase (cadr row)
                                ('resolved (list 'resolved (nth 2 row)
                                                 (nth 3 row)))

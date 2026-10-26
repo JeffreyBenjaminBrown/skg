@@ -34,13 +34,13 @@ pub fn errors_for_writeProtected_occurrences (
     let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
       &node . value () . kind else { continue; };
     if ! occurrence . is_writeProtected () { continue; }
-    if let Some (graphnode) = graphnode_from_graph (graph, &occurrence . skgid) {
+    if let Some (graphnode) = graphnode_from_graph (graph, &occurrence . gnid) {
       let differences : Vec<String> =
         writeProtected_differences_from_graph (
           node, occurrence, &graphnode );
       if ! differences . is_empty () {
         errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid    : occurrence . skgid . clone (),
+          gnid    : occurrence . gnid . clone (),
           title    : graphnode . title . clone (),
           changes  : differences,
           headline : node . value () . headline_name (), }); }}}
@@ -101,7 +101,7 @@ struct FlagsFolderSurface {
 
 #[derive(Clone, Debug)]
 struct LocatedFlagsSurface {
-  recorder_skgid    : ID,
+  recorder_gnid    : ID,
   recorder_headline : HeadlineName,
   folders           : Vec<FlagsFolderSurface>,
 }
@@ -142,7 +142,7 @@ fn collect_flags_surfaces (
           viewnodes, other_children }) })
       . collect ();
     result . push (LocatedFlagsSurface {
-      recorder_skgid    : recorder . skgid . clone (),
+      recorder_gnid    : recorder . gnid . clone (),
       recorder_headline : node . value () . headline_name (),
       folders, }); }
   for child in node . children () {
@@ -159,7 +159,7 @@ fn flags_surface_errors_against_graph (
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for surface in flags_surfaces_in (current) {
     if surface . folders . is_empty () { continue; }
-    let Some (node) = graphnode_from_graph (graph, &surface . recorder_skgid)
+    let Some (node) = graphnode_from_graph (graph, &surface . recorder_gnid)
     else { continue; };
     let expected_viewnodes : Vec<(Flag, String, Option<String>)> =
       Flag::ALL
@@ -174,7 +174,7 @@ fn flags_surface_errors_against_graph (
       other_children : Vec::new (), }];
     if surface . folders != expected {
       errors . push (BufferValidationError::FlagsSurfaceEdited {
-        recorder_skgid : node . pid . clone (),
+        recorder_gnid : node . pid . clone (),
         recorder_title : node . title . clone (),
         changes        : flags_surface_changes (
           &expected, &surface . folders),
@@ -352,7 +352,7 @@ mod tests {
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, title, changes, .. }] if skgid == &ID::from ("recorder")
+        gnid, title, changes, .. }] if gnid == &ID::from ("recorder")
           && title == "recorder"
           && changes == &vec! ["title \"changed\" differs from the graph's \"recorder\"" . to_string ()]),
       "{:?}", errors);
@@ -419,7 +419,7 @@ mod tests {
       "}, &InRustGraph::new ()) . unwrap ();
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, title, changes, .. }] if skgid == &ID::from ("recorder")
+        gnid, title, changes, .. }] if gnid == &ID::from ("recorder")
           && title == "recorder" && changes == &vec!["added body text" . to_string ()]));
   }
 
@@ -435,8 +435,8 @@ mod tests {
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::FlagsSurfaceEdited {
-        recorder_skgid, recorder_title, changes, .. }]
-      if recorder_skgid == &ID::from ("recorder")
+        recorder_gnid, recorder_title, changes, .. }]
+      if recorder_gnid == &ID::from ("recorder")
         && recorder_title == "recorder"
         && changes . iter () . any (|c| c . contains ("added wasOverloaded"))
         && changes . iter () . any (|c| c . contains ("headline"))

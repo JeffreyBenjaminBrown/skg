@@ -54,16 +54,16 @@ impl SkgrepoRestriction {
   ) -> bool {
     self . name . 0 == "all" }
 
-  pub fn skgid_skgrepo_is_unrestricted (
+  pub fn gnid_skgrepo_is_unrestricted (
     &self,
     graph  : &InRustGraph,
     config : &SkgConfig,
-    skgid     : &ID,
+    gnid     : &ID,
   ) -> Result<bool, Box<dyn Error>> {
     if self . is_all () {
       return Ok (true); }
     Ok ( match find_skgrepo_with_optional_tantivy (
-      graph, skgid, None, config ) {
+      graph, gnid, None, config ) {
       Some (skgrepo) => self . contains_skgrepo (&skgrepo),
       None          => false } ) }
 }
@@ -94,7 +94,7 @@ pub fn entombstone_hidden_occurrences (
     viewforest . root () . descendants ()
     . filter ( |n| match &n . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-          graph . gnid_presence_gated (&t . skgid, Some (restriction))
+          graph . gnid_presence_gated (&t . gnid, Some (restriction))
           == GnidPresence::Hidden,
         _ => false } )
     . map ( |n| n . id () )
@@ -106,12 +106,12 @@ pub fn entombstone_hidden_occurrences (
 pub fn titles_for_skgrepo_set_for_test (
   config : &SkgConfig,
   restriction : &SkgrepoRestriction,
-  skgids    : &[ID],
+  gnids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (config)?;
   let wanted : BTreeSet<ID> =
-    skgids . iter () . cloned () . collect ();
+    gnids . iter () . cloned () . collect ();
   let mut result : HashMap<ID, String> = HashMap::new ();
   for node in nodes {
     if restriction . contains_skgrepo (&node . home_skgrepo)
@@ -119,7 +119,7 @@ pub fn titles_for_skgrepo_set_for_test (
       result . insert (node . pid, node . title); }}
   Ok (result) }
 
-pub fn search_skgids_for_skgrepo_set_for_test (
+pub fn search_gnids_for_skgrepo_set_for_test (
   _tantivy : &TantivyIndex,
   config   : &SkgConfig,
   restriction : &SkgrepoRestriction,

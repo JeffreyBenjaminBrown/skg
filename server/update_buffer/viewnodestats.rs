@@ -10,7 +10,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::required_ancestor_of;
-use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
+use crate::update_buffer::reconcile::content::unintegrated_content_gnids;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 
@@ -35,7 +35,7 @@ pub fn set_viewnodestats_in_viewforest (
   restriction           : Option<&SkgrepoRestriction>,
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
-  let mut ancestor_skgids : HashSet<ID> = HashSet::new ();
+  let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
     viewforest,
@@ -44,7 +44,7 @@ pub fn set_viewnodestats_in_viewforest (
     Some (graph),
     config,
     restriction,
-    &mut ancestor_skgids,
+    &mut ancestor_gnids,
     container_to_contents,
     content_to_containers ); }
 
@@ -55,16 +55,16 @@ fn set_viewnodestats_recursive (
   graph                 : Option<&InRustGraph>,
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
-  ancestor_skgids       : &mut HashSet<ID>,
+  ancestor_gnids       : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let opt_pid : Option<ID> =
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
-    { let node_pid : ID = t . skgid . clone ();
+    { let node_pid : ID = t . gnid . clone ();
       detect_and_mark_cycle_v2 (
-        tree, treeid, &node_pid, ancestor_skgids );
+        tree, treeid, &node_pid, ancestor_gnids );
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
       let is_member_here : bool = stands_as_member (tree, treeid);
@@ -77,7 +77,7 @@ fn set_viewnodestats_recursive (
     } else { None };
   let was_new : bool =
     if let Some ( ref pid ) = opt_pid
-    { ancestor_skgids . insert ( pid . clone() ) }
+    { ancestor_gnids . insert ( pid . clone() ) }
     else { false };
   let child_treeids : Vec<NodeId> =
     tree . get (treeid) . unwrap ()
@@ -90,12 +90,12 @@ fn set_viewnodestats_recursive (
       graph,
       config,
       restriction,
-      ancestor_skgids,
+      ancestor_gnids,
       container_to_contents,
       content_to_containers ); }
   if was_new {
     if let Some ( ref pid ) = opt_pid
-    { ancestor_skgids . remove (pid); } } }
+    { ancestor_gnids . remove (pid); } } }
 
 /// Whether the unrestricted vognode at 'treeid' stands as a member of
 /// its viewparent, for the facts its membership explains (its birth,
@@ -177,24 +177,24 @@ fn set_herald_strings_in_viewnode (
       graph . and_then (|g| {
         let subscriber_pid : &ID = &ancestors . iter ()
           . find (|(_, generation)| *generation == 2) ? . 0;
-        let visible = |skgid : &ID| -> bool {
+        let visible = |gnid : &ID| -> bool {
           match restriction {
             None => true,
             Some (a) if a . is_all () => true,
-            Some (a) => g . nodes . get (skgid)
+            Some (a) => g . nodes . get (gnid)
               .is_some_and (|n| a . contains_skgrepo (&n . home_skgrepo)), }};
         let contents : Vec<ID> = g . outbound_pids_for_relation_gated (
           node_pid, NodeRelation::Contains, restriction )
-          . into_iter () . filter (|skgid| visible (skgid)) . collect ();
+          . into_iter () . filter (|gnid| visible (gnid)) . collect ();
         let hidden : Vec<ID> = g . outbound_pids_for_relation_gated (
           subscriber_pid, NodeRelation::HidesFromSubs, restriction );
         let contained : Vec<ID> = g . outbound_pids_for_relation_gated (
           subscriber_pid, NodeRelation::Contains, restriction );
-        let members : HashSet<ID> = unintegrated_content_skgids (
+        let members : HashSet<ID> = unintegrated_content_gnids (
           g, &contents, &hidden, &contained )
           . into_iter () . collect ();
-        for (skgid, generation) in &ancestors {
-          if members . contains (skgid)
+        for (gnid, generation) in &ancestors {
+          if members . contains (gnid)
             && flags . contains_out . contains (generation) {
             flags . contents_unintegrated_out . push (*generation); } }
         Some (members . len ()) })
@@ -231,7 +231,7 @@ fn parent_kind_of (
     Some (p) => p, None => return ParentKind::Other, };
   match & parent_ref . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      ParentKind::Vognode ( t . skgid . clone () ),
+      ParentKind::Vognode ( t . gnid . clone () ),
     ViewnodeKind::Folder (folder) if ! folder . members_are_properties () =>
       ParentKind::Folder ( folder . clone (), parent_ref . id () ),
     _ => ParentKind::Other, } }
@@ -252,8 +252,8 @@ fn tracked_ancestors (
       let mut i : usize = 0;
       loop {
         match required_ancestor_of (tree, *folder_treeid, i) {
-          Some (anc_skgid) => {
-            if let Some (pid) = unrestricted_vognode_pid (tree, anc_skgid) {
+          Some (anc_gnid) => {
+            if let Some (pid) = unrestricted_vognode_pid (tree, anc_gnid) {
               out . push ( (pid, i + 2) ); }
             i += 1; }
           _ => break, } }
@@ -265,7 +265,7 @@ fn unrestricted_vognode_pid (
   treeid : NodeId,
 ) -> Option<ID> {
   match & tree . get (treeid) ? . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some ( t . skgid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some ( t . gnid . clone () ),
     _ => None, } }
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
@@ -447,7 +447,7 @@ fn set_relRepo (
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
-      t . collected_skgid () };
+      t . collected_gnid () };
     if ! claimsMembership {
       // Not a genuine member at this position (a self-writer standing
       // as a non-member under a folder, or a node of the containerward
@@ -597,8 +597,8 @@ fn detect_and_mark_cycle_v2 (
   tree            : &mut Tree<Viewnode>,
   treeid          : NodeId,
   node_pid        : &ID,
-  ancestor_skgids : &HashSet<ID>,
+  ancestor_gnids : &HashSet<ID>,
 ) {
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . cycle = ancestor_skgids . contains (node_pid); } }
+  { t . viewStats . cycle = ancestor_gnids . contains (node_pid); } }

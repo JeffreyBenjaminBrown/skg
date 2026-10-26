@@ -609,11 +609,11 @@ fn fork_skgrepos_from_request (
       // Each entry is a dotted pair (N . REPO), which the sexp crate
       // parses as the 3-element list [N, ".", REPO].
       if let Sexp::List (kv) = entry {
-        if let [ Sexp::Atom ( Atom::S (skgid) ),
+        if let [ Sexp::Atom ( Atom::S (gnid) ),
                  Sexp::Atom ( Atom::S (dot) ),
                  Sexp::Atom ( Atom::S (skgrepo) ) ] = & kv [..]
         { if dot == "." {
-            map . insert ( ID ( skgid . clone () ),
+            map . insert ( ID ( gnid . clone () ),
                            SkgrepoName::from ( skgrepo . as_str () )); }} }} }
   map }
 
@@ -855,10 +855,10 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
-  let affected_skgids : SaveAffectedIds =
+  let affected_gnids : SaveAffectedIds =
     SaveAffectedIds::from_prepared (&prepared_save);
   let dirty_conflicts = dirty_view_conflicts (
-    other_views, views_state, &affected_skgids,
+    other_views, views_state, &affected_gnids,
     prepared_save . graph_before_save (),
     prepared_save . final_candidate ())
     .map_err (|message| -> Box<dyn Error> {
@@ -872,7 +872,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         format_conflict_error (&dirty_conflicts))],
       warnings : parse_warnings, })); }
   let collateral_viewforest_ids : Vec<ViewforestId> = viewforest_id_from_request_result . as_ref ()
-    .map (|saved_viewforest_id| affected_skgids . collateral_viewforest_ids (
+    .map (|saved_viewforest_id| affected_gnids . collateral_viewforest_ids (
       saved_viewforest_id, views_state,
       prepared_save . graph_before_save (),
       prepared_save . final_candidate ()))
@@ -962,13 +962,13 @@ fn post_skgsave_commit_hiddenoutside_warnings (
   graph      : &crate::dbs::in_rust_graph::InRustGraph,
   candidates : &[PostSkgsaveCommitNoticeCandidate],
 ) -> Vec<String> {
-  let key = |skgid : &ID| -> ID {
-    graph . pid_of (skgid)
-      . unwrap_or_else (|| skgid . clone ()) };
-  let label = |skgid : &ID| -> String {
-    match graphnode_from_graph (graph, skgid) {
+  let key = |gnid : &ID| -> ID {
+    graph . pid_of (gnid)
+      . unwrap_or_else (|| gnid . clone ()) };
+  let label = |gnid : &ID| -> String {
+    match graphnode_from_graph (graph, gnid) {
       Some (node) => format! ("{} ({})", node . title, node . pid),
-      None => skgid . to_string (), } };
+      None => gnid . to_string (), } };
   let mut warnings : Vec<String> = Vec::new ();
   for candidate in candidates {
     let PostSkgsaveCommitNoticeCandidate::HiddenOutsideAdded {

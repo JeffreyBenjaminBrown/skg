@@ -13,12 +13,12 @@
 /// change facts and takes no commit-readiness marker
 /// ('stands_in_containerward_chain').
 
-use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids, containers_in_inRustGraph};
+use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_gnid_from_gnids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::util::graphnode_and_viewnode_from_skgid;
+use crate::to_org::util::graphnode_and_viewnode_from_gnid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
@@ -39,25 +39,25 @@ pub enum ContainerwardChainPartners<'a> {
 }
 
 impl ContainerwardChainPartners<'_> {
-  /// The containerward role tree of each of 'skgids', whose children
+  /// The containerward role tree of each of 'gnids', whose children
   /// are its containers.
   fn containerward_role_trees (
     &self,
     graph     : &InRustGraph,
-    skgids    : &[ID],
+    gnids    : &[ID],
     max_depth : usize,
   ) -> HashMap<ID, ContainerwardRoleTree> {
     match self {
       ContainerwardChainPartners::LiveGraph =>
-        containerward_role_trees_by_skgid_from_skgids (
-          &containers_in_inRustGraph (graph), skgids, max_depth ),
+        containerward_role_trees_by_gnid_from_gnids (
+          &containers_in_inRustGraph (graph), gnids, max_depth ),
       ContainerwardChainPartners::GraphStraddle (straddle) =>
-        containerward_role_trees_by_skgid_from_skgids (
+        containerward_role_trees_by_gnid_from_gnids (
           &|node : &ID, role : RelationRole| -> HashSet<ID> {
             straddle . partners (node, role) . into_iter ()
               . map ( |partner| partner . id )
               . collect () },
-          skgids, max_depth ), } }
+          gnids, max_depth ), } }
 }
 
 /// Draw the chain under each of 'members', each an unrestricted
@@ -71,24 +71,24 @@ pub fn attach_containerward_chains_under_members (
   restriction : Option<&SkgrepoRestriction>,
   partners    : ContainerwardChainPartners,
 ) -> Result<(), Box<dyn Error>> {
-  let members_and_skgids : Vec<(NodeId, ID)> =
+  let members_and_gnids : Vec<(NodeId, ID)> =
     members . iter ()
     . filter_map ( |member|
       tree . get (*member) . and_then ( |node|
         match &node . value () . kind {
           ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-            Some (( *member, t . skgid . clone () )),
+            Some (( *member, t . gnid . clone () )),
           _ => None, } ))
     . collect ();
-  if members_and_skgids . is_empty () { return Ok (( )); }
-  let skgids : Vec<ID> =
-    members_and_skgids . iter () . map ( |(_, skgid)| skgid . clone () ) . collect ();
-  let role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
+  if members_and_gnids . is_empty () { return Ok (( )); }
+  let gnids : Vec<ID> =
+    members_and_gnids . iter () . map ( |(_, gnid)| gnid . clone () ) . collect ();
+  let role_trees_by_gnid : HashMap<ID, ContainerwardRoleTree> =
     partners . containerward_role_trees (
-      graph, &skgids, config . max_roleTree_depth );
-  for (member, skgid) in &members_and_skgids {
+      graph, &gnids, config . max_roleTree_depth );
+  for (member, gnid) in &members_and_gnids {
     if let Some (ContainerwardRoleTree::Inner ( _, containers )) =
-      role_trees_by_skgid . get (skgid)
+      role_trees_by_gnid . get (gnid)
     { for container in containers . iter () . rev () {
         insert_containerward_chain_recursive (
           container, *member, tree, graph, config, restriction ) ?; }} }
@@ -107,7 +107,7 @@ fn insert_containerward_chain_recursive (
 ) -> Result<(), Box<dyn Error>> {
   let Some (chain_node) : Option<NodeId> =
     prepend_containerward_chain_node (
-      tree, parent, node . skgid (), graph, config, restriction ) ?
+      tree, parent, node . gnid (), graph, config, restriction ) ?
     else { return Ok (( )); };
   if let ContainerwardRoleTree::Inner ( _, containers ) = node {
     for container in containers . iter () . rev () {
@@ -137,18 +137,18 @@ fn prepend_containerward_chain_node (
         . or_else ( || home_from_disk (container, config) )
       { if ! restriction . contains_skgrepo (&skgrepo)
         { return Ok (None); }} }
-    let parent_skgid : Option<ID> =
+    let parent_gnid : Option<ID> =
       tree . get (parent) . and_then ( |node| match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (t . skgid . clone ()),
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (t . gnid . clone ()),
         _ => None, } );
-    if let Some (parent_skgid) = parent_skgid {
+    if let Some (parent_gnid) = parent_gnid {
       let relationship_unrestricted : bool =
-        graph . relRepo (container, NodeRelation::Contains, &parent_skgid)
+        graph . relRepo (container, NodeRelation::Contains, &parent_gnid)
         . map ( |skgrepo| restriction . contains_skgrepo (&skgrepo) )
         . unwrap_or (false);
       if ! relationship_unrestricted { return Ok (None); }} }
   let viewnode : Viewnode = match
-    graphnode_and_viewnode_from_skgid (graph, config, container) ? {
+    graphnode_and_viewnode_from_gnid (graph, config, container) ? {
       Some ((_graphnode, viewnode)) =>
         mk_writeProtected_from_viewnode (
           viewnode, false ) ?,

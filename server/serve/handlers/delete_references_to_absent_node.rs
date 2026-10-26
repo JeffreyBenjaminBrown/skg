@@ -29,8 +29,8 @@ pub fn handle_delete_references_to_absent_node_request (
   views_state : &mut ViewsState,
   skgrepo_restriction : &SkgrepoRestriction,
 ) {
-  let raw_skgid = match value_from_request_sexp ("id", request) {
-    Ok (skgid) => ID::from (skgid),
+  let raw_gnid = match value_from_request_sexp ("id", request) {
+    Ok (gnid) => ID::from (gnid),
     Err (e) => return refuse (stream, &e), };
   // Preview validation and the resulting rewrite are one mutation.  Taking
   // the gate before the preview prevents an approved token from becoming
@@ -40,7 +40,7 @@ pub fn handle_delete_references_to_absent_node_request (
   let runtime = env . runtime_snapshot ();
   let working_graph = new_handle ((*runtime . graph) . clone ());
   let graph = working_graph . load_full ();
-  let current = match preview (&graph, &runtime . config, &raw_skgid) {
+  let current = match preview (&graph, &runtime . config, &raw_gnid) {
     Ok (preview) => preview,
     Err (e) => return refuse (stream, &e), };
   let approved = value_from_request_sexp ("approved-preview", request) . ok ();
@@ -51,7 +51,7 @@ pub fn handle_delete_references_to_absent_node_request (
     let content = preview_warning_org (&current);
     let response = format! (
       "((id {}) (approved-preview {}) (content {}) (prompt \"Remove the structured references?\"))",
-      quote_sexp_string (&raw_skgid . 0),
+      quote_sexp_string (&raw_gnid . 0),
       quote_sexp_string (&current . opaque_approval ()),
       quote_sexp_string (&content));
     send_response_with_length_prefix (
@@ -80,7 +80,7 @@ pub fn handle_delete_references_to_absent_node_request (
   let affected_recorder_pids : HashSet<ID> = current . structural . iter ()
     . map (|occurrence| occurrence . recorder_pid . clone ()) . collect ();
   stream_rerender_views_after_absent_reference_cleanup (
-    stream, env, views_state, skgrepo_restriction, &raw_skgid, &affected_recorder_pids );
+    stream, env, views_state, skgrepo_restriction, &raw_gnid, &affected_recorder_pids );
 }
 
 fn refuse (stream : &mut TcpStream, error : &str) {
@@ -97,14 +97,14 @@ fn stream_rerender_views_after_absent_reference_cleanup (
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   skgrepo_restriction : &SkgrepoRestriction,
-  raw_skgid     : &crate::types::misc::ID,
+  raw_gnid     : &crate::types::misc::ID,
   affected_recorder_pids : &HashSet<crate::types::misc::ID>,
 ) {
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
     Some (skgrepo_restriction), None, RerenderOptions::ordinary,
     |_, state| view_can_display_absent_reference_change (
-      &state . viewforest, raw_skgid, affected_recorder_pids ));
+      &state . viewforest, raw_gnid, affected_recorder_pids ));
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
@@ -114,7 +114,7 @@ fn stream_rerender_views_after_absent_reference_cleanup (
 /// so inspect both representations rather than introducing a new view index.
 fn view_can_display_absent_reference_change (
   viewforest             : &ViewForest,
-  raw_skgid              : &crate::types::misc::ID,
+  raw_gnid              : &crate::types::misc::ID,
   affected_recorder_pids : &HashSet<crate::types::misc::ID>,
 ) -> bool {
   pids_from_viewforest (viewforest) . iter ()
@@ -123,7 +123,7 @@ fn view_can_display_absent_reference_change (
        &node . value () . kind,
        crate::types::viewnode::ViewnodeKind::Vognode (
          crate::types::viewnode::Vognode::Unknown (unknown))
-       if unknown . skgid == *raw_skgid ))
+       if unknown . gnid == *raw_gnid ))
 }
 
 #[cfg(test)]
@@ -134,33 +134,33 @@ mod tests {
   use crate::types::viewnode::{mk_editable_viewnode, mk_unknown_viewnode};
   use std::collections::HashSet;
 
-  fn skgid (text : &str) -> ID { ID::from (text) }
+  fn gnid (text : &str) -> ID { ID::from (text) }
 
   fn unrestricted_view (pid : &str) -> ViewForest {
     let mut view : ViewForest = ViewForest::new ();
     view . append_root (mk_editable_viewnode (
-      skgid (pid), SkgrepoName::from ("main"), pid . to_string (), None ));
+      gnid (pid), SkgrepoName::from ("main"), pid . to_string (), None ));
     view
   }
 
-  fn view_with_unknown (raw_skgid : &str) -> ViewForest {
+  fn view_with_unknown (raw_gnid : &str) -> ViewForest {
     let mut view : ViewForest = unrestricted_view ("unrelated-owner");
     let root = view . first_root () . unwrap () . id ();
-    view . get_mut (root) . unwrap () . append (mk_unknown_viewnode (skgid (raw_skgid)));
+    view . get_mut (root) . unwrap () . append (mk_unknown_viewnode (gnid (raw_gnid)));
     view
   }
 
   #[test]
   fn absent_reference_cleanup_selects_only_affected_recorder_or_raw_unknown () {
-    let recorders : HashSet<ID> = HashSet::from ([skgid ("changed-owner")]);
+    let recorders : HashSet<ID> = HashSet::from ([gnid ("changed-owner")]);
     assert! (view_can_display_absent_reference_change (
-      &unrestricted_view ("changed-owner"), &skgid ("gone"), &recorders),
+      &unrestricted_view ("changed-owner"), &gnid ("gone"), &recorders),
       "an open recorder can display its rewritten relationship" );
     assert! (view_can_display_absent_reference_change (
-      &view_with_unknown ("gone"), &skgid ("gone"), &recorders),
+      &view_with_unknown ("gone"), &gnid ("gone"), &recorders),
       "Unknowns are absent from the PID index but still need removal" );
     assert! (! view_can_display_absent_reference_change (
-      &unrestricted_view ("unrelated-owner"), &skgid ("gone"), &recorders),
+      &unrestricted_view ("unrelated-owner"), &gnid ("gone"), &recorders),
       "an unrelated view must receive neither a lock nor a replacement" );
   }
 }

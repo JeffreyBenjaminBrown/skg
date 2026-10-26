@@ -86,7 +86,7 @@ async fn test_modified_foreign_node_forks_with_default_skgrepo (
           org_text, config, None )  ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the foreign node should produce one fork" );
-      assert_eq! ( save_plan . fork_specs[0] . original_skgid, ID::from ("foreign2") );
+      assert_eq! ( save_plan . fork_specs[0] . original_gnid, ID::from ("foreign2") );
       assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_skgrepo,
                    SkgrepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned repo" );

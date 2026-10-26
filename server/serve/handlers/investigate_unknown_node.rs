@@ -4,7 +4,7 @@
 //! dangling ID").
 
 use crate::git_ops::vanished::{
-  investigate_vanished_skgids, vanished_node_report_as_org};
+  investigate_vanished_gnids, vanished_node_report_as_org};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   format_buffer_response_sexp,
@@ -49,12 +49,12 @@ fn investigation_as_org (
   restriction : &SkgrepoRestriction,
 ) -> Result<String, String> {
   require_skgrepo_set_all ("Investigating an unknown node", restriction) ?;
-  let skgid : ID = ID::from ( value_from_request_sexp ("id", request) ? );
-  if let Some (pid) = runtime . graph . pid_of (&skgid) {
+  let gnid : ID = ID::from ( value_from_request_sexp ("id", request) ? );
+  if let Some (pid) = runtime . graph . pid_of (&gnid) {
     let node : &GraphnodeInRust = runtime . graph . get (&pid)
-      . ok_or_else ( || format! ( "{} resolves to {}, which has no node", skgid, pid )) ?;
+      . ok_or_else ( || format! ( "{} resolves to {}, which has no node", gnid, pid )) ?;
     return Ok ( format! ( "{} resolves to node {} ({}) in {}\n",
-                          skgid, node . title, pid, node . home_skgrepo )); }
-  let reports = investigate_vanished_skgids (
-    &runtime . config, &BTreeSet::from ([ skgid ]) );
+                          gnid, node . title, pid, node . home_skgrepo )); }
+  let reports = investigate_vanished_gnids (
+    &runtime . config, &BTreeSet::from ([ gnid ]) );
   Ok ( reports . iter () . map (vanished_node_report_as_org) . collect () ) }

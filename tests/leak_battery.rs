@@ -43,19 +43,19 @@ fn viewforest_from_org (
 ) -> Result<Tree<Viewnode>, Box<dyn Error>> {
   Ok ( org_to_viewnode_tree (input, &InRustGraph::new ())? . 0 ) }
 
-fn first_child_skgid (
+fn first_child_gnid (
   tree : &Tree<Viewnode>,
 ) -> NodeId {
   tree . root () . first_child () . unwrap () . id () }
 
-fn true_child_skgids (
+fn true_child_gnids (
   tree         : &Tree<Viewnode>,
-  parent_skgid : NodeId,
+  parent_gnid : NodeId,
 ) -> BTreeSet<ID> {
-  tree . get (parent_skgid) . unwrap () . children ()
+  tree . get (parent_gnid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
-        => Some (node . skgid . clone ()),
+        => Some (node . gnid . clone ()),
       _ => None, })
     . collect () }
 
@@ -142,11 +142,11 @@ fn inbound_containerward_data_hides_N_at_public (
         let mut viewforest : Tree<Viewnode> =
           viewforest_from_org (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" )?;
-        let c_skgid : NodeId = first_child_skgid (&viewforest);
+        let c_gnid : NodeId = first_child_gnid (&viewforest);
         attach_containerward_chains_under_members (
-          &mut viewforest, &[c_skgid], &graph, config, Some (&public),
+          &mut viewforest, &[c_gnid], &graph, config, Some (&public),
           ContainerwardChainPartners::LiveGraph ) ?;
-        let ancestors : BTreeSet<ID> = true_child_skgids (&viewforest, c_skgid);
+        let ancestors : BTreeSet<ID> = true_child_gnids (&viewforest, c_gnid);
         assert! (
           ! ancestors . contains (&ID::from ("N")),
           "the rendered containerward chain must not show N at \
@@ -161,11 +161,11 @@ fn inbound_containerward_data_hides_N_at_public (
         let mut viewforest : Tree<Viewnode> =
           viewforest_from_org (
             "* (skg node (gnid C) (skgRepos (nodeRepo public))) leak-battery-C\n" )?;
-        let c_skgid : NodeId = first_child_skgid (&viewforest);
+        let c_gnid : NodeId = first_child_gnid (&viewforest);
         attach_containerward_chains_under_members (
-          &mut viewforest, &[c_skgid], &graph, config, Some (&all),
+          &mut viewforest, &[c_gnid], &graph, config, Some (&all),
           ContainerwardChainPartners::LiveGraph ) ?;
-        let ancestors : BTreeSet<ID> = true_child_skgids (&viewforest, c_skgid);
+        let ancestors : BTreeSet<ID> = true_child_gnids (&viewforest, c_gnid);
         assert! (
           ancestors . contains (&ID::from ("N")),
           "under 'all' the rendered containerward chain shows \
@@ -292,7 +292,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           & HashMap::new (),
           config,
           Some (restriction) );
-        let c_treeid : NodeId = first_child_skgid (&viewforest);
+        let c_treeid : NodeId = first_child_gnid (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();
         let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =

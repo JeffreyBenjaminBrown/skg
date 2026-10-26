@@ -17,11 +17,11 @@ local BUFFER_NAME = 'skg://unknown-node'
 
 ---Investigate the unknown headline at point; elsewhere, prompt for
 ---the ID.
----@param skgid string|nil for tests; taken from point or prompted when nil
-function M.investigate_unknown_node (skgid)
-  skgid = skgid or metadata.unknown_id_at_point()
+---@param gnid string|nil for tests; taken from point or prompted when nil
+function M.investigate_unknown_node (gnid)
+  gnid = gnid or metadata.unknown_id_at_point()
           or vim.fn.input('Investigate ID: ')
-  if skgid == '' then
+  if gnid == '' then
     vim.notify('No ID to investigate', vim.log.levels.WARN)
     return end
   state.register_response_handler('investigate-unknown-node',
@@ -31,7 +31,7 @@ function M.investigate_unknown_node (skgid)
   state.lp_reset()
   client.send_string(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'investigate unknown node'),
-    sexpr.pair(sexpr.symbol('id'), skgid) }) .. '\n')
+    sexpr.pair(sexpr.symbol('id'), gnid) }) .. '\n')
 end
 
 ---@param response any

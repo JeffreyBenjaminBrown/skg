@@ -2,7 +2,7 @@ pub mod nodeMergeInstructionTriple;
 pub mod validate_nodeMerge;
 
 use crate::dbs::filesystem::multiple_nodes::{
-  error_unless_each_skgid_names_one_node,
+  error_unless_each_gnid_names_one_node,
   read_all_skg_files_from_skgrepos};
 use crate::dbs::init::rebuild_tantivy_from_nodes;
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
@@ -69,7 +69,7 @@ pub(crate) fn merge_nodes_with_hoist_approval (
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
       &config, &base, prepared . candidate (),
-      prepared . saved_pids (), prepared . affected_skgids ());
+      prepared . saved_pids (), prepared . affected_gnids ());
   let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
     apply_prepared_nodeMerges (
     Some ((prepared, prepared_filesystem)), config,
@@ -141,7 +141,7 @@ pub(crate) fn apply_prepared_nodeMerges (
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;
-        error_unless_each_skgid_names_one_node (
+        error_unless_each_gnid_names_one_node (
           &nodes, &config . data_root)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)

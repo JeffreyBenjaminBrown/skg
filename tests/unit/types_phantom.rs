@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::super::misc::Skgrepo;
 
 fn skgrepo_name (s: &str) -> SkgrepoName { SkgrepoName ( s . to_string () ) }
-fn skgid        (s: &str) -> ID         { ID ( s . to_string () ) }
+fn gnid        (s: &str) -> ID         { ID ( s . to_string () ) }
 
 /// A node with sections in several skgrepos has exactly one home: the
 /// most public retained section. The privacy order here is declaration
@@ -49,14 +49,14 @@ fn home_from_disk_is_the_most_public_section () {
                      "pid: N\ncontains:\n- C\n" ) . unwrap ();
     for _ in 0 .. 20 {
       let config : SkgConfig = make_config ();
-      assert_eq! ( home_from_disk ( &skgid ("N"), &config ),
+      assert_eq! ( home_from_disk ( &gnid ("N"), &config ),
                    Some ( skgrepo_name ("zed") ) ); }}
   { // A section in only the more private skgrepo: that is the home.
     std::fs::write ( private_path . join ("P.skg"),
                      "pid: P\ntitle: P\n" ) . unwrap ();
     let config : SkgConfig = make_config ();
-    assert_eq! ( home_from_disk ( &skgid ("P"), &config ),
+    assert_eq! ( home_from_disk ( &gnid ("P"), &config ),
                  Some ( skgrepo_name ("alpha") ) ); }
   let config : SkgConfig = make_config ();
-  assert_eq! ( home_from_disk ( &skgid ("absent"), &config ), None );
+  assert_eq! ( home_from_disk ( &gnid ("absent"), &config ), None );
 }

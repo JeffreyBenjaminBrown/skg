@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::{
   },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
-use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit_with_status, delete_nodes_by_skgid_from_index};
+use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, tantivy_commit_with_status, delete_nodes_by_gnid_from_index};
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
@@ -91,7 +91,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
       &config, &base, prepared . candidate (),
-      prepared . saved_pids (), prepared . affected_skgids ());
+      prepared . saved_pids (), prepared . affected_gnids ());
   let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
     apply_nodeInstructions ( prepared,
                         prepared_filesystem,
@@ -322,7 +322,7 @@ pub(crate) fn prepare_save_under_mutation_gate (
     .collect ();
   let affected_ids_for_telescope : HashSet<ID> = prepared_save . iter ()
     .chain (prepared_nodeMerge . iter ())
-    .flat_map (|prepared| prepared . affected_skgids () . iter () . cloned ())
+    .flat_map (|prepared| prepared . affected_gnids () . iter () . cloned ())
     .collect ();
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
@@ -358,7 +358,7 @@ fn identities_in_nodeInstruction (
       std::iter::once (node . pid . clone ())
         .chain (node . extra_ids . iter () . cloned ())
         .collect (),
-    NodeInstruction::Delete (delete) => vec![delete . skgid . clone ()], }
+    NodeInstruction::Delete (delete) => vec![delete . gnid . clone ()], }
 }
 
 pub(crate) fn emit_telescope_warnings (
@@ -410,7 +410,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
 ) {
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
     . filter_map ( |d| match d {
-      NodeInstruction::Delete (dn) => Some ( dn . skgid . clone ()),
+      NodeInstruction::Delete (dn) => Some ( dn . gnid . clone ()),
       NodeInstruction::Save (_)    => None } )
     . collect ();
   if deleted_primary_pids . is_empty () { return; }
@@ -460,8 +460,8 @@ pub(crate) fn apply_delete_propagation_cleanup (
     for nd in node_defs . iter_mut () {
       if let NodeInstruction::Save ( SaveNode (nc) ) = nd {
         if ! config . skgrepo_is_owned (&nc . home_skgrepo) { continue; }
-        nc . contains . retain ( |skgid|
-          ! deleted_id_set . contains (& skgid . member) );
+        nc . contains . retain ( |gnid|
+          ! deleted_id_set . contains (& gnid . member) );
         nc . subscribesTo = remove_from_msv (
           &nc . subscribesTo, &deleted_id_set );
         nc . hidesFromSubs = remove_from_msv (
@@ -498,7 +498,7 @@ fn remove_from_msv (
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (
       v . iter ()
-        . filter ( |skgid| ! exclude . contains (& skgid . member) )
+        . filter ( |gnid| ! exclude . contains (& gnid . member) )
         . cloned ()
         . collect ()), } }
 
@@ -565,7 +565,7 @@ pub(crate) fn prepare_fs_update (
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = NodeInstruction::partition_save_and_delete (node_defs);
   for SaveNode (node) in &mut to_save {
-    node . normalize_skgids (); }
+    node . normalize_gnids (); }
   let prepared_writes : Vec<PreparedTelescopeWrite> =
     to_save . iter ()
     . map ( |SaveNode (node)|
@@ -579,14 +579,14 @@ pub(crate) fn prepare_fs_update (
   // Only owned sections are eligible, exactly like the standalone deleter.
   let mut prepared_deletions : Vec<String> = Vec::new ();
   let mut deleted_pids : HashSet<ID> = HashSet::new ();
-  for DeleteNode { skgid, .. } in &to_delete {
+  for DeleteNode { gnid, .. } in &to_delete {
     for skgrepo in config . ordered_skgrepos () {
       if ! config . skgrepo_is_owned (&skgrepo) { continue; }
       let path : String = crate::util::path_from_pid_and_skgrepo (
-        config, &skgrepo, skgid . clone () )
+        config, &skgrepo, gnid . clone () )
         . map_err ( |e| io::Error::new (io::ErrorKind::NotFound, e) ) ?;
       if std::path::Path::new (&path) . is_file () {
-        deleted_pids . insert ( skgid . clone () ); }
+        deleted_pids . insert ( gnid . clone () ); }
       prepared_deletions . push (path); }}
 
   let _ = skgrepo_moves;
@@ -623,12 +623,12 @@ pub(crate) fn update_tantivy_from_nodeInstructions (
         TANTIVY_WRITER_BUFFER_BYTES)? };
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "tantivy_delete" ). entered();
-    delete_nodes_by_skgid_from_index(
+    delete_nodes_by_gnid_from_index(
       // Delete all IDs, be they from Saves or Deletes.
       // (The entry for each Save is then recreated.)
       instructions . iter() . map(|instr| match instr {
         NodeInstruction::Save(SaveNode (node)) => &node . pid,
-        NodeInstruction::Delete(DeleteNode { skgid, .. }) => skgid }),
+        NodeInstruction::Delete(DeleteNode { gnid, .. }) => gnid }),
       &mut writer,
       tantivy_index)? ; }
   // Add documents only for non-deletion nodeInstructions.

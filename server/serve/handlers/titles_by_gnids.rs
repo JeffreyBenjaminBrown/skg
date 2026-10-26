@@ -1,4 +1,4 @@
-use crate::dbs::tantivy::titles_by_skgids;
+use crate::dbs::tantivy::titles_by_gnids;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -23,18 +23,18 @@ use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 
-pub fn titles_by_skgids_for_skgrepo_set_for_test (
+pub fn titles_by_gnids_for_skgrepo_set_for_test (
   config : &SkgConfig,
   restriction : &SkgrepoRestriction,
-  skgids    : &[ID],
+  gnids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn std::error::Error>> {
-  titles_for_skgrepo_set_for_test (config, restriction, skgids) }
+  titles_for_skgrepo_set_for_test (config, restriction, gnids) }
 
 /// Handle a "titles by ids" request from Emacs.
 /// Parses the ID list, performs a bulk Tantivy lookup, supplements
 /// deleted-node titles from git diff data when needed,
 /// and returns an alist of (id . title) pairs.
-pub fn handle_titles_by_skgids_request (
+pub fn handle_titles_by_gnids_request (
   stream            : &mut TcpStream,
   request           : &str,
   graph             : &InRustGraph,
@@ -46,11 +46,11 @@ pub fn handle_titles_by_skgids_request (
       config,
       SkgrepoSetName::from ("all"))
     . expect ("reserved repo-set all should always resolve");
-  handle_titles_by_skgids_request_with_skgrepo_set (
+  handle_titles_by_gnids_request_with_skgrepo_set (
     stream, request, tantivy_index, config,
     &restriction, graph ) }
 
-pub fn handle_titles_by_skgids_request_with_skgrepo_set (
+pub fn handle_titles_by_gnids_request_with_skgrepo_set (
   stream            : &mut TcpStream,
   request           : &str,
   tantivy_index     : &TantivyIndex,
@@ -69,41 +69,41 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
         return; } };
   let id_strings : Vec<String> =
     match extract_string_list_from_sexp (&parsed, "ids") {
-      Ok (skgids) => skgids,
+      Ok (gnids) => gnids,
       Err (e) => {
         tracing::error! (
           "titles_by_ids: failed to extract ids: {}", e );
         send_error_response (stream, &format! (
           "Failed to extract ids: {}", e ));
         return; } };
-  let skgids : Vec<ID> =
+  let gnids : Vec<ID> =
     id_strings . into_iter ()
     . map (ID)
     . collect ();
   let mut title_map : HashMap<ID, String> =
-    titles_by_skgids (tantivy_index, &skgids);
+    titles_by_gnids (tantivy_index, &gnids);
   let skgrepo_diffs : Option<HashMap<SkgrepoName, SkgrepoDiff>> =
-    if title_map . len () < skgids . len () {
+    if title_map . len () < gnids . len () {
       Some (compute_diff_for_every_skgrepo (config))
     } else { None };
   if let Some (skgrepo_diffs) = &skgrepo_diffs {
-    add_addedNode_titles_by_skgids (
-      &mut title_map, &skgids, skgrepo_diffs );
-    add_deleted_node_titles_by_skgids (
-      &mut title_map, &skgids, skgrepo_diffs ); }
-  title_map . retain ( |skgid, _| {
+    add_addedNode_titles_by_gnids (
+      &mut title_map, &gnids, skgrepo_diffs );
+    add_deleted_node_titles_by_gnids (
+      &mut title_map, &gnids, skgrepo_diffs ); }
+  title_map . retain ( |gnid, _| {
     if restriction . is_all () {
       true
     } else {
-      graph . pid_and_skgrepo (skgid) . map (|(_, skgrepo)| skgrepo)
-      . or_else (|| crate::dbs::tantivy::title_and_skgrepo_by_skgid (
-        tantivy_index, skgid ) . map (|(_, skgrepo)| skgrepo))
-      . or_else (|| home_from_disk (skgid, config))
+      graph . pid_and_skgrepo (gnid) . map (|(_, skgrepo)| skgrepo)
+      . or_else (|| crate::dbs::tantivy::title_and_skgrepo_by_gnid (
+        tantivy_index, gnid ) . map (|(_, skgrepo)| skgrepo))
+      . or_else (|| home_from_disk (gnid, config))
       . map ( |skgrepo| restriction . contains_skgrepo (&skgrepo) )
       . unwrap_or (false) } } );
-  let requested : HashSet<ID> = skgids . iter () . cloned () . collect ();
-  let mut overPrivateText_pids : Vec<ID> = skgids . iter ()
-    . filter_map ( |skgid| graph . pid_of (skgid) )
+  let requested : HashSet<ID> = gnids . iter () . cloned () . collect ();
+  let mut overPrivateText_pids : Vec<ID> = gnids . iter ()
+    . filter_map ( |gnid| graph . pid_of (gnid) )
     . filter ( |pid| graph . get (pid)
       . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false) )
@@ -113,7 +113,7 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
       for node in skgrepo_diff . added_nodes . values ()
         . chain (skgrepo_diff . deleted_nodes . values ()) {
         if node . overPrivateText_telescope
-           && node . all_skgids () . any ( |skgid| requested . contains (skgid) ) {
+           && node . all_gnids () . any ( |gnid| requested . contains (gnid) ) {
           overPrivateText_pids . push (node . pid . clone ()); }}}}
   let release = decide_for_overPrivateText_pids (
     "titles-by-ids", restriction, overPrivateText_pids,
@@ -127,10 +127,10 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
     _ => Vec::new (), };
   let content_pairs : Vec<String> =
     title_map . iter ()
-    . map ( |(skgid, title)|
+    . map ( |(gnid, title)|
       format! (
         "({} . {})",
-        quote_sexp_string (skgid . as_str ()),
+        quote_sexp_string (gnid . as_str ()),
         quote_sexp_string (title)) )
     . collect ();
   let response : String =
@@ -143,34 +143,34 @@ pub fn handle_titles_by_skgids_request_with_skgrepo_set (
       . collect::<Vec<String>> () . join (" ") );
   send_response_with_length_prefix (stream, &response); }
 
-pub fn add_deleted_node_titles_by_skgids (
+pub fn add_deleted_node_titles_by_gnids (
   title_map     : &mut HashMap<ID, String>,
-  skgids           : &[ID],
+  gnids           : &[ID],
   skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
 ) {
-  let requested_skgids : HashSet<ID> =
-    skgids . iter () . cloned () . collect ();
+  let requested_gnids : HashSet<ID> =
+    gnids . iter () . cloned () . collect ();
   for skgrepo_diff in skgrepo_diffs . values () {
     for node in skgrepo_diff . deleted_nodes . values () {
-      for skgid in node . all_skgids () {
-        if requested_skgids . contains (skgid) {
+      for gnid in node . all_gnids () {
+        if requested_gnids . contains (gnid) {
           title_map
-            . entry (skgid . clone ())
+            . entry (gnid . clone ())
             . or_insert_with (|| node . title . clone ()); }}} }}
 
-pub fn add_addedNode_titles_by_skgids (
+pub fn add_addedNode_titles_by_gnids (
   title_map     : &mut HashMap<ID, String>,
-  skgids           : &[ID],
+  gnids           : &[ID],
   skgrepo_diffs : &HashMap<SkgrepoName, SkgrepoDiff>,
 ) {
-  let requested_skgids : HashSet<ID> =
-    skgids . iter () . cloned () . collect ();
+  let requested_gnids : HashSet<ID> =
+    gnids . iter () . cloned () . collect ();
   for skgrepo_diff in skgrepo_diffs . values () {
     for node in skgrepo_diff . added_nodes . values () {
-      for skgid in node . all_skgids () {
-        if requested_skgids . contains (skgid) {
+      for gnid in node . all_gnids () {
+        if requested_gnids . contains (gnid) {
           title_map
-            . entry (skgid . clone ())
+            . entry (gnid . clone ())
             . or_insert_with (|| node . title . clone ()); }}} }}
 
 fn send_error_response (

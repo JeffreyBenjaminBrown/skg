@@ -106,16 +106,16 @@ impl InRustGraph {
 
   /// Resolve an ID (primary or extra) to the node's primary ID.
   /// Returns None if the ID is unknown.
-  pub fn pid_of (&self, skgid: &ID) -> Option<ID> {
-    if self . nodes . contains_key (skgid) {
-      Some (skgid . clone ())
+  pub fn pid_of (&self, gnid: &ID) -> Option<ID> {
+    if self . nodes . contains_key (gnid) {
+      Some (gnid . clone ())
     } else {
-      self . extra_id_to_pid . get (skgid) . cloned () } }
+      self . extra_id_to_pid . get (gnid) . cloned () } }
 
   /// Resolve an ID (primary or extra) to its '(pid, repo)'.
   /// Returns None if the ID is unknown.
-  pub fn pid_and_skgrepo (&self, skgid: &ID) -> Option<(ID, SkgrepoName)> {
-    let pid : ID = self . pid_of (skgid) ?;
+  pub fn pid_and_skgrepo (&self, gnid: &ID) -> Option<(ID, SkgrepoName)> {
+    let pid : ID = self . pid_of (gnid) ?;
     let node : &GraphnodeInRust = self . nodes . get (&pid) ?;
     Some ( ( pid, node . home_skgrepo . clone () ) ) }
 }
@@ -205,7 +205,7 @@ fn coalesced_final_nodeInstructions (
   for (position, nodeInstruction) in nodeInstructions . iter () . enumerate () {
     let pid : &ID = match nodeInstruction {
       NodeInstruction::Save (SaveNode (node))       => &node . pid,
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid,
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid,
     };
     by_pid . insert (pid, (position, nodeInstruction)); }
   let mut positioned : Vec<(usize, &NodeInstruction)> =
@@ -256,16 +256,16 @@ pub fn apply_nodeInstructions_to_inRustGraph (
   let touched_pids : HashSet<ID> = nodeInstructions . iter () . map (|nodeInstruction|
     match nodeInstruction {
       NodeInstruction::Save (SaveNode (node))       => node . pid . clone (),
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone (),
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone (),
     }) . collect ();
-  let mut affected_skgids : HashSet<ID> = touched_pids . clone ();
+  let mut affected_gnids : HashSet<ID> = touched_pids . clone ();
 
   // Install the complete final identity state before rebuilding any forward
   // contribution. The inherited recorderward relmaps are deliberately left in place
   // until affected recorders have been discovered from the base graph snapshot.
   for pid in &touched_pids {
     if let Some (old) = base . nodes . get (pid) {
-      affected_skgids . extend (old . extra_ids . iter () . cloned ());
+      affected_gnids . extend (old . extra_ids . iter () . cloned ());
       for extra in &old . extra_ids {
         if candidate . extra_id_to_pid . get (extra) == Some (pid) {
           candidate . extra_id_to_pid . remove (extra); }} }
@@ -273,7 +273,7 @@ pub fn apply_nodeInstructions_to_inRustGraph (
   for nodeInstruction in &nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       let rust : GraphnodeInRust = GraphnodeInRust::from (node);
-      affected_skgids . extend (rust . extra_ids . iter () . cloned ());
+      affected_gnids . extend (rust . extra_ids . iter () . cloned ());
       candidate . nodes . insert (rust . pid . clone (), rust . clone ());
       for extra in &rust . extra_ids {
         candidate . extra_id_to_pid . insert (
@@ -281,7 +281,7 @@ pub fn apply_nodeInstructions_to_inRustGraph (
 
   let final_identity : InRustGraph = candidate . clone ();
   let mut recorders_to_reindex : HashSet<ID> = touched_pids;
-  for raw in affected_skgids {
+  for raw in affected_gnids {
     let old_key : ID = canonical_key (&base, &raw);
     let final_key : ID = canonical_key (&final_identity, &raw);
     if old_key != final_key {
@@ -314,11 +314,11 @@ pub fn in_rust_graph_coherent_with_nodeInstructions_in (
           return Err ( format! (
             "Save instruction pid {} absent from the in-Rust graph",
             node . pid )); }}
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => {
-        if graph . nodes . contains_key (skgid) {
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => {
+        if graph . nodes . contains_key (gnid) {
           return Err ( format! (
             "Delete instruction id {} still present in the in-Rust graph",
-            skgid )); }} } }
+            gnid )); }} } }
   Ok (( )) }
 
 /// Server-wide handle to the shared graph. Readers call

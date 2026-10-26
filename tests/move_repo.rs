@@ -3,7 +3,7 @@
 
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use skg::dbs::filesystem::one_node::graphnode_from_skgid;
+use skg::dbs::filesystem::one_node::graphnode_from_gnid;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -20,10 +20,10 @@ use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
 
 /// Query Tantivy for a node by title and return its skgrepo.
-fn tantivy_skgrepo_for_skgid (
+fn tantivy_skgrepo_for_gnid (
   tantivy_index  : &TantivyIndex,
   query          : &str,
-  expected_skgid : &str,
+  expected_gnid : &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
   // A save tantivy-commits its search-index update in the background, so wait
   // for it to land before reading — mirroring the production search
@@ -38,7 +38,7 @@ fn tantivy_skgrepo_for_skgid (
     let id_value : Option<String> =
       doc . get_first (tantivy_index . id_field)
       . and_then (|v| v . as_str() . map (String::from));
-    if id_value . as_deref() == Some (expected_skgid) {
+    if id_value . as_deref() == Some (expected_gnid) {
       let skgrepo_value : Option<String> =
         doc . get_first (tantivy_index . skgrepo_field)
         . and_then (|v| v . as_str() . map (String::from));
@@ -131,7 +131,7 @@ async fn test_move_node_to_another_owned_skgrepo (
 
     { // FS: read Graphnode back from disk via graph identity lookup
       let node_b : Graphnode =
-        graphnode_from_skgid (&config, &ID::new ("b"))
+        graphnode_from_gnid (&config, &ID::new ("b"))
 ?;
       assert_eq!(node_b . home_skgrepo, SkgrepoName::from ("private"),
                  "Graphnode read from disk should have repo=private"); }
@@ -146,28 +146,28 @@ async fn test_move_node_to_another_owned_skgrepo (
 
     { // Tantivy: skgrepo should be updated
       let skgrepo : Option<String> =
-        tantivy_skgrepo_for_skgid (&tantivy_index, "b", "b")?;
+        tantivy_skgrepo_for_gnid (&tantivy_index, "b", "b")?;
       assert_eq!(skgrepo . as_deref(), Some ("private"),
                  "Tantivy should show repo=private for b"); }
 
     { // Other nodes unchanged
       let node_a : Graphnode =
-        graphnode_from_skgid (&config, &ID::new ("a"))
+        graphnode_from_gnid (&config, &ID::new ("a"))
 ?;
       assert_eq!(node_a . home_skgrepo, SkgrepoName::from ("public"));
       let node_c : Graphnode =
-        graphnode_from_skgid (&config, &ID::new ("c"))
+        graphnode_from_gnid (&config, &ID::new ("c"))
 ?;
       assert_eq!(node_c . home_skgrepo, SkgrepoName::from ("public")); }
 
     { // Containment relationships should be unchanged
       let node_a : Graphnode =
-        graphnode_from_skgid (&config, &ID::new ("a"))
+        graphnode_from_gnid (&config, &ID::new ("a"))
 ?;
       assert!(members_of ( &node_a . contains ) . contains (&ID::new ("b")),
               "a should still contain b after move");
       let node_b : Graphnode =
-        graphnode_from_skgid (&config, &ID::new ("b"))
+        graphnode_from_gnid (&config, &ID::new ("b"))
 ?;
       assert!(members_of ( &node_b . contains ) . contains (&ID::new ("c")),
               "b should still contain c after move"); }
@@ -232,7 +232,7 @@ async fn test_move_node_referenced_by_extra_id (
 
     { // Tantivy: skgrepo updated
       let skgrepo : Option<String> =
-        tantivy_skgrepo_for_skgid (&tantivy_index, "b", "b")?;
+        tantivy_skgrepo_for_gnid (&tantivy_index, "b", "b")?;
       assert_eq!(skgrepo . as_deref(), Some ("private")); }
 
     Ok (()) }
@@ -466,7 +466,7 @@ async fn test_skgrepo_only_change_with_populated_pool (
 
     { // Tantivy: skgrepo updated
       let skgrepo : Option<String> =
-        tantivy_skgrepo_for_skgid (&tantivy_index, "b", "b")?;
+        tantivy_skgrepo_for_gnid (&tantivy_index, "b", "b")?;
       assert_eq!(skgrepo . as_deref(), Some ("private")); }
 
     Ok (()) }

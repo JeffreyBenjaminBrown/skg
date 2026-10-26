@@ -108,10 +108,10 @@ fn outline (
         if metadata . contains ("(skg containerFolder") {
           "containerFolder" . to_string ()
         } else {
-          let skgid : &str = metadata . split ("(gnid ") . nth (1)
+          let gnid : &str = metadata . split ("(gnid ") . nth (1)
             . and_then ( |rest| rest . split (')') . next () )
             . unwrap_or ("?");
-          let mut shown : String = skgid . to_string ();
+          let mut shown : String = gnid . to_string ();
           if metadata . contains ("noClaim")      { shown += " noClaim"; }
           if metadata . contains ("writeProtected") { shown += " writeProtected"; }
           shown };

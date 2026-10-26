@@ -11,9 +11,9 @@ use std::collections::HashSet;
 
 fn relationship_member_key (
   graph : &InRustGraph,
-  skgid    : &ID,
+  gnid    : &ID,
 ) -> RelationshipMemberKey {
-  graph . relationship_member_key (skgid)
+  graph . relationship_member_key (gnid)
 }
 
 /// Goal list for a HiddenInSubscribeeFolder: the intersection of the
@@ -26,9 +26,9 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
 ) -> Vec<ID> {
   let contains_set : HashSet<RelationshipMemberKey> =
     subscribee_contains . iter ()
-    . map (|skgid| relationship_member_key (graph, skgid)) . collect ();
+    . map (|gnid| relationship_member_key (graph, gnid)) . collect ();
   subscriber_hides . iter ()
-    . filter ( |skgid| contains_set . contains (&relationship_member_key (graph, skgid)) )
+    . filter ( |gnid| contains_set . contains (&relationship_member_key (graph, gnid)) )
     . cloned () . collect () }
 
 /// Goal list for a HiddenOutsideOfSubscribeeFolder: the subscriber's
@@ -50,11 +50,11 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   let wt_all_subscribee_content : HashSet<RelationshipMemberKey> =
     wt_subscribees . iter ()
       . flat_map ( |pid| wt_subscribee_content_of (pid) )
-      . map (|skgid| relationship_member_key (graph, &skgid))
+      . map (|gnid| relationship_member_key (graph, &gnid))
       . collect ();
   wt_subscriber_hides . iter ()
-    . filter ( |skgid| ! wt_all_subscribee_content
-              . contains (&relationship_member_key (graph, skgid)) )
+    . filter ( |gnid| ! wt_all_subscribee_content
+              . contains (&relationship_member_key (graph, gnid)) )
     . cloned () . collect () }
 
 /// Resolve a node's skgrepo: try the in-Rust graph snapshot first,

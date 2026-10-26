@@ -33,9 +33,9 @@ fn config_two_owned_one_foreign () -> SkgConfig {
         owned        : owns, } ); }
   SkgConfig::fromSkgreposAndTantivyFolder ( skgrepos, "/tmp/none" ) }
 
-fn restriction (skgid : &str, skgrepo : &str) -> Viewnode {
+fn restriction (gnid : &str, skgrepo : &str) -> Viewnode {
   mk_editable_viewnode (
-    ID::from (skgid), SkgrepoName::from (skgrepo), skgid . to_string (), None ) }
+    ID::from (gnid), SkgrepoName::from (skgrepo), gnid . to_string (), None ) }
 
 fn subscribee_folder () -> Viewnode {
   viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)) }
@@ -94,7 +94,7 @@ fn non_vognode_ancestor_is_skipped () {
     "a non-vognode between an owned ancestor and a foreign node is skipped" ); }
 
 #[test]
-fn writeProtected_ancestor_skgrepo_is_read_from_its_skgid () {
+fn writeProtected_ancestor_skgrepo_is_read_from_its_gnid () {
   // A write-protected occurrence of X shows owned1, but this save moves
   // X (via its editable occurrence elsewhere) to owned2. The foreign N
   // under the write-protected occurrence infers owned2.

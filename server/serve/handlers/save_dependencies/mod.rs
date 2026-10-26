@@ -34,16 +34,16 @@ impl SaveAffectedIds {
 
   pub(crate) fn matching_identity (
     &self,
-    skgid  : &ID,
+    gnid  : &ID,
     before : &InRustGraph,
     after  : &InRustGraph,
   ) -> Option<ID> {
-    if self . raw_touched . contains (skgid) {
-      return Some (skgid . clone ()); }
-    if let Some (canonical) = before . pid_of (skgid) {
+    if self . raw_touched . contains (gnid) {
+      return Some (gnid . clone ()); }
+    if let Some (canonical) = before . pid_of (gnid) {
       if self . before . contains (&canonical) {
         return Some (canonical); }}
-    if let Some (canonical) = after . pid_of (skgid) {
+    if let Some (canonical) = after . pid_of (gnid) {
       if self . after . contains (&canonical) {
         return Some (canonical); }}
     None
@@ -58,8 +58,8 @@ impl SaveAffectedIds {
   ) -> Vec<ViewforestId> {
     let mut viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
       .filter (|(viewforest_id, state)| {
-        *viewforest_id != saved_viewforest_id && state . pids . iter () . any (|skgid|
-          self . matching_identity (skgid, before, after) . is_some ()) })
+        *viewforest_id != saved_viewforest_id && state . pids . iter () . any (|gnid|
+          self . matching_identity (gnid, before, after) . is_some ()) })
       .map (|(viewforest_id, _)| viewforest_id . clone ())
       .collect ();
     viewforest_ids . sort_by_key (ViewforestId::repr_in_client);
@@ -69,7 +69,7 @@ impl SaveAffectedIds {
 
 pub(crate) struct DirtyViewConflict {
   pub(crate) viewforest_id : ViewforestId,
-  pub(crate) skgids : Vec<ID>,
+  pub(crate) gnids : Vec<ID>,
 }
 
 pub(crate) fn dirty_view_conflicts (
@@ -100,13 +100,13 @@ pub(crate) fn dirty_view_conflicts (
     // A save of A and a dirty view of B can conflict merely because both
     // link to X, even when B does not display X's changing herald.
     let mut matching : Vec<ID> = dependencies . iter ()
-      .filter_map (|skgid| affected . matching_identity (skgid, before, after))
+      .filter_map (|gnid| affected . matching_identity (gnid, before, after))
       .collect ();
     matching . sort_by (|left, right| left . 0 . cmp (&right . 0));
     matching . dedup ();
     if ! matching . is_empty () {
       conflicts . push (DirtyViewConflict {
-        viewforest_id : buffer_snapshot . viewforest_id . clone (), skgids : matching, }); }}
+        viewforest_id : buffer_snapshot . viewforest_id . clone (), gnids : matching, }); }}
   Ok (conflicts)
 }
 
@@ -128,7 +128,7 @@ fn dependencies_from_text (
         .collect::<Vec<String>> () . join ("; "))); }
   let mut result : HashSet<ID> = dependencies_from_uninterpreted (&forest);
   result . extend (links_from_text (text) . into_iter ()
-    .map (|link| link . skgid));
+    .map (|link| link . gnid));
   Ok (result)
 }
 
@@ -139,19 +139,19 @@ fn dependencies_from_uninterpreted (
   for node in forest . nodes () {
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
-        result . insert (restriction . skgid . clone ());
+        result . insert (restriction . gnid . clone ());
         result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Unknown (phantom)) => {
-        result . insert (phantom . skgid . clone ()); }
+        result . insert (phantom . gnid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Ghost (phantom)) => {
-        result . insert (phantom . skgid . clone ()); }
+        result . insert (phantom . gnid . clone ()); }
       ViewnodeKind::PropertyMember (
-        PropertyMember::ID { skgid, .. }) => {
-        result . insert (skgid . clone ()); }
+        PropertyMember::ID { gnid, .. }) => {
+        result . insert (gnid . clone ()); }
       _ => {}, }}
   result
 }
@@ -163,19 +163,19 @@ fn dependencies_from_registered (
   for node in forest . nodes () {
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
-        result . insert (restriction . skgid . clone ());
+        result . insert (restriction . gnid . clone ());
         result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Unknown (phantom)) => {
-        result . insert (phantom . skgid . clone ()); }
+        result . insert (phantom . gnid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Ghost (phantom)) => {
-        result . insert (phantom . skgid . clone ()); }
+        result . insert (phantom . gnid . clone ()); }
       ViewnodeKind::PropertyMember (
-        PropertyMember::ID { skgid, .. }) => {
-        result . insert (skgid . clone ()); }
+        PropertyMember::ID { gnid, .. }) => {
+        result . insert (gnid . clone ()); }
       _ => {}, }}
   result
 }
@@ -186,7 +186,7 @@ pub(crate) fn format_conflict_error (
   let by_view : HashMap<String, String> = conflicts . iter ()
     .map (|conflict| (
       conflict . viewforest_id . repr_in_client (),
-      conflict . skgids . iter () . map (ToString::to_string)
+      conflict . gnids . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join (", ")))
     .collect ();
   let mut entries : Vec<(String, String)> = by_view . into_iter () . collect ();
@@ -195,6 +195,6 @@ pub(crate) fn format_conflict_error (
     "NOTHING WAS SAVED: this save conflicts with unsaved dependencies in {}. Archive those edits with skg-show-unsaved-changes (Emacs) or :SkgShowUnsavedChanges (Neovim), close the archived views, and retry. Conflicts: {}",
     entries . iter () . map (|entry| entry . 0 . as_str ())
       .collect::<Vec<&str>> () . join (", "),
-    entries . iter () . map (|(viewforest_id, skgids)| format! ("{} [{}]", viewforest_id, skgids))
+    entries . iter () . map (|(viewforest_id, gnids)| format! ("{} [{}]", viewforest_id, gnids))
       .collect::<Vec<String>> () . join ("; "))
 }

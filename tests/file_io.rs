@@ -23,7 +23,7 @@ use skg::test_utils::{run_with_test_stores, graphnode_example};
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 
 #[test]
-fn save_filesystem_preparation_writes_normalized_skgids (
+fn save_filesystem_preparation_writes_normalized_gnids (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let dir : tempfile::TempDir = tempfile::tempdir () ?;
   let skgrepo : SkgrepoName = SkgrepoName::from ("temp");

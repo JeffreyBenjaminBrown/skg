@@ -108,7 +108,7 @@ pub struct Graphnode {
 }
 
 impl Graphnode {
-  pub fn all_skgids (&self) -> impl Iterator<Item = &ID> {
+  pub fn all_gnids (&self) -> impl Iterator<Item = &ID> {
     std::iter::once (&self . pid)
       . chain (self . extra_ids . iter()) }
 
@@ -116,7 +116,7 @@ impl Graphnode {
   /// first claim, so it never also appears among the extras; otherwise the
   /// first occurrence wins and the user's meaningful extra-ID order remains
   /// intact.  This is idempotent.
-  pub fn normalize_skgids (
+  pub fn normalize_gnids (
     &mut self,
   ) {
     self . extra_ids = self . normalized_extra_ids (); }
@@ -127,8 +127,8 @@ impl Graphnode {
     let mut seen : HashSet<ID> = HashSet::new ();
     seen . insert (self . pid . clone ());
     self . extra_ids . iter ()
-      . filter_map ( |skgid| {
-        if seen . insert (skgid . clone ()) { Some (skgid . clone ()) }
+      . filter_map ( |gnid| {
+        if seen . insert (gnid . clone ()) { Some (gnid . clone ()) }
         else                             { None } } )
       . collect () }
 }

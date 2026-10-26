@@ -165,11 +165,11 @@ impl InRustGraph {
     &self,
     seeds : impl IntoIterator<Item = ID>,
   ) -> HashSet<ID> {
-    let seed_skgids : HashSet<ID> = seeds . into_iter ()
-      . map (|skgid| self . pid_of (&skgid) . unwrap_or (skgid))
+    let seed_gnids : HashSet<ID> = seeds . into_iter ()
+      . map (|gnid| self . pid_of (&gnid) . unwrap_or (gnid))
       . collect ();
-    let mut result : HashSet<ID> = seed_skgids . clone ();
-    for seed in &seed_skgids {
+    let mut result : HashSet<ID> = seed_gnids . clone ();
+    for seed in &seed_gnids {
       for relation in [
         NodeRelation::Contains,
         NodeRelation::LinksTo,
@@ -177,15 +177,15 @@ impl InRustGraph {
         NodeRelation::HidesFromSubs,
       ] {
         result . extend (
-          self . outbound_skgids_for_relation (seed, relation)
+          self . outbound_gnids_for_relation (seed, relation)
             . into_iter ()
-            . map (|skgid| self . pid_of (&skgid) . unwrap_or (skgid)));
+            . map (|gnid| self . pid_of (&gnid) . unwrap_or (gnid)));
         result . extend (
           self . inbound_pids_for_relation (seed, relation)); }}
     result . extend (self . override_walk_from_seeds (
-      &seed_skgids, BinaryRolePosition::First));
+      &seed_gnids, BinaryRolePosition::First));
     result . extend (self . override_walk_from_seeds (
-      &seed_skgids, BinaryRolePosition::Second));
+      &seed_gnids, BinaryRolePosition::Second));
     result
   }
 
@@ -199,15 +199,15 @@ impl InRustGraph {
     while let Some (node) = pending . pop () {
       let next : Vec<ID> = match seed_position {
         BinaryRolePosition::First =>
-          self . outbound_skgids_for_relation (
+          self . outbound_gnids_for_relation (
             &node, NodeRelation::Overrides),
         BinaryRolePosition::Second =>
           self . inbound_pids_for_relation (
             &node, NodeRelation::Overrides), };
-      for raw_skgid in next {
-        let skgid : ID = self . pid_of (&raw_skgid) . unwrap_or (raw_skgid);
-        if visited . insert (skgid . clone ()) {
-          pending . push (skgid); }} }
+      for raw_gnid in next {
+        let gnid : ID = self . pid_of (&raw_gnid) . unwrap_or (raw_gnid);
+        if visited . insert (gnid . clone ()) {
+          pending . push (gnid); }} }
     visited
   }
 
@@ -306,14 +306,14 @@ impl InRustGraph {
   /// Raw outbound member IDs whose relRepo is in the skgrepo restriction. Unlike the
   /// PID-oriented accessor, this retains unresolved stored IDs so rendering
   /// can preserve them as Unknown phantoms.
-  pub fn outbound_skgids_for_relation_gated (
+  pub fn outbound_gnids_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
     restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<ID> {
     if relation == NodeRelation::LinksTo {
-      return self . outbound_skgids_for_relation (pid, relation); }
+      return self . outbound_gnids_for_relation (pid, relation); }
     self . outbound_rel_partners_for_relation_gated (
       pid, relation, restriction ) . into_iter ()
       . map ( |member| member . member )
@@ -377,7 +377,7 @@ impl InRustGraph {
     relation : NodeRelation,
     restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
   ) -> Vec<ID> {
-    self . outbound_skgids_for_relation_gated (
+    self . outbound_gnids_for_relation_gated (
       pid, relation, restriction ) . iter ()
       . filter_map ( |member| self . pid_of (member) )
       . collect () }
@@ -400,13 +400,13 @@ impl InRustGraph {
              . unwrap_or (false) } )
       . collect () }
 
-  pub fn outbound_skgids_for_relation (
+  pub fn outbound_gnids_for_relation (
     &self,
     pid      : &ID,
     relation : NodeRelation,
   ) -> Vec<ID> {
     self . nodes . get (pid)
-      . map ( |node| outbound_skgids_from_node (node, relation) )
+      . map ( |node| outbound_gnids_from_node (node, relation) )
       . unwrap_or_default () }
 
   pub fn outbound_pids_for_relation (
@@ -414,9 +414,9 @@ impl InRustGraph {
     pid      : &ID,
     relation : NodeRelation,
   ) -> Vec<ID> {
-    self . outbound_skgids_for_relation (pid, relation)
+    self . outbound_gnids_for_relation (pid, relation)
       . iter ()
-      . filter_map ( |skgid| self . pid_of (skgid) )
+      . filter_map ( |gnid| self . pid_of (gnid) )
       . collect () }
 
   pub fn inbound_pids_for_relation (
@@ -486,7 +486,7 @@ impl InRustGraph {
     members . contains (member_pid) }
 }
 
-fn outbound_skgids_from_node (
+fn outbound_gnids_from_node (
   node     : &GraphnodeInRust,
   relation : NodeRelation,
 ) -> Vec<ID> {
@@ -508,7 +508,7 @@ fn inbound_pid_set (
   pid      : &ID,
   relation : NodeRelation,
 ) -> HashSet<ID> {
-  let skgids : Vec<ID> = match relation {
+  let gnids : Vec<ID> = match relation {
     NodeRelation::Contains =>
       graph . contained_by . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
@@ -530,7 +530,7 @@ fn inbound_pid_set (
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
   };
-  skgids . into_iter () . collect () }
+  gnids . into_iter () . collect () }
 
 #[cfg(test)]
 #[allow(non_snake_case)]

@@ -1,62 +1,62 @@
-use skg::test_utils::compare_headlines_modulo_skgid;
+use skg::test_utils::compare_headlines_modulo_gnid;
 
 #[test]
-fn test_compare_headlines_modulo_skgid() {
+fn test_compare_headlines_modulo_gnid() {
   // Test identical headlines
-  assert!(compare_headlines_modulo_skgid(
+  assert!(compare_headlines_modulo_gnid(
     "* Title",
     "* Title"
   ));
 
   // Test headlines that differ only by ID
-  assert!(compare_headlines_modulo_skgid(
+  assert!(compare_headlines_modulo_gnid(
     "* (skg node (gnid abc123)) Title",
     "* (skg node (gnid xyz789)) Title"
   ));
 
   // Test headlines where one has ID and other doesn't - should be unequal
-  assert!(!compare_headlines_modulo_skgid(
+  assert!(!compare_headlines_modulo_gnid(
     "* (skg node (gnid abc123)) Title",
     "* Title"
   ));
 
   // Test headlines with same other metadata but different IDs
-  assert!(compare_headlines_modulo_skgid(
+  assert!(compare_headlines_modulo_gnid(
     "* (skg node (gnid abc)) Title",
     "* (skg node (gnid xyz)) Title"
   ));
 
   // Test headlines that differ by title
-  assert!(!compare_headlines_modulo_skgid(
+  assert!(!compare_headlines_modulo_gnid(
     "* (skg node (gnid abc)) Title One",
     "* (skg node (gnid xyz)) Title Two"
   ));
 
   // Test headlines that differ by level
-  assert!(!compare_headlines_modulo_skgid(
+  assert!(!compare_headlines_modulo_gnid(
     "* (skg node (gnid abc)) Title",
     "** (skg node (gnid xyz)) Title"
   ));
 
   // Test headlines that differ by other metadata
-  assert!(!compare_headlines_modulo_skgid(
+  assert!(!compare_headlines_modulo_gnid(
     "* (skg node (gnid abc)) Title",
     "* (skg alias) Title"
   ));
 
   // Test non-headlines
-  assert!(compare_headlines_modulo_skgid(
+  assert!(compare_headlines_modulo_gnid(
     "This is body text",
     "This is body text"
   ));
 
-  assert!(!compare_headlines_modulo_skgid(
+  assert!(!compare_headlines_modulo_gnid(
     "This is body text",
     "This is different text"
   ));
 
   // Test mixed (one headline, one not)
-  assert!(!compare_headlines_modulo_skgid(
+  assert!(!compare_headlines_modulo_gnid(
     "* Title",
     "Body text" )); }
 

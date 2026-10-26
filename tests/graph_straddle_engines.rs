@@ -80,12 +80,12 @@ fn children_with_change (
 ) -> Vec<(String, DiffChange)> {
   node . children ()
     . filter_map ( |child| {
-      let skgid : &ID = match &child . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . skgid,
-        ViewnodeKind::Vognode (Vognode::Unknown (u)) => &u . skgid,
-        ViewnodeKind::Vognode (Vognode::Ghost (h)) => &h . skgid,
+      let gnid : &ID = match &child . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . gnid,
+        ViewnodeKind::Vognode (Vognode::Unknown (u)) => &u . gnid,
+        ViewnodeKind::Vognode (Vognode::Ghost (h)) => &h . gnid,
         _ => return None, };
-      Some (( skgid . 0 . clone (), child . value () . change_facts . change )) } )
+      Some (( gnid . 0 . clone (), child . value () . change_facts . change )) } )
     . collect () }
 
 #[test]

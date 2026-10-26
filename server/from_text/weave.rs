@@ -31,15 +31,15 @@ use std::hash::Hash;
 /// set.
 pub fn member_is_visible (
   graph  : &InRustGraph,
-  skgid  : &ID,
+  gnid  : &ID,
   config : &SkgConfig,
   restriction : &SkgrepoRestriction,
 ) -> bool {
   let skgrepo : Option<SkgrepoName> = {
     let from_graph : Option<SkgrepoName> =
-      graph . pid_and_skgrepo (skgid)
+      graph . pid_and_skgrepo (gnid)
       . map ( |(_pid, src)| src );
-    from_graph . or_else ( || home_from_disk (skgid, config) ) };
+    from_graph . or_else ( || home_from_disk (gnid, config) ) };
   match skgrepo {
     Some (src) => restriction . contains_skgrepo (&src),
     None       => false, }}

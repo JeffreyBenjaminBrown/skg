@@ -52,9 +52,9 @@ fn decompose_sections (
     . collect () }
 
 fn identity_resolve (
-  skgid : &ID,
+  gnid : &ID,
 ) -> ID {
-  skgid . clone () }
+  gnid . clone () }
 
 /// An arbitrary list of relation partners with unique members: up to N
 /// members, each at a random skgrepo in the universe. Uniqueness matters
@@ -345,9 +345,9 @@ fn duplicate_anchors_concatenate_in_file_order (
 #[test]
 fn anchors_resolve_through_the_resolver ( // extra-id safety
 ) {
-  let resolve = |skgid : &ID| -> ID {
+  let resolve = |gnid : &ID| -> ID {
     // "a-alias" is an extra id of "a"
-    if skgid . 0 == "a-alias" { ID::new ("a") } else { skgid . clone () }};
+    if gnid . 0 == "a-alias" { ID::new ("a") } else { gnid . clone () }};
   let sections : Vec<(SkgrepoName, SectionSlices)> = vec! [
     ( SkgrepoName::from ("S0"),
       SectionSlices {

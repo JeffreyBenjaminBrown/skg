@@ -229,7 +229,7 @@ pub(crate) fn acquisition_goal (
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
   let anchor : NodeRef<Viewnode> = tree . get ( required_ancestor_of (tree, folder, 0) ? ) ?;
   let anchor_gnid : ID = match &anchor . value () . kind {
-    ViewnodeKind::Vognode (vognode) => vognode . skgid () . clone (),
+    ViewnodeKind::Vognode (vognode) => vognode . gnid () . clone (),
     _ => return None, };
   Some ( match kind {
     Folder::Acquired => Goal::new (
@@ -315,7 +315,7 @@ fn expected_change_viewnodes (
   match &node . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
       if ! occurrence . is_writeProtected () => {
-      let pid : &ID = &occurrence . skgid;
+      let pid : &ID = &occurrence . gnid;
       let in_c : bool = sets (walk) . is_some_and ( |sets| sets . c . contains (pid) );
       let aspects : ChangedAspects =
         if in_c { ChangedAspects::of_node (straddle . change_leaves (), pid) }
@@ -341,7 +341,7 @@ fn expected_change_viewnodes (
     ViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. }) => {
       let Some (pid) = node . parent () . and_then ( |owner| match &owner . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-          Some ( occurrence . skgid . clone () ),
+          Some ( occurrence . gnid . clone () ),
         _ => None, } ) else { return Vec::new (); };
       match ( straddle . before . get (&pid), straddle . after . get (&pid) ) {
         (Some (before), Some (after)) if before . body != after . body =>
@@ -349,7 +349,7 @@ fn expected_change_viewnodes (
             before . body . as_deref (), after . body . as_deref () ) ],
         _ => Vec::new (), } },
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) if in_content_position (node) =>
-      straddle . acquirer_of (&ghost . skgid) . into_iter ()
+      straddle . acquirer_of (&ghost . gnid) . into_iter ()
       . map ( |_| viewnode_of (ViewnodeKind::Folder (Folder::AcquiredBy)) )
       . collect (),
     _ => Vec::new (), } }
@@ -425,7 +425,7 @@ pub(crate) fn tag_children (
       let change : Option<DiffChange> = match &viewnode . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
           if chain { Some (DiffChange::default ()) }
-          else { Some ( straddle . node_change (&occurrence . skgid, rel) ) },
+          else { Some ( straddle . node_change (&occurrence . gnid, rel) ) },
         ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
           Some ( DiffChange { node : Some (Existence::Removed),
                               rel  : if is_root { None } else { rel },

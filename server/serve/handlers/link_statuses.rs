@@ -18,14 +18,14 @@ pub enum LinkStatus {
   Missing,
 }
 
-pub fn classify_link_skgids (
+pub fn classify_link_gnids (
   graph  : &InRustGraph,
   config : &SkgConfig,
   restriction : &SkgrepoRestriction,
-  skgids : &[ID],
+  gnids : &[ID],
 ) -> Vec<(ID, LinkStatus)> {
-  skgids . iter () . map (|skgid| {
-    let status : LinkStatus = match graph . pid_and_skgrepo (skgid) {
+  gnids . iter () . map (|gnid| {
+    let status : LinkStatus = match graph . pid_and_skgrepo (gnid) {
       None => LinkStatus::Missing,
       Some ((_pid, skgrepo)) if ! restriction . is_all ()
         && ! restriction . contains_skgrepo (&skgrepo) => LinkStatus::Restricted,
@@ -34,7 +34,7 @@ pub fn classify_link_skgids (
           .map (|s| s . herald_label () . to_string ())
           .unwrap_or_else (|| skgrepo . 0 . clone ());
         LinkStatus::Resolved { pid, skgrepo_label } } };
-    (skgid . clone (), status) }) . collect () }
+    (gnid . clone (), status) }) . collect () }
 
 pub fn handle_link_statuses_request (
   stream  : &mut TcpStream,
@@ -61,18 +61,18 @@ fn link_statuses_response (
     "request-id", request) ?;
   let parsed : Sexp = sexp::parse (request)
     .map_err (|e| format! ("invalid link-status request: {}", e)) ?;
-  let skgids : Vec<ID> = extract_string_list_from_sexp (&parsed, "ids")
+  let gnids : Vec<ID> = extract_string_list_from_sexp (&parsed, "ids")
     .map_err (|e| e . to_string ()) ?
     . into_iter () . map (ID::from) . collect ();
-  let rows : Vec<String> = classify_link_skgids (
-    graph, config, restriction, &skgids)
+  let rows : Vec<String> = classify_link_gnids (
+    graph, config, restriction, &gnids)
     .into_iter ()
-    .map (|(skgid, status)| match status {
-      LinkStatus::Missing => format! ("({} missing)", quote_sexp_string (&skgid . 0)),
-      LinkStatus::Restricted => format! ("({} restricted)", quote_sexp_string (&skgid . 0)),
+    .map (|(gnid, status)| match status {
+      LinkStatus::Missing => format! ("({} missing)", quote_sexp_string (&gnid . 0)),
+      LinkStatus::Restricted => format! ("({} restricted)", quote_sexp_string (&gnid . 0)),
       LinkStatus::Resolved { pid, skgrepo_label } => format! (
         "({} resolved {} {})",
-        quote_sexp_string (&skgid . 0),
+        quote_sexp_string (&gnid . 0),
         quote_sexp_string (&pid . 0),
         quote_sexp_string (&skgrepo_label)), })
     .collect ();
@@ -111,9 +111,9 @@ mod tests {
       .. empty_graphnode () };
     let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[visible, private]);
-    let skgids : Vec<ID> = ["old-visible", "private", "unknown"]
+    let gnids : Vec<ID> = ["old-visible", "private", "unknown"]
       .into_iter () . map (ID::from) .collect ();
-    assert_eq! (classify_link_skgids (&graph, &config, &restriction, &skgids), vec![
+    assert_eq! (classify_link_gnids (&graph, &config, &restriction, &gnids), vec![
       (ID::from ("old-visible"), LinkStatus::Resolved {
         pid : ID::from ("visible"), skgrepo_label : "pub" .to_string () }),
       (ID::from ("private"), LinkStatus::Restricted),
@@ -137,7 +137,7 @@ mod tests {
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
       InRustGraph::new ()));
     let requested : Vec<ID> = vec![ID::from ("old-new")];
-    assert_eq! (classify_link_skgids (
+    assert_eq! (classify_link_gnids (
       &handle . load_full (), &config, &restriction, &requested),
       vec![(ID::from ("old-new"), LinkStatus::Missing)]);
 
@@ -148,7 +148,7 @@ mod tests {
         home_skgrepo : SkgrepoName::from ("public"),
         .. empty_graphnode () } ]);
     handle . store (Arc::new (current));
-    let result = classify_link_skgids (
+    let result = classify_link_gnids (
       &handle . load_full (), &config, &restriction, &requested);
     assert_eq! (result, vec![(ID::from ("old-new"),
       LinkStatus::Resolved {

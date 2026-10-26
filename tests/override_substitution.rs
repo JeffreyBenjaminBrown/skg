@@ -75,20 +75,20 @@ fn marked_lines<'a> (
     . filter ( |l| l . contains (&fact) )
     . collect () }
 
-fn saved_node_by_skgid<'a> (
+fn saved_node_by_gnid<'a> (
   instructions : &'a [NodeInstruction],
-  skgid           : &str,
+  gnid           : &str,
 ) -> &'a Graphnode {
-  opt_saved_node_by_skgid (instructions, skgid)
-    . unwrap_or_else ( || panic! ("SaveNode not found: {}", skgid) ) }
+  opt_saved_node_by_gnid (instructions, gnid)
+    . unwrap_or_else ( || panic! ("SaveNode not found: {}", gnid) ) }
 
-fn opt_saved_node_by_skgid<'a> (
+fn opt_saved_node_by_gnid<'a> (
   instructions : &'a [NodeInstruction],
-  skgid           : &str,
+  gnid           : &str,
 ) -> Option<&'a Graphnode> {
   for instruction in instructions {
     if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (skgid) {
+      if node . pid == ID::from (gnid) {
         return Some (node); }}}
   None }
 
@@ -206,7 +206,7 @@ async fn extraction_honors_overridesHere (
           ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert! (
-          opt_saved_node_by_skgid (
+          opt_saved_node_by_gnid (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . is_none (),
           "P's contains is unchanged (N, M), so no instruction \
@@ -217,7 +217,7 @@ async fn extraction_honors_overridesHere (
           ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert_eq! (
-          members_of ( & saved_node_by_skgid (
+          members_of ( & saved_node_by_gnid (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M") ] ); }
@@ -228,7 +228,7 @@ async fn extraction_honors_overridesHere (
           ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
         "};
         assert_eq! (
-          members_of ( & saved_node_by_skgid (
+          members_of ( & saved_node_by_gnid (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M"), ID::from ("N") ] ); }
@@ -243,10 +243,10 @@ async fn extraction_honors_overridesHere (
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
         assert_eq! (
-          members_of ( & saved_node_by_skgid (&instructions, "P") . contains ),
+          members_of ( & saved_node_by_gnid (&instructions, "P") . contains ),
           vec![ ID::from ("M") ] );
         assert_eq! (
-          members_of ( & saved_node_by_skgid (&instructions, "P2") . contains ),
+          members_of ( & saved_node_by_gnid (&instructions, "P2") . contains ),
           vec![ ID::from ("N") ] ); }
       { // Edits to the shown R save to R; N is untouched.
         let buffer = indoc! {"
@@ -258,13 +258,13 @@ async fn extraction_honors_overridesHere (
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
         assert_eq! (
-          saved_node_by_skgid (&instructions, "R") . title,
+          saved_node_by_gnid (&instructions, "R") . title,
           "R-edited" );
         assert! (
-          opt_saved_node_by_skgid (&instructions, "N") . is_none (),
+          opt_saved_node_by_gnid (&instructions, "N") . is_none (),
           "no instruction touches N" );
         assert! (
-          opt_saved_node_by_skgid (&instructions, "P") . is_none (),
+          opt_saved_node_by_gnid (&instructions, "P") . is_none (),
           "P's contains is unchanged, so P noops" ); }
       { // A legacy buffer showing N raw still saves identically
         // (a noop, like the marked equivalent above).
@@ -274,7 +274,7 @@ async fn extraction_honors_overridesHere (
           ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert! (
-          opt_saved_node_by_skgid (
+          opt_saved_node_by_gnid (
             & node_instructions_from (buffer, config) . await ?,
             "P" ) . is_none () ); }
       { // Tamper: a fact the server would not have rendered aborts.
@@ -300,7 +300,7 @@ async fn extraction_honors_overridesHere (
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
-        if let Some (s_node) = opt_saved_node_by_skgid (&instructions, "S") {
+        if let Some (s_node) = opt_saved_node_by_gnid (&instructions, "S") {
           assert! (
             ! s_node . hidesFromSubs . or_default ()
               . iter () . any ( |m| &m . member == &ID::from ("N") ),

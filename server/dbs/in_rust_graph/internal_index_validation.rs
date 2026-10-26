@@ -88,7 +88,7 @@ pub(crate) fn validate_local_internal_indexes (
   LocalIndexValidation {
     errors : result,
     node_checks : nodeInstructions . len (),
-    identity_checks : changes . affected_skgids . len (),
+    identity_checks : changes . affected_gnids . len (),
     relationship_membership_checks,
   }
 }
@@ -111,13 +111,13 @@ fn validate_local_nodes (
               . map (|actual| vec![actual . pid . clone ()])
               . unwrap_or_default (),
           }); }}
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => {
-        if candidate . nodes . contains_key (skgid) {
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => {
+        if candidate . nodes . contains_key (gnid) {
           result . push (InternalIndexMismatch {
             index    : "nodes",
-            key      : skgid . clone (),
+            key      : gnid . clone (),
             expected : Vec::new (),
-            actual   : vec![skgid . clone ()],
+            actual   : vec![gnid . clone ()],
           }); }} }
   }
 }
@@ -128,23 +128,23 @@ fn validate_local_identity (
   changes   : &GraphChangeSet,
   result    : &mut Vec<InternalIndexMismatch>,
 ) {
-  for skgid in &changes . affected_skgids {
+  for gnid in &changes . affected_gnids {
     let final_carrier : Option<ID> =
       match changes . canonicalization_changes . iter ()
-        . find (|change| &change . skgid == skgid) {
+        . find (|change| &change . gnid == gnid) {
         Some (change) => change . new_carrier . clone (),
-        None          => base . pid_of (skgid),
+        None          => base . pid_of (gnid),
       };
     let expected_extra_carrier : Option<ID> = match &final_carrier {
-      Some (carrier) if carrier != skgid => Some (carrier . clone ()),
+      Some (carrier) if carrier != gnid => Some (carrier . clone ()),
       _                           => None,
     };
     let actual_extra_carrier : Option<ID> =
-      candidate . extra_id_to_pid . get (skgid) . cloned ();
+      candidate . extra_id_to_pid . get (gnid) . cloned ();
     if expected_extra_carrier != actual_extra_carrier {
       result . push (InternalIndexMismatch {
         index    : "extra_id_to_pid",
-        key      : skgid . clone (),
+        key      : gnid . clone (),
         expected : expected_extra_carrier . into_iter () . collect (),
         actual   : actual_extra_carrier . into_iter () . collect (),
       }); }

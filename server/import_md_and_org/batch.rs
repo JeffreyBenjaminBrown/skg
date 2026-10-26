@@ -74,7 +74,7 @@ pub fn prepare_import_batch_with (
   refuse_documents_with_errors (&documents)?;
   if ! host_mapping_answered && contains_absolute_file_link (&documents) {
     return Ok (ImportPreparation::HostMappingNeeded); }
-  let existing_skgids : HashMap<String, ID> =
+  let existing_gnids : HashMap<String, ID> =
     configured_identity_map (env)?;
   let destination_evidence : BTreeMap<PathBuf, Vec<u8>> =
     skgrepo_file_evidence (&runtime . config)?;
@@ -82,7 +82,7 @@ pub fn prepare_import_batch_with (
     .map (|document| build_document (document, destination_skgrepo, new_id))
     .collect::<Result<_, _>> ()?;
   resolve_document_links (&mut documents, &mut built,
-    input_directory, host_root, &existing_skgids);
+    input_directory, host_root, &existing_gnids);
   let export_targets : Vec<(PathBuf, String)> = documents . iter ()
     .zip (built . iter ())
     .map (|(document, built)|
@@ -95,7 +95,7 @@ pub fn prepare_import_batch_with (
     &export_targets, &runtime . config, &existing)?;
   let record_documents : Vec<(PathBuf, ID)> = documents . iter ()
     . zip (built . iter ())
-    . map (|(document, built)| (document . path . clone (), built . root_skgid . clone ()))
+    . map (|(document, built)| (document . path . clone (), built . root_gnid . clone ()))
     . collect ();
   let mut nodes : Vec<Graphnode> = built . into_iter ()
     .flat_map (|document| document . nodes) . collect ();
@@ -218,19 +218,19 @@ fn configured_identity_map (
   env : &SkgEnv,
 ) -> Result<HashMap<String, ID>, String> {
   let runtime = env . runtime_snapshot ();
-  let mut skgids : HashMap<String, ID> = HashMap::new ();
+  let mut gnids : HashMap<String, ID> = HashMap::new ();
   for node in runtime . graph . nodes . values () {
-    skgids . insert (node . pid . 0 . clone (), node . pid . clone ());
+    gnids . insert (node . pid . 0 . clone (), node . pid . clone ());
     for extra in &node . extra_ids {
-      skgids . insert (extra . 0 . clone (), node . pid . clone ()); } }
+      gnids . insert (extra . 0 . clone (), node . pid . clone ()); } }
   for skgrepo in runtime . config . ordered_skgrepos () {
     let sections = read_skg_sections_from_folder (&skgrepo, &runtime . config)
       .map_err (|error| format! ("Reading repo {}: {}", skgrepo, error))?;
     for (_, section) in sections {
-      skgids . insert (section . pid . 0 . clone (), section . pid . clone ());
+      gnids . insert (section . pid . 0 . clone (), section . pid . clone ());
       for extra in &section . extra_ids {
-        skgids . insert (extra . 0 . clone (), section . pid . clone ()); } } }
-  Ok (skgids)
+        gnids . insert (extra . 0 . clone (), section . pid . clone ()); } } }
+  Ok (gnids)
 }
 
 fn existing_authoritative_nodes (
@@ -248,7 +248,7 @@ fn ensure_runtime_matches_disk (
     .map (|node| (node . pid . clone (),
       normalized_for_runtime_comparison (node . clone ()))) . collect ();
   let runtime : HashMap<ID, Graphnode> = graph . nodes . iter ()
-    .map (|(skgid, node)| (skgid . clone (),
+    .map (|(gnid, node)| (gnid . clone (),
       normalized_for_runtime_comparison (complete_from_rust (node))))
     .collect ();
   if disk != runtime {
@@ -311,7 +311,7 @@ fn check_export_target_conflicts (
 /// The import record links to each document's file root rather than
 /// containing it, so viewing the record does not show every document's content.
 fn import_record (
-  skgid : ID,
+  gnid : ID,
   documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
@@ -319,7 +319,7 @@ fn import_record (
   time : &str,
 ) -> Graphnode {
   let mut node : Graphnode = empty_graphnode ();
-  node . pid = skgid;
+  node . pid = gnid;
   node . title = format! ("Imported Markdown and Org from {}",
     input_directory . display ());
   node . home_skgrepo = skgrepo . clone ();

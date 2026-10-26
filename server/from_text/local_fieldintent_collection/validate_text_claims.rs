@@ -5,7 +5,7 @@
 /// match the node's disk state. Claims for nodes absent from disk
 /// are ignored.
 
-use crate::dbs::node_lookup::opt_graphnode_by_skgid;
+use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_fieldintent_collection::types::CollectedFieldIntents;
 use crate::types::errors::BufferValidationError;
@@ -24,7 +24,7 @@ pub fn validate_text_claims (
     if entry . text_claims . is_empty() {
       continue; }
     let Some (from_disk) =
-      opt_graphnode_by_skgid (graph, config, pid) ?
+      opt_graphnode_by_gnid (graph, config, pid) ?
       else { continue; };
     for claim in &entry . text_claims {
       if claim . title != from_disk . title

@@ -206,7 +206,7 @@ pub enum Vognode {
 /// no record of its target.
 #[derive( Debug, Clone, PartialEq )]
 pub struct Unknown {
-  pub skgid                 : ID,
+  pub gnid                 : ID,
   /// Display-only fact about this occurrence's binding relationship.
   pub relRepo         : Option<SkgrepoName>,
   /// A pending request about this reference's relationship to its
@@ -245,7 +245,7 @@ pub struct Unknown {
 /// removed)'), each a change-forest leaf.
 #[derive( Debug, Clone, PartialEq )]
 pub struct Ghost {
-  pub skgid             : ID,
+  pub gnid             : ID,
   pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
@@ -273,7 +273,7 @@ pub struct Ghost {
 #[derive( Debug, Clone, PartialEq )]
 pub struct UnrestrictedVognode {
   pub title         : String,
-  pub skgid         : ID,
+  pub gnid         : ID,
   pub home_skgrepo  : SkgrepoName,
   /// Whether the save reads this occurrence as an entry of its
   /// viewparent's list. For an occurrence parent, that list is the
@@ -445,7 +445,7 @@ pub enum PropertyMember {
           relationshipEditRequest: Option<RelationshipEditRequest>,
           claimsMembership: bool,
           isWarranted: Warrant },
-  ID { skgid: ID, // an ID of grandparent (the parent being an IDFolder)
+  ID { gnid: ID, // an ID of grandparent (the parent being an IDFolder)
        claimsMembership: bool,
        isWarranted: Warrant },
   /// A true file-level boolean flag of the node's grandparent.
@@ -665,9 +665,9 @@ impl UnrestrictedVognode {
   /// reconciler's orderkey all read this, never the raw 'id', so a
   /// shown overrider round-trips to the original member instead of
   /// rewriting its parent's contains.
-  pub fn collected_skgid (&self) -> ID {
+  pub fn collected_gnid (&self) -> ID {
     self . overridesHere . clone ()
-    . unwrap_or_else ( || self . skgid . clone () ) }
+    . unwrap_or_else ( || self . gnid . clone () ) }
 }
 
 impl Folder {
@@ -788,7 +788,7 @@ impl PropertyMember {
   pub fn title (&self) -> &str {
     match self {
       PropertyMember::Alias { text, .. }  => text,
-      PropertyMember::ID    { skgid, .. } => skgid,
+      PropertyMember::ID    { gnid, .. } => gnid,
       PropertyMember::Flag { title, .. }  => title,
     } }
 
@@ -810,9 +810,9 @@ impl PropertyMember {
 
   /// An ID member, as 'alias' makes an alias member.
   pub fn id (
-    skgid : ID,
+    gnid : ID,
   ) -> PropertyMember {
-    PropertyMember::ID { skgid,
+    PropertyMember::ID { gnid,
                          claimsMembership : true,
                          isWarranted      : Warrant::ByGraph } }
 
@@ -878,11 +878,11 @@ impl ChangesetMarkerKind {
 
 impl Vognode {
   /// The id the vognode stands for.
-  pub fn skgid (&self) -> &ID {
+  pub fn gnid (&self) -> &ID {
     match self {
-      Vognode::Unrestricted (t) => &t . skgid,
-      Vognode::Ghost        (g) => &g . skgid,
-      Vognode::Unknown      (u) => &u . skgid,
+      Vognode::Unrestricted (t) => &t . gnid,
+      Vognode::Ghost        (g) => &g . gnid,
+      Vognode::Unknown      (u) => &u . gnid,
     } }
 
   /// The id and home skgrepo of the node it stands for; None for an
@@ -891,8 +891,8 @@ impl Vognode {
     &self,
   ) -> Option<(&ID, &SkgrepoName)> {
     match self {
-      Vognode::Unrestricted (t) => Some ((&t . skgid, &t . home_skgrepo)),
-      Vognode::Ghost        (g) => Some ((&g . skgid, &g . home_skgrepo)),
+      Vognode::Unrestricted (t) => Some ((&t . gnid, &t . home_skgrepo)),
+      Vognode::Ghost        (g) => Some ((&g . gnid, &g . home_skgrepo)),
       Vognode::Unknown      (_) => None,
     } }
 
@@ -1046,12 +1046,12 @@ impl Viewnode {
 
   /// The node's ID, when this viewnode is an editable occurrence of
   /// it: an unrestricted vognode that is not write-protected.
-  pub fn editable_skgid (
+  pub fn editable_gnid (
     &self,
   ) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if ! t . is_writeProtected () => Some (&t . skgid),
+        if ! t . is_writeProtected () => Some (&t . gnid),
       _ => None, }}
 
   /// Consume every save-only `(editRequest ...)`, and every readiness
@@ -1106,7 +1106,7 @@ impl Viewnode {
   /// What a message says of this headline.
   pub fn headline_name (&self) -> HeadlineName {
     let graphnode_id : Option<&ID> = match &self . kind {
-      ViewnodeKind::Vognode (vognode) => Some (vognode . skgid ()),
+      ViewnodeKind::Vognode (vognode) => Some (vognode . gnid ()),
       _ => None };
     HeadlineName::of ( self . viewnode_id . as_ref (), graphnode_id,
                        self . title () ) }
@@ -1118,8 +1118,8 @@ impl Viewnode {
         => t . title . clone(),
       ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =>
         format!("property:alias({})", text),
-      ViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. }) =>
-        format!("property:id({})", skgid),
+      ViewnodeKind::PropertyMember (PropertyMember::ID { gnid, .. }) =>
+        format!("property:id({})", gnid),
       ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
         format!("property:flag({})", flag . wire_name ()),
       ViewnodeKind::ChangeViewnode (change) =>
@@ -1131,11 +1131,11 @@ impl Viewnode {
       ViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
       ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
-        format!("ghost:{}", h . skgid . 0),
+        format!("ghost:{}", h . gnid . 0),
       ViewnodeKind::Tombstone =>
         "tombstone" . to_string (),
       ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
-        format!("unknown:{}", u . skgid . 0), }}
+        format!("unknown:{}", u . gnid . 0), }}
 
   /// Reasonable for both UnrestrictedVognodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
@@ -1157,17 +1157,17 @@ impl Viewnode {
 
   /// The id of a vognode that represents a current graphnode: None
   /// for ghosts, unknowns and non-vognodes.
-  pub fn skgid_if_current_graphnode (&self) -> Option<&ID> {
+  pub fn gnid_if_current_graphnode (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (v) if v . is_current_graphnode () => Some (v . skgid ()),
+      ViewnodeKind::Vognode (v) if v . is_current_graphnode () => Some (v . gnid ()),
       _ => None,
     }}
 
   /// The id of an Unrestricted vognode. None for everything else
   /// (ghosts, unknowns, folders, non-vognodes, BufferRoot).
-  pub fn unrestricted_skgid (&self) -> Option<&ID> {
+  pub fn unrestricted_gnid (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . gnid),
       _ => None,
     }}
 }
@@ -1178,7 +1178,7 @@ impl fmt::Display for NodeEditRequest {
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      NodeEditRequest::NodeMerge (skgid) => write!(f, "(merge {})", skgid . 0),
+      NodeEditRequest::NodeMerge (gnid) => write!(f, "(merge {})", gnid . 0),
       NodeEditRequest::Delete    => write!(f, "toDelete"),
       NodeEditRequest::SetFlag { flag, value } => write! (
         f, "(flag {} {})", flag . wire_name (), value),
@@ -1249,13 +1249,13 @@ impl Default for ViewnodeStats {
 /// Create an UnrestrictedVognode with default values for all fields except id, skgrepo, and title.
 /// Useful when you need to customize other fields after construction.
 pub fn default_unrestrictedVognode (
-  skgid   : ID,
+  gnid   : ID,
   skgrepo : SkgrepoName,
   title   : String,
 ) -> UnrestrictedVognode {
   UnrestrictedVognode {
     title,
-    skgid,
+    gnid,
     home_skgrepo: skgrepo,
     claimsMembership : true,
     overridesHere    : None,
@@ -1269,11 +1269,11 @@ pub fn default_unrestrictedVognode (
   }}
 
 pub fn mk_editable_viewnode (
-  skgid   : ID,
+  gnid   : ID,
   skgrepo : SkgrepoName,
   title   : String,
   body    : Option < String >,
-) -> Viewnode { mk_viewnode ( skgid,
+) -> Viewnode { mk_viewnode ( gnid,
                             skgrepo,
                             title,
                             true,
@@ -1287,10 +1287,10 @@ pub fn mk_editable_viewnode (
 /// -- the unknown lets the view render the line as a herald
 /// rather than aborting the whole BFS extension.
 pub fn mk_unknown_viewnode (
-  skgid : ID,
+  gnid : ID,
 ) -> Viewnode {
   viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown ( Unknown {
-      skgid,
+      gnid,
       relRepo         : None,
       relationshipEditRequest : None,
       claimsMembership : true, } )) ) }
@@ -1298,11 +1298,11 @@ pub fn mk_unknown_viewnode (
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.
 pub fn mk_writeProtected_viewnode (
-  skgid     : ID,
+  gnid     : ID,
   skgrepo : SkgrepoName,
   title  : String,
   claimsMembership : bool,
-) -> Viewnode { mk_viewnode ( skgid,
+) -> Viewnode { mk_viewnode ( gnid,
                             skgrepo,
                             title,
                             claimsMembership,
@@ -1334,7 +1334,7 @@ pub fn mk_writeProtected_from_viewnode (
 /// because it would be difficult and dangerous to set that in isolation,
 /// without considering the rest of the Viewnode tree.
 pub fn mk_viewnode (
-  skgid         : ID,
+  gnid         : ID,
   skgrepo       : SkgrepoName,
   title         : String,
   claimsMembership : bool,
@@ -1347,7 +1347,7 @@ pub fn mk_viewnode (
                             view_requests,
                             editability,
                             .. default_unrestrictedVognode (
-                              skgid, skgrepo, title ) } ) )) }
+                              gnid, skgrepo, title ) } ) )) }
 
 /// Helper to create a BufferRoot Viewnode.
 pub fn viewforest_root_viewnode () -> Viewnode {

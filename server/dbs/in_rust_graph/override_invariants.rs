@@ -123,10 +123,10 @@ pub fn derive_affected_override_scope (
   base            : &InRustGraph,
   candidate       : &InRustGraph,
   touched_pids    : &HashSet<ID>,
-  affected_skgids : &HashSet<ID>,
+  affected_gnids : &HashSet<ID>,
 ) -> OverrideCheckScope {
   let mut skgrepos : HashSet<ID> = touched_pids . clone ();
-  for raw in affected_skgids {
+  for raw in affected_gnids {
     let old_key : ID = base . pid_of (raw)
       . unwrap_or_else (|| raw . clone ());
     let final_key : ID = candidate . pid_of (raw)
@@ -286,7 +286,7 @@ pub fn format_override_invariant_violations (
       } => {
         let list : String =
           overriders . iter ()
-          . map ( |skgid| skgid . to_string () )
+          . map ( |gnid| gnid . to_string () )
           . collect::<Vec<String>> ()
           . join (", ");
         lines . push (format!(
@@ -298,7 +298,7 @@ pub fn format_override_invariant_violations (
       } => {
         let arrow : String = { // a -> b -> ... -> a
           let mut nodes : Vec<String> =
-            cycle . iter () . map ( |skgid| skgid . to_string () ) . collect ();
+            cycle . iter () . map ( |gnid| gnid . to_string () ) . collect ();
           if let Some (first) = cycle . first () {
             nodes . push ( first . to_string () ); }
           nodes . join (" -> ") };

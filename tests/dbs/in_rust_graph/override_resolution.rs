@@ -55,7 +55,7 @@ fn node (
         rel_partners_at_relRepo (
           &node . home_skgrepo,
           overrides . iter ()
-          . map ( |skgid| ID::from (*skgid) )
+          . map ( |gnid| ID::from (*gnid) )
           . collect () ) )
     };
   node }
@@ -73,11 +73,11 @@ fn restricted_to (
 fn resolve (
   nodes  : Vec<Graphnode>,
   restriction : Option<&SkgrepoRestriction>,
-  skgid  : &str,
+  gnid  : &str,
 ) -> OverrideResolution {
   let graph : InRustGraph =
     InRustGraph::from_graphnodes (&nodes);
-  resolve_override (&config (), &graph, restriction, &ID::from (skgid)) }
+  resolve_override (&config (), &graph, restriction, &ID::from (gnid)) }
 
 #[test]
 fn no_overrider_resolves_to_self () {
@@ -272,7 +272,7 @@ fn multiple_owned_overriders_substitute_nothing () {
       cycle          : vec![], } ); }
 
 #[test]
-fn an_unknown_skgid_resolves_to_itself () {
+fn an_unknown_gnid_resolves_to_itself () {
   assert_eq! (
     resolve ( vec![], None, "never-heard-of-it" ),
     OverrideResolution {

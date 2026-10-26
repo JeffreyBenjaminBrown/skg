@@ -188,16 +188,16 @@ fn describe (
     Warrant::No      => Some ( "⊥" . to_string () ), } };
   match &viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) => {
-      parts . push ( format! ("node {}", occurrence . skgid) );
+      parts . push ( format! ("node {}", occurrence . gnid) );
       if occurrence . is_writeProtected () { parts . push ("wp" . into ()); }
       if ! occurrence . claimsMembership { parts . push ("noClaim" . into ()); }
       parts . extend ( warrant_atom (occurrence . viewStats . isWarranted) );
       if let Some (original) = &occurrence . overridesHere {
         parts . push ( format! ("(overridesHere {})", original) ); }},
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      parts . push ( format! ("ghost {}", ghost . skgid) ),
+      parts . push ( format! ("ghost {}", ghost . gnid) ),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
-      parts . push ( format! ("unknown {}", unknown . skgid) );
+      parts . push ( format! ("unknown {}", unknown . gnid) );
       if ! unknown . claimsMembership { parts . push ("noClaim" . into ()); }},
     ViewnodeKind::Tombstone => parts . push ("tombstone" . into ()),
     ViewnodeKind::BufferRoot => parts . push ("root" . into ()),

@@ -14,7 +14,7 @@ use crate::from_text::weave::{relationship_member_is_visible, set_difference_mer
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::opt_graphnode_by_skgid;
+use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoChange, SkgrepoName, members_of, rel_partners_at_relRepo};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{
@@ -79,9 +79,9 @@ fn homes_declared_by_nodeSaveIntents (
   let mut homes : HashMap<ID, SkgrepoName> = HashMap::new ();
   for intent in intents {
     let NodeIntent::Save (intent) = intent else { continue; };
-    for skgid in std::iter::once (&intent . pid) . chain (
+    for gnid in std::iter::once (&intent . pid) . chain (
       intent . extra_ids . iter ()) {
-      homes . insert (skgid . clone (), intent . home_skgrepo . clone ()); }}
+      homes . insert (gnid . clone (), intent . home_skgrepo . clone ()); }}
   homes }
 
 fn supplement_nodeIntent_from_disk (
@@ -95,7 +95,7 @@ fn supplement_nodeIntent_from_disk (
     NodeIntent::Delete (ref delete) => {
       if let Some (restriction) = skgrepo_restriction {
         refuse_delete_with_restricted_sections (
-          config, restriction, & delete . skgid )
+          config, restriction, & delete . gnid )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
       Ok (NodeInstruction_with_Opt_Repomove {
         instruction : intent . into_node_instruction()
@@ -118,7 +118,7 @@ fn supplement_nodeSaveIntent_from_disk (
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<Graphnode> =
-    opt_graphnode_by_skgid (
+    opt_graphnode_by_gnid (
       graph, config, &pid) ?;
   match from_disk {
     None => {
@@ -159,7 +159,7 @@ fn supplement_nodeSaveIntent_from_disk (
       let from_buffer : Graphnode =
         from_buffer . into_graphnode();
       let canonicalized : Graphnode =
-        canonicalize_skgids_from_disk (from_buffer, &disk_node) ?;
+        canonicalize_gnids_from_disk (from_buffer, &disk_node) ?;
       let maybe_move : Option<SkgrepoMove> =
         detect_skgrepo_move ( config,  &pid,
                              &canonicalized . home_skgrepo,
@@ -200,21 +200,21 @@ fn preserve_invisible_members (
   config           : &SkgConfig,
   restriction      : &SkgrepoRestriction,
 ) -> Graphnode {
-  let member_key = |skgid : &ID| -> RelationshipMemberKey {
-    graph . relationship_member_key (skgid) };
-  let contains_visible = |skgid : &ID| -> bool {
+  let member_key = |gnid : &ID| -> RelationshipMemberKey {
+    graph . relationship_member_key (gnid) };
+  let contains_visible = |gnid : &ID| -> bool {
     disk_node . contains . iter ()
-      . find (|member| &member . member == skgid)
+      . find (|member| &member . member == gnid)
       . is_some_and (|member| relationship_member_is_visible (
         graph, member, config, restriction)) };
-  let subscribes_visible = |skgid : &ID| -> bool {
+  let subscribes_visible = |gnid : &ID| -> bool {
     disk_node . subscribesTo . or_default () . iter ()
-      .find (|member| &member . member == skgid)
+      .find (|member| &member . member == gnid)
       .is_some_and (|member| relationship_member_is_visible (
         graph, member, config, restriction)) };
-  let overrides_visible = |skgid : &ID| -> bool {
+  let overrides_visible = |gnid : &ID| -> bool {
     disk_node . overrides . or_default () . iter ()
-      .find (|member| &member . member == skgid)
+      .find (|member| &member . member == gnid)
       .is_some_and (|member| relationship_member_is_visible (
         graph, member, config, restriction)) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
@@ -222,12 +222,12 @@ fn preserve_invisible_members (
   // is load-bearing: restore it before the weave so an untouched round trip
   // cannot rewrite a relationship merely because its target was displayed by PID.
   let normalize_to_disk_raw = |buffer : &[ID], disk : &[RelPartner<ID>]| {
-    buffer . iter () . map (|skgid| {
-      let key : RelationshipMemberKey = member_key (skgid);
+    buffer . iter () . map (|gnid| {
+      let key : RelationshipMemberKey = member_key (gnid);
       disk . iter ()
         . find (|member| member_key (&member . member) == key)
         . map (|member| member . member . clone ())
-        . unwrap_or_else (|| skgid . clone ())
+        . unwrap_or_else (|| gnid . clone ())
     }) . collect::<Vec<ID>>() };
   let recorder_skgrepo : SkgrepoName = supplemented . home_skgrepo . clone ();
   { let disk_contains : Vec<ID> = members_of (&disk_node . contains);
@@ -341,17 +341,17 @@ fn apply_sticky_relRepos_in_graph_with_prospective_homes (
 ) -> Result<Graphnode, String> {
   let recorder_pid  : ID         = supplemented . pid    . clone ();
   let recorder_home : SkgrepoName = supplemented . home_skgrepo . clone ();
-  let resolve = |skgid : &ID| -> ID {
-    graph . pid_of (skgid)
-      . unwrap_or_else ( || skgid . clone () ) };
-  let member_key = |skgid : &ID| -> RelationshipMemberKey {
-    graph . relationship_member_key (skgid) };
-  let home_of = |skgid : &ID| -> Option<SkgrepoName> {
-    prospective_homes . get ( &resolve (skgid) ) . cloned ()
-      .or_else ( || prospective_homes . get (skgid) . cloned () )
-      .or_else ( || graph . pid_and_skgrepo (skgid)
+  let resolve = |gnid : &ID| -> ID {
+    graph . pid_of (gnid)
+      . unwrap_or_else ( || gnid . clone () ) };
+  let member_key = |gnid : &ID| -> RelationshipMemberKey {
+    graph . relationship_member_key (gnid) };
+  let home_of = |gnid : &ID| -> Option<SkgrepoName> {
+    prospective_homes . get ( &resolve (gnid) ) . cloned ()
+      .or_else ( || prospective_homes . get (gnid) . cloned () )
+      .or_else ( || graph . pid_and_skgrepo (gnid)
       . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (skgid, config) ) ) };
+      . or_else ( || home_from_disk (gnid, config) ) ) };
   // The default floor for one member. Owned-to-owned relationships use the
   // more private endpoint home. An owned-to-foreign relationship stays at
   // the recorder's home; Skg never proposes writing a foreign section.
@@ -555,16 +555,16 @@ pub(crate) fn hide_skgrepo (
     None => endpoint_floor, }}
 
 /// Replace buffer's (singleton) ids with disk's (possibly multiple) ids.
-pub fn canonicalize_skgids_from_disk (
+pub fn canonicalize_gnids_from_disk (
   mut from_buffer : Graphnode,
   disk_node       : &Graphnode,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  for buffer_skgid in from_buffer . all_skgids() {
-    let buffer_skgid : &ID = buffer_skgid;
-    if ! disk_node . all_skgids() . any ( |skgid| skgid == buffer_skgid ) {
+  for buffer_gnid in from_buffer . all_gnids() {
+    let buffer_gnid : &ID = buffer_gnid;
+    if ! disk_node . all_gnids() . any ( |gnid| gnid == buffer_gnid ) {
       return Err(format!(
         "ID '{}' from buffer not found in IDs form disk.",
-        buffer_skgid ) . into() ); }}
+        buffer_gnid ) . into() ); }}
   from_buffer . pid = disk_node . pid . clone();
   from_buffer . extra_ids = disk_node . extra_ids . clone();
   Ok (from_buffer) }

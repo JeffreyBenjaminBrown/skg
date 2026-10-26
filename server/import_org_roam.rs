@@ -144,11 +144,11 @@ fn merge_into_existing (
   { // Merge contents. New members are tagged with the owning
     // (existing) node's skgrepo; degenerate (see RelPartner).
     for child in &newcomer . contains {
-      let child_skgid : &ID = & child . member;
+      let child_gnid : &ID = & child . member;
       if ! existing . contains . iter ()
-           . any ( |m| &m . member == child_skgid ) {
+           . any ( |m| &m . member == child_gnid ) {
         existing . contains . push ( RelPartner::at_relRepo (
-          existing . home_skgrepo . clone (), child_skgid . clone () )); }} }
+          existing . home_skgrepo . clone (), child_gnid . clone () )); }} }
   { // Append the newcomer's title and body into the existing body,
     // separated by an informative marker.
     let separator : &str =

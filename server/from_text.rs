@@ -305,19 +305,19 @@ fn dead_link_warnings (
     . chain ( fork_specs . iter () . map ( |spec| & spec . clone . 0 ) )
     . collect ();
   let created_this_save : HashSet<&ID> = {
-    let mut skgids : HashSet<&ID> = HashSet::new ();
+    let mut gnids : HashSet<&ID> = HashSet::new ();
     for node in &saved_nodes {
-      skgids . insert (& node . pid);
-      skgids . extend ( node . extra_ids . iter () ); }
-    skgids };
+      gnids . insert (& node . pid);
+      gnids . extend ( node . extra_ids . iter () ); }
+    gnids };
   let mut warnings : Vec<String> = Vec::new ();
   for node in &saved_nodes {
     for link in links_from_node (node) {
-      if created_this_save . contains (& link . skgid) { continue; }
-      if graph . pid_of (& link . skgid) . is_some () { continue; }
+      if created_this_save . contains (& link . gnid) { continue; }
+      if graph . pid_of (& link . gnid) . is_some () { continue; }
       warnings . push ( format! (
         "Dangling link: node {} links to absent id {} (label {:?}).",
-        node . pid . 0, link . skgid . 0, link . label )); }}
+        node . pid . 0, link . gnid . 0, link . label )); }}
   warnings }
 
 /// Build a ForkSpec for each node carrying 'ViewRequest::Fork' (the
@@ -343,7 +343,7 @@ fn explicit_fork_specs_from_viewforest (
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
       else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
-    let pid : &ID = & t . skgid;
+    let pid : &ID = & t . gnid;
     let graph_snapshot : Graphnode =
       match graphnode_graphFirst_by_pid_and_skgrepo (
         graph, config, pid, & t . home_skgrepo ) {

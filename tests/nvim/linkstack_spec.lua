@@ -44,12 +44,12 @@ describe('skg.linkstack push', function ()
       '* (skg node (gnid 3)) [[id:2][link to 4]] hello',
       '* (skg (fake metadata]] [[id:fake-link) (]]',
       '* (skg node (gnid 6)) just a title' }, '\n'))
-    for _, skgid in ipairs({ '1', '3', '6' }) do
-      cursor_on(string.format('(gnid %s)', skgid), 2)
+    for _, gnid in ipairs({ '1', '3', '6' }) do
+      cursor_on(string.format('(gnid %s)', gnid), 2)
       local before = #state.linkstack
       linkstack.id_push()
       assert.are.equal(before + 1, #state.linkstack)
-      assert.are.equal(skgid, state.linkstack[1][1])
+      assert.are.equal(gnid, state.linkstack[1][1])
     end
     -- From the title area, still finds the metadata id.
     cursor_on('just a title', 3)

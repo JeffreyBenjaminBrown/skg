@@ -22,7 +22,7 @@ fn test_link_from_str_valid() {
   let text : &str =
     "[[id:abc123][My Link]]";
   let link: Link = text . parse() . unwrap();
-  assert_eq! ( link . skgid, "abc123" . into() );
+  assert_eq! ( link . gnid, "abc123" . into() );
   assert_eq! ( link . label, "My Link");
 }
 
@@ -71,7 +71,7 @@ fn test_links_from_text_single() {
   let links : Vec < Link > =
     links_from_text (text);
   assert_eq! ( links . len(), 1 ) ;
-  assert_eq! ( links[0] . skgid, "abc123" . into() );
+  assert_eq! ( links[0] . gnid, "abc123" . into() );
   assert_eq! ( links[0] . label, "My Link" ) ;
 }
 
@@ -82,9 +82,9 @@ fn test_links_from_text_multiple() {
   let links : Vec < Link > =
     links_from_text (text);
   assert_eq!(links . len(), 2);
-  assert_eq!(links[0] . skgid, "abc123" . into() );
+  assert_eq!(links[0] . gnid, "abc123" . into() );
   assert_eq!(links[0] . label, "First Link");
-  assert_eq!(links[1] . skgid, "def456" . into() );
+  assert_eq!(links[1] . gnid, "def456" . into() );
   assert_eq!(links[1] . label, "Second Link");
 }
 
@@ -96,7 +96,7 @@ fn test_links_from_text_with_uuid() {
     links_from_text (text);
   assert_eq!(links . len(), 1);
   assert_eq!(
-    links[0] . skgid,
+    links[0] . gnid,
     "846207ef-11d6-49e4-89b4-4558b2989a60" . into() );
   assert_eq!(links[0] . label, "My UUID Link");
 }
@@ -108,7 +108,7 @@ fn test_links_from_text_with_nested_brackets() {
   let links : Vec < Link > =
     links_from_text (text);
   assert_eq!(links . len(), 1);
-  assert_eq!(links[0] . skgid, "abc123" . into() );
+  assert_eq!(links[0] . gnid, "abc123" . into() );
   assert_eq!(links[0] . label, "Link [with] brackets");
 }
 
@@ -123,16 +123,16 @@ fn test_links_from_node() {
     links_from_node (&test_node);
   assert_eq!(links . len(), 4);
   assert!(links . iter()
-          . any(|link| link . skgid == "link1" . into() &&
+          . any(|link| link . gnid == "link1" . into() &&
                link . label == "First Link"));
   assert!(links . iter()
-          . any(|link| link . skgid == "link2" . into() &&
+          . any(|link| link . gnid == "link2" . into() &&
                link . label == "Second Link"));
   assert!(links . iter()
-          . any(|link| link . skgid == "link3" . into() &&
+          . any(|link| link . gnid == "link3" . into() &&
                link . label == "Third Link"));
   assert!(links . iter()
-          . any(|link| link . skgid == "link4" . into() &&
+          . any(|link| link . gnid == "link4" . into() &&
                link . label == "Fourth Link"));
 }
 
@@ -179,7 +179,7 @@ fn shared_literal_link_cases_hold () {
   assert! (cases . len () > 5, "too few cases parsed");
   for (name, text, live) in cases {
     let found : Vec<String> = links_from_text (&text) . into_iter ()
-      . map (|link| link . skgid . 0) . collect ();
+      . map (|link| link . gnid . 0) . collect ();
     assert_eq! (found, live, "case: {}", name); }
 }
 

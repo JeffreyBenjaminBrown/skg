@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 /// The ID of this node if it is an occurrence,
 /// else that of its nearest occurrence ancestor.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
-pub fn skgid_from_self_or_nearest_ancestor (
+pub fn gnid_from_self_or_nearest_ancestor (
   tree    : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result<ID, String> {
@@ -21,37 +21,37 @@ pub fn skgid_from_self_or_nearest_ancestor (
   loop {
     match &node . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        return Ok (t . skgid . clone ()),
+        return Ok (t . gnid . clone ()),
       _ => {} }
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
-pub fn find_child_by_skgid (
+pub fn find_child_by_gnid (
   tree          : & Tree<Viewnode>,
   parent_treeid : NodeId,
-  target_skgid  : & ID,
+  target_gnid  : & ID,
 ) -> Option < NodeId > {
   let singleton : HashSet<ID> =
-    std::iter::once( target_skgid . clone() )
+    std::iter::once( target_gnid . clone() )
     . collect();
-  find_children_by_skgids( tree, parent_treeid, &singleton)
-    . remove (target_skgid) }
+  find_children_by_gnids( tree, parent_treeid, &singleton)
+    . remove (target_gnid) }
 
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
-pub fn find_children_by_skgids (
+pub fn find_children_by_gnids (
   tree          : & Tree<Viewnode>,
   parent_treeid : NodeId,
-  target_skgids : & HashSet < ID >,
+  target_gnids : & HashSet < ID >,
 ) -> HashMap < ID, NodeId > {
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree . get (parent_treeid) . unwrap() . children() {
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        if target_skgids . contains (&t . skgid)
-        { result . insert (t . skgid . clone (), child . id()); },
+        if target_gnids . contains (&t . gnid)
+        { result . insert (t . gnid . clone (), child . id()); },
       _ => {} } }
   result }
 
@@ -69,8 +69,8 @@ pub fn generation_includes_only<F> (
 where F: Fn (&Viewnode) -> bool
 { collect_generation( tree, treeid, generation, skip_non_content )
     . iter()
-    . all ( |&skgid| predicate(
-      tree . get (skgid) . unwrap() . value() )) }
+    . all ( |&gnid| predicate(
+      tree . get (gnid) . unwrap() . value() )) }
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
@@ -87,8 +87,8 @@ where F: Fn (&Viewnode) -> bool
     tree, treeid, generation, skip_non_content);
   !nodes . is_empty() &&
     nodes . iter() . all(
-      |&skgid| predicate(
-        tree . get (skgid) . unwrap() . value() )) }
+      |&gnid| predicate(
+        tree . get (gnid) . unwrap() . value() )) }
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
@@ -132,12 +132,12 @@ fn collect_generation (
     for _ in 0..generation {
       let mut next_gen : Vec<NodeId> =
         vec![];
-      for skgid in current_gen {
-        if let Some (n) = tree . get (skgid) {
+      for gnid in current_gen {
+        if let Some (n) = tree . get (gnid) {
           // Under a parent that does not read its children's claims
           // ('parent_reads_claims') no occurrence claims, whatever it
           // carries.
-          let claims_are_read : bool = parent_reads_claims (tree, skgid);
+          let claims_are_read : bool = parent_reads_claims (tree, gnid);
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||

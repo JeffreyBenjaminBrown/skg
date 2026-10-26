@@ -32,14 +32,14 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CanonicalizationChange {
-  pub(crate) skgid        : ID,
+  pub(crate) gnid        : ID,
   pub(crate) old_carrier  : Option<ID>,
   pub(crate) new_carrier  : Option<ID>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct IdentityAcquisition {
-  pub(crate) skgid        : ID,
+  pub(crate) gnid        : ID,
   pub(crate) old_carrier  : Option<ID>,
   pub(crate) new_carrier  : ID,
 }
@@ -49,7 +49,7 @@ pub(crate) struct GraphChangeSet {
   pub(crate) touched_pids             : HashSet<ID>,
   pub(crate) saved_pids               : HashSet<ID>,
   pub(crate) deleted_pids             : HashSet<ID>,
-  pub(crate) affected_skgids             : HashSet<ID>,
+  pub(crate) affected_gnids             : HashSet<ID>,
   pub(crate) canonicalization_changes : Vec<CanonicalizationChange>,
   pub(crate) identity_acquisitions    : Vec<IdentityAcquisition>,
   pub(crate) recorders_to_reindex         : HashSet<ID>,
@@ -64,18 +64,18 @@ pub(crate) struct GraphChangeSet {
 pub(crate) struct ExtraIdRevocation {
   pub(crate) pid            : ID,
   pub(crate) title          : String,
-  pub(crate) dropped_skgids : Vec<ID>,
+  pub(crate) dropped_gnids : Vec<ID>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct OverrideParticipant {
-  pub(crate) skgid    : ID,
+  pub(crate) gnid    : ID,
   pub(crate) title : String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MergeOverrideCollision {
-  pub(crate) acquired_skgid       : ID,
+  pub(crate) acquired_gnid       : ID,
   pub(crate) acquirer             : OverrideParticipant,
   pub(crate) acquiree             : OverrideParticipant,
   pub(crate) existing_overriders  : Vec<OverrideParticipant>,
@@ -107,8 +107,8 @@ impl fmt::Display for GraphUpdatePreparationError {
         "Cannot save node '{}' ('{}') because it would revoke existing extra ID(s): {}. Skg keeps acquired IDs stable because another dataset may link to them. Raw-file editing followed by rebuild remains the explicit escape hatch.",
         revocation . pid,
         revocation . title,
-        revocation . dropped_skgids . iter ()
-          . map ( |skgid| skgid . 0 . as_str () )
+        revocation . dropped_gnids . iter ()
+          . map ( |gnid| gnid . 0 . as_str () )
           . collect::<Vec<&str>> ()
           . join (", ") )); }
     for collision in &self . merge_override_collisions {
@@ -170,10 +170,10 @@ impl PreparedGraphUpdate {
   ) -> &HashSet<ID> {
     &self . changes . saved_pids }
 
-  pub(crate) fn affected_skgids (
+  pub(crate) fn affected_gnids (
     &self,
   ) -> &HashSet<ID> {
-    &self . changes . affected_skgids }
+    &self . changes . affected_gnids }
 
   pub(crate) fn verify_base (
     &self,
@@ -228,11 +228,11 @@ pub(crate) fn prepare_graph_update (
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("derive_affected_override_scope") . entered ();
     derive_affected_override_scope (
-      &base, &candidate, &changes . touched_pids, &changes . affected_skgids) };
+      &base, &candidate, &changes . touched_pids, &changes . affected_gnids) };
   changes . override_skgrepos_to_check = override_scope . skgrepos . clone ();
   changes . override_targets_to_check = override_scope . targets . clone ();
   changes . telescope_recorders_to_check = derive_affected_telescope_recorders (
-    &base, &candidate, &changes . saved_pids, &changes . affected_skgids);
+    &base, &candidate, &changes . saved_pids, &changes . affected_gnids);
   let affected_override_validation : AffectedOverrideValidation = {
     let _span : tracing::span::EnteredSpan =
       tracing::info_span! ("validate_affected_override_invariants") . entered ();
@@ -252,7 +252,7 @@ pub(crate) fn prepare_graph_update (
     "incremental graph work: graph_nodes={} normalized_nodeInstructions={} affected_ids={} recorders_reindexed={} override_repos_checked={} override_targets_checked={} override_chain_steps={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
     base . nodes . len (),
     batch . final_graph_nodeInstructions . len (),
-    changes . affected_skgids . len (),
+    changes . affected_gnids . len (),
     changes . recorders_to_reindex . len (),
     changes . override_skgrepos_to_check . len (),
     changes . override_targets_to_check . len (),
@@ -273,7 +273,7 @@ pub(crate) fn prepare_graph_update (
     }); }
   if ! merge_override_collisions . is_empty () {
     let merge_targets : HashSet<ID> = merge_override_collisions . iter ()
-      . map (|collision| collision . acquirer . skgid . clone ()) . collect ();
+      . map (|collision| collision . acquirer . gnid . clone ()) . collect ();
     let remaining_errors : Vec<CompleteGraphError> = affected_override_errors
       . into_iter () . filter (|violation| ! matches! (
         violation,
@@ -319,28 +319,28 @@ fn derive_merge_override_collisions (
     }) . collect ();
   let mut result : Vec<MergeOverrideCollision> = Vec::new ();
   for acquisition in &changes . identity_acquisitions {
-    let Some (acquiree_skgid) = &acquisition . old_carrier else { continue; };
-    if acquiree_skgid == &acquisition . new_carrier
+    let Some (acquiree_gnid) = &acquisition . old_carrier else { continue; };
+    if acquiree_gnid == &acquisition . new_carrier
       || ! collision_targets . contains (&acquisition . new_carrier)
     { continue; }
-    let existing_skgids : Vec<ID> = owned_overriders_at (
+    let existing_gnids : Vec<ID> = owned_overriders_at (
       config, base, &acquisition . new_carrier);
-    let redirected_skgids : Vec<ID> = owned_overriders_at (
-      config, base, acquiree_skgid);
-    if existing_skgids . is_empty () || redirected_skgids . is_empty () {
+    let redirected_gnids : Vec<ID> = owned_overriders_at (
+      config, base, acquiree_gnid);
+    if existing_gnids . is_empty () || redirected_gnids . is_empty () {
       continue; }
     result . push (MergeOverrideCollision {
-      acquired_skgid : acquisition . skgid . clone (),
+      acquired_gnid : acquisition . gnid . clone (),
       acquirer : participant (candidate, base, &acquisition . new_carrier),
-      acquiree : participant (base, candidate, acquiree_skgid),
-      existing_overriders : existing_skgids . iter ()
-        . map (|skgid| participant (base, candidate, skgid)) . collect (),
-      redirected_overriders : redirected_skgids . iter ()
-        . map (|skgid| participant (base, candidate, skgid)) . collect (),
+      acquiree : participant (base, candidate, acquiree_gnid),
+      existing_overriders : existing_gnids . iter ()
+        . map (|gnid| participant (base, candidate, gnid)) . collect (),
+      redirected_overriders : redirected_gnids . iter ()
+        . map (|gnid| participant (base, candidate, gnid)) . collect (),
     }); }
   result . sort_by (|left, right|
-    left . acquired_skgid . cmp (&right . acquired_skgid)
-      . then_with (|| left . acquirer . skgid . cmp (&right . acquirer . skgid)));
+    left . acquired_gnid . cmp (&right . acquired_gnid)
+      . then_with (|| left . acquirer . gnid . cmp (&right . acquirer . gnid)));
   result
 }
 
@@ -362,13 +362,13 @@ fn owned_overriders_at (
 fn participant (
   preferred : &InRustGraph,
   fallback  : &InRustGraph,
-  skgid     : &ID,
+  gnid     : &ID,
 ) -> OverrideParticipant {
-  let title : String = preferred . nodes . get (skgid)
-    . or_else (|| fallback . nodes . get (skgid))
+  let title : String = preferred . nodes . get (gnid)
+    . or_else (|| fallback . nodes . get (gnid))
     . map (|node| node . title . clone ())
     . unwrap_or_else (|| "<missing>" . to_string ());
-  OverrideParticipant { skgid : skgid . clone (), title }
+  OverrideParticipant { gnid : gnid . clone (), title }
 }
 
 fn format_merge_override_collision (
@@ -377,13 +377,13 @@ fn format_merge_override_collision (
   let render = |participants : &[OverrideParticipant]| -> String {
     participants . iter ()
       . map (|participant| format! (
-        "{} ('{}')", participant . skgid, participant . title))
+        "{} ('{}')", participant . gnid, participant . title))
       . collect::<Vec<String>> () . join (", ") };
   format! (
     "Node merge cannot acquire ID '{}' because canonicalizing it from {} ('{}') to {} ('{}') would make one node have multiple owned overriders.\nParticipants:\n  existing overrider(s): {}\n  redirected overrider(s): {}\nBefore the merge:\n  R1 -> N1\n  R2 -> N2\nThe merge would produce:\n  R1 -> N1\n  R2 -> N1\nRemove either relationship, or choose precedence:\n  R2 -> R1 -> N1\nor\n  R1 -> R2 -> N1",
-    collision . acquired_skgid,
-    collision . acquiree . skgid, collision . acquiree . title,
-    collision . acquirer . skgid, collision . acquirer . title,
+    collision . acquired_gnid,
+    collision . acquiree . gnid, collision . acquiree . title,
+    collision . acquirer . gnid, collision . acquirer . title,
     render (&collision . existing_overriders),
     render (&collision . redirected_overriders))
 }
@@ -394,7 +394,7 @@ fn normalize_and_coalesce_nodeInstructions (
   let filesystem_nodeInstructions : Vec<NodeInstruction> = nodeInstructions . into_iter ()
     . map ( |mut nodeInstruction| {
       if let NodeInstruction::Save (SaveNode (node)) = &mut nodeInstruction {
-        node . normalize_skgids (); }
+        node . normalize_gnids (); }
       nodeInstruction } )
     . collect ();
   let mut final_by_pid : HashMap<ID, (usize, NodeInstruction)> = HashMap::new ();
@@ -429,25 +429,25 @@ fn validate_identity_and_derive_changes (
   let deleted_pids : HashSet<ID> = nodeInstructions . iter ()
     . filter_map ( |nodeInstruction| match nodeInstruction {
       NodeInstruction::Save (_) => None,
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => Some (skgid . clone ()), } )
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => Some (gnid . clone ()), } )
     . collect ();
-  let mut affected_skgids : HashSet<ID> = HashSet::new ();
+  let mut affected_gnids : HashSet<ID> = HashSet::new ();
   for pid in &touched_pids {
-    affected_skgids . insert (pid . clone ());
+    affected_gnids . insert (pid . clone ());
     if let Some (old) = base . nodes . get (pid) {
-      affected_skgids . extend (old . extra_ids . iter () . cloned ()); }}
+      affected_gnids . extend (old . extra_ids . iter () . cloned ()); }}
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
-      affected_skgids . extend (node . all_skgids () . cloned ()); }}
+      affected_gnids . extend (node . all_gnids () . cloned ()); }}
 
   let mut claims : BTreeMap<ID, CarriersForId> = BTreeMap::new ();
-  for skgid in &affected_skgids {
-    if base . nodes . contains_key (skgid) && ! touched_pids . contains (skgid) {
-      claims . entry (skgid . clone ()) . or_default ()
-        . primary . insert (skgid . clone ()); }
-    if let Some (carrier) = base . extra_id_to_pid . get (skgid) {
+  for gnid in &affected_gnids {
+    if base . nodes . contains_key (gnid) && ! touched_pids . contains (gnid) {
+      claims . entry (gnid . clone ()) . or_default ()
+        . primary . insert (gnid . clone ()); }
+    if let Some (carrier) = base . extra_id_to_pid . get (gnid) {
       if ! touched_pids . contains (carrier) {
-        claims . entry (skgid . clone ()) . or_default ()
+        claims . entry (gnid . clone ()) . or_default ()
           . extra . insert (carrier . clone ()); }}}
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
@@ -458,10 +458,10 @@ fn validate_identity_and_derive_changes (
           . extra . insert (node . pid . clone ()); }}}
 
   let mut errors : Vec<CompleteGraphError> = Vec::new ();
-  for (skgid, carriers) in &claims {
+  for (gnid, carriers) in &claims {
     if carriers . extra . len () > 1 {
       errors . push (CompleteGraphError::DuplicateExtraId {
-        skgid     : skgid . clone (),
+        gnid     : gnid . clone (),
         carriers  : carriers . extra . iter () . cloned () . collect (),
       }); }
     let extra_carriers : Vec<ID> = carriers . extra . iter ()
@@ -470,7 +470,7 @@ fn validate_identity_and_derive_changes (
       . collect ();
     if ! carriers . primary . is_empty () && ! extra_carriers . is_empty () {
       errors . push (CompleteGraphError::PrimaryExtraCollision {
-        skgid             : skgid . clone (),
+        gnid             : gnid . clone (),
         primary_carriers  : carriers . primary . iter () . cloned () . collect (),
         extra_carriers,
       }); }}
@@ -487,37 +487,37 @@ fn validate_identity_and_derive_changes (
   for nodeInstruction in nodeInstructions {
     if let NodeInstruction::Save (SaveNode (node)) = nodeInstruction {
       let Some (old) = base . nodes . get (&node . pid) else { continue; };
-      let final_skgids : HashSet<&ID> = node . extra_ids . iter () . collect ();
-      let mut dropped_skgids : Vec<ID> = old . extra_ids . iter ()
-        . filter ( |skgid| ! final_skgids . contains (skgid) )
+      let final_gnids : HashSet<&ID> = node . extra_ids . iter () . collect ();
+      let mut dropped_gnids : Vec<ID> = old . extra_ids . iter ()
+        . filter ( |gnid| ! final_gnids . contains (gnid) )
         . cloned ()
         . collect ();
-      dropped_skgids . sort ();
-      if ! dropped_skgids . is_empty () {
+      dropped_gnids . sort ();
+      if ! dropped_gnids . is_empty () {
         revocations . push (ExtraIdRevocation {
           pid         : node . pid . clone (),
           title       : node . title . clone (),
-          dropped_skgids,
+          dropped_gnids,
         }); }} }
   revocations . sort_by ( |left, right| left . pid . cmp (&right . pid) );
 
   let mut canonicalization_changes : Vec<CanonicalizationChange> = Vec::new ();
   let mut identity_acquisitions : Vec<IdentityAcquisition> = Vec::new ();
-  let mut sorted_affected_skgids : Vec<ID> = affected_skgids . iter () . cloned ()
+  let mut sorted_affected_gnids : Vec<ID> = affected_gnids . iter () . cloned ()
     . collect ();
-  sorted_affected_skgids . sort ();
-  for skgid in sorted_affected_skgids {
-    let old_carrier : Option<ID> = base . pid_of (&skgid);
-    let new_carrier : Option<ID> = final_carrier_of (&claims, &skgid);
+  sorted_affected_gnids . sort ();
+  for gnid in sorted_affected_gnids {
+    let old_carrier : Option<ID> = base . pid_of (&gnid);
+    let new_carrier : Option<ID> = final_carrier_of (&claims, &gnid);
     if old_carrier != new_carrier {
       canonicalization_changes . push (CanonicalizationChange {
-        skgid        : skgid . clone (),
+        gnid        : gnid . clone (),
         old_carrier  : old_carrier . clone (),
         new_carrier  : new_carrier . clone (),
       });
       if let Some (new_carrier) = new_carrier {
         identity_acquisitions . push (IdentityAcquisition {
-          skgid,
+          gnid,
           old_carrier,
           new_carrier,
         }); }} }
@@ -525,20 +525,20 @@ fn validate_identity_and_derive_changes (
   let mut recorders_to_reindex : HashSet<ID> = touched_pids . clone ();
   for change in &canonicalization_changes {
     let old_key : &ID = change . old_carrier . as_ref ()
-      . unwrap_or (&change . skgid);
+      . unwrap_or (&change . gnid);
     let new_key : &ID = change . new_carrier . as_ref ()
-      . unwrap_or (&change . skgid);
+      . unwrap_or (&change . gnid);
     if old_key != new_key {
       recorders_to_reindex . extend (inbound_recorders_at (base, old_key)); }}
 
   #[cfg(test)]
   let identity_base_lookup_bound : usize =
-    touched_pids . len () + affected_skgids . len () * 4 + saved_pids . len ();
+    touched_pids . len () + affected_gnids . len () * 4 + saved_pids . len ();
   (GraphChangeSet {
     touched_pids,
     saved_pids,
     deleted_pids,
-    affected_skgids,
+    affected_gnids,
     canonicalization_changes,
     identity_acquisitions,
     recorders_to_reindex,
@@ -552,9 +552,9 @@ fn validate_identity_and_derive_changes (
 
 fn final_carrier_of (
   claims    : &BTreeMap<ID, CarriersForId>,
-  skgid     : &ID,
+  gnid     : &ID,
 ) -> Option<ID> {
-  let carriers : &CarriersForId = claims . get (skgid) ?;
+  let carriers : &CarriersForId = claims . get (gnid) ?;
   carriers . primary . first () . or_else (|| carriers . extra . first ())
     . cloned ()
 }
@@ -564,7 +564,7 @@ fn definition_pid (
 ) -> &ID {
   match nodeInstruction {
     NodeInstruction::Save (SaveNode (node))       => &node . pid,
-    NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid,
+    NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid,
   }
 }
 

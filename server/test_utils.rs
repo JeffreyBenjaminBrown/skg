@@ -570,7 +570,7 @@ pub fn cleanup_test_tantivy (
 
 /// Compare two org-mode headlines ignoring ID differences.
 /// Converts each headline to HeadlineInfo and strips ID from metadata.
-pub fn compare_headlines_modulo_skgid(
+pub fn compare_headlines_modulo_gnid(
   headline1: &str,
   headline2: &str
 ) -> bool {
@@ -583,9 +583,9 @@ pub fn compare_headlines_modulo_skgid(
     (Ok((level1, metadata1, title1)),
      Ok((level2, metadata2, title2))) => {
       let has_id1: bool =
-        metadata1 . as_ref() . map_or(false, |m| m . skgid . is_some());
+        metadata1 . as_ref() . map_or(false, |m| m . gnid . is_some());
       let has_id2: bool =
-        metadata2 . as_ref() . map_or(false, |m| m . skgid . is_some());
+        metadata2 . as_ref() . map_or(false, |m| m . gnid . is_some());
       if has_id1 != has_id2 {
         // One has an ID and the other doesn't, so they are unequal.
         return false; }
@@ -626,7 +626,7 @@ pub fn compare_viewnode_trees (
               compare_viewnode_trees ( *c1, *c2 )) }}
 
 /// Compares ignoring ID values.
-pub fn compare_viewnode_trees_modulo_skgid(
+pub fn compare_viewnode_trees_modulo_gnid(
   viewforest1: &Tree<Viewnode>,
   viewforest2: &Tree<Viewnode>
 ) -> bool {
@@ -637,13 +637,13 @@ pub fn compare_viewnode_trees_modulo_skgid(
   if root1 . len() != root2 . len() {
     return false; }
   for (tree1, tree2) in root1 . iter() . zip(root2 . iter()) {
-    if !compare_two_viewnode_branches_recursively_modulo_skgid(
+    if !compare_two_viewnode_branches_recursively_modulo_gnid(
       *tree1, *tree2 )
     { return false; }}
   true }
 
 /// Compare two Viewnode subtrees, ignoring ID values.
-fn compare_two_viewnode_branches_recursively_modulo_skgid (
+fn compare_two_viewnode_branches_recursively_modulo_gnid (
   node1: NodeRef<Viewnode>,
   node2: NodeRef<Viewnode>
 ) -> bool {
@@ -653,11 +653,11 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
     ( ViewnodeKind::Vognode (Vognode::Unrestricted (_)),
       ViewnodeKind::Vognode (Vognode::Unrestricted (t2)) ) =>
     { // Copy the ID from one to the other, then compare.
-      let id2 : ID = t2 . skgid . clone ();
+      let id2 : ID = t2 . gnid . clone ();
       let mut n1_copy : Viewnode =
         n1 . clone();
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut n1_copy . kind
-        { t . skgid = id2; }
+        { t . gnid = id2; }
       if n1_copy != *n2 { return false; }}
     ( ViewnodeKind::Folder (_)
       | ViewnodeKind::PropertyMember (_)
@@ -681,7 +681,7 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
     ( children1 . len() == children2 . len() &&
       children1 . iter() . zip(children2 . iter())
       . all (|(c1, c2)|
-             compare_two_viewnode_branches_recursively_modulo_skgid(
+             compare_two_viewnode_branches_recursively_modulo_gnid(
                *c1, *c2)) ) }}
 
 /// Remove ID from metadata struct while preserving other metadata
@@ -689,17 +689,17 @@ fn strip_id_from_metadata_struct(
   metadata: Option<ViewnodeMetadata>
 ) -> Option<ViewnodeMetadata> {
   metadata . map(|mut meta| {
-    meta . skgid = None;
+    meta . gnid = None;
     meta
   } ) }
 
 
 /// Check if a specific ID exists in Tantivy search results.
 /// Searches for the given query and checks if any result has the exact ID.
-pub fn tantivy_contains_skgid(
+pub fn tantivy_contains_gnid(
   tantivy_index: &TantivyIndex,
   query: &str,
-  expected_skgid: &str,
+  expected_gnid: &str,
 ) -> Result<bool, Box<dyn Error>> {
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, Searcher)
@@ -710,7 +710,7 @@ pub fn tantivy_contains_skgid(
     let id_value: Option<String> =
       doc . get_first(tantivy_index . id_field)
       . and_then(|v| v . as_str() . map (String::from));
-    if id_value == Some(expected_skgid . to_string()) {
+    if id_value == Some(expected_gnid . to_string()) {
       return Ok (true); }}
   Ok (false) }
 

@@ -86,7 +86,7 @@ pub struct ViewnodeMetadata {
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<ViewnodeKind>,
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
-  pub skgid: Option<ID>,
+  pub gnid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
   // False when the headline carries 'noClaim': on a node, an alias,
   // an id or an unknown.
@@ -109,7 +109,7 @@ pub struct ViewnodeMetadata {
   pub is_tombstone: bool,
   // When Some, this is a Unknown (a phantom for a missing
   // referent). Carries only the id; no skgrepo/title/body apply.
-  pub unknown_node_skgid: Option<ID>,
+  pub unknown_node_gnid: Option<ID>,
   pub unknown_relRepo : Option<SkgrepoName>,
   pub unknown_relRepo_request : Option<SkgrepoName>,
 }
@@ -120,7 +120,7 @@ impl ViewnodeMetadata {
     self . non_vognode . is_none ()
     && ! self . is_ghost
     && ! self . is_tombstone
-    && self . unknown_node_skgid . is_none () }
+    && self . unknown_node_gnid . is_none () }
 
   /// What a message says of the headline that wrote this metadata and
   /// TITLE: the IDs it writes, not any the parse supplies.
@@ -130,8 +130,8 @@ impl ViewnodeMetadata {
   ) -> HeadlineName {
     HeadlineName::of (
       self . viewnode_id . as_ref (),
-      self . skgid . as_ref ()
-        . or ( self . unknown_node_skgid . as_ref () ),
+      self . gnid . as_ref ()
+        . or ( self . unknown_node_gnid . as_ref () ),
       title ) }}
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -139,7 +139,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     foldAndFocus: FoldAndFocus::default(),
     viewnode_id: None,
     non_vognode: None,
-    skgid: None,
+    gnid: None,
     home_skgrepo: None,
     claimsMembership: true,
     writeProtected: false,
@@ -154,7 +154,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     property_relRepo_request : None,
     is_ghost: false,
     is_tombstone: false,
-    unknown_node_skgid: None,
+    unknown_node_gnid: None,
     unknown_relRepo: None,
     unknown_relRepo_request: None, }}
 
@@ -180,10 +180,10 @@ pub fn viewnode_from_metadata (
     metadata . headline_name (&title);
   let (kind, error, warning)
     : (ViewnodeKind, Option<BufferValidationError>, Option<String>)
-    = if let Some (ref uid) = metadata . unknown_node_skgid {
+    = if let Some (ref uid) = metadata . unknown_node_gnid {
         ( ViewnodeKind::Vognode (Vognode::Unknown (
             Unknown {
-              skgid           : uid . clone (),
+              gnid           : uid . clone (),
               relRepo         : metadata . unknown_relRepo . clone (),
               relationshipEditRequest : metadata . unknown_relRepo_request . clone ()
                 . map (RelationshipEditRequest::RelRepo),
@@ -199,7 +199,7 @@ pub fn viewnode_from_metadata (
         ( ViewnodeKind::Tombstone, None, None )
       } else if metadata . is_ghost {
         ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
-            skgid : metadata . skgid . clone ()
+            gnid : metadata . gnid . clone ()
                     . unwrap_or_else ( || ID::from ("")),
             home_skgrepo : metadata . home_skgrepo . clone ()
                            . unwrap_or_else ( || SkgrepoName::from ("")),
@@ -253,7 +253,7 @@ pub fn viewnode_from_metadata (
               isWarranted : Warrant::ByGraph }),
           ViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
             ViewnodeKind::PropertyMember (PropertyMember::ID {
-              skgid : title . clone () . into (),
+              gnid : title . clone () . into (),
               claimsMembership : metadata . claimsMembership,
               isWarranted : Warrant::ByGraph }),
           ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
@@ -318,13 +318,13 @@ pub fn viewnode_from_metadata (
         let error : Option<BufferValidationError> =
           if     metadata . writeProtected
               && edit_request . is_some ()
-          { metadata . skgid . clone ()
-            . map ( |skgid| BufferValidationError::EditRequestOnWriteProtectedOccurrence (
-                      skgid, headline . clone () )) }
+          { metadata . gnid . clone ()
+            . map ( |gnid| BufferValidationError::EditRequestOnWriteProtectedOccurrence (
+                      gnid, headline . clone () )) }
           else { None };
         let t : UnrestrictedVognode = UnrestrictedVognode {
             title,
-            skgid            : metadata . skgid . clone ()
+            gnid            : metadata . gnid . clone ()
                                . unwrap_or_else ( || ID (
                                  Uuid::new_v4 () . to_string () )),
             home_skgrepo     : metadata . home_skgrepo . clone ()
@@ -479,7 +479,7 @@ pub fn parse_metadata_to_viewnodemd (
     MetadataKind::Node => {},
     MetadataKind::Ghost => result . is_ghost = true,
     MetadataKind::Unknown =>
-      if result . unknown_node_skgid . is_none () {
+      if result . unknown_node_gnid . is_none () {
         return Err ( "An unknown requires its (gnid X)" . to_string () ); },
     MetadataKind::Tombstone => result . is_tombstone = true,
     MetadataKind::Other (other) => result . non_vognode = Some (other), }
@@ -610,8 +610,8 @@ fn read_metadata_part (
     "gnid" => {
       let gnid : ID = ID::from ( single_argument (name, args) ? );
       if matches! (kind, MetadataKind::Unknown) {
-        metadata . unknown_node_skgid = Some (gnid);
-      } else { metadata . skgid = Some (gnid); }},
+        metadata . unknown_node_gnid = Some (gnid);
+      } else { metadata . gnid = Some (gnid); }},
     "skgRepos" => {
       let (nodeRepo, relRepo) : (Option<SkgrepoName>, Option<SkgrepoName>) =
         parse_skgRepos (args) ?;

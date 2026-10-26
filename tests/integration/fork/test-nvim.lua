@@ -13,8 +13,8 @@ local metadata = require('skg.metadata')
 local save = require('skg.save')
 
 ---Return a live skg view buffer whose text mentions (gnid ID).
-local function buffer_showing (skgid)
-  local needle = '(gnid ' .. skgid .. ')'
+local function buffer_showing (gnid)
+  local needle = '(gnid ' .. gnid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then

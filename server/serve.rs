@@ -37,7 +37,7 @@ use crate::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::{ abandon_search_enrichment, enrich_search_viewforest, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
-use crate::serve::handlers::titles_by_skgids::handle_titles_by_skgids_request_with_skgrepo_set;
+use crate::serve::handlers::titles_by_gnids::handle_titles_by_gnids_request_with_skgrepo_set;
 use crate::serve::handlers::diff_view::handle_diffView_request;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
@@ -216,7 +216,7 @@ fn handle_emacs (
                                            &runtime . config,
                                            &skgrepo_restriction ),
           Ok (RequestType::TitlesByIds) =>
-            handle_titles_by_skgids_request_with_skgrepo_set (
+            handle_titles_by_gnids_request_with_skgrepo_set (
               &mut stream, &request_header,
               &runtime . tantivy_index, &runtime . config,
               &skgrepo_restriction,
@@ -408,7 +408,7 @@ fn enrich_search_buffer_snapshot (
     . filter_map ( |node| match &node . value () . kind {
       crate::types::viewnode::ViewnodeKind::Vognode (
         crate::types::viewnode::Vognode::Unrestricted (unrestricted_node)) =>
-          Some (unrestricted_node . skgid . clone ()),
+          Some (unrestricted_node . gnid . clone ()),
       _ => None, } )
     . collect ();
   let approved : std::collections::HashSet<_> =

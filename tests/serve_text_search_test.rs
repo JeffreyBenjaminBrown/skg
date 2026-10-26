@@ -8,7 +8,7 @@ use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetNa
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
-  group_matches_by_skgid, build_search_viewforest};
+  group_matches_by_gnid, build_search_viewforest};
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -70,14 +70,14 @@ fn test_text_search_org_format (
         "the bear eats cheese";
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, search_terms, &SearchOptions::default () ) ?;
-      let matches_by_skgid =
-        group_matches_by_skgid (
+      let matches_by_gnid =
+        group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
           search_terms, &SearchOptions::default (), None );
       let (viewforest, _search_results) =
         build_search_viewforest (
           search_terms,
-          &matches_by_skgid,
+          &matches_by_gnid,
           &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
         SkgConfig::dummyFromSkgrepos (HashMap::new ());
@@ -106,9 +106,9 @@ fn test_text_search_org_format (
                   aliases_under_current . clone () );
                 aliases_under_current . clear (); }
               if let Some (md) = metadata {
-                if let Some (skgid) = md . skgid {
+                if let Some (gnid) = md . gnid {
                   level1_headlines . push (
-                    ( skgid . to_string (), title ) ); }} },
+                    ( gnid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
                 if let Some ( ViewnodeKind::PropertyMember (
@@ -200,11 +200,11 @@ fn test_search_results_preserve_links_in_title (
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, "science",
                        &SearchOptions::default () ) ?;
-      let matches_by_skgid = group_matches_by_skgid (
+      let matches_by_gnid = group_matches_by_gnid (
         best_matches, searcher, &tantivy_index,
         "science", &SearchOptions::default (), None );
       let (viewforest, _ids) = build_search_viewforest (
-        "science", &matches_by_skgid, &std::collections::HashSet::new () );
+        "science", &matches_by_gnid, &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
         SkgConfig::dummyFromSkgrepos (HashMap::new ());
       let result : String =
@@ -217,7 +217,7 @@ fn test_search_results_preserve_links_in_title (
       let mut found_link_node_title : Option<String> = None;
       for line in result . lines () {
         if let Ok (( 1, Some (md), title )) = headline_to_triple (line) {
-          if md . skgid . as_ref () . map ( |i| i . as_str () )
+          if md . gnid . as_ref () . map ( |i| i . as_str () )
                                   == Some ("link_node") {
             found_link_node_title = Some (title); }} }
       let title : String = found_link_node_title
@@ -282,17 +282,17 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let ( best_matches, searcher ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &SearchOptions::default () ) ?;
-      let matches_by_skgid = group_matches_by_skgid (
+      let matches_by_gnid = group_matches_by_gnid (
         best_matches, searcher, &tantivy_index,
         "axiom thesis lemma",
         &SearchOptions::default (), None );
       // Both should be in the result set.
-      assert! ( matches_by_skgid . contains_key (&ID::new ("few")),
+      assert! ( matches_by_gnid . contains_key (&ID::new ("few")),
                 "few should appear among results" );
-      assert! ( matches_by_skgid . contains_key (&ID::new ("many")),
+      assert! ( matches_by_gnid . contains_key (&ID::new ("many")),
                 "many should appear among results" );
-      let score_for = |skgid : &str| -> f32 {
-        matches_by_skgid . get (& ID::new (skgid)) . unwrap ()
+      let score_for = |gnid : &str| -> f32 {
+        matches_by_gnid . get (& ID::new (gnid)) . unwrap ()
           . 1 . iter () . map ( |(s, _)| *s )
           . fold (f32::NEG_INFINITY, f32::max) };
       let many_score : f32 = score_for ("many");
@@ -317,7 +317,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       let ( best_matches_re, searcher_re ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &regex_opts ) ?;
-      let matches_re = group_matches_by_skgid (
+      let matches_re = group_matches_by_gnid (
         best_matches_re, searcher_re, &tantivy_index,
         "axiom thesis lemma", &regex_opts, None );
       assert! ( matches_re . contains_key (&ID::new ("few")),
@@ -379,31 +379,31 @@ fn private_alias_documents_are_filtered_before_grouping (
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;
-        let matches_by_skgid = group_matches_by_skgid (
+        let matches_by_gnid = group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
           "zanzibar", &SearchOptions::default (),
           Some (&public_only) );
-        assert! ( ! matches_by_skgid . contains_key (
+        assert! ( ! matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")),
                   "private alias doc leaked into a main-only search" ); }
       { // Unrestricted (None): the alias matches.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;
-        let matches_by_skgid = group_matches_by_skgid (
+        let matches_by_gnid = group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
           "zanzibar", &SearchOptions::default (), None );
-        assert! ( matches_by_skgid . contains_key (
+        assert! ( matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")) ); }
       { // The title doc still matches under the restricted set.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "public title",
                          &SearchOptions::default () ) ?;
-        let matches_by_skgid = group_matches_by_skgid (
+        let matches_by_gnid = group_matches_by_gnid (
           best_matches, searcher, &tantivy_index,
           "public title", &SearchOptions::default (),
           Some (&public_only) );
-        assert! ( matches_by_skgid . contains_key (
+        assert! ( matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")) ); }
       Ok (( )) } ) ();
   if Path::new (index_dir) . exists () {

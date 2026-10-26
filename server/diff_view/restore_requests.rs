@@ -70,7 +70,7 @@ pub fn add_restore_instructions (
     || ( live . pid_of (pid) . is_some ()
          && ! instructions . iter () . any ( |instruction| matches! (
               instruction, NodeInstruction::Delete (delete)
-              if live . pid_of (&delete . skgid) . as_ref () == Some (pid) )) ) };
+              if live . pid_of (&delete . gnid) . as_ref () == Some (pid) )) ) };
   let mut relationships : Vec<RestoredRelationship> = Vec::new ();
   let mut restored_in_order : Vec<&ID> = restored_pids . iter () . collect ();
   restored_in_order . sort (); // so that the writes do not depend on hash order
@@ -136,15 +136,15 @@ fn restore_nodes (
   for node in viewforest . root () . descendants () {
     let ViewnodeKind::Vognode (Vognode::Ghost (h))
       : &ViewnodeKind = &node . value () . kind else { continue; };
-    if ! h . restoreNode_request || restored . contains (&h . skgid)
+    if ! h . restoreNode_request || restored . contains (&h . gnid)
     { continue; }
     let headline : HeadlineName = node . value () . headline_name ();
     let saved_already : bool = instructions . iter () . any (
-      |instruction| instruction_skgid (instruction) == &h . skgid );
+      |instruction| instruction_gnid (instruction) == &h . gnid );
     let graphnode : Option<Graphnode> =
-      graphnode_from_graph (before, &h . skgid);
+      graphnode_from_graph (before, &h . gnid);
     match graphnode {
-      _ if live . pid_of (&h . skgid) . is_some () || saved_already =>
+      _ if live . pid_of (&h . gnid) . is_some () || saved_already =>
         warnings . push ( with_org_subheadlines (
           "A restoreNode request was dropped: that node exists.",
           &[ headline ] )),
@@ -153,18 +153,18 @@ fn restore_nodes (
           "A restoreNode request was dropped: HEAD has no such node.",
           &[ headline ] )),
       Some (graphnode) => {
-        restored . insert (h . skgid . clone ());
+        restored . insert (h . gnid . clone ());
         instructions . push (
           NodeInstruction::Save ( SaveNode (graphnode) )); }, }}
   restored }
 
 /// The ID a NodeInstruction writes or deletes.
-fn instruction_skgid (
+fn instruction_gnid (
   instruction : &NodeInstruction,
 ) -> &ID {
   match instruction {
     NodeInstruction::Save (SaveNode (graphnode)) => &graphnode . pid,
-    NodeInstruction::Delete (delete) => &delete . skgid, } }
+    NodeInstruction::Delete (delete) => &delete . gnid, } }
 
 /// The relationships in which 'pid' is the member at HEAD, from the
 /// before-graph's inbound indexes. Links live in text, so they are not
@@ -228,8 +228,8 @@ fn restoreRel_requests (
   viewforest : &ViewForest,
   live       : &InRustGraph,
 ) -> Vec<(Option<RelationshipKey>, HeadlineName)> {
-  let pid_of = |skgid : &ID| -> ID {
-    live . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
+  let pid_of = |gnid : &ID| -> ID {
+    live . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
   viewforest . root () . descendants ()
     . filter ( |node| matches! ( &node . value () . kind,
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) ))

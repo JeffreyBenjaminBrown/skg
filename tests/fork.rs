@@ -126,10 +126,10 @@ fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  let skgid : ID = ID::from (pid);
+  let gnid : ID = ID::from (pid);
   read_all_skg_files_from_skgrepos (config) ?
     . into_iter ()
-    . find ( |node| node . pid == skgid )
+    . find ( |node| node . pid == gnid )
     . ok_or_else ( || format! ("node not found on disk: {}", pid) . into () ) }
 
 /// The single clone produced by saving the FORK_BUFFER -- the owned
@@ -231,7 +231,7 @@ async fn explicit_fork_save_instruction (
   assert_eq! ( fork_specs . len (), 1,
     "exactly one explicit fork (of P): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
-  assert_eq! ( spec . original_skgid, ID::from ("P") );
+  assert_eq! ( spec . original_gnid, ID::from ("P") );
   let c : &Graphnode = &spec . clone . 0;
   assert_eq! ( c . title, "P-container",
     "clone copies P's disk title (not a buffer edit)" );
@@ -553,7 +553,7 @@ async fn fork_from_bare_new_child_plan (
     "appending a bare new child must fork N: {:?}",
     save_plan . fork_specs );
   let clone : &Graphnode = & save_plan . fork_specs[0] . clone . 0;
-  assert_eq! ( save_plan . fork_specs[0] . original_skgid, ID::from ("N") );
+  assert_eq! ( save_plan . fork_specs[0] . original_gnid, ID::from ("N") );
   assert_eq! ( clone . contains . len (), 3,
     "the clone's contains must be N1, N2 and the new node: {:?}",
     clone . contains );
@@ -720,7 +720,7 @@ async fn fork_save_instruction (
   assert_eq! ( fork_specs . len (), 1,
     "exactly one fork (of N): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
-  assert_eq! ( spec . original_skgid, ID::from ("N") );
+  assert_eq! ( spec . original_gnid, ID::from ("N") );
   let c : &Graphnode = &spec . clone . 0;
   assert_eq! ( c . title, "N-edited",
     "clone copies the edited title" );
@@ -803,7 +803,7 @@ async fn fork_round_trip (
     &mut stream, FORK_BUFFER, config, tantivy, &graph,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
-  let clone_skgid : ID = clone_on_disk (config) ? . pid;
+  let clone_gnid : ID = clone_on_disk (config) ? . pid;
 
   // Reopen P de-novo. N is P's content; override substitution shows the
   // clone in its place with (overridesHere N).
@@ -813,8 +813,8 @@ async fn fork_round_trip (
   assert! ( p_view . contains ("(overridesHere N)"),
     "the clone must be shown in N's place with (overridesHere N):\n{}",
     p_view );
-  assert! ( p_view . contains (& format! ("(gnid {})", clone_skgid . 0)),
-    "the shown substitute must be the clone {}:\n{}", clone_skgid . 0, p_view );
+  assert! ( p_view . contains (& format! ("(gnid {})", clone_gnid . 0)),
+    "the shown substitute must be the clone {}:\n{}", clone_gnid . 0, p_view );
   assert! ( p_view . contains ("subscribeeFolder"),
     "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
   assert! ( ! p_view . contains ("overriddenFolder"),
@@ -825,7 +825,7 @@ async fn fork_round_trip (
   // to the clone; it still lists N (the fact collected N, not C).
   let p_disk : Graphnode = node_from_disk (config, "P") ?;
   assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],
-    "P's contains must still point at N, not the clone {}", clone_skgid . 0 );
+    "P's contains must still point at N, not the clone {}", clone_gnid . 0 );
   Ok (( )) }
 
 /// A collateral rerender substitutes the clone for N, as every refresh

@@ -919,9 +919,9 @@ function M.fork_repos_from_confirmation_buffer (buf)
           -- clone-to-be's repo to a later fork's child.
           parent_skgrepo = sexp and metadata.node_repo(sexp) or nil
         elseif level == 2 and sexp and parent_skgrepo then
-          local skgid = metadata.node_id(sexp)
-          if skgid then
-            table.insert(pairs_found, { skgid, parent_skgrepo }) end
+          local gnid = metadata.node_id(sexp)
+          if gnid then
+            table.insert(pairs_found, { gnid, parent_skgrepo }) end
         end
       end
     end

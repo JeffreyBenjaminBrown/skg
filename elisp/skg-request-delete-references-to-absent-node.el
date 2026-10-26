@@ -10,27 +10,27 @@
 (defun skg-delete-references-to-absent-node ()
   "Remove owned structured references to the Unknown headline at point."
   (interactive)
-  (let ((skgid (skg--unknown-node-id-at-point)))
-    (unless skgid
+  (let ((gnid (skg--unknown-node-id-at-point)))
+    (unless gnid
       (user-error "Point must be on an Unknown headline"))
     (when (cl-some (lambda (buf)
                      (and (buffer-local-value 'skg-view-id buf)
                           (buffer-modified-p buf)))
                    (buffer-list))
       (user-error "Save or revert every skg view before global reference cleanup"))
-    (skg--delete-absent-send skgid nil)))
+    (skg--delete-absent-send gnid nil)))
 
-(defun skg--delete-absent-send (skgid approved-preview)
+(defun skg--delete-absent-send (gnid approved-preview)
   "Send cleanup request for ID; APPROVED-PREVIEW is echoed verbatim on retry."
   (skg--send-streaming-request
    "delete absent references"
    'delete-references-confirmation
    (append `((request . "delete references to absent node")
-             (id . ,skgid))
+             (id . ,gnid))
            (when approved-preview
              `((approved-preview . ,approved-preview))))
    (lambda (_tcp payload)
-     (skg--delete-absent-confirmation-handler skgid payload))
+     (skg--delete-absent-confirmation-handler gnid payload))
    `((delete-references-result
       . ,(lambda (_tcp payload)
            (skg--delete-absent-result-handler payload)))
@@ -39,8 +39,8 @@
            (skg--delete-absent-error-handler payload))))
    t))
 
-(defun skg--delete-absent-confirmation-handler (skgid payload)
-  "Show the preview in PAYLOAD; on approval, resend for SKGID with its
+(defun skg--delete-absent-confirmation-handler (gnid payload)
+  "Show the preview in PAYLOAD; on approval, resend for GNID with its
 token once the empty rerender stream that follows is done."
   ;; The confirmation replaces the result response for this request.
   ;; Balance its one-shot registration before the empty-stream retry.
@@ -58,7 +58,7 @@ token once the empty rerender stream that follows is done."
       ;; The server sends an empty stream after confirmation.  A timer
       ;; after rerender-done avoids nesting a request in its filter.
       (setq skg--rerender-after-empty-stream
-            (lambda () (skg--delete-absent-send skgid approval))))))
+            (lambda () (skg--delete-absent-send gnid approval))))))
 
 (defun skg--delete-absent-result-handler (payload)
   "Show the cleanup report in PAYLOAD."

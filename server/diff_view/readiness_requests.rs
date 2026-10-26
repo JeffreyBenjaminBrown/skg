@@ -91,8 +91,8 @@ pub fn readiness_requests_in_viewforest (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
 ) -> Vec<RequestedReadiness> {
-  let pid_of = |skgid : &ID| -> ID {
-    graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
+  let pid_of = |gnid : &ID| -> ID {
+    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
   viewforest . root () . descendants ()
     . filter_map ( |node| {
       let request : &ReadinessRequest = node . value () . readiness_request . as_ref () ?;
@@ -162,10 +162,10 @@ fn leaves_named_at (
           leaves . push ( LeafKey::Node {
             pid : pid_of_folders_viewparent,
             aspect : NodeAspect::Alias (text . clone ()) } ),
-        PropertyMember::ID { skgid, .. } =>
+        PropertyMember::ID { gnid, .. } =>
           leaves . push ( LeafKey::Node {
             pid : pid_of_folders_viewparent,
-            aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
+            aspect : NodeAspect::ExtraId (gnid . clone ()) } ),
         PropertyMember::Flag { flag, .. } =>
           leaves . push ( LeafKey::Node {
             pid : pid_of_folders_viewparent,
@@ -236,8 +236,8 @@ pub fn set_ready_facts_in_viewforest (
   store      : &ReadinessStore,
   graph      : &InRustGraph,
 ) {
-  let pid_of = |skgid : &ID| -> ID {
-    graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
+  let pid_of = |gnid : &ID| -> ID {
+    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
   let object_is_ready = |node : NodeRef<Viewnode>, objects : &[DiffObject]| -> bool {
     let keys : Vec<LeafKey> = keys_named_at (node, objects, forest, &pid_of);
     ! keys . is_empty () && forest . readiness_of_leaves (store, &keys) };
@@ -349,9 +349,9 @@ pub(crate) fn vognode_leaf_pid (
 ) -> Option<ID> {
   match &viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
-      Some ( h . skgid . clone () ),
+      Some ( h . gnid . clone () ),
     ViewnodeKind::Vognode (vognode) =>
-      Some ( pid_of ( vognode . skgid () )),
+      Some ( pid_of ( vognode . gnid () )),
     _ => None, } }
 
 /// Set or clear the marks the requests name, at their fingerprints
@@ -416,7 +416,7 @@ fn grandparent_pid (
   node : NodeRef<Viewnode>,
 ) -> Option<ID> {
   match &node . parent () ? . parent () ? . value () . kind {
-    ViewnodeKind::Vognode (vognode) => Some ( vognode . skgid () . clone () ),
+    ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () . clone () ),
     _ => None, } }
 
 /// The readiness summary of a buffer of the diff view, from

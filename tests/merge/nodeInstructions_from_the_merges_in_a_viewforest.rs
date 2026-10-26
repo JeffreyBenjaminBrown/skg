@@ -39,7 +39,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         let merge = &nodeMerge_instructions[0];
         let ( acquiree_text_preserver,
               node1,
-              (node2_skgid, node2_skgrepo) )
+              (node2_gnid, node2_skgrepo) )
           = merge . targets_from_nodeMerge();
 
         // Verify acquiree_text_preserver properties
@@ -101,19 +101,19 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
 
         // Verify node 1's contents: [acquiree_text_preserver ID, original node 1 contents, node 2 contents]
         // In this case: [acquiree_text_preserver ID] (since both started with empty contents)
-        let acquiree_text_preserver_skgid = &acquiree_text_preserver . pid;
+        let acquiree_text_preserver_gnid = &acquiree_text_preserver . pid;
         assert_eq!(
           node1 . contains . len(),
           1,
           "Node 1 should contain exactly the acquiree_text_preserver"
         );
         assert_eq!(
-          &node1 . contains[0] . member, acquiree_text_preserver_skgid,
+          &node1 . contains[0] . member, acquiree_text_preserver_gnid,
           "Node 1's first content should be the acquiree_text_preserver"
         );
 
         // Verify node 2 (acquiree) deletion instruction
-        assert_eq!( node2_skgid, &ID::from ("2"),
+        assert_eq!( node2_gnid, &ID::from ("2"),
                     "Node 2 should have ID '2'" );
         assert_eq!( node2_skgrepo, &SkgrepoName::from ("main"),
                     "Node 2 should have repo 'main'" );

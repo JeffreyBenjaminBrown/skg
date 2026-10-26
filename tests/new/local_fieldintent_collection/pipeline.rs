@@ -48,23 +48,23 @@ async fn placed_forest_from_org_with_disk (
     org_to_viewforest (input, &graph_from_config (config) ?) ?;
   Ok ( viewforest ) }
 
-fn save_skgids (
+fn save_gnids (
   instructions : &[NodeInstruction],
 ) -> Vec<ID> {
   instructions . iter() . map (|instruction| match instruction {
     NodeInstruction::Save (SaveNode (node)) => node . pid . clone(),
-    NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone(),
+    NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone(),
   }) . collect() }
 
-fn saved_node_by_skgid<'a> (
+fn saved_node_by_gnid<'a> (
   instructions : &'a [NodeInstruction],
-  skgid           : &str,
+  gnid           : &str,
 ) -> &'a Graphnode {
   for instruction in instructions {
     if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (skgid) {
+      if node . pid == ID::from (gnid) {
         return node; }}}
-  panic! ("SaveNode not found: {}", skgid) }
+  panic! ("SaveNode not found: {}", gnid) }
 
 #[test]
 fn all_tests
@@ -131,16 +131,16 @@ async fn pipeline_basic_mixed_tree (
         extract_nonmergeSavePlan_locally (
           &placed_forest_from_org (input), config, None)?;
       assert_eq!(
-        save_skgids (&plan . node_instructions),
+        save_gnids (&plan . node_instructions),
         vec![ ID::from ("root"), ID::from ("child"),
               ID::from ("grandchild"), ID::from ("independent"),
               ID::from ("explicit"), ID::from ("doomed") ]);
       assert!( matches!(
         plan . node_instructions . last(),
-        Some (NodeInstruction::Delete (DeleteNode { skgid, .. }))
-          if skgid == &ID::from ("doomed") ));
+        Some (NodeInstruction::Delete (DeleteNode { gnid, .. }))
+          if gnid == &ID::from ("doomed") ));
       { let root : &Graphnode =
-          saved_node_by_skgid (&plan . node_instructions, "root");
+          saved_node_by_gnid (&plan . node_instructions, "root");
         assert_eq!( root . body,
                     Some ("Root body" . to_string()) );
         assert_eq!( members_of (&root . contains), vec![ID::from ("child")] );
@@ -153,7 +153,7 @@ async fn pipeline_basic_mixed_tree (
         assert_eq!( members_msv (&root . overrides),
                     MSV::Specified (vec![ID::from ("o1")]) ); }
       { let explicit : &Graphnode =
-          saved_node_by_skgid (&plan . node_instructions, "explicit");
+          saved_node_by_gnid (&plan . node_instructions, "explicit");
         // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,
                     MSV::Specified (vec![]) );
@@ -182,11 +182,11 @@ async fn pipeline_subscribee_hiderels (
         extract_nonmergeSavePlan_locally (
           &forest, config, None)?;
       assert_eq!(
-        members_msv (&saved_node_by_skgid (&plan . node_instructions, "r")
+        members_msv (&saved_node_by_gnid (&plan . node_instructions, "r")
           . hidesFromSubs),
         MSV::Specified (vec![ID::from ("e1")]));
       assert!(
-        ! save_skgids (&plan . node_instructions)
+        ! save_gnids (&plan . node_instructions)
           . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode" );
       Ok (( )) }
@@ -210,14 +210,14 @@ async fn pipeline_write_protected_folder_member_edits (
         extract_nonmergeSavePlan_locally (
           &placed_forest_from_org (input), config, None)?;
       assert_eq!(
-        save_skgids (&plan . node_instructions),
+        save_gnids (&plan . node_instructions),
         vec![ ID::from ("recorder"), ID::from ("intruder"),
               ID::from ("intruder-child"), ID::from ("lurker") ]);
       assert_eq!(
-        members_of (&saved_node_by_skgid (&plan . node_instructions, "recorder") . contains),
+        members_of (&saved_node_by_gnid (&plan . node_instructions, "recorder") . contains),
         Vec::<ID>::new() );
       assert_eq!(
-        members_of (&saved_node_by_skgid (&plan . node_instructions, "intruder") . contains),
+        members_of (&saved_node_by_gnid (&plan . node_instructions, "intruder") . contains),
         vec![ID::from ("intruder-child")] );
       Ok (( )) }
 
@@ -235,11 +235,11 @@ async fn pipeline_restricted_subtree (
         extract_nonmergeSavePlan_locally (
           &placed_forest_from_org (input), config, None)?;
       assert_eq!(
-        save_skgids (&plan . node_instructions),
+        save_gnids (&plan . node_instructions),
         // stowaway is on the new recursion surface.
         vec![ ID::from ("root"), ID::from ("stowaway") ]);
       assert_eq!(
-        members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
+        members_of (&saved_node_by_gnid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new(),
         "the tombstone emits no contains membership; under a \
          restricted set the weave restores a hidden node's from disk \
@@ -261,12 +261,12 @@ async fn pipeline_phantom_subtree (
         extract_nonmergeSavePlan_locally (
           &forest, config, None)?;
       assert_eq!(
-        save_skgids (&plan . node_instructions),
+        save_gnids (&plan . node_instructions),
         // survivor is on the new recursion surface; the phantom
         // itself emits nothing and is not content of its parent.
         vec![ ID::from ("root"), ID::from ("survivor") ]);
       assert_eq!(
-        members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
+        members_of (&saved_node_by_gnid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new() );
       Ok (( )) }
 
@@ -295,8 +295,8 @@ async fn pipeline_nodeMerge_requests (
           &graph_handle_from_config (config)? . load_full (),
           config)?;
       assert_eq!( nodeMerges . len(), 1 );
-      assert_eq!( nodeMerges [0] . acquirer_skgid(), &ID::from ("1") );
-      assert_eq!( nodeMerges [0] . acquiree_skgid(), &ID::from ("2") );
+      assert_eq!( nodeMerges [0] . acquirer_gnid(), &ID::from ("1") );
+      assert_eq!( nodeMerges [0] . acquiree_gnid(), &ID::from ("2") );
       assert_eq!( nodeMerges [0] . acquiree_text_preserver . 0 . title,
                   "MERGED: 2" );
       Ok (( )) }

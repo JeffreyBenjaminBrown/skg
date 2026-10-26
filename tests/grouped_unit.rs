@@ -81,7 +81,7 @@ mod test_utils;
 mod links;
 
 #[path = "titles_by_ids.rs"]
-mod titles_by_skgids;
+mod titles_by_gnids;
 
 #[path = "to_org.rs"]
 mod to_org;

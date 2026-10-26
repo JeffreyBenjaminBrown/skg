@@ -11,7 +11,7 @@ pub fn write_at_ancestor_in_tree<T, F, R>(
   f: F
 ) -> Result<R, String>
 where F: FnOnce (&mut T) -> R, {
-  let target_skgid : NodeId = {
+  let target_gnid : NodeId = {
     // Climb to target node via immutable reference
     let mut node_ref : NodeRef<T> = tree . get (treeid)
       . ok_or ("node not found")?;
@@ -19,7 +19,7 @@ where F: FnOnce (&mut T) -> R, {
       node_ref = node_ref . parent()
         . ok_or ("cannot climb that many generations")?; }
     node_ref . id() };
-  let mut node_mut : NodeMut<T> = tree . get_mut (target_skgid)
+  let mut node_mut : NodeMut<T> = tree . get_mut (target_gnid)
     . ok_or ("target node not found")?;
   Ok(f(node_mut . value() )) }
 
@@ -76,7 +76,7 @@ pub fn do_everywhere_in_tree_dfs<T, F>(
   f             : &mut F
 ) -> Result<(), String>
 where F: FnMut(NodeMut<T>) -> Result<(), String> {
-  let child_skgids : Vec<NodeId> = {
+  let child_gnids : Vec<NodeId> = {
     // Collect early so no borrow conflicts
     let node_ref : NodeRef<T> =
       tree . get (start_treeid) . ok_or ("do_everywhere_in_tree_dfs: start node not found") ?;
@@ -87,9 +87,9 @@ where F: FnMut(NodeMut<T>) -> Result<(), String> {
     let node_mut : NodeMut<T> = tree . get_mut (start_treeid)
       . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
     f (node_mut) ?; }
-  for child_skgid in child_skgids { // recurse
+  for child_gnid in child_gnids { // recurse
     do_everywhere_in_tree_dfs (
-      tree, child_skgid, preorder, f ) ?; }
+      tree, child_gnid, preorder, f ) ?; }
   if !preorder {
     let node_mut : NodeMut<T> = tree . get_mut (start_treeid)
       . ok_or ("do_everywhere_in_tree_dfs: node not found") ?;
@@ -130,7 +130,7 @@ pub fn do_everywhere_in_tree_dfs_prunable<T, F>(
 ) -> Result<(), String>
 where F: FnMut(NodeMut<T>
               ) -> Result<bool, String> {
-  let child_skgids : Vec<NodeId> = {
+  let child_gnids : Vec<NodeId> = {
     let node_ref : NodeRef<T> =
       tree . get (start_treeid) . ok_or (
         "do_everywhere_in_tree_dfs_prunable: start node not found" )?;
@@ -143,9 +143,9 @@ where F: FnMut(NodeMut<T>
         "do_everywhere_in_tree_dfs_prunable: node not found" )?;
     f (node_mut)? };
   if should_continue {
-    for child_skgid in child_skgids {
+    for child_gnid in child_gnids {
       do_everywhere_in_tree_dfs_prunable (
-        tree, child_skgid, f )?; }}
+        tree, child_gnid, f )?; }}
   Ok (( )) }
 
 /// Compare two trees for structural and value equality.

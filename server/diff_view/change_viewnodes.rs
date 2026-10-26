@@ -112,7 +112,7 @@ pub fn mk_historical_viewnode (
       leaves   : None,
       .. ChangeFacts::default () },
     .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
-        skgid        : pid . clone (),
+        gnid        : pid . clone (),
         home_skgrepo : before . home_skgrepo . clone (),
         title        : before . title . clone (),
         body         : before . body . clone (),

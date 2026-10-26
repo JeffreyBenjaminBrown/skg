@@ -51,17 +51,17 @@ pub fn resolve_document_links (
   built : &mut [BuiltDocument],
   input_directory : &Path,
   host_root : Option<&Path>,
-  existing_skgids : &HashMap<String, ID>,
+  existing_gnids : &HashMap<String, ID>,
 ) {
   let index : AddressIndex =
-    build_address_index (documents, built, existing_skgids);
+    build_address_index (documents, built, existing_gnids);
   for (document_index, document) in documents . iter_mut () . enumerate () {
     let links : Vec<ParsedLink> = document . links . clone ();
     for link in links {
       match resolve_link (
         document_index, &link, document, &index,
         input_directory, host_root) {
-        LinkTarget::Node (skgid, warning) => {
+        LinkTarget::Node (gnid, warning) => {
           if let Some (warning) = warning {
             document . diagnostics . push (Diagnostic {
               range : link . range . clone (), message : warning }); }
@@ -75,7 +75,7 @@ pub fn resolve_document_links (
             continue; }
           document . source_edits . push (SourceEdit {
             range : link . range . clone (),
-            replacement : format! ("[[id:{}][{}]]", skgid, link . label),
+            replacement : format! ("[[id:{}][{}]]", gnid, link . label),
           }); }
         LinkTarget::External => {
           if let Some (reference_id) = &link . reference_id {
@@ -108,10 +108,10 @@ pub fn resolve_document_links (
           message : "Footnote reference overlaps another conversion; left unchanged"
             . to_string (), });
         continue; }
-      let skgid : &ID = &built [document_index] . nodes [*node_index] . pid;
+      let gnid : &ID = &built [document_index] . nodes [*node_index] . pid;
       document . source_edits . push (SourceEdit {
         range : reference . range . clone (),
-        replacement : format! ("[[id:{}][Footnote {}]]", skgid, reference . name),
+        replacement : format! ("[[id:{}][Footnote {}]]", gnid, reference . name),
       }); }
     document . source_edits . sort_by_key (|edit| edit . range . start);
     for definition in &document . footnote_definitions {
@@ -173,26 +173,26 @@ fn markdown_reference_definition_offset (
 fn build_address_index (
   documents : &[ParsedDocument],
   built : &[BuiltDocument],
-  existing_skgids : &HashMap<String, ID>,
+  existing_gnids : &HashMap<String, ID>,
 ) -> AddressIndex {
   let mut index : AddressIndex = AddressIndex {
-    global_ids : existing_skgids . clone (), ..Default::default () };
+    global_ids : existing_gnids . clone (), ..Default::default () };
   for (document_index, document) in documents . iter () . enumerate () {
     index . files . insert (document . path . clone (), document_index);
-    index . roots . insert (document_index, built [document_index] . root_skgid . clone ());
+    index . roots . insert (document_index, built [document_index] . root_gnid . clone ());
     let mut slug_counts : HashMap<String, usize> = HashMap::new ();
     let mut used_slugs : std::collections::HashSet<String> =
       std::collections::HashSet::new ();
     for (section_index, section) in document . sections . iter () . enumerate () {
-      let skgid : ID = built [document_index] . nodes [section_index] . pid . clone ();
+      let gnid : ID = built [document_index] . nodes [section_index] . pid . clone ();
       if let Some (explicit) = &section . explicit_id {
-        index . global_ids . insert (explicit . clone (), skgid . clone ()); }
+        index . global_ids . insert (explicit . clone (), gnid . clone ()); }
       if let Some (custom) = &section . custom_id {
         index . custom_ids . entry ((document_index, custom . clone ()))
-          . or_default () . push (skgid . clone ()); }
+          . or_default () . push (gnid . clone ()); }
       if section . heading . is_empty () { continue; } // a root without one
       index . org_headings . entry ((document_index, section . title . clone ()))
-        . or_default () . push (skgid . clone ());
+        . or_default () . push (gnid . clone ());
       let base : String = github_slug (&section . title);
       let count : &mut usize = slug_counts . entry (base . clone ()) . or_default ();
       let mut slug : String = if *count == 0 { base . clone () }
@@ -202,14 +202,14 @@ fn build_address_index (
         slug = format! ("{}-{}", base, count); }
       *count += 1;
       used_slugs . insert (slug . clone ());
-      index . markdown_fragments . insert ((document_index, slug), skgid); }
+      index . markdown_fragments . insert ((document_index, slug), gnid); }
     for (name, offset) in named_targets (document) {
       let section_index : usize = document . sections . iter () . enumerate ()
         .filter (|(_, section)| section . heading . start <= offset)
         .map (|(index, _)| index) . last () . unwrap_or (0);
-      let skgid : ID = built [document_index] . nodes [section_index] . pid . clone ();
+      let gnid : ID = built [document_index] . nodes [section_index] . pid . clone ();
       index . named_targets . entry ((document_index, name))
-        . or_default () . push (skgid); } }
+        . or_default () . push (gnid); } }
   index
 }
 
@@ -256,11 +256,11 @@ fn resolve_link (
   host_root : Option<&Path>,
 ) -> LinkTarget {
   let destination : &str = &link . destination;
-  if let Some (skgid) = destination . strip_prefix ("id:") {
-    return index . global_ids . get (skgid) . cloned ()
-      . map (|skgid| LinkTarget::Node (skgid, None))
+  if let Some (gnid) = destination . strip_prefix ("id:") {
+    return index . global_ids . get (gnid) . cloned ()
+      . map (|gnid| LinkTarget::Node (gnid, None))
       . unwrap_or_else (|| LinkTarget::Unresolved (
-        format! ("ID target {:?} is absent", skgid))); }
+        format! ("ID target {:?} is absent", gnid))); }
   if destination . starts_with ("http://") ||
     destination . starts_with ("https://") ||
     destination . starts_with ("mailto:") ||
@@ -330,7 +330,7 @@ fn resolve_link (
     LinkSyntax::Org =>
       unique_address (&index . named_targets, target_document, &key), };
   match candidate {
-    Some (skgid) => LinkTarget::Node (skgid . clone (),
+    Some (gnid) => LinkTarget::Node (gnid . clone (),
       if link . syntax == LinkSyntax::Org && ! key . starts_with ('*') &&
         ! key . starts_with ('#') {
         Some (format! (
@@ -378,8 +378,8 @@ fn unique_address <'a> (
   document_index : usize,
   key : &str,
 ) -> Option<&'a ID> {
-  let skgids : &Vec<ID> = addresses . get (&(document_index, key . to_string ()))?;
-  if skgids . len () == 1 { skgids . first () } else { None }
+  let gnids : &Vec<ID> = addresses . get (&(document_index, key . to_string ()))?;
+  if gnids . len () == 1 { gnids . first () } else { None }
 }
 
 fn normalized_input_path (
@@ -497,13 +497,13 @@ mod tests {
     let a_second_body : &str = built [0] . nodes [2] . body . as_deref () . unwrap ();
     // b.org's sole top-level heading is its root.
     assert! (a_second_body . contains (&format! (
-      "[[id:{}][org]]", built [1] . root_skgid)));
+      "[[id:{}][org]]", built [1] . root_gnid)));
     assert! (a_second_body . contains (&format! (
-      "[[id:{}][later]]", built [1] . root_skgid)));
+      "[[id:{}][later]]", built [1] . root_gnid)));
     assert! (a_second_body . contains ("[site][web]"));
     let b_body : &str = built [1] . nodes [0] . body . as_deref () . unwrap ();
     assert! (b_body . contains (&format! (
-      "[[id:{}][root]]", built [0] . root_skgid)));
+      "[[id:{}][root]]", built [0] . root_gnid)));
     assert! (b_body . contains ("[[file:notes/a.md::*Same][ambiguous]]"));
     assert! (documents [1] . diagnostics . iter () . any (|warning|
       warning . message . contains ("ambiguous")));
@@ -573,12 +573,12 @@ mod tests {
       .map (|doc| build_document (doc, &skgrepo, &mut next) . unwrap ())
       .collect ();
     let footnote_index : usize = built [0] . footnote_node_indices ["a"];
-    let footnote_skgid : ID = built [0] . nodes [footnote_index] . pid . clone ();
+    let footnote_gnid : ID = built [0] . nodes [footnote_index] . pid . clone ();
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/container/import"), None, &HashMap::new ());
     let body : &str = // the sole heading, Topic, is the root
       built [0] . nodes [0] . body . as_deref () . unwrap ();
-    assert_eq! (body . matches (&format! ("[[id:{}][Footnote a]]", footnote_skgid))
+    assert_eq! (body . matches (&format! ("[[id:{}][Footnote a]]", footnote_gnid))
       .count (), 2);
     assert! (! body . contains ("[^a]:"));
     assert! (built [0] . nodes [footnote_index] . body . as_deref () . unwrap ()

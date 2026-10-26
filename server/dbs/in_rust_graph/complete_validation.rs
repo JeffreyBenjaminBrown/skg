@@ -24,8 +24,8 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteGraphError {
   DuplicatePrimaryId { pid : ID, homes : Vec<SkgrepoName> },
-  DuplicateExtraId { skgid : ID, carriers : Vec<ID> },
-  PrimaryExtraCollision { skgid : ID, primary_carriers : Vec<ID>, extra_carriers : Vec<ID> },
+  DuplicateExtraId { gnid : ID, carriers : Vec<ID> },
+  PrimaryExtraCollision { gnid : ID, primary_carriers : Vec<ID>, extra_carriers : Vec<ID> },
   UnconfiguredNodeHome { pid : ID, skgrepo : SkgrepoName },
   Override (OverrideInvariantViolation),
   InternalIndex (InternalIndexMismatch),
@@ -66,21 +66,21 @@ pub fn validate_complete_graph (
       homes . sort ();
       errors . push (CompleteGraphError::DuplicatePrimaryId {
         pid : pid . clone (), homes }); }}
-  for (skgid, carriers) in &extra_carriers {
+  for (gnid, carriers) in &extra_carriers {
     if carriers . len () > 1 {
       errors . push (CompleteGraphError::DuplicateExtraId {
-        skgid : skgid . clone (),
+        gnid : gnid . clone (),
         carriers : carriers . iter () . cloned () . collect (), }); }}
-  for skgid in primary_homes . keys () {
-    if let Some (extras) = extra_carriers . get (skgid) {
+  for gnid in primary_homes . keys () {
+    if let Some (extras) = extra_carriers . get (gnid) {
       let extra_carriers : Vec<ID> = extras . iter ()
-        . filter ( |carrier| *carrier != skgid )
+        . filter ( |carrier| *carrier != gnid )
         . cloned ()
         . collect ();
       if ! extra_carriers . is_empty () {
         errors . push (CompleteGraphError::PrimaryExtraCollision {
-          skgid : skgid . clone (),
-          primary_carriers : vec![skgid . clone ()],
+          gnid : gnid . clone (),
+          primary_carriers : vec![gnid . clone ()],
           extra_carriers, }); }}}
   let mut nodes_by_pid : Vec<&Graphnode> = nodes . iter () . collect ();
   nodes_by_pid . sort_by (|a, b| a . pid . cmp (&b . pid));
@@ -114,10 +114,10 @@ fn error_sort_key (error : &CompleteGraphError) -> (u8, String, String) {
   match error {
     CompleteGraphError::DuplicatePrimaryId { pid, .. } =>
       (0, pid . to_string (), String::new ()),
-    CompleteGraphError::DuplicateExtraId { skgid, .. } =>
-      (1, skgid . to_string (), String::new ()),
-    CompleteGraphError::PrimaryExtraCollision { skgid, .. } =>
-      (2, skgid . to_string (), String::new ()),
+    CompleteGraphError::DuplicateExtraId { gnid, .. } =>
+      (1, gnid . to_string (), String::new ()),
+    CompleteGraphError::PrimaryExtraCollision { gnid, .. } =>
+      (2, gnid . to_string (), String::new ()),
     CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } =>
       (3, pid . to_string (), skgrepo . to_string ()),
     CompleteGraphError::Override (violation) =>
@@ -133,12 +133,12 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
     let detail = match error {
       CompleteGraphError::DuplicatePrimaryId { pid, homes } => format! (
         "duplicate primary id '{}' in homes {:?}", pid, homes),
-      CompleteGraphError::DuplicateExtraId { skgid, carriers } => format! (
-        "duplicate extra id '{}' claimed by {:?}", skgid, carriers),
+      CompleteGraphError::DuplicateExtraId { gnid, carriers } => format! (
+        "duplicate extra id '{}' claimed by {:?}", gnid, carriers),
       CompleteGraphError::PrimaryExtraCollision {
-        skgid, primary_carriers, extra_carriers } => format! (
+        gnid, primary_carriers, extra_carriers } => format! (
           "id '{}' is both primary {:?} and extra on {:?}",
-          skgid, primary_carriers, extra_carriers),
+          gnid, primary_carriers, extra_carriers),
       CompleteGraphError::UnconfiguredNodeHome { pid, skgrepo } => format! (
         "node '{}' has unconfigured home repo '{}'", pid, skgrepo),
       CompleteGraphError::Override (violation) =>
@@ -180,8 +180,8 @@ pub fn validate_complete_graph_candidate (
     match nodeInstruction {
       NodeInstruction::Save (SaveNode (node)) => {
         by_pid . insert (node . pid . clone (), node . clone ()); }
-      NodeInstruction::Delete (DeleteNode { skgid, .. }) => {
-        by_pid . remove (skgid); }
+      NodeInstruction::Delete (DeleteNode { gnid, .. }) => {
+        by_pid . remove (gnid); }
     }}
   let nodes : Vec<Graphnode> = by_pid . into_values () . collect ();
   validate_complete_graph (config, &nodes)

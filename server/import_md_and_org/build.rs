@@ -21,7 +21,7 @@ struct OutlineNode {
 
 pub struct BuiltDocument {
   pub nodes : Vec<Graphnode>,
-  pub root_skgid : ID,
+  pub root_gnid : ID,
   pub export_target : String,
   pub footnote_node_indices : HashMap<String, usize>,
 }
@@ -78,17 +78,17 @@ pub fn build_document (
       footnote_node_indices . insert (definition . name . clone (), child_index);
       outline [footnotes_index] . children . push (child_index); }
     outline [0] . children . push (footnotes_index); }
-  let skgids : Vec<ID> = outline . iter () . map (|entry| entry . node . pid . clone ())
+  let gnids : Vec<ID> = outline . iter () . map (|entry| entry . node . pid . clone ())
     . collect ();
   for entry in &mut outline {
     entry . node . contains = rel_partners_at_relRepo (
       skgrepo,
-      entry . children . iter () . map (|index| skgids [*index] . clone ())
+      entry . children . iter () . map (|index| gnids [*index] . clone ())
         . collect ()); }
-  let root_skgid : ID = skgids [0] . clone ();
+  let root_gnid : ID = gnids [0] . clone ();
   let nodes : Vec<Graphnode> = outline . into_iter () . map (|entry| entry . node)
     . collect ();
-  Ok (BuiltDocument { nodes, root_skgid, export_target, footnote_node_indices })
+  Ok (BuiltDocument { nodes, root_gnid, export_target, footnote_node_indices })
 }
 
 fn node_for_section (
@@ -97,7 +97,7 @@ fn node_for_section (
   skgrepo : &SkgrepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Graphnode {
-  let skgid : ID = section . explicit_id . as_ref ()
+  let gnid : ID = section . explicit_id . as_ref ()
     . map (|value| ID::new (value)) . unwrap_or_else (new_id);
   let body : String = rendered_range (document, section . body . clone ());
   Graphnode {
@@ -106,7 +106,7 @@ fn node_for_section (
     aliases : rel_partners_at_relRepo_msv (
       skgrepo, MSV::Specified (section . aliases . clone ())),
     home_skgrepo : skgrepo . clone (),
-    pid : skgid,
+    pid : gnid,
     extra_ids : Vec::new (),
     body : normalize_body (Some (body)),
     contains : Vec::new (),

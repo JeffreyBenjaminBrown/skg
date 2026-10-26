@@ -34,10 +34,10 @@ fn forest_from_org (
 
 fn entry<'a> (
   collected : &'a CollectedFieldIntents,
-  skgid        : &str,
+  gnid        : &str,
 ) -> &'a FieldIntentsForOneId {
-  collected . by_pid . get (&ID::from (skgid))
-    . unwrap_or_else ( || panic! ("no entry for {}", skgid) ) }
+  collected . by_pid . get (&ID::from (gnid))
+    . unwrap_or_else ( || panic! ("no entry for {}", gnid) ) }
 
 #[test]
 fn ordinary_editable_emissions () {

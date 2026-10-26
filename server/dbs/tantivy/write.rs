@@ -45,22 +45,22 @@ pub fn delete_nodes_from_index<'a, I>(
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a GraphnodeInTantivy>, {
   for node in nodes_iter {
-    { let primary_skgid : &ID = &node . pid;
+    { let primary_gnid : &ID = &node . pid;
       writer . delete_term (
         Term::from_field_text( tantivy_index . id_field,
-                               primary_skgid . as_str() ) ); }}
+                               primary_gnid . as_str() ) ); }}
   Ok (( )) }
 
-pub fn delete_nodes_by_skgid_from_index<'a, I>(
+pub fn delete_nodes_by_gnid_from_index<'a, I>(
   ids_iter: I,
   writer: &mut IndexWriter,
   tantivy_index: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
 where I: Iterator<Item = &'a ID>, {
-  for skgid in ids_iter {
+  for gnid in ids_iter {
     writer . delete_term (
       Term::from_field_text( tantivy_index . id_field,
-                             skgid . as_str() ) ); }
+                             gnid . as_str() ) ); }
   Ok (( )) }
 
 pub fn add_documents_to_tantivy_writer<'a, I> (
@@ -87,9 +87,9 @@ fn create_documents_from_node (
   prominence_sources : &HashMap<ID, String>,
 ) -> Result < Vec < TantivyDocument >,
               Box < dyn Error >> {
-  let primary_skgid : &ID = &node . pid;
+  let primary_gnid : &ID = &node . pid;
   let prominence_source : &str =
-    prominence_sources . get (primary_skgid)
+    prominence_sources . get (primary_gnid)
     . map ( |s| s . as_str () ) . unwrap_or ("");
   let had_id : &str =
     if node . flags . contains (
@@ -129,7 +129,7 @@ fn create_documents_from_node (
     documents . push (
       doc!(
         tantivy_index . id_field =>
-          primary_skgid . as_str (),
+          primary_gnid . as_str (),
         tantivy_index . title_or_alias_field =>
           replace_each_link_with_its_label (
             title_or_alias ),

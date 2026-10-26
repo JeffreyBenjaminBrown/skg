@@ -53,14 +53,14 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
           . collect() );
       assert_eq!(skgrepo_errors . len(), 2,
                  "Expected 2 repo validation errors (pub-1 and dub-1)");
-      let skgids: Vec<&str> = skgrepo_errors . iter()
+      let gnids: Vec<&str> = skgrepo_errors . iter()
         . filter_map(|e| {
-          if let BufferValidationError::LocalStructureViolation(_, skgid, _) = e {
-            Some(skgid . 0 . as_str())
+          if let BufferValidationError::LocalStructureViolation(_, gnid, _) = e {
+            Some(gnid . 0 . as_str())
           } else { None } })
         . collect();
-      assert!(skgids . contains(&"dub-1"), "Repo error should include dub-1");
-      assert!(skgids . contains(&"pub-1"), "Repo error should include pub-1"); }
+      assert!(gnids . contains(&"dub-1"), "Repo error should include dub-1");
+      assert!(gnids . contains(&"pub-1"), "Repo error should include pub-1"); }
 
     { let multiple_defining_errors: Vec<&BufferValidationError>
       = ( errors . iter()
@@ -69,8 +69,8 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
           . collect() );
       assert_eq!(multiple_defining_errors . len(), 1,
                  "Expected exactly 1 Multiple_Defining_Viewnodes error for priv-1");
-      if let BufferValidationError::Multiple_Defining_Viewnodes (skgid, _) = multiple_defining_errors[0] {
-        assert_eq!(skgid . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
+      if let BufferValidationError::Multiple_Defining_Viewnodes (gnid, _) = multiple_defining_errors[0] {
+        assert_eq!(gnid . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
     assert_eq!(errors . len(), 3,
                "Expected exactly 3 errors: 2 LocalStructureViolation (skgRepos (nodeRepo errors)), 1 Multiple_Defining_Viewnodes");
@@ -152,20 +152,20 @@ fn test_foreign_node_modification_errors(
           assert_eq!(created_foreign_errors . len(), 1,
                      "Expected exactly 1 CreatedForeignNode error");
 
-          let error_skgids: Vec<String> = modified_foreign_errors . iter()
+          let error_gnids: Vec<String> = modified_foreign_errors . iter()
             . filter_map(|e| {
-              if let BufferValidationError::ModifiedForeignNode(skgid, _) = e {
-                Some(skgid . 0 . clone())
+              if let BufferValidationError::ModifiedForeignNode(gnid, _) = e {
+                Some(gnid . 0 . clone())
               } else { None }
             } ) . collect();
 
-          println!("Errors for IDs: {:?}", error_skgids);
+          println!("Errors for IDs: {:?}", error_gnids);
 
-          assert!(error_skgids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
-          assert!(error_skgids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
+          assert!(error_gnids . contains(&"ext-6" . to_string()), "Expected error for ext-6 (deletion)");
+          assert!(error_gnids . contains(&"ext-7" . to_string()), "Expected error for ext-7 (deletion)");
           assert!(created_foreign_errors . iter() . any (|e| matches!(
-            e, BufferValidationError::CreatedForeignNode(skgid, _)
-              if skgid . 0 == "ext-new")),
+            e, BufferValidationError::CreatedForeignNode(gnid, _)
+              if gnid . 0 == "ext-new")),
             "Expected error for ext-new (new node)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
@@ -207,17 +207,17 @@ fn test_foreign_node_modification_errors(
           assert_eq!(merge_foreign_errors . len(), 2,
                      "Expected exactly 2 ModifiedForeignNode errors for merges");
 
-          let error_skgids: Vec<String> = merge_foreign_errors . iter()
+          let error_gnids: Vec<String> = merge_foreign_errors . iter()
             . filter_map(|e| {
-              if let BufferValidationError::ModifiedForeignNode(skgid, _) = e {
-                Some(skgid . 0 . clone())
+              if let BufferValidationError::ModifiedForeignNode(gnid, _) = e {
+                Some(gnid . 0 . clone())
               } else { None }
             } ) . collect();
 
-          println!("NodeMerge errors for IDs: {:?}", error_skgids);
+          println!("NodeMerge errors for IDs: {:?}", error_gnids);
 
-          assert!(error_skgids . contains(&"ext-8" . to_string()), "Expected error for ext-8 (foreign acquirer)");
-          assert!(error_skgids . contains(&"ext-9" . to_string()), "Expected error for ext-9 (foreign acquiree)");
+          assert!(error_gnids . contains(&"ext-8" . to_string()), "Expected error for ext-8 (foreign acquirer)");
+          assert!(error_gnids . contains(&"ext-9" . to_string()), "Expected error for ext-9 (foreign acquiree)");
         } else {
           panic!("Expected SaveError::BufferValidationErrors, got: {:?}", e);
         }

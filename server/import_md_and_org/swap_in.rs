@@ -37,14 +37,14 @@ pub(crate) fn prepare_import_swap_in (
     if ! config . skgrepo_is_owned (&node . home_skgrepo) {
       return Err (format! ("Destination repo {:?} is not owned",
         node . home_skgrepo)); }
-    for skgid in node . all_skgids () {
-      validate_safe_skgid (skgid)?;
-      if let Some (carrier) = claims . insert (skgid . clone (), node . pid . clone ()) {
+    for gnid in node . all_gnids () {
+      validate_safe_gnid (gnid)?;
+      if let Some (carrier) = claims . insert (gnid . clone (), node . pid . clone ()) {
         return Err (format! ("ID {} is claimed by both {} and {} in this import",
-          skgid, carrier, node . pid)); }
-      if let Some ((carrier, skgrepo)) = runtime . graph . pid_and_skgrepo (skgid) {
+          gnid, carrier, node . pid)); }
+      if let Some ((carrier, skgrepo)) = runtime . graph . pid_and_skgrepo (gnid) {
         return Err (format! ("ID {} already belongs to {} in repo {}",
-          skgid, carrier, skgrepo)); } } }
+          gnid, carrier, skgrepo)); } } }
   check_authoritative_disk_claims (&claims, config)?;
   let nodeInstructions : Vec<NodeInstruction> = nodes . iter () . cloned ()
     .map (|node| NodeInstruction::Save (SaveNode (node))) . collect ();
@@ -85,16 +85,16 @@ impl PreparedImportSwapIn {
   }
 }
 
-fn validate_safe_skgid (
-  skgid : &ID,
+fn validate_safe_gnid (
+  gnid : &ID,
 ) -> Result<(), String> {
-  let path : &Path = Path::new (&skgid . 0);
+  let path : &Path = Path::new (&gnid . 0);
   let components : Vec<Component<'_>> = path . components () . collect ();
-  if skgid . 0 . is_empty () || skgid . 0 . contains ('.') ||
-    skgid . 0 . contains ('\\') || skgid . 0 . contains ('\0') ||
+  if gnid . 0 . is_empty () || gnid . 0 . contains ('.') ||
+    gnid . 0 . contains ('\\') || gnid . 0 . contains ('\0') ||
     components . len () != 1 ||
     ! matches! (components [0], Component::Normal (_)) {
-    return Err (format! ("ID {:?} is unsafe as a .skg filename", skgid . 0)); }
+    return Err (format! ("ID {:?} is unsafe as a .skg filename", gnid . 0)); }
   Ok (())
 }
 
@@ -106,12 +106,12 @@ fn check_authoritative_disk_claims (
     let sections = read_skg_sections_from_folder (&skgrepo, config)
       .map_err (|error| format! ("Reading repo {}: {}", skgrepo, error))?;
     for (_, section) in sections {
-      for skgid in std::iter::once (&section . pid)
+      for gnid in std::iter::once (&section . pid)
         .chain (section . extra_ids . iter ()) {
-        if let Some (new_carrier) = claims . get (skgid) {
+        if let Some (new_carrier) = claims . get (gnid) {
           return Err (format! (
             "ID {} for imported node {} is already claimed on disk by {} in repo {}",
-            skgid, new_carrier, section . pid, skgrepo)); } } }
+            gnid, new_carrier, section . pid, skgrepo)); } } }
     for pid in claims . values () {
       let path : String = crate::util::path_from_pid_and_skgrepo (
         config, &skgrepo, pid . clone ())?;

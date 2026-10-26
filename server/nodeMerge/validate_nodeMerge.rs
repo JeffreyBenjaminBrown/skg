@@ -20,7 +20,7 @@ struct NodeMergeValidationData<'a> {
   acquirer_viewnodes    : Vec<&'a Viewnode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
-  to_delete_skgids      : HashSet<ID>, }
+  to_delete_gnids      : HashSet<ID>, }
 
 /// Validates merge requests in a viewnode viewforest.
 /// Returns a vector of validation error messages,
@@ -38,12 +38,12 @@ pub fn validate_nodeMerge_requests(
       _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
                                      node . kind));
              continue; }};
-    let acquirer_skgid : &ID = &t . skgid;
-    if let Some(NodeEditRequest::NodeMerge (acquiree_skgid))
+    let acquirer_gnid : &ID = &t . gnid;
+    if let Some(NodeEditRequest::NodeMerge (acquiree_gnid))
       = t . edit_request ()
     { let pair_errors : Vec<String> = validate_nodeMerge_pair(
-        graph, acquirer_skgid, acquiree_skgid,
-        &nodeMerge_validation_data . to_delete_skgids)?;
+        graph, acquirer_gnid, acquiree_gnid,
+        &nodeMerge_validation_data . to_delete_gnids)?;
       errors . extend (pair_errors); }}
   errors . extend( {
     let monogamy_errors : Vec<String> =
@@ -61,74 +61,74 @@ fn collect_nodeMerge_validation_data<'a>(
   let mut acquirer_viewnodes : Vec<&Viewnode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
-  let mut to_delete_skgids : HashSet<ID> = HashSet::new();
+  let mut to_delete_gnids : HashSet<ID> = HashSet::new();
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       let viewnode : &Viewnode = node_ref . value();
       if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = &viewnode . kind
-      { { let skgid : &ID = &t . skgid;
+      { { let gnid : &ID = &t . gnid;
           if matches!(t . edit_request (),
                       Some (NodeEditRequest::Delete)) {
-            to_delete_skgids . insert(skgid . clone()); } // mutate!
-          if let Some(NodeEditRequest::NodeMerge (acquiree_skgid))
+            to_delete_gnids . insert(gnid . clone()); } // mutate!
+          if let Some(NodeEditRequest::NodeMerge (acquiree_gnid))
           = t . edit_request ()
           { acquirer_viewnodes . push (viewnode); // mutate!
             acquirer_to_acquirees // mutate!
-              . entry(skgid . clone())
+              . entry(gnid . clone())
               . or_insert_with (HashSet::new)
-              . insert(acquiree_skgid . clone());
+              . insert(acquiree_gnid . clone());
             acquiree_to_acquirers // mutate!
-              . entry(acquiree_skgid . clone())
+              . entry(acquiree_gnid . clone())
               . or_insert_with (HashSet::new)
-              . insert(skgid . clone()); }} }} }
+              . insert(gnid . clone()); }} }} }
   NodeMergeValidationData { acquirer_viewnodes,
                         acquirer_to_acquirees,
                         acquiree_to_acquirers,
-                        to_delete_skgids, }}
+                        to_delete_gnids, }}
 
 /// Validates a single merge pair (acquirer + acquiree).
 /// Returns a vector of validation errors for this pair.
 /// The error messages explain what each passage does.
 fn validate_nodeMerge_pair(
   graph: &InRustGraph,
-  acquirer_skgid: &ID,
-  acquiree_skgid: &ID,
-  to_delete_skgids: &HashSet<ID>,
+  acquirer_gnid: &ID,
+  acquiree_gnid: &ID,
+  to_delete_gnids: &HashSet<ID>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
-    match graph . pid_and_skgrepo (acquirer_skgid)
+    match graph . pid_and_skgrepo (acquirer_gnid)
     { Some((pid, _skgrepo)) => pid,
       None      => {
         errors . push(format!(
           "Acquirer ID '{}' not found in database",
-          acquirer_skgid . as_str() ));
+          acquirer_gnid . as_str() ));
         return Ok (errors); }} );
   let acquiree_pid : ID = (
-    match graph . pid_and_skgrepo (acquiree_skgid)
+    match graph . pid_and_skgrepo (acquiree_gnid)
     { Some((pid, _skgrepo)) => pid,
       None => {
         errors . push(format!(
           "Acquiree ID '{}' (requested by '{}') not found in database",
-          acquiree_skgid . as_str(),
-          acquirer_skgid . as_str() ));
+          acquiree_gnid . as_str(),
+          acquirer_gnid . as_str() ));
         return Ok (errors); }} );
   if acquirer_pid == acquiree_pid {
     errors . push(format!(
       "Self-merge detected: acquirer '{}' and acquiree '{}' resolve to the same node (PID: '{}')",
-      acquirer_skgid . as_str(),
-      acquiree_skgid . as_str(),
+      acquirer_gnid . as_str(),
+      acquiree_gnid . as_str(),
       acquirer_pid . as_str() )); }
-  if to_delete_skgids . contains (acquirer_skgid) {
+  if to_delete_gnids . contains (acquirer_gnid) {
     errors . push(format!(
       "Acquirer '{}' cannot be marked for deletion",
-      acquirer_skgid . as_str() )); }
-  if to_delete_skgids . contains (acquiree_skgid) {
+      acquirer_gnid . as_str() )); }
+  if to_delete_gnids . contains (acquiree_gnid) {
     errors . push(format!(
       "Acquiree '{}' (requested by '{}') cannot be marked for deletion",
-      acquiree_skgid . as_str(),
-      acquirer_skgid . as_str() )); }
+      acquiree_gnid . as_str(),
+      acquirer_gnid . as_str() )); }
   Ok (errors) }
 
 /// Validates monogamy rules for all merges.
@@ -139,33 +139,33 @@ fn validate_monogamy_for_all_nodeMerges(
   acquiree_to_acquirers: &HashMap<ID, HashSet<ID>>,
 ) -> Vec<String> {
   let mut errors: Vec<String> = Vec::new();
-  for (acquirer_skgid, acquirees) in acquirer_to_acquirees {
+  for (acquirer_gnid, acquirees) in acquirer_to_acquirees {
     if acquirees . len() > 1 {
       errors . push(format!(
         "Monogamy violation: acquirer '{}' would merge with multiple nodes: {:?}",
-        acquirer_skgid . as_str(),
+        acquirer_gnid . as_str(),
         acquirees . iter() . map(
-          |skgid| skgid . as_str()
+          |gnid| gnid . as_str()
         ) . collect::<Vec<_>>() )); }}
-  for (acquiree_skgid, acquirers) in acquiree_to_acquirers {
+  for (acquiree_gnid, acquirers) in acquiree_to_acquirers {
     if acquirers . len() > 1 {
       errors . push(format!(
         "Monogamy violation: acquiree '{}' would merge with multiple nodes: {:?}",
-        acquiree_skgid . as_str(),
+        acquiree_gnid . as_str(),
         acquirers . iter() . map(
-          |skgid| skgid . as_str()
+          |gnid| gnid . as_str()
         ) . collect::<Vec<_>>() )); }}
   let overlap: Vec<&ID> = {
-    let acquirer_skgids: HashSet<&ID> =
+    let acquirer_gnids: HashSet<&ID> =
       acquirer_to_acquirees . keys() . collect();
-    let acquiree_skgids: HashSet<&ID> =
+    let acquiree_gnids: HashSet<&ID> =
       acquiree_to_acquirers . keys() . collect();
-    acquirer_skgids . intersection (&acquiree_skgids)
+    acquirer_gnids . intersection (&acquiree_gnids)
       . copied() . collect() };
   if !overlap . is_empty() {
     errors . push(format!(
       "Monogamy violation: nodes cannot be both acquirer and acquiree: {:?}",
       overlap . iter() . map(
-        |skgid| skgid . as_str()
+        |gnid| gnid . as_str()
       ) . collect::<Vec<_>>() )); }
   errors }

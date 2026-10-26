@@ -8,7 +8,7 @@ use tantivy::schema::document::Value;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::wipe_then_init_tantivy_db;
-use skg::dbs::tantivy::title_and_skgrepo_by_skgid;
+use skg::dbs::tantivy::title_and_skgrepo_by_gnid;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
@@ -461,7 +461,7 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
       . and_then (|value| value . as_str ()),
     Some ("ordinary"));
   assert_eq! (
-    title_and_skgrepo_by_skgid (&index, &ID::new ("excluded"))
+    title_and_skgrepo_by_gnid (&index, &ID::new ("excluded"))
       . map (|(title, _)| title),
     Some ("shaver titletoken" . to_string ()),
     "supporting Tantivy documents remain available to exact-ID lookup");
@@ -721,48 +721,48 @@ fn test_search_regex_operator_grouping (
       SearchOptions { regex: true, operators: true,
                       ..SearchOptions::default () };
     let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
-    let mut skgids : Vec<String> = Vec::new ();
+    let mut gnids : Vec<String> = Vec::new ();
     for (_, addr) in &matches {
       let doc : TantivyDocument = searcher . doc (*addr) ?;
-      skgids . push (
+      gnids . push (
         doc . get_first (ti . id_field) . unwrap ()
         . as_str () . unwrap () . to_string () ); }
-    Ok (skgids) };
-  let assert_set = | label : &str, skgids : &[String],
+    Ok (gnids) };
+  let assert_set = | label : &str, gnids : &[String],
                      inside : &[&str], outside : &[&str] | {
-    for skgid in inside {
-      assert! ( skgids . contains (&skgid . to_string ()),
-                "{}: should match '{}' (got {:?})", label, skgid, skgids ); }
-    for skgid in outside {
-      assert! ( ! skgids . contains (&skgid . to_string ()),
-                "{}: should NOT match '{}' (got {:?})", label, skgid, skgids ); }};
-  { let skgids : Vec<String> =
+    for gnid in inside {
+      assert! ( gnids . contains (&gnid . to_string ()),
+                "{}: should match '{}' (got {:?})", label, gnid, gnids ); }
+    for gnid in outside {
+      assert! ( ! gnids . contains (&gnid . to_string ()),
+                "{}: should NOT match '{}' (got {:?})", label, gnid, gnids ); }};
+  { let gnids : Vec<String> =
       gather ("( poli.* AND sci.* ) OR fish.*") ?;
-    assert_set ( "grouped AND under OR", &skgids,
+    assert_set ( "grouped AND under OR", &gnids,
                  &["polsci", "fish", "polfish"],
                  &["polbio", "scibio", "bio"] ); }
   { // Same expression without parens: AND binds tighter than OR.
-    let skgids : Vec<String> =
+    let gnids : Vec<String> =
       gather ("poli.* AND sci.* OR fish.*") ?;
-    assert_set ( "precedence AND > OR", &skgids,
+    assert_set ( "precedence AND > OR", &gnids,
                  &["polsci", "fish", "polfish"],
                  &["polbio", "scibio", "bio"] ); }
   { // Parens override precedence.
-    let skgids : Vec<String> =
+    let gnids : Vec<String> =
       gather ("poli.* AND ( sci.* OR fish.* )") ?;
-    assert_set ( "grouped OR under AND", &skgids,
+    assert_set ( "grouped OR under AND", &gnids,
                  &["polsci", "polfish"],
                  &["fish", "polbio", "scibio", "bio"] ); }
   { // NOT inside a group excludes within it.
-    let skgids : Vec<String> =
+    let gnids : Vec<String> =
       gather ("( sci.* NOT bio.* )") ?;
-    assert_set ( "NOT inside a group", &skgids,
+    assert_set ( "NOT inside a group", &gnids,
                  &["polsci"],
                  &["scibio", "bio"] ); }
   { // A paren attached to a pattern is regex syntax, not grouping.
-    let skgids : Vec<String> =
+    let gnids : Vec<String> =
       gather ("(poli|fish).*") ?;
-    assert_set ( "regex-internal parens", &skgids,
+    assert_set ( "regex-internal parens", &gnids,
                  &["polsci", "polbio", "fish", "polfish"],
                  &["scibio", "bio"] ); }
   { // A lone unbalanced paren errors loudly.
@@ -779,7 +779,7 @@ fn test_search_regex_operator_grouping (
   Ok (( )) }
 
 #[test]
-fn test_title_by_skgid_returns_title_not_alias (
+fn test_title_by_gnid_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let empty_node : Graphnode = empty_graphnode ();
   let mut node = empty_node . clone ();
@@ -797,14 +797,14 @@ fn test_title_by_skgid_returns_title_not_alias (
   assert_eq! (indexed_count, 3,
     "Expected 3 documents (1 title + 2 aliases)");
   let result : Option<(String, SkgrepoName)> =
-    title_and_skgrepo_by_skgid (
+    title_and_skgrepo_by_gnid (
       &tantivy_index,
       &ID::new ("node-with-aliases") );
   assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
     Some ("The Real Title"),
     "title_and_repo_by_id should return the title, not an alias");
   let missing : Option<(String, SkgrepoName)> =
-    title_and_skgrepo_by_skgid (
+    title_and_skgrepo_by_gnid (
       &tantivy_index,
       &ID::new ("nonexistent-id") );
   assert_eq! (missing, None,

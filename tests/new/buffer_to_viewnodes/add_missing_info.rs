@@ -7,14 +7,14 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_viewforest};
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::types::errors::BufferValidationError;
-use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees, graph_from_config};
+use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_gnid, compare_viewnode_trees, graph_from_config};
 use skg::types::viewnode::{
   PropertyMember, Viewnode, ViewnodeKind, Vognode};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
 use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
   ViewForest,
-  tree_forest_root_skgids};
+  tree_forest_root_gnids};
 
 use ego_tree::Tree;
 
@@ -38,9 +38,9 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_repoless_folder_member_gets_graph_skgrepo (
         &s . config ) . await ?;
-      s . reset ("test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo",
+      s . reset ("test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
+      test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
         &s . config ) . await ?;
       s . reset ("test_new_headline_inherits_through_phantoms_and_folders",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
@@ -84,7 +84,7 @@ async fn test_provenance_records_what_the_parse_invented (
     viewforest . nodes ()
     . find_map ( |node_ref| match &node_ref . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          if t . title == title => Some (t . skgid . clone ()),
+          if t . title == title => Some (t . gnid . clone ()),
         _ => None } )
     . expect (title) };
   let inheriting : ID = gnid_of ("inheriting new");
@@ -176,7 +176,7 @@ async fn test_new_headline_at_top_level_is_refused (
 /// parent's ID will have after the save, not the (stale) one that
 /// occurrence shows: its editable occurrence's, if the buffer has one,
 /// else the graph's. (Fixture node 'root-pid' lives in 'main'.)
-async fn test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
+async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   for (input, expected_skgrepo) in [
@@ -243,7 +243,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
          graph (node root-pid lives in repo 'main'), not stay \
          repoless." );
       assert_eq! (
-        t . skgid . 0, "root-pid",
+        t . gnid . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
          'root-pid'." ); }
     _ => panic! ("expected an UnrestrictedVognode subscribee member") }
@@ -287,21 +287,21 @@ async fn test_add_missing_info_logic (
   let expected_viewforest: Tree<Viewnode> =
     org_to_viewnode_tree (without_missing_info, &InRustGraph::new ()) . unwrap() . 0;
   assert_eq!(
-    tree_forest_root_skgids (&expected_viewforest) . len(),
+    tree_forest_root_gnids (&expected_viewforest) . len(),
     1,
     "Expected exactly one tree in the expected viewforest" );
   assert!(
-    compare_viewnode_trees_modulo_skgid(
+    compare_viewnode_trees_modulo_gnid(
       &after_adding_missing_info,
       &expected_viewforest),
     "org_to_viewforest: Forests not equivalent modulo ID." );
 
   { let actual_root : &Viewnode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
-    let actual_root_skgid : &ID =
-      actual_root . unrestricted_skgid () . unwrap ();
+    let actual_root_gnid : &ID =
+      actual_root . unrestricted_gnid () . unwrap ();
     assert_eq!(
-      actual_root_skgid . 0,
+      actual_root_gnid . 0,
       "root-pid",
       "Root ID 'root' should have changed to 'root-pid', based on the .skg file in fixtures/."
     ); }

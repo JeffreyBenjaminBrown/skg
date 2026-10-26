@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::stats::{
   graphnodestats_for_pid,
   AllGraphnodeStats};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::to_org::util::skgids_that_can_have_graphnodestats;
+use crate::to_org::util::gnids_that_can_have_graphnodestats;
 use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -51,7 +51,7 @@ fn set_graphnodestats_in_viewforest_inner (
   let pids : Vec < ID > =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "ids_that_can_have_graphnodestats" ). entered();
-      skgids_that_can_have_graphnodestats (viewforest) };
+      gnids_that_can_have_graphnodestats (viewforest) };
   let stats : AllGraphnodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
@@ -87,10 +87,10 @@ pub fn set_metadata_relationships_in_node_recursive (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => { let graphnode_opt : Option<Graphnode>
                  = graphnode_graphFirst_by_pid_and_skgrepo (
-                     graph, config, &t . skgid, &t . home_skgrepo
+                     graph, config, &t . gnid, &t . home_skgrepo
                    ). ok ();
                Some ( graphnodestats_for_pid (
-                 &t . skgid, stats, graphnode_opt . as_ref () )) },
+                 &t . gnid, stats, graphnode_opt . as_ref () )) },
         _ => None }};
   match new_stats {
     Some (gs) =>

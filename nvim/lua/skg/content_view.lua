@@ -14,14 +14,14 @@ local state = require('skg.state')
 local M = {}
 
 ---The request sexp string for a single-root content view of NODE_ID.
----@param node_skgid string
+---@param node_gnid string
 ---@param view_id string
 ---@param approved_pids string[]|nil
 ---@return string
-function M.request_string (node_skgid, view_id, approved_pids)
+function M.request_string (node_gnid, view_id, approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
-    sexpr.pair(sexpr.symbol('id'), node_skgid),
+    sexpr.pair(sexpr.symbol('id'), node_gnid),
     sexpr.pair(sexpr.symbol('view-id'), view_id) }
   if approved_pids and #approved_pids > 0 then
     local approval = { sexpr.symbol('approved-overPrivateText-pids') }
@@ -34,7 +34,7 @@ end
 ---Ask the server for a single-root content view of NODE_ID.
 ---The server opens the requested node itself.
 ---@param node_id string
-function M.request_single_root_content_view_from_id (node_skgid,
+function M.request_single_root_content_view_from_id (node_gnid,
                                                      approved_pids,
                                                      existing_view_id)
   local view_id = existing_view_id or buffer.generate_uuid()
@@ -58,12 +58,12 @@ function M.request_single_root_content_view_from_id (node_skgid,
         payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
         M.request_single_root_content_view_from_id(
-          node_skgid, pids, view_id) end
+          node_gnid, pids, view_id) end
     end, false)
   state.lp_reset()
   client.send_string(
     M.request_string(
-      node_skgid, view_id, approved_pids))
+      node_gnid, view_id, approved_pids))
 end
 
 ---Handle a content-view response: either a (switch-to-view ID)

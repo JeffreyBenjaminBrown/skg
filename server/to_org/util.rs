@@ -16,19 +16,19 @@ use std::io;
 /// Fetch a Graphnode from the in-Rust graph or disk. Resolves id→(pid,skgrepo)
 /// via 'pid_and_repo_from_id', then reads. Makes a Viewnode with
 /// validated title. Returns both.
-/// Returns Ok(None) when SKGID has no record anywhere -- not as a
+/// Returns Ok(None) when GNID has no record anywhere -- not as a
 /// primary pid or extra_id in the captured graph.
 /// Callers should substitute a Unknown. A real
 /// query error still surfaces as Err.
-pub fn graphnode_and_viewnode_from_skgid (
+pub fn graphnode_and_viewnode_from_gnid (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  skgid  : &ID,
+  gnid  : &ID,
 ) -> Result < Option<( Graphnode, Viewnode )>, Box<dyn Error> > {
   let resolved : Option<(ID, SkgrepoName)> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "graphnode_and_viewnode_from_id" ). entered();
-      graph . pid_and_skgrepo (skgid) };
+      graph . pid_and_skgrepo (gnid) };
   match resolved {
     None => Ok (None),
     Some ((pid_resolved, skgrepo)) =>
@@ -68,13 +68,13 @@ fn graphnode_and_viewnode_from_pid_and_skgrepo (
 
 /// The gnids of the occurrences in 'tree', in preorder, each as often
 /// as it occurs: the nodes whose graph stats the stats pass sets.
-pub fn skgids_that_can_have_graphnodestats (
+pub fn gnids_that_can_have_graphnodestats (
   tree : &Tree<Viewnode>,
 ) -> Vec < ID > {
-  let mut skgids : Vec < ID > = Vec::new ();
+  let mut gnids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
-      if let Some (skgid) =
-        node_ref . value () . unrestricted_skgid ()
-      { skgids . push ( skgid . clone () ); }}}
-  skgids }
+      if let Some (gnid) =
+        node_ref . value () . unrestricted_gnid ()
+      { gnids . push ( gnid . clone () ); }}}
+  gnids }

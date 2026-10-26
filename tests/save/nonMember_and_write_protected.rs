@@ -1,6 +1,6 @@
 // cargo test --test save nonMember_and_write_protected
 
-use skg::dbs::filesystem::one_node::graphnode_from_skgid;
+use skg::dbs::filesystem::one_node::graphnode_from_gnid;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_nodeInstructions;
 use skg::test_utils::{copy_dir_all, run_with_test_stores};
@@ -56,7 +56,7 @@ fn test_nonMember_and_write_protected(
 
         { // verify writeProtected is treated correctly
           let node2 : Graphnode =
-            graphnode_from_skgid(
+            graphnode_from_gnid(
               config, &ID("2" . to_string() ))
 ?;
         assert_eq!(
@@ -66,7 +66,7 @@ fn test_nonMember_and_write_protected(
 
         { // verify noClaim is treated correctly
           let node1 : Graphnode =
-            graphnode_from_skgid(
+            graphnode_from_gnid(
               config, &ID("1" . to_string() ))
 ?;
         assert!(

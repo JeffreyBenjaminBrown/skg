@@ -30,7 +30,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, sexp_to_client_string, tag_text_response};
 use crate::types::views_state::{ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
-use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
+use crate::skgrepo_sets::{SkgrepoRestriction, search_gnids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ FoldAndFocus, Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
@@ -58,7 +58,7 @@ pub type MatchGroups =
                   Vec < ( f32,           // score (after multiplier)
                           String ) >) >; // title or alias
 
-pub fn search_skgids_for_skgrepo_set_for_test (
+pub fn search_gnids_for_skgrepo_set_for_test (
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
   restriction   : &SkgrepoRestriction,
@@ -72,11 +72,11 @@ pub fn enriched_search_buffer_for_skgrepo_set_for_test (
   graph            : &InRustGraph,
   config           : &SkgConfig,
   terms            : &str,
-  matches_by_skgid : &MatchGroups,
+  matches_by_gnid : &MatchGroups,
   restriction      : &SkgrepoRestriction,
 ) -> Result<String, Box<dyn Error>> {
   let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
-    build_search_viewforest (terms, matches_by_skgid, &HashSet::new ());
+    build_search_viewforest (terms, matches_by_gnid, &HashSet::new ());
   enrich_search_viewforest (
     &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
     &search_results, restriction, false ) }
@@ -175,9 +175,9 @@ pub fn handle_text_search_request (
             send_search_results_without_enrichment (
               stream, &search_terms, "No matches found." );
             return None; }
-          let matches_by_skgid : MatchGroups =
+          let matches_by_gnid : MatchGroups =
             filter_match_groups_to_unrestricted_skgrepos (
-              group_matches_by_skgid (
+              group_matches_by_gnid (
               best_matches,
               searcher,
               &runtime . tantivy_index,
@@ -185,20 +185,20 @@ pub fn handle_text_search_request (
               &search_opts,
               Some (restriction) ),
               restriction );
-          if matches_by_skgid . is_empty () {
+          if matches_by_gnid . is_empty () {
             send_search_results_without_enrichment (
               stream, &search_terms, "No matches found." );
             return None; }
           let suppressed : HashSet<ID> =
-            suppressed_result_skgids (
-              &matches_by_skgid,
+            suppressed_result_gnids (
+              &matches_by_gnid,
               &runtime . graph,
               &runtime . config,
               restriction );
           let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
             build_search_viewforest (
               &search_terms,
-              &matches_by_skgid,
+              &matches_by_gnid,
               &suppressed );
           let approved : HashSet<ID> =
             if include_overPrivateText_telescopes {
@@ -307,12 +307,12 @@ fn bool_key (
     == "true" }
 
 fn filter_match_groups_to_unrestricted_skgrepos (
-  matches_by_skgid : MatchGroups,
+  matches_by_gnid : MatchGroups,
   restriction   : &SkgrepoRestriction,
 ) -> MatchGroups {
   if restriction . is_all () {
-    return matches_by_skgid; }
-  matches_by_skgid . into_iter ()
+    return matches_by_gnid; }
+  matches_by_gnid . into_iter ()
     . filter ( |(_, (skgrepo, _))|
       restriction . contains_skgrepo (skgrepo) )
     . collect () }
@@ -379,7 +379,7 @@ pub fn enrich_search_viewforest (
     viewforest . roots ()
     . filter ( |root| matches! ( &root . value () . kind,
                  ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
-                   if search_results . contains (&occurrence . skgid) ))
+                   if search_results . contains (&occurrence . gnid) ))
     . map ( |root| root . id () )
     . collect ();
   let drawn_before : HashSet<NodeId> =
@@ -421,7 +421,7 @@ fn stub_root_of_hit (
     occurrence . write_protect ();
     occurrence . view_requests . insert (
       ViewRequest::Folder (FolderRelation::Containers) );
-    occurrence . skgid . clone () };
+    occurrence . gnid . clone () };
   for folder in [ Folder::Overridden, Folder::Overrider ] {
     // Prepended last-first, so that they stand in the order named.
     if ! override_relatives (graph, &gnid, &folder, restriction) . is_empty () {
@@ -526,7 +526,7 @@ fn mk_search_results_sexp (
 ///   MultiContained, or 1.0 for none).
 ///
 /// adjusted_score = bm25_score * coverage * context_multiplier
-pub fn group_matches_by_skgid (
+pub fn group_matches_by_gnid (
   best_matches  : Vec < (f32, tantivy::DocAddress) >,
   searcher      : Searcher,
   tantivy_index : &TantivyIndex,
@@ -542,7 +542,7 @@ pub fn group_matches_by_skgid (
     match searcher . doc (doc_address) {
       Ok (retrieved_doc) => {
         let retrieved_doc : TantivyDocument = retrieved_doc;
-        let skgid_opt : Option < ID > =
+        let gnid_opt : Option < ID > =
           retrieved_doc
             . get_first ( tantivy_index . id_field )
             . and_then ( |v| v . as_str() )
@@ -597,9 +597,9 @@ pub fn group_matches_by_skgid (
         let coverage : f32 =
           coverage_factor (&matcher, &searchable_title);
         let adjusted_score : f32 = score * coverage * multiplier;
-        if let (Some (skgid), Some (title)) = (skgid_opt, title_opt) {
+        if let (Some (gnid), Some (title)) = (gnid_opt, title_opt) {
           result_acc
-            . entry (skgid)
+            . entry (gnid)
             . or_insert_with ( || (
               skgrepo,
               Vec::new () ))
@@ -625,17 +625,17 @@ pub fn group_matches_by_skgid (
 /// owned overrider that matched the query but ranks past the
 /// display limit could suppress its target without itself being shown
 /// (rare; suppression frees slots, so the anchor usually fits).
-pub fn suppressed_result_skgids (
-  matches_by_skgid : &MatchGroups,
+pub fn suppressed_result_gnids (
+  matches_by_gnid : &MatchGroups,
   graph            : &InRustGraph,
   config           : &SkgConfig,
   restriction      : &SkgrepoRestriction,
 ) -> HashSet<ID> {
   let candidates : HashSet<ID> =
-    matches_by_skgid . keys () . cloned () . collect ();
+    matches_by_gnid . keys () . cloned () . collect ();
   let mut suppressed : HashSet<ID> = HashSet::new ();
-  for owned in candidates . iter () . filter ( |skgid|
-    graph . nodes . get (*skgid)
+  for owned in candidates . iter () . filter ( |gnid|
+    graph . nodes . get (*gnid)
       . map_or ( false, |n| config . skgrepo_is_owned (&n . home_skgrepo) ) )
   { // Walk owned's overriddenward closure; any hit in it is suppressed
     // (it will hang under 'owned'). Cycle-guarded: foreign relationships in the
@@ -653,7 +653,7 @@ pub fn suppressed_result_skgids (
 
 pub fn build_search_viewforest (
   _search_terms    : &str,
-  matches_by_skgid : &MatchGroups,
+  matches_by_gnid : &MatchGroups,
   suppressed       : &HashSet<ID>,
 ) -> (ViewForest, Vec<ID>) {
   let mut viewforest : ViewForest =
@@ -661,9 +661,9 @@ pub fn build_search_viewforest (
   let mut id_entries : Vec < ( &ID,
                                &SkgrepoName,
                                &Vec < ( f32, String ) > ) > =
-    matches_by_skgid . iter ()
-    . map ( |(skgid, (skgrepo, matches))| // flatten
-             (skgid, skgrepo, matches) )
+    matches_by_gnid . iter ()
+    . map ( |(gnid, (skgrepo, matches))| // flatten
+             (gnid, skgrepo, matches) )
     . collect ();
   id_entries . sort_by ( |a, b| { // sort by best score (descending)
     let score_a : f32 =
@@ -673,12 +673,12 @@ pub fn build_search_viewforest (
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut search_results : Vec < ID > = Vec::new ();
-  for (skgid, skgrepo, matches) in id_entries . iter ()
+  for (gnid, skgrepo, matches) in id_entries . iter ()
         // Suppress before truncation, so a dropped result frees a slot
         // for the next-ranked hit (design corner O2).
         . filter ( |entry| ! suppressed . contains (entry . 0) )
         . take (SEARCH_DISPLAY_LIMIT)
-    { search_results . push ( (*skgid) . clone () );
+    { search_results . push ( (*gnid) . clone () );
       let mut sorted_matches : Vec < &(f32, String) > =
         // We borrow from matches_by_id.
         // Sort matches by score descending for display.
@@ -688,7 +688,7 @@ pub fn build_search_viewforest (
       let (_score, title) : &(f32, String) = sorted_matches [0];
       let result_treeid : NodeId =
         viewforest . append_root ( mk_writeProtected_viewnode (
-          (*skgid) . clone (),
+          (*gnid) . clone (),
           (*skgrepo) . clone (),
           title . clone (),
           true ) );
@@ -696,7 +696,7 @@ pub fn build_search_viewforest (
         // We bury all but the best match in an AliasFolder.
         // PITFALL: The title might not be the best match,
         // in which case this makes it look like an alias.
-        let aliasfolder_skgid : NodeId = {
+        let aliasfolder_gnid : NodeId = {
           let mut result_mut : NodeMut<Viewnode> =
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( Viewnode {
@@ -705,7 +705,7 @@ pub fn build_search_viewforest (
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliasfolder_mut : NodeMut<Viewnode> =
-            viewforest . get_mut (aliasfolder_skgid) . unwrap ();
+            viewforest . get_mut (aliasfolder_gnid) . unwrap ();
           aliasfolder_mut . append ( viewnode_of (
             ViewnodeKind::PropertyMember ( PropertyMember::alias (
               title . clone (), None, None ))) ); }} }

@@ -8,7 +8,7 @@ use skg::prominence::{
   content_maps_from_nodes,
   prominence_sources_for_saved_from_inRustGraph,
   had_id_set_from_nodes,
-  mentioned_skgids_from_nodes,
+  mentioned_gnids_from_nodes,
   find_roots_and_multiply_contained,
   extend_region,
   extend_regions_for_cycles,
@@ -56,7 +56,7 @@ fn test_had_id_set_from_nodes_mixed () {
   assert! (result . contains (&ID::new ("has-id"))); }
 
 #[test]
-fn test_mentioned_skgids_from_nodes () {
+fn test_mentioned_gnids_from_nodes () {
   let mut node1 : Graphnode = empty_graphnode ();
   node1 . pid = ID::new ("src");
   node1 . title =
@@ -67,11 +67,11 @@ fn test_mentioned_skgids_from_nodes () {
   node2 . pid = ID::new ("other");
   node2 . title = "no links here" . to_string ();
   let nodes : Vec<Graphnode> = vec![node1, node2];
-  let mentioned_skgids : HashSet<ID> =
-    mentioned_skgids_from_nodes (&nodes);
-  assert_eq! (mentioned_skgids . len (), 2);
-  assert! (mentioned_skgids . contains (&ID::new ("tgt1")));
-  assert! (mentioned_skgids . contains (&ID::new ("tgt2"))); }
+  let mentioned_gnids : HashSet<ID> =
+    mentioned_gnids_from_nodes (&nodes);
+  assert_eq! (mentioned_gnids . len (), 2);
+  assert! (mentioned_gnids . contains (&ID::new ("tgt1")));
+  assert! (mentioned_gnids . contains (&ID::new ("tgt2"))); }
 
 #[test]
 fn test_prominence_source_priority () {
@@ -124,7 +124,7 @@ fn in_rust_prominence_sources_for_saved_nodes () {
     . map ( |n| NodeInstruction::Save ( SaveNode (n) )) . collect ();
   let types : HashMap<ID, String> =
     prominence_sources_for_saved_from_inRustGraph (&graph, &defs);
-  let got = |skgid : &str| types . get (&ID::new (skgid)) . map ( |s| s . as_str () );
+  let got = |gnid : &str| types . get (&ID::new (gnid)) . map ( |s| s . as_str () );
   assert_eq! (got ("root"),   Some ("Root"));
   assert_eq! (got ("other"),  Some ("Root"));
   assert_eq! (got ("linker"), Some ("Root"));
@@ -140,7 +140,7 @@ fn in_rust_prominence_sources_for_saved_nodes () {
 fn test_find_roots_and_multiply_contained () {
   // a → b, a → c, e → b. d is a root (not contained).
   // b is multiply-contained (by a and e).
-  let all_skgids : HashSet<ID> =
+  let all_gnids : HashSet<ID> =
     HashSet::from ([
       ID::new ("a"), ID::new ("b"),
       ID::new ("c"), ID::new ("d"),
@@ -151,7 +151,7 @@ fn test_find_roots_and_multiply_contained () {
   reverse . insert (
     ID::new ("c"), vec![ID::new ("a")] );
   let ( roots, multi ) : ( HashSet<ID>, HashSet<ID> ) =
-    find_roots_and_multiply_contained (&all_skgids, &reverse);
+    find_roots_and_multiply_contained (&all_gnids, &reverse);
   assert_eq! (roots . len (), 3);
   assert! (roots . contains (&ID::new ("a")));
   assert! (roots . contains (&ID::new ("d")));
@@ -231,7 +231,7 @@ fn test_extend_regions_for_cycles_detects_cycle () {
     ID::new ("c"), vec![ID::new ("b")] );
   reverse_map . insert (
     ID::new ("a"), vec![ID::new ("c")] );
-  let all_node_skgids : HashSet<ID> =
+  let all_node_gnids : HashSet<ID> =
     HashSet::from ([
       ID::new ("a"), ID::new ("b"),
       ID::new ("c"), ID::new ("d") ]);
@@ -242,7 +242,7 @@ fn test_extend_regions_for_cycles_detects_cycle () {
   let mut all_regions : Vec<HashSet<ID>> =
     vec![HashSet::from ([ID::new ("d")])];
   extend_regions_for_cycles (
-    &all_node_skgids,
+    &all_node_gnids,
     &contains_map,
     &reverse_map,
     &mut prominence_sources,
@@ -287,24 +287,24 @@ fn test_full_prominence_pipeline () {
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
-  let mentioned_skgids : HashSet<ID> =
-    mentioned_skgids_from_nodes (&nodes);
+  let mentioned_gnids : HashSet<ID> =
+    mentioned_gnids_from_nodes (&nodes);
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
-  let all_node_skgids : HashSet<ID> =
+  let all_node_gnids : HashSet<ID> =
     nodes . iter ()
     . map ( |n| n . pid . clone () )
     . collect ();
-  assert_eq! (all_node_skgids . len (), 15);
-  assert_eq! (mentioned_skgids . len (), 1);
-  assert! (mentioned_skgids . contains (&ID::new ("link-target")));
+  assert_eq! (all_node_gnids . len (), 15);
+  assert_eq! (mentioned_gnids . len (), 1);
+  assert! (mentioned_gnids . contains (&ID::new ("link-target")));
   assert_eq! (had_id_set . len (), 1);
   assert! (had_id_set . contains (&ID::new ("had-id")));
   // Step 1: identify origins.
   // (identify_origins is private, so we replicate its logic.)
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
     find_roots_and_multiply_contained (
-      &all_node_skgids, &map_to_containers );
+      &all_node_gnids, &map_to_containers );
   assert_eq! (roots . len (), 3);
   assert! (roots . contains (&ID::new ("root-1")));
   assert! (roots . contains (&ID::new ("root-2")));
@@ -314,18 +314,18 @@ fn test_full_prominence_pipeline () {
   let mut prominence_sources : HashMap<ID, ProminenceSource> =
     HashMap::new ();
   // Priority order: MC, HadID, Target, Root (lowest first).
-  for skgid in &multicontained {
+  for gnid in &multicontained {
     prominence_sources . insert (
-      skgid . clone (), ProminenceSource::MultiContained ); }
-  for skgid in &had_id_set {
+      gnid . clone (), ProminenceSource::MultiContained ); }
+  for gnid in &had_id_set {
     prominence_sources . insert (
-      skgid . clone (), ProminenceSource::HadID ); }
-  for skgid in &mentioned_skgids {
+      gnid . clone (), ProminenceSource::HadID ); }
+  for gnid in &mentioned_gnids {
     prominence_sources . insert (
-      skgid . clone (), ProminenceSource::Mentioned ); }
-  for skgid in &roots {
+      gnid . clone (), ProminenceSource::Mentioned ); }
+  for gnid in &roots {
     prominence_sources . insert (
-      skgid . clone (), ProminenceSource::Root ); }
+      gnid . clone (), ProminenceSource::Root ); }
   assert_eq! (prominence_sources . len (), 6);
   assert_eq! (prominence_sources [&ID::new ("root-1")],
               ProminenceSource::Root);
@@ -383,7 +383,7 @@ fn test_full_prominence_pipeline () {
     &ID::new ("cycle-1") ));
   // Step 3: handle cycles.
   extend_regions_for_cycles (
-    &all_node_skgids,
+    &all_node_gnids,
     &map_to_content,
     &map_to_containers,
     &mut prominence_sources,
@@ -409,12 +409,12 @@ fn test_full_prominence_pipeline () {
 
 /// Find the region containing the given node ID.
 fn ctx_containing (
-  skgid       : &str,
+  gnid       : &str,
   regions : &[HashSet<ID>],
 ) -> HashSet<ID> {
-  let target : ID = ID::new (skgid);
+  let target : ID = ID::new (gnid);
   regions . iter ()
   . find ( |region| region . contains (&target) )
   . unwrap_or_else ( || panic! (
-    "{} not in any region", skgid ) )
+    "{} not in any region", gnid ) )
   . clone () }

@@ -229,7 +229,7 @@ fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
         let nodeInstructions    : Vec<NodeInstruction> = match action {
           0 => vec![NodeInstruction::Save (SaveNode (node_at ("X", "public")))],
           1 => vec![NodeInstruction::Delete (DeleteNode {
-            skgid : ID::from ("T"), home_skgrepo : SkgrepoName::from ("public"),
+            gnid : ID::from ("T"), home_skgrepo : SkgrepoName::from ("public"),
           })],
           2 => vec![NodeInstruction::Save (SaveNode (node_at ("T", "private")))],
           3 => {
@@ -244,7 +244,7 @@ fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
             vec![
               NodeInstruction::Save (SaveNode (acquirer)),
               NodeInstruction::Delete (DeleteNode {
-                skgid : ID::from ("N2"), home_skgrepo : SkgrepoName::from ("private"),
+                gnid : ID::from ("N2"), home_skgrepo : SkgrepoName::from ("private"),
               }),
             ]
           },
@@ -260,16 +260,16 @@ fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
         let touched_pids : HashSet<ID> = nodeInstructions . iter ()
           .map (|nodeInstruction| match nodeInstruction {
             NodeInstruction::Save (SaveNode (node)) => node . pid . clone (),
-            NodeInstruction::Delete (DeleteNode { skgid, .. }) => skgid . clone (),
+            NodeInstruction::Delete (DeleteNode { gnid, .. }) => gnid . clone (),
           }) . collect ();
-        let mut affected_skgids : HashSet<ID> = touched_pids . clone ();
+        let mut affected_gnids : HashSet<ID> = touched_pids . clone ();
         for pid in &touched_pids {
           if let Some (node) = base . nodes . get (pid) {
-            affected_skgids . extend (node . extra_ids . iter () . cloned ()); }
+            affected_gnids . extend (node . extra_ids . iter () . cloned ()); }
           if let Some (node) = candidate . nodes . get (pid) {
-            affected_skgids . extend (node . extra_ids . iter () . cloned ()); }}
+            affected_gnids . extend (node . extra_ids . iter () . cloned ()); }}
         let affected_recorders : HashSet<ID> = derive_affected_telescope_recorders (
-          &base, &candidate, &saved_pids, &affected_skgids);
+          &base, &candidate, &saved_pids, &affected_gnids);
         let before : BTreeMap<ID, Vec<TelescopeViolation>> =
           warnings_by_recorder (&config, &base);
         let after : BTreeMap<ID, Vec<TelescopeViolation>> =
@@ -286,7 +286,7 @@ fn affected_recorder_derivation_covers_warning_changes_exhaustively () {
             .collect ();
         assert_eq! (
           affected_telescope_warnings (
-            &config, &base, &candidate, &saved_pids, &affected_skgids),
+            &config, &base, &candidate, &saved_pids, &affected_gnids),
           expected);
       }} }
 }
@@ -311,15 +311,15 @@ fn combined_warning_scope_reports_only_the_final_merge_state () {
   let merge : Vec<NodeInstruction> = vec![
     NodeInstruction::Save (SaveNode (merged_destination)),
     NodeInstruction::Delete (DeleteNode {
-      skgid : ID::from ("X"), home_skgrepo : SkgrepoName::from ("private"),
+      gnid : ID::from ("X"), home_skgrepo : SkgrepoName::from ("private"),
     }),
   ];
   let mut final_graph : InRustGraph = intermediate . clone ();
   apply_nodeInstructions_to_inRustGraph (&mut final_graph, &merge);
   let saved_pids : HashSet<ID> = [ID::from ("X"), ID::from ("Y")]
     . into_iter () . collect ();
-  let affected_skgids : HashSet<ID> = [ID::from ("X"), ID::from ("Y")]
+  let affected_gnids : HashSet<ID> = [ID::from ("X"), ID::from ("Y")]
     . into_iter () . collect ();
   assert! (affected_telescope_warnings (
-    &config, &base, &final_graph, &saved_pids, &affected_skgids) . is_empty ());
+    &config, &base, &final_graph, &saved_pids, &affected_gnids) . is_empty ());
 }

@@ -18,7 +18,7 @@ pub fn handle_get_file_path_request_with_skgrepo_set (
   config  : &SkgConfig,
   restriction : &SkgrepoRestriction,
 ) {
-  let skgid : ID = match value_from_request_sexp (
+  let gnid : ID = match value_from_request_sexp (
     "id", request ) {
     Ok  (v) => ID (v),
     Err (e) => {
@@ -50,7 +50,7 @@ pub fn handle_get_file_path_request_with_skgrepo_set (
   let raw_path : String = match path_from_pid_and_skgrepo (
     config,
     & skgrepo,
-    skgid ) {
+    gnid ) {
     Ok  (p) => p,
     Err (e) => {
       send_response_with_length_prefix (

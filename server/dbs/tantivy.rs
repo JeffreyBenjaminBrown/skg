@@ -133,22 +133,22 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
 /// and one whose title links to a different node also labelled
 /// "science". Alias-doc fallback paths use 'title_or_alias' because
 /// only is_title="true" docs carry a 'raw_title'.
-pub fn title_and_skgrepo_by_skgid (
+pub fn title_and_skgrepo_by_gnid (
   tantivy_index : &TantivyIndex,
-  skgid            : &ID,
+  gnid            : &ID,
 ) -> Option < (String, SkgrepoName) > {
   let searcher : Searcher = tantivy_index . reader . searcher ();
   let doc_addresses : Vec<tantivy::DocAddress> =
-    doc_addresses_for_skgid (
-      tantivy_index, &searcher, skgid,
+    doc_addresses_for_gnid (
+      tantivy_index, &searcher, gnid,
       TANTIVY_PER_ID_LOOKUP_LIMIT ) ?;
   let (doc, was_fallback) : (TantivyDocument, bool) =
-    pick_title_doc ( tantivy_index, &searcher, skgid, &doc_addresses ) ?;
+    pick_title_doc ( tantivy_index, &searcher, gnid, &doc_addresses ) ?;
   if was_fallback {
     tracing::warn! (
       "title_and_repo_by_id: no is_title=\"true\" document \
        found for ID {}. Falling back to first title_or_alias.",
-      skgid ); }
+      gnid ); }
   let title : String =
     string_field ( &doc, tantivy_index . raw_title_field )
       . filter ( |s| ! s . is_empty () )
@@ -161,29 +161,29 @@ pub fn title_and_skgrepo_by_skgid (
 
 /// Look up canonical titles for multiple IDs in a single searcher session.
 /// IDs not found in Tantivy are absent from the result.
-pub fn titles_by_skgids (
+pub fn titles_by_gnids (
   tantivy_index : &TantivyIndex,
-  skgids           : &[ID],
+  gnids           : &[ID],
 ) -> HashMap<ID, String> {
   let mut result : HashMap<ID, String> = HashMap::new ();
   let searcher : Searcher = tantivy_index . reader . searcher ();
-  for skgid in skgids {
+  for gnid in gnids {
     let doc_addresses : Vec<tantivy::DocAddress> =
-      match doc_addresses_for_skgid (
-        tantivy_index, &searcher, skgid,
+      match doc_addresses_for_gnid (
+        tantivy_index, &searcher, gnid,
         TANTIVY_PER_ID_LOOKUP_LIMIT )
       { Some (a) => a,
         None     => continue };
     let (doc, was_fallback) : (TantivyDocument, bool) =
       match pick_title_doc (
-        tantivy_index, &searcher, skgid, &doc_addresses )
+        tantivy_index, &searcher, gnid, &doc_addresses )
       { Some (d) => d,
         None     => continue };
     if was_fallback {
       tracing::debug! (
         "titles_by_ids: no is_title=\"true\" document \
          found for ID {}. Falling back to first title_or_alias.",
-        skgid ); }
+        gnid ); }
     // Prefer the un-reduced raw title (only on is_title="true" docs);
     // fall back to 'title_or_alias' for the alias-only fallback case,
     // which has no raw_title stored.
@@ -193,7 +193,7 @@ pub fn titles_by_skgids (
         . or_else ( || string_field (
           &doc, tantivy_index . title_or_alias_field ));
     if let Some (t) = title
-    { result . insert ( skgid . clone (), t ); } }
+    { result . insert ( gnid . clone (), t ); } }
   result }
 
 
@@ -201,16 +201,16 @@ pub fn titles_by_skgids (
 /// the matching doc addresses (scores discarded). None on any
 /// index/search error; an empty vec means "no hits" (distinct from
 /// error).
-fn doc_addresses_for_skgid (
+fn doc_addresses_for_gnid (
   tantivy_index : &TantivyIndex,
   searcher      : &Searcher,
-  skgid         : &ID,
+  gnid         : &ID,
   limit         : usize,
 ) -> Option < Vec<tantivy::DocAddress> > {
   let query : Box<dyn Query> =
     Box::new ( tantivy::query::TermQuery::new (
       Term::from_field_text (
-        tantivy_index . id_field, skgid . as_str () ),
+        tantivy_index . id_field, gnid . as_str () ),
       schema::IndexRecordOption::Basic ));
   searcher . search (
     &query, &TopDocs::with_limit (limit) . order_by_score () )
@@ -225,13 +225,13 @@ fn doc_addresses_for_skgid (
 fn pick_title_doc (
   tantivy_index : &TantivyIndex,
   searcher      : &Searcher,
-  skgid         : &ID,
+  gnid         : &ID,
   doc_addresses : &[tantivy::DocAddress],
 ) -> Option < (TantivyDocument, bool) > {
   let mut fallback : Option<TantivyDocument> = None;
   for addr in doc_addresses {
     let doc : TantivyDocument =
-      match load_doc_or_warn ( searcher, *addr, skgid ) {
+      match load_doc_or_warn ( searcher, *addr, gnid ) {
         Some (d) => d,
         None     => continue };
     if bool_field_eq_true ( &doc, tantivy_index . is_title_field ) {
@@ -246,14 +246,14 @@ fn pick_title_doc (
 fn load_doc_or_warn (
   searcher : &Searcher,
   addr     : tantivy::DocAddress,
-  skgid    : &ID,
+  gnid    : &ID,
 ) -> Option < TantivyDocument > {
   match searcher . doc (addr) {
     Ok (doc) => Some (doc),
     Err (e)  => {
       tracing::warn! (
         "Failed to load Tantivy doc for ID {} at {:?}: {}",
-        skgid, addr, e );
+        gnid, addr, e );
       None }} }
 
 fn bool_field_eq_true (

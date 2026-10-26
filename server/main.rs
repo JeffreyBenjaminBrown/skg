@@ -141,8 +141,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let ( env,
         InitContextHandoff { had_id_set,
-                             all_node_skgids,
-                             mentioned_skgids,
+                             all_node_gnids,
+                             mentioned_gnids,
                              map_to_content,
                              map_to_containers },
         nodes )
@@ -160,8 +160,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let runtime = env . runtime_snapshot ();
   compute_context_rankings (
-    &runtime . tantivy_index, had_id_set, all_node_skgids,
-    mentioned_skgids, map_to_content, map_to_containers );
+    &runtime . tantivy_index, had_id_set, all_node_gnids,
+    mentioned_gnids, map_to_content, map_to_containers );
 
   init_done . store (true, Ordering::Release);
   busysignal_handle . join ()
@@ -287,8 +287,8 @@ fn install_shutdown_signal_handler (
 fn compute_context_rankings (
   tantivy_index     : &TantivyIndex,
   had_id_set        : HashSet<ID>,
-  all_node_skgids   : HashSet<ID>,
-  mentioned_skgids  : HashSet<ID>,
+  all_node_gnids   : HashSet<ID>,
+  mentioned_gnids  : HashSet<ID>,
   map_to_content    : MapToContent,
   map_to_containers : MapToContainers,
 ) {
@@ -297,8 +297,8 @@ fn compute_context_rankings (
   match compute_and_store_prominence_sources (
     tantivy_index,
     &had_id_set,
-    &all_node_skgids,
-    &mentioned_skgids,
+    &all_node_gnids,
+    &mentioned_gnids,
     &map_to_content,
     &map_to_containers )
   { Ok (_) => {}

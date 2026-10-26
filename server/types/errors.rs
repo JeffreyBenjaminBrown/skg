@@ -42,8 +42,8 @@ pub enum BufferValidationError {
   Multiple_Defining_Viewnodes     (ID, Vec<HeadlineName>), // For any given ID, at most one occurrence can be editable. (Its contents are intended to define those of the node.) The names are the editable occurrences'.
   AmbiguousDeletion              (ID, Vec<HeadlineName>), // The names are the editable occurrences', with and without the delete request.
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
-  ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (skgid, repo_name)
-  CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (skgid, repo_name)
+  ModifiedForeignNode            (ID, SkgrepoName), // Attempted to modify a node from a foreign skgrepo - (gnid, repo_name)
+  CreatedForeignNode             (ID, SkgrepoName), // Attempted to create a node in a foreign skgrepo - (gnid, repo_name)
   CannotMoveToOrFromForeignSkgrepo (ID,
                                    SkgrepoName, // disk skgrepo
                                    SkgrepoName), // buffer skgrepo
@@ -68,13 +68,13 @@ pub enum BufferValidationError {
   LocalStructureViolation        (String, ID, HeadlineName), // (error message, nearest ancestor ID, the headline violating)
   EditRequestOnWriteProtectedOccurrence      (ID, HeadlineName), // Write-protected nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit an editable view of the node first.
   EditedWriteProtectedOccurrence {
-    skgid    : ID,
+    gnid    : ID,
     title    : String,
     changes  : Vec<String>,
     headline : HeadlineName,
   }, // This occurrence differs from the graph, but a write-protected occurrence emits no fieldIntent for the differing data.
   FlagsSurfaceEdited {
-    recorder_skgid : ID,
+    recorder_gnid : ID,
     recorder_title : String,
     changes        : Vec<String>,
     headline       : HeadlineName, // the recorder's occurrence
@@ -122,7 +122,7 @@ impl HeadlineName {
       else { &self . title };
     let graphnode_line : String =
       self . graphnode_id . as_ref ()
-      . map ( |skgid| format! ("- graphnode ID: {}\n", skgid . 0) )
+      . map ( |gnid| format! ("- graphnode ID: {}\n", gnid . 0) )
       . unwrap_or_default ();
     let viewnode_line : String = match &self . viewnode_id {
       Some (viewnode_id) => format! (
@@ -212,62 +212,62 @@ impl std::fmt::Display for BufferValidationError {
       BufferValidationError::Body_of_NonVognode(title, kind, headline) =>
         write!(f, "{} node ({}) should not have a body. Node title: '{}'",
                kind, headline, title),
-      BufferValidationError::Multiple_Defining_Viewnodes (skgid, headlines) =>
+      BufferValidationError::Multiple_Defining_Viewnodes (gnid, headlines) =>
         write!(f, "Multiple occurrences of node {:?} are editable ({})",
-               skgid, name_headlines (headlines)),
-      BufferValidationError::AmbiguousDeletion (skgid, headlines) =>
+               gnid, name_headlines (headlines)),
+      BufferValidationError::AmbiguousDeletion (gnid, headlines) =>
         write!(f, "Ambiguous deletion request for ID {:?} ({})",
-               skgid, name_headlines (headlines)),
-      BufferValidationError::DuplicatedContent (skgid) =>
-        write!(f, "Node has multiple Content children with the same ID {:?}", skgid),
-      BufferValidationError::ModifiedForeignNode(skgid, skgrepo) =>
-        write!(f, "Cannot modify node {:?} from foreign repo '{}'", skgid, skgrepo),
-      BufferValidationError::CreatedForeignNode(skgid, skgrepo) =>
-        write!(f, "Cannot create node {:?} in foreign repo '{}'", skgid, skgrepo),
-      BufferValidationError::CannotMoveToOrFromForeignSkgrepo(skgid, disk_skgrepo, buffer_skgrepo) =>
-        write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign", skgid, disk_skgrepo, buffer_skgrepo),
-      BufferValidationError::CannotMoveAndMergeSimultaneously(skgid) =>
-        write!(f, "Cannot move and merge node {:?} in the same save", skgid),
-      BufferValidationError::SkgrepoNotInConfig(skgid, skgrepo) =>
-        write!(f, "Node {:?} references repo '{}' which does not exist in config", skgid, skgrepo),
-      BufferValidationError::ForkSkgrepoUnresolved(skgid) =>
-        write!(f, "Cannot fork node {:?}: no owned repo to put the clone in. It has no owned ancestor in the view to inherit a repo from; set the clone's repo in the confirmation buffer (C-c s s).", skgid),
+               gnid, name_headlines (headlines)),
+      BufferValidationError::DuplicatedContent (gnid) =>
+        write!(f, "Node has multiple Content children with the same ID {:?}", gnid),
+      BufferValidationError::ModifiedForeignNode(gnid, skgrepo) =>
+        write!(f, "Cannot modify node {:?} from foreign repo '{}'", gnid, skgrepo),
+      BufferValidationError::CreatedForeignNode(gnid, skgrepo) =>
+        write!(f, "Cannot create node {:?} in foreign repo '{}'", gnid, skgrepo),
+      BufferValidationError::CannotMoveToOrFromForeignSkgrepo(gnid, disk_skgrepo, buffer_skgrepo) =>
+        write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign", gnid, disk_skgrepo, buffer_skgrepo),
+      BufferValidationError::CannotMoveAndMergeSimultaneously(gnid) =>
+        write!(f, "Cannot move and merge node {:?} in the same save", gnid),
+      BufferValidationError::SkgrepoNotInConfig(gnid, skgrepo) =>
+        write!(f, "Node {:?} references repo '{}' which does not exist in config", gnid, skgrepo),
+      BufferValidationError::ForkSkgrepoUnresolved(gnid) =>
+        write!(f, "Cannot fork node {:?}: no owned repo to put the clone in. It has no owned ancestor in the view to inherit a repo from; set the clone's repo in the confirmation buffer (C-c s s).", gnid),
       BufferValidationError::ForkAlreadyExists(original, existing) =>
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one owned override).", original, existing),
-      BufferValidationError::ForkSkgrepoRestricted(skgid, skgrepo) =>
-        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is restricted under the current repo-set. Activate it first; an invisible clone is never created silently.", skgid, skgrepo),
-      BufferValidationError::ForkSkgrepoNotOwned(skgid, skgrepo) =>
-        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", skgid, skgrepo),
-      BufferValidationError::ForkRequestOnUnknownNode(skgid, headline) =>
-        write!(f, "Cannot fork node {:?} ({}): it is not in the graph. Only a saved node can be forked; save it first, then fork.", skgid, headline),
-      BufferValidationError::ForkRequestMultiple(skgid, headlines) =>
-        write!(f, "Multiple fork requests for the same node {:?} ({}). At most one fork request per node is allowed.", skgid, name_headlines (headlines)),
+      BufferValidationError::ForkSkgrepoRestricted(gnid, skgrepo) =>
+        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is restricted under the current repo-set. Activate it first; an invisible clone is never created silently.", gnid, skgrepo),
+      BufferValidationError::ForkSkgrepoNotOwned(gnid, skgrepo) =>
+        write!(f, "Cannot fork node {:?}: the clone's repo '{}' is not one you own. Choose an owned repo for the clone (C-c s s in the confirmation buffer).", gnid, skgrepo),
+      BufferValidationError::ForkRequestOnUnknownNode(gnid, headline) =>
+        write!(f, "Cannot fork node {:?} ({}): it is not in the graph. Only a saved node can be forked; save it first, then fork.", gnid, headline),
+      BufferValidationError::ForkRequestMultiple(gnid, headlines) =>
+        write!(f, "Multiple fork requests for the same node {:?} ({}). At most one fork request per node is allowed.", gnid, name_headlines (headlines)),
       BufferValidationError::OverrideInvariantViolation(msg) =>
         write!(f, "{}", msg),
-      BufferValidationError::MultipleEditableViewRequestsForSameId (skgid, headlines) =>
-        write!(f, "Multiple editable view requests for the same ID {:?} ({}). At most one request per ID is allowed.", skgid, name_headlines (headlines)),
-      BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (skgid, headline) =>
-        write!(f, "An occurrence of node {:?} ({}) requests both write-protection and an editable view. Request one; to move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).", skgid, headline),
-      BufferValidationError::EmptyTitle(skgid) =>
-        write!(f, "Node {:?} has an empty title. Every editable node must have a non-empty title.", skgid),
-      BufferValidationError::LocalStructureViolation(msg, skgid, headline) =>
-        write!(f, "Local structure violation at ID {:?} ({}): {}", skgid, headline, msg),
-      BufferValidationError::IDFolder_Edited(recorder, buffer_skgids, real_skgids, headline) =>
-        write!(f, "The idFolder under node {:?} ({}) was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", recorder, headline, buffer_skgids, real_skgids),
-      BufferValidationError::EditRequestOnWriteProtectedOccurrence (skgid, headline) =>
-        write!(f, "Edit request on write-protected (phantom) node {:?} ({}). Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", skgid, headline),
+      BufferValidationError::MultipleEditableViewRequestsForSameId (gnid, headlines) =>
+        write!(f, "Multiple editable view requests for the same ID {:?} ({}). At most one request per ID is allowed.", gnid, name_headlines (headlines)),
+      BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (gnid, headline) =>
+        write!(f, "An occurrence of node {:?} ({}) requests both write-protection and an editable view. Request one; to move editability, request write-protection on one occurrence (C-c s w) and an editable view on another (C-c s d).", gnid, headline),
+      BufferValidationError::EmptyTitle(gnid) =>
+        write!(f, "Node {:?} has an empty title. Every editable node must have a non-empty title.", gnid),
+      BufferValidationError::LocalStructureViolation(msg, gnid, headline) =>
+        write!(f, "Local structure violation at ID {:?} ({}): {}", gnid, headline, msg),
+      BufferValidationError::IDFolder_Edited(recorder, buffer_gnids, real_gnids, headline) =>
+        write!(f, "The idFolder under node {:?} ({}) was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", recorder, headline, buffer_gnids, real_gnids),
+      BufferValidationError::EditRequestOnWriteProtectedOccurrence (gnid, headline) =>
+        write!(f, "Edit request on write-protected (phantom) node {:?} ({}). Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a editable view of the node first (C-c g RET).", gnid, headline),
       BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, title, changes, headline } =>
+        gnid, title, changes, headline } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",
-               skgid, title, headline, changes . join ("; ")),
+               gnid, title, headline, changes . join ("; ")),
       BufferValidationError::FlagsSurfaceEdited {
-        recorder_skgid, recorder_title, changes, headline } =>
+        recorder_gnid, recorder_title, changes, headline } =>
         write!(f, "The flags surface under node {:?} ({:?}, {}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-flag-search-matching for noSearchMatching; provenance flags have no setter.",
-               recorder_skgid, recorder_title, headline, changes . join ("; ")),
-      BufferValidationError::FlagEditOnForeignNode (skgid, skgrepo) =>
-        write! (f, "Cannot change flags of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", skgid, skgrepo),
-      BufferValidationError::FlagEditOnUnknownNode (skgid) =>
-        write! (f, "Cannot change flags of unsaved or unknown node {:?}; save the node first.", skgid),
+               recorder_gnid, recorder_title, headline, changes . join ("; ")),
+      BufferValidationError::FlagEditOnForeignNode (gnid, skgrepo) =>
+        write! (f, "Cannot change flags of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", gnid, skgrepo),
+      BufferValidationError::FlagEditOnUnknownNode (gnid) =>
+        write! (f, "Cannot change flags of unsaved or unknown node {:?}; save the node first.", gnid),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective, headline) =>
         write!(f, "Node {:?} ({}) carries the fact (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The fact looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, headline, original, effective),
       BufferValidationError::Other (msg) =>

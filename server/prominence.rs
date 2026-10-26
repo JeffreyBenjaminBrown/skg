@@ -81,8 +81,8 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 pub fn compute_and_store_prominence_sources (
   tantivy_index : &TantivyIndex,
   had_id_set    : &HashSet<ID>,
-  all_node_skgids  : &HashSet<ID>,
-  mentioned_skgids  : &HashSet<ID>,
+  all_node_gnids  : &HashSet<ID>,
+  mentioned_gnids  : &HashSet<ID>,
   map_to_content  : &MapToContent,
   map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
@@ -90,34 +90,34 @@ pub fn compute_and_store_prominence_sources (
   let relationship_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
   tracing::info! ("  {} nodes, {} relationships, {} mentioned nodes.",
-            all_node_skgids . len (), relationship_count, mentioned_skgids . len ());
+            all_node_gnids . len (), relationship_count, mentioned_gnids . len ());
   let mut prominence_sources : HashMap<ID, ProminenceSource> =
     identify_origins (
-      all_node_skgids, map_to_containers, mentioned_skgids, had_id_set );
+      all_node_gnids, map_to_containers, mentioned_gnids, had_id_set );
   tracing::info! ("  {} origins identified.", prominence_sources . len ());
   let mut all_regions : Vec<HashSet<ID>> =
     grow_all_regions (&prominence_sources, map_to_content);
   tracing::info! ("  {} treelike regions grown.", all_regions . len ());
   extend_regions_for_cycles (
-    all_node_skgids,
+    all_node_gnids,
     map_to_content,
     map_to_containers,
     &mut prominence_sources,
     &mut all_regions );
   tracing::info! ("  {} total regions after cycle detection.",
             all_regions . len ());
-  let prominence_sources_by_skgid : HashMap<ID, String> =
+  let prominence_sources_by_gnid : HashMap<ID, String> =
     // Converts ProminenceSource too String for Tantivy.
     prominence_sources . iter ()
-    . map ( |(skgid, ct)| (skgid . clone (),
+    . map ( |(gnid, ct)| (gnid . clone (),
                         ct . label () . to_string ()) )
     . collect ();
   let updated : usize = // update Tantivy
     update_prominence_sources (
-      tantivy_index, &prominence_sources_by_skgid ) ?;
+      tantivy_index, &prominence_sources_by_gnid ) ?;
   tracing::info! ("  {} Tantivy documents updated with prominence sources.",
             updated);
-  Ok (prominence_sources_by_skgid) }
+  Ok (prominence_sources_by_gnid) }
 
 /// Prominence sources (used to rank search results) for the nodes a save
 /// touched, read straight from the post-save graph. Returns a pid ->
@@ -140,17 +140,17 @@ pub fn prominence_sources_for_saved_from_inRustGraph (
       NodeInstruction::Delete (_) => None } )
     . collect ();
   if saved . is_empty () { return HashMap::new (); }
-  let saved_skgids : HashSet<ID> =
+  let saved_gnids : HashSet<ID> =
     saved . iter () . map ( |n| n . pid . clone () ) . collect ();
   let map_to_containers : MapToContainers = // each saved pid -> its containers
-    saved_skgids . iter ()
-    . filter_map ( |skgid| graph . contained_by . get (skgid)
-      . map ( |cs| ( skgid . clone (),
+    saved_gnids . iter ()
+    . filter_map ( |gnid| graph . contained_by . get (gnid)
+      . map ( |cs| ( gnid . clone (),
                      cs . iter () . cloned () . collect () )) )
     . collect ();
-  let mentioned_skgids : HashSet<ID> = // saved nodes that anything links to
-    saved_skgids . iter ()
-    . filter ( |skgid| graph . mentioners_of . get (skgid)
+  let mentioned_gnids : HashSet<ID> = // saved nodes that anything links to
+    saved_gnids . iter ()
+    . filter ( |gnid| graph . mentioners_of . get (gnid)
                . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
     . cloned () . collect ();
   let had_id_set : HashSet<ID> = // from each node's own flags
@@ -161,15 +161,15 @@ pub fn prominence_sources_for_saved_from_inRustGraph (
     . collect ();
   let mut prominence_sources : HashMap<ID, ProminenceSource> =
     identify_origins (
-      &saved_skgids, &map_to_containers, &mentioned_skgids, &had_id_set );
-  for skgid in &saved_skgids {
+      &saved_gnids, &map_to_containers, &mentioned_gnids, &had_id_set );
+  for gnid in &saved_gnids {
     // CycleMember, only for nodes not already a higher-priority origin.
-    if ! prominence_sources . contains_key (skgid)
-       && node_is_in_containerward_cycle (graph, skgid) {
+    if ! prominence_sources . contains_key (gnid)
+       && node_is_in_containerward_cycle (graph, gnid) {
       prominence_sources . insert (
-        skgid . clone (), ProminenceSource::CycleMember ); } }
+        gnid . clone (), ProminenceSource::CycleMember ); } }
   prominence_sources . iter ()
-    . map ( |(skgid, ct)| (skgid . clone (),
+    . map ( |(gnid, ct)| (gnid . clone (),
                         ct . label () . to_string ()) )
     . collect () }
 
@@ -204,47 +204,47 @@ fn node_is_in_containerward_cycle (
 /// (That's safe because the only higher-priority thing is a Root,
 /// and a Root cannot be a CycleMember.)
 fn identify_origins (
-  all_node_skgids : &HashSet<ID>,
+  all_node_gnids : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
-  mentioned_skgids : &HashSet<ID>,
+  mentioned_gnids : &HashSet<ID>,
   had_id_set   : &HashSet<ID>,
 ) -> HashMap<ID, ProminenceSource> {
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
-    find_roots_and_multiply_contained (all_node_skgids, map_to_containers);
+    find_roots_and_multiply_contained (all_node_gnids, map_to_containers);
   let mut prominence_sources : HashMap<ID, ProminenceSource> =
     HashMap::new ();
   { // Important: Start at least priority, work up to highest.
-    for skgid in &multicontained {
+    for gnid in &multicontained {
       prominence_sources . insert (
-        skgid . clone (), ProminenceSource::MultiContained ); }
-    for skgid in had_id_set {
+        gnid . clone (), ProminenceSource::MultiContained ); }
+    for gnid in had_id_set {
       prominence_sources . insert (
-        skgid . clone (), ProminenceSource::HadID ); }
-    for skgid in mentioned_skgids {
+        gnid . clone (), ProminenceSource::HadID ); }
+    for gnid in mentioned_gnids {
       prominence_sources . insert (
-        skgid . clone (), ProminenceSource::Mentioned ); }
-    for skgid in &roots {
+        gnid . clone (), ProminenceSource::Mentioned ); }
+    for gnid in &roots {
       prominence_sources . insert (
-        skgid . clone (), ProminenceSource::Root ); }}
+        gnid . clone (), ProminenceSource::Root ); }}
   prominence_sources }
 
 /// Partition nodes into roots and multiply-contained
 /// based on how many distinct containers each has:
 /// Roots have none, multiply-contained have more than one.
 pub fn find_roots_and_multiply_contained (
-  all_node_skgids    : &HashSet<ID>,
+  all_node_gnids    : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
 ) -> ( HashSet<ID>, HashSet<ID> ) {
   let mut roots : HashSet<ID> = HashSet::new();
   let mut multi : HashSet<ID> = HashSet::new();
-  for skgid in all_node_skgids {
-    match map_to_containers . get (skgid) {
-      None => { roots . insert (skgid . clone()); },
+  for gnid in all_node_gnids {
+    match map_to_containers . get (gnid) {
+      None => { roots . insert (gnid . clone()); },
       Some (containers) => {
         let unique_containers : HashSet<&ID> =
           containers . iter () . collect ();
         if unique_containers . len () > 1 {
-          multi . insert (skgid . clone() ); }}, }}
+          multi . insert (gnid . clone() ); }}, }}
   ( roots, multi ) }
 
 //
@@ -274,7 +274,7 @@ fn grow_all_regions (
 /// this will climb containerward to find a cycle,
 /// mark cycle members as origins, and grow their tails.
 pub fn extend_regions_for_cycles (
-  all_node_skgids   : &HashSet<ID>,
+  all_node_gnids   : &HashSet<ID>,
   map_to_content    : &MapToContent,
   map_to_containers : &MapToContainers,
   origins  : &mut HashMap<ID, ProminenceSource>, // we grow this
@@ -285,7 +285,7 @@ pub fn extend_regions_for_cycles (
     . flat_map ( |region| region . iter () . cloned () )
     . collect ();
   let mut uncovered : HashSet<ID> =
-    all_node_skgids . difference (&covered) . cloned () . collect ();
+    all_node_gnids . difference (&covered) . cloned () . collect ();
   while ! uncovered . is_empty () { // consume some of 'uncovered'
     let start : ID = // picks a random node
       uncovered . iter () . next () . unwrap () . clone ();
@@ -345,7 +345,7 @@ fn climb_containerward_to_content_origins (
   map_to_containers : &MapToContainers,
 ) -> ( Vec<ID>, HashSet<ID> ) {
   climb_containerward_to_content_origins_via (
-    &|skgid : &ID| map_to_containers . get (skgid)
+    &|gnid : &ID| map_to_containers . get (gnid)
       . cloned () . unwrap_or_default (),
     start ) }
 
@@ -374,7 +374,7 @@ pub fn climb_containerward_to_content_origins_via (
       let cycle_start_idx : usize =
         path . iter ()
         . position ( // returns the first match
-          |skgid| skgid == container )
+          |gnid| gnid == container )
         . unwrap ();
       let content_origins : HashSet<ID> = // the rootlike cycle's members
         path [cycle_start_idx ..] . iter ()
@@ -399,25 +399,25 @@ pub fn content_maps_from_nodes (
   let mut to_containers : MapToContainers = HashMap::new ();
   for node in nodes {
     { let pid : &ID = &node . pid;
-      for child_skgid in node . contains . iter () . map ( |m| &m . member ) {
+      for child_gnid in node . contains . iter () . map ( |m| &m . member ) {
         to_content . entry (pid . clone ())
           . or_insert_with (Vec::new)
-          . push (child_skgid . clone ());
-        to_containers . entry (child_skgid . clone ())
+          . push (child_gnid . clone ());
+        to_containers . entry (child_gnid . clone ())
           . or_insert_with (Vec::new)
           . push (pid . clone ()); } }}
   ( to_content, to_containers ) }
 
 /// Collect all link dest IDs from titles and bodies.
 /// This is a single linear pass over the already-loaded nodes.
-pub fn mentioned_skgids_from_nodes (
+pub fn mentioned_gnids_from_nodes (
   nodes : &[Graphnode],
 ) -> HashSet<ID> {
   nodes . iter ()
   . flat_map ( |node| {
     links_from_node (node)
     . into_iter ()
-    . map ( |tl| tl . skgid ) } )
+    . map ( |tl| tl . gnid ) } )
   . collect () }
 
 /// Collect the set of IDs of nodes whose flags field

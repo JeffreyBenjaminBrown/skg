@@ -83,7 +83,7 @@ fn visit (
           // ghost meaningful: its children stay in
           // subscribee-as-such position, so their title edits bounce
           // via text claims instead of silently becoming real edits.
-          skgid               : vognode . skgid() . clone(),
+          gnid               : vognode . gnid() . clone(),
           headline            : node_ref . value () . headline_name (),
           is_editable    : false,
           is_saveEligible : false } ),
@@ -153,7 +153,7 @@ fn visit_unrestricted_vognode (
       Some (( subscriber, subscriber_is_editable )) => {
         collected . instructionMerge_fieldIntent (
           &headline,
-          t . skgid . clone(),
+          t . gnid . clone(),
           FieldIntent::SubscribeeTextClaim (
             SubscribeeTextClaim {
               title    : t . title . clone(),
@@ -171,7 +171,7 @@ fn visit_unrestricted_vognode (
             subscriber . clone(),
             FieldIntent::SubscribeeVisibility (
               SubscribeeVisibility {
-                subscribee : t . skgid . clone(),
+                subscribee : t . gnid . clone(),
                 visible    : visible_content_members (node_ref) } )) ?; }
         // Delete and NodeMerge edit requests here are ignored: a
         // subscribee-as-such can affect only what its subscriber
@@ -181,20 +181,20 @@ fn visit_unrestricted_vognode (
         if has_delete_request {
           collected . instructionMerge_fieldIntent (
             &headline,
-            t . skgid . clone(),
+            t . gnid . clone(),
             FieldIntent::Delete {
               skgrepo : t . home_skgrepo . clone() } ) ?;
         } else {
           collected . instructionMerge_fieldIntent (
             &headline,
-            t . skgid . clone(),
+            t . gnid . clone(),
             FieldIntent::SetTitleAndBody {
               skgrepo : t . home_skgrepo . clone(),
               title   : t . title . clone(),
               body    : t . body() . cloned() } ) ?;
           collected . instructionMerge_fieldIntent (
             &headline,
-            t . skgid . clone(),
+            t . gnid . clone(),
             // This is always emitted, even if empty: an editable
             // node's content is always Specified.
             FieldIntent::SetContains (
@@ -203,24 +203,24 @@ fn visit_unrestricted_vognode (
             t . edit_request()
           { collected . instructionMerge_fieldIntent (
               &headline,
-              t . skgid . clone(),
+              t . gnid . clone(),
               FieldIntent::NodeMerge {
                 acquiree : acquiree . clone() } ) ?; }
           if let Some (NodeEditRequest::SetFlag { flag, value }) =
             t . edit_request()
           { collected . instructionMerge_fieldIntent (
               &headline,
-              t . skgid . clone(),
+              t . gnid . clone(),
               FieldIntent::SetFlag {
                 flag : *flag, value : *value } ) ?; }}},}}
   recurse_under_vognode (
     node_ref,
     Some ( DefiningFolderRecorder {
-      skgid               : t . skgid . clone(),
+      gnid               : t . gnid . clone(),
       headline,
       is_editable,
       is_saveEligible } ),
-    if is_saveEligible { Some (t . skgid . clone()) } else { None },
+    if is_saveEligible { Some (t . gnid . clone()) } else { None },
     collected) }
 
 /// This recurses into a vognode's children. Vognode
@@ -298,7 +298,7 @@ fn visit_aliasFolder (
       // Specified(vec![]).
       collected . instructionMerge_fieldIntent (
         &recorder . headline,
-        recorder . skgid . clone(),
+        recorder . gnid . clone(),
         FieldIntent::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected) }
@@ -313,7 +313,7 @@ fn visit_subscribee_folder (
       if recorder . is_saveEligible {
         collected . instructionMerge_fieldIntent (
           &recorder . headline,
-          recorder . skgid . clone(),
+          recorder . gnid . clone(),
           FieldIntent::SetSubscribesTo (
             subscribeeFolder_members (node_ref) )) ?; }
       for child in node_ref . children() {
@@ -321,14 +321,14 @@ fn visit_subscribee_folder (
           match &child . value() . kind {
             ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
               LocalContext::HiddenOutsidePosition {
-                subscriber      : recorder . skgid . clone(),
+                subscriber      : recorder . gnid . clone(),
                 is_saveEligible : recorder . is_saveEligible },
             _ =>
               // The subscriber's identity is passed even when the recorder is
               // not save-eligible, because text claims outlive the
               // visibility guard.
               LocalContext::SubscribeeAsSuchPosition {
-                subscriber               : recorder . skgid . clone(),
+                subscriber               : recorder . gnid . clone(),
                 subscriber_is_editable : recorder . is_editable }, };
         visit (child, &child_context, collected) ?; }
       Ok (( )) },
@@ -359,15 +359,15 @@ fn visit_hiddenOutside_folder (
             if member_counts_for_partnerFolder (t) => {
               if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
-              members . push (t . skgid . clone ()); },
+              members . push (t . gnid . clone ()); },
           ViewnodeKind::Vognode (Vognode::Unknown (unknown))
             if unknown . claimsMembership => {
             if RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
-            members . push (unknown . skgid . clone ()); },
+            members . push (unknown . gnid . clone ()); },
           ViewnodeKind::Vognode (Vognode::Ghost (ghost))
             if ghost . claimsMembership =>
-            members . push (ghost . skgid . clone ()),
+            members . push (ghost . gnid . clone ()),
           _ => {}, }}
       collected . instructionMerge_fieldIntent (
         &node_ref . value () . headline_name (),
@@ -386,7 +386,7 @@ fn visit_overridden_folder (
     if recorder . is_saveEligible {
       collected . instructionMerge_fieldIntent (
         &recorder . headline,
-        recorder . skgid . clone(),
+        recorder . gnid . clone(),
         FieldIntent::SetOverrides (
           partnerFolder_members (node_ref) )) ?; }}
   recurse_with_uniform_context (
@@ -401,14 +401,14 @@ fn visit_overridden_folder (
 /// duplicate ID with a different skgrepo request must still
 /// be silently dropped, matching the existing defining-folder dedup
 /// policy ("duplicate defining-folder members are silently deduped").
-fn dedup_members_by_skgid (
+fn dedup_members_by_gnid (
   members : Vec<(ID, Option<SkgrepoName>)>,
 ) -> Vec<(ID, Option<SkgrepoName>)> {
   let mut seen   : std::collections::HashSet<ID> = std::collections::HashSet::new();
   let mut result : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
-  for (skgid, skgrepo) in members {
-    if seen . insert (skgid . clone()) {
-      result . push ((skgid, skgrepo)); }}
+  for (gnid, skgrepo) in members {
+    if seen . insert (gnid . clone()) {
+      result . push ((gnid, skgrepo)); }}
   result }
 
 /// This returns the members of an OverriddenFolder: its Unrestricted
@@ -428,18 +428,18 @@ fn partnerFolder_members (
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if member_counts_for_partnerFolder (t) =>
-          members . push ((t . skgid . clone(),
+          members . push ((t . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
         if unknown . claimsMembership =>
-          members . push ((unknown . skgid . clone(),
+          members . push ((unknown . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       ViewnodeKind::Vognode (Vognode::Ghost (ghost))
         if ghost . claimsMembership =>
           // As an unknown's: the list still names it.
-          members . push (( ghost . skgid . clone (), None )),
+          members . push (( ghost . gnid . clone (), None )),
       _ => {}, }}
-  dedup_members_by_skgid (members) }
+  dedup_members_by_gnid (members) }
 
 /// This returns the members of a SubscribeeFolder: its Unrestricted children
 /// that pass the PartnerFolder membership predicate, deduplicated (by
@@ -458,18 +458,18 @@ fn subscribeeFolder_members (
     match &child . value() . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if member_counts_for_partnerFolder (t) =>
-          members . push ((t . skgid . clone(),
+          members . push ((t . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
         if unknown . claimsMembership =>
-          members . push ((unknown . skgid . clone(),
+          members . push ((unknown . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       ViewnodeKind::Vognode (Vognode::Ghost (ghost))
         if ghost . claimsMembership =>
           // As an unknown's: the list still names it.
-          members . push (( ghost . skgid . clone (), None )),
+          members . push (( ghost . gnid . clone (), None )),
       _ => {}, }}
-  dedup_members_by_skgid (members) }
+  dedup_members_by_gnid (members) }
 
 /// This returns the content of an editable vognode: its Unrestricted
 /// children that pass the contains predicate. It does not dedup,
@@ -497,20 +497,20 @@ fn content_members (
           contents . push ((
             // collected_id, not id: a shown overrider stands for
             // the original member it is shown in place of.
-            t . collected_skgid (),
+            t . collected_gnid (),
             RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
         if unknown . claimsMembership =>
         // An Unknown is save-inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination skgrepo sticky.
-        contents . push (( unknown . skgid . clone(),
+        contents . push (( unknown . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned () )),
       ViewnodeKind::Vognode (Vognode::Ghost (ghost))
         if ghost . claimsMembership =>
         // A ghost the list still names (a dangling reference to a node
         // HEAD has) keeps its gnid there, as an unknown does.
-        contents . push (( ghost . skgid . clone (), None )),
+        contents . push (( ghost . gnid . clone (), None )),
       _ => {}, }}
   contents }
 
@@ -530,12 +530,12 @@ fn visible_content_members (
         visible . push (
           // collected_id: a shown overrider presents the original,
           // so hide/unhide inference must speak of the original.
-          t . collected_skgid ()); },
+          t . collected_gnid ()); },
       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
         if unknown . claimsMembership =>
-        visible . push (unknown . skgid . clone ()),
+        visible . push (unknown . gnid . clone ()),
       ViewnodeKind::Vognode (Vognode::Ghost (ghost))
         if ghost . claimsMembership =>
-        visible . push (ghost . skgid . clone ()),
+        visible . push (ghost . gnid . clone ()),
       _ => {}, }}
   visible }

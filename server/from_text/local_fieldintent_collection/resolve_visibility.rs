@@ -22,7 +22,7 @@
 /// elsewhere in the same map.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::opt_graphnode_by_skgid;
+use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::from_text::local_fieldintent_collection::lower::LoweredNodeIntents;
 use crate::from_text::local_fieldintent_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
@@ -55,11 +55,11 @@ pub fn resolve_visibility (
     skgrepo_restriction ) ?;
   for (subscriber, signal) in visibility {
     let Some (subscribee_from_disk) =
-      opt_graphnode_by_skgid (
+      opt_graphnode_by_gnid (
         graph, config, &signal . subscribee ) ?
     else { continue; };
     let Some (subscriber_from_disk) =
-      opt_graphnode_by_skgid (
+      opt_graphnode_by_gnid (
         graph, config, subscriber ) ?
     else { continue; };
     if ! config . skgrepo_is_owned (&subscriber_from_disk . home_skgrepo) {
@@ -77,14 +77,14 @@ pub fn resolve_visibility (
         . or_default() );
     let inferred_hides : Vec<ID> =
       subscribee_contains . iter()
-      . filter ( |skgid| ! visible_content . contains (*skgid) )
-      . filter ( |skgid| ! subscriber_contains . contains (*skgid) )
+      . filter ( |gnid| ! visible_content . contains (*gnid) )
+      . filter ( |gnid| ! subscriber_contains . contains (*gnid) )
       . cloned()
       . collect();
     let inferred_unhides : Vec<ID> =
       subscribee_contains . iter()
-      . filter ( |skgid| visible_content . contains (*skgid) )
-      . filter ( |skgid| subscriber_hides . contains (*skgid) )
+      . filter ( |gnid| visible_content . contains (*gnid) )
+      . filter ( |gnid| subscriber_hides . contains (*gnid) )
       . cloned() . collect();
     if inferred_hides . is_empty() && inferred_unhides . is_empty()
       { continue; }
@@ -115,19 +115,19 @@ fn apply_hiddenoutside_edits (
       return Err (Box::new (BufferValidationError::Other (
         format! ("More than one HiddenOutsideOfSubscribee edit was submitted for subscriber {}", subscriber) ))); }
     let Some (subscriber_from_disk) =
-      opt_graphnode_by_skgid (graph, config, subscriber) ?
+      opt_graphnode_by_gnid (graph, config, subscriber) ?
     else { continue; };
     if ! config . skgrepo_is_owned (&subscriber_from_disk . home_skgrepo) {
       continue; }
 
-    let key = |skgid : &ID| -> ID {
-      graph . pid_of (skgid) . unwrap_or_else (|| skgid . clone ()) };
-    let subscribee_skgids : Vec<ID> =
+    let key = |gnid : &ID| -> ID {
+      graph . pid_of (gnid) . unwrap_or_else (|| gnid . clone ()) };
+    let subscribee_gnids : Vec<ID> =
       lowered . subscriber_subscribes_after_save (&subscriber_from_disk);
     let mut inside : HashSet<ID> = HashSet::new ();
-    for subscribee_skgid in subscribee_skgids {
+    for subscribee_gnid in subscribee_gnids {
       let Some (subscribee) =
-        opt_graphnode_by_skgid (graph, config, &subscribee_skgid) ?
+        opt_graphnode_by_gnid (graph, config, &subscribee_gnid) ?
       else { continue; };
       for member in &subscribee . contains {
         if skgrepo_restriction . map_or (
@@ -146,7 +146,7 @@ fn apply_hiddenoutside_edits (
       .filter (|member_key| ! inside . contains (member_key))
       .collect ();
     let submitted : HashSet<ID> =
-      edit . members . iter () . map (|skgid| key (skgid)) . collect ();
+      edit . members . iter () . map (|gnid| key (gnid)) . collect ();
     let disk_hide_keys : HashSet<ID> =
       subscriber_from_disk . hidesFromSubs . or_default ()
       . iter () . map (|member| key (&member . member)) . collect ();
@@ -158,15 +158,15 @@ fn apply_hiddenoutside_edits (
     let current_hides : Vec<ID> =
       lowered . subscriber_hides_after_resolution (&subscriber_from_disk);
     let inferred_unhides : Vec<ID> = current_hides . iter ()
-      . filter (|skgid| {
-        let member_key : ID = key (skgid);
+      . filter (|gnid| {
+        let member_key : ID = key (gnid);
         replaceable_outside . contains (&member_key)
           && ! submitted . contains (&member_key) })
       . cloned () . collect ();
     let current_keys : HashSet<ID> =
-      current_hides . iter () . map (|skgid| key (skgid)) . collect ();
+      current_hides . iter () . map (|gnid| key (gnid)) . collect ();
     let inferred_hides : Vec<ID> = edit . members . iter ()
-      . filter (|skgid| ! current_keys . contains (&key (skgid)))
+      . filter (|gnid| ! current_keys . contains (&key (gnid)))
       . cloned () . collect ();
     if ! inferred_hides . is_empty () || ! inferred_unhides . is_empty () {
       lowered . apply_hiderel_delta_to_subscriber (
@@ -199,7 +199,7 @@ fn infer_hides_from_contains_removals (
     in lowered . nodeSaveIntents_with_specified_contains () {
     if ! config . skgrepo_is_owned (&skgrepo) { continue; }
     let Some (subscriber_from_disk) =
-      opt_graphnode_by_skgid (
+      opt_graphnode_by_gnid (
         graph, config, &subscriber_pid ) ?
     else { continue; };
     let subscriber_contains : Vec<ID> =
@@ -213,10 +213,10 @@ fn infer_hides_from_contains_removals (
         . flat_map ( |(_, signal)| signal . visible . iter () )
         . collect ();
       subscriber_contains . iter ()
-        . filter ( |skgid| ! new_contains_set . contains (skgid) )
-        . filter ( |skgid| ! signal_visible . contains (skgid) )
-        . filter ( |skgid| skgrepo_restriction . map_or (
-            true, |restriction| member_is_visible (graph, skgid, config, restriction) ))
+        . filter ( |gnid| ! new_contains_set . contains (gnid) )
+        . filter ( |gnid| ! signal_visible . contains (gnid) )
+        . filter ( |gnid| skgrepo_restriction . map_or (
+            true, |restriction| member_is_visible (graph, gnid, config, restriction) ))
         . cloned () . collect () };
     let inferred_unhides : Vec<ID> = {
       let disk_contains : HashSet<&ID> =
@@ -226,8 +226,8 @@ fn infer_hides_from_contains_removals (
           subscriber_from_disk . hidesFromSubs
           . or_default () );
       new_contains . iter ()
-        . filter ( |skgid| ! disk_contains . contains (skgid) )
-        . filter ( |skgid| disk_hides . contains (skgid) )
+        . filter ( |gnid| ! disk_contains . contains (gnid) )
+        . filter ( |gnid| disk_hides . contains (gnid) )
         . cloned () . collect () };
     let inferred_hides : Vec<ID> =
       if removed . is_empty () { Vec::new () }
@@ -243,13 +243,13 @@ fn infer_hides_from_contains_removals (
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =
-              opt_graphnode_by_skgid (
+              opt_graphnode_by_gnid (
                 graph, config, subscribee ) ?
             { content . extend (
                 members_of (& subscribee_from_disk . contains) ); }}
           content };
         removed . into_iter ()
-          . filter ( |skgid| subscribee_content . contains (skgid) )
+          . filter ( |gnid| subscribee_content . contains (gnid) )
           . collect () };
     if inferred_hides . is_empty () && inferred_unhides . is_empty ()
       { continue; }
@@ -272,24 +272,24 @@ fn validate_no_overlapping_subscribee_hiderel_conflicts (
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
   for (subscriber, signal) in visibility {
     let subscribee_from_disk : Graphnode =
-      match opt_graphnode_by_skgid (
+      match opt_graphnode_by_gnid (
         graph, config, &signal . subscribee ) ?
       { Some (subscribee_from_disk) => subscribee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =
       signal . visible . iter() . cloned() . collect();
-    for content_skgid in members_of (&subscribee_from_disk . contains) {
-      let content_skgid : ID = content_skgid;
+    for content_gnid in members_of (&subscribee_from_disk . contains) {
+      let content_gnid : ID = content_gnid;
       let key : (ID, ID) =
-        (subscriber . clone(), content_skgid . clone());
-      let visible : bool = visible_content . contains (&content_skgid);
+        (subscriber . clone(), content_gnid . clone());
+      let visible : bool = visible_content . contains (&content_gnid);
       match seen . get (&key) {
         Some (previous_visible) => {
           let previous_visible : &bool = previous_visible;
           if *previous_visible != visible {
             return Err (Box::new (BufferValidationError::Other (
               format!( "Conflicting subscribee visibility edits for subscriber {} and content {}",
-                        subscriber, content_skgid )) )); }},
+                        subscriber, content_gnid )) )); }},
         None => {}, }
       seen . insert (key, visible); }}
   Ok (( )) }

@@ -39,7 +39,7 @@ use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::node_lookup::graphnode_by_skgid;
+use skg::dbs::node_lookup::graphnode_by_gnid;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::viewnode::Viewnode;
@@ -87,12 +87,12 @@ impl Fails {
 // Small helpers
 //////////////////////////////////////////////////////////////
 
-fn saved_node_by_skgid<'a> (
-  instructions : &'a [NodeInstruction], skgid : &str,
+fn saved_node_by_gnid<'a> (
+  instructions : &'a [NodeInstruction], gnid : &str,
 ) -> Option<&'a Graphnode> {
   for instruction in instructions {
     if let NodeInstruction::Save (SaveNode (node)) = instruction {
-      if node . pid == ID::from (skgid) { return Some (node); }}}
+      if node . pid == ID::from (gnid) { return Some (node); }}}
   None }
 
 fn line_containing<'a> ( buf : &'a str, fragment : &str ) -> &'a str {
@@ -166,15 +166,15 @@ fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
 /// skgrepo -- the overriderFolder's members are foreign.
 fn intruder_with_child (
   member_line : &str,
-  intruder_skgid : &str,
+  intruder_gnid : &str,
 ) -> (String, String) {
   let stars : usize =
     member_line . chars () . take_while ( |c| *c == '*' ) . count ();
   let line : String = format! (
     "{} (skg node (gnid {}) (skgRepos (nodeRepo public))) {}",
-    "*" . repeat (stars), intruder_skgid, intruder_skgid );
+    "*" . repeat (stars), intruder_gnid, intruder_gnid );
   let child : String =
-    format! ( "{} {}-child", "*" . repeat (stars + 1), intruder_skgid );
+    format! ( "{} {}-child", "*" . repeat (stars + 1), intruder_gnid );
   ( line, child ) }
 
 //////////////////////////////////////////////////////////////
@@ -445,10 +445,10 @@ async fn member_carries_its_chain (
     . map ( |offset| folder_index + offset )
     else { fails . record (&scenario, format! ("no member {} in:\n{}", spec . member, buf));
            return Ok (( )); };
-  let chain_line = |offset : usize, skgid : &str| -> bool {
+  let chain_line = |offset : usize, gnid : &str| -> bool {
     lines . get (member_index + offset) . is_some_and ( |line|
       line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + offset)))
-      && line . contains (&format! ("(gnid {})", skgid))
+      && line . contains (&format! ("(gnid {})", gnid))
       && ! line . contains ("noClaim") && line . contains ("writeProtected") ) };
   if ! ( lines [member_index] . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1)))
          && chain_line (1, "chain-c") && chain_line (2, "chain-cc") ) {
@@ -578,9 +578,9 @@ async fn saveplan_nodes (
   Ok (plan . node_instructions) }
 
 /// A fresh write-protected public member line at the given indentation.
-fn member_line ( stars : usize, skgid : &str ) -> String {
+fn member_line ( stars : usize, gnid : &str ) -> String {
   format! ( "{} (skg node (gnid {}) (skgRepos (nodeRepo public)) writeProtected) {}",
-            "*" . repeat (stars), skgid, skgid ) }
+            "*" . repeat (stars), gnid, gnid ) }
 
 fn folder_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
   line_containing (buf, any_member_fragment)
@@ -598,7 +598,7 @@ async fn editable_subscribeeFolder (
       swap_lines (&buf, "(gnid wSub-a)", "(gnid wSub-c)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, None) . await ?;
-    match saved_node_by_skgid (&nodes, "wSub-owner") {
+    match saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
         fails . record (s, format! (
@@ -611,7 +611,7 @@ async fn editable_subscribeeFolder (
     let edited : String = buf . replace (&format! ("{}\n", b_line), "");
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
-    match saved_node_by_skgid (&nodes, "wSub-owner") {
+    match saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
         fails . record (s, format! (
@@ -625,7 +625,7 @@ async fn editable_subscribeeFolder (
       &c_line, &format! ("{}\n{}", c_line, member_line (stars, "wSub-d")) );
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
-    match saved_node_by_skgid (&nodes, "wSub-owner") {
+    match saved_node_by_gnid (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribesTo) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
           ID::from ("wSub-c"), ID::from ("wSub-d")]) {
@@ -636,7 +636,7 @@ async fn editable_subscribeeFolder (
 
 fn override_set ( n : &Graphnode ) -> Vec<ID> {
   match &n . overrides {
-    MSV::Specified (skgids) => { let mut v = members_of (skgids); v . sort (); v }
+    MSV::Specified (gnids) => { let mut v = members_of (gnids); v . sort (); v }
     MSV::Unspecified => Vec::new (), } }
 
 async fn editable_overriddenFolder (
@@ -654,7 +654,7 @@ async fn editable_overriddenFolder (
       swap_lines (&buf, "(gnid wOvr-a)", "(gnid wOvr-b)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, None) . await ?;
-    match saved_node_by_skgid (&nodes, "wOvr-owner") {
+    match saved_node_by_gnid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b")] {
         fails . record (s, format! (
@@ -667,7 +667,7 @@ async fn editable_overriddenFolder (
     let edited : String = buf . replace (&format! ("{}\n", a_line), "");
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
-    match saved_node_by_skgid (&nodes, "wOvr-owner") {
+    match saved_node_by_gnid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![ID::from ("wOvr-b")] {
         fails . record (s, format! (
           "after delete, override set wrong: {:?}", n . overrides)); },
@@ -680,7 +680,7 @@ async fn editable_overriddenFolder (
       &b_line, &format! ("{}\n{}", b_line, member_line (stars, "wOvr-c")) );
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
-    match saved_node_by_skgid (&nodes, "wOvr-owner") {
+    match saved_node_by_gnid (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b"), ID::from ("wOvr-c")] {
         fails . record (s, format! (
@@ -709,9 +709,9 @@ async fn hiddenFolder_delete_does_not_unhide (
     saveplan_nodes (&edited, config, None) . await ?;
   // Either the recorder is a no-op (absent from the plan), or its SaveNode
   // still hides roHidden-a; in no case is roHidden-a unhidden.
-  if let Some (n) = saved_node_by_skgid (&nodes, "roHidden-owner") {
+  if let Some (n) = saved_node_by_gnid (&nodes, "roHidden-owner") {
     let hides : Vec<ID> = match &n . hidesFromSubs {
-      MSV::Specified (skgids) => members_of (skgids),
+      MSV::Specified (gnids) => members_of (gnids),
       MSV::Unspecified => Vec::new (), };
     if ! hides . is_empty () && ! hides . contains (&ID::from ("roHidden-a")) {
       fails . record (s, format! (
@@ -756,9 +756,9 @@ async fn omission_scenarios (
       buf . replace (&format! ("{}\n", unrestricted_line), "");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, Some (&restriction)) . await ?;
-    match saved_node_by_skgid (&nodes, "omWsub-owner") {
+    match saved_node_by_gnid (&nodes, "omWsub-owner") {
       Some (n) => { let subs : Vec<ID> = match &n . subscribesTo {
-          MSV::Specified (skgids) => members_of (skgids),
+          MSV::Specified (gnids) => members_of (gnids),
           MSV::Unspecified => Vec::new (), };
         if ! subs . contains (&ID::from ("omWsub-inactive")) {
           fails . record (s, format! (
@@ -819,12 +819,12 @@ fn buffer_save_rejects_second_owned_overrider
       // Disk unchanged: the override-invariant check runs before the
       // filesystem write, so mono-r2 still overrides nothing.
       let r2 : Graphnode =
-        graphnode_by_skgid (
+        graphnode_by_gnid (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
       let overrides_empty : bool = match &r2 . overrides {
         MSV::Unspecified       => true,
-        MSV::Specified (skgids)   => skgids . is_empty (), };
+        MSV::Specified (gnids)   => gnids . is_empty (), };
       assert! ( overrides_empty,
         "a rejected save must not write mono-r2's override relationship: {:?}",
         r2 . overrides );

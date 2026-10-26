@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 /// Identifies a buffer in the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ViewforestId {
-  ContentView  (String), // the root skgid
+  ContentView  (String), // the root gnid
   SearchView   (String), // query
 }
 
@@ -28,7 +28,7 @@ pub struct OpenViews {
   // TODO ? OPTIMIZE:
   // The reverse lookup (PID -> views) is computed by scanning `views` via views_containing(). This is O(views) per call, fine for < 10 views. If the number of views grows large, consider a bijective map (HashMap<ID, HashSet<ViewforestId>> maintained alongside this one) for O(1) reverse lookups.
 
-  root_skgids        : ManyToMany<ID, ViewforestId>, // Maps every root ID (primary + extra) ↔ ViewforestId. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
+  root_gnids        : ManyToMany<ID, ViewforestId>, // Maps every root ID (primary + extra) ↔ ViewforestId. Supports many-to-many because a view can have multiple roots, and an ID could be a root in multiple views. Maintained by register_view / update_view / unregister_view.
 }
 
 /// Invariant: all viewforest mutations must go through register_view /
@@ -110,11 +110,11 @@ impl OpenViews {
   pub fn new () -> Self {
     OpenViews {
       views       : HashMap::new (),
-      root_skgids : ManyToMany::new () }}
+      root_gnids : ManyToMany::new () }}
 
   pub fn clear (&mut self) {
     self . views       . clear ();
-    self . root_skgids    = ManyToMany::new (); }
+    self . root_gnids    = ManyToMany::new (); }
 
   pub fn viewforest_id_to_pids (
     &self,
@@ -134,11 +134,11 @@ impl OpenViews {
   /// Returns the first (if any exists) content buffer (not a search
   /// view) for which the ID is a root
   /// (level-1 headline).
-  pub fn content_viewforest_id_for_root_skgid (
+  pub fn content_viewforest_id_for_root_gnid (
     &self,
-    skgid : &ID,
+    gnid : &ID,
   ) -> Option<&ViewforestId> {
-    self . root_skgids . get_right (skgid)
+    self . root_gnids . get_right (gnid)
       . and_then ( |viewforest_ids| viewforest_ids . iter ()
                    . find ( |u| matches! (
                        u, ViewforestId::ContentView (_) ))) }
@@ -152,9 +152,9 @@ impl OpenViews {
   ) { let viewforest : ViewForest =
         viewforest . into ();
       let rids : HashSet<ID> =
-        root_skgids_from_viewforest ( graph, &viewforest );
+        root_gnids_from_viewforest ( graph, &viewforest );
       for rid in &rids {
-        self . root_skgids . insert (
+        self . root_gnids . insert (
           rid . clone (), viewforest_id . clone () ); }
       let pids : HashSet<ID> =
         pids . iter () . cloned () . collect ();
@@ -213,11 +213,11 @@ impl OpenViews {
         new_viewforest . into ();
       let pids : HashSet<ID> =
         pids_from_viewforest ( &new_viewforest );
-      self . root_skgids . remove_right (viewforest_id);
+      self . root_gnids . remove_right (viewforest_id);
       let rids : HashSet<ID> =
-        root_skgids_from_viewforest ( graph, &new_viewforest );
+        root_gnids_from_viewforest ( graph, &new_viewforest );
       for rid in &rids {
-        self . root_skgids . insert (
+        self . root_gnids . insert (
           rid . clone (), viewforest_id . clone () ); }
       if let Some (vs)
         = self . views . get_mut (viewforest_id)
@@ -233,7 +233,7 @@ impl OpenViews {
   pub fn unregister_view (
     &mut self,
     viewforest_id : &ViewforestId,
-  ) { self . root_skgids . remove_right (viewforest_id);
+  ) { self . root_gnids . remove_right (viewforest_id);
       self . views . remove (viewforest_id); }
 
   pub fn views_containing (
@@ -351,7 +351,7 @@ pub fn pids_from_viewforest (
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        Some ( t . skgid . clone () ),
+        Some ( t . gnid . clone () ),
       _ => None } )
     . collect () }
 
@@ -361,17 +361,17 @@ pub fn pids_from_viewforest (
 /// this does not return those.)
 ///
 /// Extra IDs are pulled from the operation's captured in-Rust graph.
-fn root_skgids_from_viewforest (
+fn root_gnids_from_viewforest (
   graph      : &InRustGraph,
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
-  let mut skgids : HashSet<ID> = HashSet::new ();
+  let mut gnids : HashSet<ID> = HashSet::new ();
   for child in viewforest . roots () {
-    if let Some (root_skgid) = child . value () . unrestricted_skgid () {
-      skgids . insert ( root_skgid . clone () );
-      if let Some (pid) = graph . pid_of ( root_skgid ) {
+    if let Some (root_gnid) = child . value () . unrestricted_gnid () {
+      gnids . insert ( root_gnid . clone () );
+      if let Some (pid) = graph . pid_of ( root_gnid ) {
           if let Some (node) = graph . nodes . get (&pid) {
-            skgids . insert ( pid . clone () );
+            gnids . insert ( pid . clone () );
             for extra_id in &node . extra_ids {
-              skgids . insert ( extra_id . clone () ); }}}}}
-  skgids }
+              gnids . insert ( extra_id . clone () ); }}}}}
+  gnids }

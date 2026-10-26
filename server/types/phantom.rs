@@ -19,10 +19,10 @@ use super::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 /// answer; a home whose section carries no title is a violation the
 /// composition reports, not a reason to keep looking.
 pub fn home_from_disk (
-  skgid     : &ID,
+  gnid     : &ID,
   config : &SkgConfig,
 ) -> Option<SkgrepoName> {
-  let filename : String = format!( "{}.skg", skgid . 0 );
+  let filename : String = format!( "{}.skg", gnid . 0 );
   let ordered_skgrepos : Vec<SkgrepoName> = config . ordered_skgrepos ();
   for owned_only in [true, false] {
     for skgrepo_name in &ordered_skgrepos {

@@ -43,7 +43,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
   let mut viewforest : Tree<Viewnode> =
     Tree::new ( viewforest_root_viewnode () );
-  let a_skgid = {
+  let a_gnid = {
     let vn : Viewnode = mk_editable_viewnode (
       ID::from ("a"),
       SkgrepoName::from ("pub"),
@@ -55,7 +55,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
       SkgrepoName::from ("pub"),
       "node B" . to_string (),
       false );
-    viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
+    viewforest . get_mut (a_gnid) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
     &InRustGraph::new (),
@@ -66,7 +66,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
   // B has same skgrepo as A, so homeRepoAtBoundary should be false,
   // even though B is a non-member.
   let b_ref =
-    viewforest . get (a_skgid) . unwrap ()
+    viewforest . get (a_gnid) . unwrap ()
     . first_child () . unwrap ();
   let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind
@@ -85,7 +85,7 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
   let mut viewforest : Tree<Viewnode> =
     Tree::new ( viewforest_root_viewnode () );
-  let a_skgid = {
+  let a_gnid = {
     let vn : Viewnode = mk_editable_viewnode (
       ID::from ("a"),
       SkgrepoName::from ("pub"),
@@ -97,7 +97,7 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
       SkgrepoName::from ("priv"),
       "node B" . to_string (),
       false );
-    viewforest . get_mut (a_skgid) . unwrap () . append (vn); }
+    viewforest . get_mut (a_gnid) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
     &InRustGraph::new (),
@@ -106,7 +106,7 @@ fn skgrepo_inheritance_across_non_content_different_skgrepo () {
     &config,
     None );
   let b_ref =
-    viewforest . get (a_skgid) . unwrap ()
+    viewforest . get (a_gnid) . unwrap ()
     . first_child () . unwrap ();
   let ViewnodeKind::Vognode ( Vognode::Unrestricted (t) )
     = & b_ref . value () . kind

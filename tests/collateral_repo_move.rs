@@ -54,12 +54,12 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
   let (_save_response, collateral_buffer)
     : (SaveResponse, String) =
     block_on ( async {
-      let root_skgids : Vec<ID> =
+      let root_gnids : Vec<ID> =
         vec![ ID::new ("a") ];
       let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
-          &config, None, &root_skgids )?;
+          &config, None, &root_gnids )?;
       assert! (
         buffer_has_skgrepo_for_title (
           &initial_buffer, "b", "public" ),

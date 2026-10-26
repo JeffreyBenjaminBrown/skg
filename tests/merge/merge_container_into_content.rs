@@ -105,10 +105,10 @@ async fn merge_container_into_content_impl (
   // A text preserver should exist.
   // Its PID is a new UUID; find it: in aa's contains
   // but not x, b, c, or aa.
-  let known_skgids : Vec<&str> = vec!["x", "b", "c", "aa"];
+  let known_gnids : Vec<&str> = vec!["x", "b", "c", "aa"];
   let preserver_candidates : Vec<&ID> =
     aa_graphnode . contains . iter()
-    . filter ( |m| !known_skgids . contains (& m . member . 0 . as_str()) )
+    . filter ( |m| !known_gnids . contains (& m . member . 0 . as_str()) )
     . map ( |m| & m . member )
     . collect();
   if preserver_candidates . len() != 1 {

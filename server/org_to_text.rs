@@ -452,7 +452,7 @@ fn unrestrictedVognode_metadata_to_string (
         return Some ( relationshipEditRequest_element (request) ); }
       unrestrictedVognode . edit_request () . map ( | edit_req | {
         match edit_req {
-          NodeEditRequest::NodeMerge (skgid) => format! ( "(merge {})", skgid . 0 ),
+          NodeEditRequest::NodeMerge (gnid) => format! ( "(merge {})", gnid . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
           NodeEditRequest::SetFlag { flag, value } =>
             format! ( "(flag {} {})",
@@ -472,7 +472,7 @@ fn unrestrictedVognode_metadata_to_string (
                        request_strings . join (" ") )) }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    parts . push ( format! ( "(gnid {})", unrestrictedVognode . skgid . 0 ));
+    parts . push ( format! ( "(gnid {})", unrestrictedVognode . gnid . 0 ));
     parts . extend ( skgRepos_form (
       Some (&unrestrictedVognode . home_skgrepo),
       unrestrictedVognode . viewStats . relRepo . as_ref () ));
@@ -511,7 +511,7 @@ fn ghost_metadata_to_string (
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . extend (
     [ "ghost" . to_string (),
-      format! ("(gnid {})", ghost . skgid . 0) ]
+      format! ("(gnid {})", ghost . gnid . 0) ]
     . into_iter ()
     . chain ( skgRepos_form ( Some (&ghost . home_skgrepo), None ))
     . chain ( noClaim_atom (ghost . claimsMembership, claims_are_read) )
@@ -540,7 +540,7 @@ fn phantomUnknown_metadata_to_string (
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . push ( "unknown" . to_string () );
-  parts . push ( format! ("(gnid {})", unknown_node . skgid . 0) );
+  parts . push ( format! ("(gnid {})", unknown_node . gnid . 0) );
   parts . extend ( skgRepos_form ( None, unknown_node . relRepo . as_ref () ));
   parts . extend ( noClaim_atom (unknown_node . claimsMembership, claims_are_read) );
   parts . extend ( editRequest_form (

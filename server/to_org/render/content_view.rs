@@ -27,23 +27,23 @@ use std::error::Error;
 pub fn single_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
-  root_skgid        : &ID,
+  root_gnid        : &ID,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view (
     config,
     tantivy_index,
-    & [ root_skgid . clone () ] ) }
+    & [ root_gnid . clone () ] ) }
 
 /// See file header comment.
 pub fn multi_root_view (
   config            : &SkgConfig,
   tantivy_index     : Option<&TantivyIndex>,
-  root_skgids       : &[ID],
+  root_gnids       : &[ID],
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view_inner (
-    config, tantivy_index, root_skgids, None )
+    config, tantivy_index, root_gnids, None )
 }
 
 /// The parts-based de-novo entry -- a thin shim that assembles a
@@ -54,7 +54,7 @@ pub fn multi_root_view (
 fn multi_root_view_inner (
   config             : &SkgConfig,
   tantivy_index      : Option<&TantivyIndex>,
-  root_skgids        : &[ID],
+  root_gnids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
@@ -73,28 +73,28 @@ fn multi_root_view_inner (
     Arc::new (InRustGraph::from_graphnodes (&nodes)),
     tantivy_owned);
   multi_root_view_via_env (
-    &env, root_skgids, skgrepo_restriction ) }
+    &env, root_gnids, skgrepo_restriction ) }
 
 /// The de-novo view (render_initial_view). Takes a SkgEnv (carries
 /// config/driver/tantivy/graph) and refreshes a stub forest of the
 /// requested roots.
 pub fn multi_root_view_via_env (
   env                : &SkgEnv,
-  root_skgids        : &[ID],
+  root_gnids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
-    &runtime, root_skgids, skgrepo_restriction ) }
+    &runtime, root_gnids, skgrepo_restriction ) }
 
 pub(crate) fn multi_root_view_via_runtime (
   runtime            : &crate::types::env::RuntimeGeneration,
-  root_skgids        : &[ID],
+  root_gnids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
   let (viewforest, buffer_content) : (ViewForest, String) =
-    render_initial_view ( runtime, root_skgids, skgrepo_restriction ) ?;
+    render_initial_view ( runtime, root_gnids, skgrepo_restriction ) ?;
   // The pids the caller registers for this view -- the {Unrestricted, Restricted}
   // set, via the one shared skgrepo of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.
@@ -106,12 +106,12 @@ pub(crate) fn multi_root_view_via_runtime (
 pub fn multi_root_view_with_skgrepo_set (
   config             : &SkgConfig,
   tantivy_index      : Option<&TantivyIndex>,
-  root_skgids        : &[ID],
+  root_gnids        : &[ID],
   skgrepo_restriction : &SkgrepoRestriction,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   // multi_root_view_inner applies the skgrepo set during rendering (inside
   // multi_root_view_via_env), so this wrapper just forwards it.
   multi_root_view_inner (
-    config, tantivy_index, root_skgids,
+    config, tantivy_index, root_gnids,
     Some (skgrepo_restriction) ) }

@@ -2,8 +2,8 @@
 
 use std::error::Error;
 
-use skg::dbs::filesystem::one_node::optgraphnode_from_skgid;
-use skg::from_text::supplement_from_disk::{ canonicalize_skgids_from_disk, detect_skgrepo_move, supplement_unspecified_fields_from_disk, };
+use skg::dbs::filesystem::one_node::optgraphnode_from_gnid;
+use skg::from_text::supplement_from_disk::{ canonicalize_gnids_from_disk, detect_skgrepo_move, supplement_unspecified_fields_from_disk, };
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_msv, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -40,10 +40,10 @@ async fn supplement_from_disk_then_extract_graphnode (
 ) -> Result<Graphnode, Box<dyn Error>> {
   let pid : ID = user_node . pid . clone();
   let disk_node : Graphnode =
-    optgraphnode_from_skgid (config, &pid) ?
+    optgraphnode_from_gnid (config, &pid) ?
       . ok_or ("Expected node on disk") ?;
   let canonicalized : Graphnode =
-    canonicalize_skgids_from_disk (user_node, &disk_node) ?;
+    canonicalize_gnids_from_disk (user_node, &disk_node) ?;
   let _skgrepo_move : Option<SkgrepoMove> =
     detect_skgrepo_move (
       config,

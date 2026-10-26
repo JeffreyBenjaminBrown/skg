@@ -16,7 +16,7 @@ use crate::types::tree::viewnode_graphnode::{
   generation_exists_and_includes,
   generation_does_not_exist,
   siblings_cannot_include,
-  skgid_from_self_or_nearest_ancestor,
+  gnid_from_self_or_nearest_ancestor,
 };
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashSet;
@@ -27,7 +27,7 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalStructureError {
   pub message  : String,
-  pub skgid    : ID,
+  pub gnid    : ID,
   pub headline : HeadlineName,
 }
 
@@ -39,7 +39,7 @@ pub fn validate_local_structure (
   let Some (node_ref) = tree . get (treeid)
     else { return Err(LocalStructureError {
       message: "node not found" . to_string(),
-      skgid: ID::from ("<unknown>"),
+      gnid: ID::from ("<unknown>"),
       headline: HeadlineName::of ( None, None, "" ),
     }); };
 
@@ -98,12 +98,12 @@ pub fn validate_local_structure (
   if errors . is_empty() {
     Ok (( ))
   } else {
-    let skgid : ID =
-      skgid_from_self_or_nearest_ancestor(tree, treeid)
+    let gnid : ID =
+      gnid_from_self_or_nearest_ancestor(tree, treeid)
       . unwrap_or_else(|_| ID::from ("<no ancestor ID>"));
     Err(LocalStructureError {
       message: errors . join ("; "),
-      skgid,
+      gnid,
       headline: node_ref . value () . headline_name (),
     } ) }}
 
@@ -240,7 +240,7 @@ fn validate_hiddenInSubscribee_folder (
                       Folder::HiddenInSubscribee )))
     { errors . push("HiddenInSubscribeeFolder must be unique among its siblings."
                     . to_string()); }
-  if !partnerFolder_children_have_distinct_skgids(tree, treeid)
+  if !partnerFolder_children_have_distinct_gnids(tree, treeid)
     { errors . push(
       "HiddenInSubscribeeFolder must not have duplicate UnrestrictedVognode children."
         . to_string() ); }
@@ -284,7 +284,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     { errors . push(
         "HiddenOutsideOfSubscribeeFolder must be unique among its siblings."
         . to_string()); }
-  if !partnerFolder_children_have_distinct_skgids(tree, treeid)
+  if !partnerFolder_children_have_distinct_gnids(tree, treeid)
     { errors . push(
         "HiddenOutsideOfSubscribeeFolder must not have duplicate UnrestrictedVognode children."
         . to_string() ); }
@@ -373,7 +373,7 @@ fn validate_relation_folder (
     // OverriddenFolder is a defining folder: duplicate members are silently
     // deduplicated at emission rather than bouncing the save. The
     // write-protected roles keep the check.
-    && !partnerFolder_children_have_distinct_skgids(tree, treeid) {
+    && !partnerFolder_children_have_distinct_gnids(tree, treeid) {
     errors . push(format!(
       "{} must not have duplicate UnrestrictedVognode children.", label)); }
   errors }
@@ -391,7 +391,7 @@ fn validate_ghost (
       tree . get (treeid) . is_some_and ( |n| matches! (
         &n . value () . kind,
         ViewnodeKind::Vognode (Vognode::Ghost (ghost))
-          if ! ghost . skgid . 0 . is_empty () )),
+          if ! ghost . gnid . 0 . is_empty () )),
       "Ghost" );
   if !generation_includes_only(
     tree, treeid, 1, false,
@@ -601,7 +601,7 @@ fn validate_vognode_identity_and_structure (
     tree, treeid, 1, true,
     |node| !cannot_be_child_of_vognode (node, is_subscribee_as_such))
     { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeFolder (outside a subscribee-as-such), or HiddenOutsideOfSubscribeeFolder.", label) ); }
-  if !nonignored_children_have_distinct_skgids(tree, treeid) {
+  if !nonignored_children_have_distinct_gnids(tree, treeid) {
     errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
   errors }
 
@@ -684,7 +684,7 @@ fn has_empty_title ( t : &UnrestrictedVognode ) -> bool {
 /// "Non-ignored" means one that claims membership.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
-pub fn nonignored_children_have_distinct_skgids (
+pub fn nonignored_children_have_distinct_gnids (
   tree    : &Tree<Viewnode>,
   treeid  : NodeId,
 ) -> bool {
@@ -695,7 +695,7 @@ pub fn nonignored_children_have_distinct_skgids (
     return true; }
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
-    let content_skgid : Option<ID> =
+    let content_gnid : Option<ID> =
       // collected IDs, not own IDs: distinctness guards the
       // collected contains list, and a shown overrider can
       // legitimately appear twice when it stands for two distinct
@@ -703,23 +703,23 @@ pub fn nonignored_children_have_distinct_skgids (
       match &child . value() . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . claimsMembership
-          => Some (t . collected_skgid ()),
+          => Some (t . collected_gnid ()),
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
-          Some (u . skgid . clone()),
+          Some (u . gnid . clone()),
         // A tombstone is not a content member (where it stands for a
         // hidden node, disk supplementation owns that membership), so
         // it does not participate in content-id distinctness.
         _ => None };
-    if let Some (skgid) = content_skgid {
-      if !seen . insert(skgid) {
+    if let Some (gnid) = content_gnid {
+      if !seen . insert(gnid) {
         return false; }}}
   true }
 
 /// Whether a folder's members have distinct IDs. As for a content
-/// list ('nonignored_children_have_distinct_skgids'), only members
+/// list ('nonignored_children_have_distinct_gnids'), only members
 /// count, so that a non-member copy of a member may stand beside it,
 /// and only where the folder's claims are read.
-fn partnerFolder_children_have_distinct_skgids (
+fn partnerFolder_children_have_distinct_gnids (
   tree    : &Tree<Viewnode>,
   treeid  : NodeId,
 ) -> bool {
@@ -730,16 +730,16 @@ fn partnerFolder_children_have_distinct_skgids (
     return true; }
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
-    let Some (skgid) =
+    let Some (gnid) =
       (match &child . value() . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . claimsMembership =>
-          Some (t . skgid . clone()),
+          Some (t . gnid . clone()),
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
-          Some (u . skgid . clone()),
+          Some (u . gnid . clone()),
         _ => None,
       })
     else { continue; };
-    if !seen . insert (skgid) {
+    if !seen . insert (gnid) {
       return false; }}
   true }

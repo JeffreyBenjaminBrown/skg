@@ -133,7 +133,7 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
-          skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
+          gnid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
           title : "D" . into (), body : None,
           restoreNode_request : false, tombstone_request : false,
           claimsMembership : true, isWarranted : Warrant::ByGraph, } ))),
@@ -143,7 +143,7 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
-          skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None,
+          gnid : ID::from ("u"), relRepo : None, relationshipEditRequest : None,
           claimsMembership : true, } ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
@@ -179,7 +179,7 @@ fn property_leaves_round_trip_their_readiness_requests () {
 fn a_ghost_warranted_property_member_claims_nothing () {
   let lost_id : Viewnode = with_facts (
     viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
-      skgid : ID::from ("x"),
+      gnid : ID::from ("x"),
       claimsMembership : false,
       isWarranted : skg::types::viewnode::Warrant::ByHead } )),
     facts ( None, Some (Existence::Removed), None ),

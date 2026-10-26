@@ -140,16 +140,16 @@ fn identity_overlay_rejects_untouched_primary_and_extra_carriers () {
     . expect_err ("both untouched claims must be protected");
   assert! (error . complete_graph_errors . iter () . any (|error| matches! (
     error,
-    CompleteGraphError::PrimaryExtraCollision { skgid, .. }
-      if skgid == &ID::from ("primary-carrier"))));
+    CompleteGraphError::PrimaryExtraCollision { gnid, .. }
+      if gnid == &ID::from ("primary-carrier"))));
   assert! (error . complete_graph_errors . iter () . any (|error| matches! (
     error,
-    CompleteGraphError::DuplicateExtraId { skgid, .. }
-      if skgid == &ID::from ("owned-extra"))));
+    CompleteGraphError::DuplicateExtraId { gnid, .. }
+      if gnid == &ID::from ("owned-extra"))));
 }
 
 #[test]
-fn identity_overlay_rejects_two_saves_claiming_one_new_skgid () {
+fn identity_overlay_rejects_two_saves_claiming_one_new_gnid () {
   let mut first : Graphnode = node ("first");
   first . extra_ids = vec![ID::from ("shared")];
   let mut second : Graphnode = node ("second");
@@ -161,8 +161,8 @@ fn identity_overlay_rejects_two_saves_claiming_one_new_skgid () {
     ]) . expect_err ("two final carriers must conflict");
   assert! (matches! (
     error . complete_graph_errors . first (),
-    Some (CompleteGraphError::DuplicateExtraId { skgid, carriers })
-      if skgid == &ID::from ("shared") && carriers == &vec![
+    Some (CompleteGraphError::DuplicateExtraId { gnid, carriers })
+      if gnid == &ID::from ("shared") && carriers == &vec![
         ID::from ("first"), ID::from ("second")]
   ));
 }
@@ -178,7 +178,7 @@ fn simultaneous_overlay_accepts_merge_style_primary_transfer () {
     &config (), base, vec![
       NodeInstruction::Save (SaveNode (acquirer)),
       NodeInstruction::Delete (DeleteNode {
-        skgid           : ID::from ("N2"),
+        gnid           : ID::from ("N2"),
         home_skgrepo : SkgrepoName::from ("main"),
       }),
     ]) . unwrap ();
@@ -186,7 +186,7 @@ fn simultaneous_overlay_accepts_merge_style_primary_transfer () {
     prepared . candidate () . pid_of (&ID::from ("N2")),
     Some (ID::from ("N1")));
   assert! (prepared . changes . canonicalization_changes . iter () . any (
-    |change| change . skgid == ID::from ("N2")
+    |change| change . gnid == ID::from ("N2")
       && change . old_carrier == Some (ID::from ("N2"))
       && change . new_carrier == Some (ID::from ("N1"))));
 }
@@ -201,7 +201,7 @@ fn repeated_definitions_use_the_last_graph_state () {
     &config (), Arc::new (InRustGraph::new ()), vec![
       NodeInstruction::Save (SaveNode (first)),
       NodeInstruction::Delete (DeleteNode {
-        skgid           : ID::from ("P"),
+        gnid           : ID::from ("P"),
         home_skgrepo : SkgrepoName::from ("main"),
       }),
       NodeInstruction::Save (SaveNode (last)),
@@ -218,7 +218,7 @@ fn repeated_save_then_delete_leaves_no_graph_node () {
     &config (), Arc::new (InRustGraph::new ()), vec![
       NodeInstruction::Save (SaveNode (node ("P"))),
       NodeInstruction::Delete (DeleteNode {
-        skgid           : ID::from ("P"),
+        gnid           : ID::from ("P"),
         home_skgrepo : SkgrepoName::from ("main"),
       }),
     ]) . unwrap ();
@@ -234,7 +234,7 @@ fn repeated_delete_then_save_leaves_the_saved_graph_node () {
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config (), base, vec![
       NodeInstruction::Delete (DeleteNode {
-        skgid           : ID::from ("P"),
+        gnid           : ID::from ("P"),
         home_skgrepo : SkgrepoName::from ("main"),
       }),
       NodeInstruction::Save (SaveNode (saved)),
@@ -257,7 +257,7 @@ fn arbitrary_extra_id_revocation_is_actionably_rejected () {
     . expect_err ("managed Save must not revoke aliases");
   assert_eq! (error . extra_id_revocations . len (), 1);
   assert_eq! (
-    error . extra_id_revocations [0] . dropped_skgids,
+    error . extra_id_revocations [0] . dropped_gnids,
     vec![ID::from ("E1"), ID::from ("E2")]);
   let message : String = error . to_string ();
   for expected in ["P", "A titled node", "E1", "E2", "another dataset"] {
@@ -396,7 +396,7 @@ fn merge_override_collision_names_participants_and_both_repairs () {
     &config (), base, vec![
       NodeInstruction::Save (SaveNode (n1)),
       NodeInstruction::Delete (DeleteNode {
-        skgid : ID::from ("N2"), home_skgrepo: skgrepo,
+        gnid : ID::from ("N2"), home_skgrepo: skgrepo,
       }),
     ]) . expect_err ("merge redirection must violate monogamy");
   assert_eq! (error . merge_override_collisions . len (), 1);

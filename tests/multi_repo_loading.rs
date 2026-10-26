@@ -6,7 +6,7 @@ use std::io::{Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use skg::dbs::filesystem::multiple_nodes::error_unless_each_skgid_names_one_node;
+use skg::dbs::filesystem::multiple_nodes::error_unless_each_gnid_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::filesystem::one_node::write_graphnode_to_skgrepo;
 use skg::test_utils::set_skgrepo_retagging_relRepos;
@@ -183,7 +183,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   assert_eq!( nodes[0] . title, "Node in Main",
     "the home (most public titled section) wins the title" );
   assert_eq!( nodes[0] . home_skgrepo, SkgrepoName::from ("main") );
-  error_unless_each_skgid_names_one_node (
+  error_unless_each_gnid_names_one_node (
     &nodes, &config . data_root)
     . expect ("a telescope is not an id conflict");
 
@@ -200,7 +200,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
     node_b . extra_ids = vec! [ ID::new ("contested") ];
     set_skgrepo_retagging_relRepos ( &mut node_b, &SkgrepoName::from ("shared") );
     let result : IoResult<()> =
-      error_unless_each_skgid_names_one_node (
+      error_unless_each_gnid_names_one_node (
         & [ node_a, node_b ], &config . data_root);
     assert!(result . is_err(), "Should fail: two pids claim one id");
     let err : IoError = result . unwrap_err();
@@ -258,7 +258,7 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (&config) . unwrap();
   let result : IoResult<()> =
-    error_unless_each_skgid_names_one_node (
+    error_unless_each_gnid_names_one_node (
       &nodes, &config . data_root);
   assert!(result . is_err(), "Should fail due to overlapping ID");
 
@@ -356,7 +356,7 @@ fn test_skgrepo_field_set_correctly() {
 }
 
 #[test]
-fn test_many_skgid_conflicts_create_org_file() {
+fn test_many_gnid_conflicts_create_org_file() {
   // Test that >10 duplicates triggers org file creation
   let temp_dir : TempDir = tempdir() . unwrap();
 
@@ -391,13 +391,13 @@ fn test_many_skgid_conflicts_create_org_file() {
   // suffice; the check takes the folded node list.
   let mut nodes : Vec<Graphnode> = Vec::new ();
   for i in 1..=15 {
-    let skgid : String = format!("dup_id_{}", i);
+    let gnid : String = format!("dup_id_{}", i);
     let mut node_a : Graphnode = empty_graphnode();
     let mut node_b : Graphnode = empty_graphnode();
     node_a . pid = ID::new (&format!("pid_a_{}", i));
     node_b . pid = ID::new (&format!("pid_b_{}", i));
-    node_a . extra_ids = vec![ID::new (&skgid)];
-    node_b . extra_ids = vec![ID::new (&skgid)];
+    node_a . extra_ids = vec![ID::new (&gnid)];
+    node_b . extra_ids = vec![ID::new (&gnid)];
     node_a . title = format!("Node A {}", i);
     node_b . title = format!("Node B {}", i);
     set_skgrepo_retagging_relRepos ( &mut node_a, &SkgrepoName::from ("repo_a") );
@@ -406,7 +406,7 @@ fn test_many_skgid_conflicts_create_org_file() {
     nodes . push (node_b); }
 
   let result : IoResult<()> =
-    error_unless_each_skgid_names_one_node (
+    error_unless_each_gnid_names_one_node (
       &nodes, &config . data_root);
   assert!(result . is_err(), "Should fail: 15 ids claimed by two nodes each");
 
@@ -432,13 +432,13 @@ fn test_many_skgid_conflicts_create_org_file() {
 
   // IDs are sorted alphabetically (lexicographic), not numerically
   // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...
-  let mut skgids : Vec<String> =
+  let mut gnids : Vec<String> =
     (1..=15) . map(|i| format!("dup_id_{}", i)) . collect();
-  skgids . sort();
+  gnids . sort();
 
-  for skgid in skgids {
-    let n : &str = skgid . rsplit ('_') . next () . unwrap ();
-    expected . push_str(&format!("* {}\n", skgid));
+  for gnid in gnids {
+    let n : &str = gnid . rsplit ('_') . next () . unwrap ();
+    expected . push_str(&format!("* {}\n", gnid));
     expected . push_str(&format!("** pid_a_{} (repo_a)\n", n));
     expected . push_str(&format!("** pid_b_{} (repo_b)\n", n));
   }

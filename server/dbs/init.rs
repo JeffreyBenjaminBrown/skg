@@ -2,7 +2,7 @@
 
 use crate::prominence::{MapToContent, MapToContainers};
 use crate::prominence::{content_maps_from_nodes, had_id_set_from_nodes};
-use crate::prominence::mentioned_skgids_from_nodes;
+use crate::prominence::mentioned_gnids_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos_collecting_violations;
 use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
@@ -31,8 +31,8 @@ use tantivy::Index;
 /// window.
 pub struct InitContextHandoff {
   pub had_id_set        : HashSet<ID>,
-  pub all_node_skgids   : HashSet<ID>,
-  pub mentioned_skgids  : HashSet<ID>,
+  pub all_node_gnids   : HashSet<ID>,
+  pub mentioned_gnids  : HashSet<ID>,
   pub map_to_content    : MapToContent,
   pub map_to_containers : MapToContainers,
 }
@@ -84,12 +84,12 @@ fn env_and_handoff_from_nodes (
 ) -> (SkgEnv, InitContextHandoff) {
   let had_id_set : HashSet<ID> =
     had_id_set_from_nodes (&nodes);
-  let all_node_skgids : HashSet<ID> =
+  let all_node_gnids : HashSet<ID> =
     nodes . iter ()
     . map ( |n| n . pid . clone () )
     . collect ();
-  let mentioned_skgids : HashSet<ID> =
-    mentioned_skgids_from_nodes (&nodes);
+  let mentioned_gnids : HashSet<ID> =
+    mentioned_gnids_from_nodes (&nodes);
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
@@ -97,8 +97,8 @@ fn env_and_handoff_from_nodes (
       config . clone (), Arc::new (graph), tantivy_index ),
     InitContextHandoff {
       had_id_set,
-      all_node_skgids,
-      mentioned_skgids,
+      all_node_gnids,
+      mentioned_gnids,
       map_to_content,
       map_to_containers } ) }
 

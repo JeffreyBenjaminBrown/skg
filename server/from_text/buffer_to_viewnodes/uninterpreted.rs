@@ -87,7 +87,7 @@ pub fn org_to_viewforest (
   // treeid_stack[1] is the current view root, etc.
   let mut treeid_stack: Vec<NodeId> = vec![ {
     let viewforest_root_treeid: NodeId =
-      viewforest . internal_root_skgid ();
+      viewforest . internal_root_gnid ();
     viewforest_root_treeid } ];
   let mut viewnode_line_cols: Vec<ViewnodeLineCol> =
     divide_into_viewNodeLineCols (input)?;
@@ -176,7 +176,7 @@ fn complete_linecol_to_viewnode (
          metadata, viewparent, graph,
          & provenance . writeProtected_skgrepos_after_save );
   let gnid_minted : bool =
-    metadata . names_an_occurrence () && metadata . skgid . is_none ();
+    metadata . names_an_occurrence () && metadata . gnid . is_none ();
   let (_level, mut viewnode, error_opt, warning_opt)
     : (usize, Viewnode, Option<BufferValidationError>, Option<String>)
     = linecol_to_viewnode (viewnode_line_col)?;
@@ -278,9 +278,9 @@ fn linecol_to_viewnode(
       . to_string () ); }
   let error_opt : Option<BufferValidationError> =
     error_opt . or_else ( || if body_on_writeProtected {
-      Some (match metadata . skgid . clone () {
-        Some (skgid) => BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid    : skgid,
+      Some (match metadata . gnid . clone () {
+        Some (gnid) => BufferValidationError::EditedWriteProtectedOccurrence {
+          gnid    : gnid,
           title    : title . clone (),
           changes  : vec!["added body text" . to_string ()],
           headline : viewnode . headline_name (), },

@@ -27,15 +27,15 @@ function M.node_info_at_point ()
   if not sexp then
     vim.notify('No metadata sexp found on this line.')
     return nil end
-  local skgid = id_search.extract_id_from_metadata_sexp(sexp)
-  if not skgid then
+  local gnid = id_search.extract_id_from_metadata_sexp(sexp)
+  if not gnid then
     vim.notify("No id in this line's metadata.")
     return nil end
   local skgrepo = id_search.extract_repo_from_metadata_sexp(sexp)
   if not skgrepo then
     vim.notify('Could not extract id or repo from metadata.')
     return nil end
-  return { id = skgid, repo = skgrepo }
+  return { id = gnid, repo = skgrepo }
 end
 
 ---{id, repo} for the parent headline's node, or nil with a message.
@@ -52,20 +52,20 @@ function M.parent_info_at_point ()
   if not sexp then
     vim.notify('Parent headline has no node metadata.')
     return nil end
-  local skgid = id_search.extract_id_from_metadata_sexp(sexp)
+  local gnid = id_search.extract_id_from_metadata_sexp(sexp)
   local skgrepo = id_search.extract_repo_from_metadata_sexp(sexp)
-  if not (skgid and skgrepo) then
+  if not (gnid and skgrepo) then
     vim.notify('Could not extract id or repo from parent.')
     return nil end
-  return { id = skgid, repo = skgrepo }
+  return { id = gnid, repo = skgrepo }
 end
 
 ---Request the on-disk path for ID within REPO; HANDLER receives the
 ---resolved absolute path (or is not called, with a message shown).
----@param skgid string
+---@param gnid string
 ---@param skgrepo string
 ---@param handler fun(resolved_path: string)
-function M.request_file_path (skgid, skgrepo, handler)
+function M.request_file_path (gnid, skgrepo, handler)
   state.register_response_handler('get-file-path',
     function (_payload_text, response)
       local content = payload.field_text(response, 'content')
@@ -86,7 +86,7 @@ function M.request_file_path (skgid, skgrepo, handler)
   state.lp_reset()
   client.send_string(sexpr.to_string({
     sexpr.pair(sexpr.symbol('request'), 'get file path'),
-    sexpr.pair(sexpr.symbol('id'), skgid),
+    sexpr.pair(sexpr.symbol('id'), gnid),
     sexpr.pair(sexpr.symbol('repo'), skgrepo) }) .. '\n')
 end
 

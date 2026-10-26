@@ -115,7 +115,7 @@ pub(crate) fn rekind_vognode (
   let vognode : Vognode = match &tree . get (child) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (vognode) => vognode . clone (),
     _ => return Ok (( )), };
-  let gnid : ID = vognode . skgid () . clone ();
+  let gnid : ID = vognode . gnid () . clone ();
   match ( id_rule (&gnid, parent_goal, walk), vognode ) {
     ( IdRuleAnswer::Occurrence (pid), Vognode::Unrestricted (occurrence) ) =>
       refresh_occurrence_in_place (tree, child, occurrence, &pid, walk) ?,
@@ -177,7 +177,7 @@ pub(crate) fn rekind_vognode (
         || relationship_edit_request != requests . relationship_edit_request;
       set_vognode_keeping_readiness (
         tree, child, Vognode::Unknown ( Unknown {
-          skgid                   : gnid . clone (),
+          gnid                   : gnid . clone (),
           relRepo                 : goal_relRepo (parent_goal, &gnid),
           relationshipEditRequest : relationship_edit_request,
           claimsMembership        : true, } ));
@@ -244,16 +244,16 @@ fn refresh_occurrence_in_place (
 ) -> Result<(), Box<dyn Error>> {
   let node : &GraphnodeInRust = walk . truth . graph . get (pid)
     . ok_or ("refresh_occurrence_in_place: the truth lacks a present node") ?;
-  if occurrence . skgid != *pid && ! occurrence . is_writeProtected () {
+  if occurrence . gnid != *pid && ! occurrence . is_writeProtected () {
     // A gnid that became an extra ID: the node it now names may have
     // its editable occurrence elsewhere.
-    walk . editable_gnids . remove (&occurrence . skgid);
+    walk . editable_gnids . remove (&occurrence . gnid);
     if walk . editable_gnids . contains (pid) {
       write_protect_occurrence (tree, child, walk); }
     else { walk . editable_gnids . insert (pid . clone ()); }}
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
-  { occurrence . skgid        = pid . clone ();
+  { occurrence . gnid        = pid . clone ();
     occurrence . title        = node . title . clone ();
     occurrence . home_skgrepo = node . home_skgrepo . clone ();
     if let Editability::Editable { body, .. } = &mut occurrence . editability
@@ -324,7 +324,7 @@ fn forget_editable_occurrence (
 ) {
   if let Vognode::Unrestricted (occurrence) = vognode {
     if ! occurrence . is_writeProtected () {
-      walk . editable_gnids . remove (&occurrence . skgid);
+      walk . editable_gnids . remove (&occurrence . gnid);
       walk . drawn_editable . remove (&treeid); }}}
 
 /// Set the vognode at 'treeid' to 'vognode', keeping its fold state,

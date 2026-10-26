@@ -52,10 +52,10 @@ pub fn commit_all(gitrepo: &Repository, message: &str) {
 // Disk verification helpers
 //
 
-pub fn read_graphnode(gitrepo_path: &Path, skgid: &str) -> Result<Graphnode, Box<dyn Error>> {
+pub fn read_graphnode(gitrepo_path: &Path, gnid: &str) -> Result<Graphnode, Box<dyn Error>> {
   // Read YAML as GraphnodeOnDisk, then attach skgrepo.
   // Tests in this module use skgrepo "main".
-  let path = gitrepo_path . join(format!("{}.skg", skgid));
+  let path = gitrepo_path . join(format!("{}.skg", gnid));
   let content = fs::read_to_string (&path)?;
   let node_fs: GraphnodeOnDisk = yaml_serde::from_str (&content)?;
   Ok ( node_fs . into_complete_as_single_section ( SkgrepoName::from ("main") ))

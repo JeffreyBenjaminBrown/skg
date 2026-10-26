@@ -11,7 +11,7 @@
 //! has no goal.
 //!
 //! The goal computers it reuses: 'partnerFolder_members_in_graph',
-//! the two compound folders' goal lists, 'unintegrated_content_skgids'
+//! the two compound folders' goal lists, 'unintegrated_content_gnids'
 //! and 'omit_restricted_members'.
 
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -30,7 +30,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::forest::in_content_position;
 use crate::types::viewnode::{
   Existence, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant};
-use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
+use crate::update_buffer::reconcile::content::unintegrated_content_gnids;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 
@@ -123,15 +123,15 @@ pub(crate) fn member_of_child (
 ) -> Option<GoalMember> {
   match &viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-      Some ( GoalMember::Gnid ( occurrence . collected_skgid () )),
+      Some ( GoalMember::Gnid ( occurrence . collected_gnid () )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      Some ( GoalMember::Gnid ( ghost . skgid . clone () )),
+      Some ( GoalMember::Gnid ( ghost . gnid . clone () )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-      Some ( GoalMember::Gnid ( unknown . skgid . clone () )),
+      Some ( GoalMember::Gnid ( unknown . gnid . clone () )),
     ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =>
       Some ( GoalMember::Alias ( text . clone () )),
-    ViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. }) =>
-      Some ( GoalMember::Id ( skgid . clone () )),
+    ViewnodeKind::PropertyMember (PropertyMember::ID { gnid, .. }) =>
+      Some ( GoalMember::Id ( gnid . clone () )),
     ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
       Some ( GoalMember::Flag (*flag) ),
     ViewnodeKind::Folder (_) | ViewnodeKind::ChangeViewnode (_)
@@ -147,13 +147,13 @@ pub(crate) fn goal_of_parent (
   let node : NodeRef<Viewnode> = tree . get (parent) ?;
   match &node . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) => {
-      let pid : &ID = &occurrence . skgid;
+      let pid : &ID = &occurrence . gnid;
       Some ( if is_chain_parent (tree, parent) {
                chain_goal (pid, walk)
              } else { content_goal (tree, parent, pid, walk) } ) },
     ViewnodeKind::Vognode (Vognode::Ghost (ghost))
       if walk . is_diff_view () && in_content_position (node) =>
-      diff_view::ghost_content_goal (&ghost . skgid, walk),
+      diff_view::ghost_content_goal (&ghost . gnid, walk),
     ViewnodeKind::Folder (folder) =>
       folder_goal (tree, parent, folder, walk),
     ViewnodeKind::Vognode (_) | ViewnodeKind::PropertyMember (_)
@@ -181,7 +181,7 @@ fn chain_goal (
 /// An occurrence's content: its 'contains' list, its unresolved
 /// members as raw IDs, less what the restriction hides; for a
 /// subscribee as such, less what its subscriber hides or contains
-/// ('unintegrated_content_skgids').
+/// ('unintegrated_content_gnids').
 fn content_goal (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -193,11 +193,11 @@ fn content_goal (
   let unintegrated = |contents : Vec<ID>| -> Vec<ID> {
     match &subscriber {
       None => contents,
-      Some (subscriber) => unintegrated_content_skgids (
+      Some (subscriber) => unintegrated_content_gnids (
         graph, &contents,
-        &graph . outbound_skgids_for_relation_gated (
+        &graph . outbound_gnids_for_relation_gated (
           subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
-        &graph . outbound_skgids_for_relation_gated (
+        &graph . outbound_gnids_for_relation_gated (
           subscriber, NodeRelation::Contains, walk . truth . restriction )), } };
   if let Some (goal) = diff_view::content_goal (pid, &unintegrated, walk) {
     return goal; }
@@ -285,9 +285,9 @@ pub(crate) fn hidden_in_subscribee (
   let graph : &InRustGraph = walk . truth . graph;
   let goal : Vec<ID> = goal_list_for_hiddenInSubscribee_folder (
     graph,
-    &graph . outbound_skgids_for_relation_gated (
+    &graph . outbound_gnids_for_relation_gated (
       subscribee, NodeRelation::Contains, walk . truth . restriction ),
-    &graph . outbound_skgids_for_relation_gated (
+    &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
   resolve_all ( omit_hidden (goal, walk), graph ) }
 
@@ -301,9 +301,9 @@ pub(crate) fn hidden_outside_of_subscribees (
   let graph : &InRustGraph = walk . truth . graph;
   let goal : Vec<ID> = goal_list_for_hiddenOutsideOfSubscribee_folder (
     graph,
-    &graph . outbound_skgids_for_relation_gated (
+    &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
-    &graph . outbound_skgids_for_relation_gated (
+    &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
     walk . truth . config );
   resolve_all ( omit_hidden (goal, walk), graph ) }
@@ -396,5 +396,5 @@ pub(crate) fn occurrence_pid (
 ) -> Option<ID> {
   match &node . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-      Some ( occurrence . skgid . clone () ),
+      Some ( occurrence . gnid . clone () ),
     _ => None, } }

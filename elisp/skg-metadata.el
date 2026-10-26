@@ -175,19 +175,19 @@ when write-protected occurrences were skipped."
                           (skg--change-repo-at-point-unless-write-protected
                            new-skgrepo)))
          (changed-count (car change-result))
-         (write-protected-skgids (cdr change-result)))
-    (dolist (skgid write-protected-skgids)
+         (write-protected-gnids (cdr change-result)))
+    (dolist (gnid write-protected-gnids)
       (message "skg-set-repo: write-protected occurrence not changed (the save would refuse its edit): %s"
-               skgid))
+               gnid))
     (message "%s"
              (concat
               (format "Repo changed from %s to %s on %d node%s. Save to apply."
                       old-skgrepo new-skgrepo changed-count
                       (if (= changed-count 1) "" "s"))
-              (when write-protected-skgids
+              (when write-protected-gnids
                 (format "  WARNING: %d write-protected node%s not changed -- the save would refuse their edits. See *Messages* for the ID list."
-                        (length write-protected-skgids)
-                        (if (= (length write-protected-skgids) 1) "" "s")))))))
+                        (length write-protected-gnids)
+                        (if (= (length write-protected-gnids) 1) "" "s")))))))
 
 (defun skg--change-repo-at-point-unless-write-protected (new-skgrepo)
   "Set the repo at point to NEW-REPO, unless the occurrence is
@@ -235,11 +235,11 @@ member of a write-protected folder, or with an ID missing."
     (unless (or (skg--unrestrictedNode-sexp-p member-sexp)
                 (skg--unknown-headline-p member-sexp))
       (user-error "Not on an unrestrictedNode or Unknown headline"))
-    (let ((member-skgid (skg--relationship-member-id member-sexp))
+    (let ((member-gnid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)
                               (skg--metadata-sexp-at-point-or-nil)))))
-      (unless member-skgid
+      (unless member-gnid
         (user-error "No id in this headline's metadata"))
       (unless parent-sexp
         (user-error
@@ -265,22 +265,22 @@ member of a write-protected folder, or with an ID missing."
                     (and (org-up-heading-safe) ;; to the folder
                          (org-up-heading-safe) ;; to its anchor
                          (skg--metadata-sexp-at-point-or-nil))))
-                 (anchor-skgid (skg--node-id anchor-sexp)))
-            (unless anchor-skgid
+                 (anchor-gnid (skg--node-id anchor-sexp)))
+            (unless anchor-gnid
               (user-error "Could not find the folder's anchor headline"))
             (when (skg--node-write-protected-p anchor-sexp)
               (user-error "The folder's anchor is write-protected here, so the save would not write this relationship; set it from a view where the anchor is editable"))
-            (list :recorder anchor-skgid
-                  :member member-skgid
+            (list :recorder anchor-gnid
+                  :member member-gnid
                   :relation (cdr writable-folder))))
          ((skg--unrestrictedNode-sexp-p parent-sexp)
-          (let ((parent-skgid (skg--node-id parent-sexp)))
-            (unless parent-skgid
+          (let ((parent-gnid (skg--node-id parent-sexp)))
+            (unless parent-gnid
               (user-error "No id in the parent headline's metadata"))
             (when (skg--node-write-protected-p parent-sexp)
               (user-error "The parent is write-protected here, so the save would not write this relationship; set it from a view where the parent is editable"))
-            (list :recorder parent-skgid
-                  :member member-skgid
+            (list :recorder parent-gnid
+                  :member member-gnid
                   :relation "contains")))
          (t (user-error
              "The parent headline is neither a node nor a writable folder")))))))
@@ -669,12 +669,12 @@ bare ID or an org id link like [[id:ID][label]].
 Does not save; call `skg-request-save-buffer' afterward."
   (interactive
    (list (skg--read-id-or-link "Acquiree ID or link: ")))
-  (let ((acquiree-skgid (skg--id-from-link-or-text acquiree-id-or-link)))
-    (when (string-empty-p acquiree-skgid)
+  (let ((acquiree-gnid (skg--id-from-link-or-text acquiree-id-or-link)))
+    (when (string-empty-p acquiree-gnid)
       (user-error "Acquiree ID cannot be empty"))
-    (skg--write-edit-request `(merge ,(intern acquiree-skgid)) 'node)
+    (skg--write-edit-request `(merge ,(intern acquiree-gnid)) 'node)
     (message "Merge request set for acquiree %s. Save to apply."
-             acquiree-skgid)))
+             acquiree-gnid)))
 
 ;;; The diff view's restore requests ('docs/diff-view.org',
 ;;; "Restoring what a change removed"). The server refuses them on the
@@ -1031,23 +1031,23 @@ carries the move, and the rerender after the save shows it everywhere.
 Its viewdescendants are still traversed: they are self-writers, so
 their repo edits take effect even under a write-protected parent."
   (let* ((changed-count 0)
-         (changed-skgids '())
-         (write-protected-skgids '()))
+         (changed-gnids '())
+         (write-protected-gnids '()))
     (skg--do-at-recursive-repo-move-occurrences
      old-skgrepo
      (lambda ()
        (let ((meta (skg--metadata-sexp-at-point-or-nil)))
          (if (skg--node-write-protected-p meta)
              (push (or (skg--node-id meta) "(no id)")
-                   write-protected-skgids)
-           (push (skg--node-id meta) changed-skgids)
+                   write-protected-gnids)
+           (push (skg--node-id meta) changed-gnids)
            (setq changed-count
                  (+ changed-count
                     (skg--change-repo-at-point new-skgrepo)))))))
     (cons changed-count
           (nreverse (seq-remove
-                     (lambda (skgid) (member skgid changed-skgids))
-                     write-protected-skgids)))))
+                     (lambda (gnid) (member gnid changed-gnids))
+                     write-protected-gnids)))))
 
 (defun skg--do-at-recursive-repo-move-occurrences (old-skgrepo fn)
   "Call FN, with point on each headline a recursive repo move from

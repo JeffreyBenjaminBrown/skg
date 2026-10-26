@@ -47,7 +47,7 @@ fn test_viewnode_to_text_with_metadata () {
   assert_metadata_eq! ( result, "* (skg folded aliasFolder)\n" ); }
 
 #[test]
-fn test_viewnode_to_text_with_skgid_metadata () {
+fn test_viewnode_to_text_with_gnid_metadata () {
   let t : UnrestrictedVognode = UnrestrictedVognode {
     editability : Editability::WriteProtected,
     .. default_unrestrictedVognode ( ID::from ("test123"),

@@ -51,7 +51,7 @@ impl EnrichmentProvenance {
     gnid_minted       : bool,
     skgrepo_inherited : bool,
   ) {
-    let Some (gnid) : Option<&ID> = viewnode . unrestricted_skgid ()
+    let Some (gnid) : Option<&ID> = viewnode . unrestricted_gnid ()
       else { return; };
     if gnid_minted {
       self . new_nodes . insert (gnid . clone ()); }
@@ -68,10 +68,10 @@ pub fn replace_gnid_with_pid (
 ) {
   if ! metadata . names_an_occurrence () { return; }
   let pid : Option<ID> =
-    metadata . skgid . as_ref ()
+    metadata . gnid . as_ref ()
     . and_then ( |gnid| graph . pid_of (gnid) );
   if let Some (pid) = pid {
-    metadata . skgid = Some (pid); }}
+    metadata . gnid = Some (pid); }}
 
 /// The skgrepo each ID with a write-protected occurrence will have once
 /// this save lands: that of its editable occurrence in this buffer, if
@@ -87,21 +87,21 @@ pub fn skgrepos_after_save_of_writeProtected_occurrences<'a> (
   graph     : &InRustGraph,
 ) -> HashMap<ID, SkgrepoName> {
   let mut editable_skgrepos : HashMap<ID, SkgrepoName> = HashMap::new ();
-  let mut writeProtected_skgids : HashSet<ID> = HashSet::new ();
+  let mut writeProtected_gnids : HashSet<ID> = HashSet::new ();
   for metadata in headlines {
     if ! metadata . names_an_occurrence () { continue; }
-    let Some (skgid) = &metadata . skgid else { continue; };
+    let Some (gnid) = &metadata . gnid else { continue; };
     if metadata . writeProtected {
-      writeProtected_skgids . insert (skgid . clone ());
+      writeProtected_gnids . insert (gnid . clone ());
     } else if let Some (skgrepo) = &metadata . home_skgrepo {
-      editable_skgrepos . insert (skgid . clone (), skgrepo . clone ()); }}
-  writeProtected_skgids . into_iter ()
-    . filter_map ( |skgid| {
+      editable_skgrepos . insert (gnid . clone (), skgrepo . clone ()); }}
+  writeProtected_gnids . into_iter ()
+    . filter_map ( |gnid| {
       let skgrepo : Option<SkgrepoName> =
-        editable_skgrepos . get (&skgid) . cloned ()
-        . or_else ( || graph . pid_and_skgrepo (&skgid)
+        editable_skgrepos . get (&gnid) . cloned ()
+        . or_else ( || graph . pid_and_skgrepo (&gnid)
                          . map ( |(_pid, skgrepo)| skgrepo ) );
-      skgrepo . map ( |skgrepo| (skgid, skgrepo) ) } )
+      skgrepo . map ( |skgrepo| (gnid, skgrepo) ) } )
     . collect () }
 
 /// Give an occurrence headline that names no skgrepo one, if one can
@@ -126,7 +126,7 @@ pub fn complete_occurrence_skgrepo (
      || metadata . home_skgrepo . is_some () { return false; }
   let from_graph : Option<SkgrepoName> =
     if metadata . writeProtected {
-      metadata . skgid . as_ref ()
+      metadata . gnid . as_ref ()
       . and_then ( |gnid| graph . pid_and_skgrepo (gnid) )
       . map ( |(_pid, skgrepo)| skgrepo )
     } else { None };
@@ -158,7 +158,7 @@ fn skgrepo_of_nearest_occurrence_ancestor (
     match &ancestor . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (at)) =>
         return Some ( if at . is_writeProtected () {
-          writeProtected_skgrepos_after_save . get (&at . skgid) . cloned ()
+          writeProtected_skgrepos_after_save . get (&at . gnid) . cloned ()
           . unwrap_or_else ( || at . home_skgrepo . clone () )
         } else { at . home_skgrepo . clone () } ),
       ViewnodeKind::Vognode (Vognode::Ghost (_) | Vognode::Unknown (_))

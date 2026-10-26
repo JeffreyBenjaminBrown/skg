@@ -64,7 +64,7 @@ fn identity_errors_are_aggregated_and_deterministically_ordered () {
 }
 
 #[test]
-fn repeated_skgids_of_one_recorder_are_normalized_not_rejected () {
+fn repeated_gnids_of_one_recorder_are_normalized_not_rejected () {
   let mut carrier = node ("carrier", "public");
   carrier . extra_ids = vec![
     ID::from ("B"),
@@ -148,8 +148,8 @@ fn save_candidate_is_rejected_before_publication () {
   let report = validate_complete_graph_candidate (
     &config (), &current, &[NodeInstruction::Save (SaveNode (edited))]);
   assert! (report . errors . iter () . any (|error| matches! (
-    error, CompleteGraphError::PrimaryExtraCollision { skgid, .. }
-      if skgid == &ID::from ("existing"))));
+    error, CompleteGraphError::PrimaryExtraCollision { gnid, .. }
+      if gnid == &ID::from ("existing"))));
   assert! (report . errors . iter () . any (|error| matches! (
     error, CompleteGraphError::UnconfiguredNodeHome { pid, .. }
       if pid == &ID::from ("edited"))));

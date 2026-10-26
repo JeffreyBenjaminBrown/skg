@@ -32,12 +32,12 @@ impl Forest<Viewnode> {
       viewnode . consume_edit_request_after_save (); }}}
 
 /// The IDs of the nodes that have an editable occurrence in the
-/// viewforest ('Viewnode::editable_skgid').
+/// viewforest ('Viewnode::editable_gnid').
 pub fn editable_occurrences (
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
   viewforest . nodes ()
-    . filter_map ( |node| node . value () . editable_skgid () . cloned () )
+    . filter_map ( |node| node . value () . editable_gnid () . cloned () )
     . collect () }
 
 /// Whether 'node' stands where content does: its parent is the buffer
@@ -88,7 +88,7 @@ pub fn stands_in_containerward_chain (
 /// The 'internal' functions expose the awkward internal representation
 /// that Forest is designed to hide when possible.
 impl<T> Forest<T> {
-  pub fn internal_root_skgid (
+  pub fn internal_root_gnid (
     &self,
   ) -> NodeId {
     self . tree . root () . id () }
@@ -119,10 +119,10 @@ impl<T> Forest<T> {
   ) -> impl Iterator<Item = NodeRef<'a, T>> + 'a {
     self . tree . root () . children () }
 
-  pub fn root_skgids (
+  pub fn root_gnids (
     &self,
   ) -> Vec<NodeId> {
-    tree_forest_root_skgids (&self . tree) }
+    tree_forest_root_gnids (&self . tree) }
 
   pub fn nodes<'a> (
     &'a self,
@@ -143,15 +143,15 @@ impl<T> Forest<T> {
 
   pub fn get<'a> (
     &'a self,
-    skgid : NodeId,
+    gnid : NodeId,
   ) -> Option<NodeRef<'a, T>> {
-    self . tree . get (skgid) }
+    self . tree . get (gnid) }
 
   pub fn get_mut<'a> (
     &'a mut self,
-    skgid : NodeId,
+    gnid : NodeId,
   ) -> Option<NodeMut<'a, T>> {
-    self . tree . get_mut (skgid) }}
+    self . tree . get_mut (gnid) }}
 
 impl<T> From<Tree<T>> for Forest<T> {
   fn from (
@@ -181,7 +181,7 @@ impl<T> DerefMut for Forest<T> {
 
 /// Compatibility helper for code that still holds the old
 /// single-tree forest representation directly.
-pub fn tree_forest_root_skgids<T> (
+pub fn tree_forest_root_gnids<T> (
   tree : &Tree<T>,
 ) -> Vec<NodeId> {
   tree . root () . children ()

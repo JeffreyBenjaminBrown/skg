@@ -85,12 +85,12 @@ fn prune_children_postorder (
   tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
-  let child_skgids : Vec<NodeId> =
+  let child_gnids : Vec<NodeId> =
     tree . get (node)
     . ok_or ("prune_children_postorder: node not found") ?
     . children () . map ( |c| c . id () ) . collect ();
-  let had_children : bool = ! child_skgids . is_empty ();
-  for child in child_skgids {
+  let had_children : bool = ! child_gnids . is_empty ();
+  for child in child_gnids {
     if prune_children_postorder (tree, child) ? {
       let had_focus : bool =
         subtree_satisfies (

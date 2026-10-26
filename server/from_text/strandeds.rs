@@ -77,18 +77,18 @@ pub fn stranded_relationships (
   let deleted : HashSet<ID> =
     instructions . iter ()
     . filter_map ( |instruction| match instruction {
-      NodeInstruction::Delete (delete) => Some (delete . skgid . clone ()),
+      NodeInstruction::Delete (delete) => Some (delete . gnid . clone ()),
       NodeInstruction::Save (_) => None, } )
     . collect ();
-  let resolve = |skgid : &ID| -> ID {
-    graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
-  let home_before = |skgid : &ID| -> Option<SkgrepoName> {
-    graph . pid_and_skgrepo (skgid) . map ( |(_pid, home)| home )
-      . or_else ( || home_from_disk (skgid, config) ) };
-  let home_after = |skgid : &ID| -> Option<SkgrepoName> {
-    saves . get ( &resolve (skgid) )
+  let resolve = |gnid : &ID| -> ID {
+    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
+  let home_before = |gnid : &ID| -> Option<SkgrepoName> {
+    graph . pid_and_skgrepo (gnid) . map ( |(_pid, home)| home )
+      . or_else ( || home_from_disk (gnid, config) ) };
+  let home_after = |gnid : &ID| -> Option<SkgrepoName> {
+    saves . get ( &resolve (gnid) )
       . map ( |node| node . home_skgrepo . clone () )
-      . or_else ( || home_before (skgid) ) };
+      . or_else ( || home_before (gnid) ) };
   // The recorder as the save leaves it: its saved form, else the graph's.
   let recorder_after = |pid : &ID| -> Option<Graphnode> {
     if deleted . contains (pid) { return None; }
@@ -149,8 +149,8 @@ pub fn reset_to_default_relationships (
   strandeds    : &[&StrandedRelationship],
   graph        : &InRustGraph,
 ) {
-  let resolve = |skgid : &ID| -> ID {
-    graph . pid_of (skgid) . unwrap_or_else ( || skgid . clone () ) };
+  let resolve = |gnid : &ID| -> ID {
+    graph . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
   for stranded in strandeds {
     let recorder_pid : &ID = &stranded . relationship . recorder;
     let position : Option<usize> =

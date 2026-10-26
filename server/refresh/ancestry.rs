@@ -152,5 +152,5 @@ pub fn parent_reads_claims (
         if matches! ( folder, Folder::HiddenOutsideOfSubscribee ) { 1 } else { 0 };
       required_ancestor_of (tree, parent, anchor_depth)
         . and_then ( |anchor| tree . get (anchor) )
-        . is_some_and ( |anchor| anchor . value () . editable_skgid () . is_some () ) },
+        . is_some_and ( |anchor| anchor . value () . editable_gnid () . is_some () ) },
     _ => false, } }

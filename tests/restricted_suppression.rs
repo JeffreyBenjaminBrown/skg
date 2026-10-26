@@ -24,23 +24,23 @@ use skg::types::save::{NodeInstruction, SaveNode};
 
 use std::error::Error;
 
-fn save_skgids (instructions : &[NodeInstruction]) -> Vec<ID> {
+fn save_gnids (instructions : &[NodeInstruction]) -> Vec<ID> {
   instructions . iter ()
     . filter_map ( |i| match i {
         NodeInstruction::Save (SaveNode (node)) => Some (node . pid . clone ()),
         _ => None } )
     . collect () }
 
-fn saved_node_by_skgid<'a> (
+fn saved_node_by_gnid<'a> (
   instructions : &'a [NodeInstruction],
-  skgid           : &str,
+  gnid           : &str,
 ) -> &'a Graphnode {
   instructions . iter ()
     . find_map ( |i| match i {
         NodeInstruction::Save (SaveNode (node))
-          if node . pid == ID::from (skgid) => Some (node),
+          if node . pid == ID::from (gnid) => Some (node),
         _ => None } )
-    . unwrap_or_else ( || panic! ("no SaveNode for {}", skgid) ) }
+    . unwrap_or_else ( || panic! ("no SaveNode for {}", gnid) ) }
 
 #[test]
 fn writes_to_restricted_nodes_are_suppressed_with_warning (
@@ -66,7 +66,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
           buffer_to_validated_saveplan (
             buffer, config, Some (&restriction) )  ?;
         assert! (
-          ! save_skgids (&plan . node_instructions)
+          ! save_gnids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
           "the edit to the restricted node must be suppressed" );
         assert! (
@@ -74,7 +74,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
             "Restricted nodes present in saved buffer remain unchanged in graph")),
           "suppression must warn: {:?}", warnings );
         assert_eq! (
-          members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
+          members_of (&saved_node_by_gnid (&plan . node_instructions, "root") . contains),
           vec![ ID::from ("active-b"), ID::from ("private-a") ],
           "the unrestricted parent keeps containing the restricted child" ); }
       { // The same stale node untouched: the noop filter drops its
@@ -89,7 +89,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
           buffer_to_validated_saveplan (
             buffer, config, Some (&restriction) )  ?;
         assert! (
-          ! save_skgids (&plan . node_instructions)
+          ! save_gnids (&plan . node_instructions)
             . contains (&ID::from ("private-a")),
           "an untouched stale node writes nothing" );
         assert! (
@@ -110,7 +110,7 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
           plan . skgrepo_moves . is_empty (),
           "a move into a restricted repo must be suppressed" );
         assert! (
-          ! save_skgids (&plan . node_instructions)
+          ! save_gnids (&plan . node_instructions)
             . contains (&ID::from ("active-b")),
           "the write claiming the restricted repo must be suppressed" );
         assert! (

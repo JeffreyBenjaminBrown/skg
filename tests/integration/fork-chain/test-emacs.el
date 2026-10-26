@@ -13,14 +13,14 @@
   (apply #'message (concat "✗ FAIL: " message) args)
   (kill-emacs 1))
 
-(defun chain-test--buffer-showing (skgid)
+(defun chain-test--buffer-showing (gnid)
   "Return a live skg view buffer whose text mentions (gnid ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-id) skg-view-id
-                 (string-match-p (regexp-quote (format "(gnid %s)" skgid))
+                 (string-match-p (regexp-quote (format "(gnid %s)" gnid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))

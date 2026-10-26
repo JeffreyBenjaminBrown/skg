@@ -24,8 +24,8 @@ pub fn omit_restricted_members (
     None => goal,
     Some (a) =>
       goal . into_iter ()
-      . filter ( |skgid|
-          resolve (skgid)
+      . filter ( |gnid|
+          resolve (gnid)
           . map ( |src| a . contains_skgrepo (&src) )
           . unwrap_or (false) )
       . collect (), }}

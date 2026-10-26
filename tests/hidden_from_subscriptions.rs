@@ -278,10 +278,10 @@ fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,
 ) -> Result<Graphnode, Box<dyn Error>> {
-  let skgid : ID = ID::from (pid);
+  let gnid : ID = ID::from (pid);
   read_all_skg_files_from_skgrepos (config)?
     . into_iter()
-    . find ( |node| node . pid == skgid )
+    . find ( |node| node . pid == gnid )
     . ok_or_else ( || format! ("node not found on disk: {}", pid) . into() ) }
 
 #[test]

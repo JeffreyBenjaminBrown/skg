@@ -165,7 +165,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
         NodeInstruction::Save (SaveNode (merged)),
         NodeInstruction::Save (SaveNode (rewritten_recorder)),
         NodeInstruction::Delete (DeleteNode {
-          skgid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main") }),
+          gnid : ID::from ("acquiree"), home_skgrepo : SkgrepoName::from ("main") }),
       ];
       let mut candidate = (*graph_snapshot) . clone ();
       apply_nodeInstructions_to_inRustGraph (&mut candidate, &instructions);

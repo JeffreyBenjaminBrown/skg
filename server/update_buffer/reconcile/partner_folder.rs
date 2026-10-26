@@ -22,10 +22,10 @@ pub fn partnerFolder_members_in_graph (
   let member_role : RelationRole = kind . relation_member_role () ?;
   let recorder_role : RelationRole =
     member_role . opposite_role ();
-  let skgrepo_resolver = |skgid : &ID| -> Option<SkgrepoName> {
-    graph . pid_and_skgrepo (skgid)
+  let skgrepo_resolver = |gnid : &ID| -> Option<SkgrepoName> {
+    graph . pid_and_skgrepo (gnid)
       . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (skgid, config) ) };
+      . or_else ( || home_from_disk (gnid, config) ) };
   let members : Vec<ID> =
     if recorder_role . is_first_role () { // the folder shows a list in the recorder's file
       raw_outbound_members (graph, viewparent_pid, member_role, skgrepo_restriction)

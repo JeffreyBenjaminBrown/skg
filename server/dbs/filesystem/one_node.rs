@@ -17,16 +17,16 @@ use std::path::Path;
 use std::fs;
 use yaml_serde;
 
-pub fn graphnode_from_skgid (
+pub fn graphnode_from_gnid (
   config : &SkgConfig,
-  skgid  : &ID
+  gnid  : &ID
 ) -> Result<Graphnode, Box<dyn Error>> {
   let nodes = read_all_skg_files_from_skgrepos (config)?;
   let graph = InRustGraph::from_graphnodes (&nodes);
   let (pid, skgrepo) : (ID, SkgrepoName) =
-    graph . pid_and_skgrepo (skgid)
+    graph . pid_and_skgrepo (gnid)
     . ok_or_else ( || format! (
-      "ID '{}' not found in graph", skgid ) ) ?;
+      "ID '{}' not found in graph", gnid ) ) ?;
   Ok ( graphnode_from_pid_and_skgrepo (
     config, pid, &skgrepo )? ) }
 
@@ -51,7 +51,7 @@ pub fn graphnode_from_pid_and_skgrepo (
       io::ErrorKind::NotFound,
       format! ("No .skg file for '{}' in any repo (caller expected one in '{}')",
                pid, skgrepo ))); };
-  compose_telescope ( telescope, & |skgid : &ID| skgid . clone () ) }
+  compose_telescope ( telescope, & |gnid : &ID| gnid . clone () ) }
 
 /// PID's telescope as it sits on disk, in privacy order: for each
 /// configured skgrepo (most public first), pid.skg if present. The
@@ -88,12 +88,12 @@ pub(crate) fn telescope_from_disk (
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// Errors are propagated only if they are not of the 'not found' kind.
-pub fn optgraphnode_from_skgid (
+pub fn optgraphnode_from_gnid (
   config : &SkgConfig,
-  skgid  : &ID
+  gnid  : &ID
 ) -> Result<Option<Graphnode>, Box<dyn Error>> {
-  match graphnode_from_skgid(
-    config, skgid
+  match graphnode_from_gnid(
+    config, gnid
   ) {
     Ok (graphnode) => Ok(Some (graphnode)),
     Err (e)      => {
@@ -109,10 +109,10 @@ pub fn optgraphnode_from_skgid (
 /// returns the empty vector.
 pub fn fetch_aliases_from_file (
   config : &SkgConfig,
-  skgid  : ID,
+  gnid  : ID,
 ) -> Vec<String> {
-  match optgraphnode_from_skgid(
-    config, &skgid
+  match optgraphnode_from_gnid(
+    config, &gnid
   ) {
     Ok ( Some (graphnode)) =>
       members_msv ( & graphnode . aliases ) . into_vec(),
@@ -329,7 +329,7 @@ fn error_unless_home_is_writable (
     match telescope_from_disk (config, &graphnode . pid) ? {
       None => false,
       Some (telescope) => match
-        compose_telescope ( telescope, & |skgid : &ID| skgid . clone () ) {
+        compose_telescope ( telescope, & |gnid : &ID| gnid . clone () ) {
           Ok (disk_node) => disk_node . overPrivateText_telescope,
           Err (error) => return Err ( io::Error::new (
             io::ErrorKind::InvalidData,

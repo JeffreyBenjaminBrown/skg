@@ -515,31 +515,31 @@ end
 ---@param new_skgrepo string
 ---@param recursive boolean|nil
 function M.change_repo_and_report (old_skgrepo, new_skgrepo, recursive)
-  local changed_count, writeProtected_skgids
+  local changed_count, writeProtected_gnids
   if recursive then
-    changed_count, writeProtected_skgids =
+    changed_count, writeProtected_gnids =
       M.change_repo_recursive(old_skgrepo, new_skgrepo)
   else
-    changed_count, writeProtected_skgids =
+    changed_count, writeProtected_gnids =
       M.change_repo_at_line_unless_write_protected(
         M.current_line_number(), new_skgrepo) end
-  for _, skgid in ipairs(writeProtected_skgids) do
+  for _, gnid in ipairs(writeProtected_gnids) do
     vim.notify(
       'SkgSetRepo: write-protected occurrence not changed '
-        .. '(the save would refuse its edit): ' .. skgid,
+        .. '(the save would refuse its edit): ' .. gnid,
       vim.log.levels.WARN) end
   local summary = string.format(
     'Repo changed from %s to %s on %d node%s. Save to apply.',
     old_skgrepo, new_skgrepo, changed_count,
     changed_count == 1 and '' or 's')
-  if #writeProtected_skgids == 0 then
+  if #writeProtected_gnids == 0 then
     vim.notify(summary)
   else
     vim.notify(summary .. string.format(
       '  WARNING: %d write-protected node%s not changed -- the save '
         .. 'would refuse their edits. See :messages for the ID list.',
-      #writeProtected_skgids,
-      #writeProtected_skgids == 1 and '' or 's'),
+      #writeProtected_gnids,
+      #writeProtected_gnids == 1 and '' or 's'),
       vim.log.levels.WARN) end
 end
 
@@ -573,16 +573,16 @@ end
 ---@return string[] the skipped write-protected IDs
 function M.change_repo_recursive (old_skgrepo, new_skgrepo)
   local changed_count = 0
-  local changed_skgids = {}
-  local writeProtected_skgids = {}
+  local changed_gnids = {}
+  local writeProtected_gnids = {}
   local function change_or_skip (line)
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if M.node_write_protected_p(metadata) then
-      table.insert(writeProtected_skgids,
+      table.insert(writeProtected_gnids,
                    M.node_id(metadata) or '(no id)')
     else
-      local skgid = M.node_id(metadata)
-      if skgid then changed_skgids[skgid] = true end
+      local gnid = M.node_id(metadata)
+      if gnid then changed_gnids[gnid] = true end
       changed_count = changed_count
         + M.change_repo_at_line(line, new_skgrepo) end
   end
@@ -601,9 +601,9 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
       line = M.next_headline_line(line) end
   end
   return changed_count,
-         vim.tbl_filter(function (skgid)
-                          return not changed_skgids[skgid] end,
-                        writeProtected_skgids)
+         vim.tbl_filter(function (gnid)
+                          return not changed_gnids[gnid] end,
+                        writeProtected_gnids)
 end
 
 ---Set the skgrepo at LINE_NUMBER to NEW_REPO. The save recomputes the
@@ -626,13 +626,13 @@ function M.set_merge_request (acquiree_id_or_link)
                  or vim.fn.input('Acquiree ID or link: ')
   if answer == nil or answer == '' then
     error('Acquiree ID cannot be empty') end
-  local acquiree_skgid = M.id_from_link_or_text(answer)
-  if acquiree_skgid == '' then
+  local acquiree_gnid = M.id_from_link_or_text(answer)
+  if acquiree_gnid == '' then
     error('Acquiree ID cannot be empty') end
   M.write_edit_request(
-    { sexpr.symbol('merge'), sexpr.symbol(acquiree_skgid) }, 'node')
+    { sexpr.symbol('merge'), sexpr.symbol(acquiree_gnid) }, 'node')
   vim.notify(string.format(
-    'Merge request set for acquiree %s. Save to apply.', acquiree_skgid))
+    'Merge request set for acquiree %s. Save to apply.', acquiree_gnid))
 end
 
 -- The diff view's restore requests ('docs/diff-view.org', "Restoring
@@ -803,8 +803,8 @@ end
 ---@return string
 function M.id_from_link_or_text (text)
   local trimmed = vim.trim(text)
-  local skgid = trimmed:match('%[%[id:([^%]]+)%]%[')
-  return skgid or trimmed
+  local gnid = trimmed:match('%[%[id:([^%]]+)%]%[')
+  return gnid or trimmed
 end
 
 ---Delete all kv-pairs keyed KEY from the metadata of the headline at

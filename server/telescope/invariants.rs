@@ -160,10 +160,10 @@ pub fn derive_affected_telescope_recorders (
   base            : &InRustGraph,
   candidate       : &InRustGraph,
   saved_pids      : &HashSet<ID>,
-  affected_skgids : &HashSet<ID>,
+  affected_gnids : &HashSet<ID>,
 ) -> HashSet<ID> {
   let mut recorders : HashSet<ID> = saved_pids . clone ();
-  for raw in affected_skgids {
+  for raw in affected_gnids {
     let old_pid : Option<ID> = base . pid_of (raw);
     let final_pid : Option<ID> = candidate . pid_of (raw);
     let old_home : Option<SkgrepoName> = old_pid . as_ref ()
@@ -195,12 +195,12 @@ pub fn affected_telescope_warnings (
   base            : &InRustGraph,
   candidate       : &InRustGraph,
   saved_pids      : &HashSet<ID>,
-  affected_skgids : &HashSet<ID>,
+  affected_gnids : &HashSet<ID>,
 ) -> Vec<(ID, TelescopeViolation)> {
   let _span : tracing::span::EnteredSpan =
     tracing::info_span! ("affected_telescope_warnings") . entered ();
   let mut recorders : Vec<ID> = derive_affected_telescope_recorders (
-    base, candidate, saved_pids, affected_skgids) . into_iter () . collect ();
+    base, candidate, saved_pids, affected_gnids) . into_iter () . collect ();
   recorders . sort ();
   tracing::info! (
     "incremental telescope work: telescope_recorders_checked={}",

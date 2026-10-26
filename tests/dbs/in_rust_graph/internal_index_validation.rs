@@ -101,7 +101,7 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
     . contains (&ID::from ("recorder")));
 
   apply_nodeInstructions_to_inRustGraph (&mut graph, &[NodeInstruction::Delete (DeleteNode {
-    skgid : ID::from ("disposable"), home_skgrepo: skgrepo,
+    gnid : ID::from ("disposable"), home_skgrepo: skgrepo,
   })]);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
   assert! (! graph . contained_by . contains_key (&ID::from ("delete-target")));
@@ -159,7 +159,7 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
   apply_nodeInstructions_to_inRustGraph (&mut graph, &[
     NodeInstruction::Save (SaveNode (merged . clone ())),
     NodeInstruction::Delete (DeleteNode {
-      skgid           : ID::from ("acquiree"),
+      gnid           : ID::from ("acquiree"),
       home_skgrepo : skgrepo,
     }),
   ]);
@@ -177,14 +177,14 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
 fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   let skgrepo      : SkgrepoName = SkgrepoName::from ("main");
   let mut recorder : Graphnode = node ("foreign-recorder");
-  let raw_skgids : Vec<ID> = vec![ID::from ("target"), ID::from ("extra")];
-  recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_skgids . clone ());
+  let raw_gnids : Vec<ID> = vec![ID::from ("target"), ID::from ("extra")];
+  recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_gnids . clone ());
   recorder . subscribesTo = MSV::Specified (rel_partners_at_relRepo (
-    &skgrepo, raw_skgids . clone ()));
+    &skgrepo, raw_gnids . clone ()));
   recorder . hidesFromSubs = MSV::Specified (rel_partners_at_relRepo (
-    &skgrepo, raw_skgids . clone ()));
+    &skgrepo, raw_gnids . clone ()));
   recorder . overrides = MSV::Specified (rel_partners_at_relRepo (
-    &skgrepo, raw_skgids . clone ()));
+    &skgrepo, raw_gnids . clone ()));
   recorder . body = Some (
     "[[id:target][primary]] [[id:extra][extra]]" . to_string ());
   let mut target : Graphnode = node ("target");
@@ -194,7 +194,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   ]);
   apply_nodeInstructions_to_inRustGraph (&mut graph, &[
     NodeInstruction::Delete (DeleteNode {
-      skgid     : ID::from ("target"),
+      gnid     : ID::from ("target"),
       home_skgrepo: skgrepo,
     }),
   ]);
@@ -206,7 +206,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
     &graph . overriders_of,
     &graph . mentioners_of,
   ] {
-    for raw in &raw_skgids {
+    for raw in &raw_gnids {
       assert! (index . get (raw) . unwrap () . contains (&ID::from ("foreign-recorder"))); }}
   let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&[recorder]);
   assert_same_graph (&graph, &rebuilt);
@@ -257,11 +257,11 @@ proptest! {
   ) {
     let skgrepo : SkgrepoName = SkgrepoName::from ("main");
     let universe : [&str; 6] = ["P", "E", "Q", "U", "X", "Y"];
-    let raw_skgids : Vec<ID> = raw_indexes . iter ()
+    let raw_gnids : Vec<ID> = raw_indexes . iter ()
       . map (|index| ID::from (universe [*index]))
       . collect ();
     let mut recorder : Graphnode = node ("recorder");
-    recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_skgids . clone ());
+    recorder . contains = rel_partners_at_relRepo (&skgrepo, raw_gnids . clone ());
     recorder . subscribesTo = MSV::Specified (recorder . contains . clone ());
     recorder . hidesFromSubs = MSV::Specified (recorder . contains . clone ());
     recorder . overrides = MSV::Specified (recorder . contains . clone ());
@@ -277,7 +277,7 @@ proptest! {
     let (nodeInstructions, final_nodes) : (Vec<NodeInstruction>, Vec<Graphnode>) =
       match action {
         0 => (vec![NodeInstruction::Delete (DeleteNode {
-                skgid : ID::from ("P"), home_skgrepo : skgrepo . clone (),
+                gnid : ID::from ("P"), home_skgrepo : skgrepo . clone (),
               })],
               vec![recorder, acquirer]),
         1 => {
@@ -286,7 +286,7 @@ proptest! {
           (vec![
              NodeInstruction::Save (SaveNode (merged . clone ())),
              NodeInstruction::Delete (DeleteNode {
-               skgid : ID::from ("P"), home_skgrepo : skgrepo . clone (),
+               gnid : ID::from ("P"), home_skgrepo : skgrepo . clone (),
              }),
            ], vec![recorder, merged])
         },

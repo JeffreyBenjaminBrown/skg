@@ -50,7 +50,7 @@ pub(crate) fn extent_of_parent (
       && ! node . ancestors () . any ( |ancestor| matches! (
            &ancestor . value () . kind,
            ViewnodeKind::Vognode (Vognode::Ghost (above))
-             if above . skgid == ghost . skgid )),
+             if above . gnid == ghost . gnid )),
     _ => false, };
   if all { Extent::All } else { Extent::None } }
 
@@ -109,7 +109,7 @@ pub(crate) fn settle_budget_at_visit (
 ) {
   let pid : ID = match &tree . get (parent) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
-      if ! occurrence . is_writeProtected () => occurrence . skgid . clone (),
+      if ! occurrence . is_writeProtected () => occurrence . gnid . clone (),
     _ => return, };
   let charged : bool = walk . mode . charges_node_budget (
     &pid, walk . had_editableView_request . contains (&parent) );

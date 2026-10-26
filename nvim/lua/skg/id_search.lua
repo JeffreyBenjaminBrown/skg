@@ -58,9 +58,9 @@ end
 function M.point_in_link_p ()
   local line = metadata.line_text()
   local pos = vim.api.nvim_win_get_cursor(0)[2] + 1
-  local start, _, skgid, label =
+  local start, _, gnid, label =
     M.match_containing(line, M.link_pattern, pos, false)
-  if start then return { id = skgid, label = label } end
+  if start then return { id = gnid, label = label } end
   return nil
 end
 
@@ -71,8 +71,8 @@ function M.point_on_uuid_p ()
   local start, finish =
     M.match_containing(line, M.uuid_v4_pattern, pos, true)
   if start then
-    local skgid = line:sub(start, finish)
-    return { id = skgid, label = skgid } end
+    local gnid = line:sub(start, finish)
+    return { id = gnid, label = gnid } end
   return nil
 end
 
@@ -169,8 +169,8 @@ function M.point_in_metadata_p ()
   local metadata_end = start_col + #split.metadata
   if pos >= start_col and pos < metadata_end then
     local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-    local skgid = sexp and M.extract_id_from_metadata_sexp(sexp)
-    if skgid then return { id = skgid, label = split.title } end
+    local gnid = sexp and M.extract_id_from_metadata_sexp(sexp)
+    if gnid then return { id = gnid, label = split.title } end
   end
   return nil
 end
@@ -311,12 +311,12 @@ function M.goto_id_near_point ()
 end
 
 ---Open a content view for ID, prompting when not given.
----@param skgid string|nil
-function M.goto_by_id (skgid)
-  skgid = skgid or vim.fn.input('Node ID: ')
-  if skgid == nil or skgid == '' then return end
-  vim.notify('Visiting node: ' .. skgid)
-  content_view.request_single_root_content_view_from_id(skgid)
+---@param gnid string|nil
+function M.goto_by_id (gnid)
+  gnid = gnid or vim.fn.input('Node ID: ')
+  if gnid == nil or gnid == '' then return end
+  vim.notify('Visiting node: ' .. gnid)
+  content_view.request_single_root_content_view_from_id(gnid)
 end
 
 ---Move the cursor to the headline carrying VIEWNODE_ID, prompting
@@ -370,9 +370,9 @@ function M.goto_and_close_this ()
   goto_then_close(M.goto_id_near_point)
 end
 
----@param skgid string|nil
-function M.goto_by_id_and_close_this (skgid)
-  goto_then_close(function () M.goto_by_id(skgid) end)
+---@param gnid string|nil
+function M.goto_by_id_and_close_this (gnid)
+  goto_then_close(function () M.goto_by_id(gnid) end)
 end
 
 return M

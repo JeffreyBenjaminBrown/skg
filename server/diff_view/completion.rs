@@ -10,7 +10,7 @@
 
 use crate::diff_view::pruned_change_view::{
   append_contentOrigins_to_buffer, contentOrigins_missing_from_buffer,
-  ensure_editableOccurrences_exist, root_skgids_of_buffer};
+  ensure_editableOccurrences_exist, root_gnids_of_buffer};
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
@@ -76,7 +76,7 @@ pub fn rerender_diffView_buffer (
       graph_straddle_slot, &runtime . config, runtime . graph . clone () )
     . map_err ( |e| format! (
       "Cannot rerender the diff view buffer: {}", e )) ?;
-  let standing_roots : BTreeSet<ID> = root_skgids_of_buffer (viewforest);
+  let standing_roots : BTreeSet<ID> = root_gnids_of_buffer (viewforest);
   if integrate_unshown_changes {
     ensure_editableOccurrences_exist (&straddle, diffView_buffer_kind, viewforest); }
   let store : MutexGuard<ReadinessStore> = env . runtime . lock_readiness_store ();

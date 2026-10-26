@@ -1,6 +1,6 @@
 use crate::from_text::fork::{CloneSkgrepoInputs, fork_spec_from_buffer_node};
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::dbs::node_lookup::opt_graphnode_by_skgid;
+use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
@@ -104,19 +104,19 @@ fn apply_foreign_policy(
 ) -> Result<ForeignPolicyOutcome,
             Vec<BufferValidationError>> {
   match instr {
-    NodeInstruction::Delete(DeleteNode { skgid, home_skgrepo: skgrepo }) => {
+    NodeInstruction::Delete(DeleteNode { gnid, home_skgrepo: skgrepo }) => {
       if skgrepo_is_foreign (config, skgrepo) {
         // can't delete foreign nodes
         Ok (ForeignPolicyOutcome::Reject(
           BufferValidationError::ModifiedForeignNode(
-            skgid . clone(),
+            gnid . clone(),
             skgrepo . clone() )))
       } else { Ok (ForeignPolicyOutcome::Keep) }}
     NodeInstruction::Save(SaveNode (node)) => {
       if !skgrepo_is_foreign (config, &node . home_skgrepo) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match opt_graphnode_by_skgid(
+      match opt_graphnode_by_gnid(
         graph, config, &node . pid
       ) {
         Ok(Some (disk_node)) => {
@@ -192,7 +192,7 @@ fn finalize_foreign_policy_instructions(
       ForeignPolicyOutcome::AdoptCloneSkgrepo (forked) => {
         let clone_skgrepo : Option<&SkgrepoName> =
           fork_specs . iter()
-          . find ( |spec| spec . original_skgid == *forked )
+          . find ( |spec| spec . original_gnid == *forked )
           . map ( |spec| & spec . clone . 0 . home_skgrepo );
         match (instruction, clone_skgrepo) {
           ( NodeInstruction::Save (SaveNode (mut node)),
@@ -208,7 +208,7 @@ fn finalize_foreign_policy_instructions(
             // Unreachable: only a Save earns AdoptCloneRepo.
             errors . push (
               BufferValidationError::ModifiedForeignNode(
-                d . skgid . clone(),
+                d . gnid . clone(),
                 d . home_skgrepo . clone() )), }},
       _ => kept . push (instruction), }}
   if errors . is_empty() { Ok (kept) } else { Err (errors) }}
@@ -324,18 +324,18 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
 ) -> Result<(), Vec<BufferValidationError>> {
   if skgrepo_moves . is_empty() || nodeMerge_instructions . is_empty() {
     return Ok (()); }
-  let move_skgids : HashSet<&ID> =
+  let move_gnids : HashSet<&ID> =
     skgrepo_moves . iter() . map(|sm| &sm . pid) . collect();
   let mut errors : Vec<BufferValidationError> = Vec::new();
   for nodeMerge in nodeMerge_instructions {
-    if move_skgids . contains (nodeMerge . acquirer_skgid()) {
+    if move_gnids . contains (nodeMerge . acquirer_gnid()) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          nodeMerge . acquirer_skgid() . clone() )); }
-    if move_skgids . contains (nodeMerge . acquiree_skgid()) {
+          nodeMerge . acquirer_gnid() . clone() )); }
+    if move_gnids . contains (nodeMerge . acquiree_gnid()) {
       errors . push (
         BufferValidationError::CannotMoveAndMergeSimultaneously(
-          nodeMerge . acquiree_skgid() . clone() )); }}
+          nodeMerge . acquiree_gnid() . clone() )); }}
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
