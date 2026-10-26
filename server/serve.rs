@@ -14,7 +14,6 @@ pub mod util;
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
 use crate::serve::handlers::relRepo_info::handle_relRepo_info_request;
@@ -31,32 +30,27 @@ use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::server_warnings::handle_server_warnings_request;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
-  decide as decide_text_release,
-  exclude_overPrivateText_nodes_from_viewforest};
+  decide as decide_text_release};
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use crate::serve::handlers::integrate_unshown_changes::handle_integrate_unshown_changes_request;
 use crate::serve::handlers::stage_and_commit::handle_stage_and_commit_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
-use crate::serve::handlers::text_search::render_enriched_search_buffer::insert_partner_folders_into_search_view;
-use crate::serve::handlers::text_search::{ abandon_search_enrichment, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
+use crate::serve::handlers::text_search::{ abandon_search_enrichment, enrich_search_viewforest, handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_skgids::handle_titles_by_skgids_request_with_skgrepo_set;
 use crate::serve::handlers::diff_view::handle_diffView_request;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
-use crate::to_org::util::mark_view_roots_as_members;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::skgrepo_sets::entombstone_hidden_occurrences;
 use crate::types::misc::SkgrepoSetName;
+use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
-use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
-use crate::update_buffer::set_viewnodestats_in_viewforest;
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::Tree;
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
 use std::net::TcpListener;
@@ -326,8 +320,8 @@ fn handle_emacs (
   tracing::info!(peer = %peer, "Emacs disconnected"); }
 
 /// Handle the buffer snapshot that Emacs sent back.
-/// Parses the buffer text, inserts the partner folders, sets graphnodestats,
-/// and sends the enriched result to Emacs.
+/// Parses the buffer text, refreshes it as the enrichment's stub
+/// ('enrich_search_viewforest'), and sends the enriched result to Emacs.
 /// Always sends exactly one 'search-enrichment', because that is what
 /// releases the client's stream guard. If enrichment fails, it has no
 /// content, and carries the failure as a warning.
@@ -395,8 +389,8 @@ fn enrich_search_buffer_snapshot (
   let parse_result : Result<(Tree<Viewnode>,
                              Vec<BufferValidationError>), String>
     = org_to_viewnode_tree (buffer_text, &runtime . graph);
-  let mut viewforest : Tree<Viewnode> = match parse_result {
-    Ok (( viewforest, _errors )) => viewforest,
+  let mut viewforest : ViewForest = match parse_result {
+    Ok (( viewforest, _errors )) => ViewForest::from_internal_tree (viewforest),
     Err (e) => {
       return Err ( format! ("parse failed: {}", e )); }};
   let viewforest_id : ViewforestId =
@@ -404,35 +398,13 @@ fn enrich_search_buffer_snapshot (
   let mut viewnode_id_record : ViewnodeIdRecord =
     views_state . open_views . viewnode_id_record_of (&viewforest_id);
   viewnode_id_record . drop_unknown_viewnode_ids_in_parsed_viewforest (&mut viewforest);
-  insert_partner_folders_into_search_view (
-    &mut viewforest, &runtime . graph, &payload . search_results,
-    &payload . containerward_role_trees_by_skgid, &runtime . tantivy_index,
-    &runtime . config, skgrepo_restriction );
-  { let root_treeid : NodeId =
-      viewforest . root () . id ();
-    set_metadata_relationships_in_node_recursive (
-      &mut viewforest, root_treeid,
-      &runtime . graph,
-      &payload . graphnodestats,
-      &runtime . config ); }
-  mark_view_roots_as_members (
-    &mut viewforest );
-  set_viewnodestats_in_viewforest (
-    &mut viewforest,
-    &runtime . graph,
-    & payload . graphnodestats . container_to_contents,
-    & payload . graphnodestats . content_to_containers,
-    &runtime . config,
-    Some (skgrepo_restriction) );
-  entombstone_hidden_occurrences (
-    &mut viewforest,
-    &runtime . graph,
-    skgrepo_restriction );
-  if ! payload . include_overPrivateText_telescopes {
-    exclude_overPrivateText_nodes_from_viewforest (
-      &mut viewforest, &runtime . graph ); }
+  let enriched : String = enrich_search_viewforest (
+    &mut viewforest, &mut viewnode_id_record, &runtime . graph, &runtime . config,
+    &payload . search_results, skgrepo_restriction,
+    payload . include_overPrivateText_telescopes )
+    . map_err ( |e| format! ("refresh failed: {}", e) ) ?;
   let rendered_pids : Vec<_> =
-    viewforest . root () . descendants ()
+    viewforest . nodes ()
     . filter_map ( |node| match &node . value () . kind {
       crate::types::viewnode::ViewnodeKind::Vognode (
         crate::types::viewnode::Vognode::Unrestricted (unrestricted_node)) =>
@@ -455,10 +427,6 @@ fn enrich_search_buffer_snapshot (
   let release_warnings : Vec<String> = match release {
     TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
-  viewnode_id_record . assign_viewnode_ids (&mut viewforest);
-  let enriched : String =
-    viewforest_to_string ( &viewforest, &runtime . config )
-    . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp (
       terms, Some (&enriched), &release_warnings );

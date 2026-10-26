@@ -1054,7 +1054,7 @@ it: the stub's roots and a newly editable occurrence carry a
 the refresh fulfils it as any folder request, drawing the
 hidden-outside folder beside the subscribees as today. A test
 shows a subscribing root drawn with both folders.
-** TODO Slice 10: the search buffer, and the corrections channel
+** DONE Slice 10: the search buffer, and the corrections channel
 The search enrichment builds its stub (the hits as
 write-protected roots with a '(folder containers)' request)
 and calls 'refresh_viewforest';

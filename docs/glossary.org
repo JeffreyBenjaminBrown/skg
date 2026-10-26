@@ -404,8 +404,7 @@ it where it stands as a non-member, with its title, ID, subtree and
 the editability it had, so that it can be adopted back as a member
 when its membership returns. A reconciler does this to a member the
 graph no longer warrants that holds something, so that what stands
-below it survives; it loses its change facts. A save's warning says
-"retained N child(ren) as non-members". The verb is always spelled
+below it survives; it loses its change facts. The verb is always spelled
 out this way; "retain" alone and "park" are not used. The rule that
 decides between this and a tombstone is in the implementation's
 glossary:
@@ -1371,7 +1370,9 @@ How the server's startup warnings reach the user: 'load_config'
 returns warnings beside the config, 'main' records them once on the
 runtime ('record_startup_warnings' in 'server/types/env.rs'), the
 server serves them on request ("server warnings"), and each client
-shows them in its '*SKG Server Warnings*' buffer on connect.
+shows them in its '*SKG Server Warnings*' buffer on connect. The
+same buffer receives the corrections a save or a rerender reports,
+under a headline per view.
 
 *** "snapshot" is always qualified: graph, git or buffer snapshot
 

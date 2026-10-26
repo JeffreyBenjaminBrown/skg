@@ -6,10 +6,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
 
-use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
-use skg::dbs::in_rust_graph::stats::AllGraphnodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
@@ -27,7 +24,7 @@ use skg::org_to_text::viewforest_to_string;
 use skg::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
 use skg::types::viewnode::{
@@ -37,11 +34,9 @@ use skg::types::viewnode::{
 use skg::types::viewnode::Vognode;
 use skg::types::views_state::{OpenViews, ViewState, ViewforestId, ViewnodeIdRecord};
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashSet};
 use std::error::Error;
-use std::fs;
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use skg::metadata_canon::without_viewnode_ids;
@@ -338,8 +333,6 @@ async fn skgrepo_set_switch_rerenders_views_and_cancels_stale_search_enrichment 
           runtime        : env . runtime_snapshot (),
           terms          : "shared ranking term" . to_string (),
           search_results : vec![ID::from ("active-search-hit")],
-          containerward_role_trees_by_skgid : HashMap::new (),
-          graphnodestats : AllGraphnodeStats::empty (),
           include_overPrivateText_telescopes : false, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
@@ -562,8 +555,12 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
         rendered );
       Ok (( )) }
 
+/// The enrichment under the restriction "public": the hit's containers
+/// folder holds its public container, whose chain stops before the
+/// private container above it, and nothing of the private container
+/// that contains the hit directly.
 #[test]
-fn search_enrichment_truncates_containers_folder_before_restricted_container (
+fn search_enrichment_omits_the_containers_the_restriction_hides (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;
@@ -583,47 +580,33 @@ fn search_enrichment_truncates_containers_folder_before_restricted_container (
     skg::types::nodes::complete::empty_graphnode ();
   unrestricted_container . pid = ID::from ("active-container");
   unrestricted_container . title = "active-container" . to_string ();
+  unrestricted_container . contains = rel_partners_at_relRepo (
+    &SkgrepoName::from ("public"), vec! [ ID::from ("active-search-hit") ] );
   set_skgrepo_retagging_relRepos ( &mut unrestricted_container, &SkgrepoName::from ("public") );
   let mut private_container : Graphnode =
     skg::types::nodes::complete::empty_graphnode ();
   private_container . pid = ID::from ("private-container");
   private_container . title =
     "private container title must not leak" . to_string ();
+  private_container . contains = rel_partners_at_relRepo (
+    &SkgrepoName::from ("private"),
+    vec! [ ID::from ("active-container"), ID::from ("active-search-hit") ] );
   set_skgrepo_retagging_relRepos ( &mut private_container, &SkgrepoName::from ("private") );
   let graph = skg::dbs::in_rust_graph::InRustGraph::from_graphnodes (
-    &[result_node . clone (), unrestricted_container . clone (),
-      private_container . clone ()]);
-  let index_dir : &str =
-    "/tmp/tantivy-test-repo-sets-search-enrichment-truncation";
-  let (tantivy, _count) =
-    wipe_then_init_tantivy_db (
-      &[ result_node, unrestricted_container, private_container ],
-      Path::new (index_dir))?;
+    &[result_node, unrestricted_container, private_container]);
   let mut matches_by_skgid =
     skg::serve::handlers::text_search::MatchGroups::new ();
   matches_by_skgid . insert (
     ID::from ("active-search-hit"),
     ( SkgrepoName::from ("public"),
       vec![(1.0, "unrestricted search hit" . to_string ())] ));
-  let containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
-    HashMap::from ([(
-      ID::from ("active-search-hit"),
-      ContainerwardRoleTree::Inner (
-        ID::from ("active-search-hit"),
-        vec![ContainerwardRoleTree::Inner (
-          ID::from ("active-container"),
-          vec![ContainerwardRoleTree::Root (
-            ID::from ("private-container"))])]))]);
   let rendered : String =
     skg::serve::handlers::text_search
       ::enriched_search_buffer_for_skgrepo_set_for_test (
         &graph,
+        &config,
         "search term",
         &matches_by_skgid,
-        &[ID::from ("active-search-hit")],
-        &containerward_role_trees_by_skgid,
-        &tantivy,
-        &config,
         &restriction)?;
   assert! (
     rendered . lines () . any ( |line|
@@ -642,15 +625,17 @@ fn search_enrichment_truncates_containers_folder_before_restricted_container (
     rendered );
   assert! (
     ! rendered . contains ("private-container"),
-    "restricted enrichment ancestry should be truncated before the \
-     restricted container: {}",
+    "the private container shows nowhere, neither in the folder nor \
+     in the chain: {}",
     rendered );
   assert! (
     ! rendered . contains ("private container title must not leak"),
     "restricted enrichment ancestry must not reveal title text: {}",
     rendered );
-  if Path::new (index_dir) . exists () {
-    fs::remove_dir_all (index_dir)?; }
+  assert! (
+    ! rendered . contains ("tombstone"),
+    "nothing stands where the hidden container would: {}",
+    rendered );
   Ok (( )) }
 
 #[test]

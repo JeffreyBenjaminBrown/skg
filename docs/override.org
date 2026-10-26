@@ -302,7 +302,7 @@ not perform interactive override substitution.
 - [[file:../server/types/viewnode.rs][folder policies and =overridesHere= collection]]
 - [[file:../server/to_org/extend/folder_request.rs][on-demand folder construction]]
 - [[file:../server/serve/handlers/text_search.rs][search suppression]]
-- [[file:../server/serve/handlers/text_search/render_enriched_search_buffer.rs][the search results' folders]]
+- [[file:../server/serve/handlers/text_search.rs][the search results' folders ('enrich_search_viewforest')]]
 - [[file:../server/from_text/fork.rs][implicit and explicit fork construction]]
 - [[file:../server/nodeMerge/nodeMergeInstructionTriple.rs][merge list combination]]
 - [[file:../server/dbs/in_rust_graph/prepared_update.rs][merge collision diagnostics]]

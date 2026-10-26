@@ -80,11 +80,17 @@ So far there are these endpoints:
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with =(("content" "TERMS"))= — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with =((request . "snapshot response") (terms . "TERMS"))\n= followed by =Content-Length: N\r\n\r\n<buffer text>= — the current buffer contents, dirty or not. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the buffer snapshot, inserts each hit's partner
-       folders and graphnodestats, and sends LP
-       response-type "search-enrichment" with =(("terms" "TERMS")
-       ("content" "ORG") ("warnings" (...)))=. Emacs replaces the
-       buffer and exits readonly.
+    3. Rust parses the buffer snapshot and refreshes it as a stub
+       ('enrich_search_viewforest'): each hit, a write-protected
+       occurrence, asks for its containers folder ('(folder
+       containers)'), and holds an empty overrider and overridden
+       folder when it has such relatives; the refresh fills the
+       folders and draws each member's containerward chain. Rust then
+       sends LP response-type "search-enrichment" with =(("terms"
+       "TERMS") ("content" "ORG") ("warnings" (...)))=. Emacs replaces
+       the buffer and exits readonly. A refresh shows each hit with
+       its node's title, so a hit that matched by an alias shows the
+       alias in the first phase and the title in the second.
     - Enrichment uses the same skgrepo restriction as the original
       search. The containerward chain stops before restricted
       containers.
@@ -182,15 +188,31 @@ So far there are these endpoints:
        =Content-Length: N\r\n\r\n((response-type collateral-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     4. Final save response:
-       =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
+       =Content-Length: N\r\n\r\n((response-type save-result) (content "...") (errors ("..." ...)) (warnings ("..." ...)) (corrections (("VIEW_ID" "..." ...) ...)) (point-lines-below-focused-headline N) (point-column C) (point-screen-lines-below-window-start M))=
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
+       =corrections= holds what the refresh corrected in each view the
+       save refreshed, the saved view and the collateral ones: one
+       list per view with corrections, its view ID first, then one
+       message per correction (see "How a message names a headline"
+       below), such as =("content-view:5" "Drew what the graph says
+       belongs here.\n*** new child\n- viewnode ID: 0d. ...")=. A
+       correction is a headline the refresh changed because the
+       buffer contradicted the graph (reinstated, entombstoned, marked
+       =noClaim=, merged, re-kinded, or an edit request dropped). What
+       the refresh draws as extent is not one: the content of an
+       occurrence it extends first, the members of a folder first
+       requested, a fresh view's content. So a reinstatement is
+       reported only where a list already drawn lacked a member, and a
+       plain save reports nothing. The list is present and empty if
+       none; a failed save's response has no =corrections=. A buffer
+       of the diff view reports none. Each client appends them to its
+       warnings buffer (see "Server warnings" below), under one level-1
+       headline per view naming the view's buffer (or its view ID when
+       no buffer shows it).
        Each message names the headlines it concerns as subheadlines
        (see "How a message names a headline" below). A failed save
        sends one error, =NOTHING WAS SAVED=, whose validation errors
-       follow as =** Error N= headlines. For a content view, each
-       correction the refresh made to the saved buffer is a warning
-       naming its headline; for a buffer of the diff view, a repair
-       warning names the repaired folder, one per folder occurrence.
+       follow as =** Error N= headlines.
        When the saved buffer is one of the diff view's, the response
        ends with =(readiness-summary (ready N) (changed M) (foreign F) (order-only O) (notEditable K))=:
        of the M changed files of the owned skgrepos (O of them changed only
@@ -356,10 +378,11 @@ So far there are these endpoints:
     both directions. It pins atom coverage only, not presentation.
 
 ** How a message names a headline
-Every message in an =errors= or =warnings= list is Org text. Its first
-line is the message's headline text, which both clients write as a
-level-2 headline (=** =) under =* errors= or =* warnings=; the lines
-after it are its body. A message that concerns a headline of the
+Every message in an =errors=, =warnings= or =corrections= list is Org
+text. Its first line is the message's headline text, which both
+clients write as a level-2 headline (=** =) under =* errors=, =*
+warnings= or the headline naming a corrected view; the lines after
+it are its body. A message that concerns a headline of the
 buffer names it as a level-3 subheadline, after the message's own
 lines:
 #+begin_example
@@ -404,6 +427,10 @@ since the command searches the current buffer.
     opens a buffer listing the warnings, one headline each:
     =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
     in Neovim. An empty answer opens nothing.
+  - The same buffer receives the corrections that a =save-result= or
+    a =rerender-done= carries: each client appends them, keeping
+    what the buffer holds, under one level-1 headline per view, each
+    correction a level-2 headline under it.
 
 ** Link statuses
   - Request: =((request . "link statuses") (request-id . "TOKEN") (ids "ID" ...))=.
@@ -735,8 +762,12 @@ one automatically.
        =Content-Length: N\r\n\r\n((response-type rerender-view) (view-id "VIEW_ID") (content "..."))=
        Emacs unlocks and updates each buffer as it arrives.
     3. Done message:
-       =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)))=
+       =Content-Length: N\r\n\r\n((response-type rerender-done) (errors ("..." ...)) (warnings ("..." ...)) (corrections (("VIEW_ID" "..." ...) ...)))=
        Emacs removes the rerender-view handler and unlocks any remaining buffers.
+       =corrections= holds what the refresh corrected in each view it
+       rerendered, as in the save's =save-result= (see "Save buffer"
+       above), and is present and empty if none. Every rerender stream
+       ends with this message.
   - Behavior: Re-renders every open view from server memory; a buffer
     of the diff view is reconciled over the graph straddle.
     Does not save or modify the graph. Refreshes all views without

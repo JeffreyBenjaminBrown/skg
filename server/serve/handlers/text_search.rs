@@ -1,4 +1,3 @@
-pub mod render_enriched_search_buffer;
 mod coverage;
 
 use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
@@ -14,20 +13,17 @@ use crate::prominence::ProminenceSource;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
-use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::in_rust_graph::stats::{
-  AllGraphnodeStats,
-  fetch_all_graphnodestats_with_skgrepo_set};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
-use crate::update_buffer::set_viewnodestats_in_viewforest;
+use crate::refresh::{Truth, refresh_viewforest};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
   SearchOverPrivateTextChoice,
   decide as decide_text_release,
+  exclude_overPrivateText_nodes_from_viewforest,
   search_challenge_response,
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
@@ -38,11 +34,13 @@ use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ FoldAndFocus, Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
-use crate::types::viewnode::{Folder, PropertyMember, viewnode_of};
+use crate::types::viewnode::{Folder, FolderRelation, PropertyMember, ViewRequest, Vognode, viewnode_of};
+use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -71,56 +69,34 @@ pub fn search_skgids_for_skgrepo_set_for_test (
     tantivy_index, config, restriction, terms, limit ) }
 
 pub fn enriched_search_buffer_for_skgrepo_set_for_test (
-  graph                             : &InRustGraph,
-  terms                             : &str,
-  matches_by_skgid                  : &MatchGroups,
-  search_results                    : &[ID],
-  containerward_role_trees_by_skgid : &HashMap<ID, ContainerwardRoleTree>,
-  tantivy_index                     : &TantivyIndex,
-  config                            : &SkgConfig,
-  restriction                       : &SkgrepoRestriction,
-) -> Result<String, Box<dyn std::error::Error>> {
-  let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
+  graph            : &InRustGraph,
+  config           : &SkgConfig,
+  terms            : &str,
+  matches_by_skgid : &MatchGroups,
+  restriction      : &SkgrepoRestriction,
+) -> Result<String, Box<dyn Error>> {
+  let (mut viewforest, search_results) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_skgid, &HashSet::new ());
-  render_enriched_search_buffer::insert_partner_folders_into_search_view (
-    &mut viewforest,
-    graph,
-    search_results,
-    containerward_role_trees_by_skgid,
-    tantivy_index,
-    config,
-    restriction );
-  set_viewnodestats_in_viewforest (
-    // Mirror the production enrichment path (handle_snapshot_response):
-    // compute view-relative stats so the rendered buffer carries the
-    // repoBoundary at skgrepo boundaries. Empty containment maps suffice
-    // here -- repoBoundary is derived from the tree alone; the maps
-    // only feed the containsParent stat, which this test does not assert.
-    &mut viewforest,
-    graph,
-    & HashMap::new (),
-    & HashMap::new (),
-    config,
-    Some (restriction) );
-  Ok ( viewforest_to_string ( &viewforest, config )? ) }
+  enrich_search_viewforest (
+    &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
+    &search_results, restriction, false ) }
 
-/// Structured enrichment data passed through the slot,
-/// replacing the raw rendered String.
+/// What the enrichment of a search buffer needs besides its snapshot
+/// ('enrich_search_viewforest'), passed through the slot.
 pub struct SearchEnrichmentPayload {
   pub runtime                           : Arc<RuntimeGeneration>,
   pub terms                             : String,
   pub search_results                    : Vec<ID>,
-  pub containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree>,
-  pub graphnodestats                    : AllGraphnodeStats,
   /// Load-bearing across the asynchronous buffer-snapshot exchange: enrichment
   /// must not broaden a preflight decision to exclude overPrivateText telescopes.
   pub include_overPrivateText_telescopes : bool,
 }
 
 /// Provides two responses, one fast and one slow.
-/// The slower one is 'enriched'
-/// with partner folders and graphnodestats at each search hit,
-/// and is processed in the background -- the user need not await it.
+/// The slower one is 'enriched' with partner folders at each search
+/// hit ('enrich_search_viewforest'), once the client has sent the
+/// buffer snapshot the idle loop asks for when the payload is ready
+/// -- the user need not await it.
 ///
 /// Every 'search-results' is eventually followed by exactly one
 /// 'search-enrichment', because that is what releases the client's
@@ -261,7 +237,7 @@ pub fn handle_text_search_request (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
             runtime . clone (),
-            &search_terms, &search_results, restriction,
+            &search_terms, &search_results,
             include_overPrivateText_telescopes );
           Some (search_terms) },
         Err (e) => {
@@ -341,17 +317,16 @@ fn filter_match_groups_to_unrestricted_skgrepos (
       restriction . contains_skgrepo (skgrepo) )
     . collect () }
 
-/// Spawn a background thread to compute containerward acnestries
-/// and graphnodestats, then write the structured payload
-/// to the shared slot. Clears any stale enrichment and resets
-/// the cancellation flag before spawning.
+/// Spawn a background thread to write the enrichment's payload to the
+/// shared slot, where the idle loop finds it and asks the client for
+/// the buffer snapshot. Clears any stale enrichment and resets the
+/// cancellation flag before spawning.
 fn spawn_enrichment_thread (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   runtime          : Arc<RuntimeGeneration>,
   search_terms     : &str,
   search_results   : &[ID],
-  restriction      : &SkgrepoRestriction,
   include_overPrivateText_telescopes : bool,
 ) {
   { // Clear stale enrichment before spawning.
@@ -363,70 +338,117 @@ fn spawn_enrichment_thread (
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let restriction_clone : SkgrepoRestriction   = restriction . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
-  let max_depth : usize = runtime . config . max_roleTree_depth;
   std::thread::spawn ( move || {
-    tracing::info! (
-      generation = runtime . generation,
-      result_count = ids_clone . len (),
-      "search enrichment thread started");
-    let containerward_role_trees_by_skgid : HashMap<ID, ContainerwardRoleTree> =
-      containerward_role_trees_by_skgid_from_skgids (
-        &containers_in_inRustGraph (&runtime . graph), &ids_clone, max_depth );
-    tracing::info! ("search enrichment: role tree computed ({} entries)",
-              containerward_role_trees_by_skgid . len ());
-    if cancel_clone . load (Ordering::SeqCst) {
-      tracing::info! ("search enrichment: cancelled after role tree");
-      return; }
-    let all_enriched_skgids : Vec<ID> = {
-      // Collect result IDs + every ID of their containerward trees +
-      // every member of the override folders the enrichment will draw
-      // (so those nodes get their graphStats, hence their heralds).
-      let mut skgid_set : HashSet<ID> = HashSet::new ();
-      for skgid in &ids_clone {
-        skgid_set . insert ( skgid . clone () ); }
-      for tree in containerward_role_trees_by_skgid . values () {
-        collect_skgids_from_role_tree_node ( tree, &mut skgid_set ); }
-      skgid_set . extend (
-        render_enriched_search_buffer::collect_override_folder_member_skgids (
-          &runtime . graph, &ids_clone, &restriction_clone ) );
-      skgid_set . into_iter () . collect () };
-    let graphnodestats : AllGraphnodeStats =
-      fetch_all_graphnodestats_with_skgrepo_set (
-        &runtime . graph,
-        &all_enriched_skgids,
-        Some (&restriction_clone) )
-      . unwrap_or_else ( |e| {
-        tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
-        AllGraphnodeStats::empty () } );
-    tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
-              all_enriched_skgids . len ());
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       slot_clone . lock () . unwrap ();
     if cancel_clone . load (Ordering::SeqCst) {
       // Checked under the lock, so that 'cancel_search_enrichment'
       // cannot clear the slot between this check and the write.
-      tracing::info! ("search enrichment: cancelled after graphnodestats");
+      tracing::info! ("search enrichment: cancelled");
       return; }
     tracing::info! ("search enrichment: writing payload to slot");
     *guard = Some ( SearchEnrichmentPayload {
       runtime,
       terms          : terms_clone,
       search_results : ids_clone,
-      containerward_role_trees_by_skgid,
-      graphnodestats,
       include_overPrivateText_telescopes } ); } ); }
 
-fn collect_skgids_from_role_tree_node(
-  node      : &ContainerwardRoleTree,
-  skgid_set : &mut HashSet<ID>,
+/// The search buffer's enrichment ('docs/api-and-formats.org', "Text
+/// search"): the refresh, in content-view mode under 'restriction', of
+/// a stub made of the search buffer. Each hit (a root standing for one
+/// of 'search_results') is a write-protected occurrence asking for its
+/// containers folder, and holds the folder of the nodes that override
+/// it and the folder of the nodes it overrides, each only when it
+/// would have members ('stub_root_of_hit'); the refresh fills the
+/// folders, each member with its containerward chain. What the refresh
+/// drew under a hit is then folded, so that the hit shows collapsed,
+/// and unless the search included them, the occurrences of
+/// overPrivateText nodes are entombstoned. Returns the buffer's text.
+pub fn enrich_search_viewforest (
+  viewforest         : &mut ViewForest,
+  viewnode_id_record : &mut ViewnodeIdRecord,
+  graph              : &InRustGraph,
+  config             : &SkgConfig,
+  search_results     : &[ID],
+  restriction        : &SkgrepoRestriction,
+  include_overPrivateText_telescopes : bool,
+) -> Result<String, Box<dyn Error>> {
+  let hits : Vec<NodeId> =
+    viewforest . roots ()
+    . filter ( |root| matches! ( &root . value () . kind,
+                 ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+                   if search_results . contains (&occurrence . skgid) ))
+    . map ( |root| root . id () )
+    . collect ();
+  let drawn_before : HashSet<NodeId> =
+    viewforest . nodes () . map ( |node| node . id () ) . collect ();
+  for hit in &hits {
+    stub_root_of_hit (viewforest, *hit, graph, restriction); }
+  { let truth : Truth = Truth { graph, config, restriction : Some (restriction) };
+    refresh_viewforest (
+      viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
+      config . initial_node_limit, None ) ?; }
+  for hit in &hits {
+    let drawn : Vec<NodeId> =
+      viewforest . get (*hit) . unwrap () . children ()
+      . map ( |child| child . id () )
+      . filter ( |child| ! drawn_before . contains (child) )
+      . collect ();
+    for child in drawn { // In the clients' encoding, folding a hit's children collapses it.
+      viewforest . get_mut (child) . unwrap () . value () . foldAndFocus . folded = true; }}
+  if ! include_overPrivateText_telescopes {
+    exclude_overPrivateText_nodes_from_viewforest (viewforest, graph); }
+  viewforest_to_string (viewforest, config) }
+
+/// Make the hit at 'hit' a root of the enrichment's stub: a
+/// write-protected occurrence asking for its containers folder,
+/// holding first an empty folder of the nodes that override it and
+/// then one of the nodes it overrides, each only when the restriction
+/// lets it show some.
+fn stub_root_of_hit (
+  viewforest  : &mut ViewForest,
+  hit         : NodeId,
+  graph       : &InRustGraph,
+  restriction : &SkgrepoRestriction,
 ) {
-  skgid_set . insert ( node . skgid () . clone () );
-  if let ContainerwardRoleTree::Inner ( _, children ) = node {
-    for child in children {
-      collect_skgids_from_role_tree_node ( child, skgid_set ); }}}
+  let gnid : ID = {
+    let mut node : NodeMut<Viewnode> = viewforest . get_mut (hit) . unwrap ();
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+      &mut node . value () . kind
+      else { return; };
+    occurrence . write_protect ();
+    occurrence . view_requests . insert (
+      ViewRequest::Folder (FolderRelation::Containers) );
+    occurrence . skgid . clone () };
+  for folder in [ Folder::Overridden, Folder::Overrider ] {
+    // Prepended last-first, so that they stand in the order named.
+    if ! override_relatives (graph, &gnid, &folder, restriction) . is_empty () {
+      viewforest . get_mut (hit) . unwrap ()
+        . prepend ( viewnode_of ( ViewnodeKind::Folder (folder) )); }}}
+
+/// The IDs of the hit's override relatives that a folder of 'kind'
+/// shows: the nodes that override it (the overrider folder) or that it
+/// overrides (the overridden folder), less those whose override
+/// relationship or own skgrepo the restriction hides.
+fn override_relatives (
+  graph       : &InRustGraph,
+  hit         : &ID,
+  kind        : &Folder,
+  restriction : &SkgrepoRestriction,
+) -> Vec<ID> {
+  let relatives : Vec<ID> = match kind {
+    Folder::Overridden =>
+      graph . outbound_pids_for_relation_gated (
+        hit, NodeRelation::Overrides, Some (restriction) ),
+    _ =>
+      graph . inbound_pids_for_relation_gated (
+        hit, NodeRelation::Overrides, Some (restriction) ), };
+  relatives . into_iter ()
+    . filter ( |relative| graph . nodes . get (relative)
+      . is_some_and ( |node| restriction . contains_skgrepo (&node . home_skgrepo) ))
+    . collect () }
 
 /// Build the tagged s-exp for a search enrichment payload.
 /// Format: (("response-type" "search-enrichment")

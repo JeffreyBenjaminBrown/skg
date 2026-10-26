@@ -1132,3 +1132,86 @@ took over; this session (host-7a) finished slice 9's triage and
 handed the run to host-f7, which launches slices 10 to 13 and
 writes 05_review.org.
 
+** Slice 10: the search buffer, and the corrections channel
+*** What's done
+**** extent is not a correction
+'Walk::record_drawn' reports a drawn headline as reinstated only
+where a list already drawn lacked it: not under an occurrence
+the refresh extends first (drawn editable, or extended by an
+editable-view request, a fresh view's stub roots among them),
+nor in a folder it added ('Walk::added_folders'). Tests in
+'tests/refresh/corrections.rs': a fresh view's stub reports
+nothing; a plain save reports nothing
+('tests/corrections_channel.rs').
+**** the channel
+'save-result' and 'rerender-done' carry
+'(corrections (("VIEW_ID" MESSAGE...) ...))', one list per view
+with corrections ('ViewCorrections', 'corrections_entry_sexp').
+'rerender_view' returns them ('Refreshed'). The warning sink,
+'CompletionWarning', 'RepairKind' and 'warnings.rs' are gone.
+Both clients append them to their warnings buffer, a level-1
+headline per view naming its buffer, each correction a level-2
+headline ('skg-show-corrections-in-server-warnings',
+'show_corrections'). The integration test
+'save_collateral_add_content_and_modify_text' gained a phase:
+the collateral view's correction stands under that view's
+headline, with either client.
+**** the search buffer
+'enrich_search_viewforest' (text_search.rs) refreshes the
+parsed snapshot as a stub; 'render_enriched_search_buffer.rs'
+and the "search" skgrepo trick are gone. The test of a hit whose
+container the restriction hides is
+'search_enrichment_omits_the_containers_the_restriction_hides'
+('tests/repo_sets.rs'). The protocol is unchanged.
+*** Deviations from the plan's "how"
+**** the corrections are tagged with the view ID
+The server knows a view by its ID, not by the client's buffer
+name, so each view's corrections are tagged with its view ID,
+the protocol's name for it; each client turns the ID into the
+name of the buffer that shows the view (the ID itself when none
+does) for the headline.
+**** a save without a view ID reports nothing
+Corrections need a view to be tagged with. The clients always
+send one; 'partner_folder_matrix' saved with none, and now
+names one.
+**** the diff view reports no corrections until slice 11
+Its old walk's folder repair warnings went with the sink; it
+repairs silently (as its collateral rerenders always did) until
+slice 11 refreshes it and reports its corrections.
+**** the stub keeps the override folders
+The plan's stub gives each hit a '(folder containers)' request.
+The enrichment also drew the overrider and overridden folders,
+and suppressed hits reappear in the overridden folder ('docs/
+override.org'), so the stub also holds those two folders, empty,
+when the hit has such relatives. A '(folder overrides)' request
+would add both, and the empty editable overridden folder would
+stay.
+**** what the refresh draws under a hit is folded
+As before, the folders show folded (the hit collapsed): after
+the refresh, the enrichment folds each child of a hit that the
+snapshot lacked, and renders again.
+**** the payload and the thread
+The payload lost the role trees and the graph stats the refresh
+computes itself. The thread that filled them only writes the
+payload now; it stays, with its cancellation flag, so that the
+protocol and its timing are unchanged.
+*** What's imperfect about what's done
+**** a hit found by an alias shows its title after enrichment
+The refresh titles an occurrence from the graph, so a hit whose
+best match was an alias shows the alias in phase 1 and the
+node's title after enrichment. Where several matched, the alias
+folder from phase 1 now holds the node's aliases, and the title,
+if it was buried there, is an unwarranted alias member.
+*** Suite failures and their classification
+**** first failure: reinstate::an_editable_occurrences_content...
+Expected fixture adaptation: it counted 4 reinstatements; the
+extent rule leaves 2 (a and b, missing from p's drawn list).
+**** partner_folder_matrix: six delete scenarios
+Expected fixture adaptation: the test saved without a view ID,
+so its corrections had nothing to be tagged with (above).
+**** delete_strips_references_from_neighbors, once
+Unrelated: the "Directory not empty" cleanup flake; it passed
+alone and in the later full runs.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 9, with either
+client; the other 34 pass with each.

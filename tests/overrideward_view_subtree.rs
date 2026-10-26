@@ -9,29 +9,21 @@
 // E. Ownership is by location -- "main" lives under owned/, so it is
 // owned; "foreign" is not.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeRef, Tree};
 
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::dbs::in_rust_graph::stats::{
-  AllGraphnodeStats, fetch_all_graphnodestats_with_skgrepo_set};
-use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
-  MatchGroups, build_search_viewforest, suppressed_result_skgids};
-use skg::serve::handlers::text_search::render_enriched_search_buffer::{
-  collect_override_folder_member_skgids,
-  insert_partner_folders_into_search_view};
-use skg::skgrepo_sets::{
-  SkgrepoRestriction, SkgrepoSetName, entombstone_hidden_occurrences};
+  MatchGroups, build_search_viewforest, enrich_search_viewforest,
+  suppressed_result_skgids};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
-use skg::to_org::util::mark_view_roots_as_members;
-use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Folder, Viewnode, ViewnodeKind, Vognode};
-use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
-use skg::update_buffer::set_viewnodestats_in_viewforest;
+use skg::types::views_state::ViewnodeIdRecord;
 
 /// One search hit, as a MatchGroups entry.
 fn hit (
@@ -57,26 +49,22 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
       suppression_anchors_at_owned (
         &graph, &s . config, &restriction ) ?;
       a_hit_shows_the_nodes_it_overrides_in_a_folder (
-        &graph, &s . config, &s . tantivy, &restriction ) ?;
+        &graph, &s . config, &restriction ) ?;
       end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
-        &graph, &s . config, &s . tantivy, &restriction ) . await ?;
+        &graph, &s . config, &restriction ) ?;
       Ok (( )) } )) }
 
-/// End-to-end: replay production's phase-1 + phase-2 enrichment
-/// (suppression -> pre-fetch graphStats for results + override
-/// folder members -> folders -> graphStats -> heralds -> render) and
-/// check the rendered buffer. The suppressed F is absent from the top
-/// level and reappears in U's overridden folder, carrying its
-/// override heralds -- U, two levels up, overrides it -- which only
-/// render because the pre-fetch includes the folder members
-/// ('collect_override_folder_member_skgids'). G, which F overrides,
-/// is not shown: the search buffer's override folders hold direct
-/// relatives only, and only its containers folder's members carry
-/// anything.
-async fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
+/// End-to-end: replay production's phase 1 (suppression, then the
+/// top-level viewforest) and phase 2 (the enrichment, a refresh of the
+/// hits as a stub) and check the rendered buffer. The suppressed F is
+/// absent from the top level and reappears in U's overridden folder,
+/// carrying its override heralds -- U, two levels up, overrides it.
+/// G, which F overrides, is not shown: the search buffer's override
+/// folders hold direct relatives only, and only its containers
+/// folder's members carry anything.
+fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  tantivy : &TantivyIndex,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups = [
@@ -93,35 +81,10 @@ async fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
   assert_eq! (
     search_results, vec![ ID::from ("U") ],
     "F and G are suppressed, so only U is a top-level result" );
-  // Production's pre-fetch id-set: results + ancestry (none here) +
-  // the members of the override folders.
-  let all_skgids : Vec<ID> = {
-    let mut skgids : HashSet<ID> =
-      search_results . iter () . cloned () . collect ();
-    skgids . extend (
-      collect_override_folder_member_skgids (
-        &graph, &search_results, restriction ) );
-    skgids . into_iter () . collect () };
-  let stats : AllGraphnodeStats =
-    fetch_all_graphnodestats_with_skgrepo_set (
-      &graph, &all_skgids, Some (restriction) ) ?;
-  // Phase 2: the folders, then the same stats/herald/render passes as
-  // handle_snapshot_response.
-  insert_partner_folders_into_search_view (
-    &mut viewforest, &graph, &search_results, &HashMap::new (),
-    tantivy, config, restriction );
-  let root_skgid : NodeId = viewforest . root () . id ();
-  set_metadata_relationships_in_node_recursive (
-    &mut viewforest, root_skgid, &graph, &stats, config );
-  mark_view_roots_as_members ( &mut viewforest );
-  set_viewnodestats_in_viewforest (
-    &mut viewforest,
-    &graph,
-    & stats . container_to_contents,
-    & stats . content_to_containers,
-    config, Some (restriction) );
-  entombstone_hidden_occurrences ( &mut viewforest, &graph, restriction );
-  let buffer : String = viewforest_to_string ( &viewforest, config ) ?;
+  // Phase 2: the enrichment.
+  let buffer : String = enrich_search_viewforest (
+    &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
+    &search_results, restriction, false ) ?;
 
   let level_of = |needle : &str| -> usize {
     buffer . lines ()
@@ -130,7 +93,7 @@ async fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
       . unwrap_or (0) };
   assert_eq! ( level_of ("cooking the owned way"), 1,
     "U is the top-level result.\n{}", buffer );
-  assert_eq! ( level_of ("(skg folded overriddenFolder"), 2,
+  assert_eq! ( level_of ("folded overriddenFolder"), 2,
     "U's overridden folder hangs under it, folded.\n{}", buffer );
   assert_eq! ( level_of ("cooking, forked once"), 3,
     "F (suppressed) reappears in U's overridden folder.\n{}", buffer );
@@ -180,7 +143,6 @@ fn suppression_anchors_at_owned (
 fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  tantivy     : &TantivyIndex,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups =
@@ -188,9 +150,9 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
-  insert_partner_folders_into_search_view (
-    &mut viewforest, graph, &results, &HashMap::new (),
-    tantivy, config, restriction );
+  enrich_search_viewforest (
+    &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
+    &results, restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
   let u : NodeRef<Viewnode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");
@@ -207,19 +169,17 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
     . expect ("F (the node U overrides) is in the folder");
   assert! ( matches! ( &f . value () . kind,
                        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                       if t . claimsMembership
-                          && t . is_writeProtected () ),
+                       if t . is_writeProtected () ),
             "F is a write-protected member" );
   assert! ( f . children () . next () . is_none (), "F holds nothing" );
   a_hit_shows_the_nodes_that_override_it_in_a_folder (
-    graph, config, tantivy, restriction ) }
+    graph, config, restriction ) }
 
 /// B overrides E, and E overrides nothing. So under E hangs, folded,
 /// an overrider folder whose one member is B.
 fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  tantivy     : &TantivyIndex,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups =
@@ -227,9 +187,9 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "exciting", &matches, &HashSet::new () );
-  insert_partner_folders_into_search_view (
-    &mut viewforest, graph, &results, &HashMap::new (),
-    tantivy, config, restriction );
+  enrich_search_viewforest (
+    &mut viewforest, &mut ViewnodeIdRecord::default (), graph, config,
+    &results, restriction, false ) ?;
   let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
   let e : NodeRef<Viewnode> =
     find_result_root ( &tree, "E" ) . expect ("E is a result root");
