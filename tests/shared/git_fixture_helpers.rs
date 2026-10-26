@@ -7,6 +7,7 @@
 // 'tests/grouped_saves.rs'.
 
 use git2::Repository;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::net::TcpStream;
@@ -17,7 +18,12 @@ use skg::test_utils::copy_dir_all;
 use skg::types::misc::SkgrepoName;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::nodes::fs::GraphnodeOnDisk;
-use skg::types::viewnode::{ChangeFacts, ReadinessRequest, Viewnode};
+use skg::org_to_text::viewnode_to_string;
+use skg::serve::parse_metadata_sexp::{
+  ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
+use skg::types::misc::SkgConfig;
+use skg::types::viewnode::{
+  ChangeFacts, PropertyMember, ReadinessRequest, Viewnode, ViewnodeKind, Vognode, Warrant};
 
 //
 // Git helpers
@@ -100,6 +106,44 @@ pub fn with_facts (
   readiness_request : Option<ReadinessRequest>,
 ) -> Viewnode {
   Viewnode { change_facts, readiness_request, .. node } }
+
+/// Render 'node''s metadata, assert it is 'expected', parse it back
+/// and assert that the parse refuses and warns of nothing and yields
+/// 'node' less what the parser skips ('without_derived_facts').
+pub fn assert_round_trip (
+  node     : Viewnode,
+  expected : &str,
+) {
+  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
+  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+  assert_eq! ( rendered, expected );
+  let metadata : ViewnodeMetadata =
+    parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) )
+    . unwrap ();
+  let (parsed, error, warning) : (Viewnode, _, _) =
+    viewnode_from_metadata (
+      &metadata, node . title () . to_string (), node . body () . cloned () );
+  assert_eq! ( error, None );
+  assert_eq! ( warning, None );
+  assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
+               without_derived_facts (node) ); }
+
+/// 'node' as the parser reads it back: without its derived facts, the
+/// change facts and the warrant, which the parser skips.
+pub fn without_derived_facts (
+  node : Viewnode,
+) -> Viewnode {
+  let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
+  match &mut node . kind {
+    ViewnodeKind::PropertyMember (
+      PropertyMember::Alias { warrant, .. }
+      | PropertyMember::ID { warrant, .. }
+      | PropertyMember::Flag { warrant, .. } ) =>
+      *warrant = Warrant::ByGraph,
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      ghost . warrant = Warrant::ByGraph,
+    _ => {}, }
+  node }
 
 //
 // Test setup helper

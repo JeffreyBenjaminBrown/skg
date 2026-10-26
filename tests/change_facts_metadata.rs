@@ -7,10 +7,10 @@
 // carries them: each renders; the parser skips '(diff ...)' whole and
 // reads the readiness request back.
 
-use crate::git_fixture_helpers::with_facts;
+use crate::git_fixture_helpers::{assert_round_trip, with_facts};
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
-  ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
+  ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
@@ -50,42 +50,6 @@ fn request (
 ) -> Option<ReadinessRequest> {
   Some ( ReadinessRequest { ready, objects : objects (on) } ) }
 
-/// Render 'node', check its metadata against 'expected', parse it
-/// back, and check that the result is 'node' without its derived
-/// facts, which the parser skips, and with its readiness request.
-fn assert_round_trip (
-  node     : Viewnode,
-  expected : &str,
-) {
-  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
-  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
-  assert_eq! ( rendered, expected );
-  let metadata : ViewnodeMetadata =
-    parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) )
-    . unwrap ();
-  let (parsed, error, _warning) : (Viewnode, _, _) =
-    viewnode_from_metadata (
-      &metadata, node . title () . to_string (), node . body () . cloned () );
-  assert_eq! ( error, None );
-  assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
-               without_derived_facts (node) ); }
-
-/// 'node' as the parser reads it back: without its derived facts, the
-/// change facts and the warrant, which the parser skips.
-fn without_derived_facts (
-  node : Viewnode,
-) -> Viewnode {
-  let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
-  match &mut node . kind {
-    ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { warrant, .. }
-      | PropertyMember::ID { warrant, .. }
-      | PropertyMember::Flag { warrant, .. } ) =>
-      *warrant = skg::types::viewnode::Warrant::ByGraph,
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . warrant = skg::types::viewnode::Warrant::ByGraph,
-    _ => {}, }
-  node }
 
 
 #[test]

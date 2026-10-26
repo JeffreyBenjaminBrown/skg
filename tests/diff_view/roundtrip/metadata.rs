@@ -2,19 +2,17 @@
 // parses back to the same viewnode, less its change facts, which the
 // parser skips.
 
-use crate::git_fixture_helpers::with_facts;
-use skg::org_to_text::viewnode_to_string;
+use crate::git_fixture_helpers::{assert_round_trip, with_facts};
 use skg::serve::parse_metadata_sexp::{
   RESTORE_NODE_ON_A_NODE_NOT_DELETED, RESTORE_REL_ON_A_DELETED_NODE,
-  RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP,
-  ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
+  RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP, parse_metadata_to_viewnodemd};
+use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 fn ready (
   objects : &[DiffObject],
@@ -29,43 +27,6 @@ fn request_all () -> Option<ReadinessRequest> {
     ready   : true,
     objects : [ DiffObject::All ] . into_iter () . collect::<BTreeSet<_>> () } ) }
 
-/// Render 'node', check its metadata against 'expected', parse it
-/// back with its headline and body, and check that the result is
-/// 'node' again, less its derived facts.
-fn assert_round_trip (
-  node     : Viewnode,
-  expected : &str,
-) {
-  let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
-  let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
-  assert_eq! ( rendered, expected );
-  let metadata : ViewnodeMetadata =
-    parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) )
-    . unwrap ();
-  let (parsed, error, warning) : (Viewnode, _, _) =
-    viewnode_from_metadata (
-      &metadata, node . title () . to_string (), node . body () . cloned () );
-  assert_eq! ( error, None );
-  assert_eq! ( warning, None );
-  assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
-               without_derived_facts (node) ); }
-
-/// 'node' as the parser reads it back: without its derived facts, the
-/// change facts and the warrant, which the parser skips.
-fn without_derived_facts (
-  node : Viewnode,
-) -> Viewnode {
-  let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
-  match &mut node . kind {
-    ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { warrant, .. }
-      | PropertyMember::ID { warrant, .. }
-      | PropertyMember::Flag { warrant, .. } ) =>
-      *warrant = Warrant::ByGraph,
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      ghost . warrant = Warrant::ByGraph,
-    _ => {}, }
-  node }
 
 
 fn change_viewnode (
