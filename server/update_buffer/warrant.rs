@@ -12,7 +12,7 @@ use crate::to_org::extend::containerward_chain::is_in_containerward_chain;
 use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::nodes::complete::{Graphnode, flag_is_true};
 use crate::types::viewnode::{
-  PartnerFolder, Property, Viewnode, ViewnodeKind, Vognode, Warrant };
+  PartnerFolder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{NodeId, NodeRef};
 
@@ -59,8 +59,11 @@ pub fn warrant_of_viewnode (
               folder_member_is_warranted (
                 parent, *folder, &gnid, graph, config, restriction ),
             _ => true, }}},
-      ViewnodeKind::Property (property) =>
-        property_member_is_warranted (property, parent, graph),
+      ViewnodeKind::PropertyMember (property) =>
+        // HEAD alone warrants a member with a ghost warrant; 'Warrant'
+        // has no word for that yet, so it reads as warranted.
+        node . value () . is_ghostWarranted ()
+        || property_member_is_warranted (property, parent, graph),
       _ => true, }};
   if warranted { Warrant::ByGraph } else { Warrant::No } }
 
@@ -118,11 +121,9 @@ fn folder_member_is_warranted (
 
 /// Whether the node above the property folder holding 'property' has
 /// it: the alias, the ID (its pid or an extra ID), or the flag set
-/// true. True for the diff view's properties, which describe a change
-/// rather than claim a property, and when the node above is not an
-/// occurrence the graph has.
+/// true. True when the node above is not an occurrence the graph has.
 fn property_member_is_warranted (
-  property : &Property,
+  property : &PropertyMember,
   folder   : NodeRef<Viewnode>,
   graph    : &InRustGraph,
 ) -> bool {
@@ -131,13 +132,12 @@ fn property_member_is_warranted (
     . and_then ( |gnid| graphnode_from_graph (graph, &gnid) )
     else { return true; };
   match property {
-    Property::Alias { text, .. } =>
+    PropertyMember::Alias { text, .. } =>
       members_of (node . aliases . or_default ()) . contains (text),
-    Property::ID { skgid } =>
+    PropertyMember::ID { skgid } =>
       node . pid == *skgid || node . extra_ids . contains (skgid),
-    Property::Flag { flag, .. } =>
-      flag_is_true (&node . flags, *flag),
-    _ => true, } }
+    PropertyMember::Flag { flag, .. } =>
+      flag_is_true (&node . flags, *flag), } }
 
 fn occurrence_gnid (
   node : NodeRef<Viewnode>,

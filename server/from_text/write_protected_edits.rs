@@ -7,7 +7,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{RelationshipEditRequest, Existence, PartnerFolder, Phantom, Property, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{RelationshipEditRequest, Existence, PartnerFolder, Phantom, PropertyMember, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -173,8 +173,10 @@ fn aliases_of_occurrence (
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
-      let ViewnodeKind::Property (Property::Alias { text, relationshipEditRequest, .. }) =
+      let ViewnodeKind::PropertyMember (PropertyMember::Alias { text, relationshipEditRequest, .. }) =
         &alias . value () . kind else { return None; };
+      if alias . value () . is_ghostWarranted () { // one the worktree lost
+        return None; }
       Some ((text . clone (),
              RelationshipEditRequest::relRepo_of (relationshipEditRequest) . cloned ()))
     }) . collect () ) }
@@ -222,7 +224,7 @@ fn collect_flags_surfaces (
         let mut other_children : Vec<String> = Vec::new ();
         for leaf in child . children () {
           match &leaf . value () . kind {
-            ViewnodeKind::Property (Property::Flag {
+            ViewnodeKind::PropertyMember (PropertyMember::Flag {
               flag, title, body, .. }) =>
               viewnodes . push ((*flag, title . clone (), body . clone ())),
             // A tombstone (a stale flag holding something) and a

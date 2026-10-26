@@ -148,12 +148,12 @@ fn alias_id_and_flag_changes_fill_their_folders (
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg (aliasFolder changed))",
-    "*** (skg removedAlias (diff (rel removed) (leaves 1))) a1",
+    "*** (skg alias (diff (rel removed) (leaves 1))) a1",
     "*** (skg alias) a2",
     "*** (skg alias (diff (rel added) (leaves 1))) a3",
     "** (skg (idFolder changed))",
     "*** (skg id) ali",
-    "*** (skg removedID (diff (rel removed) (leaves 1))) ali-old" ] );
+    "*** (skg id (diff (rel removed) (leaves 1))) ali-old" ] );
   assert_lines_in_order ( &buffer, &[
     "** (skg (idFolder changed))",
     "*** (skg id) acq",
@@ -220,7 +220,7 @@ fn marks_in_the_store_show_as_ready (
               "{}", buffer );
     assert_lines_in_order ( &buffer, &[
       "** (skg (aliasFolder changed))", // a3 is not ready, so neither is the folder
-      "*** (skg removedAlias (diff (rel removed) (leaves 1) (ready))) a1",
+      "*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1",
       "*** (skg alias (diff (rel added) (leaves 1))) a3" ] );
     let buffer : String = all_changes_buffer_with_marks (
       f, &[ alias ("a1"), alias ("a3") ] ) ? . unwrap ();

@@ -145,7 +145,8 @@ pub struct ViewnodeId (pub String);
 pub enum ViewnodeKind {
   Vognode       (Vognode),
   PropertyFolder       (PropertyFolder),
-  Property          (Property),
+  PropertyMember    (PropertyMember),
+  ChangeViewnode    (ChangeViewnode),
   PartnerFolder    (PartnerFolder),
   BufferRoot,
   Tombstone,
@@ -457,8 +458,17 @@ pub enum PropertyFolder {
   Flags { title : String, body : Option<String> },
 }
 
+/// A member of a property folder: one alias, extra ID or true flag
+/// of the folder's viewparent.
+///
+/// In the diff view an alias or ID the worktree lost since HEAD is a
+/// member with a ghost warrant: HEAD alone warrants it. Until property
+/// members carry view facts, that warrant is written, and read, as the
+/// change fact '(diff (rel removed))' ('Viewnode::is_ghostWarranted');
+/// the alias reader and the ID check skip such a member, and its
+/// change-forest leaf is that alias or ID.
 #[derive( Debug, Clone, PartialEq )]
-pub enum Property {
+pub enum PropertyMember {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<SkgrepoName>,
           relationshipEditRequest: Option<RelationshipEditRequest> },
@@ -468,17 +478,15 @@ pub enum Property {
     flag : Flag,
     title    : String,
     body     : Option<String>, },
-  // The diff view's properties, below, are display-only and
-  // save-inert: the validator ignores them, and the diff view's
-  // reconciler draws them and knows them by their kind. Each but BodyDiff is a change-forest leaf or
-  // commit readiness aggregate, so its viewnode carries '(ready ...)' and a
-  // readiness request.
-  /// In an alias folder: an alias the worktree lost since HEAD. The
-  /// alias reader never reads it. Its change-forest leaf is that alias.
-  RemovedAlias { text : String },
-  /// In an ID folder: an extra ID the worktree lost since HEAD. The
-  /// ID check never counts it. Its change-forest leaf is that ID.
-  RemovedID { skgid : ID },
+}
+
+/// A headline the diff view adds to describe a change. Display-only
+/// and save-inert: the validator ignores them, and the diff view's
+/// reconciler draws them and knows them by their kind. Each but
+/// BodyDiff is a change-forest leaf or commit readiness aggregate, so
+/// its viewnode carries '(ready ...)' and a readiness request.
+#[derive( Debug, Clone, PartialEq )]
+pub enum ChangeViewnode {
   /// The node's text at HEAD, under a node whose text changed.
   /// 'title' is Some iff the title changed, 'body' Some iff the body
   /// changed (the empty string for a body HEAD lacked). Its
@@ -500,7 +508,7 @@ pub enum Property {
   ChangesetMarker { kind : ChangesetMarkerKind },
 }
 
-/// Which changes a 'Property::ChangesetMarker' stands for.
+/// Which changes a 'ChangeViewnode::ChangesetMarker' stands for.
 #[derive( Debug, Clone, Copy, PartialEq, Eq, Hash )]
 pub enum ChangesetMarkerKind {
   Content,   // "its content changed": the ~ change-forest leaves of its content
@@ -801,42 +809,54 @@ impl PropertyFolder {
 
 }
 
-impl Property {
+impl PropertyMember {
   pub fn repr_in_client (&self) -> &'static str {
     match self {
-      Property::Alias { .. }       => "alias",
-      Property::ID { .. }          => "id",
-      Property::Flag { .. }    => "flag",
-      Property::RemovedAlias { .. }    => "removedAlias",
-      Property::RemovedID { .. }       => "removedID",
-      Property::OldText { .. }         => "oldText",
-      Property::BodyDiff { .. }        => "bodyDiff",
-      Property::HomeSkgrepoMove { .. } => "homeSkgrepoMove",
-      Property::RelRepoMove { .. }     => "relRepoMove",
-      Property::ChangesetMarker { .. } => "changesetMarker",
+      PropertyMember::Alias { .. } => "alias",
+      PropertyMember::ID { .. }    => "id",
+      PropertyMember::Flag { .. }  => "flag",
     } }
 
   pub fn title (&self) -> &str {
     match self {
-      Property::Alias { text, .. } => text,
-      Property::ID    { skgid, .. }   => skgid,
-      Property::Flag { title, .. } => title,
-      Property::RemovedAlias { text, .. } => text,
-      Property::RemovedID { skgid, .. }   => skgid,
-      Property::OldText { title, .. } =>
-        title . as_deref () . unwrap_or (""),
-      Property::BodyDiff { .. }
-        | Property::HomeSkgrepoMove { .. }
-        | Property::RelRepoMove { .. }
-        | Property::ChangesetMarker { .. } => "",
+      PropertyMember::Alias { text, .. }  => text,
+      PropertyMember::ID    { skgid, .. } => skgid,
+      PropertyMember::Flag { title, .. }  => title,
     } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      Property::Flag { body, .. } => body . as_ref (),
-      Property::OldText { body, .. } => body . as_ref (),
-      Property::BodyDiff { diff } => Some (diff),
-      _ => None, } }
+      PropertyMember::Flag { body, .. } => body . as_ref (),
+      PropertyMember::Alias { .. } | PropertyMember::ID { .. } => None, } }
+}
+
+impl ChangeViewnode {
+  pub fn repr_in_client (&self) -> &'static str {
+    match self {
+      ChangeViewnode::OldText { .. }         => "oldText",
+      ChangeViewnode::BodyDiff { .. }        => "bodyDiff",
+      ChangeViewnode::HomeSkgrepoMove { .. } => "homeSkgrepoMove",
+      ChangeViewnode::RelRepoMove { .. }     => "relRepoMove",
+      ChangeViewnode::ChangesetMarker { .. } => "changesetMarker",
+    } }
+
+  pub fn title (&self) -> &str {
+    match self {
+      ChangeViewnode::OldText { title, .. } =>
+        title . as_deref () . unwrap_or (""),
+      ChangeViewnode::BodyDiff { .. }
+        | ChangeViewnode::HomeSkgrepoMove { .. }
+        | ChangeViewnode::RelRepoMove { .. }
+        | ChangeViewnode::ChangesetMarker { .. } => "",
+    } }
+
+  pub fn body (&self) -> Option<&String> {
+    match self {
+      ChangeViewnode::OldText { body, .. } => body . as_ref (),
+      ChangeViewnode::BodyDiff { diff } => Some (diff),
+      ChangeViewnode::HomeSkgrepoMove { .. }
+        | ChangeViewnode::RelRepoMove { .. }
+        | ChangeViewnode::ChangesetMarker { .. } => None, } }
 }
 
 impl ChangesetMarkerKind {
@@ -1073,7 +1093,7 @@ impl Viewnode {
         unknown . relationshipEditRequest = None,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
         historical . restoreNode_request = false,
-      ViewnodeKind::Property (Property::Alias { relationshipEditRequest, .. }) =>
+      ViewnodeKind::PropertyMember (PropertyMember::Alias { relationshipEditRequest, .. }) =>
         *relationshipEditRequest = None,
       _ => {}, }}
 
@@ -1084,8 +1104,8 @@ impl Viewnode {
         &d . title,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
         &h . title,
-      ViewnodeKind::Property (q) =>
-        q . title (),
+      ViewnodeKind::PropertyMember (member) => member . title (),
+      ViewnodeKind::ChangeViewnode (change) => change . title (),
       ViewnodeKind::PropertyFolder (folder) => folder . title (),
       ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
@@ -1110,13 +1130,21 @@ impl Viewnode {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => h . body . as_ref (),
       ViewnodeKind::PropertyFolder (folder) => folder . body (),
-      ViewnodeKind::Property (property) => property . body (),
+      ViewnodeKind::PropertyMember (member) => member . body (),
+      ViewnodeKind::ChangeViewnode (change) => change . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         | ViewnodeKind::Vognode (Vognode::Restricted (_))
         | ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone => None,
     }}
+
+  /// Whether HEAD alone warrants this viewnode where it stands: for
+  /// now, whether it carries the change fact '(rel removed)', which
+  /// is how a property member's ghost warrant is written until
+  /// property members carry view facts ('PropertyMember').
+  pub fn is_ghostWarranted (&self) -> bool {
+    self . change_facts . change . rel == Some (Existence::Removed) }
 
   pub fn is_unrestrictedVognode_and_member (&self) -> bool {
     match &self . kind {

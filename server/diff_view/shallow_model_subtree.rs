@@ -24,7 +24,7 @@ use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  ChangeFacts, Existence, Phantom, Property, PropertyFolder,
+  ChangeFacts, Existence, Phantom, PropertyMember, ChangeViewnode, PropertyFolder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, Unwarranted, convert_unwarranted_child};
 
@@ -55,8 +55,10 @@ pub fn match_key (
       skgid_a_folder_child_stands_for (viewnode, graph)
       . or_else ( || vognode . skgid () . cloned () )
       . map (MatchKey::Graphnode),
-    ViewnodeKind::Property (property) =>
-      Some ( MatchKey::Kind ( property_kind (property) )),
+    ViewnodeKind::PropertyMember (member) =>
+      Some ( MatchKey::Kind ( propertyMember_kind (member) )),
+    ViewnodeKind::ChangeViewnode (change) =>
+      Some ( MatchKey::Kind ( changeViewnode_kind (change) )),
     ViewnodeKind::PropertyFolder (folder) =>
       Some ( MatchKey::Kind ( match folder {
         PropertyFolder::ID          => "idFolder",
@@ -66,22 +68,28 @@ pub fn match_key (
       Some ( MatchKey::Kind ( format! ("{:?}Folder", folder) )),
     ViewnodeKind::BufferRoot | ViewnodeKind::Tombstone => None, }}
 
-fn property_kind (
-  property : &Property,
+/// The key of a member. A member with a ghost warrant has its live
+/// twin's key, so an entry the worktree regains (or loses) keeps its
+/// viewnode.
+fn propertyMember_kind (
+  member : &PropertyMember,
 ) -> String {
-  match property {
-    // A removed entry has its live twin's key, so an entry the
-    // worktree regains (or loses) keeps its viewnode.
-    Property::Alias { text, .. } | Property::RemovedAlias { text, .. } =>
+  match member {
+    PropertyMember::Alias { text, .. } =>
       format! ("alias {}", text),
-    Property::ID { skgid, .. } | Property::RemovedID { skgid, .. } =>
+    PropertyMember::ID { skgid, .. } =>
       format! ("id {}", skgid . 0),
-    Property::Flag { flag, .. }    => format! ("flag {:?}", flag),
-    Property::OldText { .. }       => "oldText" . to_string (),
-    Property::BodyDiff { .. }      => "bodyDiff" . to_string (),
-    Property::HomeSkgrepoMove { .. } => "homeSkgrepoMove" . to_string (),
-    Property::RelRepoMove { .. }   => "relRepoMove" . to_string (),
-    Property::ChangesetMarker { kind, .. } =>
+    PropertyMember::Flag { flag, .. }    => format! ("flag {:?}", flag), }}
+
+fn changeViewnode_kind (
+  change : &ChangeViewnode,
+) -> String {
+  match change {
+    ChangeViewnode::OldText { .. }       => "oldText" . to_string (),
+    ChangeViewnode::BodyDiff { .. }      => "bodyDiff" . to_string (),
+    ChangeViewnode::HomeSkgrepoMove { .. } => "homeSkgrepoMove" . to_string (),
+    ChangeViewnode::RelRepoMove { .. }   => "relRepoMove" . to_string (),
+    ChangeViewnode::ChangesetMarker { kind, .. } =>
       format! ("changesetMarker {:?}", kind), }}
 
 /// Under 'parent', make the children that 'selects' selects match the
@@ -246,7 +254,8 @@ pub fn is_diffView_change_viewnode (
 ) -> bool {
   let viewnode : &Viewnode = node . value ();
   match &viewnode . kind {
-    ViewnodeKind::Property (_)
+    ViewnodeKind::PropertyMember (_)
+      | ViewnodeKind::ChangeViewnode (_)
       | ViewnodeKind::PropertyFolder (_)
       | ViewnodeKind::PartnerFolder (_)
       | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,

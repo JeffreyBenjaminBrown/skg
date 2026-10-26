@@ -5,7 +5,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{PropertyFolder, Property, viewnode_of};
+use crate::types::viewnode::{PropertyFolder, PropertyMember, viewnode_of};
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest};
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -45,16 +45,16 @@ pub fn reconcile_idFolder_children (
       . collect();
   let is_skgid : fn (&Viewnode) -> bool =
     |viewnode| matches!( &viewnode . kind,
-                         ViewnodeKind::Property (Property::ID { .. } ) );
+                         ViewnodeKind::PropertyMember (PropertyMember::ID { .. } ) );
   let view_id_text : fn (&Viewnode) -> Result<ID, String> =
     |viewnode| match &viewnode . kind {
-      ViewnodeKind::Property (Property::ID { skgid, .. } ) =>
+      ViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. } ) =>
         Ok ( skgid . clone() ),
       _ => Err ( "reconcile_idFolder_children: managed child is not an ID property"
                  . to_string() ), };
   let create_skgid = |skgid: &ID| -> Result<Viewnode, String> {
-    Ok ( viewnode_of (ViewnodeKind::Property (
-        Property::ID {
+    Ok ( viewnode_of (ViewnodeKind::PropertyMember (
+        PropertyMember::ID {
           skgid: skgid . clone() } )) ) };
   complete_managed_children_in_viewforest(
     tree,

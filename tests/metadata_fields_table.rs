@@ -15,7 +15,7 @@ use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangesetMarkerKind, FolderRelation, NodeEditRequest,
-  PartnerFolder, Property, PropertyFolder, ViewRequest};
+  PartnerFolder, PropertyMember, ChangeViewnode, PropertyFolder, ViewRequest};
 
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -48,27 +48,28 @@ fn every_kind_atom (
   let change : SkgrepoChange =
     SkgrepoChange { old : SkgrepoName::from ("a"),
                     new : SkgrepoName::from ("b") };
-  let properties : Vec<Property> = vec! [
-    Property::Alias { text : String::new (), relRepo : None,
+  let members : Vec<PropertyMember> = vec! [
+    PropertyMember::Alias { text : String::new (), relRepo : None,
                       relationshipEditRequest : None },
-    Property::ID { skgid : ID::default () },
-    Property::Flag { flag : Flag::NoSearchMatching,
-                     title : String::new (), body : None },
-    Property::RemovedAlias { text : String::new () },
-    Property::RemovedID { skgid : ID::default () },
-    Property::OldText { title : None, body : None },
-    Property::BodyDiff { diff : String::new () },
-    Property::HomeSkgrepoMove { skgrepo_change : change . clone () },
-    Property::RelRepoMove { skgrepo_change : change },
-    Property::ChangesetMarker { kind : ChangesetMarkerKind::Content } ];
-  for property in &properties {
-    match property {
-      Property::Alias { .. } | Property::ID { .. }
-        | Property::Flag { .. } | Property::RemovedAlias { .. }
-        | Property::RemovedID { .. } | Property::OldText { .. }
-        | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
-        | Property::RelRepoMove { .. }
-        | Property::ChangesetMarker { .. } => (), } }
+    PropertyMember::ID { skgid : ID::default () },
+    PropertyMember::Flag { flag : Flag::NoSearchMatching,
+                     title : String::new (), body : None } ];
+  for member in &members {
+    match member {
+      PropertyMember::Alias { .. } | PropertyMember::ID { .. }
+        | PropertyMember::Flag { .. } => (), } }
+  let changes : Vec<ChangeViewnode> = vec! [
+    ChangeViewnode::OldText { title : None, body : None },
+    ChangeViewnode::BodyDiff { diff : String::new () },
+    ChangeViewnode::HomeSkgrepoMove { skgrepo_change : change . clone () },
+    ChangeViewnode::RelRepoMove { skgrepo_change : change },
+    ChangeViewnode::ChangesetMarker { kind : ChangesetMarkerKind::Content } ];
+  for change in &changes {
+    match change {
+      ChangeViewnode::OldText { .. }
+        | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
+        | ChangeViewnode::RelRepoMove { .. }
+        | ChangeViewnode::ChangesetMarker { .. } => (), } }
   let property_folders : Vec<PropertyFolder> = vec! [
     PropertyFolder::Alias, PropertyFolder::ID, PropertyFolder::flags () ];
   for folder in &property_folders {
@@ -95,8 +96,10 @@ fn every_kind_atom (
   [ "node", "historical", "deleted", "unknown",
     "restrictedNode", "tombstone", "forestRoot" ]
     . iter () . map ( |atom| atom . to_string () )
-    . chain ( properties . iter ()
-              . map ( |p| p . repr_in_client () . to_string () ))
+    . chain ( members . iter ()
+              . map ( |m| m . repr_in_client () . to_string () ))
+    . chain ( changes . iter ()
+              . map ( |c| c . repr_in_client () . to_string () ))
     . chain ( property_folders . iter ()
               . map ( |f| f . repr_in_client () . to_string () ))
     . chain ( partner_folders . iter ()

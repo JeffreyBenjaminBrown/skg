@@ -10,7 +10,7 @@ use crate::types::misc::ID;
 use crate::types::links::links_from_text;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 use crate::types::viewnode::{
-  Editability, NodeEditRequest, Phantom, Property, ViewnodeKind, Vognode,
+  Editability, NodeEditRequest, Phantom, PropertyMember, ViewnodeKind, Vognode,
 };
 use crate::types::views_state::ViewforestId;
 
@@ -152,8 +152,8 @@ fn dependencies_from_uninterpreted (
         result . insert (phantom . skgid . clone ()); }
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
-      MpViewnodeKind::Property (
-        Property::ID { skgid, .. } | Property::RemovedID { skgid, .. }) => {
+      MpViewnodeKind::PropertyMember (
+        PropertyMember::ID { skgid, .. }) => {
         result . insert (skgid . clone ()); }
       _ => {}, }}
   result
@@ -178,8 +178,8 @@ fn dependencies_from_registered (
         result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (phantom))) => {
         result . insert (phantom . skgid . clone ()); }
-      ViewnodeKind::Property (
-        Property::ID { skgid, .. } | Property::RemovedID { skgid, .. }) => {
+      ViewnodeKind::PropertyMember (
+        PropertyMember::ID { skgid, .. }) => {
         result . insert (skgid . clone ()); }
       _ => {}, }}
   result

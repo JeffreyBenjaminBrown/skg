@@ -7,7 +7,7 @@ use crate::types::nodes::complete::{
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 use crate::types::viewnode::{
-  Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
+  PropertyMember, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -48,7 +48,7 @@ pub fn build_and_integrate_flags (
       if flag_is_true (&node . flags, flag) {
         insert_non_vognode_as_child (
           tree, folder,
-          ViewnodeKind::Property (Property::Flag {
+          ViewnodeKind::PropertyMember (PropertyMember::Flag {
             flag,
             title : String::new (),
             body  : None, }),
@@ -98,7 +98,7 @@ mod tests {
     let folder = tree . get (root) . unwrap () . children () . next () . unwrap ();
     let viewnodes : Vec<(Flag, String)> = folder . children ()
       . map (|child| match &child . value () . kind {
-        ViewnodeKind::Property (Property::Flag { flag, title, .. }) =>
+        ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, title, .. }) =>
           (*flag, title . clone ()),
         other => panic! ("unexpected viewnode: {:?}", other), })
       . collect ();

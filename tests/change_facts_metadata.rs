@@ -16,7 +16,7 @@ use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangeFacts, DiffChange, Existence, LeavesFact, Phantom,
-  PhantomDeleted, PhantomUnknown, Property, DiffObject, ReadinessRequest, Viewnode,
+  PhantomDeleted, PhantomUnknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
   PartnerFolder, ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
@@ -126,21 +126,21 @@ fn phantoms_round_trip_their_change_facts () {
 fn property_leaves_round_trip_their_change_facts () {
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Property ( Property::Alias {
+      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
         text : "an alias" . into (), relRepo : None, relationshipEditRequest : None, } )),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       None ),
     "alias (diff (rel added) (ready))" );
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Property ( Property::ID {
+      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
         skgid : ID::from ("x"), } )),
       facts ( None, Some (Existence::Removed), None ),
       request (true, &[]) ),
     "id (diff (rel removed) (readyRequest))" );
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Property ( Property::Flag {
+      viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Flag {
         flag : Flag::NoSearchMatching, title : String::new (), body : None, } )),
       facts ( None, Some (Existence::Added), None ),
       None ),
@@ -191,7 +191,7 @@ fn each_part_of_the_diff_form_round_trips_together_and_alone () {
                facts ( Some (Existence::Added), Some (Existence::Added),
                        Some (&[DiffObject::Node]) ));
   assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Rel]) );
-  let alias = || viewnode_of ( ViewnodeKind::Property ( Property::Alias {
+  let alias = || viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
     text : "an alias" . into (), relRepo : None, relationshipEditRequest : None, } ));
   assert_round_trip (
     with_facts ( alias (), facts ( None, Some (Existence::Removed), None ), None ),
@@ -291,7 +291,7 @@ fn a_folder_is_ready_when_each_changed_membership_is () {
     change_facts . leaves = Some ( LeavesFact { count : 1, objects : BTreeSet::new () } );
     with_facts ( mk_unknown_viewnode (ID::from ("unknown")), change_facts, None ) };
   let entry_unready : Viewnode = with_facts (
-    viewnode_of ( ViewnodeKind::Property ( Property::Alias {
+    viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::Alias {
       text : "an alias" . into (), relRepo : None, relationshipEditRequest : None } )),
     facts ( None, Some (Existence::Removed), None ),
     None );

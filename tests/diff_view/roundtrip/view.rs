@@ -29,7 +29,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
-  ChangesetMarkerKind, Existence, Phantom, Property, Viewnode, ViewnodeKind,
+  ChangesetMarkerKind, Existence, Phantom, ChangeViewnode, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use skg::types::views_state::ViewforestId;
 
@@ -113,7 +113,7 @@ fn buffer_with_every_new_viewnode (
     append_old_text (&mut tree, a, &straddle, &ID::from ("a"))
       . expect ("a's text changed"); }
   { let mut b_mut = tree . get_mut (b) . unwrap ();
-    b_mut . append ( viewnode_of (ViewnodeKind::Property ( Property::HomeSkgrepoMove {
+    b_mut . append ( viewnode_of (ViewnodeKind::ChangeViewnode ( ChangeViewnode::HomeSkgrepoMove {
         skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("main"),
                                          new : SkgrepoName::from ("elsewhere") } } )) );
     b_mut . append ( mk_relRepo_move_viewnode ( &Partner {

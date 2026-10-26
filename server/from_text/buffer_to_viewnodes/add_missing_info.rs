@@ -5,7 +5,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::viewnode::{RelationshipEditRequest, Editability, PropertyFolder, Property};
+use crate::types::viewnode::{RelationshipEditRequest, Editability, PropertyFolder, PropertyMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -134,7 +134,7 @@ fn finish_missing_info_enrichment(
          writeProtected_skgrepos_after_save, } ) }
 
 
-/// Make it a Property::Alias if both:
+/// Make it a PropertyMember::Alias if both:
 /// - it is an UnrestrictedVognode
 /// - its parent is an AliasFolder
 fn make_alias_if_appropriate(
@@ -155,8 +155,8 @@ fn make_alias_if_appropriate(
         : &MpViewnodeKind
         = &org . kind
       else { unreachable!() };
-      org . kind = MpViewnodeKind::Property (
-        Property::Alias { text: t . title . clone(),
+      org . kind = MpViewnodeKind::PropertyMember (
+        PropertyMember::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
                       relationshipEditRequest: // an alias takes no restoreRel
                         t . relationshipEditRequest . clone () . filter ( |request|
@@ -219,7 +219,8 @@ fn skgrepo_of_nearest_unrestricted_ancestor (
         | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::PropertyFolder (_) => continue,
       MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-        | MpViewnodeKind::Property (_)
+        | MpViewnodeKind::PropertyMember (_)
+        | MpViewnodeKind::ChangeViewnode (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone => return None, }}
   None }

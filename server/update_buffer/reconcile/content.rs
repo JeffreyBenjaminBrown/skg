@@ -750,7 +750,8 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
     partition_children( tree, node,
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::PropertyFolder (_)
-          | ViewnodeKind::Property (_)
+          | ViewnodeKind::PropertyMember (_)
+          | ViewnodeKind::ChangeViewnode (_)
           | ViewnodeKind::PartnerFolder (_)
           | ViewnodeKind::BufferRoot
           | ViewnodeKind::Tombstone                => 0,

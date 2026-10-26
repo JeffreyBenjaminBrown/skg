@@ -23,7 +23,7 @@
 use crate::sexp_string::quote_sexp_string;
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangesetMarkerKind, DiffChange, PartnerFolder, Property, PropertyFolder,
+  ChangesetMarkerKind, DiffChange, PartnerFolder, PropertyMember, ChangeViewnode, PropertyFolder,
   DiffObject, ViewRequest};
 
 use serde_json::Value;
@@ -391,8 +391,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("bodyFolded"),
       vac ("vnid"), // the viewnode ID ends every wrapper
       leaf (PropertyFolder::Alias . repr_in_client (), "aliases"),
-      leaf ("alias", "alias"), // Property::Alias
-      leaf ("removedAlias", "alias"), // Property::RemovedAlias
+      leaf ("alias", "alias"), // PropertyMember::Alias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
@@ -431,8 +430,7 @@ pub fn herald_rule_table () -> HeraldRule {
             "it acquired"),
       vec! [
       leaf (PropertyFolder::ID . repr_in_client (), "IDs"),
-      leaf ("id", "ID"), // Property::ID
-      leaf ("removedID", "ID") ], // Property::RemovedID
+      leaf ("id", "ID") ], // PropertyMember::ID
       write_protected_leaves (PropertyFolder::flags () . repr_in_client (),
                 "flags"),
       vec! [
@@ -818,18 +816,21 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
   let all_propertyFolders : [PropertyFolder; 3] = [
     PropertyFolder::ID, PropertyFolder::Alias, PropertyFolder::flags () ];
   for c in &all_propertyFolders { propertyFolder_guard (c); }
-  let all_property_atoms : [&'static str; 10] = {
-    fn property_guard ( q : &Property ) { // ditto
+  let all_property_atoms : [&'static str; 8] = {
+    fn propertyMember_guard ( q : &PropertyMember ) { // ditto
       match q {
-        Property::Alias { .. } | Property::ID { .. }
-          | Property::Flag { .. }
-          | Property::RemovedAlias { .. } | Property::RemovedID { .. }
-          | Property::OldText { .. }
-          | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
-          | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. }
+        PropertyMember::Alias { .. } | PropertyMember::ID { .. }
+          | PropertyMember::Flag { .. }
           => () }}
-    let _ = property_guard;
-    [ "alias", "id", "flag", "removedAlias", "removedID", "oldText", "bodyDiff",
+    let _ = propertyMember_guard;
+    fn changeViewnode_guard ( q : &ChangeViewnode ) { // ditto
+      match q {
+        ChangeViewnode::OldText { .. }
+          | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
+          | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
+          => () }}
+    let _ = changeViewnode_guard;
+    [ "alias", "id", "flag", "oldText", "bodyDiff",
       "homeSkgrepoMove", "relRepoMove", "changesetMarker" ] };
   // The arguments the diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').

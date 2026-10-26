@@ -55,7 +55,7 @@ use crate::types::tree::moves::{
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, PartnerFolder, Phantom, PhantomDeleted, Property,
+  Editability, PartnerFolder, Phantom, PhantomDeleted, PropertyMember, ChangeViewnode,
   PropertyFolder, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
@@ -216,7 +216,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     else { Vec::new () };
   let is_marker = |treeid : &NodeId| -> bool {
     matches! ( tree . get (*treeid) . unwrap () . value () . kind,
-               ViewnodeKind::Property (Property::ChangesetMarker { .. }) ) };
+               ViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker { .. }) ) };
   let order : Vec<NodeId> =
     fronts . iter () . filter ( |front| ! is_marker (front) ) . copied ()
     . chain (partner_folders)
@@ -434,9 +434,9 @@ fn is_front_change_viewnode (
   viewnode : &Viewnode,
 ) -> bool {
   matches! ( &viewnode . kind,
-    ViewnodeKind::Property (
-      Property::OldText { .. } | Property::HomeSkgrepoMove { .. }
-      | Property::ChangesetMarker { .. } )
+    ViewnodeKind::ChangeViewnode (
+      ChangeViewnode::OldText { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
+      | ChangeViewnode::ChangesetMarker { .. } )
     | ViewnodeKind::PropertyFolder (_)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ) }
 
@@ -496,10 +496,10 @@ fn unmark_property_folders_except (
     let lost : bool = {
       let mut entry_mut : NodeMut<Viewnode> = tree . get_mut (entry) . unwrap ();
       let viewnode : &mut Viewnode = entry_mut . value ();
+      let lost : bool = // an entry HEAD alone warrants
+        viewnode . is_ghostWarranted ();
       viewnode . change_facts = ChangeFacts::default ();
-      matches! ( viewnode . kind,
-        ViewnodeKind::Property (
-          Property::RemovedAlias { .. } | Property::RemovedID { .. } )) };
+      lost };
     if lost {
       let is_leaf : bool =
         tree . get (entry) . unwrap () . children () . next () . is_none ();
@@ -618,7 +618,7 @@ fn tag_content_members (
       tree, member, &model, model . root () . id (), &straddle . after,
       &is_diffView_change_viewnode,
       &|viewnode| matches! ( &viewnode . kind,
-        ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
+        ViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { .. }) ),
       &|_| false ) ?; }
   Ok (( )) }
 
@@ -732,8 +732,8 @@ fn content_list (
 /// Under 'treeid', the node's alias, ID and flags folders, those whose
 /// list changed ('aspects'), each holding the union of the list: the
 /// old order where the LCS puts a removed entry, + on a gained entry,
-/// - on a lost one. A lost alias or ID is a 'Property::RemovedAlias'
-/// or 'Property::RemovedID'.
+/// - on a lost one. A lost alias or ID is a member with a ghost
+/// warrant, written '(rel removed)' ('PropertyMember').
 fn append_changed_property_folders (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -749,12 +749,9 @@ fn append_changed_property_folders (
       tree, treeid, PropertyFolder::Alias,
       union_with_existence ( &before . alias_texts (), &after . alias_texts () )
       . into_iter ()
-      . map ( |(text, existence)| match existence {
-        Some (Existence::Removed) => entry_viewnode (
-          Property::RemovedAlias { text }, existence ),
-        _ => entry_viewnode (
-          Property::Alias { text, relRepo : None, relationshipEditRequest : None },
-          existence ), } )
+      . map ( |(text, existence)| entry_viewnode (
+        PropertyMember::Alias { text, relRepo : None, relationshipEditRequest : None },
+        existence ) )
       . collect () ); }
   if aspects . extra_ids {
     let ids = |node : &GraphnodeInRust| -> Vec<ID> {
@@ -763,10 +760,8 @@ fn append_changed_property_folders (
     append_property_folder (
       tree, treeid, PropertyFolder::ID,
       union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
-      . map ( |(skgid, existence)| match existence {
-        Some (Existence::Removed) => entry_viewnode (
-          Property::RemovedID { skgid }, existence ),
-        _ => entry_viewnode ( Property::ID { skgid }, existence ), } )
+      . map ( |(skgid, existence)| entry_viewnode (
+        PropertyMember::ID { skgid }, existence ) )
       . collect () ); }
   if aspects . flags {
     append_property_folder (
@@ -781,7 +776,7 @@ fn append_changed_property_folders (
             (true,  true)  => None,
             (false, false) => return None, };
         Some ( entry_viewnode (
-          Property::Flag { flag, title : String::new (), body : None },
+          PropertyMember::Flag { flag, title : String::new (), body : None },
           existence )) } )
       . collect () ); }
   }
@@ -806,7 +801,7 @@ fn union_with_existence<T : Clone + Eq + Hash + Ord> (
 /// A property folder's entry, whose existence in the folder changed
 /// by 'existence'.
 fn entry_viewnode (
-  property : Property,
+  property : PropertyMember,
   existence : Option<Existence>,
 ) -> Viewnode {
   Viewnode {
@@ -815,7 +810,7 @@ fn entry_viewnode (
       ready    : None,
       leaves   : None,
       .. ChangeFacts::default () },
-    .. viewnode_of ( ViewnodeKind::Property (property) ) } }
+    .. viewnode_of ( ViewnodeKind::PropertyMember (property) ) } }
 
 /// Under 'treeid', a folder 'kind' holding 'entries'.
 fn append_property_folder (

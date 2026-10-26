@@ -53,7 +53,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, Existence, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
+  ChangesetMarkerKind, PropertyMember, ChangeViewnode, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
   Editability, RelationshipEditRequest, ViewnodeId,
 };
@@ -214,11 +214,11 @@ pub fn viewnode_from_metadata (
         let is_flags_folder = matches! (non_vognode,
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }));
         let is_flag = matches! (non_vognode,
-          MpViewnodeKind::Property (Property::Flag { .. }));
+          MpViewnodeKind::PropertyMember (PropertyMember::Flag { .. }));
         let carries_text : bool = // the diff view's text properties
           matches! (non_vognode,
-            MpViewnodeKind::Property (
-              Property::OldText { .. } | Property::BodyDiff { .. } ));
+            MpViewnodeKind::ChangeViewnode (
+              ChangeViewnode::OldText { .. } | ChangeViewnode::BodyDiff { .. } ));
         let error : Option<BufferValidationError> =
           if body . is_some () && ! is_flags_folder && ! is_flag
              && ! carries_text {
@@ -241,25 +241,19 @@ pub fn viewnode_from_metadata (
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
           // Use headline title for string
-          MpViewnodeKind::Property (Property::Alias { .. }) =>
-            MpViewnodeKind::Property (Property::Alias {
+          MpViewnodeKind::PropertyMember (PropertyMember::Alias { .. }) =>
+            MpViewnodeKind::PropertyMember (PropertyMember::Alias {
                               text: title . clone (),
                               relRepo:
                                 metadata . property_relRepo . clone (),
                               relationshipEditRequest:
                                 metadata . property_relRepo_request . clone ()
                                 . map (RelationshipEditRequest::RelRepo) }),
-          MpViewnodeKind::Property (Property::ID { .. }) =>
-            MpViewnodeKind::Property (Property::ID {
+          MpViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
+            MpViewnodeKind::PropertyMember (PropertyMember::ID {
                               skgid: title . clone () . into () }),
-          MpViewnodeKind::Property (Property::RemovedAlias { .. }) =>
-            MpViewnodeKind::Property (Property::RemovedAlias {
-              text              : title . clone () }),
-          MpViewnodeKind::Property (Property::RemovedID { .. }) =>
-            MpViewnodeKind::Property (Property::RemovedID {
-              skgid             : title . clone () . into () }),
-          MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
-            MpViewnodeKind::Property (Property::Flag {
+          MpViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
+            MpViewnodeKind::PropertyMember (PropertyMember::Flag {
               flag : *flag,
               title    : title . clone (),
               body     : body . clone () }),
@@ -268,23 +262,23 @@ pub fn viewnode_from_metadata (
               title : title . clone (), body : body . clone () }),
           // The parser marks which aspects an OldText shows; its text
           // comes from the headline and the body.
-          MpViewnodeKind::Property (Property::OldText {
+          MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText {
             title : title_changed, body : body_changed, .. }) =>
-            MpViewnodeKind::Property (Property::OldText {
+            MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText {
               title : title_changed . as_ref () . map ( |_| title . clone () ),
               body  : body_changed . as_ref ()
                       . map ( |_| body . clone () . unwrap_or_default () ) }),
-          MpViewnodeKind::Property (Property::BodyDiff { .. }) =>
-            MpViewnodeKind::Property (Property::BodyDiff {
+          MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) =>
+            MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff {
               diff : body . clone () . unwrap_or_default () }),
-          MpViewnodeKind::Property (Property::HomeSkgrepoMove { skgrepo_change, .. }) =>
-            MpViewnodeKind::Property (Property::HomeSkgrepoMove {
+          MpViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove { skgrepo_change, .. }) =>
+            MpViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove {
               skgrepo_change    : skgrepo_change . clone () }),
-          MpViewnodeKind::Property (Property::RelRepoMove { skgrepo_change, .. }) =>
-            MpViewnodeKind::Property (Property::RelRepoMove {
+          MpViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { skgrepo_change, .. }) =>
+            MpViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove {
               skgrepo_change    : skgrepo_change . clone () }),
-          MpViewnodeKind::Property (Property::ChangesetMarker { kind, .. }) =>
-            MpViewnodeKind::Property (Property::ChangesetMarker {
+          MpViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker { kind, .. }) =>
+            MpViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker {
               kind : *kind }),
           other => other . clone () };
         ( non_vognode_with_title, error, folder_title_warning )
@@ -349,7 +343,7 @@ pub fn viewnode_from_metadata (
                | MpViewnodeKind::BufferRoot
                | MpViewnodeKind::Tombstone
                | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-               | MpViewnodeKind::Property (Property::BodyDiff { .. }) );
+               | MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) );
   ( MpViewnode { foldAndFocus      : metadata . foldAndFocus,
                  kind,
                  change_facts      :
@@ -367,8 +361,10 @@ fn maybeplaced_kind_error_label (
   match kind {
     MpViewnodeKind::PropertyFolder (folder) =>
       folder . repr_in_client () . to_string (),
-    MpViewnodeKind::Property (property) =>
-      property . repr_in_client () . to_string (),
+    MpViewnodeKind::PropertyMember (member) =>
+      member . repr_in_client () . to_string (),
+    MpViewnodeKind::ChangeViewnode (change) =>
+      change . repr_in_client () . to_string (),
     MpViewnodeKind::PartnerFolder (partnerFolder) =>
       partnerFolder . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
@@ -432,26 +428,26 @@ pub fn parse_metadata_to_viewnodemd (
                 "body"         => (false, true),
                 other => return Err ( format! (
                   "Unknown oldText aspect: {}", other )), };
-            result . non_vognode = Some ( MpViewnodeKind::Property (
-              Property::OldText {
+            result . non_vognode = Some ( MpViewnodeKind::ChangeViewnode (
+              ChangeViewnode::OldText {
                 title : title_changed . then (String::new),
                 body  : body_changed  . then (String::new) } )); },
           "homeSkgrepoMove" | "relRepoMove" => {
             let skgrepo_change : SkgrepoChange =
               parse_old_and_new_skgrepos (&first, &items[1..]) ?;
-            result . non_vognode = Some ( MpViewnodeKind::Property (
+            result . non_vognode = Some ( MpViewnodeKind::ChangeViewnode (
               if first == "homeSkgrepoMove" {
-                Property::HomeSkgrepoMove { skgrepo_change }
+                ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
               } else {
-                Property::RelRepoMove { skgrepo_change } } )); },
+                ChangeViewnode::RelRepoMove { skgrepo_change } } )); },
           "changesetMarker" => {
             let name : String = single_argument (&first, &items[1..]) ?;
             let kind : ChangesetMarkerKind =
               ChangesetMarkerKind::from_wire_name (&name)
               . ok_or_else ( || format! (
                 "Unknown changesetMarker kind: {}", name )) ?;
-            result . non_vognode = Some ( MpViewnodeKind::Property (
-              Property::ChangesetMarker { kind } )); },
+            result . non_vognode = Some ( MpViewnodeKind::ChangeViewnode (
+              ChangeViewnode::ChangesetMarker { kind } )); },
           "unknown" => {
             // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No skgrepo/title/body.
@@ -500,8 +496,8 @@ pub fn parse_metadata_to_viewnodemd (
             let name : String = atom_to_string (&items[1]) ?;
             let flag : Flag = Flag::from_wire_name (&name)
               . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
-            result . non_vognode = Some (MpViewnodeKind::Property (
-              Property::Flag {
+            result . non_vognode = Some (MpViewnodeKind::PropertyMember (
+              PropertyMember::Flag {
                 flag, title: String::new (), body: None })); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
@@ -536,7 +532,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relationshipEditRequest: None } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::Alias { text: String::new(), relRepo: None, relationshipEditRequest: None } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
             MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
@@ -558,18 +554,8 @@ pub fn parse_metadata_to_viewnodemd (
           "acquiredFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Acquired)),
           "bodyDiff" =>
-            result . non_vognode = Some (MpViewnodeKind::Property (
-              Property::BodyDiff { diff : String::new () } )),
-          // The diff view's removed entries; their text, like an
-          // alias's or an ID's, comes from the headline.
-          "removedAlias" =>
-            result . non_vognode = Some (MpViewnodeKind::Property (
-              Property::RemovedAlias {
-                text : String::new () } )),
-          "removedID" =>
-            result . non_vognode = Some (MpViewnodeKind::Property (
-              Property::RemovedID {
-                skgid : ID::default () } )),
+            result . non_vognode = Some (MpViewnodeKind::ChangeViewnode (
+              ChangeViewnode::BodyDiff { diff : String::new () } )),
           "overriddenFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
           "overriderFolder" =>
@@ -581,7 +567,7 @@ pub fn parse_metadata_to_viewnodemd (
           "idFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { skgid: ID::default() } ) ),
+            result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::ID { skgid: ID::default() } ) ),
           "tombstone" => result . is_tombstone = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
@@ -592,7 +578,7 @@ pub fn parse_metadata_to_viewnodemd (
   if ( result . property_relRepo . is_some ()
        || result . property_relRepo_request . is_some () )
      && ! matches! ( result . non_vognode,
-                     Some (MpViewnodeKind::Property (Property::Alias { .. })) )
+                     Some (MpViewnodeKind::PropertyMember (PropertyMember::Alias { .. })) )
   { return Err ( "relRepo and its editRequest are valid only on Alias properties"
                  . to_string () ); }
   let is_folder : bool = matches! ( result . non_vognode,
@@ -607,14 +593,12 @@ pub fn parse_metadata_to_viewnodemd (
                  . to_string () ); }
   if top_level_diff && ! is_folder
      && ! matches! ( result . non_vognode,
-                     Some (MpViewnodeKind::Property (
-                       Property::Alias { .. } | Property::ID { .. }
-                       | Property::Flag { .. }
-                       | Property::RemovedAlias { .. } | Property::RemovedID { .. }
-                       | Property::OldText { .. }
-                       | Property::HomeSkgrepoMove { .. }
-                       | Property::RelRepoMove { .. }
-                       | Property::ChangesetMarker { .. } )) )
+                     Some ( MpViewnodeKind::PropertyMember (_)
+                            | MpViewnodeKind::ChangeViewnode (
+                              ChangeViewnode::OldText { .. }
+                              | ChangeViewnode::HomeSkgrepoMove { .. }
+                              | ChangeViewnode::RelRepoMove { .. }
+                              | ChangeViewnode::ChangesetMarker { .. } )) )
   { return Err ( "A top-level diff is valid only on alias, id and flag properties, the diff view's properties other than bodyDiff, and changed folders"
                  . to_string () ); }
   check_where_the_edit_request_sits (&result) ?;

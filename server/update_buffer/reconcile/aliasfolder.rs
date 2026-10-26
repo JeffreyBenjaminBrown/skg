@@ -3,7 +3,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{Vognode, PropertyFolder, Property, viewnode_of};
+use crate::types::viewnode::{Vognode, PropertyFolder, PropertyMember, viewnode_of};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, treat_certain_children};
@@ -59,15 +59,15 @@ pub fn reconcile_aliasFolder_children (
   let is_alias : fn (&Viewnode) -> bool =
     // managedness for complete_managed_children
     |viewnode| matches!( &viewnode . kind,
-                        ViewnodeKind::Property (Property::Alias { .. } ) );
+                        ViewnodeKind::PropertyMember (PropertyMember::Alias { .. } ) );
   let view_alias_text : fn (&Viewnode) -> Result<String, String> =
     |viewnode| match &viewnode . kind {
-      ViewnodeKind::Property (Property::Alias { text, .. } ) =>
+      ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. } ) =>
         Ok ( text . clone() ),
       _ => Err ( "reconcile_aliasFolder_children: managed child is not an alias"
-                 . to_string() ), }; // managed means Property::Alias
+                 . to_string() ), }; // managed means PropertyMember::Alias
   let create_alias = |text: &String| -> Result<Viewnode, String> {
-    Ok ( viewnode_of (ViewnodeKind::Property (Property::Alias { text : text . clone(),
+    Ok ( viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias { text : text . clone(),
                                                relRepo : alias_relRepos
                                                  . get (text)
                                                  . and_then ( |relRepo|

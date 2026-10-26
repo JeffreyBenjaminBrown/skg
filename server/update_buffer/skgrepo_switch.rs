@@ -143,7 +143,7 @@ fn should_prune (
   Ok ( match &node_ref . value () . kind {
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       is_leaf,
-    ViewnodeKind::Property (_) =>
+    ViewnodeKind::PropertyMember (_) | ViewnodeKind::ChangeViewnode (_) =>
       is_leaf && grandparent_is_restricted,
     ViewnodeKind::PropertyFolder (PropertyFolder::ID)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Alias)

@@ -35,7 +35,7 @@ fn a_deleted_id_folder_respawns (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let edited : String = [ "(skg id", "(skg removedID", "(skg (idFolder" ]
+    let edited : String = [ "(skg id", "(skg (idFolder" ]
       . into_iter () . fold ( buffer . clone (), |edited, atom|
         without_lines_containing (&edited, atom) );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
@@ -76,7 +76,7 @@ fn a_removed_alias_is_not_restored_by_a_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg removedAlias (diff (rel removed) (leaves 1))) a1"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg alias (diff (rel removed) (leaves 1))) a1"),
               "{}", buffer );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (),
@@ -96,7 +96,7 @@ fn a_removed_id_does_not_abort_the_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg removedID (diff (rel removed) (leaves 1))) ali-old"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg id (diff (rel removed) (leaves 1))) ali-old"),
               "{}", buffer );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &buffer) ?;

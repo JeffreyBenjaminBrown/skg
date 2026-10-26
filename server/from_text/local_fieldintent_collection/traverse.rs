@@ -51,7 +51,7 @@ use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, 
-  NodeEditRequest, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
+  NodeEditRequest, PropertyMember, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -115,7 +115,8 @@ fn visit (
       visit_overridden_folder (node_ref, context, collected),
     ViewnodeKind::PropertyFolder (PropertyFolder::ID)
       | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
-      | ViewnodeKind::Property (_)
+      | ViewnodeKind::PropertyMember (_)
+      | ViewnodeKind::ChangeViewnode (_)
       | ViewnodeKind::PartnerFolder (_) =>
       // These are the write-protected folders and the Property leaves. Vognodes
       // found inside them are self-writers; their membership in the
@@ -252,7 +253,8 @@ fn recurse_under_vognode (
                 parent_if_editable : None } },
         ViewnodeKind::PropertyFolder (
           PropertyFolder::ID | PropertyFolder::Flags { .. })
-          | ViewnodeKind::Property (_)
+          | ViewnodeKind::PropertyMember (_)
+          | ViewnodeKind::ChangeViewnode (_)
           | ViewnodeKind::PartnerFolder (_) =>
           LocalContext::UnderWriteProtectedFolder,
         _ =>
@@ -281,11 +283,13 @@ fn visit_aliasFolder (
         let mut aliases : Vec<(String, Option<SkgrepoName>)> = Vec::new();
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
-          if let ViewnodeKind::Property (Property::Alias {
+          if let ViewnodeKind::PropertyMember (PropertyMember::Alias {
             text, relationshipEditRequest, .. })
             = &child . value() . kind
-          { // A 'Property::RemovedAlias' is no alias, so it is not read.
-            if seen . insert (text . clone ()) {
+          { // An alias with a ghost warrant, one the worktree lost, is
+            // not read.
+            if ! child . value () . is_ghostWarranted ()
+               && seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
                                 RelationshipEditRequest::relRepo_of (
                                   relationshipEditRequest ) . cloned () )); }} }

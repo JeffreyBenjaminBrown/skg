@@ -40,9 +40,9 @@ without a title ends in a space, as 'skg-format-headline' writes it."
 
 (ert-deftest test-skg-cycle-commit-ready-toggles-a-leaf ()
   (should (equal (test-skg-readiness--run
-                  '("** (skg removedAlias (diff (rel removed) (leaves 1))) a1")
+                  '("** (skg alias (diff (rel removed) (leaves 1))) a1")
                   1 #'skg-cycle-commit-ready)
-                 '("** (skg removedAlias (diff (rel removed) (leaves 1) (readyRequest))) a1")))
+                 '("** (skg alias (diff (rel removed) (leaves 1) (readyRequest))) a1")))
   (should (equal (test-skg-readiness--run
                   '("** (skg (oldText title) (diff (leaves 1) (ready))) txt")
                   1 #'skg-cycle-commit-ready)
@@ -120,13 +120,13 @@ without the form gets one."
   (should (equal (test-skg-readiness--run
                   '("* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali"
                     "** (skg (aliasFolder changed))"
-                    "*** (skg removedAlias (diff (rel removed) (leaves 1) (ready))) a1"
+                    "*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1"
                     "*** (skg alias) a2"
                     "*** (skg alias (diff (rel added) (leaves 1))) a3")
                   2 #'skg-cycle-commit-ready)
                  '("* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali"
                    "** (skg (aliasFolder changed))"
-                   "*** (skg removedAlias (diff (rel removed) (leaves 1) (ready) (readyRequest))) a1"
+                   "*** (skg alias (diff (rel removed) (leaves 1) (ready) (readyRequest))) a1"
                    "*** (skg alias) a2"
                    "*** (skg alias (diff (rel added) (leaves 1) (readyRequest))) a3")))
   ;; A changed node: one request naming every leaf it records.
@@ -194,11 +194,11 @@ without the form gets one."
   ;; The folder's one leaf is its only unmark: nothing is asked.
   (should (equal (test-skg-readiness--run
                   '("** (skg (aliasFolder changed) (diff (ready)))"
-                    "*** (skg removedAlias (diff (rel removed) (leaves 1) (ready))) a1"
+                    "*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1"
                     "*** (skg alias) a2")
                   1 #'skg-cycle-commit-ready)
                  '("** (skg (aliasFolder changed) (diff (ready)))"
-                   "*** (skg removedAlias (diff (rel removed) (leaves 1) (ready) (unreadyRequest))) a1"
+                   "*** (skg alias (diff (rel removed) (leaves 1) (ready) (unreadyRequest))) a1"
                    "*** (skg alias) a2")))
   ;; A modified node whose only leaf is ready: one leaf, as the server
   ;; counts, so nothing is asked.
@@ -323,7 +323,7 @@ siblings, or a child without metadata."
     "*** (skg (node (id b) (repo main))) b"
     "** (skg (node (id c) (repo main) (diff (properties changed) (leaves 2 all) (ready all)))) c"
     "** (skg (containerFolder changed) (diff (ready))) its containers"
-    "*** (skg removedAlias (diff (rel removed) (leaves 1))) a1")
+    "*** (skg alias (diff (rel removed) (leaves 1))) a1")
   "Three change headlines (lines 2, 4 and 6), the middle one ready,
 among headlines that carry no leaves fact, one of them a ready folder.")
 

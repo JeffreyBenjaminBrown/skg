@@ -73,7 +73,7 @@ fn warrants (
   forest . nodes ()
     . filter ( |node| matches! ( &node . value () . kind,
                  ViewnodeKind::Vognode (Vognode::Unrestricted (_))
-                 | ViewnodeKind::Property (_) ))
+                 | ViewnodeKind::PropertyMember (_) ))
     . map ( |node| ( node . value () . title () . to_string (),
                      warrant_of_viewnode (node, &graph, &config, None) ))
     . collect () }

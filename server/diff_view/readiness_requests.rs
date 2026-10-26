@@ -37,7 +37,7 @@ use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, Property, DiffObject,
+  ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, PropertyMember, ChangeViewnode, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -151,39 +151,41 @@ fn leaves_named_at (
               node, &pid, pid_of, RelationshipAspect::Existence )),
           DiffObject::All =>
             all_of . push (pid . clone ()), }} },
-    ViewnodeKind::Property (property) => {
+    ViewnodeKind::PropertyMember (member) => {
       // The change-forest leaf of an entry in a folder belongs to the
-      // folder's viewparent; the diff view's properties hang
-      // under their node.
-      let pid_of_folders_viewparent = || -> Option<ID> {
-        Some ( pid_of ( &grandparent_pid (node) ? )) };
+      // folder's viewparent.
+      let pid_of_folders_viewparent : ID =
+        pid_of ( &grandparent_pid (node) ? );
+      match member {
+        PropertyMember::Alias { text, .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : pid_of_folders_viewparent,
+            aspect : NodeAspect::Alias (text . clone ()) } ),
+        PropertyMember::ID { skgid, .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : pid_of_folders_viewparent,
+            aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
+        PropertyMember::Flag { flag, .. } =>
+          leaves . push ( LeafKey::Node {
+            pid : pid_of_folders_viewparent,
+            aspect : NodeAspect::Flag (*flag) } ), }},
+    ViewnodeKind::ChangeViewnode (change) => {
+      // A change viewnode hangs under its node.
       let parent : NodeRef<Viewnode> = node . parent () ?;
       let parent_pid = || -> Option<ID> {
         vognode_leaf_pid (parent . value (), pid_of) };
-      match property {
-        Property::Alias { text, .. } | Property::RemovedAlias { text, .. } =>
-          leaves . push ( LeafKey::Node {
-            pid : pid_of_folders_viewparent () ?,
-            aspect : NodeAspect::Alias (text . clone ()) } ),
-        Property::ID { skgid, .. } | Property::RemovedID { skgid, .. } =>
-          leaves . push ( LeafKey::Node {
-            pid : pid_of_folders_viewparent () ?,
-            aspect : NodeAspect::ExtraId (skgid . clone ()) } ),
-        Property::Flag { flag, .. } =>
-          leaves . push ( LeafKey::Node {
-            pid : pid_of_folders_viewparent () ?,
-            aspect : NodeAspect::Flag (*flag) } ),
-        Property::OldText { .. } =>
+      match change {
+        ChangeViewnode::OldText { .. } =>
           leaves . push ( LeafKey::Node {
             pid : parent_pid () ?, aspect : NodeAspect::Text } ),
-        Property::HomeSkgrepoMove { .. } =>
+        ChangeViewnode::HomeSkgrepoMove { .. } =>
           leaves . push ( LeafKey::Node {
             pid : parent_pid () ?, aspect : NodeAspect::HomeSkgrepo } ),
-        Property::RelRepoMove { .. } =>
+        ChangeViewnode::RelRepoMove { .. } =>
           leaves . extend ( relationship_to_viewparent (
             parent, &parent_pid () ?, pid_of,
             RelationshipAspect::RelRepo )),
-        Property::ChangesetMarker { kind, .. } => match kind {
+        ChangeViewnode::ChangesetMarker { kind, .. } => match kind {
           ChangesetMarkerKind::Content =>
             content_relationships_of . push ((
               parent_pid () ?, RelationshipAspect::Existence )),
@@ -191,7 +193,7 @@ fn leaves_named_at (
             content_relationships_of . push ((
               parent_pid () ?, RelationshipAspect::RelRepo )),
           ChangesetMarkerKind::OrderOnly => {}, }, // always ready
-        Property::BodyDiff { .. } =>
+        ChangeViewnode::BodyDiff { .. } =>
           return None, }},
     _ => return None, }
   Some ( NamedLeaves { leaves, all_of, content_relationships_of } ) }
@@ -262,12 +264,14 @@ pub fn set_ready_facts_in_viewforest (
           ViewnodeKind::Vognode (
             Vognode::Phantom (Phantom::Deleted (_) | Phantom::Unknown (_)) ) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
-          ViewnodeKind::Property ( Property::ChangesetMarker { kind } ) =>
+          ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { kind } ) =>
             ( *kind == ChangesetMarkerKind::OrderOnly
               || object_is_ready (node, &[]) )
             . then ( || BTreeSet::from ([ DiffObject::All ]) ),
-          ViewnodeKind::Property (property)
-            if ! matches! (property, Property::BodyDiff { .. }) =>
+          ViewnodeKind::PropertyMember (_) =>
+            object_is_ready (node, &[]) . then (BTreeSet::new),
+          ViewnodeKind::ChangeViewnode (change)
+            if ! matches! (change, ChangeViewnode::BodyDiff { .. }) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           _ => return None, };
       Some (( node . id (), ready, leaves )) } )

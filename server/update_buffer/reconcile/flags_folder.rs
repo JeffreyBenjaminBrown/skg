@@ -3,7 +3,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::{
   Flag, Graphnode, flag_is_true};
-use crate::types::viewnode::{Property, Viewnode, ViewnodeKind, viewnode_of};
+use crate::types::viewnode::{PropertyMember, Viewnode, ViewnodeKind, viewnode_of};
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{
   KeptChildOrder, complete_managed_children_in_viewforest, treat_certain_children};
@@ -30,12 +30,12 @@ pub fn reconcile_flags_folder_children (
     tree, folder_skgid,
     KeptChildOrder::Unmoved,
     |viewnode| matches! (&viewnode . kind,
-      ViewnodeKind::Property (Property::Flag { .. })),
+      ViewnodeKind::PropertyMember (PropertyMember::Flag { .. })),
     |viewnode| match &viewnode . kind {
-      ViewnodeKind::Property (Property::Flag { flag, .. }) => Ok (*flag),
+      ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) => Ok (*flag),
       _ => Err ("managed child is not a Flag" . to_string ()), },
     &goals,
-    |flag| Ok (viewnode_of (ViewnodeKind::Property (Property::Flag {
+    |flag| Ok (viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Flag {
         flag : *flag,
         title    : String::new (),
         body     : None, })))) ?;
@@ -44,8 +44,8 @@ pub fn reconcile_flags_folder_children (
   treat_certain_children (
     tree, folder_skgid,
     |viewnode| matches! (&viewnode . kind,
-      ViewnodeKind::Property (Property::Flag { .. })),
-    |viewnode| if let ViewnodeKind::Property (Property::Flag {
+      ViewnodeKind::PropertyMember (PropertyMember::Flag { .. })),
+    |viewnode| if let ViewnodeKind::PropertyMember (PropertyMember::Flag {
       title, body, .. }) = &mut viewnode . kind
     { *title = String::new ();
       *body = None; }) ?;

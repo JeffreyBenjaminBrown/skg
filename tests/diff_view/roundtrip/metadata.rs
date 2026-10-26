@@ -11,7 +11,7 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
-  PhantomHistorical, Property, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
+  PhantomHistorical, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -50,12 +50,20 @@ fn assert_round_trip (
   assert_eq! ( warning, None );
   assert_eq! ( Viewnode::try_from (parsed) . unwrap (), node ); }
 
-fn property (
-  property          : Property,
+fn change_viewnode (
+  change            : ChangeViewnode,
   change_facts      : ChangeFacts,
   readiness_request : Option<ReadinessRequest>,
 ) -> Viewnode {
-  with_facts ( viewnode_of ( ViewnodeKind::Property (property) ),
+  with_facts ( viewnode_of ( ViewnodeKind::ChangeViewnode (change) ),
+               change_facts, readiness_request ) }
+
+fn property_member (
+  member            : PropertyMember,
+  change_facts      : ChangeFacts,
+  readiness_request : Option<ReadinessRequest>,
+) -> Viewnode {
+  with_facts ( viewnode_of ( ViewnodeKind::PropertyMember (member) ),
                change_facts, readiness_request ) }
 
 #[test]
@@ -67,7 +75,7 @@ fn old_text_round_trips_each_aspect () {
     // A body HEAD lacked is the empty string.
     ( None,                   Some (""),               "(oldText body) (diff (ready))" ), ] {
     assert_round_trip (
-      property ( Property::OldText {
+      change_viewnode ( ChangeViewnode::OldText {
                    title : title . map (String::from),
                    body  : body  . map (String::from) },
                  ready (&[]), None ),
@@ -76,20 +84,20 @@ fn old_text_round_trips_each_aspect () {
 #[test]
 fn body_diff_round_trips () {
   assert_round_trip (
-    property ( Property::BodyDiff { diff : " line one\n-line two\n+line 2\n" . into () },
+    change_viewnode ( ChangeViewnode::BodyDiff { diff : " line one\n-line two\n+line 2\n" . into () },
                ChangeFacts::default (), None ),
     "bodyDiff" ); }
 
 #[test]
 fn skgrepo_moves_round_trip () {
   assert_round_trip (
-    property ( Property::HomeSkgrepoMove {
+    change_viewnode ( ChangeViewnode::HomeSkgrepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("priv") } },
       ready (&[]), None ),
     "(homeSkgrepoMove (old pub) (new priv)) (diff (ready))" );
   assert_round_trip (
-    property ( Property::RelRepoMove {
+    change_viewnode ( ChangeViewnode::RelRepoMove {
       skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("pub"),
                                        new : SkgrepoName::from ("a repo") } },
       ChangeFacts::default (), request_all () ),
@@ -102,24 +110,28 @@ fn changeset_markers_round_trip () {
     ( ChangesetMarkerKind::RelRepo,   "(changesetMarker relRepo) (diff (ready all))" ),
     ( ChangesetMarkerKind::OrderOnly, "(changesetMarker orderOnly) (diff (ready all))" ), ] {
     assert_round_trip (
-      property ( Property::ChangesetMarker { kind }, ready (&[ DiffObject::All ]), None ),
+      change_viewnode ( ChangeViewnode::ChangesetMarker { kind }, ready (&[ DiffObject::All ]), None ),
       expected ); }}
 
 #[test]
-fn removed_aliases_and_ids_round_trip () {
+/// An alias or ID the worktree lost since HEAD is a member with a
+/// ghost warrant, written '(rel removed)'.
+fn ghost_warranted_aliases_and_ids_round_trip () {
   let removed : ChangeFacts = ChangeFacts {
     change   : DiffChange { rel : Some (Existence::Removed), .. DiffChange::default () },
     ready    : Some (BTreeSet::new ()),
     leaves   : None,
     .. ChangeFacts::default () };
   assert_round_trip (
-    property ( Property::RemovedAlias { text : "an old alias" . into () },
-               removed . clone (), None ),
-    "removedAlias (diff (rel removed) (ready))" );
+    property_member ( PropertyMember::Alias { text : "an old alias" . into (),
+                                              relRepo : None,
+                                              relationshipEditRequest : None },
+                      removed . clone (), None ),
+    "alias (diff (rel removed) (ready))" );
   assert_round_trip (
-    property ( Property::RemovedID { skgid : ID::from ("old-id") },
-               removed, request_all () ),
-    "removedID (diff (rel removed) (ready) (readyRequest all))" ); }
+    property_member ( PropertyMember::ID { skgid : ID::from ("old-id") },
+                      removed, request_all () ),
+    "id (diff (rel removed) (ready) (readyRequest all))" ); }
 
 #[test]
 fn a_historical_phantom_round_trips () {

@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Editability, PartnerFolder, Property, PropertyFolder};
+use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Editability, PartnerFolder, PropertyMember, ChangeViewnode, PropertyFolder};
 use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
 use crate::serve::parse_metadata_sexp::RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP;
@@ -47,8 +47,7 @@ pub fn validate_local_structure (
         validate_unrestrictedVognode(tree, treeid, t, config),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
-      MpViewnodeKind::Property (
-        Property::Alias { .. } | Property::RemovedAlias { .. }) =>
+      MpViewnodeKind::PropertyMember (PropertyMember::Alias { .. }) =>
           validate_alias(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
           validate_aliasfolder(tree, treeid),
@@ -69,12 +68,11 @@ pub fn validate_local_structure (
           validate_subscribeefolder(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
           validate_idFolder(tree, treeid),
-      MpViewnodeKind::Property (
-        Property::ID { .. } | Property::RemovedID { .. }) =>
+      MpViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
           validate_id_property(tree, treeid),
       MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
           validate_flags_folder (tree, treeid),
-      MpViewnodeKind::Property (Property::Flag { .. }) =>
+      MpViewnodeKind::PropertyMember (PropertyMember::Flag { .. }) =>
           validate_flag (tree, treeid),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         => Vec::new(),
@@ -89,14 +87,14 @@ pub fn validate_local_structure (
         validate_acquiredBy_folder (tree, treeid),
       MpViewnodeKind::PartnerFolder (PartnerFolder::Acquired) =>
         validate_acquired_folder (tree, treeid),
-      MpViewnodeKind::Property (Property::OldText { .. }) =>
+      MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. }) =>
         validate_old_text (tree, treeid),
-      MpViewnodeKind::Property (Property::BodyDiff { .. }) =>
+      MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) =>
         validate_body_diff (tree, treeid),
-      MpViewnodeKind::Property (
-        Property::HomeSkgrepoMove { .. } | Property::RelRepoMove { .. }) =>
+      MpViewnodeKind::ChangeViewnode (
+        ChangeViewnode::HomeSkgrepoMove { .. } | ChangeViewnode::RelRepoMove { .. }) =>
         validate_skgrepo_move (tree, treeid),
-      MpViewnodeKind::Property (Property::ChangesetMarker { kind, .. }) =>
+      MpViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker { kind, .. }) =>
         validate_changeset_marker (tree, treeid, *kind) };
 
   if errors . is_empty() {
@@ -144,8 +142,8 @@ fn validate_aliasfolder (
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| matches!(&node . kind,
-                    MpViewnodeKind::Property (
-                      Property::Alias { .. } | Property::RemovedAlias { .. } ))))
+                    MpViewnodeKind::PropertyMember (
+                      PropertyMember::Alias { .. } ))))
     { errors . push("AliasFolder's (non-ignored) children must include only Aliases."
                     . to_string()); }
   if !generation_exists_and_includes(
@@ -187,7 +185,7 @@ fn validate_flags_folder (
   if ! generation_includes_only (
     tree, treeid, 1, true,
     tombstone_or (|node| matches! (&node . kind,
-      MpViewnodeKind::Property (Property::Flag { .. }))))
+      MpViewnodeKind::PropertyMember (PropertyMember::Flag { .. }))))
   { errors . push (
       "FlagsFolder's children must include only Flags."
       . to_string ()); }
@@ -471,12 +469,12 @@ fn validate_old_text (
   if !generation_includes_only(
     tree, treeid, 1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::BodyDiff { .. })))
+                    MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. })))
     { errors . push("oldText's only child can be a bodyDiff." . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::OldText { .. })))
+                    MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. })))
     { errors . push("oldText must be unique among its siblings." . to_string()); }
   errors }
 
@@ -488,7 +486,7 @@ fn validate_body_diff (
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::OldText { .. })))
+                    MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. })))
     { errors . push("bodyDiff must have an oldText parent." . to_string()); }
   if !generation_does_not_exist(tree, treeid, 1, false) {
     errors . push("bodyDiff must have no children." . to_string()); }
@@ -501,7 +499,7 @@ fn validate_skgrepo_move (
   let mut errors : Vec<String> = Vec::new();
   let is_homeSkgrepoMove : bool =
     tree . get (treeid) . is_some_and ( |n| matches! ( &n . value () . kind,
-      MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) ));
+      MpViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove { .. }) ));
   let label : &str = if is_homeSkgrepoMove { "homeSkgrepoMove" } else { "relRepoMove" };
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
@@ -512,8 +510,8 @@ fn validate_skgrepo_move (
   if !siblings_cannot_include(
     tree, treeid,
     |node| match &node . kind {
-      MpViewnodeKind::Property (Property::HomeSkgrepoMove { .. }) => is_homeSkgrepoMove,
-      MpViewnodeKind::Property (Property::RelRepoMove { .. }) => ! is_homeSkgrepoMove,
+      MpViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove { .. }) => is_homeSkgrepoMove,
+      MpViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { .. }) => ! is_homeSkgrepoMove,
       _ => false, } )
     { errors . push(format!("{} must be unique among its siblings.", label)); }
   errors }
@@ -533,7 +531,7 @@ fn validate_changeset_marker (
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Property (Property::ChangesetMarker {
+                    MpViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker {
                       kind : sibling_kind, .. })
                     if *sibling_kind == kind))
     { errors . push("A changesetMarker of each kind must be unique among its siblings."
@@ -552,8 +550,8 @@ fn validate_idFolder (
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| matches!(&node . kind,
-                    MpViewnodeKind::Property (
-                      Property::ID { .. } | Property::RemovedID { .. } ))) )
+                    MpViewnodeKind::PropertyMember (
+                      PropertyMember::ID { .. } ))) )
     { errors . push("IDFolder's (non-ignored) children can only be ID properties."
                     . to_string() ); }
   if !siblings_cannot_include(
@@ -719,9 +717,8 @@ fn cannot_be_child_of_vognode (
 ) -> bool {
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
-    MpViewnodeKind::Property (
-      Property::Alias { .. } | Property::ID { .. } | Property::Flag { .. }
-      | Property::RemovedAlias { .. } | Property::RemovedID { .. }) |
+    MpViewnodeKind::PropertyMember (
+      PropertyMember::Alias { .. } | PropertyMember::ID { .. } | PropertyMember::Flag { .. }) |
     MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
   || ( ! parent_is_subscribee_as_such
        // validate_hiddenin requires a vognode parent; a

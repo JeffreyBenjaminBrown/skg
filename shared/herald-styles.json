@@ -68,8 +68,6 @@
     "alias":                           "message",
     "idFolder":                        "message",
     "id":                              "message",
-    "removedAlias":                    "message",
-    "removedID":                       "message",
     "flagsFolder":                     "message",
     "flag":                            "message",
     "subscribeeFolder":                "message",

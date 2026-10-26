@@ -20,7 +20,7 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{FolderPolicy, PartnerFolder, Property, ViewnodeId, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{FolderPolicy, PartnerFolder, ChangeViewnode, ViewnodeId, Viewnode, ViewnodeKind};
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -189,7 +189,7 @@ pub fn reconcile_containerward_chain_under_member (
     tree, member, &model, model_member, key_graph,
     &|node| is_drawn_chain_node (node)
       || matches! ( node . value () . kind,
-                    ViewnodeKind::Property (Property::RelRepoMove { .. }) ),
+                    ViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { .. }) ),
     &|viewnode| ! viewnode . is_unrestrictedVognode_and_member (),
     &|_| true ) ?;
   Ok (( )) }

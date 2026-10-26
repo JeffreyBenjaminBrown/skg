@@ -46,8 +46,8 @@ end
 describe('skg.readiness', function ()
   it('toggles a leaf', function ()
     assert.are.same(
-      { '** (skg removedAlias (diff (rel removed) (leaves 1) (readyRequest))) a1' },
-      run({ '** (skg removedAlias (diff (rel removed) (leaves 1))) a1' }, 1,
+      { '** (skg alias (diff (rel removed) (leaves 1) (readyRequest))) a1' },
+      run({ '** (skg alias (diff (rel removed) (leaves 1))) a1' }, 1,
           readiness.cycle_commit_ready))
     assert.are.same(
       { '** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) txt' },
@@ -134,12 +134,12 @@ describe('skg.readiness', function ()
     assert.are.same({
       '* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali',
       '** (skg (aliasFolder changed))',
-      '*** (skg removedAlias (diff (rel removed) (leaves 1) (ready) (readyRequest))) a1',
+      '*** (skg alias (diff (rel removed) (leaves 1) (ready) (readyRequest))) a1',
       '*** (skg alias) a2',
       '*** (skg alias (diff (rel added) (leaves 1) (readyRequest))) a3' },
       run({ '* (skg (node (id ali) (repo r) (diff (leaves 2 all)))) ali',
             '** (skg (aliasFolder changed))',
-            '*** (skg removedAlias (diff (rel removed) (leaves 1) (ready))) a1',
+            '*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1',
             '*** (skg alias) a2',
             '*** (skg alias (diff (rel added) (leaves 1))) a3' },
           2, readiness.cycle_commit_ready))
@@ -210,10 +210,10 @@ describe('skg.readiness', function ()
   it('asks nothing before a single-leaf unmark', function ()
     assert.are.same({
       '** (skg (aliasFolder changed) (diff (ready)))',
-      '*** (skg removedAlias (diff (rel removed) (leaves 1) (ready) (unreadyRequest))) a1',
+      '*** (skg alias (diff (rel removed) (leaves 1) (ready) (unreadyRequest))) a1',
       '*** (skg alias) a2' },
       run({ '** (skg (aliasFolder changed) (diff (ready)))',
-            '*** (skg removedAlias (diff (rel removed) (leaves 1) (ready))) a1',
+            '*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1',
             '*** (skg alias) a2' },
           1, readiness.cycle_commit_ready))
     -- A modified node whose only leaf is ready: one leaf, as the
@@ -344,7 +344,7 @@ describe('skg.readiness moving between change headlines', function ()
     '*** (skg (node (id b) (repo main))) b',
     '** (skg (node (id c) (repo main) (diff (properties changed) (leaves 2 all) (ready all)))) c',
     '** (skg (containerFolder changed) (diff (ready))) its containers',
-    '*** (skg removedAlias (diff (rel removed) (leaves 1))) a1',
+    '*** (skg alias (diff (rel removed) (leaves 1))) a1',
     '' }
 
   ---Fill a buffer with LINES, put the cursor at the start of line

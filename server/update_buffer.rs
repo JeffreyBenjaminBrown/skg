@@ -57,7 +57,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_as_members, validate_membership_claims, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
-use crate::types::viewnode::{FolderRelation, Property, Vognode, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{FolderRelation, PropertyMember, Vognode, PropertyFolder, ViewRequest};
 use crate::update_buffer::ancestry::entombstone_generalized_orphan_folder;
 
 use ego_tree::{Tree, NodeId};
@@ -723,7 +723,7 @@ fn remove_id_folders (
       . ok_or ("remove_id_folders: folder not found") ?
       . children ()
       . all ( |child| matches! ( &child . value () . kind,
-                                 ViewnodeKind::Property (Property::ID { .. }) ));
+                                 ViewnodeKind::PropertyMember (PropertyMember::ID { .. }) ));
     if holds_only_its_entries {
       viewforest . get_mut (folder)
         . ok_or ("remove_id_folders: folder not found") ?

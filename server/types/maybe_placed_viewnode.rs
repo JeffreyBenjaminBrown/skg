@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, with_org_subheadlines};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
+use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, PropertyMember, ChangeViewnode, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -36,7 +36,8 @@ pub struct MpViewnode {
 pub enum MpViewnodeKind {
   Vognode      (MpVognode),
   PropertyFolder      (PropertyFolder),
-  Property         (Property),
+  PropertyMember   (PropertyMember),
+  ChangeViewnode   (ChangeViewnode),
   PartnerFolder   (PartnerFolder),
   BufferRoot,
   Tombstone,
@@ -101,8 +102,10 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
         Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))),
       MpViewnodeKind::PropertyFolder (c) =>
         Ok (ViewnodeKind::PropertyFolder (c)),
-      MpViewnodeKind::Property (q) =>
-        Ok (ViewnodeKind::Property (q)),
+      MpViewnodeKind::PropertyMember (member) =>
+        Ok (ViewnodeKind::PropertyMember (member)),
+      MpViewnodeKind::ChangeViewnode (change) =>
+        Ok (ViewnodeKind::ChangeViewnode (change)),
       MpViewnodeKind::PartnerFolder (r) =>
         Ok (ViewnodeKind::PartnerFolder (r)),
       MpViewnodeKind::BufferRoot =>
@@ -165,8 +168,10 @@ impl From<ViewnodeKind> for MpViewnodeKind {
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))),
       ViewnodeKind::PropertyFolder (c) =>
         MpViewnodeKind::PropertyFolder (c),
-      ViewnodeKind::Property (q) =>
-        MpViewnodeKind::Property (q),
+      ViewnodeKind::PropertyMember (member) =>
+        MpViewnodeKind::PropertyMember (member),
+      ViewnodeKind::ChangeViewnode (change) =>
+        MpViewnodeKind::ChangeViewnode (change),
       ViewnodeKind::PartnerFolder (r) =>
         MpViewnodeKind::PartnerFolder (r),
       ViewnodeKind::BufferRoot =>
@@ -288,8 +293,8 @@ impl MpViewnode {
         &d . title,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
         &h . title,
-      MpViewnodeKind::Property (q) =>
-        q . title (),
+      MpViewnodeKind::PropertyMember (member) => member . title (),
+      MpViewnodeKind::ChangeViewnode (change) => change . title (),
       MpViewnodeKind::PropertyFolder (folder) => folder . title (),
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
@@ -308,18 +313,14 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . title . clone(),
-      MpViewnodeKind::Property (Property::Alias { text, .. }) =>
+      MpViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =>
         format!("property:alias({})", text),
-      MpViewnodeKind::Property (Property::ID { skgid, .. }) =>
+      MpViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. }) =>
         format!("property:id({})", skgid),
-      MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
+      MpViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
         format!("property:flag({})", flag . wire_name ()),
-      MpViewnodeKind::Property (
-        property @ ( Property::RemovedAlias { .. } | Property::RemovedID { .. }
-                     | Property::OldText { .. }
-                     | Property::BodyDiff { .. } | Property::HomeSkgrepoMove { .. }
-                     | Property::RelRepoMove { .. } | Property::ChangesetMarker { .. } )) =>
-        format! ("property:{}", property . repr_in_client ()),
+      MpViewnodeKind::ChangeViewnode (change) =>
+        format! ("changeViewnode:{}", change . repr_in_client ()),
       MpViewnodeKind::PropertyFolder (folder) =>
         format!("propertyFolder:{}", folder . repr_in_client ()),
       MpViewnodeKind::PartnerFolder (partnerFolder) =>
@@ -347,7 +348,8 @@ impl MpViewnode {
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
         h . body . as_ref(),
       MpViewnodeKind::PropertyFolder (folder) => folder . body (),
-      MpViewnodeKind::Property (property) => property . body (),
+      MpViewnodeKind::PropertyMember (member) => member . body (),
+      MpViewnodeKind::ChangeViewnode (change) => change . body (),
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
@@ -370,11 +372,16 @@ impl MpViewnode {
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         Some (&u . skgid),
       MpViewnodeKind::PropertyFolder (_)
-        | MpViewnodeKind::Property (_)
+        | MpViewnodeKind::PropertyMember (_)
+        | MpViewnodeKind::ChangeViewnode (_)
         | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone =>
         None, }}
+
+  /// As 'Viewnode::is_ghostWarranted'.
+  pub fn is_ghostWarranted (&self) -> bool {
+    self . change_facts . change . rel == Some (Existence::Removed) }
 
   pub fn is_unrestricted (&self) -> bool {
     matches! ( &self . kind,

@@ -13,7 +13,7 @@ use skg::serve::handlers::text_search::{
 use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
-use skg::types::viewnode::Property;
+use skg::types::viewnode::PropertyMember;
 use skg::types::maybe_placed_viewnode::MpViewnodeKind;
 
 #[test]
@@ -111,8 +111,8 @@ fn test_text_search_org_format (
                     ( skgid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
-                if let Some ( MpViewnodeKind::Property (
-                  Property::Alias { .. } ) )
+                if let Some ( MpViewnodeKind::PropertyMember (
+                  PropertyMember::Alias { .. } ) )
                   = md . non_vognode
                   { aliases_under_current . push (title); }} }, }} }
       if ! aliases_under_current . is_empty () {

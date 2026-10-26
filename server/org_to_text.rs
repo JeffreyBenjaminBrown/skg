@@ -3,7 +3,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
-  Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
+  Viewnode, ViewnodeKind, Vognode, Phantom, PropertyMember, ChangeViewnode, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
   RelationshipEditRequest,
   Warrant,
@@ -144,7 +144,7 @@ pub fn folder_change_facts (
     . filter_map ( |member| {
       let relRepo_move_ready : Option<bool> =
         member . children () . find_map ( |child| match &child . value () . kind {
-          ViewnodeKind::Property (Property::RelRepoMove { .. }) =>
+          ViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { .. }) =>
             Some ( child . value () . change_facts . ready . is_some () ),
           _ => None, } );
       let rel_ready : Option<bool> =
@@ -236,10 +236,14 @@ fn viewnode_to_string_without_viewnode_id (
     ViewnodeKind::PropertyFolder (folder) =>
       Ok ( folder_atom_metadata_to_string (
         viewnode . foldAndFocus, folder . repr_in_client (), folder_facts )),
-    ViewnodeKind::Property (property) =>
-      property_metadata_to_string (
-        viewnode . foldAndFocus, property,
-        &viewnode . change_facts, &viewnode . readiness_request ),
+    ViewnodeKind::PropertyMember (member) =>
+      Ok ( propertyMember_metadata_to_string (
+        viewnode . foldAndFocus, member,
+        &viewnode . change_facts, &viewnode . readiness_request )),
+    ViewnodeKind::ChangeViewnode (change) =>
+      Ok ( changeViewnode_metadata_to_string (
+        viewnode . foldAndFocus, change,
+        &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::PartnerFolder (partnerFolder) =>
       Ok ( folder_atom_metadata_to_string (
         viewnode . foldAndFocus, partnerFolder . repr_in_client (),
@@ -306,15 +310,15 @@ fn folder_atom_metadata_to_string (
       if facts . ready { metadata . push_str (" (diff (ready))"); }
       metadata }, } }
 
-fn property_metadata_to_string (
+fn propertyMember_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
-  property        : &Property,
+  member          : &PropertyMember,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
-) -> Result < String, Box<dyn Error> > {
+) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  match property {
-    Property::Alias { relRepo, relationshipEditRequest, .. } => {
+  match member {
+    PropertyMember::Alias { relRepo, relationshipEditRequest, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (skgrepo) = relRepo {
         parts . push ( format! (
@@ -322,37 +326,42 @@ fn property_metadata_to_string (
       parts . extend ( relationshipEditRequest . as_ref ()
                        . map (relationshipEditRequest_form) );
       parts . extend ( change_fact_forms (facts, request) ); }
-    Property::ID { .. } => {
+    PropertyMember::ID { .. } => {
       parts . push ( "id" . to_string () );
       parts . extend ( change_fact_forms (facts, request) ); }
-    Property::Flag { flag, .. } => {
+    PropertyMember::Flag { flag, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
-      parts . extend ( change_fact_forms (facts, request) ); }
-    Property::RemovedAlias { .. }
-      | Property::RemovedID { .. } => {
-      parts . push ( property . repr_in_client () . to_string () );
-      parts . extend ( change_fact_forms (facts, request) ); }
-    Property::OldText { title, body } => {
+      parts . extend ( change_fact_forms (facts, request) ); } }
+  parts . join (" ") }
+
+fn changeViewnode_metadata_to_string (
+  foldAndFocus    : FoldAndFocus,
+  change          : &ChangeViewnode,
+  facts           : &ChangeFacts,
+  request         : &Option<ReadinessRequest>,
+) -> String {
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
+  match change {
+    ChangeViewnode::OldText { title, body } => {
       parts . push ( format! ( "(oldText {})",
         match (title . is_some (), body . is_some ()) {
           (true, true)  => "titleAndBody",
           (true, false) => "title",
           _             => "body", } ));
       parts . extend ( change_fact_forms (facts, request) ); }
-    Property::BodyDiff { .. } =>
+    ChangeViewnode::BodyDiff { .. } =>
       parts . push ( "bodyDiff" . to_string () ),
-    Property::HomeSkgrepoMove { skgrepo_change }
-      | Property::RelRepoMove { skgrepo_change } => {
+    ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
+      | ChangeViewnode::RelRepoMove { skgrepo_change } => {
       parts . push ( format! ( "({} (old {}) (new {}))",
-        property . repr_in_client (),
+        change . repr_in_client (),
         metadata_value_atom (&skgrepo_change . old),
         metadata_value_atom (&skgrepo_change . new) ));
       parts . extend ( change_fact_forms (facts, request) ); }
-    Property::ChangesetMarker { kind } => {
+    ChangeViewnode::ChangesetMarker { kind } => {
       parts . push ( format! ( "(changesetMarker {})", kind . wire_name () ));
-      parts . extend ( change_fact_forms (facts, request) ); }
-  }
-  Ok ( parts . join (" ")) }
+      parts . extend ( change_fact_forms (facts, request) ); } }
+  parts . join (" ") }
 
 /// '(editRequest (relRepo R))' or '(editRequest restoreRel)'.
 fn relationshipEditRequest_form (

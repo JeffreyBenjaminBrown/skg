@@ -1,7 +1,7 @@
 use super::*;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
-  Phantom, PhantomDeleted, Property, PropertyFolder, viewnode_of };
+  Phantom, PhantomDeleted, PropertyMember, PropertyFolder, viewnode_of };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SkgrepoName { SkgrepoName::from ("main") }
@@ -21,7 +21,7 @@ fn property_folder (qc : PropertyFolder) -> Viewnode {
   viewnode_of (ViewnodeKind::PropertyFolder (qc)) }
 
 fn alias_property (text : &str) -> Viewnode {
-  viewnode_of (ViewnodeKind::Property (Property::Alias {
+  viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
       text : text . to_string (),
       relRepo : None,
       relationshipEditRequest : None })) }

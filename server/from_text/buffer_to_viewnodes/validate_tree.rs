@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, PartnerFolder, Property, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, PartnerFolder, PropertyMember, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
@@ -145,7 +145,9 @@ fn idFolder_membership_errors (
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Property (Property::ID { skgid, .. })
+          // An ID with a ghost warrant is one the worktree lost.
+          MpViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. })
+            if ! child . value () . is_ghostWarranted ()
             => Some ( skgid . clone () ),
           _ => None } )
       . collect ();

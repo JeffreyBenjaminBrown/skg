@@ -12,7 +12,7 @@ use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, PartnerFolder, Phantom, PhantomHistorical, Property,
+  Editability, PartnerFolder, Phantom, PhantomHistorical, ChangeViewnode,
   Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -34,8 +34,8 @@ pub fn append_old_text (
   let title_changed : bool = before . title != after . title;
   let body_changed  : bool = before . body  != after . body;
   if ! title_changed && ! body_changed { return None; }
-  let old_text : Viewnode = viewnode_of ( ViewnodeKind::Property (
-    Property::OldText {
+  let old_text : Viewnode = viewnode_of ( ViewnodeKind::ChangeViewnode (
+    ChangeViewnode::OldText {
       title : title_changed . then ( || before . title . clone () ),
       body  : body_changed
               . then ( || before . body . clone () . unwrap_or_default () ) } ));
@@ -63,7 +63,7 @@ pub fn mk_body_diff_viewnode (
         ChangeTag::Insert => '+', },
       change . value () . trim_end_matches ('\n') ))
     . collect ();
-  viewnode_of ( ViewnodeKind::Property ( Property::BodyDiff { diff } )) }
+  viewnode_of ( ViewnodeKind::ChangeViewnode ( ChangeViewnode::BodyDiff { diff } )) }
 
 /// "⌂ -old +new", when the node's home skgrepo changed.
 pub fn mk_homeSkgrepoMove_viewnode (
@@ -73,8 +73,8 @@ pub fn mk_homeSkgrepoMove_viewnode (
   let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
     ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
   if before . home_skgrepo == after . home_skgrepo { return None; }
-  Some ( viewnode_of ( ViewnodeKind::Property (
-    Property::HomeSkgrepoMove {
+  Some ( viewnode_of ( ViewnodeKind::ChangeViewnode (
+    ChangeViewnode::HomeSkgrepoMove {
       skgrepo_change : SkgrepoChange {
         old : before . home_skgrepo . clone (),
         new : after  . home_skgrepo . clone () } } )) ) }
@@ -85,8 +85,8 @@ pub fn mk_relRepo_move_viewnode (
   partner : &Partner,
 ) -> Option<Viewnode> {
   if ! partner . relRepo_moved () { return None; }
-  Some ( viewnode_of ( ViewnodeKind::Property (
-    Property::RelRepoMove {
+  Some ( viewnode_of ( ViewnodeKind::ChangeViewnode (
+    ChangeViewnode::RelRepoMove {
       skgrepo_change : SkgrepoChange {
         old : partner . relRepo_before . clone () ?,
         new : partner . relRepo_after  . clone () ? } } )) ) }
@@ -94,8 +94,8 @@ pub fn mk_relRepo_move_viewnode (
 pub fn mk_changeset_marker_viewnode (
   kind : ChangesetMarkerKind,
 ) -> Viewnode {
-  viewnode_of ( ViewnodeKind::Property (
-    Property::ChangesetMarker { kind } )) }
+  viewnode_of ( ViewnodeKind::ChangeViewnode (
+    ChangeViewnode::ChangesetMarker { kind } )) }
 
 /// The historical phantom of 'pid', a node of the before-graph that
 /// the after-graph lacks. 'rel' is the existence change of its

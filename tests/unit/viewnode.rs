@@ -67,13 +67,13 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut alias : Viewnode = Viewnode {
     readiness_request : Some (ReadinessRequest {
       ready : false, objects : BTreeSet::new () }),
-    .. viewnode_of ( ViewnodeKind::Property (Property::Alias {
+    .. viewnode_of ( ViewnodeKind::PropertyMember (PropertyMember::Alias {
       text : "alias" . into (),
       relRepo : None,
       relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), })) };
   alias . consume_edit_request_after_save ();
   assert_eq! (alias . readiness_request, None);
-  let ViewnodeKind::Property (Property::Alias { relationshipEditRequest, .. }) =
+  let ViewnodeKind::PropertyMember (PropertyMember::Alias { relationshipEditRequest, .. }) =
     &alias . kind
   else { panic! ("expected alias"); };
   assert_eq! (*relationshipEditRequest, None);
@@ -167,7 +167,7 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     viewnode_of (ViewnodeKind::Tombstone),
     viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)),
     viewnode_of (ViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
-    viewnode_of (ViewnodeKind::Property (Property::Alias {
+    viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
       text : "an alias" . into (), relRepo : None, relationshipEditRequest : None })),
     viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
       PhantomDeleted { skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
