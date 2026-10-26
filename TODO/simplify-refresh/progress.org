@@ -1721,3 +1721,26 @@ qualified merges as nodeMerge and instructionMerge; it does not
 yet name the viewnode merge. The plan does not ask for that edit.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 0 (2026-10-26)
+Launched 21:33 UTC, reported 21:45 UTC: twelve minutes. No
+correction inserted. The agent's five deviations are all
+sound: one "merged" correction per result; corrections name
+the vnid a headline holds after the tail (the merge clears the
+result's vnid, so an earlier name would be stale); the
+readiness request, a ghost's requests and an unknown's
+relationship request ride with the merge, as the plan's "union
+of their requests" means; the readiness check compares named
+leaf sets without the change forest ('NamedLeafSet'), which
+refuses, in one edge case, a save the forest would have dropped
+with a warning, a stricter outcome and a harmless one; the
+refusal is its own error variant. The agent noticed that
+'coding-advice/names.org' listed the qualified merges without
+the viewnode merge; added. Suites: nextest 965 of 965 (nine
+new), integration 34 of 35 with the pre-existing
+'import-md-and-org' failure. Slice 1 launches with the context
+that 'CorrectionKind::Merged' is 'SiblingsMerged', the merge
+tests live in 'tests/refresh/merge_of_siblings.rs', and the
+ghost's tombstone request now rides through a merge, which
+slice 1 removes.
+

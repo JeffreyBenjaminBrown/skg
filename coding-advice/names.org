@@ -18,7 +18,7 @@ adjective or verb phrases into a single underscore-bracketed token.
 * Some words are never used bare
 Each of these names several things, so code and prose always say which.
 The glossary ('docs/glossary.org') defines each kind.
-- merge: nodeMerge or instructionMerge.
+- merge: nodeMerge, instructionMerge or viewnode merge.
 - snapshot: graph snapshot, git snapshot or buffer snapshot.
 - index: search index, git index or graph index. Beside HEAD and
   worktree, git's index needs no qualifier.
