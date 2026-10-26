@@ -274,6 +274,23 @@ a write-protected parent is unwarranted and carries no =noClaim=,
 since nothing claims there. The refresh keeps an unwarranted child
 where it stands; it never removes a child.
 
+*** stands as a member
+
+An occurrence *stands as a member* of its viewparent when the
+relationship its position implies is one its derived facts may
+explain: its birth heralds and its relRepo. Where the viewparent
+reads claims (see "claims membership"), that is its claim; at the
+top of the buffer it always does; in a folder that reads no claims
+(a container folder, say, or any folder of a write-protected
+occurrence), it does when the truth warrants it;
+anywhere else (under a write-protected occurrence, say) it does not
+('stands_as_member' in 'server/update_buffer/viewnodestats.rs').
+It is a third notion beside the claim and the warrant, since it is
+neither: a warranted member of a write-protected folder claims
+nothing but stands as a member, and a warranted child of an editable
+occurrence that the user marked =noClaim= stands as none. It is not
+written; the stats pass computes it where it computes those facts.
+
 *** partner folder
 
 Recall that viewnodes and graphnodes are distinct.

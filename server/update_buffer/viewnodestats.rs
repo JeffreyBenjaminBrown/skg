@@ -71,7 +71,7 @@ pub fn set_viewnodestats_in_viewforest (
     viewforest,
     root_treeid,
     multi_skgrepo,
-    Some (graph),
+    graph,
     config,
     restriction,
     &mut ancestor_gnids,
@@ -83,7 +83,7 @@ fn set_viewnodestats_recursive (
   tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
   multi_skgrepo         : bool,
-  graph                 : Option<&InRustGraph>,
+  graph                 : &InRustGraph,
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
   ancestor_gnids       : &mut HashSet<ID>,
@@ -95,16 +95,16 @@ fn set_viewnodestats_recursive (
     if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     { let node_pid : ID = t . gnid . clone ();
-      detect_and_mark_cycle_v2 (
+      detect_and_mark_cycle (
         tree, treeid, &node_pid, ancestor_gnids );
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
-      let is_member_here : bool = stands_as_member (tree, treeid);
+      let stands_as_member_here : bool = stands_as_member (tree, treeid);
       set_herald_strings_in_viewnode (
-        tree, treeid, &node_pid, is_member_here, graph, restriction,
+        tree, treeid, &node_pid, stands_as_member_here, graph, restriction,
         relRepos, container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
-      set_relRepo (tree, treeid, is_member_here, graph, relRepos, config);
+      set_relRepo (tree, treeid, stands_as_member_here, graph, relRepos, config);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -169,8 +169,8 @@ fn set_herald_strings_in_viewnode (
   tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
   node_pid              : &ID,
-  claimsMembership      : bool, // whether it stands as a member here ('stands_as_member')
-  graph                 : Option<&InRustGraph>,
+  stands_as_member_here : bool, // see 'stands_as_member'
+  graph                 : &InRustGraph,
   restriction           : Option<&SkgrepoRestriction>,
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
@@ -194,23 +194,24 @@ fn set_herald_strings_in_viewnode (
       &mut flags, graph, restriction, relRepos,
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
-  if ! claimsMembership {
-    // A child claiming nothing under a subscribee-as-such: the content the
-    // subscriber hides, retained there claiming nothing, with its subtree,
-    // says so, as the hiddenInSubscribeeFolder's members do.
-    if let (Some (graph), Some (subscriber_pid)) =
-      (graph, subscriber_above_subscribee_viewparent (tree, treeid))
+  if ! stands_as_member_here {
+    // A child standing as no member under a subscribee-as-such: the
+    // content the subscriber hides, retained there claiming nothing,
+    // with its subtree, says so, as the hiddenInSubscribeeFolder's
+    // members do.
+    if let Some (subscriber_pid) =
+      subscriber_above_subscribee_viewparent (tree, treeid)
     { if graph . relation_membership_is_visible (
         node_pid, &subscriber_pid,
         RelationRole::new (NodeRelation::HidesFromSubs, BinaryRolePosition::First),
         restriction )
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
-    if claimsMembership
+    if stands_as_member_here
       && matches! (parent_kind, ParentKind::Folder (Folder::Subscribee, _)) {
-      graph . and_then (|g| {
-        let subscriber_pid : &ID = &ancestors . iter ()
-          . find (|(_, generation)| *generation == 2) ? . 0;
+      ancestors . iter () . find (|(_, generation)| *generation == 2)
+      . map (|(subscriber_pid, _)| {
+        let g : &InRustGraph = graph;
         let visible = |gnid : &ID| -> bool {
           match restriction {
             None => true,
@@ -231,10 +232,10 @@ fn set_herald_strings_in_viewnode (
           if members . contains (gnid)
             && flags . contains_out . contains (generation) {
             flags . contents_unintegrated_out . push (*generation); } }
-        Some (members . len ()) })
+        members . len () })
     } else { None };
   let birth_facts : Vec<BirthFact> =
-    birth_facts (&parent_kind, claimsMembership, &flags, overridesHere);
+    birth_facts (&parent_kind, stands_as_member_here, &flags, overridesHere);
   let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
@@ -302,11 +303,10 @@ fn tracked_ancestors (
 /// is relRepo gated: a relationship recorded outside the skgrepo restriction
 /// must not tint an ancestor herald in a more public view (it would
 /// reveal the very relationship the user privatized). The contains
-/// gate needs the graph (the maps carry no levels); without one
-/// (some test paths, which never restrict) it degrades to ungated.
+/// gate asks the graph, since the maps carry no relRepos.
 fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
-  graph                 : Option<&InRustGraph>,
+  graph                 : &InRustGraph,
   restriction           : Option<&SkgrepoRestriction>,
   relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
@@ -316,9 +316,9 @@ fn flag_ancestor_relations (
   generation            : usize,
 ) {
   let mut contains_rel_is_visible = |recorder : &ID, target : &ID| -> bool {
-    match (graph, restriction) {
-      (Some (g), Some (a)) if ! a . is_all () =>
-        relRepos . relRepo (g, recorder, NodeRelation::Contains, target)
+    match restriction {
+      Some (a) if ! a . is_all () =>
+        relRepos . relRepo (graph, recorder, NodeRelation::Contains, target)
           . map ( |skgrepo| a . contains_skgrepo (&skgrepo) )
           . unwrap_or (false),
       _ => true }};
@@ -332,7 +332,6 @@ fn flag_ancestor_relations (
     . map_or (false, |s| s . contains (anc_pid))
     && contains_rel_is_visible (node_pid, anc_pid) {
     flags . record (NodeRelation::Contains, false, generation); }
-  let graph = match graph { Some (g) => g, None => return, };
   for rel in GRAPH_RELATIONS {
     // inbound: ancestor R's node (ancestor plays the first role).
     if graph . relation_membership_is_visible (
@@ -352,16 +351,17 @@ fn flag_ancestor_relations (
 /// side of it, accounting for which ancestor -- read from the kind of
 /// its viewparent: for a folder's member, the relation the folder
 /// names, in the direction its role implies; for a content member, its
-/// viewparent's containment; for a child claiming nothing, none. Usually a
-/// singleton; a HiddenInSubscribee member has two.
+/// viewparent's containment; for a child standing as no member
+/// ('stands_as_member'), none. Usually a singleton; a
+/// HiddenInSubscribee member has two.
 fn birth_facts (
-  parent_kind : &ParentKind,
-  claimsMembership : bool,
-  flags       : &AncestorFlags,
-  overridesHere : bool, // whether the node is shown in place of a node it overrides
+  parent_kind           : &ParentKind,
+  stands_as_member_here : bool,
+  flags                 : &AncestorFlags,
+  overridesHere         : bool, // whether the node is shown in place of a node it overrides
 ) -> Vec<BirthFact> {
   let mut facts : Vec<BirthFact> = {
-    if ! claimsMembership { Vec::new ()
+    if ! stands_as_member_here { Vec::new ()
     } else {
       match parent_kind {
         ParentKind::Vognode (_) =>
@@ -431,24 +431,22 @@ fn birth_facts_for_folder (
 
 /// Sets omitted_body on the occurrence at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one
-/// the rendering hides. Herald "B" on the ☮. False
-/// without a graph: better no B than a wrong one.
+/// the rendering hides. Herald "B" on the ☮.
 fn set_omitted_body (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   node_pid : &ID,
-  graph    : Option<&InRustGraph>,
+  graph    : &InRustGraph,
 ) {
   let omitted_body : bool = {
     let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . is_writeProtected ()
-      && graph . map_or ( false, |g| {
-           let pid : ID = g . pid_of (node_pid)
+      && { let pid : ID = graph . pid_of (node_pid)
              . unwrap_or_else ( || node_pid . clone () );
-           g . nodes . get (&pid)
-             . map_or ( false, |n| n . body . is_some () ) } ) };
+           graph . nodes . get (&pid)
+             . map_or ( false, |n| n . body . is_some () ) } };
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . omitted_body = omitted_body; }}
@@ -461,29 +459,26 @@ fn set_omitted_body (
 /// partner folder member, oriented by which side owns the outbound relationship
 /// (see 'RelationRole::is_first_role') -- then compares the relationship's
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
-/// relationship default. None on any of: no
-/// graph; the viewnode does not stand as a member here
-/// ('stands_as_member'); a compound partner folder
+/// relationship default. None on any of: the viewnode does not
+/// stand as a member here ('stands_as_member'); a compound partner folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded relationship; unresolvable homes;
 /// or the skgrepo equalling the default.
 fn set_relRepo (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
-  claimsMembership : bool, // whether it stands as a member here ('stands_as_member')
-  graph  : Option<&InRustGraph>,
+  stands_as_member_here : bool, // see 'stands_as_member'
+  graph  : &InRustGraph,
   relRepos : &mut RelRepoLookup,
   config : &SkgConfig,
 ) {
   let relRepo : Option<SkgrepoName> = 'compute : {
-    let graph : &InRustGraph = match graph {
-      Some (g) => g, None => break 'compute None, };
     let node_pid : ID = {
       let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
       t . collected_gnid () };
-    if ! claimsMembership {
+    if ! stands_as_member_here {
       // Not a genuine member at this position (a self-writer standing
       // claiming nothing under a folder, or a node of the containerward
       // chain): there
@@ -580,7 +575,7 @@ mod relationship_default_tests {
         "member" . to_string (), None ) ) . id ();
 
     set_relRepo (
-      &mut tree, member_treeid, true, Some (&graph),
+      &mut tree, member_treeid, true, &graph,
       &mut RelRepoLookup::default (), &config );
     let ViewnodeKind::Vognode (Vognode::Occurrence (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
@@ -629,7 +624,7 @@ fn nearest_occurrence_ancestor_skgrepo (
 
 /// The node's 'cycle' field becomes equal to
 /// whether the 'ancestor_ids' argument contains its ID.
-fn detect_and_mark_cycle_v2 (
+fn detect_and_mark_cycle (
   tree            : &mut Tree<Viewnode>,
   treeid          : NodeId,
   node_pid        : &ID,

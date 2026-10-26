@@ -16,8 +16,7 @@ use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::views_state::ViewnodeIdRecord;
 use crate::update_buffer::completion_mode::CompletionMode;
-use crate::update_buffer::graphnodestats::{
-  set_graphnodestats_in_viewforest, set_graphnodestats_in_viewforest_with_skgrepo_set};
+use crate::update_buffer::graphnodestats::set_graphnodestats_in_viewforest;
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
@@ -43,11 +42,9 @@ fn set_derived_facts (
   let truth : &Truth = walk . truth;
   let (container_to_contents, content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>) =
-    match truth . restriction {
-      Some (restriction) => set_graphnodestats_in_viewforest_with_skgrepo_set (
-        viewforest . as_internal_tree_mut (), truth . graph, truth . config, restriction ) ?,
-      None => set_graphnodestats_in_viewforest (
-        viewforest . as_internal_tree_mut (), truth . graph, truth . config ) ?, };
+    set_graphnodestats_in_viewforest (
+      viewforest . as_internal_tree_mut (), truth . graph, truth . config,
+      truth . restriction ) ?;
   set_viewnodestats_in_viewforest (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,

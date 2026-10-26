@@ -1,5 +1,4 @@
 use crate::dbs::in_rust_graph::stats::{
-  fetch_all_graphnodestats,
   fetch_all_graphnodestats_with_skgrepo_set,
   graphnodestats_for_pid,
   AllGraphnodeStats};
@@ -16,38 +15,18 @@ use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use ego_tree::{NodeId, Tree};
 
-/// Enrich all nodes in a viewforest with statistics from the captured graph.
-/// Also fetches and returns the containment maps, which callers
-/// can pass to `set_viewnodestats_in_viewforest`.
+/// Enrich all nodes in a viewforest with statistics from the captured
+/// graph, as the skgrepo restriction lets it be seen. Also fetches and
+/// returns the containment maps, which callers can pass to
+/// `set_viewnodestats_in_viewforest`.
 pub fn set_graphnodestats_in_viewforest (
-  viewforest : &mut Tree<Viewnode>,
-  graph : &InRustGraph,
-  config : &SkgConfig,
-) -> Result < ( HashMap < ID, HashSet < ID > >,
-               HashMap < ID, HashSet < ID > > ),
-	             Box<dyn Error> > {
-  set_graphnodestats_in_viewforest_inner (
-    viewforest, graph, config, None ) }
-
-pub fn set_graphnodestats_in_viewforest_with_skgrepo_set (
-  viewforest : &mut Tree<Viewnode>,
-  graph : &InRustGraph,
-  config : &SkgConfig,
-  restriction : &SkgrepoRestriction,
-) -> Result < ( HashMap < ID, HashSet < ID > >,
-	               HashMap < ID, HashSet < ID > > ),
-	             Box<dyn Error> > {
-  set_graphnodestats_in_viewforest_inner (
-    viewforest, graph, config, Some (restriction) ) }
-
-fn set_graphnodestats_in_viewforest_inner (
-  viewforest : &mut Tree<Viewnode>,
-  graph : &InRustGraph,
-  config : &SkgConfig,
+  viewforest  : &mut Tree<Viewnode>,
+  graph       : &InRustGraph,
+  config      : &SkgConfig,
   restriction : Option<&SkgrepoRestriction>,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
-	               HashMap < ID, HashSet < ID > > ),
-	             Box<dyn Error> > {
+               HashMap < ID, HashSet < ID > > ),
+             Box<dyn Error> > {
   let pids : Vec < ID > =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "ids_that_can_have_graphnodestats" ). entered();
@@ -55,14 +34,8 @@ fn set_graphnodestats_in_viewforest_inner (
   let stats : AllGraphnodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
-      match restriction {
-        Some (restriction) =>
-          fetch_all_graphnodestats_with_skgrepo_set (
-            graph, & pids, Some (restriction) ),
-        None =>
-          fetch_all_graphnodestats (
-            graph, & pids ),
-      }} ?;
+      fetch_all_graphnodestats_with_skgrepo_set (
+        graph, & pids, restriction ) } ?;
   let root_treeid : NodeId = viewforest . root () . id ();
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "set_graphnodestats_recursive" ). entered();
