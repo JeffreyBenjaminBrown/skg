@@ -1493,3 +1493,9 @@ Unrelated and pre-existing, as in slices 0 to 11, with either
 client, after every commit; the other 34 pass with each. No
 other failure: 'bash/nextest.sh' 956 of 956, ERT 414 of 414,
 plenary 403 of 403, after each commit.
+** Orchestrator's corrections after slice 12 (2026-10-26)
+Inserted into the plan: the verification greps allow the
+parser's deliberate refusal of the retired atoms and the two
+words with another sense; slice 13 also retires the old folder
+type names from 58 comments. No code correction.
+

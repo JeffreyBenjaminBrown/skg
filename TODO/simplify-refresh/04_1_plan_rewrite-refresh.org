@@ -1159,6 +1159,12 @@ never writes, '(FOLDER changed)', 'pendingDetachment' and
 the clients' own, beside the served rules and the label table,
 and 'docs/api-and-formats.org' must say that the herald-rules
 endpoint also serves '(skgrepoLabels ...)'.
+From slice 12: 58 comment lines under 'server/' still name
+folders by the old type names ('SubscribeeFolder',
+'AliasFolder' and the like) where the code says
+'Folder::Subscribee'; this slice makes them say the variant or
+the wire atom, so that no retired type name survives in a
+comment.
 * Verification and completion
 At the end of every slice: 'cargo check --all-targets' clean;
 'bash/nextest.sh' green. At the end of slices 0, 2, 3, 4, 5,
@@ -1173,6 +1179,12 @@ and 'bash/integration-tests.sh' green. At the end of slice 13:
   rg -n '\bskgid\b|Unrestricted|FolderPolicy|MpViewnode' \
     server tests elisp nvim --glob '!target'
 #+end_example
+Three remainders are deliberate and the greps may show them:
+the parser's refusal of the retired atoms by name
+('server/serve/parse_metadata_sexp.rs') and the tests of that
+refusal; "unrestricted" said of a skgrepo restriction; "entry"
+said of a map, an org entry or a relationship list. Slice 12
+recorded them.
 The plan is complete when every slice headline reads DONE,
 'progress.org' holds the classification of every failure met
 and the answer to the two-question check, and
