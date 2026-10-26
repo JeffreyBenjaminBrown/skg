@@ -571,3 +571,11 @@ facts at '(skg rels)'; now '(skg view rels)'. It passes alone.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 to 4, with either
 client; the other 34 pass with each.
+** Orchestrator's corrections after slice 5 (2026-10-26)
+Inserted into the plan: under slice 6, the clients' edit-request
+commands preserve the pending readiness request (and the
+readiness gestures preserve the edit request), and the Neovim
+integration suite is rerun in full; under slice 13, the two-slot
+'(editRequest ...)' and the 'noClaim' on lost members are
+documented.
+

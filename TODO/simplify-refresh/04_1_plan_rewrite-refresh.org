@@ -924,7 +924,7 @@ its members. Both clients' renderers ('heralds-minor-mode.el',
 follow. Tests: the herald conformance test; the rendering
 cases in both clients; both client unit suites; the
 integration suite.
-*** Corrections carried from slices 0, 2, 3 and 4
+*** Corrections carried from slices 0, 2, 3, 4 and 5
 Two display facts the earlier slices left wrong, for this
 slice to set right with the rest of the table. First, ⊥ moved
 from the front of a node's heralds to after the relationship
@@ -948,6 +948,15 @@ slice decides whether the directive stays once '(view ...)'
 and '(diff ...)' are the only nested forms; if it stays, it is
 documented in 'docs/heralds.org' and in the lens engines'
 headers, and the rule-table conformance test covers it.
+Fifth, slice 5 made '(editRequest ...)' hold up to two
+requests, one edit request and one readiness request, and both
+clients' commands that write one (restore, merge, relRepo, and
+the readiness gestures) replace the whole form, so a command
+would drop the other request when one is pending. Each such
+command will preserve the request it does not set, with a unit
+test per client. Sixth, the Neovim integration suite was not
+rerun in full after slice 5's last fixture fix; this slice's
+integration run covers both clients.
 ** TODO Slice 7: the parser's twin goes
 The parse mints a gnid for a headline without one and gives a
 headline without a repo its nearest occurrence ancestor's as
@@ -1089,7 +1098,11 @@ names no kind atom is a node (the clients write '(skg folded)'
 on a headline that has no metadata yet); and five kinds carry
 their parameter inside a small form rather than as a separate
 part, '(flag F)', '(oldText ASPECT)', '(homeSkgrepoMove ...)',
-'(relRepoMove ...)' and '(changesetMarker K)'.
+'(relRepoMove ...)' and '(changesetMarker K)'. From slice 5:
+'(editRequest ...)' holds up to two requests, one edit request
+and one readiness request, and a lost alias, ID or unknown
+carries 'noClaim', set by the stats pass, which the save reads
+in place of the '(diff (rel removed))' the parser now skips.
 * Verification and completion
 At the end of every slice: 'cargo check --all-targets' clean;
 'bash/nextest.sh' green. At the end of slices 0, 2, 3, 4, 5,
