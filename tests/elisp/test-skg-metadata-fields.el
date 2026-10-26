@@ -328,40 +328,8 @@ is dropped key-and-all, leaving (skg node (skgRepos (nodeRepo only)))."
     (should (equal result '(skg node (skgRepos (nodeRepo only)))))))
 
 ;;
-;; Repo defaults
+;; A nodeRepo marked '(default)'
 ;;
-
-(ert-deftest test-fillIn-with-default-repo-marks-matching ()
-  "Filling in with default-repo marks matching repo value."
-  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
-         (org-text (sexp-to-org sexp))
-         (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
-         (lines (split-string filledIn "\n"))
-         (headlines (org-to-sexp--extract-headlines lines)))
-    (should (cl-find "jeff (default)" headlines
-                     :key #'cdr :test #'string=))))
-
-(ert-deftest test-fillIn-with-default-repo-leaves-nonmatching ()
-  "Filling in with default-repo leaves non-matching repo value bare."
-  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo bob))))
-         (org-text (sexp-to-org sexp))
-         (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
-         (lines (split-string filledIn "\n"))
-         (headlines (org-to-sexp--extract-headlines lines)))
-    (should (cl-find "bob" headlines :key #'cdr :test #'string=))
-    (should-not (cl-find "bob (default)" headlines
-                         :key #'cdr :test #'string=))))
-
-(ert-deftest test-fillIn-inserts-default-repo-when-missing ()
-  "Filling in a node with no repo inserts default repo."
-  (let* ((sexp '(skg node (gnid abc)))
-         (org-text (sexp-to-org sexp))
-         (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
-         (lines (split-string filledIn "\n"))
-         (headlines (org-to-sexp--extract-headlines lines)))
-    (should (cl-find "nodeRepo" headlines :key #'cdr :test #'string=))
-    (should (cl-find "jeff (default)" headlines
-                     :key #'cdr :test #'string=))))
 
 (ert-deftest test-strip-repo-with-default-suffix ()
   "Stripping repo with '(default)' suffix removes the suffix."
@@ -388,23 +356,6 @@ is dropped key-and-all, leaving (skg node (skgRepos (nodeRepo only)))."
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
     (should (equal result '(skg node (gnid abc) (skgRepos (nodeRepo bob)))))))
-
-(ert-deftest test-round-trip-with-default-repo ()
-  "Round-trip with default-repo: fill in then strip is identity."
-  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
-         (org-text (sexp-to-org sexp))
-         (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
-         (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
-         (result (org-to-sexp stripped)))
-    (should (equal result sexp))))
-
-(ert-deftest test-round-trip-new-node-no-repo ()
-  "Round-trip for new node: fill in with default, strip keeps repo."
-  (let* ((org-text "* skg\n** node")
-         (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
-         (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
-         (result (org-to-sexp stripped)))
-    (should (equal result '(skg node (skgRepos (nodeRepo jeff)))))))
 
 ;;
 ;; Bug: skg-view-metadata was passing hardcoded "* skg\n** node"
@@ -480,7 +431,7 @@ preserves repo and all fields."
          (org-text (sexp-to-org sexp))
          (filledIn
           (skg-metadata-fields-fillIn-defaults-in-org
-           org-text test--node-kind nil "actual title"))
+           org-text test--node-kind "actual title"))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (equal (cl-subseq headlines 0 4)
@@ -494,7 +445,7 @@ preserves repo and all fields."
   (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn
-          (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind nil ""))
+          (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind ""))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     (should (equal (car headlines) '(1 . "skg")))))
@@ -505,7 +456,7 @@ preserves repo and all fields."
          (org-text (sexp-to-org sexp))
          (filledIn
           (skg-metadata-fields-fillIn-defaults-in-org
-           org-text test--node-kind nil "actual title"))
+           org-text test--node-kind "actual title"))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))

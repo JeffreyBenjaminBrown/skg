@@ -351,7 +351,7 @@ Kill the buffer to cancel without saving."
                (org-text (let ((sexp-as-org (sexp-to-org sexp)))
                            (if kind
                                (skg-metadata-fields-fillIn-defaults-in-org
-                                sexp-as-org kind nil
+                                sexp-as-org kind
                                 (when (skg--occurrence-sexp-p sexp)
                                   title))
                              sexp-as-org)) ))

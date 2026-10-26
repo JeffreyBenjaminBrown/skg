@@ -16,19 +16,17 @@ local function find_text (headlines, text)
   return nil
 end
 
-local function filledIn_headlines (sexp_text, default_skgrepo,
-                                   display_title)
+local function filledIn_headlines (sexp_text, display_title)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
   local filledIn = fields.fillIn_defaults_in_org(
-    org_text, node_kind, default_skgrepo, display_title)
+    org_text, node_kind, display_title)
   return bijection.extract_headlines(filledIn)
 end
 
 ---Fill in then strip then re-read, as the edit-buffer apply path does.
-local function round_trip (sexp_text, default_skgrepo)
+local function round_trip (sexp_text)
   local org_text = bijection.sexp_to_org(sexpr.read(sexp_text))
-  local filledIn = fields.fillIn_defaults_in_org(
-    org_text, node_kind, default_skgrepo)
+  local filledIn = fields.fillIn_defaults_in_org(org_text, node_kind)
   local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
   return bijection.org_to_sexp(stripped)
 end
@@ -217,27 +215,7 @@ describe('skg.sexpr.metadata_fields stripping', function ()
   end)
 end)
 
-describe('skg.sexpr.metadata_fields repo defaults', function ()
-  it('marks a matching repo value with (default)', function ()
-    local headlines = filledIn_headlines(
-      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', 'jeff')
-    assert.is_not_nil(find_text(headlines, 'jeff (default)'))
-  end)
-
-  it('leaves a non-matching repo value bare', function ()
-    local headlines = filledIn_headlines(
-      '(skg node (gnid abc) (skgRepos (nodeRepo bob)))', 'jeff')
-    assert.is_not_nil(find_text(headlines, 'bob'))
-    assert.is_nil(find_text(headlines, 'bob (default)'))
-  end)
-
-  it('inserts the default repo when missing', function ()
-    local headlines =
-      filledIn_headlines('(skg node (gnid abc))', 'jeff')
-    assert.is_not_nil(find_text(headlines, 'nodeRepo'))
-    assert.is_not_nil(find_text(headlines, 'jeff (default)'))
-  end)
-
+describe('skg.sexpr.metadata_fields a nodeRepo marked (default)', function ()
   it('strips the (default) suffix from a repo value', function ()
     assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
       strip_to_sexp(table.concat({
@@ -250,19 +228,6 @@ describe('skg.sexpr.metadata_fields repo defaults', function ()
       strip_to_sexp(table.concat({
         '* skg', '** node', '** gnid', '*** abc',
         '** skgRepos', '*** nodeRepo', '**** bob' }, '\n')))
-  end)
-
-  it('round-trips with a default repo', function ()
-    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
-      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', 'jeff'))
-  end)
-
-  it('round-trips a new node with no repo', function ()
-    local filledIn = fields.fillIn_defaults_in_org(
-      '* skg\n** node', node_kind, 'jeff')
-    local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
-    assert.are.same(sexpr.read('(skg node (skgRepos (nodeRepo jeff)))'),
-      bijection.org_to_sexp(stripped))
   end)
 end)
 
@@ -300,7 +265,7 @@ end)
 describe('skg.sexpr.metadata_fields display title', function ()
   it('prepends the title group', function ()
     local headlines = filledIn_headlines(
-      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', nil, 'actual title')
+      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', 'actual title')
     assert.are.same(
       { { level = 1, text = 'title' },
         { level = 2, text = 'actual title' },
@@ -311,7 +276,7 @@ describe('skg.sexpr.metadata_fields display title', function ()
 
   it('does not prepend an empty title', function ()
     local headlines = filledIn_headlines(
-      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', nil, '')
+      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', '')
     assert.are.same({ level = 1, text = 'skg' }, headlines[1])
   end)
 
@@ -319,7 +284,7 @@ describe('skg.sexpr.metadata_fields display title', function ()
     local org_text = bijection.sexp_to_org(
       sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'))
     local filledIn = fields.fillIn_defaults_in_org(
-      org_text, node_kind, nil, 'actual title')
+      org_text, node_kind, 'actual title')
     local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
     assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
       bijection.org_to_sexp(stripped))

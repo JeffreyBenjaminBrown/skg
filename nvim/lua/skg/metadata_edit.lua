@@ -46,7 +46,7 @@ function M.edit_metadata ()
   local org_text = bijection.sexp_to_org(sexp)
   if kind then
     org_text = fields.fillIn_defaults_in_org(
-      org_text, kind, nil,
+      org_text, kind,
       metadata.occurrence_sexp_p(sexp) and split.title or nil) end
   M.open_edit_buffer(org_text, source_buf, line_number,
                      #split.stars, #split.metadata, kind)

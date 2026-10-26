@@ -158,13 +158,10 @@ CHILDREN is a list of headline groups, one per child."
 ;;
 
 (defun skg-metadata-fields-fillIn-defaults-in-org
-    (org-text kind &optional default-skgrepo display-title)
+    (org-text kind &optional display-title)
   "ORG-TEXT, the metadata of a headline of KIND as org text, with each
 field KIND's headlines may set shown: in canonical order, a missing
 one at its default, a bare atom with a 'true' child.
-If DEFAULT-SKGREPO is non-nil, insert it as the nodeRepo default
-\(in '(skgRepos ...)') and mark an existing nodeRepo value that
-matches it with '(default)'.
 If DISPLAY-TITLE is non-nil and non-empty, prepend a read-only
 title display group."
   (let* (( headlines (org-to-sexp--extract-headlines
@@ -175,7 +172,7 @@ title display group."
                 headlines kind
                 (lambda (children child-level)
                   (skg-metadata-fields--fillIn-and-reorder
-                   children child-level kind default-skgrepo)))
+                   children child-level kind)))
              headlines) ))
     (skg-headlines-to-org
      (skg-metadata-fields--maybe-prepend-title filledIn display-title))))
@@ -190,14 +187,13 @@ title display group."
     headlines))
 
 (defun skg-metadata-fields--fillIn-and-reorder
-    (children child-level kind default-skgrepo)
+    (children child-level kind)
   "CHILDREN (headline groups at CHILD-LEVEL) in canonical order, flat,
 each of KIND's fields filled in: the children that say what the
 headline is (`skg-metadata-fields--leading-child-p': the markers, the
 kind's atom, the gnid and the skgRepos) lead, in their order; the
 fields follow, in the table's order; the other children close, in
-their order. With DEFAULT-SKGREPO, the skgRepos child shows its
-nodeRepo (see `skg-metadata-fields--others-with-skgRepos-default')."
+their order."
   (let* (( canonical (skg-metadata-fields-field-names kind) )
          ( field-map (mapcar (lambda (group)
                                (cons (string-trim (cdr (car group))) group))
@@ -209,14 +205,9 @@ nodeRepo (see `skg-metadata-fields--others-with-skgRepos-default')."
                              name (cdr (assoc name field-map))
                              child-level kind))
                           canonical)) )
-         ( others-map (cl-remove-if (lambda (entry)
-                                      (member (car entry) canonical))
-                                    field-map) )
-         ( others-shown
-           (if default-skgrepo
-               (skg-metadata-fields--others-with-skgRepos-default
-                others-map child-level default-skgrepo)
-             others-map) ))
+         ( others-shown (cl-remove-if (lambda (entry)
+                                        (member (car entry) canonical))
+                                      field-map) ))
     (append (apply #'append
                    (mapcar #'cdr
                            (cl-remove-if-not
@@ -254,53 +245,6 @@ or nil when absent: a missing field at its default, a bare atom with a
       (list (car group)
             (cons (1+ child-level) "true")))
      (t group))))
-
-(defun skg-metadata-fields--others-with-skgRepos-default
-    (others-map child-level default-skgrepo)
-  "OTHERS-MAP, the root's non-field children as (NAME . GROUP) at
-CHILD-LEVEL, with the skgRepos child's nodeRepo shown against
-DEFAULT-SKGREPO: a missing skgRepos (appended) or nodeRepo filled in
-as 'DEFAULT-SKGREPO (default)', a nodeRepo value matching it marked
-'(default)'."
-  (let (( with-default
-          (lambda (group)
-            (cons "skgRepos"
-                  (skg-metadata-fields--skgRepos-with-default
-                   group child-level default-skgrepo)))) )
-    (if (assoc "skgRepos" others-map)
-        (mapcar (lambda (entry)
-                  (if (equal (car entry) "skgRepos")
-                      (funcall with-default (cdr entry))
-                    entry))
-                others-map)
-      (append others-map
-              (list (funcall with-default
-                             (list (cons child-level "skgRepos"))))))))
-
-(defun skg-metadata-fields--skgRepos-with-default
-    (group child-level default-skgrepo)
-  "GROUP, the skgRepos child at CHILD-LEVEL, with its nodeRepo shown
-against DEFAULT-SKGREPO (see
-`skg-metadata-fields--others-with-skgRepos-default')."
-  (let* (( shown-default (concat default-skgrepo " (default)") )
-         ( position (cl-position-if
-                     (lambda (hl) (and (= (car hl) (1+ child-level))
-                                       (string= (string-trim (cdr hl))
-                                                "nodeRepo")))
-                     group) ))
-    (if (null position)
-        (append (list (car group)
-                      (cons (1+ child-level) "nodeRepo")
-                      (cons (+ 2 child-level) shown-default))
-                (cdr group))
-      (let (( value (nth (1+ position) group) ))
-        (if (and value
-                 (= (car value) (+ 2 child-level))
-                 (string= (string-trim (cdr value)) default-skgrepo))
-            (append (cl-subseq group 0 (1+ position))
-                    (list (cons (car value) shown-default))
-                    (nthcdr (+ 2 position) group))
-          group)))))
 
 ;;
 ;; Strip
