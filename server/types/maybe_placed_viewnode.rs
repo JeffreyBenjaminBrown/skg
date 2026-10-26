@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, with_org_subheadlines};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, PropertyMember, ChangeViewnode, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
+use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, Folder, PropertyMember, ChangeViewnode, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -35,12 +35,18 @@ pub struct MpViewnode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpViewnodeKind {
   Vognode      (MpVognode),
-  PropertyFolder      (PropertyFolder),
+  Folder           (Folder),
   PropertyMember   (PropertyMember),
   ChangeViewnode   (ChangeViewnode),
-  PartnerFolder   (PartnerFolder),
   BufferRoot,
   Tombstone,
+}
+
+impl MpViewnodeKind {
+  /// As 'ViewnodeKind::is_partner_folder'.
+  pub fn is_partner_folder (&self) -> bool {
+    matches! ( self, MpViewnodeKind::Folder (folder)
+                     if ! folder . members_are_properties () ) }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -100,14 +106,12 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
         Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
         Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))),
-      MpViewnodeKind::PropertyFolder (c) =>
-        Ok (ViewnodeKind::PropertyFolder (c)),
+      MpViewnodeKind::Folder (folder) =>
+        Ok (ViewnodeKind::Folder (folder)),
       MpViewnodeKind::PropertyMember (member) =>
         Ok (ViewnodeKind::PropertyMember (member)),
       MpViewnodeKind::ChangeViewnode (change) =>
         Ok (ViewnodeKind::ChangeViewnode (change)),
-      MpViewnodeKind::PartnerFolder (r) =>
-        Ok (ViewnodeKind::PartnerFolder (r)),
       MpViewnodeKind::BufferRoot =>
         Ok (ViewnodeKind::BufferRoot),
       MpViewnodeKind::Tombstone =>
@@ -166,14 +170,12 @@ impl From<ViewnodeKind> for MpViewnodeKind {
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))),
-      ViewnodeKind::PropertyFolder (c) =>
-        MpViewnodeKind::PropertyFolder (c),
+      ViewnodeKind::Folder (folder) =>
+        MpViewnodeKind::Folder (folder),
       ViewnodeKind::PropertyMember (member) =>
         MpViewnodeKind::PropertyMember (member),
       ViewnodeKind::ChangeViewnode (change) =>
         MpViewnodeKind::ChangeViewnode (change),
-      ViewnodeKind::PartnerFolder (r) =>
-        MpViewnodeKind::PartnerFolder (r),
       ViewnodeKind::BufferRoot =>
         MpViewnodeKind::BufferRoot,
       ViewnodeKind::Tombstone =>
@@ -295,9 +297,8 @@ impl MpViewnode {
         &h . title,
       MpViewnodeKind::PropertyMember (member) => member . title (),
       MpViewnodeKind::ChangeViewnode (change) => change . title (),
-      MpViewnodeKind::PropertyFolder (folder) => folder . title (),
-      MpViewnodeKind::PartnerFolder (_)
-        | MpViewnodeKind::BufferRoot
+      MpViewnodeKind::Folder (folder) => folder . title (),
+      MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
         | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
@@ -321,10 +322,10 @@ impl MpViewnode {
         format!("property:flag({})", flag . wire_name ()),
       MpViewnodeKind::ChangeViewnode (change) =>
         format! ("changeViewnode:{}", change . repr_in_client ()),
-      MpViewnodeKind::PropertyFolder (folder) =>
+      MpViewnodeKind::Folder (folder) if folder . members_are_properties () =>
         format!("propertyFolder:{}", folder . repr_in_client ()),
-      MpViewnodeKind::PartnerFolder (partnerFolder) =>
-        format!("partnerFolder:{}", partnerFolder . repr_in_client ()),
+      MpViewnodeKind::Folder (folder) =>
+        format!("partnerFolder:{}", folder . repr_in_client ()),
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
@@ -347,11 +348,10 @@ impl MpViewnode {
         d . body . as_ref(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
         h . body . as_ref(),
-      MpViewnodeKind::PropertyFolder (folder) => folder . body (),
+      MpViewnodeKind::Folder (folder) => folder . body (),
       MpViewnodeKind::PropertyMember (member) => member . body (),
       MpViewnodeKind::ChangeViewnode (change) => change . body (),
-      MpViewnodeKind::PartnerFolder (_)
-        | MpViewnodeKind::BufferRoot
+      MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
         | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
@@ -371,10 +371,9 @@ impl MpViewnode {
         None,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         Some (&u . skgid),
-      MpViewnodeKind::PropertyFolder (_)
+      MpViewnodeKind::Folder (_)
         | MpViewnodeKind::PropertyMember (_)
         | MpViewnodeKind::ChangeViewnode (_)
-        | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone =>
         None, }}

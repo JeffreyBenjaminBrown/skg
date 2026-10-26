@@ -10,7 +10,7 @@ use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::reconcile::partner_folder::{folder_viewnode_id_of, push_repair_warnings};
 use crate::update_buffer::util::fold_members_of_newborn_folder;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::types::viewnode::{Viewnode, PartnerFolder};
+use crate::types::viewnode::{Viewnode, Folder};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -43,8 +43,8 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
-  let kind : PartnerFolder =
-    PartnerFolder::HiddenInSubscribee;
+  let kind : &Folder =
+    &Folder::HiddenInSubscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : HiddenInContext =
@@ -91,7 +91,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
 fn read_hiddenin_context (
   tree               : &Tree<Viewnode>,
   node               : NodeId,
-  kind               : PartnerFolder,
+  kind               : &Folder,
   runtime            : &RuntimeGeneration,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<HiddenInContext, Box<dyn Error>> {

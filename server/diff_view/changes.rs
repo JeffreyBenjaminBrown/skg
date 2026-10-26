@@ -55,8 +55,7 @@ use crate::types::tree::moves::{
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, PartnerFolder, Phantom, PhantomDeleted, PropertyMember, ChangeViewnode,
-  PropertyFolder, Viewnode, ViewnodeKind, Vognode,
+  Editability, Folder, Phantom, PhantomDeleted, PropertyMember, ChangeViewnode, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
 use crate::update_buffer::util::{Unwarranted, convert_unwarranted_child};
@@ -70,13 +69,13 @@ use std::mem::discriminant;
 /// The folders of a node's recorders (its in-set changed when one
 /// was added or removed), then those of the relationships it records
 /// (changed when one was added, removed or moved to another skgrepo).
-const IN_FOLDERS : [PartnerFolder; 5] = [
-  PartnerFolder::Container, PartnerFolder::Mentioner,
-  PartnerFolder::Subscriber, PartnerFolder::Overrider,
-  PartnerFolder::Hider ];
-const OUT_FOLDERS : [PartnerFolder; 3] = [
-  PartnerFolder::Subscribee, PartnerFolder::Overridden,
-  PartnerFolder::Hidden ];
+const IN_FOLDERS : [Folder; 5] = [
+  Folder::Container, Folder::Mentioner,
+  Folder::Subscriber, Folder::Overrider,
+  Folder::Hider ];
+const OUT_FOLDERS : [Folder; 3] = [
+  Folder::Subscribee, Folder::Overridden,
+  Folder::Hidden ];
 
 /// What the change leaves that mention a node say changed about it,
 /// grouped by aspect: what the per-visit step adds ahead of its
@@ -199,14 +198,13 @@ pub(crate) fn process_unrestrictedVognode_changes (
     . map ( |child| child . id () ) . collect ();
   let model_property_folders : Vec<ViewnodeKind> = // the folders that changed
     model . root () . children ()
-    . filter ( |child| matches! ( child . value () . kind,
-                                  ViewnodeKind::PropertyFolder (_) ))
+    . filter ( |child| child . value () . kind . is_property_folder () )
     . map ( |child| child . value () . kind . clone () ) . collect ();
   let fronts : Vec<NodeId> = reconcile_children_with_shallowModelSubtree (
     tree, treeid, &model, model . root () . id (), &straddle . after,
     &is_diffView_change_viewnode,
     &|viewnode| is_front_change_viewnode (viewnode)
-      && ( ! matches! ( viewnode . kind, ViewnodeKind::PropertyFolder (_) )
+      && ( ! viewnode . kind . is_property_folder ()
            || model_property_folders . iter () . any ( |kind|
                 same_property_folder_kind (kind, &viewnode . kind) )),
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
@@ -433,12 +431,12 @@ fn model_root (
 fn is_front_change_viewnode (
   viewnode : &Viewnode,
 ) -> bool {
-  matches! ( &viewnode . kind,
+  viewnode . kind . is_property_folder ()
+  || matches! ( &viewnode . kind,
     ViewnodeKind::ChangeViewnode (
       ChangeViewnode::OldText { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
       | ChangeViewnode::ChangesetMarker { .. } )
-    | ViewnodeKind::PropertyFolder (_)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ) }
+    | ViewnodeKind::Folder (Folder::Acquired) ) }
 
 /// Convert what this step adds under an editable node: its change
 /// viewnodes, its removed members and the historical phantoms of its
@@ -453,7 +451,7 @@ fn convert_change_viewnodes (
     tree, treeid, &empty, empty . root () . id (), &straddle . after,
     &is_diffView_change_viewnode,
     &|viewnode| ( is_front_change_viewnode (viewnode)
-                  && ! matches! ( viewnode . kind, ViewnodeKind::PropertyFolder (_) ))
+                  && ! viewnode . kind . is_property_folder () )
       || matches! ( &viewnode . kind,
         ViewnodeKind::Vognode (
           Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) )),
@@ -467,7 +465,8 @@ fn same_property_folder_kind (
   b : &ViewnodeKind,
 ) -> bool {
   match (a, b) {
-    ( ViewnodeKind::PropertyFolder (a), ViewnodeKind::PropertyFolder (b) ) =>
+    ( ViewnodeKind::Folder (a), ViewnodeKind::Folder (b) )
+      if a . members_are_properties () && b . members_are_properties () =>
       discriminant (a) == discriminant (b),
     _ => false, }}
 
@@ -487,8 +486,7 @@ fn unmark_property_folders_except (
     tree . get (treeid)
     . ok_or ("unmark_property_folders_except: node not found") ?
     . children ()
-    . filter ( |child| matches! ( child . value () . kind,
-                                  ViewnodeKind::PropertyFolder (_) )
+    . filter ( |child| child . value () . kind . is_property_folder ()
                        && ! kept . contains (&child . id ()) )
     . flat_map ( |folder| folder . children () . map ( |entry| entry . id () ))
     . collect ();
@@ -563,7 +561,7 @@ fn changed_partner_folders (
       else if relation == NodeRelation::LinksTo { aspects . mentioners }
       else { aspects . recorders . contains (&relation) };
     if changed {
-      folders . push ( child_folder_or_new (tree, treeid, kind) ); }}
+      folders . push ( child_folder_or_new (tree, treeid, &kind) ); }}
   folders }
 
 /// Tag each content member, and each non-member child whose node is
@@ -746,7 +744,7 @@ fn append_changed_property_folders (
       return; };
   if aspects . aliases {
     append_property_folder (
-      tree, treeid, PropertyFolder::Alias,
+      tree, treeid, Folder::Alias,
       union_with_existence ( &before . alias_texts (), &after . alias_texts () )
       . into_iter ()
       . map ( |(text, existence)| entry_viewnode (
@@ -758,14 +756,14 @@ fn append_changed_property_folders (
       std::iter::once ( pid . clone () )
         . chain ( node . extra_ids . iter () . cloned () ) . collect () };
     append_property_folder (
-      tree, treeid, PropertyFolder::ID,
+      tree, treeid, Folder::ID,
       union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
       . map ( |(skgid, existence)| entry_viewnode (
         PropertyMember::ID { skgid }, existence ) )
       . collect () ); }
   if aspects . flags {
     append_property_folder (
-      tree, treeid, PropertyFolder::flags (),
+      tree, treeid, Folder::flags (),
       Flag::ALL . into_iter ()
       . filter_map ( |flag| {
         let existence : Option<Existence> =
@@ -816,11 +814,11 @@ fn entry_viewnode (
 fn append_property_folder (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
-  kind    : PropertyFolder,
+  kind    : Folder,
   entries : Vec<Viewnode>,
 ) {
   let folder : NodeId =
-    append ( tree, treeid, viewnode_of ( ViewnodeKind::PropertyFolder (kind) ));
+    append ( tree, treeid, viewnode_of ( ViewnodeKind::Folder (kind) ));
   for entry in entries {
     append ( tree, folder, entry ); }}
 
@@ -828,14 +826,15 @@ fn append_property_folder (
 fn child_folder_or_new (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
-  kind   : PartnerFolder,
+  kind   : &Folder,
 ) -> NodeId {
   let existing : Option<NodeId> =
     tree . get (treeid) . unwrap () . children ()
-    . find ( |child| child . value () . kind == ViewnodeKind::PartnerFolder (kind) )
+    . find ( |child| matches! ( &child . value () . kind,
+                                ViewnodeKind::Folder (folder) if folder == kind ))
     . map ( |child| child . id () );
   existing . unwrap_or_else ( ||
-    append ( tree, treeid, viewnode_of ( ViewnodeKind::PartnerFolder (kind) ))) }
+    append ( tree, treeid, viewnode_of ( ViewnodeKind::Folder (kind . clone ()) ))) }
 
 /// Append 'viewnode' under 'treeid'.
 fn append (

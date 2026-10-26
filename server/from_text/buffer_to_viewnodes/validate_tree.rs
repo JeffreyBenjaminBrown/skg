@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, PartnerFolder, PropertyMember, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
@@ -131,7 +131,7 @@ fn idFolder_membership_errors (
     let node_ref = match edge {
       Edge::Open (node_ref)
         if matches! ( &node_ref . value () . kind,
-                      MpViewnodeKind::PropertyFolder (PropertyFolder::ID) )
+                      MpViewnodeKind::Folder (Folder::ID) )
         => node_ref,
       _ => continue };
     let (recorder, recorder_headline) : (ID, HeadlineName) =
@@ -378,8 +378,8 @@ fn relRepo_request_is_collected (
     Some (parent) => match &parent . value () . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)) =>
         is_saveEligible_unrestricted_vognode (parent),
-      MpViewnodeKind::PartnerFolder (
-        PartnerFolder::Subscribee | PartnerFolder::Overridden ) =>
+      MpViewnodeKind::Folder (
+        Folder::Subscribee | Folder::Overridden ) =>
         parent . parent ()
         . map ( is_saveEligible_unrestricted_vognode )
         . unwrap_or (false),
@@ -400,7 +400,7 @@ fn is_saveEligible_unrestricted_vognode (
     t . claimsMembership
     && node_ref . parent ()
        . map ( |p| matches! ( &p . value () . kind,
-                 MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) ))
+                 MpViewnodeKind::Folder (Folder::Subscribee) ))
        . unwrap_or (false);
   ! t . is_writeProtected ()
   && ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) )

@@ -23,8 +23,8 @@ use crate::diff_view::visit::{
 use super::completion_mode::CompletionMode;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
-use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest};
-use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Folder, ViewRequest};
+use crate::types::viewnode::{Vognode, Phantom};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
 use super::reconcile::partner_folder::{
@@ -284,7 +284,7 @@ fn dispatch_node_update (
   match &kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
       visit_normal_node (tree, treeid, context) ?,
-    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
+    ViewnodeKind::Folder (Folder::Subscribee)
       if context . mode . subscribeeFolder_has_own_reconciler () =>
       // A folder fills its members whole and is budget-neutral (the node budget): the owning
       // vognode already spent its 1 budget unit when it extended, so extending all
@@ -293,28 +293,29 @@ fn dispatch_node_update (
         treeid, tree, context . runtime,
         context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction ) ?,
-    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
+    ViewnodeKind::Folder (Folder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
         treeid, tree, context . runtime,
         context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
-    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutsideSubscribeeFolder_children (
         treeid, tree, context . runtime,
         context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
-    ViewnodeKind::PartnerFolder (role)
-      // This arm serves one FolderPolicy::EditableSet folder (Overridden;
-      // Subscribee has its own completer above) and every
-      // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
-      // 'PartnerFolder::policy' where their treatment differs.
+    ViewnodeKind::Folder (role)
+      // This arm serves every folder that reads one relation role: one
+      // whose goal is ordered (Overridden; Subscribee has its own
+      // completer above) and the write-protected ones. The reconciler
+      // branches on 'Folder::goal_is_ordered' where their treatment
+      // differs.
       if role . relation_member_role () . is_some () =>
       // In a diff view the folder shows the union of the straddle;
       // the Subscribee folder comes here too.
       reconcile_partnerFolder_children (
-        treeid, tree, *role,
+        treeid, tree, role,
         context . mode,
         context . runtime, context . graph_snap,
         context . deleted_by_this_save_extra_ids,
@@ -323,15 +324,15 @@ fn dispatch_node_update (
     // In a diff view, 'diffView_visit_before_extension' has finished
     // a changed property folder's visit: the node's visit filled it
     // from the graph straddle. Any other is refreshed here.
-    ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
+    ViewnodeKind::Folder (Folder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
-    ViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
+    ViewnodeKind::Folder (Folder::ID) =>
       super::reconcile::id_folder::reconcile_idFolder_children (
         treeid, tree, &context . runtime . graph,
         &context . runtime . config ) ?,
-    ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
+    ViewnodeKind::Folder (Folder::Flags { .. }) =>
       super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
@@ -349,7 +350,7 @@ fn dispatch_node_update (
       // Deleted, Historical, Tombstone, Property leaves and BufferRoot.
       // The prune sweep handles empty/dead nodes.
     } }
-  if let ViewnodeKind::PartnerFolder (folder_kind) = &kind {
+  if let ViewnodeKind::Folder (folder_kind) = &kind {
     // In a content view, each member of the folder carries its
     // containerward chain. Over the straddle, the diff view's folder
     // reconciler reconciled the chains already; the two compound
@@ -503,7 +504,7 @@ fn update_normal_node (
 ///   just noise) -- but not Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasFolder).
 /// - HiddenInSubscribeeFolder / HiddenOutsideOfSubscribeeFolder.
-/// - PropertyFolder::ID (largely moot -- an IDFolder always holds at least the PID).
+/// - Folder::ID (largely moot -- an IDFolder always holds at least the PID).
 /// Preserved when empty (so not here): PartnerFolder(Subscribee), PartnerFolder
 /// (Overridden), PropertyFolder(Alias) -- each an *editable interface onto the origin*
 /// that the user must be able to refill, removed only by hand.
@@ -513,17 +514,17 @@ fn is_self_deletable_when_empty (
   matches! ( kind,
     ViewnodeKind::Tombstone
     | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
-    | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)
-    | ViewnodeKind::PropertyFolder (PropertyFolder::ID) ) }
+    | ViewnodeKind::Folder (Folder::Subscriber)
+    | ViewnodeKind::Folder (Folder::Overrider)
+    | ViewnodeKind::Folder (Folder::Hider)
+    | ViewnodeKind::Folder (Folder::Hidden)
+    | ViewnodeKind::Folder (Folder::Container)
+    | ViewnodeKind::Folder (Folder::Mentioner)
+    | ViewnodeKind::Folder (Folder::AcquiredBy)
+    | ViewnodeKind::Folder (Folder::Acquired)
+    | ViewnodeKind::Folder (Folder::HiddenInSubscribee)
+    | ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee)
+    | ViewnodeKind::Folder (Folder::ID) ) }
 
 /// The postorder prune sweep -- the *one* place self-deletion happens.
 /// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:

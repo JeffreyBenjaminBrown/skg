@@ -22,7 +22,7 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{
-  PartnerFolder, ViewnodeId, Viewnode, viewforest_root_viewnode,
+  Folder, ViewnodeId, Viewnode, viewforest_root_viewnode,
   viewnode_of, ViewnodeKind};
 use skg::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 
@@ -332,7 +332,7 @@ fn the_record_assigns_fresh_viewnode_ids_and_forgets_what_left (
   let mut tree : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = tree . root () . id ();
   let folder : NodeId = tree . get_mut (root) . unwrap () . append (
-    viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) ) . id ();
+    viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)) ) . id ();
   for _ in 0 .. 120 {
     tree . get_mut (folder) . unwrap () . append ( viewnode_of (
       ViewnodeKind::Tombstone )); }

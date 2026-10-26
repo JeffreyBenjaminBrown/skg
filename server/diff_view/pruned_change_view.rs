@@ -34,7 +34,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  ChangeFacts, Editability, FoldAndFocus, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  ChangeFacts, Editability, FoldAndFocus, Folder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
@@ -371,7 +371,7 @@ fn append_stub_root (
       . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?
       . append ( Viewnode {
         foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
-        .. viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) ) } ); }
+        .. viewnode_of ( ViewnodeKind::Folder (Folder::Container) ) } ); }
   Ok (root_treeid) }
 
 /// The content origins in D, of the buffer's sets recomputed after

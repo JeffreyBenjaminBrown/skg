@@ -2,7 +2,7 @@
 
 use skg::to_org::util::get_skgid_from_viewnode_at;
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, default_unrestrictedVognode};
-use skg::types::viewnode::{PropertyFolder, viewnode_of};
+use skg::types::viewnode::{Folder, viewnode_of};
 use skg::types::misc::{ID, SkgrepoName};
 use ego_tree::{NodeId,Tree};
 
@@ -30,8 +30,8 @@ fn test_get_skgid_from_viewnode_at_non_vognode() {
   // Non-vognode → returns error
   let viewnode :
     Viewnode =
-    viewnode_of (ViewnodeKind::PropertyFolder (
-        PropertyFolder::Alias));
+    viewnode_of (ViewnodeKind::Folder (
+        Folder::Alias));
   let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_skgid : NodeId = tree . root() . id();
   let result :

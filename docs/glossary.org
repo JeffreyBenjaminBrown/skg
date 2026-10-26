@@ -825,7 +825,7 @@ called a bare "marker", since a changeset marker is another thing.
 
 **** changeset marker
 
-A childless property viewnode ('Property::ChangesetMarker') that
+A childless change viewnode ('ChangeViewnode::ChangesetMarker') that
 stands for a set of changes recorded in its parent's file, and carries
 their derived readiness. There are three kinds: the content changeset
 marker ("its content changed"), the relRepo changeset marker ("some
@@ -885,11 +885,11 @@ viewparent; b, the grandparent; ...).
 **** removed alias, removed ID
 
 An alias or extra ID of a node that HEAD has and the worktree lacks.
-The diff view shows it in the node's alias or ID folder as its own kind
-('Property::RemovedAlias', 'Property::RemovedID'), where the LCS of
-the two lists puts it, with the '-' herald. It is save-inert by kind:
-the save reads no alias from it and does not count it among the
-node's IDs. Marking it marks the leaf of the lost alias or ID.
+The diff view shows it in the node's alias or ID folder as an alias or
+ID member with a ghost warrant, written '(diff (rel removed))', where
+the LCS of the two lists puts it, with the '-' herald. It is save-inert
+by that warrant: the save reads no alias from it and does not count it
+among the node's IDs. Marking it marks the leaf of the lost alias or ID.
 
 **** readiness summary
 
@@ -1012,47 +1012,52 @@ is a member of the recorder's list.
 The node that has an ID, as its PID or as an extra ID, is that ID's
 *carrier*. (Not "owner": the user *owns* skgrepos.)
 
-*** PartnerFolder, and the folder-policy vocabulary
+*** Folder, and its per-kind facts
 
-How a partner folder (see "partner folder") is built. It is the
-=ViewnodeKind::PartnerFolder= variant and the payload
-type of the same name.  “Folder” here describes an org non-vognode that groups
-viewnodes; it does not mean a filesystem directory.  “Role col”, “relation
-col”, and bare “sharing col” are retired names for the general concept.
+How a folder (see "partner folder") is built. It is the
+=ViewnodeKind::Folder= variant and the payload type =Folder=, one
+enum for the twelve partner folders and the three property folders.
+“Folder” here describes an org non-vognode that groups viewnodes; it
+does not mean a filesystem directory.  “Role col”, “relation col”,
+and bare “sharing col” are retired names for the general concept.
 
-There are twelve PartnerFolders, named by their external non-vognode
-atom. Each kind's behavior is decided by one method,
-=PartnerFolder::policy= (=server/types/viewnode.rs=), returning a
-*FolderPolicy*.  This single arbiter is consulted by reconciliation
-dispatch, save extraction's write-protected treatment, and
-herald/warning gating, so a new relation cannot acquire inconsistent
-policies in different layers:
+Each folder is named by its external non-vognode atom. Two methods on
+=Folder= (=server/types/viewnode.rs=) give the per-kind facts that
+reconciliation, save extraction and the heralds consult, so a new
+kind cannot acquire inconsistent treatment in different layers:
+=members_are_properties= (the alias, ID and flags folders) and
+=goal_is_ordered=. A folder's goal is ordered when the viewparent's
+own file records its members, in an order the save writes, so that
+the save reads its membership:
 
-- *EditableSet* (=subscribeeFolder=, =overriddenFolder=): membership edits
-  are graph edits.  An absent folder means "no opinion" (its field lowers
-  to =MSV::Unspecified=, filled from disk); a present-but-empty folder
-  means an explicit empty set (=MSV::Specified(vec![])=).
-- *EditableCompound* (=hiddenOutsideOfSubscribeeFolder=): membership is
-  derived from hide state, and a visible member set is an explicit
-  edit of that subset; the hides' relRepos stay derived.
-- *WriteProtectedSet*: membership is generated from graph facts; the
-  user's order is respected view-locally; repairs warn.  See
-  [[*write-protected set][write-protected set]].  These are the inbound folders
-  =subscriberFolder=, =overriderFolder=, =hiderFolder= and
-  =containerFolder= and =mentionerFolder= (the folders of =C-c l c= and
-  =C-c l m=; the other side of each is the node's content, or its
-  links, shown without a folder), the outbound =hiddenFolder=, and the
-  diff view's =acquiredByFolder= and =acquiredFolder=, which are
-  derived from the graph straddle and save-inert.
-- *WriteProtectedCompound* (=hiddenInSubscribeeFolder=): membership is
-  derived from hide state rather than from a single relation role.
+- =subscribeeFolder=, =overriddenFolder= and =aliasFolder=:
+  membership edits are graph edits.  An absent folder means "no
+  opinion" (its field lowers to =MSV::Unspecified=, filled from
+  disk); a present-but-empty folder means an explicit empty set
+  (=MSV::Specified(vec![])=).
+- =hiddenOutsideOfSubscribeeFolder=: membership is derived from hide
+  state, and a visible member set is an explicit edit of that subset;
+  the hides' relRepos stay derived.
+
+Every other folder's goal is unordered: membership is generated from
+graph facts, the user's order is respected view-locally, and repairs
+warn.  See [[*write-protected set][write-protected set]].  These are
+the inbound folders =subscriberFolder=, =overriderFolder=,
+=hiderFolder= and =containerFolder= and =mentionerFolder= (the
+folders of =C-c l c= and =C-c l m=; the other side of each is the
+node's content, or its links, shown without a folder), the outbound
+=hiddenFolder=, =hiddenInSubscribeeFolder= (derived from hide state
+rather than from a single relation role), the diff view's
+=acquiredByFolder= and =acquiredFolder=, which are derived from the
+graph straddle and save-inert, and the write-protected =idFolder= and
+=flagsFolder=.
 
 The ☮ herald on a write-protected folder's headline is a
 herald-table fact only (=server/heralds.rs=), with no wire atom of
 its own: which folders are write-protected is already known from the
 folder atom. The editable folders and =aliasFolder= carry none.
 
-Every policy's reconciler obeys
+Every folder's reconciler obeys
 [[*retain as non-member or tombstone, then prune; warrant, stale, duplicate][retain as non-member or tombstone, then prune]]:
 a stale member or an extra copy of a member is converted, not
 detached, and a missing graph member is reinstated. A non-member

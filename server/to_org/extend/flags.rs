@@ -7,7 +7,7 @@ use crate::types::nodes::complete::{
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 use crate::types::viewnode::{
-  PropertyMember, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
+  PropertyMember, Folder, Viewnode, ViewnodeKind, ViewRequest};
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -36,13 +36,13 @@ pub fn build_and_integrate_flags (
 ) -> Result<(), Box<dyn Error>> {
   if unique_non_vognode_child_of_viewnode (
     tree, treeid,
-    &ViewnodeKind::PropertyFolder (PropertyFolder::flags ())) ? . is_some ()
+    &ViewnodeKind::Folder (Folder::flags ())) ? . is_some ()
   { return Ok (()); }
   let pid  : ID = get_skgid_from_viewnode_at (tree, treeid) ?;
   let node : Option<Graphnode> = graphnode_from_graph (graph, &pid);
   let folder : ego_tree::NodeId = insert_non_vognode_as_child (
     tree, treeid,
-    ViewnodeKind::PropertyFolder (PropertyFolder::flags ()), false ) ?;
+    ViewnodeKind::Folder (Folder::flags ()), false ) ?;
   if let Some (node) = node {
     for flag in Flag::ALL {
       if flag_is_true (&node . flags, flag) {
@@ -114,7 +114,7 @@ mod tests {
     let empty_folder = empty_tree . get (empty_root) . unwrap ()
       . children () . next () . unwrap ();
     assert! (matches! (&empty_folder . value () . kind,
-      ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })));
+      ViewnodeKind::Folder (Folder::Flags { .. })));
     assert_eq! (empty_folder . children () . count (), 0);
   }
 

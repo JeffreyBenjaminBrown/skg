@@ -4,25 +4,25 @@ use super::*;
 fn warnings_batch_per_folder_and_recorder () {
   let warnings : Vec<CompletionWarning> = vec! [
     CompletionWarning::FolderRepair {
-      folder      : PartnerFolder::Subscriber,
+      folder      : Folder::Subscriber,
       recorder : ID::from ("n"),
       folder_viewnode_id : Some (ViewnodeId ("0a" . to_string ())),
       repair   : RepairKind::ReinstatedMember,
       children : vec! [ ID::from ("r"), ID::from ("t") ] },
     CompletionWarning::FolderRepair {
-      folder      : PartnerFolder::Subscriber,
+      folder      : Folder::Subscriber,
       recorder : ID::from ("n"),
       folder_viewnode_id : Some (ViewnodeId ("0a" . to_string ())),
       repair   : RepairKind::Retained,
       children : vec! [ ID::from ("x") ] },
     CompletionWarning::FolderRepair {
-      folder      : PartnerFolder::Hider,
+      folder      : Folder::Hider,
       recorder : ID::from ("m"),
       folder_viewnode_id : None,
       repair   : RepairKind::EntombstonedDuplicate,
       children : vec! [ ID::from ("d") ] },
     CompletionWarning::FolderRepair { // empty children: contributes nothing
-      folder      : PartnerFolder::Hider,
+      folder      : Folder::Hider,
       recorder : ID::from ("m"),
       folder_viewnode_id : None,
       repair   : RepairKind::ReinstatedMember,

@@ -29,7 +29,7 @@ use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_as_members;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind, Vognode};
+use skg::types::viewnode::{Folder, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use skg::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -195,11 +195,11 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
   let u : NodeRef<Viewnode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");
   let folders : Vec<NodeRef<Viewnode>> = u . children ()
-    . filter ( |c| matches! ( &c . value () . kind, ViewnodeKind::PartnerFolder (_) ))
+    . filter ( |c| c . value () . kind . is_partner_folder () )
     . collect ();
   assert_eq! ( folders . len (), 1, "only the overridden folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
-                       ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) )
+                       ViewnodeKind::Folder (Folder::Overridden) )
             && folders [0] . value () . foldAndFocus . folded,
             "U's one folder is its overridden folder, folded" );
   let f : NodeRef<Viewnode> =
@@ -234,11 +234,11 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
   let e : NodeRef<Viewnode> =
     find_result_root ( &tree, "E" ) . expect ("E is a result root");
   let folders : Vec<NodeRef<Viewnode>> = e . children ()
-    . filter ( |c| matches! ( &c . value () . kind, ViewnodeKind::PartnerFolder (_) ))
+    . filter ( |c| c . value () . kind . is_partner_folder () )
     . collect ();
   assert_eq! ( folders . len (), 1, "only the overrider folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
-                       ViewnodeKind::PartnerFolder (PartnerFolder::Overrider) )
+                       ViewnodeKind::Folder (Folder::Overrider) )
             && folders [0] . value () . foldAndFocus . folded,
             "E's one folder is its overrider folder, folded" );
   assert! ( find_child ( folders [0], "B" ) . is_some (),

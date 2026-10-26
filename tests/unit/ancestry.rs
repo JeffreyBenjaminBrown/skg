@@ -1,7 +1,7 @@
 use super::*;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
-  Phantom, PhantomDeleted, PropertyMember, PropertyFolder, viewnode_of };
+  Phantom, PhantomDeleted, PropertyMember, Folder, viewnode_of };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SkgrepoName { SkgrepoName::from ("main") }
@@ -14,11 +14,11 @@ fn deleted (title : &str) -> Viewnode {
       skgid    : sid (title), home_skgrepo : src (),
       title : title . to_string (), body : None })))) }
 
-fn role_folder (rc : PartnerFolder) -> Viewnode {
-  viewnode_of (ViewnodeKind::PartnerFolder (rc)) }
+fn role_folder (rc : Folder) -> Viewnode {
+  viewnode_of (ViewnodeKind::Folder (rc)) }
 
-fn property_folder (qc : PropertyFolder) -> Viewnode {
-  viewnode_of (ViewnodeKind::PropertyFolder (qc)) }
+fn property_folder (qc : Folder) -> Viewnode {
+  viewnode_of (ViewnodeKind::Folder (qc)) }
 
 fn alias_property (text : &str) -> Viewnode {
   viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
@@ -50,7 +50,7 @@ fn aliasfolder_under_normal_is_not_orphan () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let n : NodeId = child (&mut t, root, normal ("N", true));
-  let ac : NodeId = child (&mut t, n, property_folder (PropertyFolder::Alias));
+  let ac : NodeId = child (&mut t, n, property_folder (Folder::Alias));
   assert! ( ! folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
@@ -58,7 +58,7 @@ fn aliasfolder_under_deleted_is_orphan () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let ac : NodeId = child (&mut t, d, property_folder (PropertyFolder::Alias));
+  let ac : NodeId = child (&mut t, d, property_folder (Folder::Alias));
   assert! ( folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
@@ -67,7 +67,7 @@ fn relation_folder_under_tombstone_is_orphan () {
   let root : NodeId = t . root () . id ();
   let dead : NodeId = child (&mut t, root,
     viewnode_of (ViewnodeKind::Tombstone));
-  let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
+  let rc : NodeId = child (&mut t, dead, role_folder (Folder::Subscriber));
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
 // Multi-level: the immediate parent (subscribee) is a live Unrestricted, but the
@@ -79,11 +79,11 @@ fn build_subscribee_chain (
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let sber : NodeId = child (&mut t, root, subscriber);
-  let subscribee_folder : NodeId = child (&mut t, sber, role_folder (PartnerFolder::Subscribee));
+  let subscribee_folder : NodeId = child (&mut t, sber, role_folder (Folder::Subscribee));
   let sbee : NodeId = child (&mut t, subscribee_folder,
     normal ("subscribee", true));
   let hin : NodeId = child (&mut t, sbee,
-    role_folder (PartnerFolder::HiddenInSubscribee));
+    role_folder (Folder::HiddenInSubscribee));
   (t, sber, subscribee_folder, sbee, hin) }
 
 #[test]
@@ -133,7 +133,7 @@ fn entombstone_disposes_each_child_kind () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
+  let subscribee_folder : NodeId = child (&mut t, d, role_folder (Folder::Subscribee));
   // Member leaf -> a tombstone, for the prune to remove.
   let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", true));
   // Member branch (has a child) -> a write-protected non-member, kept.
@@ -141,7 +141,7 @@ fn entombstone_disposes_each_child_kind () {
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", true));
   // Nested folder -> leave it (self-entombstones at its own visit).
   let nested : NodeId = child (&mut t, subscribee_folder,
-    role_folder (PartnerFolder::HiddenOutsideOfSubscribee));
+    role_folder (Folder::HiddenOutsideOfSubscribee));
   // Non-member vognode -> keep untouched.
   let indep : NodeId = child (&mut t, subscribee_folder, normal ("I", false));
 
@@ -161,7 +161,7 @@ fn entombstone_disposes_each_child_kind () {
     "the kept branch is write-protected" );
   assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
-                       ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
+                       ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) ),
     "a nested folder is left untouched to self-entombstone at its visit" );
   assert_eq! ( parentis_at (&t, indep), Some (false),
     "a non-member vognode is kept untouched" ); }
@@ -171,7 +171,7 @@ fn entombstone_converts_property_leaf_to_tombstone () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let ac : NodeId = child (&mut t, d, property_folder (PropertyFolder::Alias));
+  let ac : NodeId = child (&mut t, d, property_folder (Folder::Alias));
   let q : NodeId = child (&mut t, ac, alias_property ("eleven"));
   entombstone_generalized_orphan_folder (&mut t, ac) . unwrap ();
   assert! ( matches! ( kind_at (&t, ac), ViewnodeKind::Tombstone ) );

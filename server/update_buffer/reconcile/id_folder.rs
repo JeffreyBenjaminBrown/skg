@@ -5,7 +5,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{PropertyFolder, PropertyMember, viewnode_of};
+use crate::types::viewnode::{Folder, PropertyMember, viewnode_of};
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest};
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -27,7 +27,7 @@ pub fn reconcile_idFolder_children (
   error_unless_node_satisfies(
     tree, idfolder_treeid,
     |viewnode| matches!( &viewnode . kind,
-                         ViewnodeKind::PropertyFolder (PropertyFolder::ID) ),
+                         ViewnodeKind::Folder (Folder::ID) ),
     "reconcile_idFolder_children: Node is not an IDFolder" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   // The parent Unrestricted vognode, read through the required-ancestry table of 'update_buffer/ancestry.rs' (index 0).

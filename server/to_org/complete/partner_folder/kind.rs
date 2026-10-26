@@ -1,4 +1,4 @@
-//! PartnerFolder metadata used by PartnerFolder completion paths.
+//! Folder metadata used by the folder completion paths.
 //!
 //! The rerender-time completers share enough structure (build child
 //! data, reconcile against a goal list) that several pieces of
@@ -9,10 +9,10 @@
 //! These methods live here rather than beside the type because they
 //! depend on 'RelationRole' (the dbs layer), which
 //! 'server/types/viewnode.rs' should not import. The pure per-kind
-//! fact, 'PartnerFolder::policy', lives with the type.
+//! facts, such as 'Folder::goal_is_ordered', live with the type.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
-use crate::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{Folder, Viewnode, ViewnodeKind};
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition,
   NodeRelation,
@@ -22,75 +22,81 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-impl PartnerFolder {
+impl Folder {
   /// Stable label used in panic messages from
   /// 'reconcile_partnerFolder_children_against_goal_list' and similar helpers.
   /// Mirrors the function name of the corresponding completer so a
   /// crash gives the reader an immediately greppable hit.
-  pub fn caller_label (self) -> &'static str {
+  pub fn caller_label (&self) -> &'static str {
     match self {
-      PartnerFolder::Subscribee =>
+      Folder::Subscribee =>
         "reconcile_subscribeeFolder_children",
-      PartnerFolder::Subscriber
-        | PartnerFolder::Overridden
-        | PartnerFolder::Overrider
-        | PartnerFolder::Hider
-        | PartnerFolder::Hidden
-        | PartnerFolder::Container
-        | PartnerFolder::Mentioner =>
+      Folder::Subscriber
+        | Folder::Overridden
+        | Folder::Overrider
+        | Folder::Hider
+        | Folder::Hidden
+        | Folder::Container
+        | Folder::Mentioner =>
         "reconcile_partnerFolder_children",
-      PartnerFolder::HiddenInSubscribee =>
+      Folder::HiddenInSubscribee =>
         "reconcile_hiddenInSubscribeeFolder_children",
-      PartnerFolder::HiddenOutsideOfSubscribee =>
+      Folder::HiddenOutsideOfSubscribee =>
         "reconcile_hiddenoutsideSubscribeeFolder_children",
       // Derived from the graph straddle, and drawn by the diff
       // view's reconciler rather than by view completion.
-      PartnerFolder::AcquiredBy
-        | PartnerFolder::Acquired =>
-        "acquisition_folder", } }
+      Folder::AcquiredBy
+        | Folder::Acquired =>
+        "acquisition_folder",
+      Folder::Alias => "reconcile_aliasFolder_children",
+      Folder::ID    => "reconcile_idFolder_children",
+      Folder::Flags { .. } => "reconcile_flags_folder_children", } }
 
-  pub fn relation_member_role (self) -> Option<RelationRole> {
+  pub fn relation_member_role (&self) -> Option<RelationRole> {
     match self {
-      PartnerFolder::Subscribee =>
+      Folder::Subscribee =>
         Some (RelationRole::new (
           NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
-      PartnerFolder::Subscriber =>
+      Folder::Subscriber =>
         Some (RelationRole::new (
           NodeRelation::SubscribesTo, BinaryRolePosition::First)),
-      PartnerFolder::Overridden =>
+      Folder::Overridden =>
         Some (RelationRole::new (
           NodeRelation::Overrides, BinaryRolePosition::Second)),
-      PartnerFolder::Overrider =>
+      Folder::Overrider =>
         Some (RelationRole::new (
           NodeRelation::Overrides, BinaryRolePosition::First)),
-      PartnerFolder::Hider =>
+      Folder::Hider =>
         Some (RelationRole::new (
           NodeRelation::HidesFromSubs, BinaryRolePosition::First)),
-      PartnerFolder::Hidden =>
+      Folder::Hidden =>
         Some (RelationRole::new (
           NodeRelation::HidesFromSubs, BinaryRolePosition::Second)),
-      PartnerFolder::Container =>
+      Folder::Container =>
         Some (RelationRole::new (
           NodeRelation::Contains, BinaryRolePosition::First)),
-      PartnerFolder::Mentioner =>
+      Folder::Mentioner =>
         Some (RelationRole::new (
           NodeRelation::LinksTo, BinaryRolePosition::First)),
-      PartnerFolder::HiddenInSubscribee |
-      PartnerFolder::HiddenOutsideOfSubscribee =>
+      Folder::HiddenInSubscribee |
+      Folder::HiddenOutsideOfSubscribee =>
         None,
       // A nodeMerge is no relation: these come from extra IDs.
-      PartnerFolder::AcquiredBy |
-      PartnerFolder::Acquired =>
+      Folder::AcquiredBy |
+      Folder::Acquired =>
+        None,
+      // A property is no relation.
+      Folder::Alias | Folder::ID | Folder::Flags { .. } =>
         None,
     } }
 
-  /// Error if 'node' is not a PartnerFolder of this kind.
+  /// Error if 'node' is not a folder of this kind.
   /// Wraps 'error_unless_node_satisfies' with
   /// - a Box<dyn Error> result
   /// - a per-kind error string of the form
   ///   "<caller_label>: expected <folder-kind>".
   pub fn error_unless_node_is_this_kind (
-    self,
+    &self,
     tree : &Tree<Viewnode>,
     node : NodeId,
   ) -> Result<(), Box<dyn Error>> {
@@ -98,7 +104,7 @@ impl PartnerFolder {
       tree, node,
       |vn : &Viewnode| matches! (
         &vn . kind,
-        ViewnodeKind::PartnerFolder (partnerFolder) if *partnerFolder == self ),
+        ViewnodeKind::Folder (folder) if folder == self ),
       &format! ( "{}: expected {:?}",
                  self . caller_label (),
                  self ),

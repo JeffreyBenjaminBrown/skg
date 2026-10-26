@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_order::)'
 //
-// A FolderPolicy::WriteProtectedSet folder (here a SubscriberFolder) respects the
+// A folder whose goal is not ordered (here a SubscriberFolder) respects the
 // user's view-local member order across save and rerender
 // ('docs/sharing-model.org', "The write-protected folders: who
 // subscribes to, overrides, or hides this node"): present members

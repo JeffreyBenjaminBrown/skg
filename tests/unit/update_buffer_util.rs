@@ -1,7 +1,7 @@
 use super::*;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
-  DiffChange, Existence, PartnerFolder, mk_editable_viewnode, mk_restricted_viewnode,
+  DiffChange, Existence, Folder, mk_editable_viewnode, mk_restricted_viewnode,
   mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of };
 use ego_tree::Tree;
 
@@ -59,10 +59,10 @@ fn an_unwarranted_child_is_converted_never_detached () {
     mk_editable_viewnode ( ID::from ("l"), SkgrepoName::from ("main"),
                            "l" . into (), None )) . id ();
   let folder : NodeId = t . get_mut (root) . unwrap () . append (
-    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) )) . id ();
+    viewnode_of ( ViewnodeKind::Folder (Folder::Acquired) )) . id ();
   t . get_mut (folder) . unwrap () . append ( mk_restricted_viewnode () );
   let childless : NodeId = t . get_mut (root) . unwrap () . append (
-    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) )) . id ();
+    viewnode_of ( ViewnodeKind::Folder (Folder::Container) )) . id ();
   assert_eq! ( convert_unwarranted_child (
                  &mut t, branch, false, Unwarranted::Stale ) . unwrap (),
                Conversion::Retained );

@@ -10,7 +10,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Phantom,
   PhantomHistorical, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
@@ -155,10 +155,10 @@ fn a_historical_phantom_round_trips () {
 #[test]
 fn the_acquisition_folders_round_trip () {
   assert_round_trip (
-    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy) ),
+    viewnode_of ( ViewnodeKind::Folder (Folder::AcquiredBy) ),
     "acquiredByFolder" );
   assert_round_trip (
-    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) ),
+    viewnode_of ( ViewnodeKind::Folder (Folder::Acquired) ),
     "acquiredFolder" ); }
 
 /// A chain node is known by where it stands; the parser knows no

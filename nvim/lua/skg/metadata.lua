@@ -643,8 +643,8 @@ function M.removed_membership_p (metadata_sexp)
          and sexpr.atom_text(rel[1]) == 'removed'
 end
 
----The atoms of the partner folders ('PartnerFolder::from_client_string',
----server/types/viewnode.rs).
+---The atoms of the partner folders ('Folder::repr_in_client' in
+---server/types/viewnode.rs, but for the three property folders).
 M.partner_folder_atoms = {
   subscribeeFolder = true, subscriberFolder = true,
   overriddenFolder = true, overriderFolder = true,

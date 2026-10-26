@@ -17,7 +17,7 @@ use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangeFacts, DiffChange, Existence, LeavesFact, Phantom,
   PhantomDeleted, PhantomUnknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
-  PartnerFolder, ViewnodeKind, Vognode, mk_editable_viewnode,
+  Folder, ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
 use ego_tree::{NodeId, Tree};
@@ -251,7 +251,7 @@ fn a_changed_folders_readiness_parses_and_is_dropped () {
   assert_eq! ( error, None );
   let viewnode : Viewnode = Viewnode::try_from (parsed) . unwrap ();
   assert_eq! ( viewnode . kind,
-               ViewnodeKind::PartnerFolder (PartnerFolder::Container) );
+               ViewnodeKind::Folder (Folder::Container) );
   assert_eq! ( viewnode . change_facts, ChangeFacts::default () ); }
 
 /// The facts of a folder holding 'members', as the renderer derives
@@ -260,7 +260,7 @@ fn facts_of_folder_holding (
   members : &[Viewnode],
 ) -> Option<FolderChangeFacts> {
   let mut tree : Tree<Viewnode> = Tree::new (
-    viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) ));
+    viewnode_of ( ViewnodeKind::Folder (Folder::Subscribee) ));
   let folder : NodeId = tree . root () . id ();
   for member in members {
     tree . get_mut (folder) . unwrap () . append (member . clone ()); }

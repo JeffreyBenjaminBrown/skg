@@ -814,8 +814,8 @@ server/to_org/extend/containerward_chain.rs)."
     hiderFolder hiddenFolder hiddenInSubscribeeFolder
     hiddenOutsideOfSubscribeeFolder containerFolder mentionerFolder
     acquiredByFolder acquiredFolder)
-  "The atoms of the partner folders ('PartnerFolder::from_client_string',
-server/types/viewnode.rs).")
+  "The atoms of the partner folders ('Folder::repr_in_client' in
+server/types/viewnode.rs, but for the three property folders).")
 
 (defun skg--partner-folder-atom (metadata-sexp)
   "The partner folder's atom if METADATA-SEXP is a partner folder's,

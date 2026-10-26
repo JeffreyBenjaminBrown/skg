@@ -12,7 +12,7 @@ use crate::to_org::extend::containerward_chain::is_in_containerward_chain;
 use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::nodes::complete::{Graphnode, flag_is_true};
 use crate::types::viewnode::{
-  PartnerFolder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant };
+  Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{NodeId, NodeRef};
 
@@ -55,9 +55,10 @@ pub fn warrant_of_viewnode (
                 &pid_or_itself (graph, &container . skgid), &gnid,
                 RelationRole::new (NodeRelation::Contains, BinaryRolePosition::Second),
                 restriction ),
-            ViewnodeKind::PartnerFolder (folder) =>
+            ViewnodeKind::Folder (folder)
+              if ! folder . members_are_properties () =>
               folder_member_is_warranted (
-                parent, *folder, &gnid, graph, config, restriction ),
+                parent, folder, &gnid, graph, config, restriction ),
             _ => true, }}},
       ViewnodeKind::PropertyMember (property) =>
         // HEAD alone warrants a member with a ghost warrant; 'Warrant'
@@ -72,7 +73,7 @@ pub fn warrant_of_viewnode (
 /// an occurrence, or the folder names no relation.
 fn folder_member_is_warranted (
   folder      : NodeRef<Viewnode>,
-  kind        : PartnerFolder,
+  kind        : &Folder,
   member      : &ID,
   graph       : &InRustGraph,
   config      : &SkgConfig,
@@ -91,14 +92,14 @@ fn folder_member_is_warranted (
       RelationRole::new (relation, BinaryRolePosition::Second),
       restriction ) };
   match kind {
-    PartnerFolder::HiddenInSubscribee =>
+    Folder::HiddenInSubscribee =>
       // subscriber > subscribeeFolder > subscribee > this folder
       match (ancestor_gnid (0), ancestor_gnid (2)) {
         (Some (subscribee), Some (subscriber)) =>
           relates (&subscriber, NodeRelation::HidesFromSubs)
           && relates (&subscribee, NodeRelation::Contains),
         _ => true, },
-    PartnerFolder::HiddenOutsideOfSubscribee =>
+    Folder::HiddenOutsideOfSubscribee =>
       // subscriber > subscribeeFolder > this folder
       match ancestor_gnid (1) {
         Some (subscriber) => {

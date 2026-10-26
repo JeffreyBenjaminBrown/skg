@@ -57,7 +57,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_as_members, validate_membership_claims, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
-use crate::types::viewnode::{FolderRelation, PropertyMember, Vognode, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{FolderRelation, PropertyMember, Vognode, Folder, ViewRequest};
 use crate::update_buffer::ancestry::entombstone_generalized_orphan_folder;
 
 use ego_tree::{Tree, NodeId};
@@ -714,7 +714,7 @@ fn remove_id_folders (
   let id_folders : Vec<NodeId> =
     viewforest . root () . descendants ()
     . filter ( |node| matches! ( &node . value () . kind,
-                                 ViewnodeKind::PropertyFolder (PropertyFolder::ID) ))
+                                 ViewnodeKind::Folder (Folder::ID) ))
     . map ( |node| node . id () )
     . collect ();
   for folder in id_folders {

@@ -7,7 +7,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{RelationshipEditRequest, Existence, PartnerFolder, Phantom, PropertyMember, PropertyFolder, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{RelationshipEditRequest, Existence, Folder, Phantom, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -97,11 +97,12 @@ fn partnerFolder_differences_from_graph (
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Vec<String> {
   node . children () . filter_map ( |folder| {
-    let ViewnodeKind::PartnerFolder (kind) = &folder . value () . kind
+    let ViewnodeKind::Folder (kind) = &folder . value () . kind
       else { return None; };
+    if kind . members_are_properties () { return None; }
     let members_in_graph : HashSet<ID> =
       partnerFolder_members_in_graph (
-        graph, config, &graphnode . pid, *kind, skgrepo_restriction ) ?
+        graph, config, &graphnode . pid, kind, skgrepo_restriction ) ?
       . into_iter () . collect ();
     let members_in_view : Vec<(ID, Option<SkgrepoName>)> =
       partnerFolder_members_in_view (folder, graph);
@@ -109,7 +110,7 @@ fn partnerFolder_differences_from_graph (
       members_in_view . iter () . any ( |(_, request)| request . is_some () )
       || members_in_view . into_iter () . map ( |(skgid, _)| skgid )
          . collect::<HashSet<ID>> () != members_in_graph;
-    differs . then ( || changed_partners_phrase (*kind) . to_string () ) } )
+    differs . then ( || changed_partners_phrase (kind) . to_string () ) } )
     . collect () }
 
 /// The members of a partner folder, as the check of a write-protected
@@ -149,21 +150,23 @@ fn partnerFolder_members_in_view (
 
 /// How an error names a change to a partner folder of this kind.
 fn changed_partners_phrase (
-  kind : PartnerFolder,
+  kind : &Folder,
 ) -> &'static str {
   match kind {
-    PartnerFolder::Subscribee                => "changed subscriptions",
-    PartnerFolder::Subscriber                => "changed subscribers",
-    PartnerFolder::Overridden                => "changed overrides",
-    PartnerFolder::Overrider                 => "changed overriders",
-    PartnerFolder::Hider                     => "changed hiders",
-    PartnerFolder::Hidden                    => "changed hidden nodes",
-    PartnerFolder::Container                 => "changed containers",
-    PartnerFolder::Mentioner                 => "changed mentioners",
-    PartnerFolder::HiddenInSubscribee // Not checked: these have no
-      | PartnerFolder::HiddenOutsideOfSubscribee // relation member role.
-      | PartnerFolder::AcquiredBy
-      | PartnerFolder::Acquired              => "changed memberships", }}
+    Folder::Subscribee                => "changed subscriptions",
+    Folder::Subscriber                => "changed subscribers",
+    Folder::Overridden                => "changed overrides",
+    Folder::Overrider                 => "changed overriders",
+    Folder::Hider                     => "changed hiders",
+    Folder::Hidden                    => "changed hidden nodes",
+    Folder::Container                 => "changed containers",
+    Folder::Mentioner                 => "changed mentioners",
+    Folder::HiddenInSubscribee // Not checked: these have no
+      | Folder::HiddenOutsideOfSubscribee // relation member role.
+      | Folder::AcquiredBy
+      | Folder::Acquired              => "changed memberships",
+    Folder::Alias | Folder::ID | Folder::Flags { .. } => // not partner folders
+      "changed properties", }}
 
 /// The aliases in the occurrence's alias folder, in order, each with
 /// its relRepo request; None if it has no alias folder.
@@ -171,7 +174,7 @@ fn aliases_of_occurrence (
   node : NodeRef<Viewnode>,
 ) -> Option<Vec<(String, Option<SkgrepoName>)>> {
   node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
+    &child . value () . kind, ViewnodeKind::Folder (Folder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
       let ViewnodeKind::PropertyMember (PropertyMember::Alias { text, relationshipEditRequest, .. }) =
         &alias . value () . kind else { return None; };
@@ -217,7 +220,7 @@ fn collect_flags_surfaces (
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (recorder)) = &node . value () . kind {
     let folders : Vec<FlagsFolderSurface> = node . children ()
       . filter_map (|child| {
-        let ViewnodeKind::PropertyFolder (PropertyFolder::Flags {
+        let ViewnodeKind::Folder (Folder::Flags {
           title, body }) = &child . value () . kind
         else { return None; };
         let mut viewnodes : Vec<(Flag, String, Option<String>)> = Vec::new ();

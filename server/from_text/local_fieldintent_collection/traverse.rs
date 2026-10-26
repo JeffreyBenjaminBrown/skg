@@ -51,7 +51,7 @@ use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, 
-  NodeEditRequest, PropertyMember, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
+  NodeEditRequest, PropertyMember, Folder, UnrestrictedVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -101,23 +101,23 @@ fn visit (
       // stays total anyway.
       recurse_with_uniform_context (
         node_ref, &LocalContext::TopLevel, collected),
-    ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
+    ViewnodeKind::Folder (Folder::Alias) =>
       visit_aliasFolder (node_ref, context, collected),
-    // The two arms below are exactly the FolderPolicy::EditableSet
-    // PartnerFolders; the catch-all PartnerFolder arm after them covers the
-    // WriteProtectedSet and WriteProtectedCompound policies. If a new PartnerFolder is
-    // added, 'PartnerFolder::policy' says which group it joins.
-    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
+    // The three arms below, with the alias folder's above, are exactly
+    // the folders whose goal is ordered ('Folder::goal_is_ordered'): the
+    // ones whose membership the save reads. The catch-all folder arm
+    // after them covers the write-protected ones.
+    ViewnodeKind::Folder (Folder::Subscribee) =>
       visit_subscribee_folder (node_ref, context, collected),
-    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       visit_hiddenOutside_folder (node_ref, context, collected),
-    ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) =>
+    ViewnodeKind::Folder (Folder::Overridden) =>
       visit_overridden_folder (node_ref, context, collected),
-    ViewnodeKind::PropertyFolder (PropertyFolder::ID)
-      | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
+    ViewnodeKind::Folder (Folder::ID)
+      | ViewnodeKind::Folder (Folder::Flags { .. })
       | ViewnodeKind::PropertyMember (_)
       | ViewnodeKind::ChangeViewnode (_)
-      | ViewnodeKind::PartnerFolder (_) =>
+      | ViewnodeKind::Folder (_) =>
       // These are the write-protected folders and the Property leaves. Vognodes
       // found inside them are self-writers; their membership in the
       // folder is never read.
@@ -237,12 +237,12 @@ fn recurse_under_vognode (
   for child in node_ref . children() {
     let child_context : LocalContext =
       match &child . value() . kind {
-        ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
-          // The two PartnerFolders here are exactly the
-          // FolderPolicy::EditableSet ones; the write-protected policies fall
-          // to the UnderWriteProtectedFolder arm below.
-          | ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
-          | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) =>
+        ViewnodeKind::Folder (Folder::Alias)
+          // The two partner folders here are the relation-role ones
+          // whose goal is ordered; the write-protected folders fall to
+          // the UnderWriteProtectedFolder arm below.
+          | ViewnodeKind::Folder (Folder::Subscribee)
+          | ViewnodeKind::Folder (Folder::Overridden) =>
           match &recorder {
             Some (o) =>
               LocalContext::UnderDefiningFolder (o . clone()),
@@ -251,11 +251,11 @@ fn recurse_under_vognode (
               // the folder will stay silent.
               LocalContext::UnderVognode {
                 parent_if_editable : None } },
-        ViewnodeKind::PropertyFolder (
-          PropertyFolder::ID | PropertyFolder::Flags { .. })
+        ViewnodeKind::Folder (
+          Folder::ID | Folder::Flags { .. })
           | ViewnodeKind::PropertyMember (_)
           | ViewnodeKind::ChangeViewnode (_)
-          | ViewnodeKind::PartnerFolder (_) =>
+          | ViewnodeKind::Folder (_) =>
           LocalContext::UnderWriteProtectedFolder,
         _ =>
           LocalContext::UnderVognode {
@@ -320,7 +320,7 @@ fn visit_subscribee_folder (
       for child in node_ref . children() {
         let child_context : LocalContext =
           match &child . value() . kind {
-            ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+            ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
               LocalContext::HiddenOutsidePosition {
                 subscriber      : recorder . skgid . clone(),
                 is_saveEligible : recorder . is_saveEligible },

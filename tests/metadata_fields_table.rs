@@ -15,7 +15,7 @@ use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangesetMarkerKind, FolderRelation, NodeEditRequest,
-  PartnerFolder, PropertyMember, ChangeViewnode, PropertyFolder, ViewRequest};
+  Folder, PropertyMember, ChangeViewnode, ViewRequest};
 
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -70,29 +70,25 @@ fn every_kind_atom (
         | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
         | ChangeViewnode::ChangesetMarker { .. } => (), } }
-  let property_folders : Vec<PropertyFolder> = vec! [
-    PropertyFolder::Alias, PropertyFolder::ID, PropertyFolder::flags () ];
-  for folder in &property_folders {
+  let folders : Vec<Folder> = vec! [
+    Folder::Alias, Folder::ID, Folder::flags (),
+    Folder::Subscribee, Folder::Subscriber,
+    Folder::Overridden, Folder::Overrider,
+    Folder::Hider, Folder::Hidden,
+    Folder::HiddenInSubscribee,
+    Folder::HiddenOutsideOfSubscribee,
+    Folder::Container, Folder::Mentioner,
+    Folder::AcquiredBy, Folder::Acquired ];
+  for folder in &folders {
     match folder {
-      PropertyFolder::Alias | PropertyFolder::ID
-        | PropertyFolder::Flags { .. } => (), } }
-  let partner_folders : Vec<PartnerFolder> = vec! [
-    PartnerFolder::Subscribee, PartnerFolder::Subscriber,
-    PartnerFolder::Overridden, PartnerFolder::Overrider,
-    PartnerFolder::Hider, PartnerFolder::Hidden,
-    PartnerFolder::HiddenInSubscribee,
-    PartnerFolder::HiddenOutsideOfSubscribee,
-    PartnerFolder::Container, PartnerFolder::Mentioner,
-    PartnerFolder::AcquiredBy, PartnerFolder::Acquired ];
-  for folder in &partner_folders {
-    match folder {
-      PartnerFolder::Subscribee | PartnerFolder::Subscriber
-        | PartnerFolder::Overridden | PartnerFolder::Overrider
-        | PartnerFolder::Hider | PartnerFolder::Hidden
-        | PartnerFolder::HiddenInSubscribee
-        | PartnerFolder::HiddenOutsideOfSubscribee
-        | PartnerFolder::Container | PartnerFolder::Mentioner
-        | PartnerFolder::AcquiredBy | PartnerFolder::Acquired => (), } }
+      Folder::Alias | Folder::ID | Folder::Flags { .. }
+        | Folder::Subscribee | Folder::Subscriber
+        | Folder::Overridden | Folder::Overrider
+        | Folder::Hider | Folder::Hidden
+        | Folder::HiddenInSubscribee
+        | Folder::HiddenOutsideOfSubscribee
+        | Folder::Container | Folder::Mentioner
+        | Folder::AcquiredBy | Folder::Acquired => (), } }
   [ "node", "historical", "deleted", "unknown",
     "restrictedNode", "tombstone", "forestRoot" ]
     . iter () . map ( |atom| atom . to_string () )
@@ -100,9 +96,7 @@ fn every_kind_atom (
               . map ( |m| m . repr_in_client () . to_string () ))
     . chain ( changes . iter ()
               . map ( |c| c . repr_in_client () . to_string () ))
-    . chain ( property_folders . iter ()
-              . map ( |f| f . repr_in_client () . to_string () ))
-    . chain ( partner_folders . iter ()
+    . chain ( folders . iter ()
               . map ( |f| f . repr_in_client () . to_string () ))
     . collect () }
 

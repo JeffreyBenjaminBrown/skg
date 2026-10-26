@@ -24,7 +24,7 @@ use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  ChangeFacts, Existence, Phantom, PropertyMember, ChangeViewnode, PropertyFolder,
+  ChangeFacts, Existence, Phantom, PropertyMember, ChangeViewnode, Folder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, Unwarranted, convert_unwarranted_child};
 
@@ -59,13 +59,12 @@ pub fn match_key (
       Some ( MatchKey::Kind ( propertyMember_kind (member) )),
     ViewnodeKind::ChangeViewnode (change) =>
       Some ( MatchKey::Kind ( changeViewnode_kind (change) )),
-    ViewnodeKind::PropertyFolder (folder) =>
+    ViewnodeKind::Folder (folder) =>
       Some ( MatchKey::Kind ( match folder {
-        PropertyFolder::ID          => "idFolder",
-        PropertyFolder::Alias       => "aliasFolder",
-        PropertyFolder::Flags { .. } => "flagsFolder", } . to_string () )),
-    ViewnodeKind::PartnerFolder (folder) =>
-      Some ( MatchKey::Kind ( format! ("{:?}Folder", folder) )),
+        Folder::ID          => "idFolder" . to_string (),
+        Folder::Alias       => "aliasFolder" . to_string (),
+        Folder::Flags { .. } => "flagsFolder" . to_string (),
+        partner_folder => format! ("{:?}Folder", partner_folder), } )),
     ViewnodeKind::BufferRoot | ViewnodeKind::Tombstone => None, }}
 
 /// The key of a member. A member with a ghost warrant has its live
@@ -256,8 +255,7 @@ pub fn is_diffView_change_viewnode (
   match &viewnode . kind {
     ViewnodeKind::PropertyMember (_)
       | ViewnodeKind::ChangeViewnode (_)
-      | ViewnodeKind::PropertyFolder (_)
-      | ViewnodeKind::PartnerFolder (_)
+      | ViewnodeKind::Folder (_)
       | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       is_unrestricted_removed_member (viewnode)
@@ -277,8 +275,8 @@ fn goes_with_a_stale_viewparent (
   node : NodeRef<Viewnode>,
 ) -> bool {
   let is_folder_member : bool =
-    node . parent () . is_some_and ( |parent| matches! (
-      parent . value () . kind, ViewnodeKind::PartnerFolder (_) ))
+    node . parent () . is_some_and ( |parent|
+      parent . value () . kind . is_partner_folder () )
     && match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         t . claimsMembership,

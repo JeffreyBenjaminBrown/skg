@@ -20,7 +20,7 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::SkgrepoName;
 use crate::types::viewnode::{
-  mk_restricted_viewnode, PartnerFolder, Phantom, PropertyFolder, Viewnode,
+  mk_restricted_viewnode, Folder, Phantom, Viewnode,
   ViewnodeKind, Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
@@ -91,7 +91,7 @@ fn recorder_home_skgrepo (
 ) -> Option<SkgrepoName> {
   let parent : NodeRef<Viewnode> = node . parent () ?;
   let recorder : NodeRef<Viewnode> = match &parent . value () . kind {
-    ViewnodeKind::PartnerFolder (_) | ViewnodeKind::PropertyFolder (_) =>
+    ViewnodeKind::Folder (_) =>
       parent . parent () ?,
     _ => parent, };
   match &recorder . value () . kind {
@@ -145,21 +145,21 @@ fn should_prune (
       is_leaf,
     ViewnodeKind::PropertyMember (_) | ViewnodeKind::ChangeViewnode (_) =>
       is_leaf && grandparent_is_restricted,
-    ViewnodeKind::PropertyFolder (PropertyFolder::ID)
-      | ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
-      | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::Folder (Folder::ID)
+      | ViewnodeKind::Folder (Folder::Alias)
+      | ViewnodeKind::Folder (Folder::Flags { .. })
+      | ViewnodeKind::Folder (Folder::Subscribee)
+      | ViewnodeKind::Folder (Folder::Subscriber)
+      | ViewnodeKind::Folder (Folder::Overridden)
+      | ViewnodeKind::Folder (Folder::Overrider)
+      | ViewnodeKind::Folder (Folder::Hider)
+      | ViewnodeKind::Folder (Folder::Hidden)
+      | ViewnodeKind::Folder (Folder::Container)
+      | ViewnodeKind::Folder (Folder::Mentioner)
+      | ViewnodeKind::Folder (Folder::AcquiredBy)
+      | ViewnodeKind::Folder (Folder::Acquired)
+      | ViewnodeKind::Folder (Folder::HiddenInSubscribee)
+      | ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       is_leaf && had_children, // emptied: its children were pruned first
     ViewnodeKind::Tombstone =>
       is_leaf,

@@ -21,7 +21,7 @@ use crate::to_org::extend::containerward_chain::ContainerwardChainPartners;
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  DiffChange, Existence, FolderPolicy, PartnerFolder, Viewnode,
+  DiffChange, Existence, Folder, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
   folder_viewnode_id_of, push_repair_warnings,
@@ -41,7 +41,7 @@ use std::error::Error;
 pub fn reconcile_partnerFolder_children_from_graph_straddle (
   node         : NodeId,
   tree         : &mut Tree<Viewnode>,
-  kind         : PartnerFolder,
+  kind         : &Folder,
   straddle     : &GraphStraddle,
   viewparent_pid : &ID,
   member_role  : RelationRole,
@@ -51,13 +51,14 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
 ) -> Result<(), Box<dyn Error>> {
   let partners : Vec<Partner> =
     straddle . partners (viewparent_pid, member_role);
-  let editable_set : bool = kind . policy () == FolderPolicy::EditableSet;
+  let editable_set : bool = // the save reads the membership
+    kind . goal_is_ordered ();
   let items : Vec<FolderGoalItem> =
     partners . iter ()
     . filter_map ( |partner| straddle_goal_item (straddle, partner, editable_set) )
     . collect ();
-  let goal_items : Vec<FolderGoalItem> = match kind . policy () {
-    FolderPolicy::WriteProtectedSet => {
+  let goal_items : Vec<FolderGoalItem> = match kind . goal_is_ordered () {
+    false => {
       let members : Vec<ID> =
         items . iter () . map ( |item| item . skgid . clone () ) . collect ();
       let ordered : Vec<ID> = view_order_preserving_goal_list (
@@ -67,7 +68,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
       ordered . iter ()
         . filter_map ( |skgid| by_skgid . get (skgid) . map ( |item| (*item) . clone () ))
         . collect () },
-    _ => items, };
+    true => items, };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &goal_items, &HashMap::new (), runtime ) ?;
@@ -77,7 +78,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
       deleted_by_this_save_extra_ids ) ?;
   attach_chains_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
-  if kind . policy () != FolderPolicy::EditableSet {
+  if ! kind . goal_is_ordered () {
     if let Some (sink) = warning_sink {
       push_repair_warnings (
         sink, kind, viewparent_pid,
@@ -89,7 +90,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
 /// relationship is only in the before-graph is removed (a non-member
 /// with '(rel removed)', the one encoding of a removed relationship);
 /// any other is a member. In a folder whose membership the save reads
-/// (an EditableSet), a removed member that is dangling is not shown at
+/// (one whose goal is ordered), a removed member that is dangling is not shown at
 /// all, since an unknown phantom there would read back as a member.
 fn straddle_goal_item (
   straddle     : &GraphStraddle,
@@ -121,7 +122,7 @@ fn straddle_goal_item (
 fn attach_chains_under_straddle_folder_members (
   tree        : &mut Tree<Viewnode>,
   folder      : NodeId,
-  kind        : PartnerFolder,
+  kind        : &Folder,
   member_role : RelationRole,
   straddle    : &GraphStraddle,
   partners    : &[Partner],

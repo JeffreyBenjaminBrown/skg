@@ -8,26 +8,31 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::{MpViewForest, ViewForest, editable_occurrences};
 use std::collections::HashMap;
 
-// 'PartnerFolder::policy' is the single source of truth for how each
-// folder's membership relates to user edits; this pins the mapping.
+// 'Folder::goal_is_ordered' and 'Folder::members_are_properties' are
+// the per-kind facts that the save, the reconcilers and the heralds
+// consult; this pins them.
 #[test]
-fn partnerFolder_policy_mapping () {
-  assert_eq! ( PartnerFolder::Subscribee . policy (),
-               FolderPolicy::EditableSet );
-  assert_eq! ( PartnerFolder::Overridden . policy (),
-               FolderPolicy::EditableSet );
-  assert_eq! ( PartnerFolder::Subscriber . policy (),
-               FolderPolicy::WriteProtectedSet );
-  assert_eq! ( PartnerFolder::Overrider . policy (),
-               FolderPolicy::WriteProtectedSet );
-  assert_eq! ( PartnerFolder::Hider . policy (),
-               FolderPolicy::WriteProtectedSet );
-  assert_eq! ( PartnerFolder::Hidden . policy (),
-               FolderPolicy::WriteProtectedSet );
-  assert_eq! ( PartnerFolder::HiddenInSubscribee . policy (),
-               FolderPolicy::WriteProtectedCompound );
-  assert_eq! ( PartnerFolder::HiddenOutsideOfSubscribee . policy (),
-               FolderPolicy::EditableCompound ); }
+fn folder_kind_facts () {
+  let ordered : Vec<Folder> = vec! [
+    Folder::Subscribee, Folder::Overridden,
+    Folder::HiddenOutsideOfSubscribee, Folder::Alias ];
+  let unordered : Vec<Folder> = vec! [
+    Folder::Subscriber, Folder::Overrider, Folder::Hider, Folder::Hidden,
+    Folder::HiddenInSubscribee, Folder::Container, Folder::Mentioner,
+    Folder::AcquiredBy, Folder::Acquired, Folder::ID, Folder::flags () ];
+  for folder in &ordered {
+    assert! ( folder . goal_is_ordered (), "{:?}", folder ); }
+  for folder in &unordered {
+    assert! ( ! folder . goal_is_ordered (), "{:?}", folder ); }
+  for folder in ordered . iter () . chain (&unordered) {
+    assert_eq! ( folder . members_are_properties (),
+                 matches! ( folder,
+                            Folder::Alias | Folder::ID | Folder::Flags { .. } ),
+                 "{:?}", folder );
+    assert_eq! ( Folder::from_client_string (folder . repr_in_client ()),
+                 Some ( match folder { Folder::Flags { .. } => Folder::flags (),
+                                       other => other . clone () } ),
+                 "{:?}", folder ); } }
 
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
@@ -127,7 +132,7 @@ fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
   let root : ego_tree::NodeId =
     tree . get_mut (buffer_root) . unwrap () . append (editable ("root")) . id ();
   let folder : ego_tree::NodeId = tree . get_mut (root) . unwrap ()
-    . append ( viewnode_of ( ViewnodeKind::PartnerFolder (PartnerFolder::Container) ))
+    . append ( viewnode_of ( ViewnodeKind::Folder (Folder::Container) ))
     . id ();
   tree . get_mut (folder) . unwrap () . append (editable ("in-folder"));
   tree . get_mut (root) . unwrap () . append (editable ("member"));
@@ -165,8 +170,8 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     mk_unknown_viewnode (ID::from ("u")),
     mk_restricted_viewnode (),
     viewnode_of (ViewnodeKind::Tombstone),
-    viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)),
-    viewnode_of (ViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
+    viewnode_of (ViewnodeKind::Folder (Folder::Container)),
+    viewnode_of (ViewnodeKind::Folder (Folder::Alias)),
     viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
       text : "an alias" . into (), relRepo : None, relationshipEditRequest : None })),
     viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (

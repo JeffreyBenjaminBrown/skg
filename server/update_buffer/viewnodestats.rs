@@ -6,7 +6,7 @@ use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-  GraphnodeStats, PartnerFolder, Viewnode, ViewnodeKind, Vognode, Warrant };
+  GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
 use crate::update_buffer::warrant::warrant_of_viewnode;
@@ -99,7 +99,7 @@ fn set_viewnodestats_recursive (
 /// distances.
 enum ParentKind {
   Vognode (ID),                 // an Unrestricted vognode parent
-  Folder (PartnerFolder, NodeId),   // a PartnerFolder parent (its treeid)
+  Folder (Folder, NodeId),   // a partner folder parent (its treeid)
   Other,
 }
 
@@ -146,7 +146,7 @@ fn set_herald_strings_in_viewnode (
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
     if claimsMembership
-      && matches! (parent_kind, ParentKind::Folder (PartnerFolder::Subscribee, _)) {
+      && matches! (parent_kind, ParentKind::Folder (Folder::Subscribee, _)) {
       graph . and_then (|g| {
         let subscriber_pid : &ID = &ancestors . iter ()
           . find (|(_, generation)| *generation == 2) ? . 0;
@@ -191,7 +191,7 @@ fn subscriber_above_subscribee_viewparent (
   let subscribee : NodeRef<Viewnode> = tree . get (treeid) ? . parent () ?;
   let folder : NodeRef<Viewnode> = subscribee . parent () ?;
   if ! matches! ( &folder . value () . kind,
-                  ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) )
+                  ViewnodeKind::Folder (Folder::Subscribee) )
   { return None; }
   unrestricted_vognode_pid (tree, subscribee . id ()) ?;
   unrestricted_vognode_pid (tree, folder . parent () ? . id ()) }
@@ -205,8 +205,8 @@ fn parent_kind_of (
   match & parent_ref . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       ParentKind::Vognode ( t . skgid . clone () ),
-    ViewnodeKind::PartnerFolder (folder) =>
-      ParentKind::Folder ( *folder, parent_ref . id () ),
+    ViewnodeKind::Folder (folder) if ! folder . members_are_properties () =>
+      ParentKind::Folder ( folder . clone (), parent_ref . id () ),
     _ => ParentKind::Other, } }
 
 /// The (pid, generation) of each tracked ancestor: the viewparent
@@ -314,7 +314,7 @@ fn birth_facts (
           if flags . contains_in . contains (&1) {
             vec![ BirthFact::new ( NodeRelation::Contains, Side::In, Some (1) ) ]
           } else { Vec::new () },
-        ParentKind::Folder (folder, _) => birth_facts_for_folder (*folder),
+        ParentKind::Folder (folder, _) => birth_facts_for_folder (folder),
         ParentKind::Other => Vec::new (), }}};
   if overridesHere
     && ! facts . iter () . any ( |fact|
@@ -338,14 +338,14 @@ fn side_of_role (
 /// levels deeper under the subscriber. (The table of birth facts is in
 /// docs/api-and-formats.org.)
 fn birth_facts_for_folder (
-  folder : PartnerFolder,
+  folder : &Folder,
 ) -> Vec<BirthFact> {
   match folder {
-    PartnerFolder::Subscribee | PartnerFolder::Subscriber
-    | PartnerFolder::Overridden | PartnerFolder::Overrider
-    | PartnerFolder::Hider | PartnerFolder::Hidden
-    | PartnerFolder::Container | PartnerFolder::Mentioner
-    | PartnerFolder::AcquiredBy | PartnerFolder::Acquired =>
+    Folder::Subscribee | Folder::Subscriber
+    | Folder::Overridden | Folder::Overrider
+    | Folder::Hider | Folder::Hidden
+    | Folder::Container | Folder::Mentioner
+    | Folder::AcquiredBy | Folder::Acquired =>
       match folder . relation_member_role () {
         Some (role) => vec![ BirthFact::new (
           role . relation, side_of_role (role), Some (2) ) ],
@@ -358,13 +358,15 @@ fn birth_facts_for_folder (
     //   subscriber > subscribeeFolder
     //     > hiddenOutsideOfSubscribeeFolder > member
     // the subscriber (generation 3) hides it.
-    PartnerFolder::HiddenInSubscribee =>
+    Folder::HiddenInSubscribee =>
       vec![ BirthFact::new (
               NodeRelation::HidesFromSubs, Side::In, Some (4) ),
             BirthFact::new ( NodeRelation::Contains, Side::In, Some (2) ) ],
-    PartnerFolder::HiddenOutsideOfSubscribee =>
+    Folder::HiddenOutsideOfSubscribee =>
       vec![ BirthFact::new (
-              NodeRelation::HidesFromSubs, Side::In, Some (3) ) ], } }
+              NodeRelation::HidesFromSubs, Side::In, Some (3) ) ],
+    // 'ParentKind::Folder' holds partner folders only.
+    Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (), } }
 
 /// Sets 'isWarranted' on the unrestricted vognode at treeid (see
 /// 'warrant_of_viewnode'). Warranted without a graph handle (some

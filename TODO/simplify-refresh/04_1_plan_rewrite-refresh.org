@@ -815,7 +815,7 @@ for now; the herald table moves ⊥ to it; 'docs/heralds.org'
 and the rendering cases follow. Tests: a unit test per
 position kind for the warrant; the herald conformance test;
 the fixpoint harness unchanged. The old walk is untouched.
-** TODO Slice 1: regroup the types
+** DONE Slice 1: regroup the types
 'FoldAndFocus' replaces the three position fields;
 'RelationshipEditRequest' replaces 'relRepo_request' and
 'restoreRel_request' on the occurrence, the unknown and the

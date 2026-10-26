@@ -19,7 +19,7 @@ use crate::to_org::complete::partner_folder::{
   maybe_add_one_partnerFolder, maybe_add_subscribeeFolder_branch };
 use crate::to_org::util::remove_completed_view_request;
 use crate::types::misc::SkgConfig;
-use crate::types::viewnode::{Viewnode, ViewRequest, FolderRelation, PartnerFolder};
+use crate::types::viewnode::{Viewnode, ViewRequest, FolderRelation, Folder};
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
@@ -64,19 +64,19 @@ fn build_and_integrate_folder (
     FolderRelation::Overrides => {
       // overriddenFolder (writable) -- forced empty; overriderFolder (write-protected).
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Overridden, config, graph,
+        tree, treeid, &Folder::Overridden, config, graph,
         skgrepo_restriction, true ) ?;
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Overrider, config, graph,
+        tree, treeid, &Folder::Overrider, config, graph,
         skgrepo_restriction, false ) ?; },
     FolderRelation::HidesFromSubs => {
       // Both sides write-protected: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden folder.
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Hider, config, graph,
+        tree, treeid, &Folder::Hider, config, graph,
         skgrepo_restriction, false ) ?;
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Hidden, config, graph,
+        tree, treeid, &Folder::Hidden, config, graph,
         skgrepo_restriction, false ) ?; },
     FolderRelation::SubscribesTo => {
       // subscribeeFolder (writable) -- forced empty; subscriberFolder (write-protected).
@@ -84,16 +84,16 @@ fn build_and_integrate_folder (
         tree, treeid, graph, config,
         skgrepo_restriction, true ) ?;
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Subscriber, config, graph,
+        tree, treeid, &Folder::Subscriber, config, graph,
         skgrepo_restriction, false ) ?; },
     FolderRelation::Containers =>
       // The other side, its content, is shown without a folder.
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Container, config, graph,
+        tree, treeid, &Folder::Container, config, graph,
         skgrepo_restriction, false ) ?,
     FolderRelation::Mentioners =>
       // The other side, its links, lives in its text.
       maybe_add_one_partnerFolder (
-        tree, treeid, PartnerFolder::Mentioner, config, graph,
+        tree, treeid, &Folder::Mentioner, config, graph,
         skgrepo_restriction, false ) ?, }
   Ok (( )) }

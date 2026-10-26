@@ -245,9 +245,10 @@ member's relationship moved to another skgrepo, hangs that move
 The alias, ID and flags folders, drawn when their list changed,
 hold the union of the two lists in the order of their interleaved
 diff, each entry tagged '(rel added)' (+) or '(rel removed)' (-),
-its existence in the list. A lost alias or ID is its own kind,
-'Property::RemovedAlias' or 'Property::RemovedID', which the save never
-reads. Each entry is one leaf.
+its existence in the list. A lost alias or ID is an alias or ID
+member with a ghost warrant, written '(rel removed)'
+('Viewnode::is_ghostWarranted'), which the save never reads. Each
+entry is one leaf.
 
 A property folder is matched by its kind among all the children of
 its node, so a folder the user requested becomes the changed one

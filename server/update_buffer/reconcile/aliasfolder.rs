@@ -3,7 +3,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{Vognode, PropertyFolder, PropertyMember, viewnode_of};
+use crate::types::viewnode::{Vognode, Folder, PropertyMember, viewnode_of};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::util::{KeptChildOrder, complete_managed_children_in_viewforest, treat_certain_children};
@@ -37,7 +37,7 @@ pub fn reconcile_aliasFolder_children (
       read_at_ancestor_in_tree(
         tree, aliasfolder_treeid, 0,
         |viewnode| matches!( &viewnode . kind,
-                            ViewnodeKind::PropertyFolder (PropertyFolder::Alias)) )
+                            ViewnodeKind::Folder (Folder::Alias)) )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliasFolder { return Err(
       "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}

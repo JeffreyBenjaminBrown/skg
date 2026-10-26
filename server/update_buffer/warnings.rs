@@ -11,7 +11,7 @@
 
 use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
-use crate::types::viewnode::{PartnerFolder, ViewnodeId};
+use crate::types::viewnode::{Folder, ViewnodeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RepairKind {
@@ -24,7 +24,7 @@ pub enum RepairKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompletionWarning {
   FolderRepair {
-    folder      : PartnerFolder,
+    folder      : Folder,
     recorder : ID, // the node the folder belongs to (its UnrestrictedVognode parent)
     folder_viewnode_id : Option<ViewnodeId>, // the folder's viewnode ID; None for a folder the user typed
     repair   : RepairKind,
@@ -40,11 +40,11 @@ pub fn render_completion_warnings (
 ) -> Vec<String> {
   let mut rendered : Vec<String> = Vec::new ();
   { // the ColRepairs, batched
-    let mut group_order : Vec<(PartnerFolder, ID, Option<ViewnodeId>)> = Vec::new ();
+    let mut group_order : Vec<(Folder, ID, Option<ViewnodeId>)> = Vec::new ();
     for w in warnings {
       let CompletionWarning::FolderRepair { folder, recorder, folder_viewnode_id, .. } = w;
-      let key : (PartnerFolder, ID, Option<ViewnodeId>) =
-        ( *folder, recorder . clone (), folder_viewnode_id . clone () );
+      let key : (Folder, ID, Option<ViewnodeId>) =
+        ( folder . clone (), recorder . clone (), folder_viewnode_id . clone () );
       if ! group_order . contains (&key) {
         group_order . push (key); } }
     for (folder, recorder, folder_viewnode_id) in &group_order {

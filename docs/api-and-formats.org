@@ -1377,7 +1377,7 @@ The metadata grammar (which keys are recognized and how they're
 parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
 =server/types/viewnode.rs= (=Viewnode=, =ViewnodeKind=, =Vognode=,
-=PropertyFolder=, =Property=, =PartnerFolder=, and the diff view's
+=Folder=, =PropertyMember=, the diff view's =ChangeViewnode=, and its
 =ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
 
 Every viewnode's metadata ends with its viewnode ID, =(vnid X)=, where
@@ -1404,8 +1404,8 @@ is determined by =elisp/heralds-minor-mode.el=, whose rule table is
 served by Rust (see "Herald rules" above; the table lives in
 =server/heralds.rs=).
 
-PartnerFolders are represented in Rust as
-=ViewnodeKind::PartnerFolder (PartnerFolder)=, but their external metadata
+Partner folders are represented in Rust as
+=ViewnodeKind::Folder (Folder)=, but their external metadata
 remains the established bare non-vognode atom:
 =subscribeeFolder=, =subscriberFolder=, =overriddenFolder=, =overriderFolder=,
 =hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=,
@@ -1455,8 +1455,8 @@ folder it is the relationship, of the folder's kind, between the
 member and the folder's viewparent (the two compound partner folders
 carry none). On an alias, id or flag leaf, the single diff object is written
 =(rel added)= or =(rel removed)=: the entry's existence in its list. A
-lost alias or ID is a =removedAlias= or =removedID= leaf (below),
-whose =(rel removed)= is display only.
+lost alias or ID (below) is an alias or id leaf carrying =(rel
+removed)=, which marks it as one the save does not read.
 **** =(properties changed)= -- the node's other properties
 The node is in both graphs and its file records a change ("modified",
 herald =M=), on a member, a removed member, a folder member or a
@@ -1529,10 +1529,10 @@ that =all= names every leaf a modified node records, so one gesture on
 it marks its file.
 
 *** The diff view's viewnodes
-**** =removedAlias=, =removedID= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
+**** =alias=, =id= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
 Its headline is the alias or the ID, carrying
-=(diff (rel removed) ...)=. Saving reads no alias from it and does
-not count it among the node's IDs.
+=(diff (rel removed) ...)=: a member with a ghost warrant. Saving
+reads no alias from it and does not count it among the node's IDs.
 **** =(historical (id ID) (repo REPO) ...)= -- a historical phantom
 It is a node HEAD has and the worktree lacks, with HEAD's title and
 body. It has the grammar of =(deleted ...)=, and may also carry
@@ -1572,7 +1572,7 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 (skg (node (id 8) (repo main) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (ready all))))
 (skg (node (id 9) (repo main) noClaim writeProtected (diff (rel removed) (leaves 1 rel))))
 (skg alias (diff (rel added) (leaves 1) (readyRequest)))
-(skg removedAlias (diff (rel removed) (leaves 1) (ready)))
+(skg alias (diff (rel removed) (leaves 1) (ready)))
 (skg (historical (id 4) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel))))
 (skg (oldText title) (diff (leaves 1) (ready)))
 (skg (changesetMarker content) (diff (leaves 3 all) (ready all)))

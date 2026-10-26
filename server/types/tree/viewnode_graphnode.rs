@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, viewnode_of };
-use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
+use crate::types::viewnode::{Vognode, Phantom, Folder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::MpVognode;
@@ -107,7 +107,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     node_ref . parent ()
     . ok_or ("Subscribee has no parent (SubscribeeFolder)") ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) {
+                  ViewnodeKind::Folder (Folder::Subscribee)) {
     return Err ( "Subscribee's parent is not a SubscribeeFolder" .
                  into () ); }
   let grandparent_ref : NodeRef < Viewnode > =

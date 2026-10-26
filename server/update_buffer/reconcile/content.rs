@@ -15,7 +15,7 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, PhantomDeleted, Editability,
     ViewRequest, mk_editable_viewnode};
-use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
+use crate::types::viewnode::{Vognode, Phantom, Folder};
 use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_graphnode::{
@@ -446,8 +446,8 @@ fn is_overridden_shown_raw (
     let parent_is_raw_showing_folder : bool =
       read_at_ancestor_in_tree( tree, node, 1,
         |vn : &Viewnode| match &vn . kind {
-          ViewnodeKind::PartnerFolder (pc)
-            => ! matches!( pc, PartnerFolder::Subscribee ),
+          ViewnodeKind::Folder (pc) if ! pc . members_are_properties ()
+            => ! matches!( pc, Folder::Subscribee ),
           _ => false } )
       . unwrap_or (false);
     let is_view_root : bool =
@@ -488,7 +488,7 @@ fn is_subscribee (
   let parent_is_subscribeeFolder : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &Viewnode| matches!( &vn . kind,
-        ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
+        ViewnodeKind::Folder (Folder::Subscribee)))
     . unwrap_or (false);
   Ok( is_member_of_parent && parent_is_subscribeeFolder ) }
 
@@ -749,10 +749,9 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
       |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::PropertyFolder (_)
+        ViewnodeKind::Folder (_)
           | ViewnodeKind::PropertyMember (_)
           | ViewnodeKind::ChangeViewnode (_)
-          | ViewnodeKind::PartnerFolder (_)
           | ViewnodeKind::BufferRoot
           | ViewnodeKind::Tombstone                => 0,
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))

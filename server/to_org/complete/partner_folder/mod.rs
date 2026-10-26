@@ -12,7 +12,7 @@ use crate::to_org::complete::partner_folder::child_data::{
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Folder};
 use crate::types::viewnode::{Vognode};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::{
@@ -82,7 +82,7 @@ pub fn type_and_parent_type_consistent_with_subscribee (
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
-              ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
+              ViewnodeKind::Folder (Folder::Subscribee)))
     . unwrap_or (false);
   Ok ( is_unrestrictedVognode_and_member
        && parent_is_subscribeeFolder ) }
@@ -117,7 +117,7 @@ pub fn maybe_add_subscribeeFolder_branch (
   { // Pre-existing SubscribeeFolder children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribeeFolder_children'.
     if unique_non_vognode_child_of_viewnode (
       tree, treeid,
-      &ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) )? . is_some ()
+      &ViewnodeKind::Folder (Folder::Subscribee) )? . is_some ()
     { return Ok (( )); }}
   let subscriber_pid : ID =
     read_at_node_in_tree (
@@ -166,20 +166,20 @@ pub fn maybe_add_subscribeeFolder_branch (
 
   let subscribee_folder_treeid : NodeId =
     insert_non_vognode_as_child ( tree, treeid,
-      ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee), true ) ?;
+      ViewnodeKind::Folder (Folder::Subscribee), true ) ?;
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &subscribee_skgids, graph, config ) ?;
     reconcile_partnerFolder_children_against_goal_list (
       tree, subscribee_folder_treeid,
-      PartnerFolder::Subscribee,
+      &Folder::Subscribee,
       &FolderGoalItem::live_members (&goal), &data, graph ) ?; }
   if ! hidden_outside_content . is_empty () {
     // HiddenOutsideOfSubscribeeFolder presents last, if it exists.
     let hidden_outside_folder_treeid : NodeId =
       insert_non_vognode_as_child (
         tree, subscribee_folder_treeid,
-        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
+        ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee),
         false ) ?;
     with_node_mut ( tree, hidden_outside_folder_treeid,
       |mut n| {
@@ -195,7 +195,7 @@ pub fn maybe_add_subscribeeFolder_branch (
         &hidden_outside_skgids, graph, config ) ?;
     reconcile_partnerFolder_children_against_goal_list (
       tree, hidden_outside_folder_treeid,
-      PartnerFolder::HiddenOutsideOfSubscribee,
+      &Folder::HiddenOutsideOfSubscribee,
       &FolderGoalItem::live_members (&goal), &data, graph ) ?; }
   Ok (( )) }
 
@@ -238,14 +238,14 @@ pub fn maybe_add_default_partnerFolder_branches (
 pub fn maybe_add_one_partnerFolder (
   tree    : &mut Tree<Viewnode>,
   treeid                  : NodeId,
-  kind    : PartnerFolder,
+  kind    : &Folder,
   config  : &SkgConfig,
   graph   : &InRustGraph,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   force_create_when_empty : bool,
 ) -> Result < (), Box<dyn Error> > {
   if unique_non_vognode_child_of_viewnode (
-      tree, treeid, &ViewnodeKind::PartnerFolder (kind)
+      tree, treeid, &ViewnodeKind::Folder (kind . clone ())
     )? . is_some ()
   { // There already is one. Don't create a new one.
     return Ok (( )); }
@@ -278,7 +278,7 @@ pub fn maybe_add_one_partnerFolder (
     return Ok (( )); }
   let folder_treeid : NodeId =
     insert_non_vognode_as_child (
-      tree, treeid, ViewnodeKind::PartnerFolder (kind), true ) ?;
+      tree, treeid, ViewnodeKind::Folder (kind . clone ()), true ) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &member_skgids, graph, config ) ?;
@@ -304,7 +304,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   if unique_non_vognode_child_of_viewnode (
       // Pre-existing HiddenIn folders are instead reconciled by the rerender pipeline's 'reconcile_hiddenIn_folders', which dispatches to 'reconcile_hiddenInSubscribeeFolder_children'.
        tree, subscribee_treeid,
-       &ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
+       &ViewnodeKind::Folder (Folder::HiddenInSubscribee)
      )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
@@ -341,7 +341,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   let hidden_folder_treeid : NodeId =
     insert_non_vognode_as_child (
       tree, subscribee_treeid,
-      ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee),
+      ViewnodeKind::Folder (Folder::HiddenInSubscribee),
       true ) ?;
   with_node_mut ( tree, hidden_folder_treeid,
     |mut n| {
@@ -355,6 +355,6 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
       &hidden_in_skgids, graph, config ) ?;
   reconcile_partnerFolder_children_against_goal_list (
     tree, hidden_folder_treeid,
-    PartnerFolder::HiddenInSubscribee,
+    &Folder::HiddenInSubscribee,
     &FolderGoalItem::live_members (&goal), &data, graph ) ?;
   Ok (( )) }

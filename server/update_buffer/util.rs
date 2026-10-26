@@ -170,8 +170,8 @@ pub enum KeptChildOrder {
   Unmoved,
   /// For a list whose order is a graph fact the save writes: the
   /// content of a node and the folders whose membership the save
-  /// reads (the alias folder, and the partner folders of the editable
-  /// 'FolderPolicy's). The unmanaged children go first, then the
+  /// reads (the folders whose goal is ordered,
+  /// 'Folder::goal_is_ordered'). The unmanaged children go first, then the
   /// managed ones in the goal list's order, so that a view other than
   /// the one saved follows a reorder saved elsewhere. In the view just
   /// saved the two orders agree, since the save wrote the buffer's.

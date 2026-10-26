@@ -38,7 +38,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ FoldAndFocus, Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
-use crate::types::viewnode::{PropertyFolder, PropertyMember, viewnode_of};
+use crate::types::viewnode::{Folder, PropertyMember, viewnode_of};
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -679,7 +679,7 @@ pub fn build_search_viewforest (
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( Viewnode {
             foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
-            .. viewnode_of ( ViewnodeKind::PropertyFolder (PropertyFolder::Alias) ) } )
+            .. viewnode_of ( ViewnodeKind::Folder (Folder::Alias) ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
           let mut aliasfolder_mut : NodeMut<Viewnode> =

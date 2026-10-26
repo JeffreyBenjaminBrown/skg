@@ -1,7 +1,7 @@
 //! Death-leafward: a folder self-checks its required ancestry at its BFS visit.
 //!
 //! In the
-//! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: PropertyFolder,
+//! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: &Folder,
 //! PartnerFolder) is reconciled at its own visit, and that reconcile reads its
 //! ancestor vognode(s). If a required ancestor died this save, the read would
 //! hit a missing Graphnode, return Err, and abort the whole (often
@@ -29,7 +29,7 @@
 
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::viewnode::{ PartnerFolder, Phantom, Viewnode, ViewnodeKind, Vognode };
+use crate::types::viewnode::{ Folder, Phantom, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::{Unwarranted, convert_unwarranted_child};
 
 use ego_tree::{ NodeId, NodeRef, Tree };
@@ -37,13 +37,13 @@ use std::error::Error;
 
 /// One position in a folder's required ancestry (the table below). A position is matched
 /// against the *actual ancestor at that tree depth*.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ExpectedAncestor {
   /// Must be a `Vognode::Unrestricted` (anything else at this depth means death).
   NormalVognode,
   /// Must be exactly this folder kind (a folder is a collecting non-vognode; see 'is_folder_kind'). The
   /// only intermediate-chain folder the table uses is the SubscribeeFolder.
-  Folder (PartnerFolder),
+  Folder (Folder),
   /// Must be a `Phantom::Historical` (the parent of an AcquiredBy folder).
   HistoricalPhantom,
 }
@@ -53,11 +53,11 @@ enum ExpectedAncestor {
 const ANC_NORMAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode ];
 const ANC_HIDDEN_OUTSIDE : &[ExpectedAncestor] =
-  &[ ExpectedAncestor::Folder (PartnerFolder::Subscribee),
+  &[ ExpectedAncestor::Folder (Folder::Subscribee),
      ExpectedAncestor::NormalVognode ];
 const ANC_HIDDEN_IN : &[ExpectedAncestor] =
   &[ ExpectedAncestor::NormalVognode,
-     ExpectedAncestor::Folder (PartnerFolder::Subscribee),
+     ExpectedAncestor::Folder (Folder::Subscribee),
      ExpectedAncestor::NormalVognode ];
 const ANC_HISTORICAL : &[ExpectedAncestor] =
   &[ ExpectedAncestor::HistoricalPhantom ];
@@ -69,25 +69,26 @@ fn required_ancestry (
   kind : &ViewnodeKind,
 ) -> &'static [ExpectedAncestor] {
   match kind {
-    // PropertyFolder(Alias) and PropertyFolder(ID): parent Unrestricted vognode.
-    ViewnodeKind::PropertyFolder (_) => ANC_NORMAL,
+    // The property folders: parent Unrestricted vognode.
+    ViewnodeKind::Folder (Folder::Alias | Folder::ID | Folder::Flags { .. }) =>
+      ANC_NORMAL,
     // Subscribee folder: parent = subscriber (Unrestricted).
     // PartnerFolders (Subscriber/Overridden/Overrider/Hider/Hidden): parent
     // Unrestricted vognode.
-    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Container)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)
-      | ViewnodeKind::PartnerFolder (PartnerFolder::Acquired) => ANC_NORMAL,
-    ViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy) =>
+    ViewnodeKind::Folder (Folder::Subscribee)
+      | ViewnodeKind::Folder (Folder::Subscriber)
+      | ViewnodeKind::Folder (Folder::Overridden)
+      | ViewnodeKind::Folder (Folder::Overrider)
+      | ViewnodeKind::Folder (Folder::Hider)
+      | ViewnodeKind::Folder (Folder::Hidden)
+      | ViewnodeKind::Folder (Folder::Container)
+      | ViewnodeKind::Folder (Folder::Mentioner)
+      | ViewnodeKind::Folder (Folder::Acquired) => ANC_NORMAL,
+    ViewnodeKind::Folder (Folder::AcquiredBy) =>
       ANC_HISTORICAL,
-    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       ANC_HIDDEN_OUTSIDE,
-    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
+    ViewnodeKind::Folder (Folder::HiddenInSubscribee) =>
       ANC_HIDDEN_IN,
     _ => ANC_NONE,
   } }
@@ -100,14 +101,14 @@ fn matches_expected (
     ExpectedAncestor::NormalVognode =>
       matches! ( actual, ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
     ExpectedAncestor::Folder (rc) =>
-      matches! ( actual, ViewnodeKind::PartnerFolder (r) if r == rc ),
+      matches! ( actual, ViewnodeKind::Folder (r) if r == rc ),
     ExpectedAncestor::HistoricalPhantom =>
       matches! ( actual,
                  ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) ),
   } }
 
 /// Whether `kind` is a folder -- a folder is a
-/// *collecting* non-vognode, i.e. a PropertyFolder (ID/Alias) or a PartnerFolder. (A non-vognode
+/// *collecting* non-vognode, i.e. a property folder or a partner folder. (A non-vognode
 /// is any non-Vognode viewnode; the non-folders -- Property leaves, BufferRoot,
 /// Tombstone -- are excluded here.) Folders are the kinds that carry a required
 /// ancestry and so are subject to the generalized-orphan check.
@@ -115,7 +116,7 @@ pub fn is_folder_kind (
   kind : &ViewnodeKind,
 ) -> bool {
   matches! ( kind,
-    ViewnodeKind::PropertyFolder (_) | ViewnodeKind::PartnerFolder (_) ) }
+    ViewnodeKind::Folder (_) ) }
 
 fn ancestor_treeid (
   tree                : &Tree<Viewnode>,

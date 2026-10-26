@@ -30,7 +30,7 @@ use crate::diff_view::shallow_model_subtree::{
   convert_unwarranted_subtree_taking_along, give_model_facts_to,
   is_unrestricted_removed_member};
 use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
-use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, FolderPolicy, PartnerFolder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, Folder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{
   Conversion, KeptChildOrder, RepairSummary, Unwarranted, complete_managed_children};
 use crate::update_buffer::util::treat_certain_children;
@@ -204,7 +204,7 @@ pub fn build_child_data (
 pub fn reconcile_partnerFolder_children_against_goal_list (
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
-  kind          : PartnerFolder,
+  kind          : &Folder,
   goal_list     : &[FolderGoalItem],
   child_data    : &HashMap<ID, ChildData>,
   graph         : &InRustGraph,
@@ -220,7 +220,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list (
 pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
   tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
-  kind          : PartnerFolder,
+  kind          : &Folder,
   goal_list     : &[FolderGoalItem],
   child_data    : &HashMap<ID, ChildData>,
   graph         : &InRustGraph,
@@ -238,12 +238,10 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   let summary : RepairSummary<ID> =
     complete_managed_children (
     tree, folder_node,
-    match kind . policy () {
-      // The save reads these folders' membership, in the buffer's order.
-      FolderPolicy::EditableSet | FolderPolicy::EditableCompound =>
-        KeptChildOrder::FollowsGoal,
-      FolderPolicy::WriteProtectedSet | FolderPolicy::WriteProtectedCompound =>
-        KeptChildOrder::Unmoved, },
+    // The save reads the membership of a folder whose goal is
+    // ordered, in the buffer's order.
+    if kind . goal_is_ordered () { KeptChildOrder::FollowsGoal }
+    else { KeptChildOrder::Unmoved },
     // A RestrictedVognode child is unmanaged
     // (the API doc's "Restricted-skgrepo nodes"): the goal omits
     // every restricted member, and a retained placeholder already in the
@@ -415,7 +413,7 @@ mod tests {
         home_skgrepo : skgrepo ("main"),
         .. crate::types::nodes::complete::empty_graphnode () } ]);
     let mut tree : Tree<Viewnode> = Tree::new (
-      viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)));
+      viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)));
     let folder : NodeId = tree . root () . id ();
     let member : Viewnode = mk_writeProtected_viewnode (
       skgid ("x2"), skgrepo ("main"), "x" . to_string (), true );
@@ -427,7 +425,7 @@ mod tests {
       home_skgrepo : skgrepo ("main"), title : "x" . to_string (),
       unknown : false, relRepo : None } );
     reconcile_partnerFolder_children_against_goal_list (
-      &mut tree, folder, PartnerFolder::Subscribee,
+      &mut tree, folder, &Folder::Subscribee,
       &FolderGoalItem::live_members (&[skgid ("x")]),
       &child_data, &graph ) . unwrap ();
     assert_eq! (
@@ -440,7 +438,7 @@ mod tests {
     let primary : ID = skgid ("deleted-primary");
     let raw_extra : ID = skgid ("surviving-extra");
     let mut tree : Tree<Viewnode> = Tree::new (
-      viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)));
+      viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)));
     let folder : NodeId = tree . root () . id ();
     let mut child : Viewnode = mk_writeProtected_viewnode (
       primary . clone (), skgrepo ("main"), "last seen" . to_string (),
@@ -456,7 +454,7 @@ mod tests {
       primary, [raw_extra . clone ()] . into_iter () . collect ());
 
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      &mut tree, folder, PartnerFolder::Subscribee,
+      &mut tree, folder, &Folder::Subscribee,
       &FolderGoalItem::live_members (&[raw_extra . clone ()]),
       &child_data, &InRustGraph::from_graphnodes (&[]),
       &deleted_extra_ids ) . unwrap ();

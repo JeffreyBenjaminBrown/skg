@@ -20,7 +20,7 @@ use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{FolderPolicy, PartnerFolder, ChangeViewnode, ViewnodeId, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{Folder, ChangeViewnode, ViewnodeId, Viewnode, ViewnodeKind};
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -39,7 +39,7 @@ use std::sync::Arc;
 pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
-  kind         : PartnerFolder,
+  kind         : &Folder,
   mode         : CompletionMode,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
@@ -67,26 +67,17 @@ pub fn reconcile_partnerFolder_children (
       partnerFolder_members_in_graph (
         graph_snap, &runtime . config, &viewparent_pid, kind, skgrepo_restriction )
       . ok_or ( "partnerFolder_members_in_graph: no relation member role" ) ?;
-    match kind . policy () {
-      FolderPolicy::EditableSet =>
-        // Graph (disk) order is meaningful here: the user's own
-        // save defines it.
-        graph_members,
-      FolderPolicy::WriteProtectedSet =>
-        // The user may have reordered this generated folder; the
-        // order is view-local and respected ('docs/sharing-model.org',
-        // "The write-protected folders: who subscribes to, overrides, or
-        // hides this node").
-        view_order_preserving_goal_list (
-          tree, node, &graph_members, graph_snap ) ?,
-      FolderPolicy::WriteProtectedCompound =>
-        // Unreachable: the let-else above already returned,
-        // because the compound partner folders have no relation member role.
-        graph_members,
-      FolderPolicy::EditableCompound =>
-        // Likewise unreachable here: HiddenOutside has its own
-        // hide-derived reconciler, rather than a relation role.
-        graph_members, }};
+    if kind . goal_is_ordered () {
+      // Graph (disk) order is meaningful here: the user's own
+      // save defines it.
+      graph_members
+    } else {
+      // The user may have reordered this generated folder; the
+      // order is view-local and respected ('docs/sharing-model.org',
+      // "The write-protected folders: who subscribes to, overrides, or
+      // hides this node").
+      view_order_preserving_goal_list (
+        tree, node, &graph_members, graph_snap ) ? }};
   // The node budget: a folder fills its members whole and is budget-neutral -- the owning
   // vognode already spent its budget unit when it extended, so adding all the
   // relation members here costs nothing and never truncates the group. (The
@@ -112,7 +103,7 @@ pub fn reconcile_partnerFolder_children (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_items, &child_data, graph_snap,
       deleted_by_this_save_extra_ids ) ?;
-  if kind . policy () != FolderPolicy::EditableSet {
+  if ! kind . goal_is_ordered () {
     // Repairs to an editable folder are not repairs: its membership is
     // whatever the user saved. Write-protected folders warn (when there is a
     // sink, i.e. when this completion serves the just-saved view).
@@ -205,7 +196,7 @@ pub fn partnerFolder_members_in_graph (
   graph               : &InRustGraph,
   config              : &SkgConfig,
   viewparent_pid      : &ID,
-  kind                : PartnerFolder,
+  kind                : &Folder,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Option<Vec<ID>> {
   let member_role : RelationRole = kind . relation_member_role () ?;
@@ -251,7 +242,7 @@ fn raw_outbound_members (
 /// Empty categories contribute nothing.
 pub fn push_repair_warnings (
   sink    : &mut Vec<CompletionWarning>,
-  folder     : PartnerFolder,
+  folder     : &Folder,
   recorder   : &ID,
   folder_viewnode_id : Option<&ViewnodeId>,
   summary : RepairSummary<ID>,
@@ -264,7 +255,7 @@ pub fn push_repair_warnings (
   for (repair, children) in categories {
     if ! children . is_empty () {
       sink . push ( CompletionWarning::FolderRepair {
-        folder,
+        folder   : folder . clone (),
         recorder : recorder . clone (),
         folder_viewnode_id : folder_viewnode_id . cloned (),
         repair,
@@ -277,7 +268,7 @@ pub fn folder_viewnode_id_of (
 ) -> Option<ViewnodeId> {
   tree . get (node) . and_then ( |folder| folder . value () . viewnode_id . clone () ) }
 
-/// The effective goal list for a FolderPolicy::WriteProtectedSet folder:
+/// The effective goal list for a folder whose goal is not ordered:
 /// the folder's existing members (the children for which
 /// 'skgid_a_folder_child_stands_for' over 'graph' says which ID each
 /// stands for), in their

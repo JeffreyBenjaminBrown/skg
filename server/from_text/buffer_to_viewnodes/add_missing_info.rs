@@ -5,7 +5,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::viewnode::{RelationshipEditRequest, Editability, PropertyFolder, PropertyMember};
+use crate::types::viewnode::{RelationshipEditRequest, Editability, Folder, PropertyMember};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -147,7 +147,7 @@ fn make_alias_if_appropriate(
       node . parent()
       . map(|mut p|
             matches!(&p . value() . kind,
-                     MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
+                     MpViewnodeKind::Folder (Folder::Alias)))
       . unwrap_or (false);
     if parent_is_aliasFolder { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
@@ -216,8 +216,7 @@ fn skgrepo_of_nearest_unrestricted_ancestor (
           . or_else ( || at . home_skgrepo . clone () )
         } else { at . home_skgrepo . clone () },
       MpViewnodeKind::Vognode (MpVognode::Phantom (_))
-        | MpViewnodeKind::PartnerFolder (_)
-        | MpViewnodeKind::PropertyFolder (_) => continue,
+        | MpViewnodeKind::Folder (_) => continue,
       MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::PropertyMember (_)
         | MpViewnodeKind::ChangeViewnode (_)

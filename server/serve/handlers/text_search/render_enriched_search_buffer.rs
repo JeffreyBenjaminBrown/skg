@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::types::viewnode::{FoldAndFocus, PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
+use crate::types::viewnode::{FoldAndFocus, Folder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -40,11 +40,11 @@ pub fn insert_partner_folders_into_search_view (
     . collect () };
   for (hit_treeid, hit_skgid) in &hits {
     // Prepended last-first, so that they stand in the order named.
-    for kind in [ PartnerFolder::Overridden, PartnerFolder::Overrider ] {
+    for kind in [ Folder::Overridden, Folder::Overrider ] {
       let members : Vec<(ID, SkgrepoName, String)> =
-        override_folder_members (graph, hit_skgid, kind, restriction);
+        override_folder_members (graph, hit_skgid, &kind, restriction);
       if members . is_empty () { continue; }
-      let folder : NodeId = prepend_folded_folder (viewforest, *hit_treeid, kind);
+      let folder : NodeId = prepend_folded_folder (viewforest, *hit_treeid, &kind);
       for (skgid, skgrepo, title) in members {
         viewforest . get_mut (folder) . unwrap () . append (
           mk_writeProtected_viewnode (
@@ -52,7 +52,7 @@ pub fn insert_partner_folders_into_search_view (
     if let Some (ContainerwardRoleTree::Inner ( _, containers )) =
       containerward_role_trees_by_skgid . get (hit_skgid)
     { let folder : NodeId =
-        prepend_folded_folder (viewforest, *hit_treeid, PartnerFolder::Container);
+        prepend_folded_folder (viewforest, *hit_treeid, &Folder::Container);
       for container in containers . iter () . rev () {
         insert_containerward_tree (
           container, hit_skgid, folder, true,
@@ -65,11 +65,11 @@ pub fn insert_partner_folders_into_search_view (
 fn prepend_folded_folder (
   viewforest : &mut Tree<Viewnode>,
   parent     : NodeId,
-  kind       : PartnerFolder,
+  kind       : &Folder,
 ) -> NodeId {
   viewforest . get_mut (parent) . unwrap () . prepend ( Viewnode {
     foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
-    .. viewnode_of ( ViewnodeKind::PartnerFolder (kind) ) } ) . id () }
+    .. viewnode_of ( ViewnodeKind::Folder (kind . clone ()) ) } ) . id () }
 
 /// The members of the hit's overrider folder (the nodes that override
 /// it) or overridden folder (the nodes it overrides): their IDs,
@@ -78,7 +78,7 @@ fn prepend_folded_folder (
 fn override_folder_members (
   graph       : &InRustGraph,
   hit         : &ID,
-  kind        : PartnerFolder,
+  kind        : &Folder,
   restriction : &SkgrepoRestriction,
 ) -> Vec<(ID, SkgrepoName, String)> {
   override_relatives (graph, hit, kind, restriction) . into_iter ()
@@ -92,11 +92,11 @@ fn override_folder_members (
 fn override_relatives (
   graph       : &InRustGraph,
   hit         : &ID,
-  kind        : PartnerFolder,
+  kind        : &Folder,
   restriction : &SkgrepoRestriction,
 ) -> Vec<ID> {
   let relatives : Vec<ID> = match kind {
-    PartnerFolder::Overridden =>
+    Folder::Overridden =>
       graph . outbound_pids_for_relation_gated (
         hit, NodeRelation::Overrides, Some (restriction) ),
     _ =>
@@ -119,8 +119,8 @@ pub fn collect_override_folder_member_skgids (
 ) -> HashSet<ID> {
   search_results . iter ()
     . flat_map ( |hit|
-      [ PartnerFolder::Overrider, PartnerFolder::Overridden ] . into_iter ()
-      . flat_map ( |kind| override_relatives (graph, hit, kind, restriction) ) )
+      [ Folder::Overrider, Folder::Overridden ] . into_iter ()
+      . flat_map ( |kind| override_relatives (graph, hit, &kind, restriction) ) )
     . collect () }
 
 /// Prepend 'node', a container of 'contained_skgid', under

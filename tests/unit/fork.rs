@@ -13,7 +13,7 @@ use crate::types::misc::{Skgrepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, empty_graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder,
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Folder,
                              mk_editable_viewnode, mk_writeProtected_viewnode,
                              viewnode_of};
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ fn restriction (skgid : &str, skgrepo : &str) -> Viewnode {
     ID::from (skgid), SkgrepoName::from (skgrepo), skgid . to_string (), None ) }
 
 fn subscribee_folder () -> Viewnode {
-  viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) }
+  viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)) }
 
 /// Build a forest exercising the three shapes:
 /// - owned2 P -> foreign F -> foreign N   (must infer nothing for N)

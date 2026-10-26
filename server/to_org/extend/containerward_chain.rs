@@ -1,5 +1,5 @@
 /// PURPOSE: Draw the containerward chain under the members of a
-/// partner folder ('PartnerFolder::members_carry_containerward_chain'):
+/// partner folder ('Folder::members_carry_containerward_chain'):
 /// under each member, its containers as write-protected non-members;
 /// under each of those, its containers; and so on breadth-first to
 /// 'max_roleTree_depth', up to the roots.
@@ -160,7 +160,7 @@ fn prepend_containerward_chain_node (
 
 /// Whether 'node' is a chain node: a non-member vognode under a
 /// member of a partner folder whose members carry the chain
-/// ('PartnerFolder::members_carry_containerward_chain'), or under
+/// ('Folder::members_carry_containerward_chain'), or under
 /// another chain node.
 pub fn is_in_containerward_chain (
   node : NodeRef<Viewnode>,
@@ -180,7 +180,7 @@ pub fn is_in_containerward_chain (
     let parent_is_a_chain_carrying_folder_member : bool =
       parent . parent () . is_some_and ( |grandparent| matches! (
         &grandparent . value () . kind,
-        ViewnodeKind::PartnerFolder (kind)
+        ViewnodeKind::Folder (kind)
           if kind . members_carry_containerward_chain () ));
     if parent_is_a_chain_carrying_folder_member { return true; }
     current = parent; }}

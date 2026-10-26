@@ -144,12 +144,24 @@ pub struct ViewnodeId (pub String);
 #[derive( Debug, Clone, PartialEq )]
 pub enum ViewnodeKind {
   Vognode       (Vognode),
-  PropertyFolder       (PropertyFolder),
+  Folder        (Folder),
   PropertyMember    (PropertyMember),
   ChangeViewnode    (ChangeViewnode),
-  PartnerFolder    (PartnerFolder),
   BufferRoot,
   Tombstone,
+}
+
+impl ViewnodeKind {
+  /// Whether this is a property folder: one whose members are the
+  /// viewparent's aliases, IDs or true flags.
+  pub fn is_property_folder (&self) -> bool {
+    matches! ( self, ViewnodeKind::Folder (folder)
+                     if folder . members_are_properties () ) }
+
+  /// Whether this is a partner folder: one whose members are nodes.
+  pub fn is_partner_folder (&self) -> bool {
+    matches! ( self, ViewnodeKind::Folder (folder)
+                     if ! folder . members_are_properties () ) }
 }
 
 /// A viewnode that represents a graphnode, which need not exist: Unrestricted
@@ -431,7 +443,7 @@ pub struct ViewnodeStats {
   /// Some(NAME) when the relationship instance this position's
   /// binding relationship to its viewparent represents (=contains= for an
   /// ordinary content child; the folder's relation for a simple
-  /// PartnerFolder member -- see 'PartnerFolder::relation_member_role')
+  /// PartnerFolder member -- see 'Folder::relation_member_role')
   /// is recorded in a skgrepo that differs from that relationship's default
   /// (see the relationship-default policy in 'SkgConfig'). None when
   /// equal to the default:
@@ -449,13 +461,6 @@ pub struct ViewnodeStats {
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
-}
-
-#[derive( Debug, Clone, PartialEq, Eq, Hash )]
-pub enum PropertyFolder {
-  ID,
-  Alias,
-  Flags { title : String, body : Option<String> },
 }
 
 /// A member of a property folder: one alias, extra ID or true flag
@@ -516,8 +521,14 @@ pub enum ChangesetMarkerKind {
   OrderOnly, // "order-only change", always ready
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PartnerFolder {
+/// A viewnode grouping the children of one kind of relationship of
+/// its viewparent: the twelve partner folders, whose members are
+/// nodes (ten relation roles, the two compound partner folders, and
+/// the diff view's two acquisition folders), and the three property
+/// folders, whose members are the viewparent's aliases, IDs and true
+/// flags.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Folder {
   Subscribee, // Collects subscribees its parent subscribes to. Writable.
   Subscriber, // Collects nodes that subscribe to its parent. Write-protected (editable from the other side of the relationship).
   Overridden, // Collects nodes whose view its parent overrides. Writable.
@@ -534,35 +545,12 @@ pub enum PartnerFolder {
   // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
   AcquiredBy, // Child of a historical phantom: the node that acquired it by a nodeMerge.
   Acquired, // Child of an acquirer: the historical phantoms of the nodes it acquired.
-}
-
-/// How a PartnerFolder's membership relates to user edits.
-/// Every layer that treats some PartnerFolders differently from others
-/// (save extraction, reconciliation, herald metadata) should consult
-/// 'PartnerFolder::policy' rather than matching on folder variants, so the
-/// policies cannot drift apart per file.
-///
-/// Every policy obeys the glossary's "retain as non-member or
-/// tombstone, then prune": during reconciliation a stale member is
-/// converted, a leaf to a tombstone the prune removes, one with
-/// children retained as non-member (noClaim), keeping its
-/// editability.
-/// The policies differ in:
-/// - whether buffer membership is read at save extraction
-///   ('EditableSet' and 'EditableCompound'),
-/// - where the goal list comes from ('EditableSet' and 'WriteProtectedSet'
-///   from 'relation_member_role'; both compound policies from hide state),
-/// - goal-list order ('EditableSet': graph/disk order, which the
-///   user's own save defines; 'WriteProtectedSet': the view's current
-///   member order, then missing members appended; compound partner
-///   folders are derived),
-/// - whether repairs warn (the write-protected policies, in the saved view).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FolderPolicy {
-  EditableSet,      // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
-  EditableCompound, // A visible derived subset is an explicit edit of that subset; skgrepo requests remain unsupported.
-  WriteProtectedSet,      // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
-  WriteProtectedCompound, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
+  // The three property folders.
+  Alias,
+  ID,
+  /// Its title and body are what the user typed there; a fresh
+  /// rendering has neither.
+  Flags { title : String, body : Option<String> },
 }
 
 /// Requests for editing operations on a node.
@@ -718,95 +706,95 @@ impl MpUnrestrictedVognode {
     . or_else ( || self . skgid . clone () ) }
 }
 
-impl PartnerFolder {
-  pub fn policy (self) -> FolderPolicy {
+impl Folder {
+  pub fn flags () -> Folder {
+    Folder::Flags { title : String::new (), body : None } }
+
+  pub fn is_flags (&self) -> bool {
+    matches! (self, Folder::Flags { .. }) }
+
+  /// Whether the members are properties of the viewparent (its
+  /// aliases, IDs or true flags) rather than nodes.
+  pub fn members_are_properties (&self) -> bool {
+    matches! ( self, Folder::Alias | Folder::ID | Folder::Flags { .. } ) }
+
+  /// Whether the folder's goal has an order the view follows. True
+  /// when the viewparent's own file records the members, in an order
+  /// the save writes, so that the save reads the folder's membership:
+  /// the subscribee, overridden and alias folders, and the compound
+  /// partner folder of what the subscriber hides outside its
+  /// subscribees. False when other nodes' files record the members,
+  /// or they are derived or write-protected: the view then keeps the
+  /// order its members already have.
+  pub fn goal_is_ordered (&self) -> bool {
     match self {
-      PartnerFolder::Subscribee
-        | PartnerFolder::Overridden
-        => FolderPolicy::EditableSet,
-      PartnerFolder::Subscriber
-        | PartnerFolder::Overrider
-        | PartnerFolder::Hider
-        | PartnerFolder::Hidden
-        | PartnerFolder::Container
-        | PartnerFolder::Mentioner
-        | PartnerFolder::AcquiredBy
-        | PartnerFolder::Acquired
-        => FolderPolicy::WriteProtectedSet,
-      PartnerFolder::HiddenInSubscribee
-        => FolderPolicy::WriteProtectedCompound,
-      PartnerFolder::HiddenOutsideOfSubscribee
-        => FolderPolicy::EditableCompound,
-    } }
+      Folder::Subscribee | Folder::Overridden
+        | Folder::HiddenOutsideOfSubscribee | Folder::Alias => true,
+      Folder::Subscriber | Folder::Overrider | Folder::Hider
+        | Folder::Hidden | Folder::HiddenInSubscribee
+        | Folder::Container | Folder::Mentioner
+        | Folder::AcquiredBy | Folder::Acquired
+        | Folder::ID | Folder::Flags { .. } => false, } }
 
   /// Whether each member of a folder of this kind carries its
   /// containerward chain: every kind whose members are live nodes,
   /// partners in a role or members of a compound partner folder. The
   /// diff view's two acquisition folders, which record a nodeMerge, do
-  /// not.
-  pub fn members_carry_containerward_chain (self) -> bool {
-    ! matches! ( self,
-                 PartnerFolder::AcquiredBy | PartnerFolder::Acquired ) }
-
-  pub fn repr_in_client (self) -> &'static str {
-    match self {
-      PartnerFolder::Subscribee                => "subscribeeFolder",
-      PartnerFolder::Subscriber                => "subscriberFolder",
-      PartnerFolder::Overridden                => "overriddenFolder",
-      PartnerFolder::Overrider                 => "overriderFolder",
-      PartnerFolder::Hider                     => "hiderFolder",
-      PartnerFolder::Hidden                    => "hiddenFolder",
-      PartnerFolder::HiddenInSubscribee        => "hiddenInSubscribeeFolder",
-      PartnerFolder::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeFolder",
-      PartnerFolder::Container                 => "containerFolder",
-      PartnerFolder::Mentioner                 => "mentionerFolder",
-      PartnerFolder::AcquiredBy                => "acquiredByFolder",
-      PartnerFolder::Acquired                  => "acquiredFolder",
-    }}
-
-  pub fn from_client_string (s : &str) -> Option<PartnerFolder> {
-    match s {
-      "subscribeeFolder"                => Some (PartnerFolder::Subscribee),
-      "subscriberFolder"                => Some (PartnerFolder::Subscriber),
-      "overriddenFolder"                => Some (PartnerFolder::Overridden),
-      "overriderFolder"                 => Some (PartnerFolder::Overrider),
-      "hiderFolder"                     => Some (PartnerFolder::Hider),
-      "hiddenFolder"                    => Some (PartnerFolder::Hidden),
-      "hiddenInSubscribeeFolder"        => Some (PartnerFolder::HiddenInSubscribee),
-      "hiddenOutsideOfSubscribeeFolder" => Some (PartnerFolder::HiddenOutsideOfSubscribee),
-      "containerFolder"                 => Some (PartnerFolder::Container),
-      "mentionerFolder"                 => Some (PartnerFolder::Mentioner),
-      "acquiredByFolder"                => Some (PartnerFolder::AcquiredBy),
-      "acquiredFolder"                  => Some (PartnerFolder::Acquired),
-      _                              => None,
-    } }
-
-}
-
-impl PropertyFolder {
-  pub fn flags () -> PropertyFolder {
-    PropertyFolder::Flags { title : String::new (), body : None } }
-
-  pub fn is_flags (&self) -> bool {
-    matches! (self, PropertyFolder::Flags { .. }) }
+  /// not, nor do the property folders.
+  pub fn members_carry_containerward_chain (&self) -> bool {
+    ! ( self . members_are_properties ()
+        || matches! ( self, Folder::AcquiredBy | Folder::Acquired )) }
 
   pub fn repr_in_client (&self) -> &'static str {
     match self {
-      PropertyFolder::Alias => "aliasFolder",
-      PropertyFolder::ID    => "idFolder",
-      PropertyFolder::Flags { .. } => "flagsFolder",
+      Folder::Subscribee                => "subscribeeFolder",
+      Folder::Subscriber                => "subscriberFolder",
+      Folder::Overridden                => "overriddenFolder",
+      Folder::Overrider                 => "overriderFolder",
+      Folder::Hider                     => "hiderFolder",
+      Folder::Hidden                    => "hiddenFolder",
+      Folder::HiddenInSubscribee        => "hiddenInSubscribeeFolder",
+      Folder::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeFolder",
+      Folder::Container                 => "containerFolder",
+      Folder::Mentioner                 => "mentionerFolder",
+      Folder::AcquiredBy                => "acquiredByFolder",
+      Folder::Acquired                  => "acquiredFolder",
+      Folder::Alias                     => "aliasFolder",
+      Folder::ID                        => "idFolder",
+      Folder::Flags { .. }              => "flagsFolder",
+    }}
+
+  /// The folder a folder atom names; a flags folder comes with no
+  /// text.
+  pub fn from_client_string (s : &str) -> Option<Folder> {
+    match s {
+      "subscribeeFolder"                => Some (Folder::Subscribee),
+      "subscriberFolder"                => Some (Folder::Subscriber),
+      "overriddenFolder"                => Some (Folder::Overridden),
+      "overriderFolder"                 => Some (Folder::Overrider),
+      "hiderFolder"                     => Some (Folder::Hider),
+      "hiddenFolder"                    => Some (Folder::Hidden),
+      "hiddenInSubscribeeFolder"        => Some (Folder::HiddenInSubscribee),
+      "hiddenOutsideOfSubscribeeFolder" => Some (Folder::HiddenOutsideOfSubscribee),
+      "containerFolder"                 => Some (Folder::Container),
+      "mentionerFolder"                 => Some (Folder::Mentioner),
+      "acquiredByFolder"                => Some (Folder::AcquiredBy),
+      "acquiredFolder"                  => Some (Folder::Acquired),
+      "aliasFolder"                     => Some (Folder::Alias),
+      "idFolder"                        => Some (Folder::ID),
+      "flagsFolder"                     => Some (Folder::flags ()),
+      _                                 => None,
     } }
 
   pub fn title (&self) -> &str {
     match self {
-      PropertyFolder::Flags { title, .. } => title,
-      PropertyFolder::Alias | PropertyFolder::ID => "", } }
+      Folder::Flags { title, .. } => title,
+      _ => "", } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      PropertyFolder::Flags { body, .. } => body . as_ref (),
-      PropertyFolder::Alias | PropertyFolder::ID => None, } }
-
+      Folder::Flags { body, .. } => body . as_ref (),
+      _ => None, } }
 }
 
 impl PropertyMember {
@@ -1106,9 +1094,8 @@ impl Viewnode {
         &h . title,
       ViewnodeKind::PropertyMember (member) => member . title (),
       ViewnodeKind::ChangeViewnode (change) => change . title (),
-      ViewnodeKind::PropertyFolder (folder) => folder . title (),
-      ViewnodeKind::PartnerFolder (_)
-        | ViewnodeKind::BufferRoot
+      ViewnodeKind::Folder (folder) => folder . title (),
+      ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone
         | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
@@ -1129,12 +1116,11 @@ impl Viewnode {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => h . body . as_ref (),
-      ViewnodeKind::PropertyFolder (folder) => folder . body (),
+      ViewnodeKind::Folder (folder) => folder . body (),
       ViewnodeKind::PropertyMember (member) => member . body (),
       ViewnodeKind::ChangeViewnode (change) => change . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         | ViewnodeKind::Vognode (Vognode::Restricted (_))
-        | ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone => None,
     }}

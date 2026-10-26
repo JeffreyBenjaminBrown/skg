@@ -402,7 +402,7 @@ pub(crate) fn relationship_to_viewparent (
     ViewnodeKind::Vognode (_) => {
       let viewparent : ID = vognode_leaf_pid (parent . value (), pid_of) ?;
       Some ( key_for_role (RelationRole::CONTENT, viewparent) ) },
-    ViewnodeKind::PartnerFolder (folder) => {
+    ViewnodeKind::Folder (folder) => { // a property folder has no role
       let role : RelationRole = folder . relation_member_role () ?;
       let folder_viewparent : ID = vognode_leaf_pid (
         parent . parent () ? . value (), pid_of ) ?;

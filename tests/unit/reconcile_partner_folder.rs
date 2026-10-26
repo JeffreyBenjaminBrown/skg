@@ -11,8 +11,8 @@ fn unrestricted_independent (id_str : &str) -> Viewnode {
     ID::from (id_str), SkgrepoName::from ("main"),
     id_str . to_string (), false ) }
 
-fn mk_folder (kind : PartnerFolder) -> Viewnode {
-  viewnode_of (ViewnodeKind::PartnerFolder (kind)) }
+fn mk_folder (kind : Folder) -> Viewnode {
+  viewnode_of (ViewnodeKind::Folder (kind)) }
 
 // The user's view order of present members survives; missing graph
 // members are appended in graph order; non-member children
@@ -22,7 +22,7 @@ fn view_order_wins_and_missing_members_append () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let folder : NodeId = t . get_mut (root) . unwrap ()
-    . append (mk_folder (PartnerFolder::Subscriber)) . id ();
+    . append (mk_folder (Folder::Subscriber)) . id ();
   { let mut folder_mut = t . get_mut (folder) . unwrap ();
     folder_mut . append (unrestricted_affected ("c"));
     folder_mut . append (unrestricted_affected ("x"));    // nonmember
@@ -42,7 +42,7 @@ fn duplicate_member_first_occurrence_wins () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let folder : NodeId = t . get_mut (root) . unwrap ()
-    . append (mk_folder (PartnerFolder::Hider)) . id ();
+    . append (mk_folder (Folder::Hider)) . id ();
   { let mut folder_mut = t . get_mut (folder) . unwrap ();
     folder_mut . append (unrestricted_affected ("c"));
     folder_mut . append (unrestricted_affected ("c"));

@@ -653,15 +653,13 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
       if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) = &mut n1_copy . kind
         { t . skgid = id2; }
       if n1_copy != *n2 { return false; }}
-    ( MpViewnodeKind::PropertyFolder (_)
+    ( MpViewnodeKind::Folder (_)
       | MpViewnodeKind::PropertyMember (_)
       | MpViewnodeKind::ChangeViewnode (_)
-      | MpViewnodeKind::PartnerFolder (_)
       | MpViewnodeKind::BufferRoot,
-      MpViewnodeKind::PropertyFolder (_)
+      MpViewnodeKind::Folder (_)
       | MpViewnodeKind::PropertyMember (_)
       | MpViewnodeKind::ChangeViewnode (_)
-      | MpViewnodeKind::PartnerFolder (_)
       | MpViewnodeKind::BufferRoot) =>
     { if n1 != n2 { return false; }}
     ( MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_))),

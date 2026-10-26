@@ -124,3 +124,77 @@ The change was reverted; the log is
   members, then save silently; the child shows ⊥); judge a
   write-protected folder's members by '(rel removed)' instead
   of the claim; and find chain nodes by position.
+** Slice 1: regroup the types
+*** What's done
+In five commits, one per regrouping: 'FoldAndFocus';
+'RelationshipEditRequest' on the occurrence, the unknown and
+the alias; 'overridesHere' on the occurrence and the two moves
+in 'ChangeFacts'; 'PropertyMember' and 'ChangeViewnode' in
+place of 'Property'; 'Folder' in place of 'PartnerFolder',
+'PropertyFolder' and 'FolderPolicy', with
+'members_are_properties' and 'goal_is_ordered'. The wire is
+unchanged but for the removed alias and ID (below).
+*** Deviations from the plan's "how"
+**** the two moves are the home move and its companion
+The plan says 'ChangeFacts' gains "the two moves
+('homeSkgrepoMove', 'relRepoMove') that 'ViewnodeStats' holds
+today". 'ViewnodeStats' held 'home_skgrepo_move' and
+'moved_like_ancestor'; the relRepo move is a change viewnode.
+Those two moved. The printer still writes them, and
+'overridesHere', in '(viewStats ...)' until slice 5.
+**** a ghost warrant is written, and read, as (rel removed)
+'Warrant' has no 'ByHead' yet and a property member has no
+'ViewnodeStats', so an alias or ID member's ghost warrant is
+its change fact '(rel removed)', read through
+'Viewnode::is_ghostWarranted' (and its twin on 'MpViewnode').
+The alias reader, the ID check and the write-protected alias
+comparison skip such members, as they skipped the old kinds.
+'warrant_of_viewnode' answers 'ByGraph' for one, as it did for
+'removedAlias'.
+**** the atoms removedAlias and removedID are refused
+The server writes 'alias' or 'id' with '(diff (rel removed))';
+the parser refuses the old atoms as unknown. The herald rules,
+'shared/herald-styles.json', 'shared/metadata-fields.json',
+the docs and the fixtures follow (the fixtures by
+'tests/results/slice1/fixture_removed_entries.pl'). No client
+code named the atoms; both clients' readiness tests did.
+**** 'Folder' is Clone, not Copy
+The flags folder keeps the title and body the user typed
+there, which the write-protected check compares, so 'Folder'
+cannot be Copy. Functions take '&Folder'; 'ExpectedAncestor'
+(ancestry.rs) lost Copy too.
+**** goal_is_ordered also answers for the property folders
+True for the alias folder, false for the ID and flags folders,
+as their reconcilers' 'KeptChildOrder' already said. Where
+'FolderPolicy::EditableSet' stood for "the save reads this
+folder's membership" (the diff view's dangling removed members,
+the repair warnings), 'goal_is_ordered' answers the same on
+every folder those paths reach.
+**** smaller choices
+'Folder::from_client_string' names all fifteen folders, so the
+parser reads every folder atom in one arm. 'ViewnodeKind' has
+'is_property_folder' and 'is_partner_folder'. A parsed
+restoreRel still passes through 'NodeEditRequest::RestoreRel'
+before it becomes 'RelationshipEditRequest::RestoreRel'.
+*** What's imperfect about what's done
+**** a ghost alias saved outside the diff view goes away
+A buffer holding 'alias (diff (rel removed))' saved as a
+content view (no straddle, as when a diff-view buffer is saved
+on another connection) now shows a managed alias the goal
+lacks, which the alias reconciler entombstones and the prune
+removes; the old 'removedAlias' was unmanaged and lingered.
+The diff view's own flow is unchanged: over TCP on one
+connection the all-changes buffer with a lost alias saved back
+to itself, and the alias stayed lost, before and after this
+slice ('tests/results/slice1/verify_diff.sh').
+*** Suite failures and their classification
+**** first failure: removed entries (step 4 of 5)
+Expected fixture adaptation: 'metadata_fields_table', the herald
+fixture test and seven 'pruned_change_view' tests expected
+'removedAlias' / 'removedID'. Converted by the script above;
+'tests/shared/herald-rules.sexp' regenerated.
+**** save::id_folder_outside_diff_view::all_tests, once
+Unrelated: "Directory not empty" at cleanup, as in slice 0; it
+passed alone and in every later full run.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slice 0.

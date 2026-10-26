@@ -136,8 +136,7 @@ pub fn folder_change_facts (
   node_ref : NodeRef<Viewnode>,
 ) -> Option<FolderChangeFacts> {
   if ! matches! ( &node_ref . value () . kind,
-                  ViewnodeKind::PartnerFolder (_)
-                  | ViewnodeKind::PropertyFolder (_) ) {
+                  ViewnodeKind::Folder (_) ) {
     return None; }
   let membership_changes : Vec<bool> = // whether each changed membership is ready
     node_ref . children ()
@@ -233,7 +232,7 @@ fn viewnode_to_string_without_viewnode_id (
   config       : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewnodeKind::PropertyFolder (folder) =>
+    ViewnodeKind::Folder (folder) =>
       Ok ( folder_atom_metadata_to_string (
         viewnode . foldAndFocus, folder . repr_in_client (), folder_facts )),
     ViewnodeKind::PropertyMember (member) =>
@@ -244,10 +243,6 @@ fn viewnode_to_string_without_viewnode_id (
       Ok ( changeViewnode_metadata_to_string (
         viewnode . foldAndFocus, change,
         &viewnode . change_facts, &viewnode . readiness_request )),
-    ViewnodeKind::PartnerFolder (partnerFolder) =>
-      Ok ( folder_atom_metadata_to_string (
-        viewnode . foldAndFocus, partnerFolder . repr_in_client (),
-        folder_facts )),
     ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewnodeKind::Tombstone =>

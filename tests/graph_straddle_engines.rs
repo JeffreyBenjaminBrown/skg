@@ -14,7 +14,7 @@ use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::viewnode::{
-  DiffChange, Existence, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  DiffChange, Existence, Folder, Phantom, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
 use skg::types::views_state::DiffViewBufferKind;
 use skg::update_buffer::completion_mode::CompletionMode;
@@ -93,10 +93,10 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
   let folder : NodeId =
     tree . get_mut (r) . unwrap ()
     . append ( viewnode_of (
-      ViewnodeKind::PartnerFolder (PartnerFolder::Container) ))
+      ViewnodeKind::Folder (Folder::Container) ))
     . id ();
   reconcile_partnerFolder_children (
-    folder, &mut tree, PartnerFolder::Container,
+    folder, &mut tree, &Folder::Container,
     // The folder reconciler reads no buffer kind.
     CompletionMode::DiffView { straddle    : &f . straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges },

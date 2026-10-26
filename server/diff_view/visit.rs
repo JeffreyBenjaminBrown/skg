@@ -76,8 +76,9 @@ pub fn diffView_visit_before_extension (
     return Ok ( DiffViewVisit::Complete {
       visit_as_unrestrictedVognode : false } ); };
   let visit_as_unrestrictedVognode : bool = match kind {
-    ViewnodeKind::PropertyFolder (_)
-      if property_folder_is_changed (tree, treeid) =>
+    ViewnodeKind::Folder (folder)
+      if folder . members_are_properties ()
+      && property_folder_is_changed (tree, treeid) =>
       return Ok (DiffViewVisit::Done),
     // A historical phantom where content stands adds its old content.
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {

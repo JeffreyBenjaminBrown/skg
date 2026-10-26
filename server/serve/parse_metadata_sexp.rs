@@ -53,7 +53,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, Existence, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  ChangesetMarkerKind, PropertyMember, ChangeViewnode, PropertyFolder, PartnerFolder, PhantomDeleted,
+  ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
   Editability, RelationshipEditRequest, ViewnodeId,
 };
@@ -212,7 +212,7 @@ pub fn viewnode_from_metadata (
           } ) )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
-          MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }));
+          MpViewnodeKind::Folder (Folder::Flags { .. }));
         let is_flag = matches! (non_vognode,
           MpViewnodeKind::PropertyMember (PropertyMember::Flag { .. }));
         let carries_text : bool = // the diff view's text properties
@@ -231,8 +231,7 @@ pub fn viewnode_from_metadata (
           if ! title . is_empty ()
             && ! is_flags_folder
             && matches! ( non_vognode,
-                          MpViewnodeKind::PropertyFolder (_)
-                          | MpViewnodeKind::PartnerFolder (_) )
+                          MpViewnodeKind::Folder (_) )
           { Some ( with_org_subheadlines (
               &format! ( "Headline text on a {} is not saved; discarded: {:?}",
                          maybeplaced_kind_error_label (non_vognode),
@@ -257,8 +256,8 @@ pub fn viewnode_from_metadata (
               flag : *flag,
               title    : title . clone (),
               body     : body . clone () }),
-          MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
-            MpViewnodeKind::PropertyFolder (PropertyFolder::Flags {
+          MpViewnodeKind::Folder (Folder::Flags { .. }) =>
+            MpViewnodeKind::Folder (Folder::Flags {
               title : title . clone (), body : body . clone () }),
           // The parser marks which aspects an OldText shows; its text
           // comes from the headline and the body.
@@ -338,8 +337,7 @@ pub fn viewnode_from_metadata (
     };
   let never_carries_a_change : bool = // so the facts parsed are dropped
     matches! ( kind,
-               MpViewnodeKind::PropertyFolder (_)
-               | MpViewnodeKind::PartnerFolder (_)
+               MpViewnodeKind::Folder (_)
                | MpViewnodeKind::BufferRoot
                | MpViewnodeKind::Tombstone
                | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
@@ -359,14 +357,12 @@ fn maybeplaced_kind_error_label (
   kind : &MpViewnodeKind,
 ) -> String {
   match kind {
-    MpViewnodeKind::PropertyFolder (folder) =>
+    MpViewnodeKind::Folder (folder) =>
       folder . repr_in_client () . to_string (),
     MpViewnodeKind::PropertyMember (member) =>
       member . repr_in_client () . to_string (),
     MpViewnodeKind::ChangeViewnode (change) =>
       change . repr_in_client () . to_string (),
-    MpViewnodeKind::PartnerFolder (partnerFolder) =>
-      partnerFolder . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
     MpViewnodeKind::Tombstone =>
@@ -533,42 +529,15 @@ pub fn parse_metadata_to_viewnodemd (
           "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::Alias { text: String::new(), relRepo: None, relationshipEditRequest: None } ) ),
-          "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
-          "flagsFolder" => result . non_vognode = Some (
-            MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
-          "hiddenInSubscribeeFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)),
-          "hiddenOutsideOfSubscribeeFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)),
-          "hiddenFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hidden)),
-          "hiderFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hider)),
-          "containerFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Container)),
-          "mentionerFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Mentioner)),
-          "acquiredByFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::AcquiredBy)),
-          "acquiredFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Acquired)),
           "bodyDiff" =>
             result . non_vognode = Some (MpViewnodeKind::ChangeViewnode (
               ChangeViewnode::BodyDiff { diff : String::new () } )),
-          "overriddenFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
-          "overriderFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overrider)),
-          "subscriberFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)),
-          "subscribeeFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)),
-          "idFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
             result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::ID { skgid: ID::default() } ) ),
           "tombstone" => result . is_tombstone = true,
+          folder_atom if folder_kind_of_atom (folder_atom) . is_some () =>
+            result . non_vognode = folder_kind_of_atom (folder_atom),
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },
@@ -582,8 +551,7 @@ pub fn parse_metadata_to_viewnodemd (
   { return Err ( "relRepo and its editRequest are valid only on Alias properties"
                  . to_string () ); }
   let is_folder : bool = matches! ( result . non_vognode,
-    Some ( MpViewnodeKind::PartnerFolder (_)
-           | MpViewnodeKind::PropertyFolder (_) ));
+    Some ( MpViewnodeKind::Folder (_) ));
   let holds_only_an_objectless_ready : bool =
     result . change_facts == ChangeFacts {
       ready : Some (BTreeSet::new ()), .. ChangeFacts::default () }
@@ -667,12 +635,7 @@ fn check_where_the_edit_request_sits (
 fn folder_kind_of_atom (
   atom : &str,
 ) -> Option<MpViewnodeKind> {
-  match atom {
-    "aliasFolder" => Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
-    "idFolder"    => Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
-    "flagsFolder" => Some (MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
-    _ => PartnerFolder::from_client_string (atom)
-         . map (MpViewnodeKind::PartnerFolder), } }
+  Folder::from_client_string (atom) . map (MpViewnodeKind::Folder) }
 
 
 /// Parse the (node ...) s-expression contents.

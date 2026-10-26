@@ -8,7 +8,7 @@ use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::moves::move_to_last_child;
 use crate::types::tree::viewnode_graphnode::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, PartnerFolder};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Folder};
 use crate::types::viewnode::{Vognode};
 
 use ego_tree::{NodeId, Tree};
@@ -37,7 +37,7 @@ pub fn reconcile_subscribeeFolder_children (
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : PartnerFolder = PartnerFolder::Subscribee;
+  let kind : &Folder = &Folder::Subscribee;
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeFolderContext =
@@ -146,14 +146,14 @@ fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
   let hidden_outside : Option<NodeId> =
     unique_non_vognode_child_of_viewnode(
       tree, node,
-      &ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ) ?;
+      &ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) ) ?;
   match hidden_outside {
     Some (child) => { move_to_last_child( tree, node, child ) ?; },
     None => {
       let new_folder : NodeId =
         insert_non_vognode_as_child(
           tree, node,
-          ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
+          ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee),
           false ) ?;
       with_node_mut ( tree, new_folder,
         |mut n| {

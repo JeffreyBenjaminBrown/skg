@@ -60,7 +60,7 @@ fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
   // §A (Jeff's invariant): a member Unrestricted node under a non-container
   // parent (Deleted phantom / Tombstone) is made a non-member; a legitimate
   // folder member (member Unrestricted under a PartnerFolder) is left untouched.
-  use crate::types::viewnode::{ PartnerFolder, Phantom, PhantomDeleted };
+  use crate::types::viewnode::{ Folder, Phantom, PhantomDeleted };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
   let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
@@ -78,7 +78,7 @@ fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
     mk_writeProtected_viewnode (skgid ("B"), src (), "B" . to_string (),
                               true) ) . id ();
   let folder : NodeId = vf . get_mut (root) . unwrap () . append (
-    viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) ) . id ();
+    viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)) ) . id ();
   let member : NodeId = vf . get_mut (folder) . unwrap () . append (
     mk_writeProtected_viewnode (skgid ("C"), src (), "C" . to_string (),
                               true) ) . id ();

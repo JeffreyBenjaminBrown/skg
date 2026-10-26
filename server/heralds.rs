@@ -23,7 +23,7 @@
 use crate::sexp_string::quote_sexp_string;
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangesetMarkerKind, DiffChange, PartnerFolder, PropertyMember, ChangeViewnode, PropertyFolder,
+  ChangesetMarkerKind, DiffChange, Folder, PropertyMember, ChangeViewnode,
   DiffObject, ViewRequest};
 
 use serde_json::Value;
@@ -245,27 +245,27 @@ fn changed_folder_rules (
       } else { vec! [] },
       vec! [ leaf ("changed", text) ] ] . concat () ) };
   vec! [
-    changed (PropertyFolder::Alias . repr_in_client (), false,
+    changed (Folder::Alias . repr_in_client (), false,
              "its aliases changed (this file)"),
-    changed (PropertyFolder::ID . repr_in_client (), false,
+    changed (Folder::ID . repr_in_client (), false,
              "its IDs changed (this file)"),
-    changed (PropertyFolder::flags () . repr_in_client (), true,
+    changed (Folder::flags () . repr_in_client (), true,
              "its flags changed (this file)"),
-    changed (PartnerFolder::Container . repr_in_client (), true,
+    changed (Folder::Container . repr_in_client (), true,
              "its containers changed (other files)"),
-    changed (PartnerFolder::Mentioner . repr_in_client (), true,
+    changed (Folder::Mentioner . repr_in_client (), true,
              "its mentioners changed (other files)"),
-    changed (PartnerFolder::Subscriber . repr_in_client (), true,
+    changed (Folder::Subscriber . repr_in_client (), true,
              "its subscribers changed (other files)"),
-    changed (PartnerFolder::Overrider . repr_in_client (), true,
+    changed (Folder::Overrider . repr_in_client (), true,
              "its overriders changed (other files)"),
-    changed (PartnerFolder::Hider . repr_in_client (), true,
+    changed (Folder::Hider . repr_in_client (), true,
              "its hiders changed (other files)"),
-    changed (PartnerFolder::Subscribee . repr_in_client (), false,
+    changed (Folder::Subscribee . repr_in_client (), false,
              "its subscribees changed (this file)"),
-    changed (PartnerFolder::Overridden . repr_in_client (), false,
+    changed (Folder::Overridden . repr_in_client (), false,
              "the nodes it overrides changed (this file)"),
-    changed (PartnerFolder::Hidden . repr_in_client (), true,
+    changed (Folder::Hidden . repr_in_client (), true,
              "the nodes it hides changed (this file)") ] }
 
 /// The diff view's '(diff ...)' form on a vognode: its node's
@@ -390,7 +390,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("folded"),
       vac ("bodyFolded"),
       vac ("vnid"), // the viewnode ID ends every wrapper
-      leaf (PropertyFolder::Alias . repr_in_client (), "aliases"),
+      leaf (Folder::Alias . repr_in_client (), "aliases"),
       leaf ("alias", "alias"), // PropertyMember::Alias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
@@ -402,36 +402,36 @@ pub fn herald_rule_table () -> HeraldRule {
       // The write-protected folders carry ☮ ("cannot be changed
       // from here"); the editable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
-      write_protected_leaves (PartnerFolder::HiddenInSubscribee . repr_in_client (),
+      write_protected_leaves (Folder::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
       vec! [
-      leaf (PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
+      leaf (Folder::HiddenOutsideOfSubscribee . repr_in_client (),
             "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
-      leaf (PartnerFolder::Subscribee . repr_in_client (),
+      leaf (Folder::Subscribee . repr_in_client (),
             "It subscribes to these.") ],
-      write_protected_leaves (PartnerFolder::Subscriber . repr_in_client (),
+      write_protected_leaves (Folder::Subscriber . repr_in_client (),
             "These subscribe to it."),
-      write_protected_leaves (PartnerFolder::Hidden . repr_in_client (),
+      write_protected_leaves (Folder::Hidden . repr_in_client (),
             "It hides these from its subscriptions."),
-      write_protected_leaves (PartnerFolder::Hider . repr_in_client (),
+      write_protected_leaves (Folder::Hider . repr_in_client (),
             "These hide it from their subscriptions."),
       vec! [
-      leaf (PartnerFolder::Overridden . repr_in_client (),
+      leaf (Folder::Overridden . repr_in_client (),
             "It overrides the view of these.") ],
-      write_protected_leaves (PartnerFolder::Overrider . repr_in_client (),
+      write_protected_leaves (Folder::Overrider . repr_in_client (),
             "These override the view of it."),
-      write_protected_leaves (PartnerFolder::Container . repr_in_client (),
+      write_protected_leaves (Folder::Container . repr_in_client (),
             "These contain it."),
-      write_protected_leaves (PartnerFolder::Mentioner . repr_in_client (),
+      write_protected_leaves (Folder::Mentioner . repr_in_client (),
             "These link to it."),
-      write_protected_leaves (PartnerFolder::AcquiredBy . repr_in_client (),
+      write_protected_leaves (Folder::AcquiredBy . repr_in_client (),
             "it was acquired by"),
-      write_protected_leaves (PartnerFolder::Acquired . repr_in_client (),
+      write_protected_leaves (Folder::Acquired . repr_in_client (),
             "it acquired"),
       vec! [
-      leaf (PropertyFolder::ID . repr_in_client (), "IDs"),
+      leaf (Folder::ID . repr_in_client (), "IDs"),
       leaf ("id", "ID") ], // PropertyMember::ID
-      write_protected_leaves (PropertyFolder::flags () . repr_in_client (),
+      write_protected_leaves (Folder::flags () . repr_in_client (),
                 "flags"),
       vec! [
       // A flag row is write-protected too: one rule emits its ☮, the
@@ -790,32 +790,27 @@ fn claim_emitted_atoms () -> Vec<&'static str> {
 /// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.
 fn property_and_folder_atoms () -> Vec<&'static str> {
-  fn partnerFolder_guard ( c : PartnerFolder ) { // compile error here = update all_partnerFolders
+  fn folder_guard ( c : &Folder ) { // compile error here = update the two lists below
     match c {
-      PartnerFolder::Subscribee | PartnerFolder::Subscriber
-      | PartnerFolder::Overridden | PartnerFolder::Overrider
-      | PartnerFolder::Hider | PartnerFolder::Hidden
-      | PartnerFolder::HiddenInSubscribee
-      | PartnerFolder::HiddenOutsideOfSubscribee
-      | PartnerFolder::Container | PartnerFolder::Mentioner
-      | PartnerFolder::AcquiredBy | PartnerFolder::Acquired => () }}
-  let _ = partnerFolder_guard;
-  let all_partnerFolders : [PartnerFolder; 12] = [
-    PartnerFolder::Subscribee, PartnerFolder::Subscriber,
-    PartnerFolder::Overridden, PartnerFolder::Overrider,
-    PartnerFolder::Hider, PartnerFolder::Hidden,
-    PartnerFolder::HiddenInSubscribee,
-    PartnerFolder::HiddenOutsideOfSubscribee,
-    PartnerFolder::Container, PartnerFolder::Mentioner,
-    PartnerFolder::AcquiredBy, PartnerFolder::Acquired ];
-  fn propertyFolder_guard ( c : &PropertyFolder ) { // ditto
-    match c {
-      PropertyFolder::ID | PropertyFolder::Alias
-        | PropertyFolder::Flags { .. } => () }}
-  let _ = propertyFolder_guard;
-  let all_propertyFolders : [PropertyFolder; 3] = [
-    PropertyFolder::ID, PropertyFolder::Alias, PropertyFolder::flags () ];
-  for c in &all_propertyFolders { propertyFolder_guard (c); }
+      Folder::Subscribee | Folder::Subscriber
+      | Folder::Overridden | Folder::Overrider
+      | Folder::Hider | Folder::Hidden
+      | Folder::HiddenInSubscribee
+      | Folder::HiddenOutsideOfSubscribee
+      | Folder::Container | Folder::Mentioner
+      | Folder::AcquiredBy | Folder::Acquired => (),
+      Folder::ID | Folder::Alias | Folder::Flags { .. } => () }}
+  let _ = folder_guard;
+  let all_partnerFolders : [Folder; 12] = [
+    Folder::Subscribee, Folder::Subscriber,
+    Folder::Overridden, Folder::Overrider,
+    Folder::Hider, Folder::Hidden,
+    Folder::HiddenInSubscribee,
+    Folder::HiddenOutsideOfSubscribee,
+    Folder::Container, Folder::Mentioner,
+    Folder::AcquiredBy, Folder::Acquired ];
+  let all_propertyFolders : [Folder; 3] = [
+    Folder::ID, Folder::Alias, Folder::flags () ];
   let all_property_atoms : [&'static str; 8] = {
     fn propertyMember_guard ( q : &PropertyMember ) { // ditto
       match q {

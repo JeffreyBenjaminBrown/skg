@@ -12,7 +12,7 @@ use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, PartnerFolder, Phantom, PhantomHistorical, ChangeViewnode,
+  Editability, Folder, Phantom, PhantomHistorical, ChangeViewnode,
   Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -140,8 +140,8 @@ pub fn append_historical_phantom_content (
     let acquirer_viewnode : Viewnode =
       mk_member_viewnode (straddle, &acquirer, None);
     let folder : NodeId = tree . get_mut (phantom) ? . append (
-      viewnode_of ( ViewnodeKind::PartnerFolder (
-        PartnerFolder::AcquiredBy ))) . id ();
+      viewnode_of ( ViewnodeKind::Folder (
+        Folder::AcquiredBy ))) . id ();
     tree . get_mut (folder) ? . append (acquirer_viewnode); }
   for partner in straddle . partners (pid, RelationRole::CONTENT) {
     let member : Option<Viewnode> =
@@ -167,8 +167,8 @@ pub fn append_acquired_folder (
   let acquirees : Vec<ID> = straddle . acquirees_of (pid);
   if acquirees . is_empty () { return None; }
   let folder : NodeId = tree . get_mut (parent) ? . append (
-    viewnode_of ( ViewnodeKind::PartnerFolder (
-      PartnerFolder::Acquired ))) . id ();
+    viewnode_of ( ViewnodeKind::Folder (
+      Folder::Acquired ))) . id ();
   for acquiree in &acquirees {
     if let Some (phantom) = mk_historical_viewnode (straddle, acquiree, None) {
       tree . get_mut (folder) ? . append (phantom); }}

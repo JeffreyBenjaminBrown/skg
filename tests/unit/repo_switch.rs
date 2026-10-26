@@ -22,8 +22,8 @@ fn writeProtected (skgid : &str, skgrepo : &str) -> Viewnode {
     ID::from (skgid), SkgrepoName::from (skgrepo),
     skgid . to_string (), true ) }
 
-fn folder (kind : PartnerFolder) -> Viewnode {
-  viewnode_of (ViewnodeKind::PartnerFolder (kind)) }
+fn folder (kind : Folder) -> Viewnode {
+  viewnode_of (ViewnodeKind::Folder (kind)) }
 
 // A now-restricted childless branch disappears; a now-restricted node
 // with an unrestricted child is retained as a RestrictedVognode (converted,
@@ -64,17 +64,17 @@ fn partners_and_folders_prune () {
   let recorder : NodeId = t . get_mut (root) . unwrap ()
     . append (def ("recorder", "public")) . id ();
   let kept_folder : NodeId = t . get_mut (recorder) . unwrap ()
-    . append (folder (PartnerFolder::Subscriber)) . id ();
+    . append (folder (Folder::Subscriber)) . id ();
   let kept_member : NodeId = t . get_mut (kept_folder) . unwrap ()
     . append (writeProtected ("unrestricted-member", "public")) . id ();
   let gone_member : NodeId = t . get_mut (kept_folder) . unwrap ()
     . append (writeProtected ("restricted-member", "private")) . id ();
   let emptied_folder : NodeId = t . get_mut (recorder) . unwrap ()
-    . append (folder (PartnerFolder::Container)) . id ();
+    . append (folder (Folder::Container)) . id ();
   t . get_mut (emptied_folder) . unwrap ()
     . append (writeProtected ("restricted-container", "private"));
   let empty_folder : NodeId = t . get_mut (recorder) . unwrap ()
-    . append (folder (PartnerFolder::Subscribee)) . id ();
+    . append (folder (Folder::Subscribee)) . id ();
   convert_and_prune_for_skgrepo_switch (
     &mut t, &restriction_public ()) . unwrap ();
   let is_attached = |node : NodeId| -> bool {

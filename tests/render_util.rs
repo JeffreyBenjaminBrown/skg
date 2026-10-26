@@ -5,7 +5,7 @@ use skg::org_to_text::viewnode_to_text;
 use skg::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, ViewnodeStats, default_unrestrictedVognode };
-use skg::types::viewnode::{PropertyFolder, Warrant, viewnode_of};
+use skg::types::viewnode::{Folder, Warrant, viewnode_of};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -37,8 +37,8 @@ fn test_viewnode_to_text_with_body () {
 
 #[test]
 fn test_viewnode_to_text_with_metadata () {
-  let mut node = viewnode_of (ViewnodeKind::PropertyFolder (
-      PropertyFolder::Alias));
+  let mut node = viewnode_of (ViewnodeKind::Folder (
+      Folder::Alias));
   node . foldAndFocus . folded = true;
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )

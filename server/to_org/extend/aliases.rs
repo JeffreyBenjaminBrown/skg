@@ -4,7 +4,7 @@ use crate::to_org::util::{get_skgid_from_viewnode_at, remove_completed_view_requ
 use crate::types::misc::{ID, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
-use crate::types::viewnode::{PropertyFolder, PropertyMember};
+use crate::types::viewnode::{Folder, PropertyMember};
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 
@@ -49,7 +49,7 @@ pub fn build_and_integrate_aliases (
     get_skgid_from_viewnode_at ( tree, treeid ) ?;
   if unique_non_vognode_child_of_viewnode (
     tree, treeid,
-    &ViewnodeKind::PropertyFolder (PropertyFolder::Alias) )? . is_some ()
+    &ViewnodeKind::Folder (Folder::Alias) )? . is_some ()
   { // If it already has an AliasFolder child,
     // then reconcile_aliasFolder_children (in update_buffer) already handled it.
     return Ok (( )); }
@@ -62,7 +62,7 @@ pub fn build_and_integrate_aliases (
     . unwrap_or_default ();
   let aliasfolder_skgid : ego_tree::NodeId =
     insert_non_vognode_as_child ( tree, treeid,
-      ViewnodeKind::PropertyFolder (PropertyFolder::Alias), true ) ?;
+      ViewnodeKind::Folder (Folder::Alias), true ) ?;
   for alias in & aliases {
     insert_non_vognode_as_child (
       tree, aliasfolder_skgid,

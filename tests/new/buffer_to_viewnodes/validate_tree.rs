@@ -943,9 +943,7 @@ fn partner_folder_treeids (
   viewforest : &MpViewForest,
 ) -> Vec<ego_tree::NodeId> {
   viewforest . nodes ()
-    . filter ( |node_ref| matches! (
-        node_ref . value () . kind,
-        MpViewnodeKind::PartnerFolder (_) ))
+    . filter ( |node_ref| node_ref . value () . kind . is_partner_folder () )
     . map ( |node_ref| node_ref . id () )
     . collect () }
 
