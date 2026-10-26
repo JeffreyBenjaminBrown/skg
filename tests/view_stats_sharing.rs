@@ -17,18 +17,14 @@
 // save (the viewStats parser errors on unknown atoms, so this also
 // pins the parse arms).
 
+use skg::test_utils::save_and_rerender;
 use skg::metadata_canon::without_viewnode_ids;
 use std::error::Error;
-use std::net::TcpStream;
 
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
-use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn all_tests
@@ -128,29 +124,6 @@ fn assert_op_in_view_of_P (
                         && l . contains ("(ancestors 1)") ),
     "{}: C shown as content of P (which it overrides) is born of an \
      overrides-out to P (gen 1):\n{}", label, buf ); }
-
-async fn save_and_rerender (
-  buf     : &str,
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<String, Box<dyn Error>> {
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
-    buf, config, tantivy, &graph,
-    &Err ( String::new () ), &mut views_state ) . await ?;
-  assert! ( response . errors . is_empty (),
-    "save must not error; got: {:?}", response . errors );
-  Ok ( response . saved_view ) }
 
 async fn sharing_view_stats_appear_and_roundtrip (
   config : &SkgConfig,

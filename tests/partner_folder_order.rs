@@ -15,6 +15,7 @@
 // keeps every child where it stood and shows u after the kept members
 // ('docs/diff-view.org', "What the refresh keeps").
 
+use skg::test_utils::save_and_rerender;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
@@ -42,29 +43,6 @@ fn write_protected_folder_order_is_preserved
       write_protected_folder_order_is_preserved_impl (
         config, tantivy ) . await
     } )) }
-
-async fn save_and_rerender (
-  buf     : &str,
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<String, Box<dyn Error>> {
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
-    buf, config, tantivy, &graph,
-    &Err ( String::new () ), &mut views_state ) . await ?;
-  assert! ( response . errors . is_empty (),
-    "save must not error; got: {:?}", response . errors );
-  Ok ( response . saved_view ) }
 
 /// The whole line containing the given metadata fragment.
 fn line_containing<'a> (

@@ -19,7 +19,7 @@ use crate::serve::handlers::save_buffer::{
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{ViewforestId, ViewnodeIdRecord};
+use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
@@ -33,6 +33,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
+use std::net::{TcpListener, TcpStream};
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
@@ -411,6 +412,32 @@ pub async fn update_from_and_rerender_buffer_test (
     stream, org_buffer_text, config, tantivy_index, graph,
     viewforest_id_from_request_result, views_state,
     /* approved_forks = */ true ) . await }
+
+/// Save 'buffer' through the full pipeline, as a client's save of a
+/// view no other buffer shares, and return the rerendered saved view.
+/// The save must succeed without errors.
+pub async fn save_and_rerender (
+  buffer  : &str,
+  config  : &SkgConfig,
+  tantivy : &TantivyIndex,
+) -> Result<String, Box<dyn Error>> {
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    open_views        : OpenViews::new (),
+    graph_straddle    : None,
+  };
+  let listener : TcpListener =
+    TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  let response : SaveResponse = update_from_and_rerender_buffer_test (
+    &mut stream,
+    buffer, config, tantivy, &graph,
+    &Err ( String::new () ), &mut views_state ) . await ?;
+  assert! ( response . errors . is_empty (),
+    "save must not error; got: {:?}", response . errors );
+  Ok ( response . saved_view ) }
 
 /// Drive the full prepared-save conflict path with explicit buffer snapshots.
 pub async fn update_from_and_rerender_buffer_with_snapshots_test (

@@ -17,6 +17,7 @@
 // N1; R2 (skgrepo "other", owned) overrides N2; N3 lives in
 // "other" while P3 and its overrider R3 live in "main".
 
+use skg::test_utils::save_and_rerender;
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
@@ -28,7 +29,6 @@ use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
   multi_root_view, multi_root_view_with_skgrepo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
@@ -99,29 +99,6 @@ async fn node_instructions_from (
   Ok ( buffer_to_validated_saveplan (
          buffer, config, None )  ?
        . 1 . node_instructions ) }
-
-async fn save_and_rerender (
-  buf     : &str,
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<String, Box<dyn Error>> {
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
-    buf, config, tantivy, &graph,
-    &Err ( String::new () ), &mut views_state ) . await ?;
-  assert! ( response . errors . is_empty (),
-    "save must not error; got: {:?}", response . errors );
-  Ok ( response . saved_view ) }
 
 fn read_fixture_file (
   config : &SkgConfig,

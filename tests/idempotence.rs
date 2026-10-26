@@ -18,17 +18,13 @@
 // deleted -- is covered separately by the save_collateral_delete_then_edit_under_it
 // integration test, which only a delete can trigger, not an unchanged-graph rerender.)
 
+use skg::test_utils::save_and_rerender;
 use std::error::Error;
-use std::net::TcpStream;
 
-use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
-use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::test_utils::run_with_test_stores;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
-use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::refresh::{Truth, refresh_content_viewforest};
@@ -65,31 +61,6 @@ fn rerender_is_a_fixpoint
         config, tantivy ) . await
     } )) }
 
-/// Run one save+rerender of `buf` through the full pipeline, returning the
-/// rerendered saved view.
-async fn rerender_once (
-  buf     : &str,
-  config : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<String, Box<dyn Error>> {
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = ViewsState {
-    open_views        : OpenViews::new (),
-    graph_straddle    : None,
-  };
-  let listener : std::net::TcpListener =
-    std::net::TcpListener::bind ("127.0.0.1:0") . unwrap ();
-  let mut stream : TcpStream =
-    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
-  let response = update_from_and_rerender_buffer (
-    &mut stream,
-    buf, config, tantivy, &graph,
-    &Err ( String::new () ), &mut views_state ) . await ?;
-  assert! ( response . errors . is_empty (),
-    "rerender must not error; got: {:?}", response . errors );
-  Ok ( response . saved_view ) }
-
 async fn rerender_is_a_fixpoint_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -103,9 +74,9 @@ async fn rerender_is_a_fixpoint_impl (
       &[ ID ("a" . to_string ()) ] ) ?;
 
   let first  : String =
-    rerender_once (&complete_buffer, config, tantivy) . await ?;
+    save_and_rerender (&complete_buffer, config, tantivy) . await ?;
   let second : String =
-    rerender_once (&first, config, tantivy) . await ?;
+    save_and_rerender (&first, config, tantivy) . await ?;
 
   assert_eq! ( first, second,
     "the refresh is not a fixpoint: a second rerender of an unchanged buffer \
