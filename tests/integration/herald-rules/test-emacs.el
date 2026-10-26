@@ -27,15 +27,21 @@
           (kill-emacs 1))
       ;; The fetched table should drive the lens engine end to end.
       (let ((herald (heralds-from-metadata
-                     "(skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected)")))
-        (if (and herald (string-match-p "☮" herald))
-            (progn
-              (message "PASS: Integration test successful!")
-              (kill-emacs 0))
-          (progn
-            (message "FAIL: fetched table did not produce the writeProtected herald: %S"
-                     herald)
-            (kill-emacs 1)))))))
+                     "(skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected)"))
+            ;; The label table served beside the rules labels a boundary.
+            (boundary (heralds-from-metadata
+                       "(skg node (gnid 1) (skgRepos (nodeRepo main)) (view repoBoundary))")))
+        (cond ((not (and herald (string-match-p "☮" herald)))
+               (message "FAIL: fetched table did not produce the writeProtected herald: %S"
+                        herald)
+               (kill-emacs 1))
+              ((not (and boundary (string-match-p "⌂:m" boundary)))
+               (message "FAIL: the served label table did not label the repo boundary: %S"
+                        boundary)
+               (kill-emacs 1))
+              (t
+               (message "PASS: Integration test successful!")
+               (kill-emacs 0)))))))
 
 ;; Set a timeout in case things hang
 (run-at-time 15 nil (lambda ()

@@ -698,6 +698,29 @@ the request."
               headline #'skg-restore-removed-membership)
              '(skg node (editRequest restoreRel))))))
 
+(ert-deftest test-skg-edit-request-commands-keep-the-readiness-request ()
+  "The merge and restore commands replace the edit request in
+'(editRequest ...)' and keep the readiness request pending there."
+  (should (equal (test-skg--metadata-after
+                  "* (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) a"
+                  (lambda () (skg-set-merge-request "b")))
+                 '(skg node (gnid a) (skgRepos (nodeRepo main))
+                       (editRequest (merge b) (ready node))
+                       (diff (node added) (leaves 1 node)))))
+  (should (equal (test-skg--metadata-after
+                  "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (rel removed) (leaves 1 node) (ready node))) g"
+                  #'skg-restore-deleted-node)
+                 '(skg ghost (gnid g) (skgRepos (nodeRepo main))
+                       (editRequest restoreNode (unready node))
+                       (diff (node removed) (rel removed) (leaves 1 node) (ready node)))))
+  (should (equal (test-skg--metadata-after
+                  "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
+** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (editRequest (ready rel)) (view noWarrant) (diff (rel removed) (leaves 1 rel))) x"
+                  #'skg-restore-removed-membership)
+                 '(skg node (gnid x) (skgRepos (nodeRepo main)) noClaim
+                       (editRequest restoreRel (ready rel))
+                       (view noWarrant) (diff (rel removed) (leaves 1 rel))))))
+
 (ert-deftest test-skg-restore-commands-refuse-the-wrong-kind ()
   "Each command refuses a headline of the wrong kind at once."
   (should (equal (test-skg--refusal-of

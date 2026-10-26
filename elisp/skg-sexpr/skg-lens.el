@@ -6,6 +6,15 @@
 ;;; Currently, it is used to turn a text-only metadata sexp
 ;;; into a shorter, colorful visual representation.
 ;;; But it might turn out to be useful for other things.
+;;;
+;;; The directive WHEN ('(WHEN KIND... RULE...)') applies its rules
+;;; to an object only when one of the object's elements is labeled
+;;; KIND. The herald rule table needs it because a headline's parts
+;;; stand beside its kind atom, and a part such as '(diff ...)' reads
+;;; differently by kind. Its full semantics are in the docstring of
+;;; `skg-transform-sexp-flat'; 'docs/heralds.org' says how the table
+;;; uses it, and the Rust conformance test checks that each WHEN names
+;;; only kind atoms.
 
 (require 'cl-lib)
 (require 'skg-shared)

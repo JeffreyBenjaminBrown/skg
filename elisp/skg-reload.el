@@ -27,9 +27,10 @@ hooks, no advice, just `defvar', `define-derived-mode',
 plain `load-file' instead.
 
 The herald rule table (`heralds--transform-rules', fetched from
-the server at connect time) is captured before the unload and
-re-installed after, since `unload-feature' on
-`heralds-minor-mode' would otherwise wipe it until the next
+the server at connect time) and the skgrepo label table served
+beside it (`heralds--skgrepo-labels') are captured before the unload
+and re-installed after, since `unload-feature' on
+`heralds-minor-mode' would otherwise wipe them until the next
 connect.
 
 PITFALL: the re-install is wrapped in `unwind-protect'. The herald
@@ -45,6 +46,8 @@ error still propagates so the user can fix it."
   (interactive)
   (let* ((herald-rules (and (boundp 'heralds--transform-rules)
                             heralds--transform-rules))
+         (skgrepo-labels (and (boundp 'heralds--skgrepo-labels)
+                              heralds--skgrepo-labels))
          (elisp-dir
           (file-name-directory
            (symbol-file 'skg-reload 'defun))))
@@ -57,7 +60,8 @@ error still propagates so the user can fix it."
         ;; still restore the captured table.
         (unless (fboundp 'heralds-install-rules)
           (load-file (expand-file-name "heralds-minor-mode.el" elisp-dir)))
-        (heralds-install-rules herald-rules))))
+        (heralds-install-rules herald-rules)
+        (setq heralds--skgrepo-labels skgrepo-labels))))
   (message "skg: all modules reloaded"))
 
 (defun skg--reload-modules (elisp-dir)

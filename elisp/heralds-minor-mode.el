@@ -14,7 +14,7 @@
 ;;; for that property rather than relying solely on the tracking list.
 
 (require 'cl-lib)
-(require 'skg-metadata) ;; for skg--folder-change-readiness-at-point
+(require 'skg-metadata) ;; for skg--folder-change-readiness-at-point and skg--pending-detachment-at-point-p
 (require 'skg-sexpr-search)
 (require 'skg-shared)
 
@@ -55,10 +55,31 @@ server/heralds.rs.
 A member carries no membership atom and so no membership herald of
 its own. Its relationship facts arrive in `(view (rels ...))', its
 birth facts in `(view (birth ...))' and its property counts in `(view
-(props ...))'. The one normalisation is a changed folder's: the
-server writes every folder as its bare atom, and the client, finding
-a member's relationship changed, hands the lens `(FOLDER changed)'
-\(see `heralds--as-changed-folder').")
+(props ...))'. Three heralds need what the headline's own metadata
+cannot say, so this client supplies it: a `repoBoundary' gets its
+skgrepo's label (`heralds--with-repoBoundary-label'), a pending
+detachment the atom `pendingDetachment' (`heralds-from-metadata'),
+and a changed folder its label in place of the lens's
+\(`heralds--changed-folder-text').")
+
+(defvar heralds--skgrepo-labels nil
+  "The skgrepo label table, an alist of (REPO . LABEL) strings, which
+the server sends beside the herald rule table as `(skgrepoLabels
+(\"REPO\" \"LABEL\")...)'. A `repoBoundary' renders as \"⌂:LABEL\",
+LABEL looked up by the node's nodeRepo, or the nodeRepo itself when
+the table lacks it.")
+
+(defun heralds-install-skgrepo-labels (labels-form)
+  "Install LABELS-FORM, `(skgrepoLabels (REPO LABEL)...)', as the skgrepo
+label table. Called with the herald rule table by the connect-time
+fetch, and by tests."
+  (unless (eq (car-safe labels-form) 'skgrepoLabels)
+    (error "heralds-install-skgrepo-labels: not a label table: %S"
+           labels-form))
+  (setq heralds--skgrepo-labels
+        (mapcar (lambda (entry)
+                  (cons (format "%s" (car entry)) (format "%s" (cadr entry))))
+                (cdr labels-form))))
 
 (defun heralds-install-rules (rules)
   "Install RULES (a list whose car is `skg') as the herald rule table.
@@ -94,12 +115,13 @@ stripped when either side is non-alphanumeric."
   "Return a copy of S with structural colons removed.
 A colon is structural when either the character before or after
 it is non-alphanumeric (and not `-', `+', or space, which we keep
-since they often appear as label values or separators).
+since they often appear as label values or separators), except a
+colon after `⌂', which reads as in \"⌂:LABEL\".
 `replace-regexp-in-string' preserves text properties of the kept
 characters, which is what we need so ranges' styles survive."
   (replace-regexp-in-string
-   "\\([^[:alnum:]+ -]\\):\\|:\\([^[:alnum:]+ -]\\)"
-   "\\1\\2"
+   "\\([^[:alnum:]+ ⌂-]\\):\\|\\([^⌂]\\|\\`\\):\\([^[:alnum:]+ -]\\)"
+   "\\1\\2\\3"
    s))
 
 (defun heralds--apply-faces-per-region (s)
@@ -247,7 +269,8 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
                    (skg-sexp (buffer-substring-no-properties start (1+ end)))
                    (heralds (heralds-from-metadata
                              skg-sexp
-                             (skg--folder-change-readiness-at-point))))
+                             (skg--folder-change-readiness-at-point)
+                             (skg--pending-detachment-at-point-p))))
               (when heralds
                 (let ((ov (make-overlay start (1+ end))))
                   (overlay-put ov 'display heralds)
@@ -291,37 +314,84 @@ renders itself from `(view (rels ...) (props ...) (birth ...))'.")
 
 (defun heralds-from-metadata
     (metadata-sexp ;; Begins with '(skg ' and ends with ')'.
-     &optional folder-change)
+     &optional folder-change pending-detachment)
   "Return a display-ready herald string for METADATA-SEXP.
 Most composition lives in `heralds--transform-rules' (the served rule
-table); the one exception is the relationship heralds, whose semantic
+table); the exception is the relationship heralds, whose semantic
 facts in `(view ...)' the rule table only positions with a sentinel
 token that this function replaces with `heralds--render-rel-facts'
-output. FOLDER-CHANGE is what `skg--folder-change-readiness' says of
-the headline when it is a folder: nil, `ready' or `unready'.
+output. A `repoBoundary' reaches the lens with its skgrepo's label
+\(`heralds--with-repoBoundary-label').
+FOLDER-CHANGE is what `skg--folder-change-readiness' says of the
+headline when it is a folder: nil, `ready' or `unready'; a changed
+folder's herald is `heralds--changed-folder-text'.
+PENDING-DETACHMENT non-nil says the headline is a pending detachment
+\(`skg--pending-detachment-p'): the lens gets the atom
+`pendingDetachment', which it renders as a request.
 Returns nil if METADATA-SEXP doesn't parse as an `(skg ...)' form."
   (let* ((sexp (heralds--read-metadata metadata-sexp))
          (is-skg (and (listp sexp) (eq (car sexp) 'skg)))
-         (lensed (if (and is-skg folder-change)
-                     (heralds--as-changed-folder sexp folder-change)
-                   sexp))
-         (tokens (when is-skg
-                   (skg-transform-sexp-flat
-                    lensed heralds--transform-rules)))
-         (rel-str (when is-skg (heralds--render-rel-facts sexp))))
-    (heralds--tokens->text
-     (heralds--splice-rel-spans tokens rel-str))))
+         (folder (and is-skg folder-change (skg--folder-atom sexp))))
+    (if (and folder (heralds--changed-folder-label folder))
+        (heralds--changed-folder-text folder folder-change)
+      (let* ((lensed (and is-skg
+                          (append (heralds--with-repoBoundary-label sexp)
+                                  (and pending-detachment
+                                       '(pendingDetachment)))))
+             (tokens (when is-skg
+                       (skg-transform-sexp-flat
+                        lensed heralds--transform-rules)))
+             (rel-str (when is-skg (heralds--render-rel-facts sexp))))
+        (heralds--tokens->text
+         (heralds--splice-rel-spans tokens rel-str))))))
 
-(defun heralds--as-changed-folder (sexp folder-change)
-  "SEXP, a folder's metadata, as the lens reads a changed folder: its
-bare atom FOLDER replaced by `(FOLDER changed)', followed by `(diff
-\(ready))' when FOLDER-CHANGE is `ready'."
-  (let ((folder (skg--folder-atom sexp)))
-    (append (mapcar (lambda (part)
-                      (if (eq part folder) (list folder 'changed) part))
-                    sexp)
-            (when (eq folder-change 'ready)
-              (list '(diff (ready)))))))
+(defun heralds--with-repoBoundary-label (sexp)
+  "SEXP, a headline's metadata, with the atom `repoBoundary' in its
+`(view ...)' replaced by `(repoBoundary LABEL)': LABEL is the label
+`heralds--skgrepo-labels' gives the nodeRepo of its `(skgRepos ...)',
+or that nodeRepo when the table lacks it. A headline naming no
+nodeRepo keeps the bare atom, which renders \"⌂\" alone."
+  (let ((node-repo (car (skg-sexp-cdr-at-path sexp '(skg skgRepos nodeRepo)))))
+    (if (not node-repo)
+        sexp
+      (let* ((repo (format "%s" node-repo))
+             (label (or (cdr (assoc repo heralds--skgrepo-labels)) repo)))
+        (mapcar (lambda (part)
+                  (if (eq (car-safe part) 'view)
+                      (mapcar (lambda (fact)
+                                (if (eq fact 'repoBoundary)
+                                    (list 'repoBoundary label)
+                                  fact))
+                              part)
+                    part))
+                sexp)))))
+
+(defun heralds--folder-heralds (key)
+  "The entry KEY of `folder_heralds' in 'shared/herald-styles.json'."
+  (alist-get key (alist-get 'folder_heralds skg-shared-herald-styles)))
+
+(defun heralds--changed-folder-label (folder)
+  "The label 'shared/herald-styles.json' gives FOLDER, a folder's atom,
+when the diff view shows it because of a change, or nil."
+  (alist-get folder (heralds--folder-heralds 'changed_labels)))
+
+(defun heralds--node-herald-style (key)
+  "The style 'node_heralds' in 'shared/herald-styles.json' gives KEY."
+  (intern (alist-get key (alist-get 'node_heralds skg-shared-herald-styles))))
+
+(defun heralds--changed-folder-text (folder folder-change)
+  "The herald of FOLDER, a folder's atom, shown because a member's
+relationship changed: its ☮ when it is write-protected, its changed
+label styled as its ordinary one, then ✓ when FOLDER-CHANGE is `ready'."
+  (concat (when (member (symbol-name folder)
+                        (heralds--folder-heralds 'write_protected))
+            (concat (heralds--styled "☮" (heralds--node-herald-style
+                                         'writeProtected))
+                    " "))
+          (heralds--styled (heralds--changed-folder-label folder)
+                           (heralds--node-herald-style folder))
+          (when (eq folder-change 'ready)
+            (heralds--styled "✓" (heralds--node-herald-style 'ready)))))
 
 (defun heralds--splice-rel-spans (tokens rel-str)
   "Return TOKENS with the first sentinel token replaced by REL-STR and

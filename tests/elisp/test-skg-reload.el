@@ -21,12 +21,15 @@ destructive `skg--reload-modules' so the real reload machinery never
 runs (no feature is actually unloaded); the stub mimics the failure by
 wiping the table and signalling.  `skg-reload' must still surface the
 error and leave the captured table installed."
-  (let ((heralds--transform-rules '(skg test-sentinel)))
+  (let ((heralds--transform-rules '(skg test-sentinel))
+        (heralds--skgrepo-labels '(("main" . "m"))))
     (cl-letf (((symbol-function 'skg--reload-modules)
                (lambda (&rest _)
-                 (setq heralds--transform-rules nil)
+                 (setq heralds--transform-rules nil
+                       heralds--skgrepo-labels nil)
                  (error "simulated load error during reload"))))
       (should-error (skg-reload))
-      (should (equal heralds--transform-rules '(skg test-sentinel))))))
+      (should (equal heralds--transform-rules '(skg test-sentinel)))
+      (should (equal heralds--skgrepo-labels '(("main" . "m")))))))
 
 (provide 'test-skg-reload)

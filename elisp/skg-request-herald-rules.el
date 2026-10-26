@@ -1,8 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Fetch the herald rule table from the server.
+;;; PURPOSE: Fetch the herald rule table from the server, and the
+;;; skgrepo label table it serves beside it.
 ;;; The table lives only in Rust (server/heralds.rs); Emacs caches it
-;;; in `heralds--transform-rules' for the session. `skg-client-init'
+;;; in `heralds--transform-rules' for the session, and the labels in
+;;; `heralds--skgrepo-labels'. `skg-client-init'
 ;;; calls `skg-request-herald-rules' once per connect, so reconnecting
 ;;; re-fetches it; `heralds-minor-mode' calls `skg-herald-rules-ensure'
 ;;; to self-heal a missing table when the user turns heralds on.
@@ -26,8 +28,9 @@ server cannot freeze Emacs with fruitless retries.")
 
 (defun skg-request-herald-rules ()
   "Send a herald-rule-table request and install the reply asynchronously.
-A one-shot handler calls `heralds-install-rules' when the reply
-arrives; a malformed reply leaves the cache untouched and logs why.
+A one-shot handler calls `heralds-install-rules' and
+`heralds-install-skgrepo-labels' when the reply arrives; a malformed
+reply leaves the caches untouched and logs why.
 
 This is the low-level fetch, used at connect time by `skg-client-init'
 and per-attempt by `skg-herald-rules-ensure'. It does not wait for or
@@ -39,9 +42,11 @@ callers that need the table should go through `skg-herald-rules-ensure'."
      (lambda (_tcp-proc payload)
        (condition-case err
            (let* ((response (read payload))
-                  (content (cadr (assoc 'content response))))
-             (heralds-install-rules
-              (car (read-from-string content))))
+                  (content (cadr (assoc 'content response)))
+                  (labels (assoc 'skgrepoLabels response))
+                  (rules (car (read-from-string content))))
+             (heralds-install-rules rules)
+             (heralds-install-skgrepo-labels labels))
          (error
           (message
            "Heralds: could not parse the rule table from the server: %S"

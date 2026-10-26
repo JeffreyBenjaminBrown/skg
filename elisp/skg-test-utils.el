@@ -23,7 +23,8 @@
     (add-to-list 'load-path (expand-file-name "skg-request-save" elisp-dir))))
 
 (defun skg-test-install-herald-rules ()
-  "Install the herald rule table from the generated fixture.
+  "Install the herald rule table from the generated fixture, and the
+skgrepo label table from tests/shared/herald-skgrepo-labels.sexp.
 In production the table is fetched from the server at connect time
 \(it lives only in Rust, server/heralds.rs); batch-mode tests inject
 it from tests/shared/herald-rules.sexp instead. That fixture is
@@ -37,7 +38,13 @@ silently; regenerate it with
     (with-temp-buffer
       (insert-file-contents fixture)
       (heralds-install-rules
-       (car (read-from-string (buffer-string)))))))
+       (car (read-from-string (buffer-string))))))
+  (with-temp-buffer ;; the skgrepo label table the rendering cases assume
+    (insert-file-contents
+     (expand-file-name "tests/shared/herald-skgrepo-labels.sexp"
+                       skg-test--project-root))
+    (heralds-install-skgrepo-labels
+     (car (read-from-string (buffer-string))))))
 
 (defun find-skg-content-buffer ()
   "Find a skg content view buffer that's not a search buffer."

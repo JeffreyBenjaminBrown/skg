@@ -5,8 +5,9 @@
 (require 'skg-request-herald-rules) ;; self-heal: skg-herald-rules-ensure
 (skg-test-install-herald-rules)
 
-;; (NAME METADATA TEXT STYLES) for each case in the file, which the
-;; Neovim tests read too. STYLES is one style name (or "-") per character.
+;; (NAME METADATA TEXT STYLES CONTEXT) for each case in the file, which
+;; the Neovim tests read too. STYLES is one style name (or "-") per
+;; character; CONTEXT is the text of its '---- context: ' line, or nil.
 (defconst test-heralds--shared-cases-file
   (expand-file-name "../shared/herald-rendering-cases.txt"
                     (file-name-directory (or load-file-name buffer-file-name))))
@@ -21,19 +22,22 @@
 
 (defun test-heralds--shared-cases ()
   "Parse `test-heralds--shared-cases-file'."
-  (let ((cases nil) (name nil) (metadata nil) (text nil))
+  (let ((cases nil) (name nil) (metadata nil) (text nil) (context nil))
     (dolist (line (split-string
                    (with-temp-buffer
                      (insert-file-contents test-heralds--shared-cases-file)
                      (buffer-string))
                    "\n"))
       (cond ((string-prefix-p "==== " line)
-             (setq name (substring line 5) metadata nil text nil))
+             (setq name (substring line 5) metadata nil text nil context nil))
+            ((string-prefix-p "---- context: " line)
+             (setq context (substring line 14)))
             ((string-prefix-p "---- text: " line)
              (setq text (substring line 11)))
             ((string-prefix-p "---- styles: " line)
              (push (list name metadata text
-                         (test-heralds--expand-style-runs (substring line 13)))
+                         (test-heralds--expand-style-runs (substring line 13))
+                         context)
                    cases)
              (setq name nil))
             ((and name (not metadata)) (setq metadata line))))
@@ -50,7 +54,12 @@
   (let ((cases (test-heralds--shared-cases)))
     (should (> (length cases) 40))
     (dolist (case cases)
-      (let ((display (heralds-from-metadata (nth 1 case))))
+      (let ((display (heralds-from-metadata
+                      (nth 1 case)
+                      (pcase (nth 4 case)
+                        ("folderChange ready" 'ready)
+                        ("folderChange unready" 'unready))
+                      (equal (nth 4 case) "pendingDetachment"))))
         (should (equal (list (car case)
                              (substring-no-properties display)
                              (cl-loop for i below (length display)
@@ -124,6 +133,49 @@ otherwise. Editing a member rerenders the folder's herald."
                       (search-forward "(leaves 1 rel)")
                       (insert " (ready rel)")))
                    (concat changed "✓")))))
+
+(defun test-heralds--last-line-display (lines)
+  "The display text of the herald on the last of LINES, with heralds on."
+  (with-temp-buffer
+    (org-mode)
+    (insert (mapconcat #'identity lines "\n") "\n")
+    (heralds-minor-mode 1)
+    (goto-char (point-max))
+    (forward-line -1)
+    (search-forward "(skg")
+    (let ((ov (cl-find-if (lambda (ov) (overlay-get ov 'display))
+                          (overlays-at (match-beginning 0)))))
+      (and ov (substring-no-properties (overlay-get ov 'display))))))
+
+(ert-deftest test-heralds-a-pending-detachment-renders-as-a-request ()
+  "A child that is 'noClaim' and warranted under an editable parent (a
+node that is not write-protected, or an editable folder whose anchor
+is one) shows \"detach\". Under a write-protected parent or folder, or
+unwarranted, it shows no request."
+  (let ((child "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) c")
+        (editable "* (skg node (gnid r) (skgRepos (nodeRepo r))) r")
+        (protected "* (skg node (gnid r) (skgRepos (nodeRepo r)) writeProtected) r"))
+    (should (equal (test-heralds--last-line-display (list editable child))
+                   "detach"))
+    (should-not (test-heralds--last-line-display (list protected child)))
+    (should (equal (test-heralds--last-line-display
+                    (list editable
+                          "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim (view noWarrant)) c"))
+                   "⊥"))
+    (should-not (test-heralds--last-line-display
+                 (list "** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) a root")))
+    (should (equal (test-heralds--last-line-display
+                    (list editable "** (skg aliasFolder) aliases"
+                          "*** (skg alias noClaim) an alias"))
+                   "alias detach"))
+    (should (equal (test-heralds--last-line-display
+                    (list protected "** (skg aliasFolder) aliases"
+                          "*** (skg alias noClaim) an alias"))
+                   "alias"))
+    (should (equal (test-heralds--last-line-display
+                    (list editable "** (skg containerFolder) containers"
+                          "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected) c"))
+                   "☮"))))
 
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."

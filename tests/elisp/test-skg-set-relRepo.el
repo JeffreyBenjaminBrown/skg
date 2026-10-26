@@ -235,6 +235,21 @@ the displayed relRepo fact; its message says the saved skgrepo survives
        (should (string-match-p "(skgRepos (nodeRepo public) (relRepo private))"
                                (test--buffer-line 1)))))))
 
+(ert-deftest test-apply-relRepo-keeps-the-readiness-request ()
+  "Setting a relRepo request, and removing one, keeps the readiness
+request pending in '(editRequest ...)'."
+  (test--with-skg-content-view
+   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (relRepo trusted) (ready rel))) x\n"
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (skg--apply-relRepo-choice "private")
+     (should (string-match-p "(editRequest (relRepo private) (ready rel)))"
+                             (test--buffer-line 1)))
+     (skg--apply-relRepo-choice skg--relRepo-no-override)
+     (should (string-match-p "(editRequest (ready rel)))"
+                             (test--buffer-line 1))))))
+
 (ert-deftest test-apply-relRepo-remove-without-atom-is-noop ()
   "The no-override choice without an atom changes nothing."
   (test--with-skg-content-view

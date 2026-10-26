@@ -344,8 +344,7 @@ next save will do with the relationship."
       (if (skg--relRepo-requested-value)
           (progn
             ;; The displayed relRepo stays under skgRepos; only the request goes.
-            (skg-edit-metadata-at-point
-             '(skg (DELETE (editRequest))))
+            (skg--write-edit-request nil)
             "Override removed: on save the membership keeps its saved (sticky) relRepo, or its default if new. Save to apply.")
         "No override present; nothing to remove.")
     (progn
@@ -353,12 +352,10 @@ next save will do with the relationship."
        ((or (skg--alias-headline-p)
             (skg--unknown-headline-p
              (skg--metadata-sexp-at-point-or-nil)))
-        (skg-edit-metadata-at-point
-         `(skg (ENSURE (editRequest (relRepo ,(intern choice)))))))
+        (skg--write-edit-request `(relRepo ,(intern choice))))
        (t
         ;; The displayed relRepo remains under skgRepos; skgrepo intent is separate.
-        (skg-edit-metadata-at-point
-         `(skg node (ENSURE (editRequest (relRepo ,(intern choice))))))))
+        (skg--write-edit-request `(relRepo ,(intern choice)) 'node)))
       (format "relRepo set to '%s'. Save to apply."
               choice))))
 
@@ -675,10 +672,7 @@ Does not save; call `skg-request-save-buffer' afterward."
   (let ((acquiree-skgid (skg--id-from-link-or-text acquiree-id-or-link)))
     (when (string-empty-p acquiree-skgid)
       (user-error "Acquiree ID cannot be empty"))
-    (skg-edit-metadata-at-point
-     `(skg node
-           (DELETE (editRequest))
-           (editRequest (merge ,(intern acquiree-skgid)))))
+    (skg--write-edit-request `(merge ,(intern acquiree-skgid)) 'node)
     (message "Merge request set for acquiree %s. Save to apply."
              acquiree-skgid)))
 
@@ -707,10 +701,7 @@ Does not save; call `skg-request-save-buffer' afterward."
   (interactive)
   (unless (skg--ghost-sexp-p (skg--metadata-sexp-at-point-or-nil))
     (user-error "%s" skg--restore-node-on-a-node-not-deleted))
-  (skg-edit-metadata-at-point
-   '(skg ghost
-         (DELETE (editRequest))
-         (editRequest restoreNode)))
+  (skg--write-edit-request 'restoreNode 'ghost)
   (message "Restore request set. Save to apply."))
 
 (defun skg-restore-removed-membership ()
@@ -729,10 +720,7 @@ Does not save; call `skg-request-save-buffer' afterward."
           ((not (and (skg--removed-membership-p metadata)
                      (skg--restoreRel-position-at-point-p)))
            (user-error "%s" skg--restore-rel-without-a-removed-membership)))
-    (skg-edit-metadata-at-point
-     '(skg node
-           (DELETE (editRequest))
-           (editRequest restoreRel)))
+    (skg--write-edit-request 'restoreRel 'node)
     (message "Restore request set. Save to apply.")))
 
 (defun skg--removed-membership-p (metadata-sexp)
@@ -894,6 +882,80 @@ headlines, nil where a headline carries none. Moves point."
                        (append (cdar members)
                                (list (skg--metadata-sexp-on-line))))))))
     (nreverse members)))
+
+
+;;; A pending detachment
+;;; A child the user marked 'noClaim' under an editable parent stays
+;;; in the buffer but leaves the parent's list at the next save. Until
+;;; then it is warranted and claims nothing, which no part of its own
+;;; metadata says, so the heralds ask here and render it as a request.
+
+(defun skg--pending-detachment-p (metadata-sexp parent-sexp grandparent-sexp)
+  "Non-nil when METADATA-SEXP, under a parent with PARENT-SEXP whose own
+parent has GRANDPARENT-SEXP, is a pending detachment: it carries
+'noClaim', the graph warrants it, and its parent is editable."
+  (and (consp metadata-sexp)
+       (memq 'noClaim (cdr metadata-sexp))
+       (skg--warranted-by-the-graph-p metadata-sexp)
+       (skg--editable-parent-p parent-sexp grandparent-sexp)))
+
+(defun skg--warranted-by-the-graph-p (metadata-sexp)
+  "Non-nil unless METADATA-SEXP's '(view ...)' carries 'noWarrant' or
+'ghostWarrant', or its '(diff ...)' a '(rel removed)': what HEAD alone
+warrants is no detachment."
+  (let ((view (cdr (assq 'view (cdr metadata-sexp)))))
+    (not (or (memq 'noWarrant view)
+             (memq 'ghostWarrant view)
+             (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
+                    '(removed))))))
+
+(defun skg--editable-parent-p (parent-sexp grandparent-sexp)
+  "Non-nil when a headline under a parent with PARENT-SEXP, whose own
+parent has GRANDPARENT-SEXP, stands under an editable parent: a node
+that is not write-protected, or a folder 'shared/herald-styles.json'
+does not list as write-protected whose anchor is such a node."
+  (let ((editable-node-p
+         (lambda (sexp)
+           (and (skg--unrestrictedNode-sexp-p sexp)
+                (not (skg--node-write-protected-p sexp)))))
+        (folder (skg--folder-atom parent-sexp)))
+    (if folder
+        (and (not (member (symbol-name folder)
+                          (alist-get 'write_protected
+                                     (alist-get 'folder_heralds
+                                                skg-shared-herald-styles))))
+             (funcall editable-node-p grandparent-sexp))
+      (funcall editable-node-p parent-sexp))))
+
+(defun skg--pending-detachment-at-point-p ()
+  "`skg--pending-detachment-p' of the headline on the line at point.
+Reads headline levels by their stars, so it works in any buffer, and
+looks for the parents only of a headline carrying 'noClaim'."
+  (let ((metadata (skg--metadata-sexp-on-line)))
+    (when (memq 'noClaim (cdr-safe metadata))
+      (let ((ancestors (skg--ancestor-metadata-sexps-on-line 2)))
+        (skg--pending-detachment-p metadata (nth 0 ancestors)
+                                   (nth 1 ancestors))))))
+
+(defun skg--ancestor-metadata-sexps-on-line (count)
+  "The metadata of the COUNT nearest ancestor headlines of the headline
+on the line at point, nearest first, nil where one has none or there
+is none. Reads headline levels by their stars."
+  (save-excursion
+    (beginning-of-line)
+    (let ((level (skg--headline-level-on-line))
+          (ancestors '()))
+      (dotimes (_ count)
+        (if (and level
+                 (> level 1)
+                 (re-search-backward
+                  (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
+                  nil t))
+            (progn (setq level (skg--headline-level-on-line))
+                   (push (skg--metadata-sexp-on-line) ancestors))
+          (setq level nil)
+          (push nil ancestors)))
+      (nreverse ancestors))))
 
 (defun skg--headline-level-on-line ()
   "The number of stars of the headline on the line at point, or nil
@@ -1261,6 +1323,42 @@ gets one, before its derived facts."
                  (old (remq old parts))
                  (new (append parts (list new)))
                  (t parts))))))
+
+(defun skg--metadata-with-edit-request (metadata-sexp request)
+  "METADATA-SEXP with REQUEST as the edit request of its
+'(editRequest ...)': any edit request there replaced, its readiness
+request kept after it. A nil REQUEST removes the edit request, and
+with it an '(editRequest ...)' left empty. A headline without
+'(editRequest ...)' gets one, before its derived facts. The
+counterpart of `skg--metadata-with-readiness-request'."
+  (let* ((parts (cdr metadata-sexp))
+         (old (assq 'editRequest parts))
+         (kept (seq-filter #'skg--readiness-request-p (cdr old)))
+         (new (when (or request kept)
+                (append '(editRequest) (and request (list request)) kept))))
+    (skg--derived-facts-last
+     (cons 'skg
+           (cond ((and old new)
+                  (mapcar (lambda (part) (if (eq part old) new part)) parts))
+                 (old (remq old parts))
+                 (new (append parts (list new)))
+                 (t parts))))))
+
+(defun skg--write-edit-request (request &optional kind)
+  "Make REQUEST the edit request of the headline at point, keeping the
+readiness request its '(editRequest ...)' holds
+\(`skg--metadata-with-edit-request'). A nil REQUEST removes the edit
+request. KIND, when given, is the kind atom a headline without
+metadata gets."
+  (let* ((metadata-sexp (skg--metadata-sexp-at-point-or-nil))
+         (edit-request
+          (assq 'editRequest
+                (cdr (skg--metadata-with-edit-request
+                      metadata-sexp request)))))
+    (skg-edit-metadata-at-point
+     `(skg ,@(and kind (list kind))
+           ,@(and metadata-sexp '((DELETE (editRequest))))
+           ,@(and edit-request (list edit-request))))))
 
 (defun skg--derived-facts-last (metadata-sexp)
   "METADATA-SEXP with its derived facts, '(view ...)' then '(diff ...)',
