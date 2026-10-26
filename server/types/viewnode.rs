@@ -234,10 +234,11 @@ pub struct Unknown {
 /// user entombstones it ('(viewRequests tombstone)'), and becomes an
 /// occurrence again, in place, when its node is back.
 ///
-/// USED: write-protected and save-inert: it emits no fieldIntents, is
-/// excluded from its parent's contains, and the vognodes under it are
-/// not its members. The diff view's reconciler draws it, and knows it
-/// by its kind.
+/// USED: write-protected: it emits no fieldIntents of its own, and
+/// the vognodes under it are not its members. When it claims
+/// membership, the save keeps its gnid in its viewparent's list, as it
+/// keeps an unknown's; otherwise it contributes nothing to the save.
+/// The refresh draws it in the diff view, and knows it by its kind.
 ///
 /// DISTINCT INFO: the before-graph's title, body and home skgrepo.
 /// Its viewnode's change facts are those of its existence ('(node
@@ -257,6 +258,16 @@ pub struct Ghost {
   /// next refresh entombstone this ghost. The only view request a
   /// ghost carries; the refresh fulfills it.
   pub tombstone_request : bool,
+  /// Whether the save reads the ghost's gnid as an entry of its
+  /// viewparent's list. The refresh lets a ghost claim only where the
+  /// worktree's list still names its gnid (a dangling reference to a
+  /// node HEAD has), so that the save keeps that list intact; on the
+  /// wire, as for an occurrence, 'noClaim' says no.
+  pub claimsMembership : bool,
+  /// Whether the truth relates it to its viewparent as its position
+  /// implies ('Warrant'), as the refresh set it. Only 'No' is written
+  /// ('noWarrant'): the ghost kind is its own ghost-warrant herald.
+  pub isWarranted : Warrant,
 }
 
 /// A Viewnode that corresponds to a Graphnode.
@@ -1050,23 +1061,35 @@ impl Viewnode {
   /// request, carried by this occurrence.
   /// Call only after the save's skgsave-commit: failed saves and confirmation
   /// round-trips must leave requests in the user's buffer. `view_requests` are
-  /// deliberately separate -- completion fulfills those while rendering.
+  /// deliberately separate -- the refresh fulfills those.
+  /// A 'restoreRel' the save fulfilled leaves its headline claiming the
+  /// relationship it restored, so that the next save keeps it (the
+  /// refresh marks 'noClaim' again where the save did not restore it).
   pub fn consume_edit_request_after_save (
     &mut self,
   ) {
     self . readiness_request = None;
+    let restored = |request : &Option<RelationshipEditRequest>| -> bool {
+      matches! ( request, Some (RelationshipEditRequest::RestoreRel) ) };
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
+        if restored (&restriction . relationshipEditRequest) {
+          restriction . claimsMembership = true; }
         restriction . relationshipEditRequest = None;
         if let Editability::Editable { edit_request, .. } =
           &mut restriction . editability
         { *edit_request = None; }},
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-        unknown . relationshipEditRequest = None,
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
+        if restored (&unknown . relationshipEditRequest) {
+          unknown . claimsMembership = true; }
+        unknown . relationshipEditRequest = None },
       ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
         ghost . restoreNode_request = false,
-      ViewnodeKind::PropertyMember (PropertyMember::Alias { relationshipEditRequest, .. }) =>
-        *relationshipEditRequest = None,
+      ViewnodeKind::PropertyMember (PropertyMember::Alias {
+        relationshipEditRequest, claimsMembership, .. }) => {
+        if restored (relationshipEditRequest) {
+          *claimsMembership = true; }
+        *relationshipEditRequest = None },
       _ => {}, }}
 
   pub fn title (&self) -> &str {

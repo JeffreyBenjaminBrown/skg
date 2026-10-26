@@ -265,9 +265,10 @@ fn an_editable_view_request_cascades_within_the_node_budget (
 /// b, unchanged. So x and y are the buffer's roots, and n is shown
 /// editable under x and write-protected under y. An editable-view
 /// request on n under y makes that occurrence editable and the one
-/// under x write-protected, with its content; a, a node of U under
-/// it, is editable again under y, its change shown there. A further
-/// save changes nothing.
+/// under x write-protected; the content under x keeps its
+/// editability, so a, a node of U, stays editable under x, its change
+/// shown there, and is write-protected under y. A further save
+/// changes nothing.
 #[test]
 fn an_editable_view_request_moves_editability_between_occurrences (
 ) -> Result<(), Box<dyn Error>> {
@@ -281,16 +282,16 @@ fn an_editable_view_request_moves_editability_between_occurrences (
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg node (gnid x) ");
     let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg node (gnid y) ");
-    for (subtree, editable) in [ (&x_subtree, false), (&y_subtree, true) ] {
-      for node in [ "n", "a" ] {
-        let atom : String = format! ("node (gnid {}) ", node);
-        let line : &str = subtree . iter ()
-          . find ( |line| without_viewnode_ids (line) . contains (&atom) )
-          . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
-        assert_eq! ( ! line . contains ("writeProtected"), editable,
-                     "{}:\n{}", node, saved ); }}
-    assert! ( y_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
-              "a's change must be shown under y:\n{}", saved );
+    for (subtree, node, editable) in [ (&x_subtree, "n", false), (&y_subtree, "n", true),
+                                       (&x_subtree, "a", true), (&y_subtree, "a", false) ] {
+      let atom : String = format! ("node (gnid {}) ", node);
+      let line : &str = subtree . iter ()
+        . find ( |line| without_viewnode_ids (line) . contains (&atom) )
+        . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
+      assert_eq! ( ! line . contains ("writeProtected"), editable,
+                   "{}:\n{}", node, saved ); }
+    assert! ( x_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
+              "a's change stays shown under x:\n{}", saved );
     assert! ( ! without_viewnode_ids (&saved) . contains ("viewRequests"), "{}", saved );
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     assert_eq! ( again, saved, "the editability moved stays where it is" );
@@ -526,8 +527,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
       t . write_protect (); }
     assert_eq! ( m_under_h_is_editable (&viewforest), Some (false) );
     ensure_editableOccurrences_exist (
-      &straddle, DiffViewBufferKind::AllChanges,
-      &mut viewforest, &runtime . graph, &runtime . config ) ?;
+      &straddle, DiffViewBufferKind::AllChanges, &mut viewforest );
     assert_eq! ( m_under_h_is_editable (&viewforest), Some (true) );
     Ok (( )) } ) }
 
@@ -538,7 +538,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";
+    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (m_line), "{}", buffer );
     let requested : String = buffer . replacen (

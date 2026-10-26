@@ -11,7 +11,10 @@
 //! occurrences the refresh draws, the first of a node is editable only
 //! when its parent is editable content and the budget allows; a repeat
 //! is write-protected. In the diff view the pruned change view decides
-//! instead: a drawn occurrence is editable when its node is in U.
+//! instead: a drawn occurrence is editable when its node is in U, or,
+//! under an occurrence an editable-view request extends (the request
+//! passes on to what it draws), when the budget allows, as in a
+//! content view; only that last extension is charged.
 
 use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::refresh::{Walk, write_protect_occurrence};
@@ -77,7 +80,8 @@ pub(crate) fn children_are_editable_content (
 /// Whether an occurrence of 'pid' the refresh draws under 'parent' is
 /// editable: its parent's children are editable content, no other
 /// occurrence of the node is editable, and the budget allows (in the
-/// diff view: the node is in U).
+/// diff view: the node is in U, or an editable-view request extends
+/// 'parent' and the budget allows).
 pub(crate) fn drawn_occurrence_is_editable (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -90,12 +94,14 @@ pub(crate) fn drawn_occurrence_is_editable (
     CompletionMode::ContentView => walk . node_budget > 0,
     CompletionMode::DiffView { straddle, buffer_kind } =>
       prunedChangeView_sets_of_buffer (straddle, buffer_kind) . u
-      . contains (pid), } }
+        . contains (pid)
+      || ( walk . had_editableView_request . contains (&parent)
+           && walk . node_budget > 0 ), } }
 
 /// At the visit of an editable occurrence, before its content is
-/// drawn: one the refresh drew editable, when the budget is spent, is
-/// write-protected instead; any other charges the budget, if the mode
-/// charges its extension.
+/// drawn: one the refresh drew editable, when the budget is spent and
+/// the mode would charge its extension, is write-protected instead;
+/// any other charges the budget, if the mode charges its extension.
 pub(crate) fn settle_budget_at_visit (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -105,11 +111,12 @@ pub(crate) fn settle_budget_at_visit (
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
       if ! occurrence . is_writeProtected () => occurrence . skgid . clone (),
     _ => return, };
+  let charged : bool = walk . mode . charges_node_budget (
+    &pid, walk . had_editableView_request . contains (&parent) );
   if walk . node_budget == 0
     && walk . drawn_editable . contains (&parent)
-    && matches! ( walk . mode, CompletionMode::ContentView ) {
+    && charged {
     write_protect_occurrence (tree, parent, walk);
     return; }
-  if walk . mode . charges_node_budget (
-       &pid, walk . had_editableView_request . contains (&parent) ) {
+  if charged {
     walk . node_budget = walk . node_budget . saturating_sub (1); }}

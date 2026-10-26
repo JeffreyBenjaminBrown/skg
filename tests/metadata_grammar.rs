@@ -11,7 +11,7 @@ use skg::serve::parse_metadata_sexp::{
   METADATA_GRAMMAR, ViewnodeMetadata, parse_metadata_to_viewnodemd};
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::viewnode::{
-  Ghost, PropertyMember, Unknown, Viewnode, ViewnodeId, ViewnodeKind, Vognode,
+  Ghost, PropertyMember, Unknown, Viewnode, ViewnodeId, ViewnodeKind, Vognode, Warrant,
   mk_editable_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
 use std::collections::HashMap;
@@ -51,7 +51,8 @@ fn each_kind_prints_its_parts_beside_its_atom (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
       skgid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
       title : "g" . into (), body : None,
-      restoreNode_request : true, tombstone_request : false } )))),
+      restoreNode_request : true, tombstone_request : false,
+      claimsMembership : true, isWarranted : Warrant::ByGraph } )))),
     "ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)" );
   assert_eq! (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
@@ -105,8 +106,8 @@ fn the_retired_spellings_are_refused_naming_the_grammar (
 fn each_kind_takes_only_its_own_parts (
 ) {
   for (metadata, refusal) in [
-    ( "(skg ghost (gnid g) (skgRepos (nodeRepo main)) noClaim)",
-      "A headline of kind ghost does not take noClaim" ),
+    ( "(skg ghost (gnid g) (skgRepos (nodeRepo main)) writeProtected)",
+      "A headline of kind ghost does not take writeProtected" ),
     ( "(skg ghost (gnid g) (skgRepos (nodeRepo main) (relRepo pub)))",
       "A ghost's skgRepos holds only (nodeRepo R)" ),
     ( "(skg unknown (gnid u) writeProtected)",

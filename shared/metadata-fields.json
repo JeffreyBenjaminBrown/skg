@@ -33,6 +33,8 @@
                                            "containers", "mentioners" ] } ] } ] } ] },
     { "kind": "ghost", "atoms": [ "ghost" ],
       "fields": [
+        { "name": "noClaim", "shape": "atom", "default": "false",
+          "values": [ { "value": "true" } ] },
         { "name": "editRequest", "shape": "one", "default": "none",
           "values": [ { "value": "restoreNode" } ] },
         { "name": "viewRequests", "shape": "some", "default": "none",

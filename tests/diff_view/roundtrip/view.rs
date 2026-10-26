@@ -156,7 +156,7 @@ fn the_new_viewnodes_cross_the_wire (
       "acquiredFolder", "acquiredByFolder",
       "ghost (gnid acquired) (skgRepos (nodeRepo main))" ];
     let change_facts : [&str; 4] = [
-      "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
+      "ghost (gnid gone) (skgRepos (nodeRepo main)) noClaim (diff (node removed) (rel removed))",
       "ghost (gnid gc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
       "(diff (rel removed))) kept",
       "ghost (gnid acquired) (skgRepos (nodeRepo main)) (diff (node removed))" ];
@@ -195,8 +195,8 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     let buffer : String = buffer_with_every_new_viewnode (f) ?
       . replace ( "(skg (oldText titleAndBody))",
                   "(skg (oldText titleAndBody) (editRequest (ready)))" )
-      . replace ( "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
-                  "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (ready node)) (diff (node removed) (rel removed))" );
+      . replace ( "ghost (gnid gone) (skgRepos (nodeRepo main)) noClaim (diff (node removed) (rel removed))",
+                  "ghost (gnid gone) (skgRepos (nodeRepo main)) noClaim (editRequest (ready node)) (diff (node removed) (rel removed))" );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     let p_contains_gone : LeafKey = LeafKey::Relationship {

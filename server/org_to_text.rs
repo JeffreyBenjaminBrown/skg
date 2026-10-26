@@ -215,7 +215,7 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus, unknown_node, claims_are_read, facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
-        viewnode . foldAndFocus, ghost, facts, request )), } }
+        viewnode . foldAndFocus, ghost, claims_are_read, facts, request )), } }
 
 /// The position atoms a headline carries, in their order on the wire.
 fn foldAndFocus_atoms (
@@ -500,11 +500,13 @@ fn unrestrictedVognode_metadata_to_string (
 
 /// Render metadata for a ghost:
 ///   [focused] [folded] [bodyFolded] ghost (gnid X)
-///   (skgRepos (nodeRepo R)) [(editRequest [restoreNode] [READINESS])]
-///   [(viewRequests tombstone)] [(diff ...)]
+///   (skgRepos (nodeRepo R)) [noClaim]
+///   [(editRequest [restoreNode] [READINESS])]
+///   [(viewRequests tombstone)] [(view noWarrant)] [(diff ...)]
 fn ghost_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   ghost           : &Ghost,
+  claims_are_read : bool,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
@@ -514,11 +516,15 @@ fn ghost_metadata_to_string (
       format! ("(gnid {})", ghost . skgid . 0) ]
     . into_iter ()
     . chain ( skgRepos_form ( Some (&ghost . home_skgrepo), None ))
+    . chain ( noClaim_atom (ghost . claimsMembership, claims_are_read) )
     . chain ( editRequest_form (
       ghost . restoreNode_request . then ( || "restoreNode" . to_string () ),
       request ))
     . chain ( ghost . tombstone_request . then (
       || "(viewRequests tombstone)" . to_string () ))
+    . chain ( view_form (
+      ( ghost . isWarranted == Warrant::No ) . then ( || "noWarrant" . to_string () )
+      . into_iter () . collect () ))
     . chain ( diff_form (facts) ) );
   parts . join (" ") }
 

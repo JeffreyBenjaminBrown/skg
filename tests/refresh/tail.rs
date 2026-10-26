@@ -35,3 +35,16 @@ fn every_viewnode_gets_a_vnid () {
             "{}", run . text );
   assert! ( run . corrections . iter () . all ( |c| c . vnid . is_some () ),
             "{:?}", run . corrections ); }
+
+#[test]
+fn a_folder_the_prune_leaves_childless_goes_too () {
+  // The containers folder's one member is gone: at the folder's visit
+  // it is a tombstone, so the folder is not yet empty; the prune
+  // removes the tombstone and then the folder.
+  let graph : InRustGraph = graph (&[ node ("p") ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg containerFolder)
+    *** {} gone
+    ", occ ("p", ""), occ ("gone", "writeProtected") );
+  assert_eq! ( run (&input, &graph) . outline (), "node p" ); }

@@ -11,6 +11,7 @@ use crate::pruned_change_view::common::{
 use crate::git_fixture_helpers::{
   mk_test_tcp_stream_pair, read_graphnode, without_lines_containing};
 
+use skg::refresh::corrections::{CorrectionKind, ViewCorrections};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
   extract_string_field_from_sexp, read_all_lp_messages,
@@ -225,4 +226,52 @@ fn override_substitution_is_off (
               "n must be shown as itself under p:\n{}", buffer );
     assert! ( ! buffer . contains ("overridesHere"),
               "no member is shown in place of another:\n{}", buffer );
+    Ok (( )) }) }
+
+/// The diff view's corrections ride the save response like a content
+/// view's ('SaveResponse.corrections'). A plain save of the "all
+/// changes" buffer reports nothing, and nor does a save that retitles
+/// a node: drawing the old text a change calls for is no correction.
+/// In the 'shared' fixture n, editable under x in the diff view, gains
+/// a child in a content view of n; the diff view, rerendered as
+/// collateral, draws it where n's list already drawn lacked it, and
+/// reports that, tagged with the diff view.
+#[test]
+fn the_diff_views_corrections_ride_the_save_response (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("shared", &["main"], |f| {
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let plain : SaveResponse = save (f, &buffer) ?;
+    assert! ( plain . errors . is_empty (), "{:?}", plain . errors );
+    assert! ( plain . corrections . is_empty (),
+              "a plain save corrects nothing: {:?}", plain . corrections );
+    let retitled : SaveResponse = save ( f, &plain . saved_view . replacen (
+      "(skgRepos (nodeRepo main)) (view (rels (contains (out 1)))) (diff (properties changed) (leaves 1 all))) x\n",
+      "(skgRepos (nodeRepo main)) (view (rels (contains (out 1)))) (diff (properties changed) (leaves 1 all))) x, retitled\n",
+      1 )) ?;
+    assert! ( retitled . errors . is_empty (), "{:?}", retitled . errors );
+    assert! ( without_viewnode_ids (&retitled . saved_view) . contains ("x, retitled\n"),
+              "{}", retitled . saved_view );
+    assert! ( retitled . corrections . is_empty (),
+              "a retitle corrects nothing: {:?}", retitled . corrections );
+    let view_of_n : ViewforestId = ViewforestId::ContentView ("content view of n" . into ());
+    let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
+      multi_root_view ( &f . config, Some (&f . tantivy), &[ ID::from ("n") ] ) ?;
+    f . views_state . open_views . register_view (
+      &f . graph . load_full (), view_of_n . clone (), tree, &pids );
+    let (mut stream, _read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+    let response : SaveResponse = block_on (
+      update_from_and_rerender_buffer_test (
+        &mut stream, &format! ("{}** new child\n", text),
+        &f . config, &f . tantivy, &f . graph,
+        &Ok (view_of_n), &mut f . views_state )) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    assert_eq! ( response . corrections . len (), 1,
+                 "only the diff view is corrected: {:?}", response . corrections );
+    let diff_view : &ViewCorrections = &response . corrections [0];
+    assert_eq! ( diff_view . viewforest_id, viewforest_id_of (DiffViewBufferKind::AllChanges) );
+    assert_eq! ( diff_view . corrections . iter () . map ( |c| ( c . kind, c . title . as_str () ))
+                 . collect::<Vec<(CorrectionKind, &str)>> (),
+                 vec! [ (CorrectionKind::Reinstated, "new child") ],
+                 "{:?}", diff_view . corrections );
     Ok (( )) }) }

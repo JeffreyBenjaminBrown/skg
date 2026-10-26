@@ -1,7 +1,7 @@
 // What a commit's rerender leaves of the change viewnodes
-// ('docs/diff-view.org', "The shallow model subtree, and what it
-// keeps"): the diff view's reconciler converts what the graph no
-// longer warrants ('convert_unwarranted_subtree'), never detaches.
+// ('docs/diff-view.org', "Rendering a buffer"): the refresh
+// entombstones a change viewnode whose change is gone, keeps an
+// unwarranted child, claiming nothing, and never detaches.
 //
 // The 'commit_leftovers' fixture is 'removed_partners' (b, d and e
 // drop x or c from their content; s drops its subscribee s2) with p,
@@ -60,11 +60,11 @@ fn line_starting<'a> (
 
 /// After the commit: the editable removed member with content is
 /// retained as non-member, still editable, holding it as its content,
-/// without facts; the
-/// childless removed member is gone; the deleted root, in neither
-/// graph now, is gone too, entombstoned and pruned as a childless
-/// tombstone; the changed folders are gone; no
-/// change fact remains; and the buffer saves back to itself.
+/// without facts; the childless removed member stays too, unwarranted;
+/// the deleted root, in neither graph now, is a tombstone, which keeps
+/// the old content drawn under it; the folders the buffer held stay,
+/// holding what the graph says; no change fact remains; and the
+/// buffer saves back to itself.
 #[test]
 fn a_commit_converts_what_the_diff_view_showed (
 ) -> Result<(), Box<dyn Error>> {
@@ -85,16 +85,13 @@ fn a_commit_converts_what_the_diff_view_showed (
       "* (skg node (gnid e) (skgRepos (nodeRepo main))) e\n",
       RETAINED_X_UNDER_E, ") x\n",
       "*** (skg node (gnid xc) (skgRepos (nodeRepo main)) writeProtected " ]);
-    assert_lines_in_order (&committed, &[ // b, under p, holds nothing
-      "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b) ", ") b\n* (skg node (gnid s)" ]);
-    assert! ( ! committed . contains ("(gnid h)")
-              && ! committed . contains ("(gnid h)")
-              && ! committed . contains ("tombstone"),
-              "h's root is gone:\n{}", committed );
-    assert! ( ! committed . contains ("(gnid hm)"), "{}", committed );
-    assert! ( ! committed . contains ("containerFolder")
-              && ! committed . contains ("subscriberFolder"),
-              "the changed folders are gone:\n{}", committed );
+    assert_lines_in_order (&committed, &[ // b, under p, holds x, unwarranted
+      "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b) ",
+      "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))) noWarrant)) x\n* (skg node (gnid s)" ]);
+    assert! ( ! committed . contains ("(gnid h)"), "h's ghost is gone:\n{}", committed );
+    assert! ( without_viewnode_ids (&committed) . contains (
+                "* (skg tombstone)\n** (skg node (gnid hm) (skgRepos (nodeRepo main))) hm\n" ),
+              "h's tombstone keeps hm:\n{}", committed );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
                   " ghost (gnid ", "homeSkgrepoMove", "(ready" ] {
       assert! ( ! committed . contains (fact),

@@ -25,20 +25,16 @@ use crate::prominence::climb_containerward_to_content_origins_via;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::diff_view::readiness_requests::set_ready_facts_in_viewforest;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
-use crate::diff_view::shallow_model_subtree::is_unrestricted_removed_member;
-use crate::to_org::util::{
-  EditableMap, append_plain_stub_root, graphnode_and_viewnode_from_skgid};
+use crate::refresh::Refreshed;
 use crate::types::env::RuntimeGeneration;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
-use crate::types::nodes::complete::Graphnode;
+use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  ChangeFacts, Editability, FoldAndFocus, Folder, Viewnode, ViewnodeKind,
-  Vognode, viewnode_of};
+  ChangeFacts, Editability, Existence, FoldAndFocus, Folder, Viewnode, ViewnodeKind,
+  Vognode, mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
-use crate::update_buffer::finish_viewforest;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -209,7 +205,9 @@ pub struct RenderedDiffViewBuffer {
 
 /// The buffer of kind 'diffView_buffer_kind' over 'straddle', with
 /// roots 'roots' (for a pruned change view, its D in order), and
-/// readiness from 'store'.
+/// readiness from 'store': the refresh of a stub of its roots
+/// ('stub_viewforest_of_roots'). A first rendering reports no
+/// correction.
 pub fn diffView_buffer_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -219,21 +217,16 @@ pub fn diffView_buffer_viewforest (
 ) -> Result<RenderedDiffViewBuffer, Box<dyn Error>> {
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
-  complete_viewforest_with_graph_straddle (
-    runtime, straddle, diffView_buffer_kind, &mut viewforest ) ?;
-  set_diffView_facts_in_viewforest (
-    &mut viewforest, straddle, diffView_buffer_kind, store, &runtime . graph );
-  let text : String = finish_viewforest (
-    &mut viewforest,
+  let refreshed : Refreshed = complete_viewforest_with_graph_straddle (
+    runtime, straddle, diffView_buffer_kind, store, None, &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
-    &mut ViewnodeIdRecord::default (),
-    &runtime . graph, &runtime . config, None ) ?;
+    &mut ViewnodeIdRecord::default () ) ?;
   let pids : Vec<ID> =
     pids_from_viewforest (&viewforest) . into_iter () . collect ();
-  Ok ( RenderedDiffViewBuffer { text, pids, viewforest } ) }
+  Ok ( RenderedDiffViewBuffer { text : refreshed . text, pids, viewforest } ) }
 
-/// What a buffer of the diff view gets after view completion:
+/// What a buffer of the diff view gets in the refresh's tail:
 /// its '(ready ...)' facts, and in the skgrepo-changes buffer each
 /// moved vognode's home skgrepo move
 /// ('set_homeSkgrepoMove_facts_in_viewforest').
@@ -323,8 +316,8 @@ pub fn nodes_editable_in_diffView (
     . chain (historical_in_content_position)
     . collect () }
 
-/// The stub the pruned change view's view completion starts from: each
-/// root as 'append_stub_root' appends it.
+/// The stub the refresh of a buffer of the diff view starts from:
+/// each root as 'append_stub_root' appends it.
 fn stub_viewforest_of_roots (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -332,40 +325,47 @@ fn stub_viewforest_of_roots (
   roots                : &[ID],
 ) -> Result<ViewForest, Box<dyn Error>> {
   let mut viewforest : ViewForest = ViewForest::new ();
-  let mut stub_editable_map : EditableMap = EditableMap::new ();
   for root in roots {
     append_stub_root (
-      runtime, straddle, diffView_buffer_kind,
-      &mut viewforest, root, &mut stub_editable_map ) ?; }
+      runtime, straddle, diffView_buffer_kind, &mut viewforest, root ) ?; }
   Ok (viewforest) }
 
-/// Append 'root' to the viewforest as an editable stub, or, when the
-/// after-graph lacks it, as a historical phantom, whose visit adds its
-/// old content. In a pruned change view, a multiply-contained root gets
-/// a folded container folder, which completion fills with its
-/// containers in either graph and their containerward forest. The
-/// order-only buffer, a flat list, gets none. Returns the root's
-/// treeid.
+/// Append 'root' to the viewforest as a stub: an editable occurrence,
+/// its body folded unless its node is in C (it is context), whose
+/// content the refresh draws, editable where it is in U; or, when the
+/// after-graph lacks the node, its ghost, whose old content the
+/// refresh draws. In a pruned change
+/// view, a multiply-contained root gets a folded container folder,
+/// which the refresh fills with its containers in either graph and
+/// their containerward chains. The order-only buffer, a flat list,
+/// gets none. Returns the root's treeid.
 fn append_stub_root (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
   viewforest           : &mut ViewForest,
   root                 : &ID,
-  stub_editable_map    : &mut EditableMap,
 ) -> Result<NodeId, Box<dyn Error>> {
   let buffer_root : NodeId = viewforest . internal_root_skgid ();
-  if straddle . after . get (root) . is_none () {
-    let phantom : Viewnode = mk_historical_viewnode (straddle, root, None)
+  let stub : Viewnode = match runtime . graph . get (root) {
+    None => mk_historical_viewnode (straddle, root, None)
       . ok_or_else ( || format! (
-        "diffView_buffer_viewforest: root {} is in neither graph", root )) ?;
-    return Ok ( viewforest . as_internal_tree_mut () . get_mut (buffer_root)
-                . ok_or ("diffView_buffer_viewforest: no buffer root") ?
-                . append (phantom) . id () ); }
-  let root_treeid : NodeId = append_plain_stub_root (
-    viewforest, root, &runtime . graph, &runtime . config,
-    stub_editable_map, None ) ?;
-  if diffView_buffer_kind != DiffViewBufferKind::OrderOnlyChanges
+        "diffView_buffer_viewforest: root {} is in neither graph", root )) ?,
+    Some (node) => {
+      let mut stub : Viewnode = mk_editable_viewnode (
+        node . pid . clone (), node . home_skgrepo . clone (),
+        node . title . clone (), node . body . clone () );
+      stub . foldAndFocus . bodyFolded =
+        ! prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind)
+          . c . contains (root);
+      stub }, };
+  let is_occurrence : bool = stub . is_occurrence ();
+  let root_treeid : NodeId =
+    viewforest . as_internal_tree_mut () . get_mut (buffer_root)
+    . ok_or ("diffView_buffer_viewforest: no buffer root") ?
+    . append (stub) . id ();
+  if is_occurrence
+    && diffView_buffer_kind != DiffViewBufferKind::OrderOnlyChanges
     && union_containers (straddle, root) . len () > 1 {
     viewforest . as_internal_tree_mut () . get_mut (root_treeid)
       . ok_or ("diffView_buffer_viewforest: a stub root vanished") ?
@@ -397,8 +397,8 @@ pub fn contentOrigins_missing_from_buffer (
     . collect () }
 
 /// Append 'content_origins' at the end of the buffer, each stubbed as the first
-/// rendering stubs a root ('append_stub_root'), for view completion to
-/// complete. Returns their treeids.
+/// rendering stubs a root ('append_stub_root'), for the refresh to
+/// draw. Returns their treeids.
 pub fn append_contentOrigins_to_buffer (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
@@ -406,11 +406,9 @@ pub fn append_contentOrigins_to_buffer (
   viewforest           : &mut ViewForest,
   content_origins      : &[ID],
 ) -> Result<Vec<NodeId>, Box<dyn Error>> {
-  let mut stub_editable_map : EditableMap = EditableMap::new ();
   content_origins . iter ()
     . map ( |content_origin| append_stub_root (
-      runtime, straddle, diffView_buffer_kind,
-      viewforest, content_origin, &mut stub_editable_map ) )
+      runtime, straddle, diffView_buffer_kind, viewforest, content_origin ) )
     . collect () }
 
 /// The IDs of the buffer's roots, whatever kind of vognode each is.
@@ -423,43 +421,50 @@ pub fn root_skgids_of_buffer (
       _ => None, } )
     . collect () }
 
-/// Before the view completion of a rerender that integrates the
-/// changes not editable in the view ('rerender_view'): each node of the buffer's recomputed U that
-/// has no editable occurrence becomes editable where it
-/// stands, at its BFS-first content occurrence (a root, a member of
-/// a vognode's content, or a removed member), with its body from the
-/// live graph, as a freshly created editable viewnode has it.
-/// Completion then extends its content list. A node of U with no
-/// occurrence is reached through the node above it on its walk, once
-/// that one is editable. A node shown only as a write-protected member
-/// of a folder counts as shown nowhere: a folder's members stay
-/// write-protected, and if the node is a content origin of D, it is
-/// appended as a root ('contentOrigins_missing_from_buffer').
+/// Before the refresh of a rerender that integrates the changes not
+/// editable in the view ('rerender_diffView_buffer'): each node of the
+/// buffer's recomputed U that has no editable occurrence becomes
+/// editable where it stands, at its level-order first content
+/// occurrence (a root, a member of a vognode's content, or a removed
+/// member). Its children claim membership, as the buffer read back
+/// says (under a write-protected parent no claim atom is written); the
+/// refresh then marks 'noClaim' on those the graph does not warrant,
+/// gives it its body and draws its content list. A node of U with no occurrence is reached through
+/// the node above it on its walk, once that one is editable. A node
+/// shown only as a write-protected member of a folder counts as shown
+/// nowhere: a folder's members stay write-protected, and if the node
+/// is a content origin of D, it is appended as a root
+/// ('contentOrigins_missing_from_buffer').
 pub fn ensure_editableOccurrences_exist (
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
   viewforest           : &mut ViewForest,
-  graph                : &InRustGraph,
-  config               : &SkgConfig,
-) -> Result<(), Box<dyn Error>> {
+) {
   let u : &BTreeSet<ID> =
     & prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind) . u;
   let mut editable : HashSet<ID> = editable_occurrences (viewforest);
   let occurrences : Vec<NodeId> =
     content_occurrences_in_level_order (viewforest);
   for treeid in occurrences {
-    let skgid : ID = match &viewforest . get (treeid) . unwrap () . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . skgid . clone (),
-      _ => continue, };
-    if ! u . contains (&skgid) || editable . contains (&skgid) { continue; }
-    let Some ((graphnode, _)) : Option<(Graphnode, Viewnode)> =
-      graphnode_and_viewnode_from_skgid (graph, config, &skgid) ? else { continue; };
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-      &mut viewforest . get_mut (treeid) . unwrap () . value () . kind {
-      t . editability = Editability::Editable {
-        body : graphnode . body, edit_request : None }; }
-    editable . insert (skgid); }
-  Ok (( )) }
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+      &mut viewforest . get_mut (treeid) . unwrap () . value () . kind
+    { if ! u . contains (&occurrence . skgid)
+         || editable . contains (&occurrence . skgid) { continue; }
+      occurrence . editability = Editability::Editable { // the refresh gives it its body
+        body : None, edit_request : None };
+      editable . insert ( occurrence . skgid . clone () ); }
+    else { continue; }
+    let children : Vec<NodeId> = viewforest . get (treeid) . unwrap () . children ()
+      . map ( |child| child . id () ) . collect ();
+    for child in children {
+      match &mut viewforest . get_mut (child) . unwrap () . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+          occurrence . claimsMembership = true,
+        ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
+          unknown . claimsMembership = true,
+        ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+          ghost . claimsMembership = true,
+        _ => {}, }}}}
 
 /// The viewforest's unrestricted vognodes in content position
 /// ('in_content_position') that are roots, members or removed members
@@ -483,7 +488,8 @@ fn content_occurrences_in_level_order (
                ViewnodeKind::Vognode (
                  Vognode::Unrestricted (_)
                  | Vognode::Ghost (_) ) =>
-                 is_unrestricted_removed_member ( node . value () ),
+                 node . value () . change_facts . change . rel
+                 == Some (Existence::Removed),
                _ => false, } );
         if ! is_root_or_member { continue; }
         occurrences . push ( node . id () ); },

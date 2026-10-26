@@ -41,6 +41,15 @@ use skg::types::views_state::ViewnodeIdRecord;
 use skg::update_buffer::completion_mode::CompletionMode;
 use skg::update_buffer::render_initial_view;
 
+use crate::git_fixture::{OwnedSkgrepos, git_fixture, graph_straddle};
+use skg::diff_view::completion::complete_viewforest_with_graph_straddle;
+use skg::diff_view::pruned_change_view::RenderedDiffViewBuffer;
+use skg::diff_view::readiness_store::ReadinessStore;
+use skg::graph_straddle::types::GraphStraddle;
+use skg::serve::handlers::diff_view::diffView_buffer;
+use skg::test_utils::cleanup_test_tantivy;
+use skg::types::views_state::DiffViewBufferKind;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -204,3 +213,133 @@ fn fixture_config (
               owned        : true, } ) ]);
   Some ( SkgConfig::fromSkgreposAndTantivyFolder (
     skgrepos, "/tmp/tantivy-test-fixpoint-unused" )) }
+
+// The refresh is a fixpoint over every diff-view fixture too: for each
+// git fixture case (a folder whose owned skgrepos each hold a 'head'
+// and a 'worktree'), each buffer of the diff view that is not empty,
+// as first rendered, parsed and refreshed again over the same graph
+// straddle and readiness store, comes back as it was, and the second
+// refresh corrects nothing. A case whose straddle cannot be built (one
+// made to be refused) is passed over. A skgrepo folder named
+// 'foreign' is foreign; the others are owned, 'public' first and
+// 'private' last.
+
+const GIT_FIXTURE_CASES : [&str; 4] = [
+  "tests/pruned_change_view/fixtures",
+  "tests/graph_straddle/fixtures",
+  "tests/diff_view/roundtrip",
+  "tests/readiness_requests", ];
+
+#[test]
+fn every_diff_view_fixture_is_a_fixpoint_of_the_refresh (
+) -> Result<(), Box<dyn Error>> {
+  let mut failures : Vec<String> = Vec::new ();
+  let mut buffers : usize = 0;
+  let mut cases : usize = 0;
+  for case in git_fixture_cases () {
+    let (owned, foreign) : (Vec<String>, Vec<String>) = skgrepos_of_case (&case);
+    let owned_names : Vec<&str> = owned . iter () . map ( |name| name . as_str () ) . collect ();
+    let foreign_names : Vec<&str> = foreign . iter () . map ( |name| name . as_str () ) . collect ();
+    let owned_skgrepos : OwnedSkgrepos =
+      if owned . is_empty () { OwnedSkgrepos::OnlyMain }
+      else { OwnedSkgrepos::Named (&owned_names) };
+    let Ok (fixture) = git_fixture (&case, owned_skgrepos, &foreign_names)
+      else { continue; };
+    let result : Result<(), Box<dyn Error>> = (|| {
+      let Ok (straddle) = graph_straddle (&fixture) else { return Ok (( )); };
+      cases += 1;
+      let runtime : RuntimeGeneration = RuntimeGeneration {
+        config        : Arc::new ( fixture . config . clone () ),
+        graph         : fixture . graph . load_full (),
+        tantivy_index : empty_in_ram_tantivy_index () ?,
+        generation    : 0, };
+      let store : ReadinessStore = ReadinessStore::default ();
+      for buffer_kind in DiffViewBufferKind::ALL {
+        let rendered : Option<RenderedDiffViewBuffer> =
+          match diffView_buffer (&runtime, &straddle, &store, buffer_kind) {
+            Ok (rendered) => rendered,
+            Err (e) => {
+              failures . push ( format! ( "{} {:?}: the first rendering failed: {}",
+                                          case . display (), buffer_kind, e ));
+              continue; }, };
+        let Some (rendered) = rendered else { continue; };
+        buffers += 1;
+        if let Err (failure) = diff_view_buffer_refreshes_unchanged (
+             &runtime, &straddle, &store, buffer_kind, &rendered . text ) {
+          failures . push ( format! ( "{} {:?}: {}", case . display (), buffer_kind, failure )); }}
+      Ok (( )) }) ();
+    cleanup_test_tantivy ( Some (&fixture . config . tantivy_folder) ) ?;
+    result ?; }
+  println! ("{} buffers over {} cases", buffers, cases);
+  assert! ( cases > 20, "too few git fixture cases were read: {}", cases );
+  assert! ( failures . is_empty (),
+            "{} of {} diff-view buffers over {} cases are not fixpoints:\n\n{}",
+            failures . len (), buffers, cases, failures . join ("\n\n") );
+  Ok (( )) }
+
+/// Whether the buffer 'text' of kind 'buffer_kind', parsed and
+/// refreshed over 'straddle', comes back as it was, correcting
+/// nothing: Err says how not.
+fn diff_view_buffer_refreshes_unchanged (
+  runtime     : &RuntimeGeneration,
+  straddle    : &GraphStraddle,
+  store       : &ReadinessStore,
+  buffer_kind : DiffViewBufferKind,
+  text        : &str,
+) -> Result<(), String> {
+  let (mut forest, errors, _warnings, _provenance) =
+    org_to_viewforest (text, &runtime . graph)
+    . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
+  if ! errors . is_empty () {
+    return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
+  let again : Refreshed = complete_viewforest_with_graph_straddle (
+    runtime, straddle, buffer_kind, store, None, &mut forest, &mut record )
+    . map_err ( |e| format! ("the second refresh failed: {}", e) ) ?;
+  if again . text != text {
+    return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
+                           text, again . text )); }
+  if ! again . corrections . is_empty () {
+    return Err ( format! ( "corrected: {:?}", again . corrections )); }
+  Ok (( )) }
+
+/// The git fixture cases under 'GIT_FIXTURE_CASES': each folder there
+/// that holds a 'head' folder, or whose subfolders do.
+fn git_fixture_cases (
+) -> Vec<PathBuf> {
+  let mut cases : Vec<PathBuf> = Vec::new ();
+  for parent in GIT_FIXTURE_CASES {
+    let parent : &Path = Path::new (parent);
+    if parent . join ("fixtures") . join ("head") . is_dir () {
+      cases . push ( parent . join ("fixtures") );
+      continue; }
+    let Ok (entries) = std::fs::read_dir (parent) else { continue; };
+    let mut found : Vec<PathBuf> = entries
+      . filter_map ( |entry| entry . ok () . map ( |e| e . path () ))
+      . filter ( |path| path . is_dir ()
+                        && ( path . join ("head") . is_dir ()
+                             || skgrepos_of_case (path) . 0 . len () > 0 ))
+      . collect ();
+    found . sort ();
+    cases . extend (found); }
+  cases }
+
+/// A case's owned skgrepos, in privacy order ('public' first, 'private'
+/// last), and its foreign ones: its subfolders holding a 'head' folder.
+/// Both empty for a case of the one skgrepo 'main' ('<case>/head').
+fn skgrepos_of_case (
+  case : &Path,
+) -> (Vec<String>, Vec<String>) {
+  if case . join ("head") . is_dir () { return ( Vec::new (), Vec::new () ); }
+  let Ok (entries) = std::fs::read_dir (case) else { return ( Vec::new (), Vec::new () ); };
+  let mut names : Vec<String> = entries
+    . filter_map ( |entry| entry . ok () . map ( |e| e . path () ))
+    . filter ( |path| path . join ("head") . is_dir () )
+    . filter_map ( |path| path . file_name () . map ( |name| name . to_string_lossy () . to_string () ))
+    . collect ();
+  let privacy = |name : &String| -> (u8, String) {
+    ( match name . as_str () { "public" => 0, "private" => 2, _ => 1 }, name . clone () ) };
+  names . sort_by_key (privacy);
+  let (foreign, owned) : (Vec<String>, Vec<String>) =
+    names . into_iter () . partition ( |name| name == "foreign" );
+  (owned, foreign) }

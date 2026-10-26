@@ -221,7 +221,7 @@ fn editable_node_inside_historical_phantom_subtree_emits () {
   let input : &str =
     indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
-      ** (skg ghost (gnid fading) (skgRepos (nodeRepo main))) fading
+      ** (skg ghost (gnid fading) (skgRepos (nodeRepo main)) noClaim) fading
       *** (skg node (gnid survivor) (skgRepos (nodeRepo main))) survivor
       "};
   let forest : ViewForest = forest_from_org (input);
@@ -234,6 +234,29 @@ fn editable_node_inside_historical_phantom_subtree_emits () {
              "a editable node beneath a phantom emits for itself" ); }
   assert_eq!( entry (&collected, "root") . contains, Some (vec![]),
               "the phantom is not content of its parent" ); }
+
+#[test]
+fn a_ghost_that_claims_keeps_its_gnid_in_its_parents_list () {
+  // A ghost its parent's list still names (a dangling reference to a
+  // node HEAD has) claims membership: the save keeps its gnid there,
+  // as it keeps an unknown's. One that claims nothing contributes
+  // nothing.
+  let input : &str =
+    indoc! {"
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+      ** (skg node (gnid before) (skgRepos (nodeRepo main)) writeProtected) before
+      ** (skg ghost (gnid named) (skgRepos (nodeRepo main))) named
+      ** (skg ghost (gnid dropped) (skgRepos (nodeRepo main)) noClaim) dropped
+      ** (skg node (gnid after) (skgRepos (nodeRepo main)) writeProtected) after
+      "};
+  let forest : ViewForest = forest_from_org (input);
+  let collected : CollectedFieldIntents =
+    collect_instructions_locally (&forest) . unwrap();
+  assert!( collected . by_pid . get (&ID::from ("named")) . is_none(),
+           "the ghost itself emits nothing" );
+  assert_eq!( entry (&collected, "root") . contains,
+              Some ( [ "before", "named", "after" ] . iter ()
+                     . map ( |gnid| (ID::from (*gnid), None) ) . collect () )); }
 
 #[test]
 fn writeProtected_subscribee_as_such_emits_nothing () {

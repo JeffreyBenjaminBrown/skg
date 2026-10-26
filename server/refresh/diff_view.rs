@@ -36,7 +36,7 @@ use crate::refresh::ancestry::required_ancestor_of;
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, folder_goal_is_ordered, member_of_child};
-use crate::refresh::id_rule::entombstone;
+use crate::refresh::id_rule::entombstone_gone_change;
 use crate::refresh::ladder::children_of;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::complete::Flag;
@@ -357,7 +357,9 @@ fn expected_change_viewnodes (
 /// Draw the expected change viewnodes the parent lacks, each after
 /// the expected one before it (or first), and bring those it keeps up
 /// to date with the straddle. Folders are drawn empty: their own
-/// visits fill them from their goals.
+/// visits fill them from their goals. A change viewnode describes the
+/// straddle and is recomputed at every refresh, so drawing one is no
+/// correction ('entombstone_gone_change').
 pub(crate) fn draw_change_viewnodes (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -381,7 +383,6 @@ pub(crate) fn draw_change_viewnodes (
       None => {
         let drawn : NodeId =
           tree . get_mut (parent) . unwrap () . append (model) . id ();
-        walk . record_drawn (tree, parent, drawn);
         if matches! ( tree . get (drawn) . unwrap () . value () . kind,
                       ViewnodeKind::Folder (_) ) {
           walk . added_folders . insert (drawn); }
@@ -399,8 +400,9 @@ pub(crate) fn draw_change_viewnodes (
 /// node's existence, its relationship's (from the goal item it is) and
 /// whether its node's other properties changed; a ghost with its
 /// node's removal and its relationship's; an unknown or a property
-/// member with its relationship's. A root is tagged as a node only;
-/// a node of the containerward chain carries no change. And under each
+/// member with its relationship's. A root, and an occurrence the goal
+/// does not name, are tagged as a node only; a node of the
+/// containerward chain carries no change. And under each
 /// member whose relationship moved to another skgrepo, its relRepo
 /// move.
 pub(crate) fn tag_children (
@@ -423,10 +425,7 @@ pub(crate) fn tag_children (
       let change : Option<DiffChange> = match &viewnode . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
           if chain { Some (DiffChange::default ()) }
-          else if is_root { Some ( straddle . node_change (&occurrence . skgid, None) ) }
-          else if item . is_some () {
-            Some ( straddle . node_change (&occurrence . skgid, rel) ) }
-          else { None },
+          else { Some ( straddle . node_change (&occurrence . skgid, rel) ) },
         ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
           Some ( DiffChange { node : Some (Existence::Removed),
                               rel  : if is_root { None } else { rel },
@@ -466,10 +465,9 @@ fn keep_one_relRepo_move (
       None => {
         let drawn : NodeId = tree . get_mut (member) . unwrap () . append (moved) . id ();
         move_to_first_child (tree, member, drawn)
-          . expect ("keep_one_relRepo_move: the move was just drawn");
-        walk . record_drawn (tree, member, drawn); }, }}
+          . expect ("keep_one_relRepo_move: the move was just drawn"); }, }}
   for stale in extra {
-    entombstone (tree, stale, walk); }}
+    entombstone_gone_change (tree, stale, walk); }}
 
 /// A drawn editable occurrence's body starts folded unless its node
 /// is in C: it is context.

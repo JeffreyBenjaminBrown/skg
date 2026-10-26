@@ -1,7 +1,8 @@
 // The git fixture: a case's skgrepos, each made a gitrepo whose HEAD
 // and worktree differ, with the config, search index, live graph and
 // views a test of the graph straddle or the diff view runs against.
-// Declared once, in 'tests/grouped_repos.rs'.
+// Declared in 'tests/grouped_repos.rs', and in
+// 'tests/grouped_overrides.rs' for the fixpoint in 'tests/idempotence.rs'.
 
 use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, setup_gitrepo_with_fixtures};
 

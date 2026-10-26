@@ -23,7 +23,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, NodeEditRequest, PropertyMember, RelationshipEditRequest,
-  Unknown, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode,
+  Unknown, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode, Warrant,
   default_unrestrictedVognode};
 use crate::update_buffer::completion_mode::CompletionMode;
 
@@ -143,8 +143,19 @@ pub(crate) fn rekind_vognode (
     ( IdRuleAnswer::Ghost (pid), other ) => {
       let requests : EditRequests = EditRequests::of (&other);
       forget_editable_occurrence (&other, child, walk);
-      let ghost : Ghost = ghost_from_head (&pid, walk)
-        . ok_or ("rekind_vognode: HEAD lacks the node it has") ?;
+      let carried_claim : bool = match &other {
+        Vognode::Unrestricted (occurrence) => occurrence . claimsMembership,
+        Vognode::Unknown (unknown) => unknown . claimsMembership,
+        Vognode::Ghost (ghost) => ghost . claimsMembership, };
+      let named_by_the_list : bool =
+        parent_goal . and_then ( |goal| goal . item_for ( &GoalMember::Gnid ( pid . clone () )))
+        . is_some_and ( |item| item . warrant == Warrant::ByGraph );
+      let ghost : Ghost = Ghost {
+        // The claim it carried, where the list still names it: a ghost
+        // claims nothing else.
+        claimsMembership : carried_claim && named_by_the_list,
+        .. ghost_from_head (&pid, walk)
+           . ok_or ("rekind_vognode: HEAD lacks the node it has") ? };
       set_vognode_keeping_readiness (tree, child, Vognode::Ghost (ghost));
       if requests . any () {
         walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
@@ -185,6 +196,29 @@ pub(crate) fn entombstone (
   treeid : NodeId,
   walk   : &mut Walk,
 ) {
+  walk . corrections . record (tree, treeid, CorrectionKind::Entombstoned);
+  entombstone_reporting_requests_only (tree, treeid, walk); }
+
+/// Make the change viewnode at 'treeid', whose change is gone, a
+/// tombstone, keeping its children. In the diff view a change viewnode
+/// describes the straddle and is recomputed at every refresh, so its
+/// going is no correction; only a request it carried, dropped, is
+/// reported. In a content view, where it can describe nothing, it is
+/// reported as any entombstoned headline is.
+pub(crate) fn entombstone_gone_change (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+  walk   : &mut Walk,
+) {
+  if walk . is_diff_view () {
+    entombstone_reporting_requests_only (tree, treeid, walk); }
+  else { entombstone (tree, treeid, walk); }}
+
+fn entombstone_reporting_requests_only (
+  tree   : &mut Tree<Viewnode>,
+  treeid : NodeId,
+  walk   : &mut Walk,
+) {
   let carried_requests : bool = {
     let viewnode : &Viewnode = tree . get (treeid) . unwrap () . value ();
     viewnode . readiness_request . is_some ()
@@ -193,7 +227,6 @@ pub(crate) fn entombstone (
       ViewnodeKind::PropertyMember (PropertyMember::Alias {
         relationshipEditRequest, .. }) => relationshipEditRequest . is_some (),
       _ => false, } };
-  walk . corrections . record (tree, treeid, CorrectionKind::Entombstoned);
   if carried_requests {
     walk . corrections . record (tree, treeid, CorrectionKind::EditRequestDropped); }
   tree . get_mut (treeid) . unwrap () . value ()
@@ -240,6 +273,8 @@ fn refresh_ghost_in_place (
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { *ghost_mut = Ghost { restoreNode_request : ghost . restoreNode_request,
                            tombstone_request   : ghost . tombstone_request,
+                           claimsMembership    : ghost . claimsMembership,
+                           isWarranted         : ghost . isWarranted,
                            .. fresh }; }}}
 
 /// An occurrence of 'pid' as the truth has it, editable (with its

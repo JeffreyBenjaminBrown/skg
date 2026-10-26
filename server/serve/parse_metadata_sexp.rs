@@ -210,6 +210,8 @@ pub fn viewnode_from_metadata (
               Some (NodeEditRequest::RestoreNode) ),
             tombstone_request : metadata . view_requests
               . contains (&ViewRequest::Tombstone),
+            claimsMembership : metadata . claimsMembership,
+            isWarranted : Warrant::ByGraph, // a derived fact: the refresh sets it
           } )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
@@ -402,7 +404,8 @@ fn parts_of_kind (
       &[ "gnid", "skgRepos", "noClaim", "writeProtected",
          "overridesHere", "editRequest", "viewRequests", "view", "diff" ],
     MetadataKind::Ghost =>
-      &[ "gnid", "skgRepos", "editRequest", "viewRequests", "diff" ],
+      &[ "gnid", "skgRepos", "noClaim", "editRequest", "viewRequests",
+         "view", "diff" ],
     MetadataKind::Unknown =>
       &[ "gnid", "skgRepos", "noClaim", "editRequest", "diff" ],
     MetadataKind::Tombstone => &[],

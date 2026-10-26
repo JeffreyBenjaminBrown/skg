@@ -193,7 +193,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       "*** (skg node (gnid cy2)", "folded" );
     let deleted : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert! ( without_viewnode_ids (&deleted) . contains (
-      "** (skg bodyFolded ghost (gnid cy1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) cy1\n\
+      "** (skg bodyFolded ghost (gnid cy1) (skgRepos (nodeRepo main)) noClaim (diff (node removed) (rel removed) (leaves 2 node rel))) cy1\n\
        *** (skg folded node (gnid cy2)" ),
       "cy1 is historical where it stood, its subtree folded as it was:\n{}", deleted );
     assert_eq! ( deleted . lines ()

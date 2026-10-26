@@ -56,7 +56,7 @@ fn a_mark_shows_on_both_images_of_a_relationship (
                               "(editRequest (ready rel)) (diff (rel removed) (leaves 1 rel))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view noWarrant) (diff (rel removed) (leaves 1 rel) (ready rel))) s1" ),
+      "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (view ghostWarrant) (diff (rel removed) (leaves 1 rel) (ready rel))) s1" ),
       "the image under sub is ready:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
       without_viewnode_ids (line) . starts_with ("*** (skg node (gnid sub)")
@@ -305,12 +305,15 @@ fn a_member_deleted_in_the_buffer_is_rerendered_as_removed (
     let saved : String = save_deleting (
       f, &buffer, "** (skg bodyFolded node (gnid cy1)", "cy1" ) ?;
     assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (gnid cy1)"), "{}", saved );
-    let historical : &str =
-      "ghost (gnid cy1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) cy1";
+    let historical : &str = "ghost (gnid cy1) (skgRepos (nodeRepo main)) ";
+    let facts : &str = "(diff (node removed) (rel removed) (leaves 2 node rel))) cy1";
     assert_eq! ( without_viewnode_ids (&saved) . matches (historical) . count (), 2,
                  "in cy2's content and in its container folder:\n{}", saved );
-    assert! ( without_viewnode_ids (&saved) . contains ( &format! ("** (skg bodyFolded {}", historical) ),
-              "cy1, context before, keeps its folded body:\n{}", saved );
+    assert! ( without_viewnode_ids (&saved) . contains (
+                &format! ("** (skg bodyFolded {}noClaim {}", historical, facts) ),
+              "cy1, context before, keeps its folded body, claiming nothing:\n{}", saved );
+    assert! ( without_viewnode_ids (&saved) . contains ( &format! ("{}{}", historical, facts) ),
+              "in the container folder it carries no claim atom:\n{}", saved );
     Ok (( )) }) }
 
 #[test]

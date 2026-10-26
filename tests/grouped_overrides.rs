@@ -8,6 +8,10 @@
 #[allow(dead_code)] // This target uses only some of the helpers.
 mod git_fixture_helpers;
 
+#[path = "shared/git_fixture.rs"]
+#[allow(dead_code)] // This target uses only some of the helpers.
+mod git_fixture;
+
 #[path = "collateral_partner_folder.rs"]
 mod collateral_partner_folder;
 

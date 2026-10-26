@@ -122,7 +122,8 @@ fn a_requested_alias_folder_becomes_the_changed_one (
 /// An alias folder the user requested is refreshed when its aliases
 /// change elsewhere, as the changed folder, a lost alias marked so;
 /// once a commit ends the change it stays, unmarked, holding the
-/// aliases as they are.
+/// aliases as they are and, unwarranted and claiming nothing, the
+/// alias the commit made lost for good.
 #[test]
 fn a_requested_alias_folder_is_refreshed_and_kept (
 ) -> Result<(), Box<dyn Error>> {
@@ -145,7 +146,8 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
     assert_eq! ( children_of (&committed, ROOT_X),
                  vec! [ "** (skg aliasFolder)" . to_string () ], "{}", committed );
     assert_eq! ( children_of (&committed, "** (skg aliasFolder)"),
-                 vec! [ "*** (skg alias) xa2" . to_string () ], "{}", committed );
+                 vec! [ "*** (skg alias noClaim (view noWarrant)) xa1" . to_string (),
+                        "*** (skg alias) xa2" . to_string () ], "{}", committed );
     assert_saves_back_cleanly (f, &committed) }) }
 
 /// A write-protected non-member x that the user put under r, when
@@ -174,8 +176,9 @@ fn a_note_of_a_node_becomes_its_removed_member (
     assert_saves_back_cleanly (f, &after_head) }) }
 
 /// A write-protected copy of y that the user pasted beside the member
-/// y, when p then drops y elsewhere, is one of the two retained as
-/// non-members and shown as the removed member: y stands under p once.
+/// y merges into it (siblings standing for one node are unified), so
+/// when p then drops y elsewhere, y stands under p once, as the
+/// removed member.
 #[test]
 fn a_pasted_copy_beside_a_removed_member_is_not_doubled (
 ) -> Result<(), Box<dyn Error>> {
@@ -186,7 +189,7 @@ fn a_pasted_copy_beside_a_removed_member_is_not_doubled (
       "{}** (skg node (gnid y) noClaim writeProtected) y\n", buffer )) ?;
     assert_eq! ( children_of (&pasted, root_p) . iter ()
                  . filter ( |child| child . contains ("node (gnid y)") ) . count (),
-                 2, "{}", pasted );
+                 1, "the copy merges into the member: {}", pasted );
     let collateral : String = edit_in_a_content_view ( f, "p", &pasted,
       |text : &str| text . lines ()
         . filter ( |line| ! line . contains ("node (gnid y)") )

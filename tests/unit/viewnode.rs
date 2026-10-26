@@ -183,7 +183,8 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
     viewnode_of (ViewnodeKind::Vognode (Vognode::Ghost (
       Ghost { skgid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
               title : "g" . into (), body : None,
-              restoreNode_request : false, tombstone_request : false } ))) ];
+              restoreNode_request : false, tombstone_request : false,
+              claimsMembership : false, isWarranted : Warrant::ByHead } ))) ];
   for (counter, kind) in kinds . into_iter () . enumerate () {
     let viewnode_id : ViewnodeId = ViewnodeId::from_counter (10 + counter as u64);
     let viewnode : Viewnode = Viewnode { viewnode_id : Some (viewnode_id . clone ()), .. kind };

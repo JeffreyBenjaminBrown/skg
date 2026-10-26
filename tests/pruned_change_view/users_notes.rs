@@ -48,7 +48,7 @@ fn a_note_under_a_historical_phantom_survives (
   with_fixture ("users_notes", &["main"], |f| {
     let phantom : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
-      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed)";
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;

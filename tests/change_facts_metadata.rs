@@ -15,7 +15,7 @@ use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
   ChangeFacts, DiffChange, Existence, Ghost, LeavesFact, Unknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
-  ViewnodeKind, Vognode, mk_editable_viewnode,
+  ViewnodeKind, Vognode, Warrant, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
 use std::collections::{BTreeSet, HashMap};
@@ -117,7 +117,8 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
           skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
           title : "D" . into (), body : None,
-          restoreNode_request : false, tombstone_request : false, } ))),
+          restoreNode_request : false, tombstone_request : false,
+          claimsMembership : true, isWarranted : Warrant::ByGraph, } ))),
       facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
       request (false, &[DiffObject::Node]) ),
     "ghost (gnid d) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (ready node))" );
@@ -230,7 +231,7 @@ fn malformed_facts_and_readiness_requests_are_refused () {
     "(skg aliasFolder (diff (ready)))",               // nor does a folder
     "(skg (aliasFolder changed))",                    // a folder is its bare atom
     "(skg bodyDiff (editRequest (ready)))",           // a body diff takes no request
-    "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (view noWarrant))",
+    "(skg tombstone (view noWarrant))",               // nor any view fact
     "(skg node (gnid a) (editRequest (ready) (unready node)))", // two requests
     "(skg node (gnid a) (editRequest (ready sideways)))",
     "(skg node (gnid a) (editRequest delete (merge b)))",       // two edit requests

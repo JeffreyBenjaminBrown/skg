@@ -365,6 +365,9 @@ fn visit_hiddenOutside_folder (
             if RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . skgid . clone ()); },
+          ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+            if ghost . claimsMembership =>
+            members . push (ghost . skgid . clone ()),
           _ => {}, }}
       collected . instructionMerge_fieldIntent (
         &node_ref . value () . headline_name (),
@@ -431,6 +434,10 @@ fn partnerFolder_members (
         if unknown . claimsMembership =>
           members . push ((unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+        if ghost . claimsMembership =>
+          // As an unknown's: the list still names it.
+          members . push (( ghost . skgid . clone (), None )),
       _ => {}, }}
   dedup_members_by_skgid (members) }
 
@@ -457,6 +464,10 @@ fn subscribeeFolder_members (
         if unknown . claimsMembership =>
           members . push ((unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+        if ghost . claimsMembership =>
+          // As an unknown's: the list still names it.
+          members . push (( ghost . skgid . clone (), None )),
       _ => {}, }}
   dedup_members_by_skgid (members) }
 
@@ -495,6 +506,11 @@ fn content_members (
         // disk supplementation to keep an existing destination skgrepo sticky.
         contents . push (( unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned () )),
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+        if ghost . claimsMembership =>
+        // A ghost the list still names (a dangling reference to a node
+        // HEAD has) keeps its gnid there, as an unknown does.
+        contents . push (( ghost . skgid . clone (), None )),
       _ => {}, }}
   contents }
 
@@ -518,5 +534,8 @@ fn visible_content_members (
       ViewnodeKind::Vognode (Vognode::Unknown (unknown))
         if unknown . claimsMembership =>
         visible . push (unknown . skgid . clone ()),
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+        if ghost . claimsMembership =>
+        visible . push (ghost . skgid . clone ()),
       _ => {}, }}
   visible }

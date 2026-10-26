@@ -1,8 +1,8 @@
 // The view request '(viewRequests tombstone)' on a ghost
 // ('docs/diff-view.org', "Dismissing a ghost"): the save leaves the
-// graph as it was, and the rerender entombstones the ghost, keeping
-// what the user put under it and dropping what the diff view drew
-// there; a tombstone left childless is pruned.
+// graph as it was, and the refresh entombstones the ghost, which, as
+// every tombstone does, keeps its children: what the user put under
+// it and what the diff view drew there.
 //
 // In the 'commit_leftovers' fixture h, deleted since HEAD, is a ghost
 // root holding its old content hm. In the 'users_notes' fixture h is a
@@ -11,13 +11,13 @@
 // contained it at HEAD, holding gc and gd.
 //
 // A ghost under a container that held it at HEAD is drawn again by a
-// later rerender of that container; the request entombstones the one
-// it is on.
+// later refresh of that container; the request entombstones the one
+// it is on. These tests assert only the refresh that carries the
+// request.
 
 use crate::pruned_change_view::common::{
   assert_lines_in_order, note, insert_after_line_starting,
-  open_all_changes_buffer, parent_line_of, save, saved_and_rerendered,
-  with_fixture};
+  open_all_changes_buffer, parent_line_of, save, with_fixture};
 use crate::git_fixture::{edit_line, skg_files};
 
 use skg::metadata_canon::without_viewnode_ids;
@@ -53,9 +53,8 @@ fn saved_leaving_the_graph (
                "a view request changes no file" );
   Ok (response . saved_view) }
 
-/// The ghost root and what the diff view drew under it go: the
-/// tombstone that replaced it was left childless and pruned, and it
-/// stays gone.
+/// The ghost root goes; the tombstone that replaced it holds what
+/// the diff view drew under it, h's old content hm.
 #[test]
 fn a_ghost_root_entombstoned_goes () -> Result<(), Box<dyn Error>> {
   with_fixture ("commit_leftovers", &["main"], |f| {
@@ -63,21 +62,21 @@ fn a_ghost_root_entombstoned_goes () -> Result<(), Box<dyn Error>> {
     assert_lines_in_order (&buffer, &[ H_AS_A_ROOT, "** (skg node (gnid hm)" ]);
     let saved : String = saved_leaving_the_graph ( f,
       &requesting_its_tombstone (&buffer, H_AS_A_ROOT) ) ?;
-    assert! ( ! saved . contains ("(gnid h)") && ! saved . contains ("(gnid hm)")
-              && ! saved . contains ("tombstone"),
-              "h and its old content are gone:\n{}", saved );
-    saved_and_rerendered (f, &saved) ?;
+    assert! ( ! saved . lines () . any ( |line|
+                without_viewnode_ids (line) . starts_with (H_AS_A_ROOT) ),
+              "h's ghost root is gone:\n{}", saved );
+    assert_lines_in_order (&saved, &[ "* (skg tombstone)", "** (skg node (gnid hm)" ]);
     Ok (( )) }) }
 
 /// What the user typed under the ghost (a new node, which the save
-/// creates) stays, under the tombstone; what the diff view drew there,
-/// its old member m, goes.
+/// creates) stays, under the tombstone, and so does what the diff
+/// view drew there, its old member m.
 #[test]
 fn a_note_under_an_entombstoned_ghost_stays () -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
     let ghost : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
-      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed)";
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (view ghostWarrant) (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let with_note : String =
       insert_after_line_starting (&buffer, ghost, &note (3, "a note under h"));
@@ -88,11 +87,14 @@ fn a_note_under_an_entombstoned_ghost_stays () -> Result<(), Box<dyn Error>> {
     let saved : String = response . saved_view;
     assert_eq! ( parent_line_of (&saved, "a note under h"), "** (skg tombstone)",
                  "{}", saved );
-    assert! ( ! without_viewnode_ids (&saved) . contains (old_member), "{}", saved );
+    assert_lines_in_order (&saved, &[
+      "** (skg tombstone)", " a note under h\n",
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main))) m\n" ]);
     Ok (( )) }) }
 
-/// A ghost under its former container is entombstoned where it stood;
-/// the other ghosts of the same node stay.
+/// A ghost under its former container is entombstoned where it stood,
+/// the tombstone holding its old content; the other ghosts of the same
+/// node stay.
 #[test]
 fn a_ghost_member_entombstoned_goes_from_its_container (
 ) -> Result<(), Box<dyn Error>> {
@@ -107,5 +109,6 @@ fn a_ghost_member_entombstoned_goes_from_its_container (
               "g is gone from under q:\n{}", saved );
     assert_eq! ( without_viewnode_ids (&saved) . matches ("ghost (gnid g)") . count (),
                  ghosts_of_g - 1, "g's other ghosts stay:\n{}", saved );
-    assert! ( ! saved . contains ("tombstone"), "{}", saved );
+    assert_lines_in_order (&saved, &[
+      "* (skg node (gnid q)", "** (skg tombstone)", "*** (skg node (gnid gc)" ]);
     Ok (( )) }) }

@@ -13,7 +13,7 @@ use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
   Editability, Folder, Ghost, ChangeViewnode,
-  Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
+  Viewnode, ViewnodeKind, Vognode, Warrant, mk_unknown_viewnode, mk_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
 use ego_tree::{NodeId, Tree};
@@ -120,7 +120,9 @@ pub fn mk_historical_viewnode (
         title        : before . title . clone (),
         body         : before . body . clone (),
         restoreNode_request : false,
-        tombstone_request   : false } ))) } ) }
+        tombstone_request   : false,
+        claimsMembership    : false,
+        isWarranted         : Warrant::ByHead } ))) } ) }
 
 /// Under 'phantom', the historical phantom of 'pid' standing where
 /// content stands, what it holds: if a nodeMerge acquired it, an "it

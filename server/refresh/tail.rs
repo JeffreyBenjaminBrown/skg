@@ -10,6 +10,7 @@ use crate::diff_view::pruned_change_view::set_diffView_facts_in_viewforest;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, Walk};
+use crate::refresh::ladder::folder_goes_when_empty;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
@@ -65,21 +66,25 @@ fn set_derived_facts (
 
 /// Remove every childless tombstone, a root included, postorder, so
 /// that a tombstone left childless by the removal of its last child
-/// goes too. Focus moves to the parent of what is removed.
+/// goes too, and so does a folder the removals leave childless that
+/// goes when empty ('folder_goes_when_empty'), as it would have been
+/// entombstoned had it been childless at its visit. Focus moves to the
+/// parent of what is removed.
 fn prune_childless_tombstones (
   tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {
-  let mut tombstones : Vec<NodeId> = Vec::new ();
+  let mut prunable : Vec<NodeId> = Vec::new ();
   let root : NodeId = tree . root () . id ();
   do_everywhere_in_tree_dfs_readonly (
     tree, root,
     false, // postorder
     &mut |node| {
-      if matches! ( node . value () . kind, ViewnodeKind::Tombstone ) {
-        tombstones . push (node . id ()); }
+      if matches! ( node . value () . kind, ViewnodeKind::Tombstone )
+         || folder_goes_when_empty ( node . value () ) {
+        prunable . push (node . id ()); }
       Ok (( )) } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  for tombstone in tombstones {
-    if tree . get (tombstone) . unwrap () . children () . next () . is_none () {
-      detach_viewnode_transferring_focus (tree, tombstone) ?; }}
+  for treeid in prunable {
+    if tree . get (treeid) . unwrap () . children () . next () . is_none () {
+      detach_viewnode_transferring_focus (tree, treeid) ?; }}
   Ok (( )) }

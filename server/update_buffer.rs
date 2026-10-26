@@ -1,14 +1,12 @@
-//! Bringing views up to date with the graph. A content view is
-//! refreshed ('refresh_viewforest', 'server/refresh/'); a buffer of
-//! the diff view runs view completion ('complete_viewforest' in
-//! 'update_buffer/complete.rs') and then its tail
-//! ('finish_viewforest': membership marking,
-//! stats, the skgrepo set, the text):
+//! Bringing views up to date with the graph. Every view is refreshed
+//! ('refresh_viewforest', 'server/refresh/'): a content view in
+//! content-view mode, a buffer of the diff view in diff-view mode,
+//! over the graph straddle ('server/diff_view/completion.rs'):
 //! - 'render_initial_view' renders a new content view, the refresh of
 //!   a stub of its roots, each asking for its containers folder;
-//! - 'complete_viewforest_with_graph_straddle'
-//!   ('server/diff_view/completion.rs') renders a buffer of the diff
-//!   view from its stub, over the graph straddle;
+//! - 'diffView_buffer_viewforest'
+//!   ('server/diff_view/pruned_change_view.rs') renders a buffer of the
+//!   diff view, the refresh of a stub of its roots;
 //! - 'rerender_view' brings a view that already exists up to date
 //!   (after a save, collaterally, after a commit, or at a skgrepo-set
 //!   switch), from what it holds;
@@ -30,18 +28,15 @@ pub use graphnodestats::{
   set_graphnodestats_in_viewforest_with_skgrepo_set};
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
-use complete::{complete_viewforest, CompletionContext};
 use completion_mode::CompletionMode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
 use crate::refresh::corrections::{Correction, ViewCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
-use crate::diff_view::completion::{
-  DiffViewRerender, finish_diffView_rerender, prepare_diffView_rerender};
+use crate::diff_view::completion::rerender_diffView_buffer;
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::SaveResponse;
 use crate::serve::handlers::text_release::{
@@ -50,18 +45,16 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::write_graph_straddle_back;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
-use crate::skgrepo_sets::{SkgrepoRestriction, entombstone_hidden_occurrences};
-use crate::to_org::util::EditableMap;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
-use crate::types::misc::{ID, SkgrepoName, SkgConfig};
+use crate::types::misc::ID;
 use crate::types::save::ForkSpec;
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_as_members, validate_membership_claims, mark_orphans_under_dead_parents_false};
 use crate::types::viewnode::{
   Editability, Viewnode, ViewnodeKind, mk_editable_viewnode, mk_unknown_viewnode};
 use crate::types::viewnode::{FolderRelation, Vognode, ViewRequest};
 
-use ego_tree::{Tree, NodeId};
+use ego_tree::NodeId;
 use std::collections::HashSet;
 use std::error::Error;
 use std::sync::Arc;
@@ -143,10 +136,6 @@ pub fn update_views_after_save (
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
-    // Used both by rewriteInPlace_viewnodes_whose_id_is_newly_extra (swap acquiree pids
-    // to acquirer pids before rerender) and by content_goal_list
-    // resolution during reconcile (neighbors' on-disk contains still
-    // point at the acquiree id).
     RerenderAfterSaveContext::with_runtime (
       env, runtime, skgrepo_restriction );
   context . graph_straddle = views_state . graph_straddle . clone ();
@@ -167,12 +156,6 @@ pub fn update_views_after_save (
   // one boundary before completion can echo any of them into the response.
   // `viewRequests` remain: those are fulfilled by completion below.
   saved_view_mut . consume_edit_requests_after_save ();
-  if saved_diffView_buffer_kind . is_some () {
-    // A content view's refresh re-kinds such an occurrence itself.
-    let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
-    rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
-      &mut saved_view_mut, &context . graph_snap ) ? }
   // Gate the forests' existing unrestricted nodes before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by completion.
@@ -342,12 +325,6 @@ fn rerender_collateral_view (
     views_state . open_views . viewnode_id_record_of (&viewforest_id);
   let diffView_buffer_kind : Option<DiffViewBufferKind> =
     views_state . open_views . diffView_buffer_kind_of_view (&viewforest_id);
-  if diffView_buffer_kind . is_some () // a content view's refresh re-kinds such an occurrence itself
-  && let Err (e) = rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
-    &mut viewforest, &context . graph_snap )
-  { return Err ( format! (
-      "Collateral view {}: preprocessing failed: {}",
-      viewforest_id . repr_in_client (), e )); }
   let refreshed : Refreshed =
     { let _span : tracing::span::EnteredSpan =
         tracing::info_span!( "rerender_view (collateral)" ). entered();
@@ -457,31 +434,13 @@ impl RerenderOptions {
 }
 
 /// Bring an open view up to date with the graph and render it,
-/// returning its text and its corrections.
-/// .
-/// A content view ('options . diffView_buffer' None) is refreshed
-/// ('refresh_viewforest' in content-view mode), from what it holds and
-/// the graph as they are now.
-/// .
-/// A buffer of the diff view ('options . diffView_buffer' Some) is
-/// reconciled over the graph straddle, brought up to date in
-/// 'context': view
-/// completion reconciles each editable node's change facts, change
-/// folders, markers and former members, its ID folder among them,
-/// with a shallow model subtree from the straddle
-/// ('process_unrestrictedVognode_changes'), keeping every viewnode
-/// that stays and its fold state, and its readiness facts are then
-/// read from the store. Completion extends what it adds anew by the
-/// buffer's sets recomputed after the save, and nothing editable is
-/// write-protected again. Only when 'options . integrate_unshown_changes'
-/// is true (the "integrate unshown changes" request) does it make occurrences
-/// editable or append roots: before completion each node of the
-/// recomputed U is made editable at its first occurrence if it has no
-/// editable one, and after completion the content origins of the
-/// recomputed D that the buffer does not show are appended as roots
-/// and completed. Its standing roots stay. The diff view does its
-/// part before completion in 'prepare_diffView_rerender' and after it
-/// in 'finish_diffView_rerender'. It reports no corrections.
+/// returning its text and its corrections. It is refreshed
+/// ('refresh_viewforest'), from what it holds and the graph as they
+/// are now: a content view ('options . diffView_buffer' None) in
+/// content-view mode; a buffer of the diff view in diff-view mode,
+/// over the graph straddle, brought up to date in 'context'
+/// ('rerender_diffView_buffer', which says what the "integrate unshown
+/// changes" request, 'options . integrate_unshown_changes', adds).
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord, // the view's, which assigns the viewnode IDs its new viewnodes get
@@ -489,13 +448,16 @@ pub fn rerender_view (
   options       : RerenderOptions,
 ) -> Result<Refreshed, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
+  let _span : tracing::span::EnteredSpan = tracing::info_span!(
+    "refresh_viewforest" ). entered();
   let result : Refreshed = match options . diffView_buffer {
     None => refresh_content_view (
       viewforest, viewnode_id_record, context ) ?,
-    Some (_) => Refreshed {
-      text : rerender_diffView_buffer (
-        viewforest, viewnode_id_record, context, options ) ?,
-      corrections : Vec::new (), }, };
+    Some (diffView_buffer_kind) => rerender_diffView_buffer (
+      &mut context . graph_straddle, &context . runtime, context . env,
+      context . skgrepo_restriction, diffView_buffer_kind,
+      options . integrate_unshown_changes,
+      viewforest, viewnode_id_record ) ?, };
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -506,188 +468,9 @@ fn refresh_content_view (
   viewnode_id_record : &mut ViewnodeIdRecord,
   context            : &mut RerenderAfterSaveContext<'_>,
 ) -> Result<Refreshed, Box<dyn Error>> {
-  let _span : tracing::span::EnteredSpan = tracing::info_span!(
-    "refresh_viewforest" ). entered();
   let truth : Truth = Truth { graph       : &context . runtime . graph,
                               config      : &context . runtime . config,
                               restriction : context . skgrepo_restriction, };
   refresh_viewforest (
     viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
     context . runtime . config . initial_node_limit, None ) }
-
-/// The rerender of a buffer of the diff view; see 'rerender_view'.
-fn rerender_diffView_buffer (
-  viewforest         : &mut ViewForest,
-  viewnode_id_record : &mut ViewnodeIdRecord,
-  context            : &mut RerenderAfterSaveContext<'_>,
-  options            : RerenderOptions,
-) -> Result<String, Box<dyn Error>> {
-  claims_as_the_old_walk_reads_them (viewforest);
-  let diffView_rerender : DiffViewRerender =
-    prepare_diffView_rerender (
-      &mut context . graph_straddle, &context . runtime,
-      options . diffView_buffer, options . integrate_unshown_changes,
-      viewforest ) ?
-    . ok_or ("rerender_diffView_buffer: not a buffer of the diff view") ?;
-  { let nodes_before_completion : HashSet<NodeId> =
-      viewforest . nodes () . map ( |node| node . id () ) . collect ();
-    let editable_before_completion : HashSet<NodeId> =
-      viewforest . nodes ()
-      . filter ( |node| node . value () . editable_skgid () . is_some () )
-      . map ( |node| node . id () ) . collect ();
-    let mut editable_map       : EditableMap = EditableMap::new ();
-    let mut completion_context : CompletionContext = CompletionContext::for_rerender (
-      &context . runtime,
-      &context . graph_snap,
-      &mut editable_map,
-      &mut context . errors,
-      diffView_rerender . completion_mode (),
-      &nodes_before_completion,
-      &editable_before_completion );
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "complete_viewforest" ). entered();
-      complete_viewforest (
-        viewforest, &mut completion_context ) ? };
-    finish_diffView_rerender (
-      Some (&diffView_rerender), viewforest, &mut completion_context,
-      &context . runtime, context . env ) ?; }
-  let _span : tracing::span::EnteredSpan = tracing::info_span!(
-    "finish_viewforest" ). entered();
-  finish_viewforest (
-    viewforest,
-    viewnode_id_record,
-    &context . runtime . graph,
-    &context . runtime . config,
-    context . skgrepo_restriction ) }
-
-/// The diff view's completion, until it too is a refresh, reads the
-/// claims of the children of a write-protected occurrence, a ghost, an
-/// unknown or a tombstone, where none claims: as non-members. The
-/// printer writes no 'noClaim' there, so a parsed buffer reads them as
-/// claiming; this marks each such vognode as claiming nothing.
-fn claims_as_the_old_walk_reads_them (
-  viewforest : &mut ViewForest,
-) {
-  let claiming_nothing : Vec<NodeId> =
-    viewforest . nodes ()
-    . filter ( |node| matches! ( node . value () . kind,
-                                 ViewnodeKind::Vognode (_) ))
-    . filter ( |node| node . parent () . is_some_and ( |parent|
-        match &parent . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-            occurrence . is_writeProtected (),
-          ViewnodeKind::Vognode (_) | ViewnodeKind::Tombstone => true,
-          _ => false, } ))
-    . map ( |node| node . id () )
-    . collect ();
-  for treeid in claiming_nothing {
-    match &mut viewforest . get_mut (treeid) . unwrap () . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-        occurrence . claimsMembership = false,
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-        unknown . claimsMembership = false,
-      _ => {}, }}}
-
-/// The post-completion tail of the diff view's renderings: its first
-/// rendering ('diffView_buffer_viewforest') and its rerender
-/// ('rerender_diffView_buffer', above). Given a viewforest whose UnrestrictedVognode
-/// content has already been completed, it:
-///   - entombstones the occurrences of nodes the skgrepo restriction
-///     hides, so the orphan marks below see their children,
-///   - marks view-root and orphan membership,
-///   - validates membership against the captured graph,
-///   - computes graph- then viewnode stats,
-///   - gives a viewnode ID to each viewnode that lacks one, from
-///     'viewnode_id_record', which it brings up to date with the forest
-///     (the end-of-completion pass, after the prune and after
-///     everything this tail adds), and renders to a buffer string.
-/// Step order is immaterial between the membership marks and graphnodestats:
-/// membership is a view property and graphnodestats reads only the in-Rust graph,
-/// never membership, so the final state is identical either way.
-pub fn finish_viewforest (
-  viewforest         : &mut ViewForest,
-  viewnode_id_record : &mut ViewnodeIdRecord,
-  graph              : &InRustGraph,
-  config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Result<String, Box<dyn Error>> {
-  if let Some (restriction) = skgrepo_restriction {
-    entombstone_hidden_occurrences ( viewforest, graph, restriction ); }
-  mark_view_roots_as_members ( viewforest );
-  // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
-  // (a phantom / Deleted / Tombstone) is a non-dead generalized orphan and
-  // must become a non-member.
-  mark_orphans_under_dead_parents_false ( viewforest );
-  // Correct any membership claims whose claimed relation to the parent doesn't
-  // hold in the captured graph.
-  validate_membership_claims ( viewforest, graph );
-  let ( container_to_contents, content_to_containers ) =
-    match skgrepo_restriction {
-      Some (restriction) =>
-        set_graphnodestats_in_viewforest_with_skgrepo_set (
-          viewforest, graph, config, restriction ),
-      None =>
-        set_graphnodestats_in_viewforest (
-          viewforest, graph, config ),
-    } ?;
-  set_viewnodestats_in_viewforest (
-    viewforest, graph, &container_to_contents, &content_to_containers, config,
-    skgrepo_restriction );
-  viewnode_id_record . assign_viewnode_ids (viewforest);
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "viewforest_to_string" ). entered();
-    viewforest_to_string ( viewforest, config ) } }
-
-/// When the server first receives the buffer, it replaces
-/// each Viewnode's ID with a PID (`replace_gnid_with_pid`).
-/// Later it updates the graph, which can involve merging nodes.
-/// After a nodeMerge, the acquiree is gone, and what was the Viewnode
-/// onto it now an extra_id of the acquirer, not a PID.
-/// This is intended to replaces such a
-/// viewnode to carry the primary's pid, skgrepo, title, and body.
-///
-/// The modified viewnode's subtree is left attached.
-/// 'reconcile_content_children' will later update it
-/// to include the rest of the subscriber's content.
-///
-/// PITFALL: The function does not actually remember the nodeMerge history.
-/// It merely identifies each UnrestrictedVognode in 'viewforest'
-/// whose pid is an extra_id of some distinct node in the snapshot.
-fn rewriteInPlace_viewnodes_whose_skgid_is_newly_extra (
-  viewforest : &mut Tree<Viewnode>,
-  graph_snap : &Arc<InRustGraph>,
-) -> Result<(), Box<dyn Error>> {
-  let treeids : Vec<NodeId> =
-    viewforest . root () . descendants ()
-    . map ( |n| n . id () )
-    . collect ();
-  for treeid in treeids {
-    let swap : Option<(ID, SkgrepoName, String, Option<String>)> = {
-      let n_ref = viewforest . get (treeid) . ok_or (
-        "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
-      match &n_ref . value () . kind {
-        // Only Unrestricted nodes are rewritten below (a phantom is never an
-        // editable occurrence), so only they need a swap computed.
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => { match graph_snap . pid_of (&t . skgid)
-               { Some (primary) if primary != t . skgid => {
-                     graph_snap . get (&primary) . map ( |r| (
-                       primary . clone (),
-                       r . home_skgrepo . clone (),
-                       r . title . clone (),
-                       r . body . clone () )) },
-                 _ => None } },
-        _ => None } };
-    if let Some ((new_pid, new_skgrepo, new_title, new_body)) = swap
-    { let mut n_mut = viewforest . get_mut (treeid)
-        . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-      = &mut n_mut . value () . kind
-      { t . skgid = new_pid;
-        t . home_skgrepo = new_skgrepo;
-        t . title = new_title;
-        if let Editability::Editable { body, .. }
-        = &mut t . editability
-        { *body = new_body; }} }}
-  Ok (( )) }
-

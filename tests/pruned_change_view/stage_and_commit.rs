@@ -222,8 +222,10 @@ fn a_request_without_changes_commits_nothing (
 
 /// At the handler: the confirmed resend commits, and the open "all
 /// changes" buffer is rerendered in the rerender stream that follows:
-/// its roots remain but its ghosts, whose nodes the commit removed
-/// from HEAD too, and carry no change facts.
+/// its roots remain, and carry no change facts. The ghost root of
+/// acqd, which acq acquired, is an occurrence of acq now, where it
+/// stood, since the commit left acqd only an extra ID of acq (the ID
+/// rule: the truth has the node).
 #[test]
 fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -237,10 +239,12 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
               && first . contains ("(lock-views ())")
               && ! first . contains ("rerender-view"),
               "{}", first );
-    let roots : Vec<String> = // but the ghosts
+    let roots : Vec<String> = // acqd's ghost is acq's occurrence after the commit
       buffer . lines ()
-      . filter ( |line| line . starts_with ("* ") && ! line . contains (" ghost (gnid ") )
-      . map ( |line| root_id (line) ) . collect ();
+      . filter ( |line| line . starts_with ("* ") )
+      . map ( |line| root_id (line) )
+      . map ( |root| if root == "acqd" { "acq" . to_string () } else { root } )
+      . collect ();
     let second : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"one message\") (confirmed . t))\n" ) ?;
     assert! ( second . contains ("(commits ((public ")

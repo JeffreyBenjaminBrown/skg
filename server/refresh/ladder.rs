@@ -39,7 +39,8 @@ use crate::refresh::goal::{
   subscriber_of_subscribee_as_such};
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
-  IdRuleAnswer, entombstone, ghost_from_head, id_rule, occurrence_from_truth,
+  IdRuleAnswer, entombstone, entombstone_gone_change, ghost_from_head, id_rule,
+  occurrence_from_truth,
   rekind_vognode};
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
@@ -50,7 +51,7 @@ use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  Editability, Folder, FolderRelation, PropertyMember, Unknown, UnrestrictedVognode,
+  Editability, Folder, FolderRelation, Ghost, PropertyMember, Unknown, UnrestrictedVognode,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
 use crate::update_buffer::completion_mode::CompletionMode;
 
@@ -178,9 +179,10 @@ fn rekind_children (
       ViewnodeKind::Folder (_)
         | ViewnodeKind::PropertyMember (_)
         | ViewnodeKind::ChangeViewnode (_) =>
-        if is_unsayable (tree, child)
-           || diff_view::change_is_gone (tree, child, walk) {
-          entombstone (tree, child, walk); },
+        if is_unsayable (tree, child) {
+          entombstone (tree, child, walk); }
+        else if diff_view::change_is_gone (tree, child, walk) {
+          entombstone_gone_change (tree, child, walk); },
       ViewnodeKind::Tombstone | ViewnodeKind::BufferRoot => {}, }}
   Ok (( )) }
 
@@ -300,6 +302,8 @@ pub(crate) fn set_warrant (
   match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
       occurrence . viewStats . isWarranted = warrant,
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      ghost . isWarranted = warrant,
     ViewnodeKind::PropertyMember (
       PropertyMember::Alias { isWarranted, .. }
       | PropertyMember::ID { isWarranted, .. }
@@ -346,6 +350,8 @@ fn claims_membership (
       Some (occurrence . claimsMembership),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       Some (unknown . claimsMembership),
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      Some (ghost . claimsMembership),
     ViewnodeKind::PropertyMember (
       PropertyMember::Alias { claimsMembership, .. }
       | PropertyMember::ID { claimsMembership, .. } ) =>
@@ -362,6 +368,8 @@ pub(crate) fn set_claim (
       occurrence . claimsMembership = claims,
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       unknown . claimsMembership = claims,
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      ghost . claimsMembership = claims,
     ViewnodeKind::PropertyMember (
       PropertyMember::Alias { claimsMembership, .. }
       | PropertyMember::ID { claimsMembership, .. } ) =>
@@ -426,8 +434,7 @@ fn after_drawing (
   if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_skgid () . cloned () {
     walk . editable_gnids . insert (gnid);
     walk . drawn_editable . insert (treeid);
-    if ! walk . is_diff_view ()
-       && walk . had_editableView_request . contains (&parent) {
+    if walk . had_editableView_request . contains (&parent) {
       // The request extends the content it draws, as it extends the
       // content it shows ('extend_requested_content').
       walk . had_editableView_request . insert (treeid); }}
@@ -481,7 +488,10 @@ fn draw_item (
         Some (viewnode) },
       IdRuleAnswer::Ghost (pid) =>
         ghost_from_head (&pid, walk) . map ( |ghost|
-          viewnode_of ( ViewnodeKind::Vognode (Vognode::Ghost (ghost)) )),
+          viewnode_of ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
+            claimsMembership : claims,
+            isWarranted      : item . warrant,
+            .. ghost } )))),
       IdRuleAnswer::Unknown =>
         Some ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
           skgid                   : gnid . clone (),
@@ -847,8 +857,8 @@ fn write_protect_content_subtree (
 //
 
 /// A folder left childless is entombstoned, so that the tail prunes
-/// it, unless the user could add something there: a folder whose
-/// membership the save reads, or a flags folder.
+/// it, unless the user could add something there
+/// ('folder_goes_when_empty').
 fn entombstone_if_an_empty_folder (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -856,12 +866,20 @@ fn entombstone_if_an_empty_folder (
   let empty_folder : bool = {
     let node : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
     node . children () . next () . is_none ()
-    && matches! ( &node . value () . kind,
-                  ViewnodeKind::Folder (folder)
-                    if ! folder . is_editable () && ! folder . is_flags () ) };
+    && folder_goes_when_empty ( node . value () ) };
   if empty_folder {
     tree . get_mut (parent) . unwrap () . value ()
       . replace_kind (ViewnodeKind::Tombstone); }}
+
+/// Whether the viewnode is a folder that goes when it holds nothing:
+/// any but one whose membership the save reads, or a flags folder,
+/// where the user could add something.
+pub(crate) fn folder_goes_when_empty (
+  viewnode : &Viewnode,
+) -> bool {
+  matches! ( &viewnode . kind,
+             ViewnodeKind::Folder (folder)
+               if ! folder . is_editable () && ! folder . is_flags () ) }
 
 /// The children of 'parent', in order.
 pub(crate) fn children_of (

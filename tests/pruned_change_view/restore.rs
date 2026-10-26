@@ -34,19 +34,19 @@ use std::error::Error;
 const X_REMOVED_FROM_B : &str =
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view noWarrant cycle)";
+  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view ghostWarrant cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
   "*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
-  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view noWarrant)";
+  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view ghostWarrant)";
 const G_UNDER_Q : &str =
   "** (skg ghost (gnid g)";
 const GC_UNDER_G : &str =
   "*** (skg node (gnid gc) (skgRepos (nodeRepo main)) writeProtected";
 const GC_REMOVED_FROM_R : &str =
-  "** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim (view noWarrant) (diff";
+  "** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim (view ghostWarrant) (diff";
 
 /// g's file at HEAD, as the save writes a node.
 const G_AT_HEAD : &str =
@@ -135,7 +135,9 @@ fn restoring_a_removed_subscription_from_a_subscriber_folder (
 
 /// The node's file is written back as HEAD had it, its out-link to
 /// gd (still deleted) included; its container and its subscriber list
-/// it again, q at its index at HEAD.
+/// it again, q at its index at HEAD. g's list names gd, which HEAD
+/// has, so gd is its ghost there, claiming membership: a later save of
+/// the buffer keeps gd in g's list, as it would an unknown's.
 #[test]
 fn restoring_a_deleted_node () -> Result<(), Box<dyn Error>> {
   with_fixture ("restore", &["main"], |f| {
@@ -153,10 +155,13 @@ fn restoring_a_deleted_node () -> Result<(), Box<dyn Error>> {
     assert! ( ! rerendered . contains ("ghost (gnid g)"),
               "g is no longer deleted:\n{}", rerendered );
     assert! ( ! rerendered . contains ("restoreNode"), "{}", rerendered );
-    assert! ( without_viewnode_ids (rerendered) . contains ("*** (skg unknown (gnid gd)"),
-              "g's out-link to gd, still deleted, shows as an unknown phantom:\n{}",
+    assert! ( without_viewnode_ids (rerendered) . contains (
+                "*** (skg ghost (gnid gd) (skgRepos (nodeRepo main)) (diff (node removed)" ),
+              "g's out-link to gd, still deleted, shows as gd's ghost, claiming:\n{}",
               rerendered );
     saved_and_rerendered (f, rerendered) ?;
+    assert_eq! ( file_of (&skg_files (f) ?, "g"), G_AT_HEAD,
+                 "the saves keep gd in g's list" );
     Ok (( )) }) }
 
 /// Restoring g and, in the same save, gc's membership in g (which g's
@@ -259,7 +264,7 @@ fn restoreRel_is_refused_on_a_chain_node_and_taken_by_a_folder_member (
       let requested : String = edit_line (
         &buffer, D_IN_THE_CHAIN_UNDER_C,
         |line : &str| line . replacen (
-          "(view noWarrant))", &format! ("{} (view noWarrant))", parts), 1 ));
+          "(view ghostWarrant))", &format! ("{} (view ghostWarrant))", parts), 1 ));
       assert_ne! ( requested, buffer );
       let refusal : String = match save (f, &requested) {
         Err (e) => match e . downcast_ref::<SaveError> () {

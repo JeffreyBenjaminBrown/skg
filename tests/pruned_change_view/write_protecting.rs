@@ -217,10 +217,13 @@ fn in_a_content_view_write_protecting_an_occurrence_with_content_saves (
 
 /// c, typed under n under x and so created, carries change facts. A
 /// write-protect request on n under x and an editable-view request
-/// on n under y, in one save, move editability: a, b and c are shown
-/// once under x, as non-members, c keeping its change facts, and
-/// editable under y. An editable-view request on n under x moves it
-/// back: n under x adopts them as its members again.
+/// on n under y, in one save, move n's editability; its content keeps
+/// its own: a and c (in U) stay editable under x, c keeping its change
+/// facts, and are write-protected under y, while b, outside U, becomes
+/// editable under y, where the request extends n's content. An
+/// editable-view request on n under x moves n's editability back, and
+/// a, b and c are shown once under each n, claiming as members under
+/// the editable one.
 #[test]
 fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
 ) -> Result<(), Box<dyn Error>> {
@@ -252,12 +255,13 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
               && ! n_lines [1] . contains ("writeProtected"),
               "n must be write-protected under x and editable under y:\n{}", moved );
     assert! ( ! moved . contains ("viewRequests"), "{}", moved );
-    for child in ["a", "b", "c"] {
+    for (child, editable_under_x) in [ ("a", true), ("b", false), ("c", true) ] {
       let lines : Vec<String> = at_depth (&moved, "***", child);
       assert! ( lines . len () == 2 // under a write-protected n, no claim atom
                 && ! lines [0] . contains ("noClaim")
-                && lines [0] . contains ("writeProtected")
-                && ! lines [1] . contains ("noClaim"),
+                && lines [0] . contains ("writeProtected") != editable_under_x
+                && ! lines [1] . contains ("noClaim")
+                && lines [1] . contains ("writeProtected") == editable_under_x,
                 "{} must be shown once under each n:\n{}", child, moved ); }
     assert! ( at_depth (&moved, "***", "c") [0] . contains ("(diff "),
               "c keeps its change facts under x:\n{}", moved );
@@ -379,9 +383,9 @@ fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
 
 /// Typed under n under y as non-members, b (folded) then a are n's
 /// content in the wrong order. An editable-view request there makes
-/// that occurrence editable; it adopts them as its members, keeping
-/// their viewnodes (b stays folded), and moves them into content
-/// order: a, then b.
+/// that occurrence editable; it keeps their viewnodes (b stays
+/// folded), still claiming nothing (a claim is the user's to make),
+/// and moves them into content order: a, then b.
 #[test]
 fn an_adopted_child_moves_into_content_order (
 ) -> Result<(), Box<dyn Error>> {
@@ -409,7 +413,7 @@ fn an_adopted_child_moves_into_content_order (
               && ! under_y [0] . contains ("writeProtected")
               && without_viewnode_ids (under_y [1]) . starts_with ("*** (skg node (gnid a) ")
               && without_viewnode_ids (under_y [2]) . starts_with ("*** (skg folded node (gnid b) ")
-              && ! under_y [1 ..] . iter () . any ( |line| line . contains ("noClaim") ),
+              && under_y [1 ..] . iter () . all ( |line| line . contains ("noClaim") ),
               "n under y must be editable, its members a then b, b folded:\n{}",
               saved );
     Ok (( )) }) }
