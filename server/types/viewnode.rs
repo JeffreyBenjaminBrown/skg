@@ -93,9 +93,7 @@ pub struct ReadinessRequest {
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
 pub struct Viewnode {
-  pub focused         : bool,
-  pub org_folded      : bool, // Is this     hidden in its parent?
-  pub org_body_folded : bool, // Is the body hidden in this?
+  pub foldAndFocus    : FoldAndFocus,
   pub kind            : ViewnodeKind,
   /// The diff view's display facts. Empty on a kind that never
   /// carries a change (a folder, a restricted vognode, the buffer
@@ -110,6 +108,16 @@ pub struct Viewnode {
   /// 'server/types/views_state.rs'); a parsed viewnode keeps the one
   /// its headline carried.
   pub viewnode_id       : Option<ViewnodeId>,
+}
+
+/// The three position atoms of a headline in the client's buffer:
+/// 'focused', 'folded' and 'bodyFolded'. The client sets them
+/// and the view keeps them; they say nothing about the graph.
+#[derive( Debug, Clone, Copy, Default, PartialEq, Eq )]
+pub struct FoldAndFocus {
+  pub focused    : bool,
+  pub folded     : bool, // Is this     hidden in its parent?
+  pub bodyFolded : bool, // Is the body hidden in this?
 }
 
 /// A viewnode ID: the identifier of one viewnode within one buffer,
@@ -1303,13 +1311,12 @@ pub fn viewforest_root_viewnode () -> Viewnode {
 /// carrying no change facts, no readiness request and no viewnode ID.
 /// A literal that
 /// sets other fields can take the rest from it:
-/// 'Viewnode { org_folded : true, .. viewnode_of (kind) }'.
+/// 'Viewnode { foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
+///            .. viewnode_of (kind) }'.
 pub fn viewnode_of (
   kind : ViewnodeKind,
 ) -> Viewnode {
-  Viewnode { focused           : false,
-             org_folded        : false,
-             org_body_folded   : false,
+  Viewnode { foldAndFocus      : FoldAndFocus::default (),
              kind,
              change_facts      : ChangeFacts::default (),
              readiness_request : None,

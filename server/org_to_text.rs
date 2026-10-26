@@ -2,7 +2,7 @@ use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, ReadinessRequest,
+  ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
   Warrant,
@@ -234,59 +234,57 @@ fn viewnode_to_string_without_viewnode_id (
   match &viewnode . kind {
     ViewnodeKind::PropertyFolder (folder) =>
       Ok ( folder_atom_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, folder . repr_in_client (), folder_facts )),
+        viewnode . foldAndFocus, folder . repr_in_client (), folder_facts )),
     ViewnodeKind::Property (property) =>
       property_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, property,
+        viewnode . foldAndFocus, property,
         &viewnode . change_facts, &viewnode . readiness_request ),
     ViewnodeKind::PartnerFolder (partnerFolder) =>
       Ok ( folder_atom_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, partnerFolder . repr_in_client (),
+        viewnode . foldAndFocus, partnerFolder . repr_in_client (),
         folder_facts )),
     ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewnodeKind::Tombstone =>
       Ok ( tombstone_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded )),
+        viewnode . foldAndFocus )),
     ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
       Ok ( unrestrictedVognode_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, unrestrictedVognode,
+        viewnode . foldAndFocus, unrestrictedVognode,
         &viewnode . change_facts, &viewnode . readiness_request, config )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted_node))) =>
       Ok ( phantomDeleted_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, deleted_node,
+        viewnode . foldAndFocus, deleted_node,
         &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown_node))) =>
       Ok ( phantomUnknown_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, unknown_node,
+        viewnode . foldAndFocus, unknown_node,
         &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
       Ok ( phantomHistorical_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded, historical,
+        viewnode . foldAndFocus, historical,
         &viewnode . change_facts, &viewnode . readiness_request )),
     ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
       Ok ( restricted_node_metadata_to_string (
-        viewnode . focused, viewnode . org_folded,
-        viewnode . org_body_folded )) } }
+        viewnode . foldAndFocus )) } }
+
+/// The position atoms a headline carries, in their order on the wire.
+fn foldAndFocus_atoms (
+  foldAndFocus : FoldAndFocus,
+) -> Vec < String > {
+  [ (foldAndFocus . focused,    "focused"),
+    (foldAndFocus . folded,     "folded"),
+    (foldAndFocus . bodyFolded, "bodyFolded") ]
+  . into_iter ()
+  . filter ( |(carried, _)| *carried )
+  . map ( |(_, atom)| atom . to_string () )
+  . collect () }
 
 fn non_vognode_atom_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
   atom            : &str,
 ) -> String {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . push (atom . to_string ());
   parts . join (" ") }
 
@@ -294,33 +292,26 @@ fn non_vognode_atom_metadata_to_string (
 /// '(ATOM changed)', then '(diff (ready))' if that change is ready:
 /// the objectless '(ready)' is the folder's aggregate.
 fn folder_atom_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
   atom            : &str,
   folder_facts    : Option<FolderChangeFacts>,
 ) -> String {
   match folder_facts {
     None => non_vognode_atom_metadata_to_string (
-      focused, org_folded, org_body_folded, atom ),
+      foldAndFocus, atom ),
     Some (facts) => {
       let mut metadata : String = non_vognode_atom_metadata_to_string (
-        focused, org_folded, org_body_folded, &format! ("({} changed)", atom) );
+        foldAndFocus, &format! ("({} changed)", atom) );
       if facts . ready { metadata . push_str (" (diff (ready))"); }
       metadata }, } }
 
 fn property_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
   property        : &Property,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> Result < String, Box<dyn Error> > {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   match property {
     Property::Alias { relRepo, relRepo_request, .. } => {
       parts . push ( "alias" . to_string () );
@@ -398,9 +389,7 @@ fn change_fact_forms (
 /// Render metadata for an UnrestrictedVognode:
 ///   (skg [focused] [folded] (node ...))
 fn unrestrictedVognode_metadata_to_string (
-  focused             : bool,
-  org_folded          : bool,
-  org_body_folded     : bool,
+  foldAndFocus    : FoldAndFocus,
   unrestrictedVognode : & UnrestrictedVognode,
   facts               : & ChangeFacts,
   request             : & Option<ReadinessRequest>,
@@ -508,27 +497,19 @@ fn unrestrictedVognode_metadata_to_string (
     { parts . push (s); }
     parts . extend ( change_fact_forms (facts, request) );
     format! ( "({})", parts . join (" ")) }
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . push ( node_sexp (unrestrictedVognode, facts, request, config));
   parts . join (" ") }
 
 /// Render metadata for a PhantomDeleted:
 ///   (skg [focused] [folded] (deleted (id X) (repo S)))
 fn phantomDeleted_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
   deleted_node    : &PhantomDeleted,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   let deleted_parts : Vec<String> =
     [ format! ("(id {})", deleted_node . skgid . 0),
       format! ("(repo {})",
@@ -543,17 +524,12 @@ fn phantomDeleted_metadata_to_string (
 ///   (skg [focused] [folded] (historical (id X) (repo S)
 ///                                       [(editRequest restoreNode)] ...))
 fn phantomHistorical_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
   historical      : &PhantomHistorical,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   let historical_parts : Vec<String> =
     [ format! ("(id {})", historical . skgid . 0),
       format! ("(repo {})",
@@ -570,17 +546,12 @@ fn phantomHistorical_metadata_to_string (
 ///   (skg [focused] [folded] (unknown (id X)))
 /// Triggered when a referenced ID resolved to nothing in any db.
 fn phantomUnknown_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
   unknown_node    : &PhantomUnknown,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   let mut unknown_parts : Vec<String> = vec! [
     format! ("(id {})", unknown_node . skgid . 0) ];
   if let Some (skgrepo) = &unknown_node . relRepo {
@@ -599,28 +570,18 @@ fn phantomUnknown_metadata_to_string (
 /// user hid by restricting the skgrepo-set, so emitting them would leak
 /// (see RestrictedVognode).
 fn restricted_node_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
 ) -> String {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . push ( "restrictedNode" . to_string () );
   parts . join (" ") }
 
 /// Render metadata for a tombstone:
 ///   (skg [focused] [folded] tombstone)
 fn tombstone_metadata_to_string (
-  focused         : bool,
-  org_folded      : bool,
-  org_body_folded : bool,
+  foldAndFocus    : FoldAndFocus,
 ) -> String {
-  let mut parts : Vec < String > = Vec::new ();
-  if focused     { parts . push ( "focused"    . to_string () ); }
-  if org_folded  { parts . push ( "folded"     . to_string () ); }
-  if org_body_folded { parts . push ( "bodyFolded" . to_string () ); }
+  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   parts . push ( "tombstone" . to_string () );
   parts . join (" ") }
 

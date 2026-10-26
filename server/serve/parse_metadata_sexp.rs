@@ -51,7 +51,7 @@ use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
-  ChangeFacts, DiffObject, Existence, ReadinessRequest,
+  ChangeFacts, DiffObject, Existence, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
@@ -72,9 +72,7 @@ use std::collections::{BTreeSet, HashSet};
 /// Intermediate parsed metadata. Converted to Viewnode via viewnode_from_metadata().
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeMetadata {
-  pub focused: bool,
-  pub org_folded: bool,
-  pub org_body_folded: bool,
+  pub foldAndFocus: FoldAndFocus,
   pub viewnode_id: Option<ViewnodeId>,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
@@ -113,9 +111,7 @@ pub struct ViewnodeMetadata {
 
 pub fn default_metadata() -> ViewnodeMetadata {
   ViewnodeMetadata {
-    focused: false,
-    org_folded: false,
-    org_body_folded: false,
+    foldAndFocus: FoldAndFocus::default(),
     viewnode_id: None,
     non_vognode: None,
     skgid: None,
@@ -346,9 +342,7 @@ pub fn viewnode_from_metadata (
                | MpViewnodeKind::Tombstone
                | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
                | MpViewnodeKind::Property (Property::BodyDiff { .. }) );
-  ( MpViewnode { focused           : metadata . focused,
-                 org_folded        : metadata . org_folded,
-                 org_body_folded   : metadata . org_body_folded,
+  ( MpViewnode { foldAndFocus      : metadata . foldAndFocus,
                  kind,
                  change_facts      :
                    if never_carries_a_change { ChangeFacts::default () }
@@ -525,9 +519,9 @@ pub fn parse_metadata_to_viewnodemd (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          "focused"  => result . focused = true,
-          "folded"   => result . org_folded = true,
-          "bodyFolded" => result . org_body_folded = true,
+          "focused"  => result . foldAndFocus . focused = true,
+          "folded"   => result . foldAndFocus . folded = true,
+          "bodyFolded" => result . foldAndFocus . bodyFolded = true,
           // A restricted vognode is a dataless bare atom
           // (see RestrictedVognode). The legacy field-bearing list form
           // '(restrictedNode ...)' is still tolerated by the List arm

@@ -161,8 +161,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_t . skgid . as_ref(), None);
   assert_eq!(first_t . viewStats . cycle, false);
   assert!(first_t . claimsMembership);
-  assert_eq!(first_node . focused, false);
-  assert_eq!(first_node . org_folded, false);
+  assert_eq!(first_node . foldAndFocus . focused, false);
+  assert_eq!(first_node . foldAndFocus . folded, false);
   assert_eq!(first_t . is_writeProtected (), false);
   assert_eq!(first_t . edit_request (), None);
 
@@ -250,13 +250,13 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   assert_eq!(meta_node . title(), "simple node with metadata");
   assert_eq!(meta_node . body(), Some(&"Node body" . to_string()));
   assert_eq!(meta_node . skgid_opt(), Some(&ID::from ("test")));
-  assert_eq!(meta_node . org_folded, true);
+  assert_eq!(meta_node . foldAndFocus . folded, true);
 
   // Test node without metadata (should have defaults)
   let regular_node = tree_roots[1] . value();
   assert_eq!(regular_node . title(), "regular node without metadata");
   assert_eq!(regular_node . skgid_opt(), None);
-  assert_eq!(regular_node . org_folded, false);
+  assert_eq!(regular_node . foldAndFocus . folded, false);
   assert_eq!(regular_node . body(), Some(&"Regular body" . to_string()));
 }
 

@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, with_org_subheadlines};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
+use super::viewnode::{ ChangeFacts, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -23,9 +23,7 @@ use std::collections::{HashMap, HashSet};
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MpViewnode {
-  pub focused           : bool,
-  pub org_folded        : bool,
-  pub org_body_folded   : bool,
+  pub foldAndFocus      : FoldAndFocus,
   pub kind              : MpViewnodeKind,
   pub change_facts      : ChangeFacts,
   pub readiness_request : Option<ReadinessRequest>,
@@ -123,9 +121,7 @@ impl TryFrom<MpViewnode> for Viewnode {
       ViewnodeKind::try_from (u . kind) . map_err (
         |e| with_org_subheadlines ( &e, &[headline] )) ?;
     Ok(Viewnode {
-      focused           : u . focused,
-      org_folded        : u . org_folded,
-      org_body_folded   : u . org_body_folded,
+      foldAndFocus      : u . foldAndFocus,
       kind,
       change_facts      : u . change_facts,
       readiness_request : u . readiness_request,
@@ -182,9 +178,7 @@ impl From<ViewnodeKind> for MpViewnodeKind {
 impl From<Viewnode> for MpViewnode {
   fn from(o: Viewnode) -> Self {
     MpViewnode {
-      focused           : o . focused,
-      org_folded        : o . org_folded,
-      org_body_folded   : o . org_body_folded,
+      foldAndFocus      : o . foldAndFocus,
       kind              : MpViewnodeKind::from(o . kind),
       change_facts      : o . change_facts,
       readiness_request : o . readiness_request,
@@ -272,9 +266,7 @@ impl Default for MpUnrestrictedVognode {
 impl Default for MpViewnode {
   fn default() -> Self {
     MpViewnode {
-      focused           : false,
-      org_folded        : false,
-      org_body_folded   : false,
+      foldAndFocus      : FoldAndFocus::default (),
       kind              : MpViewnodeKind::Vognode (
         MpVognode::Unrestricted (MpUnrestrictedVognode::default())),
       change_facts      : ChangeFacts::default (),

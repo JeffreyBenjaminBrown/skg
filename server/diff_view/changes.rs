@@ -182,7 +182,7 @@ pub(crate) fn process_unrestrictedVognode_changes (
     prunedChangeView_sets_of_buffer (straddle, diffView_buffer_kind);
   let in_c : bool = sets . c . contains (&pid);
   if created_in_this_completion {
-    tree . get_mut (treeid) . unwrap () . value () . org_body_folded = ! in_c; }
+    tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . bodyFolded = ! in_c; }
   tag_content_members (
     tree, treeid, straddle, &content,
     Some (( &sets . u, editable_before_completion )) ) ?;

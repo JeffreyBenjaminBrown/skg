@@ -39,7 +39,7 @@ fn test_viewnode_to_text_with_body () {
 fn test_viewnode_to_text_with_metadata () {
   let mut node = viewnode_of (ViewnodeKind::PropertyFolder (
       PropertyFolder::Alias));
-  node . org_folded = true;
+  node . foldAndFocus . folded = true;
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("AliasFolder rendering never fails");

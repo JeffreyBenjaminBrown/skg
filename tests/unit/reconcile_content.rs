@@ -50,8 +50,8 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   let mut restriction : Viewnode = mk_editable_viewnode (
     ghost . clone (), skgrepo_name ("main"), "last seen" . to_string (),
     Some ("last seen body" . to_string ()) );
-  restriction . focused = true;
-  restriction . org_folded = true;
+  restriction . foldAndFocus . focused = true;
+  restriction . foldAndFocus . folded = true;
   let child : NodeId = tree . root_mut () . append (restriction) . id ();
   let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   relRepos . insert (ghost . clone (), skgrepo_name ("private"));
@@ -63,7 +63,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
     &skgrepo_name ("main"), &graph_snap, &HashMap::new () ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
-  assert! (rendered . focused && rendered . org_folded,
+  assert! (rendered . foldAndFocus . focused && rendered . foldAndFocus . folded,
     "same-session normalization preserves view wrapper state");
   match &rendered . kind {
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
@@ -84,7 +84,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
   let parent : NodeId = tree . root () . id ();
   let mut restriction : Viewnode = mk_editable_viewnode (
     primary . clone (), skgrepo_name ("main"), "last seen" . to_string (), None );
-  restriction . focused = true;
+  restriction . foldAndFocus . focused = true;
   let child : NodeId = tree . root_mut () . append (restriction) . id ();
   let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
   relRepos . insert (raw_extra . clone (), skgrepo_name ("foreign"));
@@ -99,7 +99,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     &skgrepo_name ("main"), &graph_snap, &deleted_extra_ids ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
-  assert! (rendered . focused,
+  assert! (rendered . foldAndFocus . focused,
     "extra-id normalization preserves the unrestricted child wrapper state");
   match &rendered . kind {
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {

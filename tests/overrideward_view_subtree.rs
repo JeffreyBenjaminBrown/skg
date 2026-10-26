@@ -200,7 +200,7 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
   assert_eq! ( folders . len (), 1, "only the overridden folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
                        ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) )
-            && folders [0] . value () . org_folded,
+            && folders [0] . value () . foldAndFocus . folded,
             "U's one folder is its overridden folder, folded" );
   let f : NodeRef<Viewnode> =
     find_child ( folders [0], "F" )
@@ -239,7 +239,7 @@ fn a_hit_shows_the_nodes_that_override_it_in_a_folder (
   assert_eq! ( folders . len (), 1, "only the overrider folder" );
   assert! ( matches! ( &folders [0] . value () . kind,
                        ViewnodeKind::PartnerFolder (PartnerFolder::Overrider) )
-            && folders [0] . value () . org_folded,
+            && folders [0] . value () . foldAndFocus . folded,
             "E's one folder is its overrider folder, folded" );
   assert! ( find_child ( folders [0], "B" ) . is_some (),
             "B (which overrides E) is in the folder" );

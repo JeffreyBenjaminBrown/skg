@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::containerward_role_tree::ContainerwardRoleTree;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
-use crate::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
+use crate::types::viewnode::{FoldAndFocus, PartnerFolder, Viewnode, ViewnodeKind, mk_writeProtected_viewnode, viewnode_of};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -68,7 +68,7 @@ fn prepend_folded_folder (
   kind       : PartnerFolder,
 ) -> NodeId {
   viewforest . get_mut (parent) . unwrap () . prepend ( Viewnode {
-    org_folded : true,
+    foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
     .. viewnode_of ( ViewnodeKind::PartnerFolder (kind) ) } ) . id () }
 
 /// The members of the hit's overrider folder (the nodes that override

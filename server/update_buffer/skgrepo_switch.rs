@@ -117,10 +117,10 @@ fn prune_children_postorder (
     if prune_children_postorder (tree, child) ? {
       let had_focus : bool =
         subtree_satisfies (
-          tree, child, &|vn : &Viewnode| vn . focused ) ?;
+          tree, child, &|vn : &Viewnode| vn . foldAndFocus . focused ) ?;
       if had_focus {
         tree . get_mut (node) . unwrap ()
-          . value () . focused = true; }
+          . value () . foldAndFocus . focused = true; }
       tree . get_mut (child) . unwrap () . detach (); }}
   should_prune (tree, node, had_children) }
 

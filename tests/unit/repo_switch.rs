@@ -99,8 +99,8 @@ fn focus_transfers_to_surviving_parent () {
     . append (def ("parent", "public")) . id ();
   let gone : NodeId = t . get_mut (parent) . unwrap ()
     . append (def ("gone", "private")) . id ();
-  t . get_mut (gone) . unwrap () . value () . focused = true;
+  t . get_mut (gone) . unwrap () . value () . foldAndFocus . focused = true;
   convert_and_prune_for_skgrepo_switch (
     &mut t, &restriction_public ()) . unwrap ();
-  assert! ( t . get (parent) . unwrap () . value () . focused,
+  assert! ( t . get (parent) . unwrap () . value () . foldAndFocus . focused,
     "focus transfers from a pruned subtree to its surviving parent" ); }

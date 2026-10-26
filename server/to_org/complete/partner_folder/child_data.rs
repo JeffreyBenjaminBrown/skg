@@ -445,7 +445,7 @@ mod tests {
     let mut child : Viewnode = mk_writeProtected_viewnode (
       primary . clone (), skgrepo ("main"), "last seen" . to_string (),
       true );
-    child . focused = true;
+    child . foldAndFocus . focused = true;
     let child_treeid   : NodeId = tree . root_mut () . append (child) . id ();
     let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
     child_data . insert ( raw_extra . clone (), ChildData {
@@ -462,7 +462,7 @@ mod tests {
       &deleted_extra_ids ) . unwrap ();
 
     let rendered = tree . get (child_treeid) . unwrap () . value ();
-    assert! (rendered . focused,
+    assert! (rendered . foldAndFocus . focused,
       "normalization must preserve the existing view wrapper state");
     match &rendered . kind {
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {

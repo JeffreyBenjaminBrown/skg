@@ -51,15 +51,15 @@ pub fn fold_members_of_newborn_folder (
   let newborn : bool =
     tree . get (folder)
     . ok_or ("fold_members_of_newborn_folder: node not found") ?
-    . value () . org_folded;
+    . value () . foldAndFocus . folded;
   if ! newborn { return Ok (( )); }
   with_node_mut ( tree, folder,
-                  |mut n| { n . value () . org_folded = false; } )
+                  |mut n| { n . value () . foldAndFocus . folded = false; } )
     . map_err ( |e| -> String { e . into () } ) ?;
   treat_certain_children (
     tree, folder,
     |_vn : &Viewnode| true,
-    |vn : &mut Viewnode| { vn . org_folded = true; } ) }
+    |vn : &mut Viewnode| { vn . foldAndFocus . folded = true; } ) }
 
 /// Classify children of a node based on a classifier function.
 /// Returns a HashMap from classification key to Vec<NodeId>.
@@ -105,11 +105,11 @@ pub fn detach_viewnode_transferring_focus (
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let has_focus : bool =
-    subtree_satisfies ( tree, node, &|n : &Viewnode| n . focused ) ?;
+    subtree_satisfies ( tree, node, &|n : &Viewnode| n . foldAndFocus . focused ) ?;
   if has_focus {
     write_at_ancestor_in_tree (
       tree, node, 1,
-      |vn : &mut Viewnode| { vn . focused = true; } )
+      |vn : &mut Viewnode| { vn . foldAndFocus . focused = true; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   with_node_mut ( tree, node,
                   |mut n| { n . detach (); } )

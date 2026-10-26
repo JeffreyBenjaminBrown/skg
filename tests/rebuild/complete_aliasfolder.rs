@@ -145,7 +145,7 @@ async fn test_reconcile_alias_folder_children_logic (
       "Second child should be 'c'"
     );
     assert! (
-      aliasfolder_2_new . focused,
+      aliasfolder_2_new . foldAndFocus . focused,
       "AliasFolder 2 should have gained focus"
     );
   }
@@ -249,11 +249,11 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
       "First child should be 'b'"
     );
     assert! (
-      ! children_new [ 0 ] . focused,
+      ! children_new [ 0 ] . foldAndFocus . focused,
       "First child should not be focused (focus transferred to AliasFolder)"
     );
     assert! (
-      aliasfolder_vn . focused,
+      aliasfolder_vn . foldAndFocus . focused,
       "AliasFolder itself should have gained focus"
     );
     assert_eq! (
@@ -262,7 +262,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
       "Second child should be 'c'"
     );
     assert! (
-      ! children_new [ 1 ] . focused,
+      ! children_new [ 1 ] . foldAndFocus . focused,
       "Second child should not be focused"
     );
   }
@@ -297,7 +297,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
       "First child should be 'b'"
     );
     assert! (
-      children [ 0 ] . focused,
+      children [ 0 ] . foldAndFocus . focused,
       "First child should be focused"
     );
     assert_eq! (
@@ -306,7 +306,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
       "Second child should be 'c'"
     );
     assert! (
-      ! children [ 1 ] . focused,
+      ! children [ 1 ] . foldAndFocus . focused,
       "Second child should not be focused"
     );
   }

@@ -37,7 +37,7 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SkgrepoName};
 use crate::skgrepo_sets::{SkgrepoRestriction, search_skgids_for_skgrepo_set_for_test as search_ids_for_skgrepo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
+use crate::types::viewnode::{ FoldAndFocus, Viewnode, ViewnodeKind, mk_writeProtected_viewnode};
 use crate::types::viewnode::{PropertyFolder, Property, viewnode_of};
 
 use ego_tree::{NodeId, NodeMut};
@@ -678,7 +678,7 @@ pub fn build_search_viewforest (
           let mut result_mut : NodeMut<Viewnode> =
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( Viewnode {
-            org_folded : true,
+            foldAndFocus : FoldAndFocus { folded : true, .. FoldAndFocus::default () },
             .. viewnode_of ( ViewnodeKind::PropertyFolder (PropertyFolder::Alias) ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
