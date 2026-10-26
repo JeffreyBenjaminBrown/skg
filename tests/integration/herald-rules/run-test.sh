@@ -4,7 +4,8 @@
 # This script:
 # - Starts an independent skg server with test config
 # - Uses Emacs to fetch the herald rule table over TCP
-# - Tests that the table installs into the heralds cache
+# - Tests that the table installs into the heralds cache, and that the
+#   skgrepo label table served beside it labels a repo boundary
 
 set -e  # Exit on any error
 
@@ -39,6 +40,7 @@ beep_when_server_becomes_available = false
 
 [[repos]]
 name = "main"
+abbreviation = "m"
 path = "$TEST_DIR/data/owned/skg"
 EOF
 

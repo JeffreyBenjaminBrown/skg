@@ -13,7 +13,8 @@
     "go":          { "foreground": "black",   "background": "#00bb00",  "what_it_looks_like": "black text on bright green" },
     "nonstandard": { "foreground": "white",   "background": "#8b00ff",  "what_it_looks_like": "white text on violet purple" },
     "ugly":        { "foreground": "#c84286",                           "what_it_looks_like": "magenta-pink text, no background" },
-    "boring":      { "foreground": "white",   "background": "#3a3a3a",  "what_it_looks_like": "white text on dark gray" }
+    "boring":      { "foreground": "white",   "background": "#3a3a3a",  "what_it_looks_like": "white text on dark gray" },
+    "ghost":       { "foreground": "#f8f8ff", "background": "#483d8b",  "what_it_looks_like": "ghost-white text on dark slate blue" }
   },
   "view_faces_comment": "Skg dictates every face in a view, in both clients: these colors and weights replace the user's theme for the Org elements a view contains (not the typeface). They follow Jeff's Emacs setup: rainbow headlines, from his custom faces, and the manoj-dark theme's Org faces. Each entry names the Emacs faces and Neovim highlight groups it governs. A face with no background gets the default's.",
   "view_faces": [
@@ -42,17 +43,19 @@
   "node_heralds": {
     "comment": "The style of each styled atom in the server's herald rule table (server/heralds.rs), keyed by atom name. Where one atom takes different styles in different places, a qualified key names the other place: editRequest_X is the atom X under editRequest; homeSkgrepoMove_skgrepo and relRepoMove_skgrepo are the skgrepo names those properties show, as is homeSkgrepoMove_skgrepo in a moved node's own heralds. The ☮ on a write-protected label or flag takes writeProtected's style. See docs/heralds.org.",
     "writeProtected":                  "crucial",
+    "ghost":                           "ghost",
+    "ghostWarrant":                    "ghost",
     "noWarrant":                       "crucial",
     "omittedBody":                     "high",
     "cycle":                           "medium",
     "relRepo":                         "ugly",
     "repoBoundary":                    "normal",
     "ready":                           "go",
-    "changed":                         "message",
     "existence":                       "nonstandard",
     "properties":                      "nonstandard",
     "readyRequest":                    "nonstandard",
     "unreadyRequest":                  "nonstandard",
+    "pendingDetachment":               "nonstandard",
     "delete":                          "nonstandard",
     "merge":                           "nonstandard",
     "restoreNode":                     "nonstandard",
@@ -88,6 +91,26 @@
     "relRepoMove":                     "message",
     "relRepoMove_skgrepo":             "normal",
     "changesetMarker":                 "message"
+  },
+  "folder_heralds": {
+    "comment": "What the clients need to draw two heralds that depend on a folder. 'write_protected' names the folders whose label carries ☮: the user cannot change their membership from here, so a member under one detaches nothing. 'changed_labels' gives the label of a folder the diff view shows because a member carries a change of its relationship to the folder's viewparent; the client draws it, styled as the folder's own label, in place of that label, after the folder's ☮ if it has one, and followed by ✓ (styled as node_heralds.ready) when every such change is ready. The server checks both against its rule table at startup.",
+    "write_protected": [ "flagsFolder", "subscriberFolder", "overriderFolder",
+                         "hiderFolder", "hiddenFolder", "hiddenInSubscribeeFolder",
+                         "containerFolder", "mentionerFolder",
+                         "acquiredByFolder", "acquiredFolder" ],
+    "changed_labels": {
+      "aliasFolder":      "its aliases changed (this file)",
+      "idFolder":         "its IDs changed (this file)",
+      "flagsFolder":      "its flags changed (this file)",
+      "containerFolder":  "its containers changed (other files)",
+      "mentionerFolder":  "its mentioners changed (other files)",
+      "subscriberFolder": "its subscribers changed (other files)",
+      "overriderFolder":  "its overriders changed (other files)",
+      "hiderFolder":      "its hiders changed (other files)",
+      "subscribeeFolder": "its subscribees changed (this file)",
+      "overriddenFolder": "the nodes it overrides changed (this file)",
+      "hiddenFolder":     "the nodes it hides changed (this file)"
+    }
   },
   "relationship_heralds": {
     "comment": "How the clients style relationship heralds. A side's tier is shown by its carrier: its numeral if it shows one, else its ancestor flags. See docs/heralds.org.",

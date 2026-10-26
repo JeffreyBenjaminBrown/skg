@@ -266,7 +266,7 @@ fn handle_emacs (
               &mut stream, &request_header, &env, &mut views_state,
               &skgrepo_restriction ),
           Ok (RequestType::HeraldRules) =>
-            handle_herald_rules_request ( &mut stream ),
+            handle_herald_rules_request ( &mut stream, &runtime . config ),
           Ok (RequestType::ServerWarnings) =>
             handle_server_warnings_request (
               &mut stream, env . runtime . startup_warnings () ),

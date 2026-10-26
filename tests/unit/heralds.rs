@@ -85,3 +85,73 @@ fn herald_styles_consistency_check_reports_problems () {
   assert_eq! ( problems, vec! [
     "relationship_heralds.birth_letter names no_such_style, which is not a key of 'styles'" . to_string (),
     "the rule table styles cycle, which has no entry in 'node_heralds'" . to_string () ] ); }
+
+// A WHEN applies its rules to a headline of the kinds it names, so it
+// may name kind atoms only: a WHEN on a part or a typo would never
+// fire. The table keys the readings of '(diff ...)' (two objects on a
+// node or a ghost, one relationship on an unknown, one object on a
+// property or a change viewnode) on WHENs, which the serialized table
+// spells as the lens reads them.
+#[test]
+fn herald_rules_WHEN_names_only_kinds () {
+  let when_kinds : HashSet<&'static str> = when_kinds_in_rule_table ();
+  let kinds : HashSet<&'static str> = emittable_kind_atoms ();
+  let not_kinds : Vec<&&str> =
+    when_kinds . iter () . filter ( |atom| ! kinds . contains (**atom) ) . collect ();
+  assert! ( not_kinds . is_empty (), "WHEN names atoms that are no kind: {:?}", not_kinds );
+  for kind in [ "node", "ghost", "unknown", "alias", "id", "changesetMarker" ] {
+    assert! ( when_kinds . contains (kind), "no WHEN names {}", kind ); }
+  let sexp : String = herald_rules_sexp ();
+  assert! ( sexp . contains ("(WHEN ghost ") );
+  assert! ( sexp . contains ("(WHEN alias id flag oldText ") ); }
+
+// The position glyphs stand first: the ghost's ᗣ and the warrant
+// glyphs are the table's first emitting rules, before every kind's.
+#[test]
+fn the_position_glyphs_come_first_in_the_table () {
+  let sexp : String = herald_rules_sexp ();
+  let ghost_at : usize = sexp . find (r#"(GHOST ghost "ᗣ")"#) . unwrap ();
+  let warrant_at : usize =
+    sexp . find (r#"(view (GHOST ghostWarrant "ᗣ") (CRUCIAL noWarrant "⊥"))"#) . unwrap ();
+  let first_label_at : usize = sexp . find (r#"(MESSAGE aliasFolder "aliases")"#) . unwrap ();
+  assert! ( ghost_at < warrant_at && warrant_at < first_label_at ); }
+
+// The label table names every configured skgrepo, in the config's
+// order, with its herald label: its abbreviation, or else its name.
+// Both are quoted, so a name the lens would read as a number or a
+// symbol with spaces stays a string.
+#[test]
+fn skgrepo_labels_name_each_skgrepo_by_its_herald_label () {
+  use crate::types::misc::{Skgrepo, SkgrepoName};
+  use std::collections::HashMap;
+  let skgrepo = |name : &str, abbreviation : Option<&str>| -> (SkgrepoName, Skgrepo) {
+    ( SkgrepoName::from (name),
+      Skgrepo { name : SkgrepoName::from (name),
+                abbreviation : abbreviation . map (str::to_string),
+                path : std::path::PathBuf::from (name),
+                owned : true } ) };
+  let mut config : SkgConfig = SkgConfig::dummyFromSkgrepos (
+    HashMap::from ([ skgrepo ("public", Some ("pub")),
+                     skgrepo ("my diary", None) ]));
+  config . skgrepo_order = vec! [ SkgrepoName::from ("public"),
+                                  SkgrepoName::from ("my diary") ];
+  assert_eq! ( skgrepo_labels_sexp (&config),
+               r#"(skgrepoLabels ("public" "pub") ("my diary" "my diary"))"# ); }
+
+// 'folder_heralds' agrees with the rule table: the consistency check
+// notices a write-protected folder it omits, one it names wrongly, and
+// a changed label for something that is no folder.
+#[test]
+fn folder_heralds_consistency_check_reports_problems () {
+  let mut file : serde_json::Value = herald_styles () . clone ();
+  let protected : &mut Vec<serde_json::Value> =
+    file ["folder_heralds"] ["write_protected"] . as_array_mut () . unwrap ();
+  protected . retain ( |atom| atom != "containerFolder" );
+  protected . push ( serde_json::Value::from ("aliasFolder") );
+  file ["folder_heralds"] ["changed_labels"] ["alias"] =
+    serde_json::Value::from ("its alias changed");
+  let problems : Vec<String> = herald_styles_inconsistencies_of (&file);
+  assert_eq! ( problems, vec! [
+    "'folder_heralds.changed_labels' names alias, which is no folder" . to_string (),
+    "'folder_heralds.write_protected' names aliasFolder, whose label the rule table gives no ☮" . to_string (),
+    "the rule table gives containerFolder a ☮, which 'folder_heralds.write_protected' omits" . to_string () ] ); }

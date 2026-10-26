@@ -14,11 +14,17 @@
 # unstyled character, such as the space between two heralds. Lines
 # before the first case are comments.
 #
-# A changed folder's case is not a line the server writes: the server
-# writes a folder's bare atom, and a client that finds a member of the
-# folder carrying a change of its relationship hands the lens
-# '(FOLDER changed)' in its place, then '(diff (ready))' when every
-# such change is ready.
+# A case may give, between its metadata and its text, a line
+# '---- context: ' saying what the headline's own metadata cannot,
+# which a client learns from the headlines around it:
+#   'folderChange ready' or 'folderChange unready': the headline is a
+#     folder a member of which carries a change of its relationship,
+#     every such change ready, or not;
+#   'pendingDetachment': the headline is 'noClaim', warranted, and
+#     under an editable parent.
+# A 'repoBoundary' renders with the skgrepo label table in
+# tests/shared/herald-skgrepo-labels.sexp, which the server serves
+# beside the rules.
 
 ==== links: substantive fraction, both sides
 (skg node (gnid x) (view (rels (linksTo (in 5 (substantive 2)) (out 3)))))
@@ -122,8 +128,26 @@
 ---- styles: medium*1 low*1 normal*1
 ==== node: unwarranted, a cycle, a delete request, contained by the parent and another
 (skg node (gnid 123) noClaim (editRequest delete) (view (rels (contains (in 2 (ancestors 1)))) (birth (contains in 1)) noWarrant cycle))
----- text: 2aC ⊥ ⟳ delete
----- styles: medium*1 low*2 -*1 crucial*1 -*1 medium*1 -*1 nonstandard*6
+---- text: ⊥ 2aC ⟳ delete
+---- styles: crucial*1 -*1 medium*1 low*2 -*1 medium*1 -*1 nonstandard*6
+==== node: unwarranted and write-protected, with a hidden body
+(skg node (gnid x) noClaim writeProtected (view omittedBody noWarrant))
+---- text: ⊥☮B
+---- styles: crucial*2 high*1
+==== node: a pending detachment
+(skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 1 (ancestors 1))))))
+---- context: pendingDetachment
+---- text: aC detach
+---- styles: medium*1 normal*1 -*1 nonstandard*6
+==== non-vognodes: an alias the graph does not hold
+(skg alias (view noWarrant))
+---- text: ⊥ alias
+---- styles: crucial*1 -*1 message*5
+==== non-vognodes: a pending detachment of an alias
+(skg alias noClaim)
+---- context: pendingDetachment
+---- text: alias detach
+---- styles: message*5 -*1 nonstandard*6
 ==== property counts: flags
 (skg node (gnid 1) (view (props (flags 2))))
 ---- text: F2
@@ -210,28 +234,40 @@
 ---- styles: message*26
 ==== placeholders: tombstone
 (skg tombstone)
----- text: DELETED
----- styles: message*7
+---- text: something stood here
+---- styles: message*20
 ==== node: write-protected with a hidden body
 (skg node (gnid x) writeProtected (view omittedBody))
 ---- text: ☮B
 ---- styles: crucial*1 high*1
-==== node: a private relRepo and its home repo
-(skg node (gnid x) (skgRepos (relRepo priv)) (view repoBoundary))
----- text: ~priv ⌂
----- styles: ugly*5 -*1 normal*1
+==== node: a private relRepo and its home skgrepo, labeled
+(skg node (gnid x) (skgRepos (nodeRepo pub) (relRepo priv)) (view repoBoundary))
+---- text: ~priv ⌂:public
+---- styles: ugly*5 -*1 normal*8
+==== node: a home skgrepo the label table lacks shows its name
+(skg node (gnid x) (skgRepos (nodeRepo priv)) (view repoBoundary))
+---- text: ⌂:priv
+---- styles: normal*6
+==== node: a repo boundary on a node naming no nodeRepo
+(skg node (gnid x) (view repoBoundary))
+---- text: ⌂
+---- styles: normal*1
 ==== node: a merge request
 (skg node (gnid x) (editRequest (merge y)))
 ---- text: merge:y
 ---- styles: nonstandard*7
 ==== diff view: a request to restore a removed membership
 (skg node (gnid x) noClaim writeProtected (editRequest restoreRel) (view noWarrant) (diff (rel removed)))
----- text: ☮ ⊥ restore membership ~-
----- styles: crucial*1 -*1 crucial*1 -*1 nonstandard*18 -*1 nonstandard*2
+---- text: ⊥☮ restore membership ~-
+---- styles: crucial*2 -*1 nonstandard*18 -*1 nonstandard*2
 ==== diff view: a request to restore a deleted node
 (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed) (rel removed)))
----- text: ☮ restore node ∃- ~-
----- styles: crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
+---- text: ᗣ☮ restore node ∃- ~-
+---- styles: ghost*1 crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
+==== diff view: a ghost with a pending tombstone request
+(skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed) (rel removed)))
+---- text: ᗣ☮ req:tombstone ∃- ~-
+---- styles: ghost*1 crucial*1 -*1 nonstandard*13 -*1 nonstandard*2 -*1 nonstandard*2
 ==== diff view: a new member whose node object is ready
 (skg node (gnid x) (diff (node added) (rel added) (ready node)))
 ---- text: ∃+✓ ~+
@@ -256,10 +292,14 @@
 (skg alias (diff (rel added) (ready)))
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
+==== diff view: an alias the worktree lost, which HEAD warrants
+(skg alias noClaim (view ghostWarrant) (diff (rel removed)))
+---- text: ᗣ alias -
+---- styles: ghost*1 -*1 message*5 -*1 nonstandard*1
 ==== diff view: a ghost with a request to unmark its existence
 (skg ghost (gnid x) (skgRepos (nodeRepo main)) (editRequest (unready node)) (diff (node removed) (rel removed)))
----- text: ☮ ∃- ~- request:unready:node
----- styles: crucial*1 -*1 nonstandard*2 -*1 nonstandard*2 -*1 nonstandard*20
+---- text: ᗣ☮ ∃- ~- request:unready:node
+---- styles: ghost*1 crucial*1 -*1 nonstandard*2 -*1 nonstandard*2 -*1 nonstandard*20
 ==== diff view: a request to mark both objects of a member
 (skg node (gnid x) (editRequest (ready node rel)))
 ---- text: request:ready:node request:ready:rel
@@ -302,8 +342,8 @@
 ---- styles: message*17 go*1
 ==== diff view: a ghost, its existence ready
 (skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node)))
----- text: ☮ ∃-✓ ~-
----- styles: crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
+---- text: ᗣ☮ ∃-✓ ~-
+---- styles: ghost*1 crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: the acquired-by folder
 (skg acquiredByFolder)
 ---- text: ☮ it was acquired by
@@ -313,15 +353,18 @@
 ---- text: ☮ it acquired
 ---- styles: crucial*1 -*1 message*11
 ==== diff view: a folder of recorders shown because of a change, ready
-(skg (containerFolder changed) (diff (ready)))
+(skg containerFolder)
+---- context: folderChange ready
 ---- text: ☮ its containers changed (other files)✓
 ---- styles: crucial*1 -*1 message*36 go*1
 ==== diff view: a folder of the node's own list shown because of a change
-(skg (aliasFolder changed))
+(skg aliasFolder)
+---- context: folderChange unready
 ---- text: its aliases changed (this file)
 ---- styles: message*31
 ==== diff view: the node's subscribees changed
-(skg (subscribeeFolder changed))
+(skg subscribeeFolder)
+---- context: folderChange unready
 ---- text: its subscribees changed (this file)
 ---- styles: message*35
 ==== diff view: a node in the skgrepo-changes buffer whose home moved

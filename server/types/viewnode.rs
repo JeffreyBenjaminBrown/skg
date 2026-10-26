@@ -958,9 +958,10 @@ impl ViewRequest {
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
-  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 5] =
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 6] =
     [ "folder", "flags", "editableView",
-      "writeProtectedView", "writeProtectedSubtreeView" ];
+      "writeProtectedView", "writeProtectedSubtreeView",
+      "tombstone" ];
 }
 
 impl ViewnodeId {

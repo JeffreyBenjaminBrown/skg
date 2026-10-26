@@ -23,9 +23,23 @@
 /// object it stands in when that object holds an element labeled
 /// one of its LABELs (an atom, or a list headed by one): the table
 /// keys a headline's parts on its kind atom, since every part
-/// stands beside the kind at the top level of '(skg ...)'.
+/// stands beside the kind at the top level of '(skg ...)'. The WHEN
+/// directive stays because '(view ...)' and '(diff ...)' are the only
+/// nested forms and a '(diff ...)' reads differently by kind: a node's
+/// and a ghost's has two diff objects (∃+, ~+), an unknown's one
+/// relationship (~+), a property's or a change viewnode's one object
+/// (+). The conformance test checks that a WHEN names only kind atoms.
+///
+/// Three heralds need what one headline's metadata cannot say, so the
+/// clients supply it before or instead of the lens: the label of a
+/// node's home skgrepo ('repoBoundary'), from the table
+/// 'skgrepo_labels_sexp' serves beside the rules; a pending
+/// detachment, which depends on the parent; and a changed folder,
+/// which depends on the members, whose labels the clients take from
+/// 'folder_heralds' in 'shared/herald-styles.json'.
 
 use crate::sexp_string::quote_sexp_string;
+use crate::types::misc::SkgConfig;
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangesetMarkerKind, DiffChange, Folder, PropertyMember, ChangeViewnode,
@@ -245,48 +259,6 @@ fn diffView_property_rules (
           ChangesetMarkerKind::OrderOnly => "order-only change", } ) ] ))
       . collect () ) ] }
 
-/// The label of a folder the diff view shows because of a change,
-/// which takes the place of the folder's ordinary label: "its X
-/// changed (this file)" for a folder of the node's own lists, "(other
-/// files)" for one of its recorders. A write-protected folder's label
-/// starts with ☮, as its ordinary one does. The server writes no
-/// such spelling: a client that finds a member of the folder carrying
-/// a change of its relationship hands the lens '(KIND changed)' in
-/// place of the folder's atom, then '(diff (ready))' when every such
-/// change is ready.
-fn changed_folder_rules (
-) -> Vec<RuleChild> {
-  let changed = |atom : &'static str, write_protected : bool,
-                 text : &'static str| -> RuleChild {
-    rule ( atom, [
-      if write_protected {
-        vec! [ leaf_styled_as ("writeProtected", "changed", "☮") ]
-      } else { vec! [] },
-      vec! [ leaf ("changed", text) ] ] . concat () ) };
-  vec! [
-    changed (Folder::Alias . repr_in_client (), false,
-             "its aliases changed (this file)"),
-    changed (Folder::ID . repr_in_client (), false,
-             "its IDs changed (this file)"),
-    changed (Folder::flags () . repr_in_client (), true,
-             "its flags changed (this file)"),
-    changed (Folder::Container . repr_in_client (), true,
-             "its containers changed (other files)"),
-    changed (Folder::Mentioner . repr_in_client (), true,
-             "its mentioners changed (other files)"),
-    changed (Folder::Subscriber . repr_in_client (), true,
-             "its subscribers changed (other files)"),
-    changed (Folder::Overrider . repr_in_client (), true,
-             "its overriders changed (other files)"),
-    changed (Folder::Hider . repr_in_client (), true,
-             "its hiders changed (other files)"),
-    changed (Folder::Subscribee . repr_in_client (), false,
-             "its subscribees changed (this file)"),
-    changed (Folder::Overridden . repr_in_client (), false,
-             "the nodes it overrides changed (this file)"),
-    changed (Folder::Hidden . repr_in_client (), true,
-             "the nodes it hides changed (this file)") ] }
-
 /// The diff view's '(diff ...)' form on a vognode: its node's
 /// existence ('(node added)', '(node removed)') as ∃+ ∃-, its other
 /// properties ('(properties changed)') as M, and the existence of its
@@ -324,9 +296,8 @@ fn readiness_request_rules (
 
 /// The same for a leaf with a single diff object (a property leaf, an
 /// unknown), whose '(ready)' names no object, or
-/// 'all' on a changeset marker, and for a changed folder's '(diff
-/// (ready))'. 'added' and 'removed' render its existence, whichever
-/// object it names.
+/// 'all' on a changeset marker. 'added' and 'removed' render its
+/// existence, whichever object it names.
 fn change_fact_rules_for_one_object (
   added   : &'static str,
   removed : &'static str,
@@ -358,6 +329,40 @@ fn readiness_request_rule (
                 DiffObject::Rel  => ":rel",
                 DiffObject::All  => ":all", } ) ] ))
             . collect () ] . concat () ) }
+
+/// The position glyphs, first among a headline's heralds: ᗣ on a
+/// ghost and on what HEAD alone warrants ('ghostWarrant'), ⊥ on what
+/// the graph does not relate to its viewparent as its position
+/// implies ('noWarrant'; see 'Warrant'). The ☮ of a write-protected
+/// position abuts them, from its kind's rules below.
+fn position_glyph_rules (
+) -> Vec<RuleChild> {
+  vec! [
+    leaf ("ghost", "ᗣ"),
+    rule ("view", vec! [
+      leaf ("ghostWarrant", "ᗣ"),
+      leaf ("noWarrant",    "⊥") ]) ] }
+
+/// A child that is 'noClaim' and warranted under an editable parent:
+/// the user detached it, and the next save takes it out of its
+/// parent's list. Neither the warrant's absence nor the parent shows
+/// in the child's own metadata, so the client adds the atom
+/// 'pendingDetachment' before it hands the headline to the lens.
+/// Rendered as a request.
+fn pending_detachment_rule (
+) -> RuleChild {
+  leaf ("pendingDetachment", "detach") }
+
+/// The view requests a headline carries, each "req:...".
+fn view_request_rules (
+) -> RuleChild {
+  crule ("viewRequests", vec! [
+    rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
+    rule ("flags", vec! [ s ("req:flags") ]),
+    rule ("editableView", vec! [ s ("req:editable") ]),
+    rule ("writeProtectedView", vec! [ s ("req:write-protected") ]),
+    rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]),
+    rule ("tombstone", vec! [ s ("req:tombstone") ]) ]) }
 
 /// (ANY children...)
 fn any (
@@ -417,7 +422,9 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      vac ("vnid"), // the viewnode ID starts every wrapper
+      vac ("vnid") ], // the viewnode ID starts every wrapper
+      position_glyph_rules (),
+      vec! [
       leaf (Folder::Alias . repr_in_client (), "aliases"),
       leaf ("alias", "alias"), // PropertyMember::Alias
       // An alias's stored relRepo is a display fact.  A
@@ -460,7 +467,8 @@ pub fn herald_rule_table () -> HeraldRule {
             "it acquired"),
       vec! [
       leaf (Folder::ID . repr_in_client (), "IDs"),
-      leaf ("id", "ID") ], // PropertyMember::ID
+      leaf ("id", "ID"), // PropertyMember::ID
+      when ( &[ "alias", "id" ], vec! [ pending_detachment_rule () ]) ],
       write_protected_leaves (Folder::flags () . repr_in_client (),
                 "flags"),
       vec! [
@@ -472,22 +480,17 @@ pub fn herald_rule_table () -> HeraldRule {
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()) ],
       diffView_property_rules (),
-      changed_folder_rules (),
-      // A property member the graph does not relate to the node
-      // above its folder; one with a ghost warrant (HEAD alone
-      // warrants it) shows only its change facts.
-      vec! [ when ( &[ "alias", "id", "flag" ], vec! [
-        rule ("view", vec! [
-          leaf ("noWarrant", "⊥"),
-          vac ("ghostWarrant") ]) ]) ],
       // The diff view's facts on a property leaf: + and - for
       // its existence in its folder, ✓ when ready, then its readiness
-      // request; and a changed folder's '(diff (ready))'.
+      // request.
       vec! [ when ( &kinds_whose_diff_has_one_object (),
                     [ change_fact_rules_for_one_object ("+", "-"),
                       readiness_request_rules () ] . concat () ) ],
       vec! [
-      crule ("tombstone", vec! [ s ("DELETED") ]),
+      // One kind of tombstone, which says only that something stood
+      // here: a node a save deleted, or one the skgrepo restriction
+      // now hides.
+      crule ("tombstone", vec! [ s ("something stood here") ]),
       when ( &[ "unknown" ], [
         vec! [
           leaf ("unknown", "Reference to unknown node."),
@@ -495,21 +498,24 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("skgRepos", vec! [
             crule ("relRepo", vec! [
               any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
+          pending_detachment_rule (),
           rule ("editRequest", vec! [
             crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
               any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
         change_fact_rules_for_one_object ("~+", "~-"),
         readiness_request_rules () ] . concat () ),
-      // A ghost is write-protected; its two objects are
-      // its existence (∃-) and its relationship to its viewparent.
+      // A ghost is write-protected: its ☮ abuts its ᗣ. Its two
+      // objects are its existence (∃-) and its relationship to its
+      // viewparent.
       when ( &[ "ghost" ], [
         vec! [
-          leaf_styled_as ("writeProtected", "ghost", "☮"),
+          leaf_abut_styled_as ("writeProtected", "ghost", "☮"),
           vac ("gnid"),
           rule ("skgRepos", vec! [ vac ("nodeRepo") ]),
           // Its one edit request, beside its change facts.
           rule ("editRequest", vec! [
-            leaf ("restoreNode", "restore node") ]) ],
+            leaf ("restoreNode", "restore node") ]),
+          view_request_rules () ],
         change_fact_rules_for_two_objects (),
         readiness_request_rules () ] . concat () ),
       when ( &[ "node" ], [ vec! [
@@ -519,7 +525,8 @@ pub fn herald_rule_table () -> HeraldRule {
         // 'noClaim'; it has no glyph of its own.
         vac ("noClaim"),
         // The server emits the atom 'writeProtected'
-        // (see org_to_text.rs); we match that here.
+        // (see org_to_text.rs); we match that here. ABUT so the ☮
+        // rides the position glyphs before it.
         leaf_abut ("writeProtected", "☮"),
         rule ("view", vec! [
           // Emitted only on a write-protected node whose graphnode has a
@@ -535,9 +542,6 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("rels",  vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
           rule ("props", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
           vac ("birth"),
-          // The graph does not relate the node to its viewparent as
-          // its position implies (see 'Warrant').
-          leaf ("noWarrant", "⊥"),
           leaf ("cycle", "⟳") ]),
         // overridesHere is displayed as a crucial ĥ inside the O token
         // by the client relationship renderer. The atom's
@@ -554,7 +558,12 @@ pub fn herald_rule_table () -> HeraldRule {
           crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
         rule ("view", vec! [
           // The node's home skgrepo differs from its nearest
-          // occurrence ancestor's, or it is a root.
+          // occurrence ancestor's, or it is a root. The client hands
+          // the lens '(repoBoundary LABEL)', LABEL from the skgrepo
+          // label table ('skgrepo_labels_sexp'), for "⌂:LABEL"; the
+          // bare atom, which it keeps when the node names no
+          // nodeRepo, shows "⌂".
+          crule ("repoBoundary", vec! [ any (vec! [ s ("⌂"), RuleChild::It ]) ]),
           leaf ("repoBoundary", "⌂") ]),
         rule ("diff", vec! [
           // The skgrepo-changes buffer of the diff view: the
@@ -567,6 +576,7 @@ pub fn herald_rule_table () -> HeraldRule {
               s ("+"), any (vec! [ RuleChild::It ]) ]) ]),
           crule ("movedLikeAncestor", vec! [
             any (vec! [ s ("Δ⌂="), RuleChild::It ]) ]) ]),
+        pending_detachment_rule (),
         rule ("editRequest", vec! [
           leaf ("delete", "delete"),
           crule ("merge", vec! [
@@ -584,40 +594,43 @@ pub fn herald_rule_table () -> HeraldRule {
             vac (Flag::NoSearchMatching . wire_name ()),
             rule ("true",  vec! [s ("request:no search matching")]),
             rule ("false", vec! [s ("request:search matching")]) ]) ]),
-        crule ("viewRequests", vec! [
-          rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
-          rule ("flags", vec! [ s ("req:flags") ]),
-          rule ("editableView", vec! [ s ("req:editable") ]),
-          rule ("writeProtectedView", vec! [ s ("req:write-protected") ]),
-          rule ("writeProtectedSubtreeView", vec! [ s ("req:write-protected-subtree") ]) ]) ],
+        view_request_rules () ],
         change_fact_rules_for_two_objects (),
         readiness_request_rules () ] . concat ()) ] ] . concat (),
   }}
 
 /// The kinds whose '(diff ...)' renders a single diff object: the
-/// property members, the diff view's change viewnodes and the
-/// folders. A node's, a ghost's and an unknown's have rules of their
-/// own.
+/// property members and the diff view's change viewnodes but the body
+/// diff, which carries none. A node's, a ghost's and an unknown's have
+/// rules of their own; a folder carries none.
 fn kinds_whose_diff_has_one_object (
 ) -> Vec<&'static str> {
-  let folders : [Folder; 15] = [
-    Folder::Alias, Folder::ID, Folder::flags (),
-    Folder::Subscribee, Folder::Subscriber,
-    Folder::Overridden, Folder::Overrider,
-    Folder::Hider, Folder::Hidden,
-    Folder::HiddenInSubscribee,
-    Folder::HiddenOutsideOfSubscribee,
-    Folder::Container, Folder::Mentioner,
-    Folder::AcquiredBy, Folder::Acquired ];
-  [ "alias", "id", "flag",
-    "oldText", "homeSkgrepoMove", "relRepoMove", "changesetMarker" ]
-    . into_iter ()
-    . chain ( folders . iter () . map ( |folder| folder . repr_in_client () ))
+  PROPERTY_AND_CHANGE_KIND_ATOMS . into_iter ()
+    . filter ( |kind| *kind != "bodyDiff" )
     . collect () }
 
 //
 // Serialization
 //
+
+/// The skgrepo label table served beside the rules:
+/// '(skgrepoLabels ("REPO" "LABEL")...)', one entry per configured
+/// skgrepo in the config's order, LABEL its 'herald_label'. The
+/// clients render a 'repoBoundary' as "⌂:LABEL", LABEL looked up by
+/// the node's nodeRepo, so no rendered text rides in the metadata.
+pub fn skgrepo_labels_sexp (
+  config : &SkgConfig,
+) -> String {
+  let entries : Vec<String> =
+    config . ordered_skgrepos () . into_iter ()
+    . filter_map ( |name| config . skgrepos . get (&name) . map ( |skgrepo|
+      format! ( "({} {})",
+                quote_sexp_string (&name . 0),
+                quote_sexp_string (skgrepo . herald_label ()) )))
+    . collect ();
+  format! ( "(skgrepoLabels{})",
+            entries . iter () . map ( |entry| format! (" {}", entry) )
+            . collect::<String> () ) }
 
 /// Serialize the whole table to the sexp the lens engine interprets.
 /// Strings are always quoted (unlike the 'sexp' crate, which leaves
@@ -660,9 +673,10 @@ pub fn herald_styles_inconsistencies () -> Vec<String> {
   herald_styles_inconsistencies_of ( herald_styles () ) }
 
 /// Every tier file names (in 'tier_order', 'node_heralds' or
-/// 'relationship_heralds') that is not a key of its 'styles', and
-/// every styled atom of the rule table that has no entry in its
-/// 'node_heralds'.
+/// 'relationship_heralds') that is not a key of its 'styles', every
+/// styled atom of the rule table that has no entry in its
+/// 'node_heralds', and every way its 'folder_heralds' disagrees with
+/// the rule table ('folder_heralds_inconsistencies').
 pub fn herald_styles_inconsistencies_of (
   file : &Value,
 ) -> Vec<String> {
@@ -683,7 +697,47 @@ pub fn herald_styles_inconsistencies_of (
       "the rule table styles {}, which has no entry in 'node_heralds'",
       key ))
     . collect ();
-  [ undefined_tiers, unstyled_atoms ] . concat () }
+  [ undefined_tiers, unstyled_atoms,
+    folder_heralds_inconsistencies (file) ] . concat () }
+
+/// 'folder_heralds.write_protected' must name exactly the folders whose
+/// label the rule table gives a ☮, and 'folder_heralds.changed_labels'
+/// must give a string for folders only.
+fn folder_heralds_inconsistencies (
+  file : &Value,
+) -> Vec<String> {
+  let folder_atoms : HashSet<&str> =
+    all_folders () . iter () . map ( |folder| folder . repr_in_client () ) . collect ();
+  let listed : HashSet<&str> =
+    file ["folder_heralds"] ["write_protected"] . as_array ()
+    . map ( |atoms| atoms . iter () . filter_map (Value::as_str) . collect () )
+    . unwrap_or_default ();
+  let protected_in_table : HashSet<&str> =
+    rules_in_rule_table () . into_iter ()
+    . filter ( |rule| rule . node_heralds_key == Some ("writeProtected") )
+    . filter_map ( |rule| rule . label )
+    . filter ( |label| folder_atoms . contains (label) )
+    . collect ();
+  let mut problems : Vec<String> = Vec::new ();
+  for atom in protected_in_table . difference (&listed) {
+    problems . push ( format! (
+      "the rule table gives {} a ☮, which 'folder_heralds.write_protected' omits",
+      atom )); }
+  for atom in listed . difference (&protected_in_table) {
+    problems . push ( format! (
+      "'folder_heralds.write_protected' names {}, whose label the rule table gives no ☮",
+      atom )); }
+  if let Some (labels) = file ["folder_heralds"] ["changed_labels"] . as_object () {
+    for (atom, label) in labels {
+      if atom . ends_with ("comment") { continue; }
+      if ! folder_atoms . contains (atom . as_str ()) {
+        problems . push ( format! (
+          "'folder_heralds.changed_labels' names {}, which is no folder", atom )); }
+      if ! label . is_string () {
+        problems . push ( format! (
+          "'folder_heralds.changed_labels' gives {} no string", atom )); }}}
+  problems . sort ();
+  problems }
 
 /// Each tier file names, with the path where it does so.
 fn tiers_named_in_herald_styles (
@@ -792,11 +846,40 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . into_iter () . collect () }
 
 /// Atoms no wire carries, which the clients write into a headline's
-/// metadata before they hand it to the lens: '(KIND changed)' in place
-/// of a folder's atom when a member of the folder carries a change of
-/// its relationship ('changed_folder_rules').
+/// metadata before they hand it to the lens: 'pendingDetachment'
+/// ('pending_detachment_rule').
 fn client_computed_atoms () -> Vec<&'static str> {
-  vec! [ "changed" ] }
+  vec! [ "pendingDetachment" ] }
+
+/// Every kind atom the server writes: the kinds a WHEN may name.
+pub fn emittable_kind_atoms () -> HashSet<&'static str> {
+  [ "node", "ghost", "unknown", "tombstone" ] . into_iter ()
+    . chain ( PROPERTY_AND_CHANGE_KIND_ATOMS )
+    . chain ( all_folders () . iter () . map ( |folder| folder . repr_in_client () ))
+    . collect () }
+
+/// The kind atoms of the property members and the change viewnodes.
+const PROPERTY_AND_CHANGE_KIND_ATOMS : [&'static str; 8] =
+  [ "alias", "id", "flag", "oldText", "bodyDiff",
+    "homeSkgrepoMove", "relRepoMove", "changesetMarker" ];
+
+/// Every folder: the twelve partner folders, then the three property
+/// folders.
+fn all_folders () -> [Folder; 15] {
+  [ Folder::Subscribee, Folder::Subscriber,
+    Folder::Overridden, Folder::Overrider,
+    Folder::Hider, Folder::Hidden,
+    Folder::HiddenInSubscribee,
+    Folder::HiddenOutsideOfSubscribee,
+    Folder::Container, Folder::Mentioner,
+    Folder::AcquiredBy, Folder::Acquired,
+    Folder::ID, Folder::Alias, Folder::flags () ] }
+
+/// The kinds every WHEN rule in the table names.
+pub fn when_kinds_in_rule_table () -> HashSet<&'static str> {
+  rules_in_rule_table () . into_iter ()
+    . flat_map ( |rule| rule . when )
+    . collect () }
 
 /// The diff view's form, from org_to_text.rs's 'change_fact_forms':
 /// its head, the heads of its parts and their atoms, and the diff
@@ -868,7 +951,7 @@ fn claim_emitted_atoms () -> Vec<&'static str> {
 /// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.
 fn property_and_folder_atoms () -> Vec<&'static str> {
-  fn folder_guard ( c : &Folder ) { // compile error here = update the two lists below
+  fn folder_guard ( c : &Folder ) { // compile error here = update 'all_folders' 
     match c {
       Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
@@ -879,16 +962,6 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
       | Folder::AcquiredBy | Folder::Acquired => (),
       Folder::ID | Folder::Alias | Folder::Flags { .. } => () }}
   let _ = folder_guard;
-  let all_partnerFolders : [Folder; 12] = [
-    Folder::Subscribee, Folder::Subscriber,
-    Folder::Overridden, Folder::Overrider,
-    Folder::Hider, Folder::Hidden,
-    Folder::HiddenInSubscribee,
-    Folder::HiddenOutsideOfSubscribee,
-    Folder::Container, Folder::Mentioner,
-    Folder::AcquiredBy, Folder::Acquired ];
-  let all_propertyFolders : [Folder; 3] = [
-    Folder::ID, Folder::Alias, Folder::flags () ];
   let all_property_atoms : [&'static str; 8] = {
     fn propertyMember_guard ( q : &PropertyMember ) { // ditto
       match q {
@@ -903,8 +976,7 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
           | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
           => () }}
     let _ = changeViewnode_guard;
-    [ "alias", "id", "flag", "oldText", "bodyDiff",
-      "homeSkgrepoMove", "relRepoMove", "changesetMarker" ] };
+    PROPERTY_AND_CHANGE_KIND_ATOMS };
   // The arguments the diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').
   let property_argument_atoms : Vec<&'static str> =
@@ -912,9 +984,7 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
       ChangesetMarkerKind::ALL . into_iter ()
         . map (ChangesetMarkerKind::wire_name) . collect () ] . concat ();
   let mut out : Vec<&'static str> = Vec::new ();
-  out . extend ( all_partnerFolders . iter ()
-                 . map ( |c| c . repr_in_client () ) );
-  out . extend ( all_propertyFolders . iter ()
+  out . extend ( all_folders () . iter ()
                  . map ( |c| c . repr_in_client () ) );
   out . extend ( all_property_atoms );
   out . extend ( property_argument_atoms );
