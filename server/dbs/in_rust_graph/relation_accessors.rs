@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgrepoName, members_of};
@@ -21,6 +21,14 @@ pub enum NodeRelation {
   SubscribesTo,
   HidesFromSubs, // "hides from its subscriptions": the hider keeps the hidden node out of what it shows from its subscribees.
   Overrides,
+}
+
+/// Where the relRepos of a recorder's relationships under one relation
+/// are stored: in its list, member by member, or, for links, nowhere
+/// but its home ('InRustGraph::stored_rel_partners').
+enum StoredRelPartners<'a> {
+  Listed    (&'a [RelPartner<ID>]),
+  AllAtHome (SkgrepoName),
 }
 
 /// What the gated graph answers for a gnid ('gnid_presence_gated').
@@ -334,25 +342,56 @@ impl InRustGraph {
     target   : &ID,
   ) -> Option<SkgrepoName> {
     let target_key : ID = self . pid_of (target) ? ;
+    match self . stored_rel_partners (recorder, relation) ? {
+      StoredRelPartners::Listed (rel_partners) =>
+        rel_partners . iter ()
+        . find ( |m| self . pid_of ( &m . member )
+                 . as_ref () == Some (&target_key) )
+        . map ( |m| m . relRepo . clone () ),
+      StoredRelPartners::AllAtHome (home) => Some (home), } }
+
+  /// What 'relRepo' answers for each target of RECORDER's list under
+  /// RELATION, keyed by the target's pid, built in one pass over the
+  /// list: the first member that resolves to a pid gives that pid's
+  /// relRepo. None for LinksTo, whose relRepo is the recorder's home
+  /// whatever the target, or for a recorder the graph lacks. Built
+  /// once per recorder, it spares a caller that asks of every member
+  /// a scan of the list per member.
+  pub fn relRepos_by_target_pid (
+    &self,
+    recorder : &ID,
+    relation : NodeRelation,
+  ) -> Option<HashMap<ID, SkgrepoName>> {
+    let StoredRelPartners::Listed (rel_partners) =
+      self . stored_rel_partners (recorder, relation) ?
+      else { return None; };
+    let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
+    for member in rel_partners {
+      if let Some (pid) = self . pid_of (&member . member) {
+        relRepos . entry (pid) . or_insert_with ( || member . relRepo . clone () ); }}
+    Some (relRepos) }
+
+  /// RECORDER's stored list under RELATION, or, for LinksTo, its home:
+  /// links derive from the body, which is home-only, so their skgrepo
+  /// is the recorder's home by construction. None for a recorder the
+  /// graph lacks.
+  fn stored_rel_partners (
+    &self,
+    recorder : &ID,
+    relation : NodeRelation,
+  ) -> Option<StoredRelPartners<'_>> {
     let node : &GraphnodeInRust = self . nodes . get (recorder) ? ;
-    let rel_partners : Vec<RelPartner<ID>> = match relation {
+    Some ( match relation {
       NodeRelation::Contains =>
-        node . contains . clone (),
+        StoredRelPartners::Listed (&node . contains),
       NodeRelation::SubscribesTo =>
-        node . subscribesTo . or_default () . to_vec (),
+        StoredRelPartners::Listed (node . subscribesTo . or_default ()),
       NodeRelation::HidesFromSubs =>
-        node . hidesFromSubs . or_default () . to_vec (),
+        StoredRelPartners::Listed (node . hidesFromSubs . or_default ()),
       NodeRelation::Overrides =>
-        node . overrides . or_default () . to_vec (),
+        StoredRelPartners::Listed (node . overrides . or_default ()),
       NodeRelation::LinksTo =>
-        // links derive from the body, which is home-only, so
-        // their skgrepo is the recorder's home by construction.
-        return self . nodes . get (recorder)
-          . map ( |n| n . home_skgrepo . clone () ), };
-    rel_partners . iter ()
-      . find ( |m| self . pid_of ( &m . member )
-               . as_ref () == Some (&target_key) )
-      . map ( |m| m . relRepo . clone () ) }
+        StoredRelPartners::AllAtHome (node . home_skgrepo . clone ()), } ) }
 
   /// The relRepo of one exact, stored outbound member ID.
   /// Unlike 'relRepo', this deliberately does not canonicalize the

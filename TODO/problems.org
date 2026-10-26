@@ -6,6 +6,20 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 06, slice 1 (2026-10-26)
+** Under a restriction, the graphnode stats are quadratic in a list's length
+  Slice 1 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org' made
+  the viewnode stats pass linear ('RelRepoLookup' in
+  'server/update_buffer/viewnodestats.rs'): a fresh view of a root
+  with 4,000 contained children, debug build, went from 3.1 s to
+  0.14 s. Restricted to one skgrepo, the same view went from 11.3 s
+  to 2.7 s, and nearly all of the 2.7 s (2.6 s, timed by a
+  throwaway test) is 'set_graphnodestats_in_viewforest_with_skgrepo_set'
+  ('fetch_all_graphnodestats_with_skgrepo_set',
+  'server/dbs/in_rust_graph/stats.rs'), whose gated inbound counts
+  presumably ask the relRepo of each child's relationship by a scan
+  of the parent's list, as the stats pass did. Read, not traced; the
+  same per-recorder map would likely fix it.
 * Problems found while planning plan 06 (2026-10-26)
 ** An unknown recorded in a visible skgrepo vanishes under a restriction
   Seen by the same experiment, with and without the phase: the

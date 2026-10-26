@@ -658,7 +658,7 @@ vnids; two agreeing, accepted. Then the suites, with
 entry "The refresh's merge drops the editable twin's claim" to
 'TODO/DONE/problems.org'.
 
-** TODO Slice 1: the refresh's rules the review settled
+** DONE Slice 1: the refresh's rules the review settled
 *** what is not a buffer correction
 Give 'Walk' a buffer correction policy, set by the caller: the
 gnids whose tombstones are the saving user's own doing, and

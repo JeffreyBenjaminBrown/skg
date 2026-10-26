@@ -1744,3 +1744,174 @@ tests live in 'tests/refresh/merge_of_siblings.rs', and the
 ghost's tombstone request now rides through a merge, which
 slice 1 removes.
 
+
+** Slice 1
+*** The commits
+**** ca7a5354
+What is not a buffer correction: 'BufferCorrectionPolicy'
+('server/refresh/corrections.rs'), set by the save's rerender
+(the IDs the save deleted) and the skgrepo-set switch (whether
+the restriction changed); the captures of the switched buffers.
+**** 81fbc464
+The orphan warning, and its tests in Rust and both clients.
+**** 14217304
+The ghost-tombstone request and its four commands go, with
+their tests and docs; nested tombstones documented as by
+design.
+**** 1df85313
+The save keeps restricted hides ('apply_hiddenoutside_edits'
+asks 'relationship_member_is_visible').
+**** f653ce81
+The switch's entombstone-and-prune phase goes; the refresh
+prunes a folder the restriction emptied.
+**** this record's commit
+The stats pass is linear ('RelRepoLookup',
+'InRustGraph::relRepos_by_target_pid'); the glossary defines
+orphan; this record; the slice DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+970 of 970 passed. Seven tests were removed with what they
+tested (three of 'ghost_tombstone.rs', one refresh test of the
+tombstone request, three of the deleted phase's
+'tests/unit/repo_switch.rs'); twelve were added.
+**** bash/emacs-tests.sh
+410 of 410 passed (five tests of the removed commands went,
+one orphan-warning test came).
+**** bash/nvim-tests.sh
+400 passed, 0 failed, 0 errors, over 33 spec files.
+**** bash/integration-tests.sh
+34 of 35 passed. The one failure, 'import-md-and-org', is
+pre-existing, as the plan says; not investigated.
+**** no other failure
+No suite failed at any point of the slice; nothing to
+classify.
+**** the isolated instance (the verify skill)
+A scratch server on port 1751, scratch data, removed after.
+r (public) contains a, h (private) and b, subscribes to hs
+(private), hides hh (private) and hv (public). In one
+connection: drawn under "all", switched to "public", "all",
+"public": each "rerender-done" carried '(corrections ())';
+narrowed, the subscribee folder stayed holding the hidden-outside
+folder with hv, and h's occurrence became a tombstone over s1;
+widened, hs, hh and h came back. The narrowed buffer, saved
+with r retitled and a headline typed under the tombstone, saved
+the headline as a node, warned "Created an orphan, ...", and
+left r's file hiding hh and hv.
+*** The two timings
+A throwaway test (kept as text in
+'tests/results/06/slice1/throwaway_stats_timing.rs.txt'): a
+fresh view of a root with 4,000 contained children, budget
+100,000, through 'refresh_viewforest', debug build, three runs
+each.
+**** before
+3.13 to 3.16 s with no restriction (the probes' 3.7 s case).
+Restricted to one skgrepo: 11.3 to 11.4 s.
+**** after
+0.14 s with no restriction. Restricted: 2.7 s, of which 2.6 s
+is the restricted graphnode stats
+('set_graphnodestats_in_viewforest_with_skgrepo_set'), outside
+the two functions the plan names; a new 'TODO/problems.org'
+entry says so.
+*** The unknown that vanishes under a restriction
+Cause, confirmed by a throwaway test: 'omit_restricted_members'
+keeps a member only when its resolver names a home the
+restriction holds; an unknown resolves to no node, so every
+unknown is omitted under any restriction but "all", whatever
+records it, and the ID rule entombstones its headline. Its doc
+comment makes that deliberate, and the goal computers hand it
+bare IDs, having dropped each member's relRepo: not a one-line
+gating error. The 'TODO/problems.org' entry stays, with the
+cause added.
+*** Deviations from the plan's "how"
+**** a restriction change silences tombstones too
+The agreed behavior names only the reinstatements of a
+widening. The switch's phase entombstoned and pruned silently;
+with it gone, a narrowing would have reported every tombstone
+as "Entombstoned". To keep "as today", a rerender after a
+change of the restriction reports neither reinstatements nor
+tombstones: every open view was current before the switch, so
+both are the restriction's doing.
+**** what a quiet tombstone makes unsayable is quiet
+A folder under a node the save deleted becomes unsayable when
+the node's headline becomes a tombstone; reporting it would
+leave the user's own deletion reported after all. A headline
+entombstoned under a quietly entombstoned viewparent is quiet
+too ('Walk::quiet_tombstones').
+**** the policy travels as a parameter
+'refresh_viewforest', 'complete_viewforest_with_graph_straddle'
+and 'rerender_diffView_buffer' take it; the rerender pipeline's
+three preparers take it where the 'prepass' hook was. The
+deleted IDs are 'SaveAffectedIds::deleted': every ID of each
+node among those the save touched that the graph before it
+resolves and the graph after it does not.
+**** the orphan warning is computed beside the traversal
+The traversal in 'traverse.rs' reads nothing above a node and
+has no graph, and the parse gives every typed headline an ID
+before it, so it cannot tell a new node. 'orphan_warnings'
+('local_fieldintent_collection/mod.rs') finds each editable
+occurrence without a delete request whose gnid the graph lacks,
+under a viewparent for which 'parent_reads_claims' is false; a
+root is not warned of.
+**** both sites of the hide test ask one question
+'apply_hiddenoutside_edits' calls
+'relationship_member_is_visible' at both of the plan's sites.
+At the first (the hides inside a subscribee) it changes no
+outcome: a member it no longer counts inside is not
+replaceable either.
+**** "added on request" is "added by this refresh"
+The tail spares every folder in 'Walk::added_folders'. The
+default folders are added only when their goal is not empty,
+and the diff view's run under no restriction, so only a
+requested one can be added empty.
+**** the omission is reported on the goal list
+'omit_restricted_members' returns a 'RestrictedGoalList' (the
+members kept, whether any were omitted); the folder goals mark
+'Goal::emptied_by_the_restriction'; the visit records the
+folder in 'Walk::emptied_folders' for the tail.
+**** the relRepo map lives on the graph
+'InRustGraph::relRepos_by_target_pid' builds the map, sharing
+the list selection with 'relRepo', which no longer clones the
+list; the stats pass caches one map per recorder and relation.
+**** docs rode with their parts
+Each part's doc changes are in its own commit, none in a commit
+of its own.
+**** tests placed where the behavior is
+The widening case is a switch test in 'tests/hidden_nodes.rs';
+'tests/refresh/corrections.rs' has the policy's unit cases; the
+deletion case is in 'tests/corrections_channel.rs'. The orphan
+under a ghost is tested in 'users_notes.rs', since
+'ghost_tombstone.rs' went; the one under a write-protected
+occurrence in a new 'tests/orphan_warning.rs'.
+**** a second capture
+Beside the hidden-nodes fixture, a variant in which r hides hh
+was captured too, so that the hidden-outside folder the
+restriction empties is covered; both were captured before any
+change of the slice.
+**** the glossary defines orphan
+In "claims membership", one sentence; slice 10 makes the
+entries read as one voice.
+*** Fixtures changed
+The hidden-nodes fixture, written by its test, gains hh
+(private) and hv (public), unreferenced unless a test has r
+hide them, for the restricted-hides test and the second
+capture. 'tests/shared/herald-rules.sexp' was regenerated
+('cargo run --bin emit-herald-rules'), and the rendering case
+of a ghost's tombstone request left
+'herald-rendering-cases.txt', with the request.
+*** Left unfinished
+Nothing of slice 1. Noticed, for the orchestrator:
+**** Jeff's open note on the emptied-folder rule
+'06_2_new-issues.org' holds an unanswered note of Jeff's,
+"simpler yet": the rule "if narrowing emptied it, delete it"
+feels ad hoc; "let's discard it". The plan, which wins, states
+the rule, so this slice implements it; it is one commit's
+worth of code ('Walk::emptied_folders', 'RestrictedGoalList',
+the tail's test), easy to take out. Without it a narrowed view
+keeps the emptied editable folders, empty, and the save no
+longer loses a hide through them.
+**** the restricted graphnode stats are quadratic
+See "The two timings" and the new 'TODO/problems.org' entry.
+*** Headline
+DONE.

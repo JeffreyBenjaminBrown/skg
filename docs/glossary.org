@@ -234,7 +234,12 @@ folder, a tombstone, the buffer root -- no child claims, whatever it
 carries, and the server writes no =noClaim= there. A child that
 claims nothing is in no list: the save neither adds nor removes a
 relationship for it, and what it shows of its own node is saved or
-not by its editability, as at any occurrence.
+not by its editability, as at any occurrence. So a headline typed
+under a viewparent that reads no claims is saved as an *orphan*, a
+node that no list contains (a term this glossary takes from
+'docs/COMMANDS.org'), and the save warns of each one, naming its
+headline ('orphan_warnings' in
+'server/from_text/local_fieldintent_collection/mod.rs').
 
 Under an editable parent the refresh marks =noClaim= on every child
 it keeps that the graph does not relate to its viewparent (see

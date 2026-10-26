@@ -22,6 +22,32 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::SubscribesTo,
   NodeRelation::Overrides, ];
 
+/// The relRepos the stats pass reads, one map per recorder and
+/// relation, built the first time the pass asks of that recorder
+/// ('InRustGraph::relRepos_by_target_pid'): a view of N members of one
+/// list costs O(N), not a scan of the list per member.
+#[derive(Default)]
+struct RelRepoLookup {
+  maps : HashMap<(ID, NodeRelation), Option<HashMap<ID, SkgrepoName>>>,
+}
+
+impl RelRepoLookup {
+  /// What 'InRustGraph::relRepo' answers.
+  fn relRepo (
+    &mut self,
+    graph    : &InRustGraph,
+    recorder : &ID,
+    relation : NodeRelation,
+    target   : &ID,
+  ) -> Option<SkgrepoName> {
+    let target_pid : ID = graph . pid_of (target) ?;
+    match self . maps . entry (( recorder . clone (), relation ))
+      . or_insert_with ( || graph . relRepos_by_target_pid (recorder, relation) )
+    { Some (relRepos) => relRepos . get (&target_pid) . cloned (),
+      None => // links, or a recorder the graph lacks
+        graph . relRepo (recorder, relation, target), } }
+}
+
 /// The stats of each occurrence (its rels, props, birth, 'cycle',
 /// 'repoBoundary', 'omittedBody', relRepo). The warrants and the
 /// claims are the refresh's ladder's ('server/refresh/'); this pass
@@ -36,6 +62,7 @@ pub fn set_viewnodestats_in_viewforest (
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_gnids : HashSet<ID> = HashSet::new ();
+  let mut relRepos : RelRepoLookup = RelRepoLookup::default ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
     viewforest,
@@ -45,6 +72,7 @@ pub fn set_viewnodestats_in_viewforest (
     config,
     restriction,
     &mut ancestor_gnids,
+    &mut relRepos,
     container_to_contents,
     content_to_containers ); }
 
@@ -56,6 +84,7 @@ fn set_viewnodestats_recursive (
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
   ancestor_gnids       : &mut HashSet<ID>,
+  relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
@@ -70,9 +99,9 @@ fn set_viewnodestats_recursive (
       let is_member_here : bool = stands_as_member (tree, treeid);
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, is_member_here, graph, restriction,
-        container_to_contents, content_to_containers );
+        relRepos, container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
-      set_relRepo (tree, treeid, is_member_here, graph, config);
+      set_relRepo (tree, treeid, is_member_here, graph, relRepos, config);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -91,6 +120,7 @@ fn set_viewnodestats_recursive (
       config,
       restriction,
       ancestor_gnids,
+      relRepos,
       container_to_contents,
       content_to_containers ); }
   if was_new {
@@ -139,6 +169,7 @@ fn set_herald_strings_in_viewnode (
   claimsMembership      : bool, // whether it stands as a member here ('stands_as_member')
   graph                 : Option<&InRustGraph>,
   restriction           : Option<&SkgrepoRestriction>,
+  relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
@@ -157,7 +188,7 @@ fn set_herald_strings_in_viewnode (
   let ancestors : Vec<(ID, usize)> = tracked_ancestors (tree, &parent_kind);
   for (anc_pid, generation) in &ancestors {
     flag_ancestor_relations (
-      &mut flags, graph, restriction,
+      &mut flags, graph, restriction, relRepos,
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
   if ! claimsMembership {
@@ -281,16 +312,17 @@ fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
   graph                 : Option<&InRustGraph>,
   restriction           : Option<&SkgrepoRestriction>,
+  relRepos              : &mut RelRepoLookup,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   node_pid              : &ID,
   anc_pid               : &ID,
   generation            : usize,
 ) {
-  let contains_rel_is_visible = |recorder : &ID, target : &ID| -> bool {
+  let mut contains_rel_is_visible = |recorder : &ID, target : &ID| -> bool {
     match (graph, restriction) {
       (Some (g), Some (a)) if ! a . is_all () =>
-        g . relRepo (recorder, NodeRelation::Contains, target)
+        relRepos . relRepo (g, recorder, NodeRelation::Contains, target)
           . map ( |skgrepo| a . contains_skgrepo (&skgrepo) )
           . unwrap_or (false),
       _ => true }};
@@ -438,6 +470,7 @@ fn set_relRepo (
   treeid : NodeId,
   claimsMembership : bool, // whether it stands as a member here ('stands_as_member')
   graph  : Option<&InRustGraph>,
+  relRepos : &mut RelRepoLookup,
   config : &SkgConfig,
 ) {
   let relRepo : Option<SkgrepoName> = 'compute : {
@@ -477,7 +510,7 @@ fn set_relRepo (
           }},
         ParentKind::Other => break 'compute None, };
     let skgrepo : SkgrepoName =
-      match graph . relRepo (&recorder_pid, relation, &target_pid) {
+      match relRepos . relRepo (graph, &recorder_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
     let default : SkgrepoName = {
       let recorder_home : Option<SkgrepoName> =
@@ -545,7 +578,8 @@ mod relationship_default_tests {
         "member" . to_string (), None ) ) . id ();
 
     set_relRepo (
-      &mut tree, member_treeid, true, Some (&graph), &config );
+      &mut tree, member_treeid, true, Some (&graph),
+      &mut RelRepoLookup::default (), &config );
     let ViewnodeKind::Vognode (Vognode::Occurrence (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be unrestricted"); };
