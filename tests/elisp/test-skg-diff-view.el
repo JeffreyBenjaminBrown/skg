@@ -52,10 +52,10 @@ Returns (REQUESTED-BUFFERS OPENED-BUFFER-NAMES)."
   (pcase-let ((`(,requested ,opened)
                (test-skg-diff-view--run
                 `(("all changes"
-                   . ,(test-skg-diff-view--content "* (skg (node (id a))) a\n"))
+                   . ,(test-skg-diff-view--content "* (skg node (gnid a)) a\n"))
                   ("merges" . ,test-skg-diff-view--empty)
                   ("skgrepo changes"
-                   . ,(test-skg-diff-view--content "* (skg (node (id b))) b\n"))
+                   . ,(test-skg-diff-view--content "* (skg node (gnid b)) b\n"))
                   ("order-only changes" . ,test-skg-diff-view--empty)))))
     (should (equal requested skg-diffView-buffers))
     (should (equal opened '("diff-view: all changes"

@@ -17,12 +17,12 @@
 (defun test-skg-flag--has-request-p (line value)
   (skg-sexp-subtree-p
    (test-skg-flag--metadata-at-line line)
-   `(skg (node (editRequest (flag noSearchMatching ,value))))))
+   `(skg node (editRequest (flag noSearchMatching ,value)))))
 
 (ert-deftest test-skg-flag-stamps-exact-set-and-clear-requests ()
   (dolist (case '((t true) (nil false)))
     (with-temp-buffer
-      (insert "* (skg (node (id root) (repo main))) root")
+      (insert "* (skg node (gnid root) (skgRepos (nodeRepo main))) root")
       (org-mode)
       (goto-char (point-min))
       (skg--stamp-search-matching-request (car case))
@@ -31,17 +31,17 @@
 (ert-deftest test-skg-flag-recursion-prunes-and-skips ()
   (with-temp-buffer
     (insert
-     "* (skg (node (id root) (repo main))) root\n"
-     "** (skg (node (id child) (repo main))) child\n"
-     "** (skg (node (id child) (repo main))) duplicate child\n"
-     "** (skg (node (id protected) (repo main) writeProtected)) protected\n"
-     "** (skg (node (id foreign) (repo elsewhere))) foreign\n"
-     "** (skg (node (id conflict) (repo main) (editRequest delete))) conflict\n"
-     "** (skg (node (id link) (repo main) noClaim)) link\n"
-     "*** (skg (node (id under-link) (repo main))) under link\n"
+     "* (skg node (gnid root) (skgRepos (nodeRepo main))) root\n"
+     "** (skg node (gnid child) (skgRepos (nodeRepo main))) child\n"
+     "** (skg node (gnid child) (skgRepos (nodeRepo main))) duplicate child\n"
+     "** (skg node (gnid protected) (skgRepos (nodeRepo main)) writeProtected) protected\n"
+     "** (skg node (gnid foreign) (skgRepos (nodeRepo elsewhere))) foreign\n"
+     "** (skg node (gnid conflict) (skgRepos (nodeRepo main)) (editRequest delete)) conflict\n"
+     "** (skg node (gnid link) (skgRepos (nodeRepo main)) noClaim) link\n"
+     "*** (skg node (gnid under-link) (skgRepos (nodeRepo main))) under link\n"
      "** (skg aliasFolder) aliases\n"
-     "*** (skg (node (id under-folder) (repo main))) under folder\n"
-     "* (skg (node (id sibling) (repo main))) sibling")
+     "*** (skg node (gnid under-folder) (skgRepos (nodeRepo main))) under folder\n"
+     "* (skg node (gnid sibling) (skgRepos (nodeRepo main))) sibling")
     (org-mode)
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--owned-repos)
@@ -57,7 +57,7 @@
   (dolist (case '(("false" "search matching" "no search matching" true)
                   ("true" "no search matching" "search matching" false)))
     (with-temp-buffer
-      (insert "* (skg (node (id root) (repo main))) root")
+      (insert "* (skg node (gnid root) (skgRepos (nodeRepo main))) root")
       (org-mode)
       (goto-char (point-min))
       (let ((buffer (current-buffer))
@@ -84,7 +84,7 @@
 (ert-deftest test-skg-flag-state-response-refuses-a-vanished-buffer ()
   (let ((buffer (generate-new-buffer " *skg-flag-stale*")) marker)
     (with-current-buffer buffer
-      (insert "* (skg (node (id root) (repo main))) root")
+      (insert "* (skg node (gnid root) (skgRepos (nodeRepo main))) root")
       (org-mode)
       (goto-char (point-min))
       (setq marker (point-marker)))
@@ -100,9 +100,9 @@
 
 (ert-deftest test-skg-flag-root-refusals-and-key-bindings ()
   (dolist (metadata
-           '((skg (node (repo main)))
-             (skg (node (id root) (repo main) writeProtected))
-             (skg (node (id root) (repo main) (editRequest delete)))))
+           '((skg node (skgRepos (nodeRepo main)))
+             (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected)
+             (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest delete))))
     (should-error (skg--flag-eligible-root-id metadata)
                   :type 'user-error))
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c l p"))

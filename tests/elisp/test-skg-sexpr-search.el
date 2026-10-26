@@ -130,32 +130,32 @@ homeRepoHerald inside viewStats) are removed; a viewStats emptied by the
 removal is dropped, other data is kept."
   (should (equal
            (skg-strip-heralds-from-sexp
-            '(skg (node (id x)
-                        (rels (contains (in 1 (ancestors 1)) (out 3))
-                              (birth (contains in 1)))
-                        (viewStats (homeRepoHerald ⌂:priv) cycle))))
-           '(skg (node (id x) (viewStats cycle))))))
+            '(skg node (gnid x)
+                  (rels (contains (in 1 (ancestors 1)) (out 3))
+                        (birth (contains in 1)))
+                  (viewStats (homeRepoHerald ⌂:priv) cycle)))
+           '(skg node (gnid x) (viewStats cycle)))))
 
 (ert-deftest test-strip-heralds-drops-stats-form-with-only-heralds ()
   "A graphStats/viewStats holding only herald subfields is dropped."
   (should (equal
            (skg-strip-heralds-from-sexp
-            '(skg (node (id x) (viewStats (homeRepoHerald ⌂:priv)))))
-           '(skg (node (id x))))))
+            '(skg node (gnid x) (viewStats (homeRepoHerald ⌂:priv))))
+           '(skg node (gnid x)))))
 
 (ert-deftest test-strip-heralds-does-not-fabricate-node ()
   "A non-UnrestrictedVognode sexp (no (node ...)) is returned unchanged, so it
-never gains a fabricated (node ...) and never matches (skg (node))."
-  (let ((stripped (skg-strip-heralds-from-sexp '(skg (id x)))))
-    (should (equal stripped '(skg (id x))))
-    (should-not (skg-sexp-subtree-p stripped '(skg (node))))))
+never gains a fabricated (node ...) and never matches (skg node)."
+  (let ((stripped (skg-strip-heralds-from-sexp '(skg (gnid x)))))
+    (should (equal stripped '(skg (gnid x))))
+    (should-not (skg-sexp-subtree-p stripped '(skg node)))))
 
 (ert-deftest test-strip-heralds-unrestrictedNode-without-stats-unchanged ()
   "An UnrestrictedVognode lacking stats keeps exactly its fields -- no fabricated
 graphStats/viewStats."
   (should (equal
-           (skg-strip-heralds-from-sexp '(skg (node (id x) (repo y))))
-           '(skg (node (id x) (repo y))))))
+           (skg-strip-heralds-from-sexp '(skg node (gnid x) (skgRepos (nodeRepo y))))
+           '(skg node (gnid x) (skgRepos (nodeRepo y))))))
 
 (ert-deftest test-strip-heralds-passes-through-non-skg ()
   "A sexp that does not start with skg is returned unchanged."

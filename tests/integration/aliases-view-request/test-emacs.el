@@ -7,20 +7,24 @@
 (defvar integration-test-completed nil)
 
 (defconst skg-aliases-base-buffer
-  "* (skg (node (id test-node))) Test Node
+  "* (skg node (gnid test-node)) Test Node
 ")
 
 (defun skg-aliases--trim-left (text)
   (replace-regexp-in-string "\\`[ \t\n\r]+" "" text))
 
 (defun skg-aliases--metadata-kind (metadata)
-  "Return the kind symbol name from an SKG METADATA sexp string."
-  (let* ((sexp (car (read-from-string metadata)))
-         (payload (cadr sexp)))
+  "Return the kind symbol name from an SKG METADATA sexp string: its
+first top-level element, bare or heading a list, that names a kind in
+'shared/metadata-fields.json'."
+  (let ((sexp (car (read-from-string metadata))))
     (symbol-name
-     (if (consp payload)
-         (car payload)
-       payload))))
+     (seq-some (lambda (element)
+                 (let ((atom (if (consp element) (car element) element)))
+                   (and (symbolp atom)
+                        (skg-shared-metadata-kind (symbol-name atom))
+                        atom)))
+               (cdr sexp)))))
 
 (defun strip-metadata-details-and-bodies (text)
   "Return TEXT with metadata details and body content removed.
@@ -94,7 +98,7 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-with-aliases
-         (concat "* (skg (node (id test-node) (repo main) (rels (aliases 2)))) Test Node\n"
+         (concat "* (skg node (gnid test-node) (skgRepos (nodeRepo main)) (rels (aliases 2))) Test Node\n"
                  "** (skg aliasFolder)\n"
                  "*** (skg alias) first alias\n"
                  "*** (skg alias) second alias\n"))

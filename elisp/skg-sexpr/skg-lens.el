@@ -46,7 +46,7 @@ There are several keywords that receive special treatment:
 the style names (the styles of 'shared/herald-styles.json' in
 capitals, such as STOP, GO, NORMAL, MEDIUM, and HIGH); the sexp-
 shape markers ANY and IT; the positional marker ABUT; and the
-directive INTERC. Each is described below.
+directives INTERC and WHEN. Each is described below.
 .
 ANY indicates that the path of labels exists.
 Regardless of what the leaf sexp in the object at that path contains,
@@ -110,6 +110,23 @@ slot is empty, no token is emitted.
   Per-sub-rule styles are preserved on the output string's
   character ranges; SEP and PREFIX take INTERC's own style.
 .
+WHEN is a directive for rules of the form
+    (WHEN LABEL... CHILDREN...)
+where LABEL... are one or more symbols and CHILDREN are sub-rules
+(lists) and, possibly, literal strings, which form a prefix as in
+any rule. If OBJECT holds an element labeled one of the LABELs --
+that atom itself, or a list headed by it -- CHILDREN are applied
+to OBJECT itself (not to that element), and their outputs are
+emitted in order; otherwise WHEN emits nothing.
+  So for instance:
+    object = (s k (a 1) (b 2))
+    rule   = (WHEN k (a (ANY x IT)) (b (ANY y IT)))
+    output = (x:1 y:2)
+  whereas with rule = (WHEN j (a (ANY x IT))) the output is ().
+  Typical use: a kind atom sits beside the kind's parts at one
+  level, and WHEN applies the kind's rules only to objects of
+  that kind.
+.
 A leaf-list in a rule can be vacuous, a singleton label.
 This is just to demonstrate that the possibility has been considered,
 and does not affect the output.
@@ -160,10 +177,12 @@ else is `format'-ed as a last resort."
 (defun skg--rule-header (rule)
   "Parse RULE once and return an alist classifying it.
 Keys:
-  kind      -- one of `interc', `any-leaf', `atomic-leaf', `non-leaf'.
+  kind      -- one of `interc', `when', `any-leaf', `atomic-leaf',
+               `non-leaf'.
   style     -- the style keyword at the rule's head, or nil.
-  label     -- the rule's label symbol (required for non-INTERC;
-               optional for INTERC).
+  label     -- the rule's label symbol (required for a simple
+               body; optional for INTERC; nil for WHEN).
+  labels    -- WHEN's label symbols, or nil for other kinds.
   separator -- INTERC's separator string, or nil for non-INTERC.
   abut      -- t if the rule carries an ABUT marker (leaf-only).
   children  -- the rule's post-header tail: literal strings are
@@ -173,6 +192,7 @@ Keys:
 Grammar handled:
   RULE        ::= [STYLE] (INTERC-BODY | SIMPLE-BODY)
   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
+  WHEN-BODY   ::= WHEN LABEL... CHILDREN...
   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
 
 Classification for simple bodies: `non-leaf' if any child is a
@@ -182,6 +202,7 @@ list; `any-leaf' if label is ANY (and it's a leaf);
         (style nil)
         (kind nil)
         (label nil)
+        (labels nil)
         (separator nil)
         (abut nil)
         (children nil))
@@ -201,6 +222,16 @@ list; `any-leaf' if label is ANY (and it's a leaf);
          (setq label (car tail))
          (setq tail (cdr tail)))
        (setq children tail))
+      ((eq (car-safe tail) 'WHEN)
+       (setq kind 'when)
+       (setq tail (cdr tail))
+       (while (and (consp tail)
+                   (car tail)
+                   (symbolp (car tail)))
+         (push (car tail) labels)
+         (setq tail (cdr tail)))
+       (setq labels (nreverse labels))
+       (setq children tail))
       (t
        (setq label (car-safe tail))
        (setq tail (cdr tail))
@@ -216,6 +247,7 @@ list; `any-leaf' if label is ANY (and it's a leaf);
     (list (cons 'kind kind)
           (cons 'style style)
           (cons 'label label)
+          (cons 'labels labels)
           (cons 'separator separator)
           (cons 'abut abut)
           (cons 'children children))))
@@ -229,8 +261,9 @@ String-literal children of the header are collected into a prefix.
 When any list child fires, the prefix is concatenated (no
 separator) before each of its outputs. When no list child fires
 but the prefix is non-empty, the prefix is emitted alone -- so
-rules like (CRUCIAL ghost \"☮\" (gnid) (skgRepos (nodeRepo))) serve
-as a label for the structure even when their sub-rules are vacuous."
+rules like (NONSTANDARD readyRequest \"request:ready\" (node \":node\"))
+serve as a label for the structure even when their sub-rules are
+vacuous."
   (let* ((new-style
            (or (alist-get 'style header) current-style))
          (children (alist-get 'children header))
@@ -272,6 +305,7 @@ Parses RULE-CHILD's header exactly once and pcases on kind."
     (let ((header (skg--rule-header rule-child)))
       (pcase (alist-get 'kind header)
         ('interc      (skg--apply-interc        object header current-style))
+        ('when        (skg--apply-when          object header current-style))
         ('any-leaf    (skg--apply-any-leaf      object header current-style))
         ('atomic-leaf (skg--apply-ordinary-leaf object header current-style))
         ('non-leaf    (skg--apply-non-leaf      object header current-style))))))
@@ -321,6 +355,19 @@ text properties on character ranges."
                  prefix-str sep slots new-style)
                 results))))
     (nreverse results)))
+
+(defun skg--apply-when
+  (object header current-style)
+  "Apply a WHEN HEADER to OBJECT with CURRENT-STYLE: if OBJECT
+holds an element labeled one of the header's LABELS (that atom,
+or a list headed by it), apply the header's children to OBJECT
+itself; otherwise return nil."
+  (when (cl-some
+         (lambda (label)
+           (or (skg--object-atomic-matches object label)
+               (skg--object-children-with-label object label)))
+         (alist-get 'labels header))
+    (skg--transform-sexp-flat-from object header current-style)))
 
 (defun skg--interc--build-token (prefix sep slots style)
   "Build an INTERC token: PREFIX + JOIN(SLOTS, SEP), skipping empty

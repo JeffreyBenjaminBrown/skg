@@ -14,13 +14,13 @@
   (kill-emacs 1))
 
 (defun fork-repo-test--buffer-showing (skgid)
-  "Return a live skg view buffer whose text mentions (id ID)."
+  "Return a live skg view buffer whose text mentions (gnid ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-id) skg-view-id
-                 (string-match-p (regexp-quote (format "(id %s)" skgid))
+                 (string-match-p (regexp-quote (format "(gnid %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))
@@ -45,7 +45,7 @@ the clone landed in the rotated repo."
     (with-current-buffer p-buf
       ;; 2. Make N editable and edit its title -- the fork gesture.
       (goto-char (point-min))
-      (unless (re-search-forward "^.*(id N) (repo foreign).*$" nil t)
+      (unless (re-search-forward "^.*(gnid N) (skgRepos (nodeRepo foreign)).*$" nil t)
         (test-fail "could not find N's headline:\n%s" (buffer-string)))
       (let* ((line (match-string 0))
              (edited (replace-regexp-in-string
@@ -65,7 +65,7 @@ the clone landed in the rotated repo."
       ;; The server pre-fills the PICK-A-REPO placeholder and only
       ;; suggests the inferred skgrepo in a comment line (fork.rs;
       ;; documented in docs/COMMANDS.org and glossary.org).
-      (unless (string-match-p "(repo PICK-A-REPO)" (buffer-string))
+      (unless (string-match-p "(skgRepos (nodeRepo PICK-A-REPO))" (buffer-string))
         (test-fail "clone-to-be should carry the PICK-A-REPO placeholder:\n%s"
                    (buffer-string)))
       (unless (string-match-p "Suggested repo for the clone below: owned"
@@ -80,7 +80,7 @@ the clone landed in the rotated repo."
                    (buffer-string)))
       (beginning-of-line)
       (skg--change-repo-at-point "owned2")
-      (unless (string-match-p "(repo owned2)" (buffer-string))
+      (unless (string-match-p "(skgRepos (nodeRepo owned2))" (buffer-string))
         (test-fail "rotation did not set repo owned2:\n%s" (buffer-string)))
       (message "✓ rotated the clone's repo to owned2")
       ;; 5. Approve: re-save the source buffer with the chosen skgrepo.

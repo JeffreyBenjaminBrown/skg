@@ -10,7 +10,7 @@
 (require 'skg-keymaps-and-aliases)
 
 (defconst test-skg-request-views--ghost
-  "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) (vnid 0d))"
+  "(skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))"
   "A ghost's metadata, as the diff view writes it.")
 
 (defun test-skg-request-views--run (headlines command)
@@ -40,18 +40,18 @@ how many saves it requested."
   "The request lands inside the ghost's form, the rest of the headline
 unchanged, and one save is requested."
   (let ((result (test-skg-request-views--run
-                 (concat "* (skg (node (id r) (repo main))) r\n"
+                 (concat "* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n"
                          "** " test-skg-request-views--ghost " g")
                  #'skg-request-ghost-tombstone)))
     (should (equal (car result)
-                   '("* (skg (node (id r) (repo main))) r"
-                     "** (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)) (viewRequests tombstone)) (vnid 0d)) g")))
+                   '("* (skg node (gnid r) (skgRepos (nodeRepo main))) r"
+                     "** (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)) (viewRequests tombstone)) g")))
     (should (= (cdr result) 1))))
 
 (ert-deftest test-skg-request-ghost-tombstone-refuses-anything-but-a-ghost ()
   "On any other headline it refuses, changes nothing and saves nothing."
-  (dolist (headline '("* (skg (node (id x) (repo main) (diff (rel removed)))) x"
-                      "* (skg (unknown (id u)))"
+  (dolist (headline '("* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel removed))) x"
+                      "* (skg unknown (gnid u))"
                       "* (skg tombstone)"
                       "* no metadata"))
     (with-temp-buffer
@@ -73,27 +73,27 @@ unchanged, and one save is requested."
 inside its ghost form, once (a ghost behind a marker atom, or already
 carrying it, too); no other headline changes; one save is requested."
   (let ((result (test-skg-request-views--run
-                 (concat "* (skg (node (id r) (repo main))) r\n"
+                 (concat "* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n"
                          "** " test-skg-request-views--ghost " g\n"
-                         "*** (skg (node (id k) (repo main) writeProtected)) k\n"
-                         "** (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x\n"
-                         "** (skg (unknown (id u)))\n"
+                         "*** (skg node (gnid k) (skgRepos (nodeRepo main)) writeProtected) k\n"
+                         "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x\n"
+                         "** (skg unknown (gnid u))\n"
                          "** (skg tombstone)\n"
-                         "* (skg folded (ghost (gnid h) (skgRepos (nodeRepo main)) (viewRequests tombstone))) h")
+                         "* (skg folded ghost (gnid h) (skgRepos (nodeRepo main)) (viewRequests tombstone)) h")
                  #'skg-request-buffer-ghosts-tombstone)))
     (should (equal (car result)
-                   '("* (skg (node (id r) (repo main))) r"
-                     "** (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)) (viewRequests tombstone)) (vnid 0d)) g"
-                     "*** (skg (node (id k) (repo main) writeProtected)) k"
-                     "** (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x"
-                     "** (skg (unknown (id u)))"
+                   '("* (skg node (gnid r) (skgRepos (nodeRepo main))) r"
+                     "** (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)) (viewRequests tombstone)) g"
+                     "*** (skg node (gnid k) (skgRepos (nodeRepo main)) writeProtected) k"
+                     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x"
+                     "** (skg unknown (gnid u))"
                      "** (skg tombstone)"
-                     "* (skg folded (ghost (gnid h) (skgRepos (nodeRepo main)) (viewRequests tombstone))) h")))
+                     "* (skg folded ghost (gnid h) (skgRepos (nodeRepo main)) (viewRequests tombstone)) h")))
     (should (= (cdr result) 1))))
 
 (ert-deftest test-skg-request-buffer-ghosts-tombstone-without-a-ghost-does-not-save ()
   "With no ghost in the buffer, nothing changes and no save is requested."
-  (let* ((headlines (concat "* (skg (node (id r) (repo main))) r\n"
+  (let* ((headlines (concat "* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n"
                             "** (skg tombstone)"))
          (result (test-skg-request-views--run
                   headlines #'skg-request-buffer-ghosts-tombstone)))

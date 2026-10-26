@@ -207,7 +207,7 @@ from once the goto request has been issued."
 
 (defun skg-id-next ()
   "Move point to the next ID occurrence.
-An ID can appear in metadata like (skg (node (id X)) ...),
+An ID can appear in metadata like (skg node (gnid X) ...),
   in which case point moves to the opening paren of (skg ...),
 or in a link like [[id:X][label]],
   in which case point moves to the opening bracket of [[id:..."
@@ -232,7 +232,7 @@ or in a link like [[id:X][label]],
 
 (defun skg-id-prev ()
   "Move point to the previous ID occurrence.
-An ID can appear in metadata like (skg (node (id X)) ...),
+An ID can appear in metadata like (skg node (gnid X) ...),
   in which case point moves to the opening paren of (skg ...),
 or in a link like [[id:X][label]],
   in which case point moves to the opening bracket of [[id:..."
@@ -342,8 +342,8 @@ headline."
                   t )) )
          ( node-text
            (format (if request-editable-view
-                       "(skg (node (id %s) writeProtected (viewRequests editableView))) %s"
-                     "(skg (node (id %s) writeProtected)) %s")
+                       "(skg node (gnid %s) writeProtected (viewRequests editableView)) %s"
+                     "(skg node (gnid %s) writeProtected) %s")
                    skgid title )) )
     (if (save-excursion
           (let ((pos (point)))
@@ -373,7 +373,7 @@ requests a editable view.  The server allows only one of those per ID."
                      (equal (skg--node-id sexp) skgid)
                      (or (not (skg--node-write-protected-p sexp))
                          (skg-sexp-subtree-p
-                          sexp '(skg (node (viewRequests editableView))))))
+                          sexp '(skg (viewRequests editableView)))))
             (setq found t)))
         (forward-line 1))
       found)))
@@ -458,28 +458,26 @@ title comes from the stack entry."
 
 (defun skg--metadata-sexp-contains-id-p
     (sexp)
-  "Return t if SEXP contains an id under the UnrestrictedVognode shape
-(skg (node (id ...))) or the ghost shape (skg (ghost (gnid ...)))."
-  (or (skg-sexp-subtree-p sexp '(skg (node  (id))))
-      (skg-sexp-subtree-p sexp '(skg (ghost (gnid))))))
+  "Return t if SEXP is an UnrestrictedVognode's or a ghost's carrying
+an id: (skg node (gnid ...) ...) or (skg ghost (gnid ...) ...)."
+  (or (skg-sexp-subtree-p sexp '(skg node (gnid)))
+      (skg-sexp-subtree-p sexp '(skg ghost (gnid)))))
 
 (defun skg--extract-id-from-metadata-sexp
     (sexp)
-  "Extract the id value from SEXP. Accepts the UnrestrictedVognode shape
-(skg (node (id X) ...)) or the ghost shape (skg (ghost (gnid X) ...)).
+  "Extract the id value from SEXP, an UnrestrictedVognode's
+\(skg node (gnid X) ...) or a ghost's (skg ghost (gnid X) ...).
 Returns the id as a string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node  id)))
-                 (car (skg-sexp-cdr-at-path sexp '(skg ghost gnid))))))
+  (let ((val (and (skg--metadata-sexp-contains-id-p sexp)
+                  (car (skg-sexp-cdr-at-path sexp '(skg gnid))))))
     (when val (format "%s" val))))
 
 (defun skg--extract-repo-from-metadata-sexp (sexp)
-  "Extract the repo value from SEXP. Accepts the UnrestrictedVognode shape
-(skg (node (repo X) ...)) or the ghost shape
-(skg (ghost (skgRepos (nodeRepo X)) ...)). Returns the repo as a
+  "Extract the repo value from SEXP, an UnrestrictedVognode's
+\(skg node (skgRepos (nodeRepo X)) ...) or a ghost's
+\(skg ghost (skgRepos (nodeRepo X)) ...). Returns the repo as a
 string, or nil."
-  (let ((val (or (car (skg-sexp-cdr-at-path sexp '(skg node repo)))
-                 (car (skg-sexp-cdr-at-path
-                       sexp '(skg ghost skgRepos nodeRepo))))))
+  (let ((val (car (skg-sexp-cdr-at-path sexp '(skg skgRepos nodeRepo)))))
     (when val (format "%s" val))))
 
 (defun skg--point-in-link-p ()

@@ -43,7 +43,7 @@ true-content subtree.  This modifies metadata but does not save."
     (user-error "Search matching can be set only on an unrestricted node"))
   (when (skg--node-write-protected-p metadata)
     (user-error "Cannot set search matching on a write-protected node"))
-  (when (skg-sexp-cdr-at-path metadata '(skg node editRequest))
+  (when (skg-sexp-cdr-at-path metadata '(skg editRequest))
     (user-error "This node already has an editRequest"))
   (or (skg--node-id metadata)
       (user-error "Save the node first; it has no graph ID")))
@@ -98,9 +98,10 @@ true-content subtree.  This modifies metadata but does not save."
 
 (defun skg--stamp-search-matching-request (no-search-matching)
   (skg-edit-metadata-at-point
-   `(skg (node (editRequest
-                (flag noSearchMatching
-                          ,(if no-search-matching 'true 'false)))))))
+   `(skg node
+         (editRequest
+          (flag noSearchMatching
+                ,(if no-search-matching 'true 'false))))))
 
 (defun skg--stage-flag-search-matching-recursive (desired)
   "Stage DESIRED uniformly through the true-content subtree at point."
@@ -118,7 +119,7 @@ true-content subtree.  This modifies metadata but does not save."
                  ((not skgid) "no saved ID")
                  ((gethash skgid seen) "duplicate occurrence")
                  ((skg--node-write-protected-p meta) "write-protected")
-                 ((skg-sexp-cdr-at-path meta '(skg node editRequest))
+                 ((skg-sexp-cdr-at-path meta '(skg editRequest))
                   "already has an editRequest")
                  ((not (member (skg--node-repo meta)
                                (skg--owned-repos))) "foreign repo"))))

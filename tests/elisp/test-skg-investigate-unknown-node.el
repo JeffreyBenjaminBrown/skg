@@ -26,8 +26,8 @@ handlers, and the prompts (via a function)."
 
 (ert-deftest test-investigate-sends-the-id-of-the-unknown-headline-at-point ()
   (with-temp-buffer
-    (insert "* (skg (node (id p) (repo main))) p\n"
-            "** (skg (unknown (id gone-id))) \n")
+    (insert "* (skg node (gnid p) (skgRepos (nodeRepo main))) p\n"
+            "** (skg unknown (gnid gone-id)) \n")
     (org-mode)
     (goto-char (point-min))
     (forward-line 1)
@@ -42,7 +42,7 @@ handlers, and the prompts (via a function)."
 
 (ert-deftest test-investigate-prompts-for-the-id-elsewhere ()
   (with-temp-buffer
-    (insert "* (skg (node (id p) (repo main))) p\n")
+    (insert "* (skg node (gnid p) (skgRepos (nodeRepo main))) p\n")
     (org-mode)
     (goto-char (point-min))
     (test--investigate-run

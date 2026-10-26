@@ -37,7 +37,7 @@ first, via a function), the handlers and the prompts."
   (with-temp-buffer
     (skg-content-view-mode)
     (setq-local skg-view-id "dirty-view")
-    (insert "* (skg (node (id a))) a\n")
+    (insert "* (skg node (gnid a)) a\n")
     (set-buffer-modified-p t)
     (let ((err (should-error (skg-stage-and-commit) :type 'user-error)))
       (should (string-match-p "Save or revert" (cadr err))))
@@ -106,7 +106,7 @@ when every changed file is ready; \"yes\" resends confirmed."
   (with-temp-buffer
     (skg-content-view-mode)
     (setq-local skg-view-id "diff-view: all changes")
-    (insert "* (skg (node (id a))) a\n")
+    (insert "* (skg node (gnid a)) a\n")
     (skg--apply-streamed-view-update
      "((view-id \"diff-view: all changes\") (content \"\"))" 'rerender "rerender-view")
     (should (equal (buffer-string) ""))))

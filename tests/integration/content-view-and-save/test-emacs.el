@@ -35,7 +35,7 @@
             (message "Content: %s" content)
 
             ;; Verify exact content: should include skgrepo metadata
-            (let ((expected-content "* (skg (node (id 1) (repo main))) 1\n"))
+            (let ((expected-content "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n"))
               (if (string= (skg-test-without-viewnode-ids content) expected-content)
                   (progn
                     (message "✓ PASS: Buffer content exactly matches expected")
@@ -92,19 +92,23 @@
             (message "Updated buffer content: %s" updated-content)
 
             ;; Verify the structure: should have original line and new line with UUID
-            (if (and (string-match-p "\\* (skg (node (id 1) (repo main)" updated-content)
-                     (string-match "\\*\\* (skg (node (id \\([^)]+\\)) (repo main).*) 2" updated-content))
+            (if (and (string-match-p "\\* (skg node (gnid 1) (skgRepos (nodeRepo main))"
+                                     (skg-test-without-viewnode-ids updated-content))
+                     (string-match "\\*\\* (skg node (gnid \\([^) ]+\\)) (skgRepos (nodeRepo main)).*) 2"
+                                   (skg-test-without-viewnode-ids updated-content)))
                 (progn
                   ;; Extract the new UUID for verification
-                  (when (string-match "\\*\\* (skg (node (id \\([^)]+\\)).*) 2" updated-content)
-                    (setq integration-test-new-uuid (match-string 1 updated-content))
+                  (when (string-match "\\*\\* (skg node (gnid \\([^) ]+\\)).*) 2"
+                                      (skg-test-without-viewnode-ids updated-content))
+                    (setq integration-test-new-uuid
+                          (match-string 1 (skg-test-without-viewnode-ids updated-content)))
                     (message "✓ Extracted new UUID: %s" integration-test-new-uuid))
 
                   (message "✓ PASS: Buffer shows correct structure after save")
                   (message "✓ PASS: Found new UUID in saved content"))
               (progn
                 (message "✗ FAIL: Expected content structure not found after save")
-                (message "Expected: * (skg (node (id 1) (repo main) ...)) 1 and ** (skg (node (id UUID) (repo main) ...)) 2")
+                (message "Expected: * (skg node (gnid 1) (skgRepos (nodeRepo main)) ...) 1 and ** (skg node (gnid UUID) (skgRepos (nodeRepo main)) ...) 2")
                 (message "Got: %s" updated-content)
                 (kill-emacs 1)))))
       (progn

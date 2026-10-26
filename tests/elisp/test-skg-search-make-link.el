@@ -46,7 +46,7 @@
             (backward-char 5)
             (setq insert-pos (point)))
           (with-current-buffer search-buf
-            (insert "* (skg (node (id outer-id))) outer headline with [[id:inner-id][inner label]] inside\n")
+            (insert "* (skg node (gnid outer-id)) outer headline with [[id:inner-id][inner label]] inside\n")
             (goto-char (point-min))
             (search-forward "inner label")
             (backward-char 4)
@@ -77,7 +77,7 @@ ID, with any inline links in the title reduced to their labels."
             (goto-char (point-max))
             (setq insert-pos (point)))
           (with-current-buffer search-buf
-            (insert "* (skg (node (id outer-id))) outer with [[id:inner][inner]] mixed\n")
+            (insert "* (skg node (gnid outer-id)) outer with [[id:inner][inner]] mixed\n")
             (goto-char (point-min))
             ;; Move point onto the metadata sexp so we get the headline ID.
             (search-forward "(skg")

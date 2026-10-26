@@ -7,9 +7,9 @@
 (defvar integration-test-completed nil)
 
 (defconst skg-mentionerward-base-buffer
-  "* (skg (node (id 1) (repo main))) 1
-** (skg (node (id 11))) 11
-** (skg (node (id 12))) 12
+  "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1
+** (skg node (gnid 11)) 11
+** (skg node (gnid 12)) 12
 ")
 
 (defun strip-metadata-and-bodies (text)
@@ -22,11 +22,15 @@
         (let ((line (buffer-substring-no-properties
                      (line-beginning-position)
                      (line-end-position))))
-          (when (string-match "^\\(\\*+\\) \\((skg .*)\\) \\(.*\\)$" line)
-            (setq result (concat result (match-string 1 line)
-                                 " "
-                                 (match-string 3 line)
-                                 "\n"))))
+          ;; A headline with metadata and a title; a titleless one
+          ;; (the mentioners folder) is dropped.
+          (let ((parts (skg-split-as-stars-metadata-title line)))
+            (when (and parts
+                       (not (string-empty-p (nth 1 parts)))
+                       (not (string-empty-p (nth 2 parts))))
+              (setq result (concat result (nth 0 parts)
+                                   (nth 2 parts)
+                                   "\n")))))
         (forward-line 1))
       result)))
 
@@ -70,19 +74,19 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-line0
-         (concat "* (skg (node (id 1) (repo main) (rels (contains (out 2))))) 1\n"
-                 "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n"
-                 "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n"))
+         (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 2)))) 1\n"
+                 "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n"
+                 "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n"))
         (expected-line2
-         (concat "* (skg (node (id 1) (repo main) (rels (contains (out 2))))) 1\n"
-                 "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n"
-                 "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n"))
+         (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 2)))) 1\n"
+                 "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n"
+                 "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n"))
         (expected-changed
-         (concat "* (skg (node (id 1) (repo main) (rels (contains (out 2))))) 1\n"
-                 "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n"
+         (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (out 2)))) 1\n"
+                 "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n"
                  "*** (skg mentionerFolder)\n"
-                 "**** (skg (node (id l-11) (repo main) writeProtected (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2))))) [[id:11][a link to 11]]\n"
-                 "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n"))
+                 "**** (skg node (gnid l-11) (skgRepos (nodeRepo main)) writeProtected (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2)))) [[id:11][a link to 11]]\n"
+                 "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n**** [[id:11][a link to 11]]\n** 12\n")))
 

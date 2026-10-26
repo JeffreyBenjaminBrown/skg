@@ -40,11 +40,11 @@ root with `focused' metadata and each child with `folded' metadata.
 `skg-replace-buffer-with-new-content' must not drop the root line."
   (let* ((from-rust
           (concat
-           "* (skg focused (node (id root))) root\n"
+           "* (skg focused node (gnid root)) root\n"
            "root body\n"
-           "** (skg folded (node (id c1))) c1\n"
+           "** (skg folded node (gnid c1)) c1\n"
            "c1 body\n"
-           "** (skg folded (node (id c2))) c2\n"
+           "** (skg folded node (gnid c2)) c2\n"
            "c2 body\n"))
          (buf (generate-new-buffer "*test-save-response-folded-root*")))
     (unwind-protect
@@ -53,10 +53,10 @@ root with `focused' metadata and each child with `folded' metadata.
           (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content nil from-rust)
           (let ((actual (skg-test--buffer-text)))
-            (should (string-match-p "(id root)" actual))
+            (should (string-match-p "(gnid root)" actual))
             (should (string-match-p "^\\* " actual))
-            (should (string-match-p "(id c1)" actual))
-            (should (string-match-p "(id c2)" actual))))
+            (should (string-match-p "(gnid c1)" actual))
+            (should (string-match-p "(gnid c2)" actual))))
       (kill-buffer buf))))
 
 (ert-deftest test-save-response-no-focused-preserves-root ()
@@ -64,11 +64,11 @@ root with `focused' metadata and each child with `folded' metadata.
 isolate the fold-processing path from the focus-processing path."
   (let* ((from-rust
           (concat
-           "* (skg (node (id root))) root\n"
+           "* (skg node (gnid root)) root\n"
            "root body\n"
-           "** (skg folded (node (id c1))) c1\n"
+           "** (skg folded node (gnid c1)) c1\n"
            "c1 body\n"
-           "** (skg folded (node (id c2))) c2\n"
+           "** (skg folded node (gnid c2)) c2\n"
            "c2 body\n"))
          (buf (generate-new-buffer "*test-save-response-folded-root-nofocus*")))
     (unwind-protect
@@ -77,7 +77,7 @@ isolate the fold-processing path from the focus-processing path."
           (setq-local skg-view-id "test-view-id")
           (skg-replace-buffer-with-new-content nil from-rust)
           (let ((actual (skg-test--buffer-text)))
-            (should (string-match-p "(id root)" actual))
+            (should (string-match-p "(gnid root)" actual))
             (should (string-match-p "^\\* " actual))))
       (kill-buffer buf))))
 
@@ -85,10 +85,10 @@ isolate the fold-processing path from the focus-processing path."
   "Point returns to the same body line below the focused headline."
   (let* ((from-rust
           (concat
-           "* (skg focused (node (id root))) root\n"
+           "* (skg focused node (gnid root)) root\n"
            "body 1\n"
            "body 2\n"
-           "** (skg (node (id child))) child\n"))
+           "** (skg node (gnid child)) child\n"))
          (buf (generate-new-buffer "*test-save-response-body-point*")))
     (unwind-protect
         (with-current-buffer buf
@@ -109,8 +109,8 @@ isolate the fold-processing path from the focus-processing path."
   "If the saved body line is gone, point stays on the focused headline."
   (let* ((from-rust
           (concat
-           "* (skg focused (node (id root))) root\n"
-           "** (skg (node (id child))) child\n"))
+           "* (skg focused node (gnid root)) root\n"
+           "** (skg node (gnid child)) child\n"))
          (buf (generate-new-buffer "*test-save-response-vanished-body-point*")))
     (unwind-protect
         (with-current-buffer buf
@@ -132,10 +132,10 @@ isolate the fold-processing path from the focus-processing path."
   "Point returns to the same character within the restored body line."
   (let* ((from-rust
           (concat
-           "* (skg focused (node (id root))) root\n"
+           "* (skg focused node (gnid root)) root\n"
            "body 1\n"
            "body 2\n"
-           "** (skg (node (id child))) child\n"))
+           "** (skg node (gnid child)) child\n"))
          (buf (generate-new-buffer "*test-save-response-column*")))
     (unwind-protect
         (with-current-buffer buf
@@ -159,9 +159,9 @@ isolate the fold-processing path from the focus-processing path."
 line's end and does not spill onto the next line."
   (let* ((from-rust
           (concat
-           "* (skg focused (node (id root))) root\n"
+           "* (skg focused node (gnid root)) root\n"
            "ab\n"
-           "** (skg (node (id child))) child\n"))
+           "** (skg node (gnid child)) child\n"))
          (buf (generate-new-buffer "*test-save-response-clamp-column*")))
     (unwind-protect
         (with-current-buffer buf
@@ -186,9 +186,9 @@ headline, point lands on the entry's last line, not on the next
 headline and not back on the focused headline."
   (let* ((from-rust
           (concat
-           "* (skg focused (node (id root))) root\n"
+           "* (skg focused node (gnid root)) root\n"
            "only body line\n"
-           "** (skg (node (id child))) child\n"))
+           "** (skg node (gnid child)) child\n"))
          (buf (generate-new-buffer "*test-save-response-clamp-line*")))
     (unwind-protect
         (with-current-buffer buf

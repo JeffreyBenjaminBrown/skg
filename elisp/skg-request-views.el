@@ -24,7 +24,7 @@ atom via `skg-edit-metadata-at-point'."
   (save-excursion
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
-     `(skg (node (viewRequests ,view-request)))))
+     `(skg node (viewRequests ,view-request))))
   (skg-request-save-buffer))
 
 (defmacro skg--define-view-request-commands (&rest rows)
@@ -72,7 +72,7 @@ one such request per node. Does not auto-save."
   (save-excursion
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
-     `(skg (node (viewRequests editableView))))))
+     `(skg node (viewRequests editableView)))))
 
 (defun skg-request-write-protected ()
   "Edit metadata to request write-protection for the headline at point.
@@ -87,7 +87,7 @@ Does not auto-save."
   (save-excursion
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
-     `(skg (node (viewRequests writeProtectedView))))))
+     `(skg node (viewRequests writeProtectedView)))))
 
 (defun skg-request-write-protected-recursive ()
   "Edit metadata to request write-protection for the headline at point
@@ -99,7 +99,7 @@ affecting its parent. Does not auto-save."
   (save-excursion
     (org-back-to-heading t)
     (skg-edit-metadata-at-point
-     `(skg (node (viewRequests writeProtectedSubtreeView))))))
+     `(skg node (viewRequests writeProtectedSubtreeView)))))
 
 (defun skg-fork-node ()
   "Fork the (owned) node at point: create a private clone that overrides it.
@@ -109,7 +109,7 @@ overrides C overrides N).
 
 Refuses if the buffer has unsaved changes (\"Save the buffer before
 forking.\"), so the clone's saved state matches what you see. Otherwise
-stamps (viewRequests fork) into the headline's own (skg (node ...)) --
+stamps (viewRequests fork) into the headline's own (skg node ...) --
 targeting the headline's own id, never an (overridesHere N) fact it may
 carry -- and auto-saves (unlike `skg-request-editable-view'). The server
 returns the usual fork-confirmation buffer; Emacs prompts for the clone's
@@ -121,13 +121,13 @@ with C-c C-k."
     (save-excursion
       (org-back-to-heading t)
       (skg-edit-metadata-at-point
-       `(skg (node (viewRequests fork)))))
+       `(skg node (viewRequests fork))))
     (skg-request-save-buffer)))
 
 ;;; The diff view's ghosts ('docs/diff-view.org'). A ghost stands where
 ;;; the diff view drew it, for a node HEAD has and the worktree lacks,
 ;;; until the user entombstones it: these commands stamp the 'tombstone'
-;;; view request into its ghost form and save. The save keeps what the
+;;; view request into its metadata and save. The save keeps what the
 ;;; user put under the ghost and drops what the diff view drew there; a
 ;;; childless tombstone is pruned. The server refuses the request
 ;;; anywhere but on a ghost, with the same text.
@@ -138,7 +138,7 @@ with C-c C-k."
 
 (defun skg-request-ghost-tombstone ()
   "Entombstone the ghost at point, then save.
-Stamps '(viewRequests tombstone)' into the headline's ghost form and
+Stamps '(viewRequests tombstone)' into the ghost's metadata and
 saves. The headline must be a ghost: a node of the diff view deleted
 since HEAD."
   (interactive)
@@ -151,8 +151,8 @@ since HEAD."
 
 (defun skg-request-buffer-ghosts-tombstone ()
   "Entombstone every ghost in the buffer, then save once.
-Stamps '(viewRequests tombstone)' into each ghost headline's ghost
-form. With no ghost in the buffer, says so and does not save."
+Stamps '(viewRequests tombstone)' into each ghost headline's
+metadata. With no ghost in the buffer, says so and does not save."
   (interactive)
   (let (( ghost-count (save-excursion
                         (skg--stamp-every-ghost-tombstone-request)) ))
@@ -177,9 +177,9 @@ Returns how many it stamped."
     ghost-count))
 
 (defun skg--stamp-ghost-tombstone-request ()
-  "Stamp '(viewRequests tombstone)' into the ghost form of the headline
-at point."
+  "Stamp '(viewRequests tombstone)' into the metadata of the ghost
+headline at point."
   (skg-edit-metadata-at-point
-   '(skg (ghost (viewRequests tombstone)))))
+   '(skg ghost (viewRequests tombstone))))
 
 (provide 'skg-request-views)

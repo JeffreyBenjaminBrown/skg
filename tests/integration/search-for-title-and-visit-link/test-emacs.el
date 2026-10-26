@@ -26,13 +26,13 @@
           (let ((content (buffer-substring-no-properties (point-min) (point-max))))
             (message "Search results received")
             (message "Content: %s" content)
-            (if (string-match-p "(id apples)" content)
+            (if (string-match-p "(gnid apples)" content)
                 (progn
                   (message "✓ PASS: Found apples node in search results")
                   (setq integration-test-phase "search-complete"))
               (progn
                 (message "✗ FAIL: Expected apples node not found in search results")
-                (message "Expected pattern: (id apples)")
+                (message "Expected pattern: (gnid apples)")
                 (message "Got: %s" content)
                 (kill-emacs 1)))))
       (progn
@@ -48,9 +48,9 @@
     (if search-buffer
         (with-current-buffer search-buffer
           (goto-char (point-min))
-          ;; Find the headline with (id apples) in metadata
+          ;; Find the headline with (gnid apples) in metadata
           ;; and position cursor on the metadata so skg-goto can read it.
-          (if (re-search-forward "(id apples)" nil t)
+          (if (re-search-forward "(gnid apples)" nil t)
               (progn
                 (message "✓ Found apples metadata, positioning cursor")
                 (goto-char (match-beginning 0))

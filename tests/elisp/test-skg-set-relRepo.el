@@ -68,12 +68,12 @@ skg-config-dir is set and `skg--repo-names' works."
   "A content child's relationship: recorder = viewparent, relation = contains."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (node (id kid) (repo public))) kid\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id kid)" nil t)
+     (search-forward "(gnid kid)" nil t)
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
                     '(:recorder "recorder" :member "kid"
@@ -84,13 +84,13 @@ skg-config-dir is set and `skg--repo-names' works."
 viewparent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id anchor) (repo public))) anchor\n"
+    "* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor\n"
     "** (skg subscribeeFolder)\n"
-    "*** (skg (node (id seen) (repo public) writeProtected)) seen\n")
+    "*** (skg node (gnid seen) (skgRepos (nodeRepo public)) writeProtected) seen\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id seen)" nil t)
+     (search-forward "(gnid seen)" nil t)
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
                     '(:recorder "anchor" :member "seen"
@@ -101,12 +101,12 @@ viewparent), relation = the folder's relation."
 so it can be set from the child."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (node (id kid) (repo public) writeProtected)) kid\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public)) writeProtected) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id kid)" nil t)
+     (search-forward "(gnid kid)" nil t)
      (beginning-of-line)
      (should (equal (skg--rel-at-point)
                     '(:recorder "recorder" :member "kid"
@@ -117,12 +117,12 @@ so it can be set from the child."
 would not let write the relationship."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public) writeProtected)) recorder\n"
-    "** (skg (node (id kid) (repo public))) kid\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public)) writeProtected) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id kid)" nil t)
+     (search-forward "(gnid kid)" nil t)
      (beginning-of-line)
      (let ((err (should-error (skg--rel-at-point)
                               :type 'user-error)))
@@ -132,13 +132,13 @@ would not let write the relationship."
   "Refuses (user-error) on a member of a write-protected folder."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
     "** (skg subscriberFolder)\n"
-    "*** (skg (node (id sub) (repo public))) sub\n")
+    "*** (skg node (gnid sub) (skgRepos (nodeRepo public))) sub\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id sub)" nil t)
+     (search-forward "(gnid sub)" nil t)
      (beginning-of-line)
      (let ((err (should-error (skg--rel-at-point)
                               :type 'user-error)))
@@ -148,7 +148,7 @@ would not let write the relationship."
 (ert-deftest test-rel-refuses-on-root ()
   "Refuses on a root headline: with no viewparent there is no relationship."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -160,7 +160,7 @@ would not let write the relationship."
   "Refuses on a non-vognode headline (no (node ...) form)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
     "** (skg aliasFolder) aliases\n")
    test--config-public-private-trusted
    (lambda ()
@@ -199,7 +199,7 @@ is offered; the server's save-time floor check backstops."
 (ert-deftest test-apply-relRepo-sets-atom ()
   "Choosing a repo writes the (relRepo NAME) atom."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -210,7 +210,7 @@ is offered; the server's save-time floor check backstops."
 (ert-deftest test-apply-relRepo-preserves-existing-viewstats ()
   "Setting relRepo must not disturb a pre-existing viewStats sibling."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public) (viewStats cycle))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (viewStats cycle)) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -224,7 +224,7 @@ is offered; the server's save-time floor check backstops."
 the displayed relRepo fact; its message says the saved skgrepo survives
 (sticky), not that anything resets to the default."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public) (viewStats (relRepo private)) (editRequest (relRepo trusted)))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public) (relRepo private)) (editRequest (relRepo trusted))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -232,13 +232,13 @@ the displayed relRepo fact; its message says the saved skgrepo survives
                  skg--relRepo-no-override)))
        (should (string-match-p "sticky" msg))
        (should-not (string-match-p "editRequest" (test--buffer-line 1)))
-       (should (string-match-p "(viewStats (relRepo private))"
+       (should (string-match-p "(skgRepos (nodeRepo public) (relRepo private))"
                                (test--buffer-line 1)))))))
 
 (ert-deftest test-apply-relRepo-remove-without-atom-is-noop ()
   "The no-override choice without an atom changes nothing."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -249,10 +249,10 @@ the displayed relRepo fact; its message says the saved skgrepo survives
        (should (equal (test--buffer-line 1) before))))))
 
 (ert-deftest test-apply-relRepo-on-alias-uses-flat-metadata ()
-  "Alias relRepo intent is a flat non-vognode editRequest, not node viewStats."
+  "Alias relRepo intent is a non-vognode editRequest, not a skgRepos fact."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
     "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
@@ -263,7 +263,7 @@ the displayed relRepo fact; its message says the saved skgrepo survives
      (should (string-match-p
               "(skg alias (editRequest (relRepo trusted)))"
               (test--buffer-line 3)))
-     (should-not (string-match-p "viewStats" (test--buffer-line 3)))
+     (should-not (string-match-p "skgRepos" (test--buffer-line 3)))
      (should (equal (skg--relRepo-requested-value) "trusted"))
      (skg--apply-relRepo-choice
       skg--relRepo-no-override)
@@ -274,19 +274,19 @@ the displayed relRepo fact; its message says the saved skgrepo survives
   "An Unknown content member stores intent under its own editRequest."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (unknown (id na) (viewStats (relRepo private))))\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg unknown (gnid na) (skgRepos (relRepo private)))\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (forward-line 1)
      (skg--apply-relRepo-choice "trusted")
      (should (string-match-p
-              "(unknown (id na) (viewStats (relRepo private)) (editRequest (relRepo trusted)))"
+              "unknown (gnid na) (skgRepos (relRepo private)) (editRequest (relRepo trusted))"
               (test--buffer-line 2)))
      (skg--apply-relRepo-choice
       skg--relRepo-no-override)
-     (should (string-match-p "(viewStats (relRepo private))"
+     (should (string-match-p "(skgRepos (relRepo private))"
                              (test--buffer-line 2)))
      (should-not (string-match-p "editRequest" (test--buffer-line 2))))))
 
@@ -294,9 +294,9 @@ the displayed relRepo fact; its message says the saved skgrepo survives
   "A delete/merge target aborts the recursive operation before any write."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (node (id a) (repo public))) a\n"
-    "** (skg (node (id b) (repo public) (editRequest delete))) b\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid a) (skgRepos (nodeRepo public))) a\n"
+    "** (skg node (gnid b) (skgRepos (nodeRepo public)) (editRequest delete)) b\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -308,7 +308,7 @@ the displayed relRepo fact; its message says the saved skgrepo survives
   "The alias gesture uses its owning node's home without an relationship-info request."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo private))) recorder\n"
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo private))) recorder\n"
     "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
@@ -357,12 +357,12 @@ the no-override entry, pre-fills the minibuffer with the current
 repo, and applies the selection."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (node (id kid) (repo public))) kid\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id kid)" nil t)
+     (search-forward "(gnid kid)" nil t)
      (beginning-of-line)
      (let (seen-choices seen-prefill)
        (test--run-info-handler
@@ -383,12 +383,12 @@ repo, and applies the selection."
 choices, so the prompt pre-fills with the default instead."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (node (id kid) (repo public))) kid\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id kid)" nil t)
+     (search-forward "(gnid kid)" nil t)
      (beginning-of-line)
      (let (seen-prefill)
        (test--run-info-handler
@@ -402,12 +402,12 @@ choices, so the prompt pre-fills with the default instead."
   "An error reply falls back to the full ladder (plus no-override)."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
-    "** (skg (node (id kid) (repo public))) kid\n")
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
+    "** (skg node (gnid kid) (skgRepos (nodeRepo public))) kid\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id kid)" nil t)
+     (search-forward "(gnid kid)" nil t)
      (beginning-of-line)
      (let (seen-choices)
        (test--run-info-handler
@@ -425,16 +425,16 @@ choices, so the prompt pre-fills with the default instead."
 
 (defvar test--recursive-content-tree
   (concat
-   "* (skg (node (id r) (repo public))) r\n"
-   "** (skg (node (id a) (repo public))) a\n"
-   "*** (skg (node (id b) (repo public))) b\n"
-   "** (skg (node (id c) (repo public) noClaim)) c\n"
-   "*** (skg (node (id d) (repo public))) d\n"
-   "** (skg (node (id e) (repo public) writeProtected)) e\n"
-   "*** (skg (node (id f) (repo public))) f\n"
+   "* (skg node (gnid r) (skgRepos (nodeRepo public))) r\n"
+   "** (skg node (gnid a) (skgRepos (nodeRepo public))) a\n"
+   "*** (skg node (gnid b) (skgRepos (nodeRepo public))) b\n"
+   "** (skg node (gnid c) (skgRepos (nodeRepo public)) noClaim) c\n"
+   "*** (skg node (gnid d) (skgRepos (nodeRepo public))) d\n"
+   "** (skg node (gnid e) (skgRepos (nodeRepo public)) writeProtected) e\n"
+   "*** (skg node (gnid f) (skgRepos (nodeRepo public))) f\n"
    "** (skg subscribeeFolder)\n"
-   "*** (skg (node (id g) (repo public))) g\n"
-   "**** (skg (node (id h) (repo public))) h\n"
+   "*** (skg node (gnid g) (skgRepos (nodeRepo public))) g\n"
+   "**** (skg node (gnid h) (skgRepos (nodeRepo public))) h\n"
    "** (skg aliasFolder) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
 true content (a, b), an false branch (c, d), an
@@ -446,7 +446,7 @@ aliasFolder.")
   "Return the text of the buffer line whose metadata carries ID."
   (save-excursion
     (goto-char (point-min))
-    (search-forward (format "(id %s)" skgid))
+    (search-forward (format "(gnid %s)" skgid))
     (buffer-substring-no-properties
      (line-beginning-position) (line-end-position))))
 
@@ -495,7 +495,7 @@ own relationship to its view-parent."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(id a)")
+     (search-forward "(gnid a)")
      (beginning-of-line)
      (let ((count (skg--set-relRepo-recursive-walk
                    'content "trusted")))
@@ -510,10 +510,10 @@ own relationship to its view-parent."
 own content children (the member being editable) match kind
 `content' through the folder."
   (let ((tree (concat
-               "* (skg (node (id anchor) (repo public))) anchor\n"
+               "* (skg node (gnid anchor) (skgRepos (nodeRepo public))) anchor\n"
                "** (skg overriddenFolder)\n"
-               "*** (skg (node (id o) (repo public))) o\n"
-               "**** (skg (node (id oc) (repo public))) oc\n")))
+               "*** (skg node (gnid o) (skgRepos (nodeRepo public))) o\n"
+               "**** (skg node (gnid oc) (skgRepos (nodeRepo public))) oc\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
@@ -540,10 +540,10 @@ own content children (the member being editable) match kind
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id recorder) (repo public))) recorder\n"
+    "* (skg node (gnid recorder) (skgRepos (nodeRepo public))) recorder\n"
     "** (skg subscriberFolder)\n"
-    "*** (skg (node (id s) (repo public))) s\n"
-    "**** (skg (node (id sc) (repo public))) sc\n")
+    "*** (skg node (gnid s) (skgRepos (nodeRepo public))) s\n"
+    "**** (skg node (gnid sc) (skgRepos (nodeRepo public))) sc\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -559,9 +559,9 @@ save, so its members do not match -- whether the walk starts at the
 anchor (pruned below the write-protected node) or at the folder itself
 (refused by the anchor-editableness check)."
   (let ((tree (concat
-               "* (skg (node (id anchor) (repo public) writeProtected)) anchor\n"
+               "* (skg node (gnid anchor) (skgRepos (nodeRepo public)) writeProtected) anchor\n"
                "** (skg subscribeeFolder)\n"
-               "*** (skg (node (id g) (repo public))) g\n")))
+               "*** (skg node (gnid g) (skgRepos (nodeRepo public))) g\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
      (lambda ()
@@ -586,9 +586,9 @@ anchor (pruned below the write-protected node) or at the folder itself
 the subtree, while preserving display facts."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (repo public))) r\n"
-    "** (skg (node (id a) (repo public) (viewStats (relRepo trusted)) (editRequest (relRepo trusted)))) a\n"
-    "*** (skg (node (id b) (repo public) (viewStats (relRepo private)) (editRequest (relRepo private)))) b\n")
+    "* (skg node (gnid r) (skgRepos (nodeRepo public))) r\n"
+    "** (skg node (gnid a) (skgRepos (nodeRepo public) (relRepo trusted)) (editRequest (relRepo trusted))) a\n"
+    "*** (skg node (gnid b) (skgRepos (nodeRepo public) (relRepo private)) (editRequest (relRepo private))) b\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -694,9 +694,9 @@ window plumbing are stubbed as in the other handler tests."
 what a move strands, the save decides."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (repo private))) r\n"
-    "** (skg (node (id e) (repo private) writeProtected)) e\n"
-    "*** (skg (node (id f) (repo private))) f\n")
+    "* (skg node (gnid r) (skgRepos (nodeRepo private))) r\n"
+    "** (skg node (gnid e) (skgRepos (nodeRepo private)) writeProtected) e\n"
+    "*** (skg node (gnid f) (skgRepos (nodeRepo private))) f\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -717,9 +717,9 @@ what a move strands, the save decides."
                                   (string-match-p "\\*Messages\\*" m)
                                   (string-match-p "refuse" m)))
                            msgs))))
-     (should (string-match-p "(repo private)" (test--line-of-id "e")))
+     (should (string-match-p "(skgRepos (nodeRepo private))" (test--line-of-id "e")))
      (dolist (skgid '("r" "f"))
-       (should (string-match-p "(repo public)"
+       (should (string-match-p "(skgRepos (nodeRepo public))"
                                (test--line-of-id skgid)))))))
 
 (ert-deftest test-set-repo-recursive-repeat-follows-its-editable-occurrence ()
@@ -728,11 +728,11 @@ changes is left as rendered (the save ignores it) and raises no warning:
 the node does move."
   (test--with-skg-content-view
    (concat
-    "* (skg (node (id r) (repo private))) r\n"
-    "** (skg (node (id a) (repo private))) a\n"
-    "*** (skg (node (id x) (repo private))) x\n"
-    "** (skg (node (id b) (repo private))) b\n"
-    "*** (skg (node (id x) (repo private) writeProtected)) x again\n")
+    "* (skg node (gnid r) (skgRepos (nodeRepo private))) r\n"
+    "** (skg node (gnid a) (skgRepos (nodeRepo private))) a\n"
+    "*** (skg node (gnid x) (skgRepos (nodeRepo private))) x\n"
+    "** (skg node (gnid b) (skgRepos (nodeRepo private))) b\n"
+    "*** (skg node (gnid x) (skgRepos (nodeRepo private)) writeProtected) x again\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -744,9 +744,9 @@ the node does move."
                                  (or (string-match-p "not changed" m)
                                      (string-match-p "WARNING" m)))
                                msgs))))
-     (should (string-match-p "(repo trusted)" (test--line-of-id "x")))
+     (should (string-match-p "(skgRepos (nodeRepo trusted))" (test--line-of-id "x")))
      (should (string-match-p
-              "(repo private) writeProtected"
+              "(skgRepos (nodeRepo private)) writeProtected"
               (save-excursion
                 (goto-char (point-min))
                 (search-forward "x again")
@@ -756,7 +756,7 @@ the node does move."
 (ert-deftest test-set-repo-single-write-protected-warns-and-skips ()
   "A single move of a write-protected instance edits nothing and warns."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo private) writeProtected)) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo private)) writeProtected) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -766,8 +766,8 @@ the node does move."
                          (lambda () (skg-set-repo))))))
          (should (seq-find (lambda (m) (string-match-p "WARNING" m))
                            msgs))))
-     (should (string-match-p "(repo private)" (test--line-of-id "x")))
-     (should-not (string-match-p "(repo public)"
+     (should (string-match-p "(skgRepos (nodeRepo private))" (test--line-of-id "x")))
+     (should-not (string-match-p "(skgRepos (nodeRepo public))"
                                  (test--line-of-id "x"))))))
 
 (provide 'test-skg-set-relRepo)

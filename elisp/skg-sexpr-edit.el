@@ -115,7 +115,8 @@ open time; cycling a value does not refresh them."
   (when (bound-and-true-p heralds--transform-rules)
     (save-excursion
       (goto-char (point-min))
-      (let (( path nil )) ;; ((level . title) ...), outermost first
+      (let (( path nil ) ;; ((level . title) ...), outermost first
+            ( kind-atoms (skg-sexp-edit--kind-atoms-in-buffer) ))
         (while (re-search-forward "^\\(\\*+\\) \\(.*\\)$" nil t)
           (let* (( level (length (match-string 1)) )
                  ( title (string-trim
@@ -126,7 +127,7 @@ open time; cycling a value does not refresh them."
                                         path)
                           (list (cons level title))))
             (let (( herald (skg-sexp-edit--herald-for-label-path
-                            (mapcar #'cdr path)) ))
+                            (mapcar #'cdr path) kind-atoms) ))
               (when herald
                 (let (( ov (make-overlay (line-end-position)
                                          (line-end-position)) ))
@@ -134,15 +135,36 @@ open time; cycling a value does not refresh them."
                                (concat " (" herald ")"))
                   (overlay-put ov 'skg-sexp-edit-herald t))))))))))
 
-(defun skg-sexp-edit--herald-for-label-path (labels)
+(defun skg-sexp-edit--kind-atoms-in-buffer ()
+  "The kind atoms (symbols) the metadata view in the current buffer
+shows: each level-2 headline whose title is an atom of a kind in
+'shared/metadata-fields.json'. The heralds of a kind's parts fire
+only beside its atom, so each hint's object carries them."
+  (save-excursion
+    (goto-char (point-min))
+    (let (( atoms nil ))
+      (while (re-search-forward "^\\*\\* \\(.*\\)$" nil t)
+        (let (( title (string-trim
+                       (substring-no-properties (match-string 1))) ))
+          (when (skg-shared-metadata-kind title)
+            (push (intern title) atoms))))
+      (nreverse atoms))))
+
+(defun skg-sexp-edit--herald-for-label-path (labels &optional kind-atoms)
   "The herald display string for the metadata-view headline whose
 label path from the buffer's root is LABELS (title strings, outermost
 first), or nil when that path produces none. Builds a minimal object
-sexp along the path and runs the same lens engine the heralds view
-uses, so the hint matches what the content view would show."
+sexp along the path, with KIND-ATOMS beside it at the top level, and
+runs the same lens engine the heralds view uses, so the hint matches
+what the content view would show."
   (when (and (bound-and-true-p heralds--transform-rules)
              labels)
-    (let* (( object (skg-sexp-edit--nest-label-path labels) )
+    (let* (( path-object (skg-sexp-edit--nest-label-path labels) )
+           ( object (append (list (car path-object))
+                            (cl-remove-if
+                             (lambda (atom) (memq atom (cdr path-object)))
+                             kind-atoms)
+                            (cdr path-object)) )
            ( tokens (ignore-errors
                       (skg-transform-sexp-flat
                        object heralds--transform-rules)) )
@@ -152,7 +174,7 @@ uses, so the hint matches what the content view would show."
 
 (defun skg-sexp-edit--nest-label-path (labels)
   "Nest LABELS (title strings, outermost first) into an object sexp:
-the labels skg, node, writeProtected become (skg (node writeProtected))."
+the labels skg, writeProtected, true become (skg (writeProtected true))."
   (let* (( syms (mapcar #'intern labels) )
          ( acc (car (last syms)) ))
     (dolist (label (reverse (butlast syms)))
@@ -190,7 +212,8 @@ the labels skg, node, writeProtected become (skg (node writeProtected))."
 then open its metadata view.  TITLE is the headline's existing title.
 The view pre-fills the chosen repo (saving needs a repo, so the
 user confronts that choice immediately) and leaves every other editable
-field childless, so an untouched save yields just (skg (node (repo X)))."
+field childless, so an untouched save yields just
+\(skg node (skgRepos (nodeRepo X)))."
   (skg--populate-minimal-node-metadata)
   (let* (( source-buffer (current-buffer) )
          ( headline (skg-get-current-headline-text) )
@@ -205,11 +228,11 @@ field childless, so an untouched save yields just (skg (node (repo X)))."
     (skg-sexp-edit--open-edit-buffer
      org-text source-buffer sexp-start sexp-end
      (skg-shared-metadata-kind "node"))
-    (skg-sexp-edit--goto-field-value "repo")))
+    (skg-sexp-edit--goto-field-value "nodeRepo")))
 
 (defun skg-view-metadata--empty-node-org-text (skgrepo title)
   "Build org text for the empty-node metadata view.
-REPO is pre-filled under the `repo' field.  TITLE, if non-blank,
+REPO is pre-filled under the `nodeRepo' of `skgRepos'.  TITLE, if non-blank,
 appears under a display-only `title' group; otherwise `title' is shown
 childless.  Every editable field other than repo appears childless,
 so the strip step (`skg-metadata-fields-strip-defaults-from-org') drops the
@@ -222,10 +245,11 @@ ones the user never populates -- key and all."
          ( node-skeleton
            (append (list (cons 1 "skg")
                          (cons 2 "node")
-                         (cons 3 "repo")
+                         (cons 2 "skgRepos")
+                         (cons 3 "nodeRepo")
                          (cons 4 skgrepo))
                    (mapcar (lambda (field)
-                             (cons 3 field))
+                             (cons 2 field))
                            (skg-metadata-fields-field-names
                             (skg-shared-metadata-kind "node")))) ))
     (skg-headlines-to-org
@@ -269,18 +293,23 @@ walk ends at a tombstone or a property."
       nil)))
 
 (defun skg--headline-kind-at-point ()
-  "The kind of the headline at point, as the symbol that heads its
-metadata after the markers 'focused', 'folded' and 'bodyFolded'
-(node, ghost, tombstone, aliasFolder, alias ...), or nil for a
-headline without metadata."
+  "The kind of the headline at point, as its kind atom among the
+top-level elements of its metadata, bare or heading a list (node,
+ghost, tombstone, aliasFolder, alias ...; see
+'shared/metadata-fields.json'); `node' for metadata that names no
+kind, which the server reads as a node's; nil for a headline without
+metadata."
   (let* (( split (skg-split-as-stars-metadata-title
                   (skg-get-current-headline-text)) )
          ( metadata-str (and split (cadr split)) ))
     (when (and metadata-str (not (string-empty-p metadata-str)))
-      (let (( kind (seq-find (lambda (form)
-                               (not (memq form '(focused folded bodyFolded))))
-                             (cdr (read metadata-str))) ))
-        (if (consp kind) (car kind) kind)))))
+      (or (seq-some (lambda (element)
+                      (let (( atom (if (consp element) (car element) element) ))
+                        (and atom (symbolp atom)
+                             (skg-shared-metadata-kind (symbol-name atom))
+                             atom)))
+                    (cdr (read metadata-str)))
+          'node))))
 
 (advice-add 'org-insert-heading-respect-content :after
             #'skg-sexp-edit--after-insert-headline)
@@ -294,7 +323,8 @@ headline without metadata."
 Opens a temporary org buffer with the sexp converted to org headlines,
 showing each field a user may set on the headline's kind
 ('shared/metadata-fields.json'), at its default when it is absent.
-If the headline has no metadata, populates a minimal (skg (node (repo X)))
+If the headline has no metadata, populates a minimal
+\(skg node (skgRepos (nodeRepo X)))
 in place and opens the empty-node view over it -- repo pre-filled, the
 other editable fields childless (see `skg-view-metadata--open-empty-node-view').
 Use C-c C-c to save changes back to the source buffer.
@@ -326,6 +356,6 @@ Kill the buffer to cancel without saving."
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer
            org-text source-buffer sexp-start sexp-end kind)
-          (skg-sexp-edit--goto-field-value "repo"))))))
+          (skg-sexp-edit--goto-field-value "nodeRepo"))))))
 
 (provide 'skg-sexpr-edit)

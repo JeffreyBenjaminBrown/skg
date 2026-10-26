@@ -131,11 +131,11 @@
 
 (ert-deftest test-fork-repos-from-confirmation-buffer-walks-two-levels ()
   "skg--fork-repos-from-confirmation-buffer pairs each clone-to-be
-parent's (repo X) with each child's (id N)."
+parent's (skgRepos (nodeRepo X)) with each child's (gnid N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
-    (insert "* (skg (node (repo owned2) (viewStats (homeRepoHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (repo foreign) noClaim writeProtected (rels \"aO\"))) N-original\n")
+    (insert "* (skg node (skgRepos (nodeRepo owned2)) (viewStats (homeRepoHerald ⌂:owned2))) N-edited\n")
+    (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected (rels \"aO\")) N-original\n")
     (org-mode)
     (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
@@ -144,11 +144,11 @@ parent's (repo X) with each child's (id N)."
   "A metadata-less level-1 headline must not leak the previous clone's
 repo to a later fork's child (parent-repo resets on every level 1)."
   (with-temp-buffer
-    (insert "* (skg (node (repo ownedA))) A-edited\n")
-    (insert "** (skg (node (id N1) (repo foreign) writeProtected)) N1-original\n")
+    (insert "* (skg node (skgRepos (nodeRepo ownedA))) A-edited\n")
+    (insert "** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1-original\n")
     ;; A stray/garbled level-1 headline with no skg metadata.
     (insert "* plain headline, no metadata\n")
-    (insert "** (skg (node (id N2) (repo foreign) writeProtected)) N2-original\n")
+    (insert "** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2-original\n")
     (org-mode)
     ;; N1 -> ownedA; N2 must not inherit ownedA (its parent has no skgrepo).
     (should (equal (skg--fork-repos-from-confirmation-buffer)
@@ -162,7 +162,7 @@ ordinary-save refusal on C-x C-s."
   (let ((source (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) noClaim writeProtected (rels \"aO\"))) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg node (skgRepos (nodeRepo owned))) N-edited\n** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected (rels \"aO\")) N-original\n"
                     source)))
           (unwind-protect
               (with-current-buffer buf
@@ -170,7 +170,7 @@ ordinary-save refusal on C-x C-s."
                 (should (null skg-view-id))
                 (should (eq skg--fork-source-buffer source))
                 (should (derived-mode-p 'skg-content-view-mode))
-                (should (string-match-p "(id N)" (buffer-string)))
+                (should (string-match-p "(gnid N)" (buffer-string)))
                 ;; approve / decline / save-refusal are reachable
                 (should (eq (key-binding (kbd "C-c C-c")) #'skg-approve-fork))
                 (should (eq (key-binding (kbd "C-c C-k")) #'skg-decline-fork))
@@ -189,7 +189,7 @@ ordinary-save refusal on C-x C-s."
           (when (get-buffer result-name) (kill-buffer result-name))
           (setq confirm
                 (skg--show-fork-confirmation
-                 "* (skg (node (repo owned))) N-edited\n** (skg (node (id N) (repo foreign) writeProtected)) N-original\n"
+                 "* (skg node (skgRepos (nodeRepo owned))) N-edited\n** (skg node (gnid N) (skgRepos (nodeRepo foreign)) writeProtected) N-original\n"
                  source))
           (setq confirm-window (get-buffer-window confirm t))
           (should (window-live-p confirm-window))
@@ -224,7 +224,7 @@ ordinary-save refusal on C-x C-s."
 skg-content-view-mode-map (which would break C-x C-s in real views)."
   (let ((source (generate-new-buffer "*fork-origin-3*")))
     (let ((buf (skg--show-fork-confirmation
-                "* (skg (node (repo owned))) N-edited\n"
+                "* (skg node (skgRepos (nodeRepo owned))) N-edited\n"
                 source)))
       (unwind-protect
           (should (eq (lookup-key skg-content-view-mode-map (kbd "C-x C-s"))
@@ -240,8 +240,8 @@ clone) as the default, and writes the choice into the metadata."
     (insert "* Fork confirmation -- what this buffer is\n")
     (insert "Some explanation.\n")
     (insert "# Suggested repo for the clone below: owned2\n")
-    (insert "* (skg (node (repo PICK-A-REPO) (viewStats (homeRepoHerald ⌂:PICK-A-REPO)))) N-edited\n")
-    (insert "** (skg (node (id N) (repo foreign) noClaim writeProtected)) N-original\n")
+    (insert "* (skg node (skgRepos (nodeRepo PICK-A-REPO)) (viewStats (homeRepoHerald ⌂:PICK-A-REPO))) N-edited\n")
+    (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected) N-original\n")
     (org-mode)
     (let ((offered-defaults nil))
       (cl-letf (((symbol-function 'skg--owned-repos)
@@ -253,28 +253,28 @@ clone) as the default, and writes the choice into the metadata."
                    def))) ;; the user accepts the default
         (skg--fork-choose-placeholder-repos))
       (should (equal offered-defaults '("owned2")))
-      (should (string-match-p "(repo owned2)" (buffer-string)))
+      (should (string-match-p "(skgRepos (nodeRepo owned2))" (buffer-string)))
       (should (string-match-p "⌂:owned2" (buffer-string)))
-      (should-not (string-match-p "(repo PICK-A-REPO)"
+      (should-not (string-match-p "(skgRepos (nodeRepo PICK-A-REPO))"
                                   (buffer-string))))))
 
 (ert-deftest test-fork-choose-placeholder-repos-skips-specified-clones ()
   "A clone whose repo is already real (the user specified it in the
 saved metadata, so the server omitted the placeholder) prompts nothing."
   (with-temp-buffer
-    (insert "* (skg (node (repo owned2) (viewStats (homeRepoHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (repo foreign) noClaim writeProtected)) N-original\n")
+    (insert "* (skg node (skgRepos (nodeRepo owned2)) (viewStats (homeRepoHerald ⌂:owned2))) N-edited\n")
+    (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected) N-original\n")
     (org-mode)
     (cl-letf (((symbol-function 'skg--completing-read-with-cycle)
                (lambda (&rest _)
                  (error "must not prompt for a specified repo"))))
       (skg--fork-choose-placeholder-repos))
-    (should (string-match-p "(repo owned2)" (buffer-string)))))
+    (should (string-match-p "(skgRepos (nodeRepo owned2))" (buffer-string)))))
 
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."
   (let ((source (generate-new-buffer "*fork-origin-2*")))
-    (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (repo foreign) writeProtected)) N\n"
+    (let ((buf (skg--show-fork-confirmation "* (skg node (gnid N) (skgRepos (nodeRepo foreign)) writeProtected) N\n"
                                             source)))
       (kill-buffer source) ;; source dies before approval
       (unwind-protect

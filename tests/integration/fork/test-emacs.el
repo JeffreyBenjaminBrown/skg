@@ -13,13 +13,13 @@
   (kill-emacs 1))
 
 (defun fork-test--buffer-showing (skgid)
-  "Return a live skg view buffer whose text mentions (id ID)."
+  "Return a live skg view buffer whose text mentions (gnid ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-id) skg-view-id
-                 (string-match-p (regexp-quote (format "(id %s)" skgid))
+                 (string-match-p (regexp-quote (format "(gnid %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))
@@ -37,7 +37,7 @@
                                 (line-beginning-position)
                                 (line-end-position))))
                      (string-match-p
-                      (regexp-quote (format "(id %s)" skgid)) line)))))))
+                      (regexp-quote (format "(gnid %s)" skgid)) line)))))))
    (buffer-list)))
 
 (defun fork-test--line-containing (needle)
@@ -64,7 +64,7 @@
             (lambda () (fork-test--root-buffer "F")) 10))
     (unless fork-buffer (test-fail "F's root view never appeared"))
     (with-current-buffer fork-buffer
-      (unless (string-match-p "(id O)" (buffer-string))
+      (unless (string-match-p "(gnid O)" (buffer-string))
         (test-fail "F's view does not expose its existing child O:\n%s"
                    (buffer-string))))
 
@@ -72,7 +72,7 @@
     ;; F to N.  The bare node must inherit the eventual clone skgrepo.
     (with-current-buffer fork-buffer
       (goto-char (point-min))
-      (unless (re-search-forward "^\\*\\* .*?(id O).*$" nil t)
+      (unless (re-search-forward "^\\*\\* .*?(gnid O).*$" nil t)
         (test-fail "could not find O directly under F:\n%s"
                    (buffer-string)))
       (let ((o-line (buffer-substring-no-properties
@@ -94,11 +94,11 @@
             (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
       (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
       (with-current-buffer confirm-buf
-        (unless (string-match-p "(id F)" (buffer-string))
+        (unless (string-match-p "(gnid F)" (buffer-string))
           (test-fail "confirmation buffer does not list F:\n%s"
                      (buffer-string)))
         (goto-char (point-min))
-        (unless (re-search-forward "^\\* (skg (node (repo " nil t)
+        (unless (re-search-forward "^\\* (skg node (skgRepos (nodeRepo " nil t)
           (test-fail "could not find clone-to-be repo headline:\n%s"
                      (buffer-string)))
         (beginning-of-line)
@@ -154,7 +154,7 @@
       (let ((k-line (buffer-substring-no-properties
                      (line-beginning-position) (line-end-position))))
           (unless (and k-line
-                       (string-match "(id \\([^ )]+\\))" k-line)
+                       (string-match "(gnid \\([^ )]+\\))" k-line)
                        (string-match-p "(overridesHere F)" k-line)
                        (string-match-p "(subscribesTo (out 1))" k-line)
                        (string-match-p "(overrides (out 1))" k-line))
@@ -162,14 +162,14 @@
                        (buffer-string)))
         (setq k-skgid (match-string 1 k-line)))
       (unless (re-search-forward
-               "^\\*\\* .*?(id \\([^ )]+\\)).* N-new$" nil t)
+               "^\\*\\* .*?(gnid \\([^ )]+\\)).* N-new$" nil t)
         (test-fail "K does not contain the new N:\n%s" (buffer-string)))
       (setq n-skgid (match-string 1))
-      (unless (re-search-forward "^\\*\\*\\* .*?(id O).* O-original$"
+      (unless (re-search-forward "^\\*\\*\\* .*?(gnid O).* O-original$"
                                  nil t)
         (test-fail "N does not contain O:\n%s" (buffer-string)))
       (goto-char (point-min))
-      (when (re-search-forward "^\\*\\* .*?(id O).* O-original$" nil t)
+      (when (re-search-forward "^\\*\\* .*?(gnid O).* O-original$" nil t)
         (test-fail "K still contains O directly:\n%s" (buffer-string))))
 
     ;; 6. Fresh graph-derived views verify all three nodes independently:
@@ -197,7 +197,7 @@
       (with-current-buffer k-buf
         (unless (and (string-match-p "F-original" (buffer-string))
                      (string-match-p "^\\*\\* .* N-new$" (buffer-string))
-                     (not (string-match-p "^\\*\\* .*?(id O).* O-original$"
+                     (not (string-match-p "^\\*\\* .*?(gnid O).* O-original$"
                                           (buffer-string))))
           (test-fail "K is not F-with-N-in-place-of-O:\n%s"
                      (buffer-string)))))
@@ -207,7 +207,7 @@
            (skg-test-wait-for (lambda () (fork-test--root-buffer n-skgid)) 10)))
       (unless n-buf (test-fail "fresh N view never appeared"))
       (with-current-buffer n-buf
-        (unless (string-match-p "^\\*\\* .*?(id O).* O-original$"
+        (unless (string-match-p "^\\*\\* .*?(gnid O).* O-original$"
                                 (buffer-string))
           (test-fail "N's graph view does not contain O:\n%s"
                      (buffer-string)))))

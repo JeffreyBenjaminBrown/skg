@@ -17,7 +17,7 @@ Does not save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if recursive
       (skg-delete-recursive)
-    (skg-edit-metadata-at-point '(skg (node (editRequest delete))))
+    (skg-edit-metadata-at-point '(skg node (editRequest delete)))
     (forward-line)
     (message "This change will only be applied when you save the buffer.")))
 
@@ -32,7 +32,7 @@ call `skg-request-save-buffer' afterward."
   (save-excursion
     (let ((start-level (org-outline-level)))
       (skg-edit-metadata-at-point
-       '(skg (node (editRequest delete)))) ;; mark this one
+       '(skg node (editRequest delete))) ;; mark this one
       (outline-next-heading)
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
@@ -40,9 +40,9 @@ call `skg-request-save-buffer' afterward."
                        (skg-get-current-headline-text)))
                (meta (and parts (nth 1 parts))))
           (when (and meta (not (string-empty-p meta))
-                     (skg-sexp-subtree-p (read meta) '(skg (node))))
+                     (skg-sexp-subtree-p (read meta) '(skg node)))
             (skg-edit-metadata-at-point ;; mark a descendent
-             '(skg (node (editRequest delete))))))
+             '(skg node (editRequest delete)))))
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
@@ -99,7 +99,7 @@ If there is no active region, do nothing."
 (defun skg--current-node-repo ()
   "Return the repo string for the UnrestrictedVognode headline at point."
   (let* ((sexp (skg--current-headline-metadata-sexp))
-         (repo-values (skg-sexp-cdr-at-path sexp '(skg node repo))))
+         (repo-values (skg-sexp-cdr-at-path sexp '(skg skgRepos nodeRepo))))
     (unless repo-values
       (user-error "Node has no repo"))
     (format "%s" (car repo-values))))
@@ -114,12 +114,12 @@ If there is no active region, do nothing."
 (defun skg--populate-minimal-node-metadata ()
   "Write minimal UnrestrictedVognode metadata onto the metadata-less headline at point.
 Prompts for an owned repo (no prompt when only one repo is owned)
-and inserts (skg (node (repo REPO))).  Returns the chosen repo.
+and inserts (skg node (skgRepos (nodeRepo REPO))).  Returns the chosen repo.
 Reuses `skg-edit-metadata-at-point', which formats and spaces the sexp
 correctly relative to the existing title."
   (let (( skgrepo (skg--prompt-for-owned-repo) ))
     (skg-edit-metadata-at-point
-     `(skg (node (repo ,(intern skgrepo)))))
+     `(skg node (skgRepos (nodeRepo ,(intern skgrepo)))))
     skgrepo))
 
 (defun skg-set-repo (&optional recursive)
@@ -286,36 +286,26 @@ member of a write-protected folder, or with an ID missing."
              "The parent headline is neither a node nor a writable folder")))))))
 
 (defun skg--relRepo-current-value ()
-  "Return the displayed `(relRepo NAME)' fact at point, if any."
-  (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
-         (alias-p (memq 'alias (cdr metadata)))
-         (unknown-p (skg--unknown-headline-p metadata))
-         (values (skg-sexp-cdr-at-path
-                  metadata
-                  (cond (alias-p '(skg relRepo))
-                        (unknown-p '(skg unknown viewStats relRepo))
-                        (t '(skg node viewStats relRepo))))))
+  "Return the displayed `(skgRepos (relRepo NAME))' fact at point, if any."
+  (let ((values (skg-sexp-cdr-at-path
+                 (or (skg--metadata-sexp-at-point-or-nil) '(skg))
+                 '(skg skgRepos relRepo))))
     (when values
       (format "%s" (car values)))))
 
 (defun skg--relRepo-requested-value ()
   "Return the pending `(editRequest (relRepo NAME))' value at point."
-  (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
-         (alias-p (memq 'alias (cdr metadata)))
-         (unknown-p (skg--unknown-headline-p metadata))
-         (values (skg-sexp-cdr-at-path
-                  metadata
-                  (cond (alias-p '(skg editRequest relRepo))
-                        (unknown-p '(skg unknown editRequest relRepo))
-                        (t '(skg node editRequest relRepo))))))
+  (let ((values (skg-sexp-cdr-at-path
+                 (or (skg--metadata-sexp-at-point-or-nil) '(skg))
+                 '(skg editRequest relRepo))))
     (when values
       (format "%s" (car values)))))
 
 (defun skg--node-edit-request-at-point-p ()
   "Whether the Unrestricted headline at point already requests delete or merge."
-  (let ((values (skg-sexp-cdr-at-path
-                 (or (skg--metadata-sexp-at-point-or-nil) '(skg))
-                 '(skg node editRequest))))
+  (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
+         (values (and (skg--unrestrictedNode-sexp-p metadata)
+                      (skg-sexp-cdr-at-path metadata '(skg editRequest)))))
     (and values
          (not (and (consp (car values))
                    (eq (caar values) 'relRepo))))))
@@ -353,34 +343,22 @@ next save will do with the relationship."
   (if (equal choice skg--relRepo-no-override)
       (if (skg--relRepo-requested-value)
           (progn
-            (cond
-             ((skg--alias-headline-p)
-              (skg-edit-metadata-at-point
-               '(skg (DELETE (editRequest)))))
-             ((skg--unknown-headline-p
-               (skg--metadata-sexp-at-point-or-nil))
-              (skg-edit-metadata-at-point
-               '(skg (unknown (DELETE (editRequest))))))
-             (t
-              ;; The display fact stays under viewStats; only the request goes.
-              (skg-edit-metadata-at-point
-               '(skg (node (DELETE (editRequest)))))))
+            ;; The displayed relRepo stays under skgRepos; only the request goes.
+            (skg-edit-metadata-at-point
+             '(skg (DELETE (editRequest))))
             "Override removed: on save the membership keeps its saved (sticky) relRepo, or its default if new. Save to apply.")
         "No override present; nothing to remove.")
     (progn
       (cond
-       ((skg--alias-headline-p)
+       ((or (skg--alias-headline-p)
+            (skg--unknown-headline-p
+             (skg--metadata-sexp-at-point-or-nil)))
         (skg-edit-metadata-at-point
          `(skg (ENSURE (editRequest (relRepo ,(intern choice)))))))
-        ((skg--unknown-headline-p
-         (skg--metadata-sexp-at-point-or-nil))
-        (skg-edit-metadata-at-point
-         `(skg (unknown (ENSURE (editRequest (relRepo ,(intern choice))))))))
        (t
-        ;; The display fact remains under viewStats; skgrepo intent is separate.
-        (skg-edit-metadata-at-point '(skg (node (editRequest))))
+        ;; The displayed relRepo remains under skgRepos; skgrepo intent is separate.
         (skg-edit-metadata-at-point
-         `(skg (node (editRequest (ENSURE (relRepo ,(intern choice)))))))))
+         `(skg node (ENSURE (editRequest (relRepo ,(intern choice))))))))
       (format "relRepo set to '%s'. Save to apply."
               choice))))
 
@@ -698,8 +676,9 @@ Does not save; call `skg-request-save-buffer' afterward."
     (when (string-empty-p acquiree-skgid)
       (user-error "Acquiree ID cannot be empty"))
     (skg-edit-metadata-at-point
-     `(skg (node (DELETE (editRequest))
-                 (editRequest (merge ,(intern acquiree-skgid))))))
+     `(skg node
+           (DELETE (editRequest))
+           (editRequest (merge ,(intern acquiree-skgid)))))
     (message "Merge request set for acquiree %s. Save to apply."
              acquiree-skgid)))
 
@@ -729,8 +708,9 @@ Does not save; call `skg-request-save-buffer' afterward."
   (unless (skg--ghost-sexp-p (skg--metadata-sexp-at-point-or-nil))
     (user-error "%s" skg--restore-node-on-a-node-not-deleted))
   (skg-edit-metadata-at-point
-   '(skg (ghost (DELETE (editRequest))
-                (editRequest restoreNode))))
+   '(skg ghost
+         (DELETE (editRequest))
+         (editRequest restoreNode)))
   (message "Restore request set. Save to apply."))
 
 (defun skg-restore-removed-membership ()
@@ -750,8 +730,9 @@ Does not save; call `skg-request-save-buffer' afterward."
                      (skg--restoreRel-position-at-point-p)))
            (user-error "%s" skg--restore-rel-without-a-removed-membership)))
     (skg-edit-metadata-at-point
-     '(skg (node (DELETE (editRequest))
-                 (editRequest restoreRel))))
+     '(skg node
+           (DELETE (editRequest))
+           (editRequest restoreRel)))
     (message "Restore request set. Save to apply.")))
 
 (defun skg--removed-membership-p (metadata-sexp)
@@ -760,7 +741,7 @@ Does not save; call `skg-request-save-buffer' afterward."
 may sit on it depends also on where it stands
 (`skg--restoreRel-position-at-point-p')."
   (and (skg--unrestrictedNode-sexp-p metadata-sexp)
-       (equal (skg-sexp-cdr-at-path metadata-sexp '(skg node diff rel))
+       (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
               '(removed))))
 
 (defun skg--restoreRel-position-at-point-p ()
@@ -832,13 +813,13 @@ a ghost or an unknown."
   (and (consp metadata-sexp)
        (or (skg--unrestrictedNode-sexp-p metadata-sexp)
            (skg--ghost-sexp-p metadata-sexp)
-           (skg-sexp-subtree-p metadata-sexp '(skg (unknown))))))
+           (skg--unknown-headline-p metadata-sexp))))
 
 (defun skg--ghost-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a ghost's: a node of the diff view that
-HEAD has and the worktree lacks, '(skg (ghost (gnid X) ...))'."
+HEAD has and the worktree lacks, '(skg ghost (gnid X) ...)'."
   (and (consp metadata-sexp)
-       (skg-sexp-subtree-p metadata-sexp '(skg (ghost)))))
+       (skg-sexp-subtree-p metadata-sexp '(skg ghost))))
 
 (defun skg--read-id-or-link (prompt)
   "Read an ID or link with linkstack paste/pop bindings in the minibuffer."
@@ -936,62 +917,66 @@ OLD-REPO. Restores point afterward."
 (defun skg--unrestrictedNode-sexp-p (metadata-sexp)
   "Return non-nil if METADATA-SEXP describes an UnrestrictedVognode."
   (and metadata-sexp
-       (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
+       (skg-sexp-subtree-p metadata-sexp '(skg node))))
 
 (defun skg--node-member-p (metadata-sexp)
   "Return non-nil unless METADATA-SEXP carries the bare noClaim atom.
 A member carries nothing."
-  (not (skg-sexp-subtree-p metadata-sexp '(skg (node noClaim)))))
+  (not (skg-sexp-subtree-p metadata-sexp '(skg noClaim))))
 
 (defun skg--node-repo (metadata-sexp)
   "Return METADATA-SEXP's node repo as a string, or nil."
   (let ((repo-values (skg-sexp-cdr-at-path metadata-sexp
-                                             '(skg node repo))))
+                                             '(skg skgRepos nodeRepo))))
     (when repo-values
       (format "%s" (car repo-values)))))
 
-(defun skg--node-id (metadata-sexp)
-  "Return METADATA-SEXP's node ID as a string, or nil."
-  (let ((id-values (skg-sexp-cdr-at-path metadata-sexp
-                                         '(skg node id))))
+(defun skg--metadata-gnid (metadata-sexp)
+  "Return METADATA-SEXP's '(gnid X)' value as a string, whatever the
+headline's kind, or nil."
+  (let ((id-values (skg-sexp-cdr-at-path metadata-sexp '(skg gnid))))
     (when id-values
       (format "%s" (car id-values)))))
+
+(defun skg--node-id (metadata-sexp)
+  "Return METADATA-SEXP's node ID as a string, or nil (also when
+METADATA-SEXP is not an UnrestrictedVognode's)."
+  (and (skg--unrestrictedNode-sexp-p metadata-sexp)
+       (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-headline-p (metadata-sexp)
   "Return non-nil when METADATA-SEXP is an Unknown phantom."
   (and metadata-sexp
-       (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))))
+       (skg-sexp-subtree-p metadata-sexp '(skg unknown))))
 
 (defun skg--relationship-member-id (metadata-sexp)
   "Return the raw member ID for an UnrestrictedVognode or Unknown headline."
-  (or (skg--node-id metadata-sexp)
-      (let ((id-values (skg-sexp-cdr-at-path metadata-sexp
-                                              '(skg unknown id))))
-        (when id-values
-          (format "%s" (car id-values))))))
+  (and (or (skg--unrestrictedNode-sexp-p metadata-sexp)
+           (skg--unknown-headline-p metadata-sexp))
+       (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-node-id-at-point ()
   "The ID of the unknown phantom whose headline is at point, or nil."
   (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
     (when (skg--unknown-headline-p metadata)
-      (let ((id-values (skg-sexp-cdr-at-path metadata '(skg unknown id))))
-        (when id-values (format "%s" (car id-values)))))))
+      (skg--metadata-gnid metadata))))
 
 (defun skg--node-write-protected-p (metadata-sexp)
   "Return non-nil if METADATA-SEXP has the bare UnrestrictedVognode writeProtected atom."
-  (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))
+  (skg-sexp-subtree-p metadata-sexp '(skg node writeProtected)))
 
 (defun skg--change-repo-at-point (new-skgrepo)
   "Set the repo at point to NEW-REPO.
 Returns 1 if the current line was edited."
   (skg-edit-metadata-at-point
-   `(skg (node (ENSURE (repo ,(intern new-skgrepo)))
-               (viewStats))))
+   `(skg (skgRepos)
+         (skgRepos (ENSURE (nodeRepo ,(intern new-skgrepo))))
+         (viewStats)))
   (skg-edit-metadata-at-point
-   `(skg (node (viewStats
-                (ENSURE
-                 (homeRepoHerald ,(intern
-                                  (format "⌂:%s" new-skgrepo))))))))
+   `(skg (viewStats
+          (ENSURE
+           (homeRepoHerald ,(intern
+                            (format "⌂:%s" new-skgrepo)))))))
   1)
 
 (defun skg-parse-headline-metadata (headline-text)
@@ -1070,27 +1055,20 @@ checks\" entry in PITFALLs.org."
            (skg-format-headline stars new-metadata-sexp title)))))))
 
 (defun skg--remove-fork-from-viewrequests (host-sexp)
-  "Return HOST-SEXP with the `fork' symbol removed from its node's
+  "Return HOST-SEXP with the `fork' symbol removed from its
 \(viewRequests ...) form, dropping that form entirely if it becomes empty.
-HOST-SEXP is a (skg (node ...) ...) sexp. The result is `equal' to
+HOST-SEXP is a (skg ...) sexp. The result is `equal' to
 HOST-SEXP when there was no fork request, so callers can detect a no-op."
   (cons
    'skg
-   (mapcar
-    (lambda (elem)
-      (if (and (consp elem) (eq (car elem) 'node))
-          (cons 'node
-                (delq nil
-                      (mapcar
-                       (lambda (ne)
-                         (if (and (consp ne) (eq (car ne) 'viewRequests))
-                             (let ((kept (delq 'fork
-                                               (copy-sequence (cdr ne)))))
-                               (and kept (cons 'viewRequests kept)))
-                           ne))
-                       (cdr elem))))
-        elem))
-    (cdr host-sexp))))
+   (delq nil
+         (mapcar
+          (lambda (elem)
+            (if (and (consp elem) (eq (car elem) 'viewRequests))
+                (let ((kept (delq 'fork (copy-sequence (cdr elem)))))
+                  (and kept (cons 'viewRequests kept)))
+              elem))
+          (cdr host-sexp)))))
 
 (defun skg-strip-fork-requests-in-buffer ()
   "Remove every (viewRequests ... fork ...) fork request from the headlines

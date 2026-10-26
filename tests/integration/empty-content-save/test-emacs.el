@@ -1,5 +1,5 @@
 ;;; If we open an empty skg buffer,
-;;; enter the line '* (skg (node (id 1))) 1', and save,
+;;; enter the line '* (skg node (gnid 1)) 1', and save,
 ;;; the result should be saved to 'data/owned/skg/1.skg'.
 
 (load-file "../../../elisp/skg-init.el")
@@ -25,7 +25,7 @@
 
   (with-current-buffer "*skg-empty*"
     (erase-buffer)
-    (insert "* (skg (node (id 1) (repo main))) 1\n")
+    (insert "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n")
     (goto-char (point-min))
     (setq integration-test-phase "save-buffer")
     (skg-request-save-buffer))

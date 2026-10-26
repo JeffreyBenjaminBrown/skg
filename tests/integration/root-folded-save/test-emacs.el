@@ -43,15 +43,15 @@
       (let ((inhibit-read-only t)) (erase-buffer))
       (insert
        (concat
-        "* (skg (node (id rfs-root) (repo main))) rfs-root\n"
+        "* (skg node (gnid rfs-root) (skgRepos (nodeRepo main))) rfs-root\n"
         "rfs-root body\n"
-        "** (skg (node (id rfs-c1) (repo main))) rfs-c1\n"
+        "** (skg node (gnid rfs-c1) (skgRepos (nodeRepo main))) rfs-c1\n"
         "rfs-c1 body\n"
-        "** (skg (node (id rfs-c2) (repo main))) rfs-c2\n"
+        "** (skg node (gnid rfs-c2) (skgRepos (nodeRepo main))) rfs-c2\n"
         "rfs-c2 body\n"
-        "*** (skg (node (id rfs-g1) (repo main))) rfs-g1\n"
+        "*** (skg node (gnid rfs-g1) (skgRepos (nodeRepo main))) rfs-g1\n"
         "rfs-g1 body\n"
-        "** (skg (node (id rfs-c3) (repo main))) rfs-c3\n"
+        "** (skg node (gnid rfs-c3) (skgRepos (nodeRepo main))) rfs-c3\n"
         "rfs-c3 body\n"))
       (skg-content-view-mode)
       (setq skg-view-id (org-id-uuid))
@@ -90,7 +90,7 @@
         (message "%s" result)
         (message "First line: %s" first-line)
 
-        (unless (string-match-p "(id rfs-root)" result)
+        (unless (string-match-p "(gnid rfs-root)" result)
           (fail "Result lost the root headline. First line: %s" first-line))
         (unless (string-match-p "^\\* " first-line)
           (fail "First line is not a level-1 headline: %s" first-line))

@@ -11,11 +11,11 @@
   (let* ((imaginary-from-rust "* 1
 1 body
 ** 11
-*** (skg folded (node (id 1))) 111
-*** (skg folded (node (id 2) writeProtected)) 112
+*** (skg folded node (gnid 1)) 111
+*** (skg folded node (gnid 2) writeProtected) 112
 ** 12
 12 body
-*** (skg folded (node (id 3))) 121
+*** (skg folded node (gnid 3)) 121
 121 body
 *** 122
 ** 13")
@@ -37,11 +37,11 @@
             "* 1
 1 body
 ** 11
-*** (skg (node (id 1)) folded) 111
-*** (skg (node (id 2) writeProtected) folded) 112
+*** (skg node (gnid 1) folded) 111
+*** (skg node (gnid 2) writeProtected folded) 112
 ** 12
 12 body
-*** (skg (node (id 3)) folded) 121
+*** (skg node (gnid 3) folded) 121
 121 body
 *** (skg folded) 122
 ** 13")

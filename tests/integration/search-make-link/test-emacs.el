@@ -89,7 +89,7 @@ park point on that blank line. Return the point position."
       (unless skg-search-make-link-mode
         (fail "search buffer was not in skg-search-make-link-mode"))
       (goto-char (point-min))
-      (unless (re-search-forward "(id target)" nil t)
+      (unless (re-search-forward "(gnid target)" nil t)
         (fail "target result not present in search buffer; got:\n%s"
               (buffer-substring-no-properties
                (point-min) (point-max))))

@@ -27,7 +27,7 @@ the sent requests (newest first) and the handlers."
   (with-temp-buffer
     (skg-content-view-mode)
     (setq-local skg-view-id "diff-view: all changes")
-    (insert "* (skg (node (id a))) a\n")
+    (insert "* (skg node (gnid a)) a\n")
     (set-buffer-modified-p t)
     (test--integrate-unshown-changes-run
      (lambda (sent _handlers)
@@ -40,7 +40,7 @@ the sent requests (newest first) and the handlers."
   (with-temp-buffer
     (skg-content-view-mode)
     (setq-local skg-view-id "diff-view: all changes")
-    (insert "* (skg (node (id a))) a\n")
+    (insert "* (skg node (gnid a)) a\n")
     (set-buffer-modified-p nil)
     (test--integrate-unshown-changes-run
      (lambda (sent handlers)

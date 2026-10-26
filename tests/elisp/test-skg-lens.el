@@ -250,4 +250,58 @@ token per match."
                         (addedR "R"))))
                  '("stage:-N" "stage:R"))))
 
+;;
+;; WHEN directive
+;;
+
+(ert-deftest test-skg-transform-sexp-flat-when-applies-children-to-the-object ()
+  "A WHEN rule whose label stands in OBJECT, as an atom or as the
+head of a list, applies its children to OBJECT itself and emits
+their outputs in order, prefixed by any literal string."
+  (should (equal (skg-transform-sexp-flat
+                  '(a k (b 1) (c 2))
+                  '(a (WHEN k (b (ANY x IT)) (c (ANY y IT)))))
+                 '("x:1" "y:2")))
+  (should (equal (skg-transform-sexp-flat
+                  '(a (k changed) (b 1))
+                  '(a (WHEN k (b (ANY x IT)))))
+                 '("x:1")))
+  (should (equal (skg-transform-sexp-flat
+                  '(a k (b 1))
+                  '(a (WHEN k "P" (b (ANY IT)))))
+                 '("P1"))))
+
+(ert-deftest test-skg-transform-sexp-flat-when-any-of-several-labels ()
+  "A WHEN rule naming several labels fires when any one of them
+stands in OBJECT, and fires once even if several do."
+  (should (equal (skg-transform-sexp-flat
+                  '(a m (b 1))
+                  '(a (WHEN k m (b (ANY IT)))))
+                 '("1")))
+  (should (equal (skg-transform-sexp-flat
+                  '(a k m (b 1))
+                  '(a (WHEN k m (b (ANY IT)))))
+                 '("1"))))
+
+(ert-deftest test-skg-transform-sexp-flat-when-skipped-if-no-label ()
+  "A WHEN rule none of whose labels stands in OBJECT emits nothing,
+not even its literal prefix; a label found only deeper does not
+count."
+  (should (equal (skg-transform-sexp-flat
+                  '(a j (b 1))
+                  '(a (WHEN k "P" (b (ANY x IT)))))
+                 '()))
+  (should (equal (skg-transform-sexp-flat
+                  '(a (b k))
+                  '(a (WHEN k (b (ANY x IT)))))
+                 '())))
+
+(ert-deftest test-skg-transform-sexp-flat-when-children-keep-their-styles ()
+  "Styles inside a WHEN rule's children style their outputs."
+  (let ((out (skg-transform-sexp-flat
+              '(a k (b 1))
+              '(a (WHEN k (MEDIUM b (ANY IT)))))))
+    (should (equal out '("1")))
+    (should (eq (get-text-property 0 'skg-style (car out)) 'MEDIUM))))
+
 (provide 'test-skg-lens)

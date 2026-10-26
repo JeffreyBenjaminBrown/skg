@@ -20,7 +20,7 @@
   ;; Create the *skg-content-view* buffer with problematic content
   (with-current-buffer (get-buffer-create "*skg-content-view*")
     (erase-buffer)
-    (insert "* (skg (node (id 1) (repo main))) 1\n** (skg (node (id 1))) 1")
+    (insert "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n** (skg node (gnid 1)) 1")
     (org-mode)
     (setq skg-view-id (org-id-uuid))
     (goto-char (point-min))
@@ -56,13 +56,13 @@
           (if content-buffer
               (with-current-buffer content-buffer
                 (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-                  (if (string= content "* (skg (node (id 1) (repo main))) 1\n** (skg (node (id 1))) 1")
+                  (if (string= content "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n** (skg node (gnid 1)) 1")
                       (progn
                         (message "✓ PASS: Buffer content unchanged (no lingering atoms)")
                         (setq integration-test-phase "invalid-save-complete"))
                     (progn
                       (message "✗ FAIL: Buffer content does not match expected")
-                      (message "Expected: %S" "* (skg (node (id 1) (repo main))) 1\n** (skg (node (id 1))) 1")
+                      (message "Expected: %S" "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n** (skg node (gnid 1)) 1")
                       (message "Got: %S" content)
                       (kill-emacs 1)))))
             (progn
@@ -82,8 +82,8 @@
   ;; Switch back to content view buffer and fix the content
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
-    (search-forward "** (skg (node (id 1))) 1")
-    (replace-match "** (skg (node (id 1) writeProtected)) 1")
+    (search-forward "** (skg node (gnid 1)) 1")
+    (replace-match "** (skg node (gnid 1) writeProtected) 1")
     (message "✓ Amended previously invalid content to use writeProtected, so it is now valid"))
 
   ;; Switch to buffer to make it current
@@ -102,7 +102,7 @@
       (message "Updated buffer content: %s" updated-content)
 
       ;; Should contain cycle and write-protected atoms
-      ;; Note: cycle and write-protected are inside (node ...)
+      ;; Note: cycle sits in (viewStats ...), write-protected beside the node atom
       (if (and (string-match-p "cycle" updated-content)
                (string-match-p "\\bwriteProtected\\b" updated-content))
           (progn

@@ -150,12 +150,12 @@ but skg-content-view-mode is lost."
           (setq public
                 (test--make-skg-buffer
                  "*cooking*"
-                 "* (skg (node (id public-id) (repo public))) cooking\n"
+                 "* (skg node (gnid public-id) (skgRepos (nodeRepo public))) cooking\n"
                  "view-id-public"))
           (setq cheese
                 (test--make-skg-buffer
                  "*cooking*"
-                 "* (skg (node (id cheese-id) (repo Cheese))) cooking\n"
+                 "* (skg node (gnid cheese-id) (skgRepos (nodeRepo Cheese))) cooking\n"
                  "view-id-cheese"))
           (should (equal (buffer-name public) "*cooking* <public>"))
           (should (equal (buffer-name cheese) "*cooking* <Cheese>"))
@@ -175,7 +175,7 @@ but skg-content-view-mode is lost."
           (setq opened
                 (test--make-skg-buffer
                  "*occupied-title*"
-                 "* (skg (node (id x) (repo public))) occupied title\n"
+                 "* (skg node (gnid x) (skgRepos (nodeRepo public))) occupied title\n"
                  "view-id-new"))
           (should-not (eq unrelated opened))
           (should (equal (buffer-name opened) "*occupied-title*<2>"))

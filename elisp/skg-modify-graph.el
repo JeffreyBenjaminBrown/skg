@@ -253,7 +253,7 @@ one link is not an id link."
                        (skg-get-current-headline-text))))
          (skgid (plist-get link :id))
          (label (or (plist-get link :label) skgid))
-         (replacement (format "%s(skg (node (id %s) writeProtected (viewRequests editableView))) %s\n"
+         (replacement (format "%s(skg node (gnid %s) writeProtected (viewRequests editableView)) %s\n"
                               stars skgid label))
          (start (line-beginning-position))
          (end (save-excursion

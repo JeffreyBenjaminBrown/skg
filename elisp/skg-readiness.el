@@ -103,20 +103,11 @@ its move. Works on write-protected occurrences too."
 
 ;;; Reading a headline's change facts
 
-(defun skg--readiness-host (metadata-sexp)
-  "The list in METADATA-SEXP that holds its '(diff ...)' form: the
-form among its elements that holds one, as a vognode's (a ghost's
-among them) does, if one does, else the whole sexp, as a property's
-or a changed folder's."
-  (or (seq-find (lambda (element)
-                  (and (consp element)
-                       (assq 'diff (cdr element))))
-                (cdr metadata-sexp))
-      metadata-sexp))
-
 (defun skg--readiness-diff-form (metadata-sexp)
-  "The '(diff ...)' form of METADATA-SEXP, or nil."
-  (assq 'diff (cdr (skg--readiness-host metadata-sexp))))
+  "The '(diff ...)' form of METADATA-SEXP, or nil. Every kind's
+'(diff ...)' stands at the top level of '(skg ...)', beside its kind
+atom."
+  (assq 'diff (cdr metadata-sexp)))
 
 (defun skg--readiness-form (metadata-sexp key)
   "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
@@ -293,10 +284,9 @@ On refusal, write nothing and return nil."
   "Replace the readiness request of the headline at point with one
 that marks (READY non-nil) or unmarks the leaves on OBJECTS. The
 request is the last part of the headline's '(diff ...)' form, which
-lies under '(node ...)', '(ghost ...)' or another vognode's form, or
-at top level on a property. A headline without the form gets one."
+stands at the top level of its metadata, whatever its kind. A
+headline without the form gets one."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
-         (host (skg--readiness-host metadata-sexp))
          (request (cons (if ready 'readyRequest 'unreadyRequest) objects))
          (diff-edit
           (if (skg--readiness-diff-form metadata-sexp)
@@ -304,9 +294,7 @@ at top level on a property. A headline without the form gets one."
             ;; A missing form is appended whole, so it holds no DELETE.
             `(diff ,request))))
     (skg-edit-metadata-at-point
-     (if (eq host metadata-sexp)
-         `(skg ,diff-edit)
-       `(skg (,(car host) ,diff-edit))))))
+     `(skg ,diff-edit))))
 
 ;;; Moving between change headlines
 ;;; A change headline is one whose metadata carries a '(leaves ...)'

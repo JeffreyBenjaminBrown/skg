@@ -12,8 +12,9 @@
 (defvar integration-test-phase "starting")
 
 (defun search-root-line (content)
-  (and (string-match "^\\* (skg (node (id leaf-b).*$" content)
-       (match-string 0 content)))
+  (let ((text (skg-test-without-viewnode-ids content)))
+    (and (string-match "^\\* (skg node (gnid leaf-b) .*$" text)
+         (match-string 0 text))))
 
 (defun assert-leaf-b-root-is-content (content phase)
   (let ((line (search-root-line content)))
@@ -57,7 +58,7 @@
        (buffer-substring-no-properties (point-min) (point-max))
        "immediate search results")
       (unless (string-match-p
-               "(repo \"Mr Cheese\")"
+               "(skgRepos (nodeRepo \"Mr Cheese\"))"
                (buffer-substring-no-properties (point-min) (point-max)))
         (message "✗ FAIL: spaced repo name was not quoted in phase 1")
         (kill-emacs 1)))
@@ -90,8 +91,8 @@
        content
        "enriched search results")
       (unless (string-match-p
-               "^\\* (skg (node (id leaf-b).*\n\\*\\* (skg folded containerFolder.*\n\\*\\*\\* (skg (node (id container-a) (repo \"Mr Cheese\") writeProtected "
-               content)
+               "^\\* (skg node (gnid leaf-b) .*\n\\*\\* (skg folded containerFolder.*\n\\*\\*\\* (skg node (gnid container-a) (skgRepos (nodeRepo \"Mr Cheese\")) writeProtected "
+               (skg-test-without-viewnode-ids content))
         (message "✗ FAIL: leaf-b's folded containers folder does not hold container-a")
         (message "Buffer content:\n%s" content)
         (kill-emacs 1))

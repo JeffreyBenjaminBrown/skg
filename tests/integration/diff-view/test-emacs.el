@@ -62,7 +62,7 @@
              (let ((buf (all-changes-buffer)))
                (and buf
                     (with-current-buffer buf
-                      (string-match-p "(id r)" (buffer-string)))
+                      (string-match-p "(gnid r)" (buffer-string)))
                     (skg-test-wait-for-response 1)))))
     (test-fail "Timeout waiting for the \"all changes\" buffer"))
   ;; The sequence opens each nonempty buffer in turn.
@@ -77,7 +77,7 @@
       (test-fail "Expected the merges and skgrepo-changes buffers, got %S" names))
     (dolist (expected '("(oldText title)"        ; t's text edit
                         "(homeSkgrepoMove (old alpha) (new beta))" ; m's move
-                        "(ghost (gnid d)"        ; d's deletion
+                        "ghost (gnid d)"        ; d's deletion
                         "acquiredFolder"))       ; x's nodeMerge
       (unless (string-match-p (regexp-quote expected) all-changes)
         (test-fail "The \"all changes\" buffer lacks %s:\n%s"
@@ -179,12 +179,12 @@
                     (with-current-buffer b
                       (and (derived-mode-p 'skg-content-view-mode)
                            (not (string-match-p "diff-view: " (buffer-name b)))
-                           (string-match-p "(unknown (id d))" (buffer-string)))))
+                           (string-match-p "unknown (gnid d)" (buffer-string)))))
                   (buffer-list))))))
     (unless view (test-fail "Timeout waiting for a view of r showing d as unknown"))
     (switch-to-buffer view)
     (goto-char (point-min))
-    (re-search-forward "(unknown (id d))")
+    (re-search-forward "unknown (gnid d)")
     (beginning-of-line)
     (skg-investigate-unknown-node))
   (let ((answer (skg-test-wait-for-buffer "*skg unknown node*" 20)))

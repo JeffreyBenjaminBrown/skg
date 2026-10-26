@@ -31,7 +31,7 @@
 ;;; The line of the diff view's "all changes" buffer that shows
 ;;; b as a removed member of a.
 (defconst test-removed-member-line-regexp
-  "(id b).*(diff (rel removed)")
+  "(gnid b).*(diff (rel removed)")
 
 (defun find-all-changes-buffer ()
   (cl-find-if
@@ -51,7 +51,7 @@
              (let ((buf (find-all-changes-buffer)))
                (when buf
                  (with-current-buffer buf
-                   (string-match-p "(id a)"
+                   (string-match-p "(gnid a)"
                                    (buffer-substring-no-properties
                                     (point-min) (point-max))))))))
     (test-fail "Timeout waiting for the \"all changes\" buffer"))

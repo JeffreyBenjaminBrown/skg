@@ -62,8 +62,8 @@
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with heralds
-      (insert "Test line with (skg (node (id 123) (rels (contains (out 2))) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (rels (linksTo (in 3 (substantive 3)))) (editRequest delete))) more text\n")
+      (insert "Test line with (skg node (gnid 123) (rels (contains (out 2))) (viewStats cycle)) herald\n")
+      (insert "Another line (skg node (gnid 456) (rels (linksTo (in 3 (substantive 3)))) (editRequest delete)) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -96,7 +96,7 @@ payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
 the C token 2aC: the in-side numeral \"2\" (medium), the ancestor \"a\"
 at its floor (low), and the birth letter \"C\" (low)."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats noWarrant cycle) (editRequest delete))) text")
+    (insert "Line with (skg node (gnid 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats noWarrant cycle) (editRequest delete)) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ( ( herald-start
@@ -140,7 +140,7 @@ at its floor (low), and the birth letter \"C\" (low)."
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg (node (id 1) (repo s) (rels (contains (out 2)))))\n")
+    (insert "(skg node (gnid 1) (skgRepos (nodeRepo s)) (rels (contains (out 2))))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
@@ -167,7 +167,7 @@ the fixture table."
     (cl-letf (((symbol-function 'skg-request-herald-rules)
                (lambda () (skg-test-install-herald-rules))))
       (with-temp-buffer
-        (insert "(skg (node (id 1) (repo s) (rels (contains (out 2)))))\n")
+        (insert "(skg node (gnid 1) (skgRepos (nodeRepo s)) (rels (contains (out 2))))\n")
         (heralds-minor-mode 1)
         (should heralds-minor-mode)       ;; stayed on
         (should heralds--transform-rules) ;; table recovered
@@ -186,7 +186,7 @@ of times and then disables itself instead of spinning forever."
                ;; requests but never install a table.
                (lambda () (setq calls (1+ calls)))))
       (with-temp-buffer
-        (insert "(skg (node (id 1)))\n")
+        (insert "(skg node (gnid 1))\n")
         (heralds-minor-mode 1)
         (should-not heralds-minor-mode)     ;; turned itself off
         (should-not heralds--transform-rules)

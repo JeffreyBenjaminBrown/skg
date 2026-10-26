@@ -478,11 +478,10 @@ relations in display order (C L S O H), then the property counts A I F,
 space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
-      (let* ((node (cdr (assq 'node (cdr sexp))))
+      (let* ((parts (cdr sexp)) ;; a node's parts stand beside its kind atom
              (birth (cdr (assq 'birth (cdr rels)))) ;; facts (RELATION SIDE [GEN])
-             (write-protected (memq 'writeProtected node))
-             (overrides-here
-              (assq 'overridesHere (cdr (assq 'viewStats node))))
+             (write-protected (memq 'writeProtected parts))
+             (overrides-here (assq 'overridesHere parts))
              (property-style (heralds--relationship-style 'property_counts))
              (tokens '()))
         (dolist (rel heralds--rel-order)

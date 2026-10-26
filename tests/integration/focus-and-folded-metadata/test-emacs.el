@@ -54,12 +54,12 @@
       (setq skg-view-id (org-id-uuid))
 
       ;; Insert the 6 headlines
-      (insert "* (skg (node (id 1) (repo main))) 1\n")
-      (insert "** (skg (node (id 2))) 2\n")
-      (insert "** (skg (node (id 3))) 3\n")
-      (insert "*** (skg (node (id 4))) 4\n")
-      (insert "*** (skg (node (id 5))) 5\n")
-      (insert "** (skg (node (id 6))) 6\n")
+      (insert "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n")
+      (insert "** (skg node (gnid 2)) 2\n")
+      (insert "** (skg node (gnid 3)) 3\n")
+      (insert "*** (skg node (gnid 4)) 4\n")
+      (insert "*** (skg node (gnid 5)) 5\n")
+      (insert "** (skg node (gnid 6)) 6\n")
 
       (message "✓ Created buffer with 6 headlines")
 
@@ -71,7 +71,7 @@
 
       ;; Position point on headline 3 (third headline)
       (goto-char (point-min))
-      (re-search-forward "^\\*\\* (skg (node (id 3)))")
+      (re-search-forward "^\\*\\* (skg node (gnid 3))")
       (beginning-of-line)
       (message "✓ Positioned point on headline 3")
 
@@ -86,7 +86,7 @@
       ;; Verify we're on the right line
       (let ((current-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
         (message "Current line: %s" current-line)
-        (unless (string-match-p "(id 2)" current-line)
+        (unless (string-match-p "(gnid 2)" current-line)
           (message "✗ FAIL: Not on headline 2")
           (kill-emacs 1)))
 
@@ -142,7 +142,7 @@
 
           (if (and (not has-focused-metadata)
                    (not has-folded-metadata)
-                   (string-match-p "(id 2)" current-line)
+                   (string-match-p "(gnid 2)" current-line)
                    line-4-invisible
                    line-5-invisible)
               (progn

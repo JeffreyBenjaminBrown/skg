@@ -30,9 +30,9 @@ returns its ROLENAME from its (rels ...) facts (e.g. `container');
 otherwise the result is `noClaim' for a non-member and `member' for
 a member."
   (let* ((non-member (and sexp
-                          (skg-sexp-subtree-p sexp '(skg (node noClaim)))))
+                          (skg-sexp-subtree-p sexp '(skg node noClaim))))
          (rels-body (when sexp
-                      (skg-sexp-cdr-at-path sexp '(skg node rels))))
+                      (skg-sexp-cdr-at-path sexp '(skg rels))))
          (chain-node-role (when non-member
                        (headline--role-of-chain-node-from-rels rels-body))))
     (cond
@@ -45,7 +45,7 @@ a member."
   "Extract (depth relation id) triples from every headline in BUFFER.
 Depth is the number of asterisks. Relation is a membership symbol or
 a chain node's role; see `headline--relation-from-sexp'.
-ID comes from the (skg (node (id X) ...)) metadata. Headlines
+ID comes from the (skg node (gnid X) ...) metadata. Headlines
 without metadata are skipped."
   (with-current-buffer buffer
     (let ((result '()))
@@ -62,8 +62,9 @@ without metadata are skipped."
                      (sexp (condition-case nil
                                (car (read-from-string metadata-str))
                              (error nil)))
-                     (id-list (when sexp
-                                (skg-sexp-cdr-at-path sexp '(skg node id))))
+                     (id-list (when (and (consp sexp)
+                                         (memq 'node (cdr sexp)))
+                                (skg-sexp-cdr-at-path sexp '(skg gnid))))
                      (skgid (when id-list
                            (format "%s" (car id-list))))
                      (relation (headline--relation-from-sexp sexp)))
@@ -143,7 +144,7 @@ PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
   "Extract (depth type title) triples from every headline in BUFFER.
 Type is a symbol derived from the metadata:
   node, ghost, tombstone, subscribeeFolder, etc.
-For (skg (node ...)) the type is node; for (skg (ghost ...)) it is
+For (skg node ...) the type is node; for (skg ghost ...) it is
 ghost; for (skg tombstone) it is tombstone; and so on."
   (with-current-buffer buffer
     (let ((result '()))
@@ -161,12 +162,20 @@ ghost; for (skg tombstone) it is tombstone; and so on."
                      (sexp (condition-case nil
                                (car (read-from-string metadata-str))
                              (error nil)))
-                     (type-elem (when (and sexp (listp sexp))
-                                  (cadr sexp)))
-                     (type-sym (cond
-                                ((listp type-elem) (car type-elem))
-                                ((symbolp type-elem) type-elem)
-                                (t nil))))
+                     ;; The kind atom: the first top-level element,
+                     ;; bare or heading a list, that names a kind.
+                     (type-sym
+                      (when (consp sexp)
+                        (seq-some
+                         (lambda (element)
+                           (let ((atom (if (consp element)
+                                           (car element)
+                                         element)))
+                             (and (symbolp atom)
+                                  (skg-shared-metadata-kind
+                                   (symbol-name atom))
+                                  atom)))
+                         (cdr sexp)))))
                 (when type-sym
                   (push (list depth type-sym title) result)))))
           (forward-line 1)))

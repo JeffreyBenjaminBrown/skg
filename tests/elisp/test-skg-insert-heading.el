@@ -40,7 +40,7 @@ skg-config-dir is set and skg--owned-repos works."
   "C-return on a root headline prompts for repo in the minibuffer
 and inserts metadata with the chosen repo on the new headline."
   (test--with-skg-content-view
-   "* (skg (node (id a) (repo public))) a\n"
+   "* (skg node (gnid a) (skgRepos (nodeRepo public))) a\n"
    test--config-two-owned-repos
    (lambda ()
      (let ((source-buffer (current-buffer)))
@@ -60,11 +60,11 @@ and inserts metadata with the chosen repo on the new headline."
                          (point-min) (point-max))))
            ;; Original headline unchanged.
            (should (string-match-p
-                    "^\\* (skg (node (id a) (repo public))) a$"
+                    "^\\* (skg node (gnid a) (skgRepos (nodeRepo public))) a$"
                     content))
            ;; New headline has metadata with chosen skgrepo.
            (should (string-match-p
-                    "^\\* (skg (node (repo private))) $"
+                    "^\\* (skg node (skgRepos (nodeRepo private))) $"
                     content))
            (should (= 2 (how-many "^\\* " (point-min) (point-max))))))
 

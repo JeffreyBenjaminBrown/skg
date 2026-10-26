@@ -72,12 +72,12 @@ contains to [], overwriting subee.skg on disk."
     ;; Add aliases view request to node 11.
     (goto-nth-headline-with-title "11" 1)
     (skg-edit-metadata-at-point
-     '(skg (node (viewRequests (folder aliases)))))
+     '(skg node (viewRequests (folder aliases))))
     ;; Append standalone subee root with child.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))
-    (insert "* (skg (node (id subee) (repo main))) subee\n")
-    (insert "** (skg (node (id subee-1) (repo main))) subee-1")
+    (insert "* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee\n")
+    (insert "** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1")
     (skg-request-save-buffer))
   (skg-test-wait-for-response)
   (let ((buf (get-buffer "*1*")))
@@ -110,9 +110,9 @@ which takes priority over subee.skg on disk."
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
-      (insert "* (skg (node (id 11) (repo main) writeProtected)) 11\n")
-      (insert "* (skg (node (id subee) (repo main))) subee\n")
-      (insert "** (skg (node (id subee-1) (repo main))) subee-1")
+      (insert "* (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11\n")
+      (insert "* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee\n")
+      (insert "** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1")
       (skg-request-save-buffer))
     (skg-test-wait-for-response)
     (message "Buffer 2 after save:\n%s"
@@ -133,7 +133,7 @@ which takes priority over subee.skg on disk."
     (goto-char (point-min))
     (skg-edit-metadata-at-point
      ;; Remove 'writeProtected' and add 'editRequest delete'.
-     '(skg (node (DELETE writeProtected) (editRequest delete))))
+     '(skg node (DELETE writeProtected) (editRequest delete)))
     (message "Buffer 2 after metadata edit:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))
@@ -251,7 +251,7 @@ after the delete pipeline started cleaning up references to the
 deleted node, buffer 1 no longer contains a tombstone, so the
 phase now exercises adding a top-level root via metadata-only
 insertion (the BufferRoot, like a tombstone, supplies no repo
-to inherit, so explicit (repo main) is still required)."
+to inherit, so explicit (skgRepos (nodeRepo main)) is still required)."
   (message "=== PHASE 8: Add new-root under tombstone in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
@@ -273,7 +273,7 @@ to inherit, so explicit (repo main) is still required)."
           (forward-line 1))
         ;; Insert new-root as a sibling of subee.
         (let ((stars (make-string subee-depth ?*)))
-          (insert (format "%s (skg (node (repo main))) new-root\n"
+          (insert (format "%s (skg node (skgRepos (nodeRepo main))) new-root\n"
                           stars)))))
     (message "Buffer 1 after inserting new-root:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))

@@ -39,7 +39,7 @@
                           (buffer-list)) ))
                (when buf
                  (with-current-buffer buf
-                   (string-match-p "(id x)"
+                   (string-match-p "(gnid x)"
                                    (buffer-substring-no-properties
                                     (point-min) (point-max)) ))))) )
     (test-fail "Timeout waiting for content view of x"))

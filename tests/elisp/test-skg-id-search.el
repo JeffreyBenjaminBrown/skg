@@ -7,8 +7,8 @@
 
 (defconst test-skg-id-navigation-buffer
   (concat "* no id\n"
-          "* (skg (node (id 1))) 1 has a [[id:2][link to 2]]\n"
-          "* (skg (node (id 2))) 2\n"
+          "* (skg node (gnid 1)) 1 has a [[id:2][link to 2]]\n"
+          "* (skg node (gnid 2)) 2\n"
           "* no id\n")
   "Test buffer for skg-id-next and skg-id-prev tests.")
 
@@ -73,11 +73,11 @@
   "Test that skg-id-push pushes the metadata ID from the current line."
   (setq skg-linkstack nil)
   (with-temp-buffer
-    (insert "* (skg (node (id 1))) [[id:2][link to 2]]\n")
-    (insert "* (skg (node (id 3))) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
-    (insert "* (skg (fake metadata]] [[id:fake-link)(]]\n")
-    (insert "* (skg (node (id 6))) just a title\n")
-    (insert "* (skg (node (id 7))) [[id:8][link to 8]]\n")
+    (insert "* (skg node (gnid 1)) [[id:2][link to 2]]\n")
+    (insert "* (skg node (gnid 3)) [[id:2][link to 4]] hello [[id:2][link to 5]]\n")
+    (insert "* (skg (fake metadata]] [[id:fake-link) (]]\n")
+    (insert "* (skg node (gnid 6)) just a title\n")
+    (insert "* (skg node (gnid 7)) [[id:8][link to 8]]\n")
     (let* (( line3-start
              (progn (goto-char (point-min))
                     (forward-line 2)
@@ -87,7 +87,7 @@
         (dolist (skgid '("1" "3" "6" "7"))
           (let (( len-before (length skg-linkstack) ))
             (goto-char (point-min))
-            (search-forward (format "(skg (node (id %s)))" skgid))
+            (search-forward (format "(skg node (gnid %s))" skgid))
             (skg-id-push)
             (should (equal (length skg-linkstack) (1+ len-before)))
             (should (equal (caar skg-linkstack) skgid)) )) )
@@ -113,7 +113,7 @@ not the headline's metadata ID and title."
   (setq skg-linkstack nil)
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id outer-id))) outer headline with [[id:inner-id][inner label]] inside\n")
+    (insert "* (skg node (gnid outer-id)) outer headline with [[id:inner-id][inner label]] inside\n")
     ;; Move point onto the inline link.
     (goto-char (point-min))
     (search-forward "inner label")
@@ -128,9 +128,9 @@ not the headline's metadata ID and title."
   (setq skg-linkstack nil)
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id a))) a\n")
-    (insert "** (skg (node (id b))) b has a [[id:a][link to a]]\n")
-    (insert "* (skg (node (id c))) c\n")
+    (insert "* (skg node (gnid a)) a\n")
+    (insert "** (skg node (gnid b)) b has a [[id:a][link to a]]\n")
+    (insert "* (skg node (gnid c)) c\n")
     (progn ;; Push from start of buffer (line 1, id=a)
       (goto-char (point-min))
       (skg-id-push))
@@ -239,7 +239,7 @@ not the headline's metadata ID and title."
       (org-mode)
       (skg-paste-node)
       (should (equal (buffer-string)
-                     "* (skg (node (id id-1) writeProtected)) Title from stack\n"))
+                     "* (skg node (gnid id-1) writeProtected) Title from stack\n"))
       (should (equal skg-linkstack '(("id-1" "Title from stack")) )) )))
 
 (ert-deftest test-skg-pop-node ()
@@ -250,7 +250,7 @@ not the headline's metadata ID and title."
       (org-mode)
       (skg-pop-node)
       (should (equal (buffer-string)
-                     "* (skg (node (id id-2) writeProtected)) Second\n"))
+                     "* (skg node (gnid id-2) writeProtected) Second\n"))
       (should (equal skg-linkstack '(("id-1" "First")) )) )))
 
 (ert-deftest test-skg-paste-node-after-typed-stars ()
@@ -261,7 +261,7 @@ not the headline's metadata ID and title."
       (insert "** ")
       (skg-paste-node)
       (should (equal (buffer-string)
-                     "** (skg (node (id id-1) writeProtected)) Title from stack")) )))
+                     "** (skg node (gnid id-1) writeProtected) Title from stack")) )))
 
 ;; In a view, paste-node requests an editable view unless the buffer
 ;; already has a writable (or editable-requesting) occurrence.
@@ -283,28 +283,28 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
 (ert-deftest test-skg-paste-node-in-view-requests-editable-view ()
   "With no writable occurrence present, the paste requests a editable view."
   (let (( result (skg-test--paste-node-in-view
-                  "* (skg (node (id id-1) writeProtected)) Elsewhere\n") ))
+                  "* (skg node (gnid id-1) writeProtected) Elsewhere\n") ))
     (should (equal (car result)
-                   (concat "* (skg (node (id id-1) writeProtected)) Elsewhere\n"
-                           "* (skg (node (id id-1) writeProtected (viewRequests editableView))) Title from stack\n")))
+                   (concat "* (skg node (gnid id-1) writeProtected) Elsewhere\n"
+                           "* (skg node (gnid id-1) writeProtected (viewRequests editableView)) Title from stack\n")))
     (should (null (cdr result))) ))
 
 (ert-deftest test-skg-paste-node-in-view-beside-writable-occurrence ()
   "With a writable occurrence present, the paste stays write-protected and says why."
   (let (( result (skg-test--paste-node-in-view
-                  "* (skg (node (id id-1) (repo main))) Writable\n") ))
+                  "* (skg node (gnid id-1) (skgRepos (nodeRepo main))) Writable\n") ))
     (should (equal (car result)
-                   (concat "* (skg (node (id id-1) (repo main))) Writable\n"
-                           "* (skg (node (id id-1) writeProtected)) Title from stack\n")))
+                   (concat "* (skg node (gnid id-1) (skgRepos (nodeRepo main))) Writable\n"
+                           "* (skg node (gnid id-1) writeProtected) Title from stack\n")))
     (should (equal (cdr result)
                    "NOTE: Pasting node write-protected because a writable occurrence is already present in this same buffer.")) ))
 
 (ert-deftest test-skg-paste-node-in-view-twice ()
   "A pending editable view request counts as a writable occurrence."
   (let (( result (skg-test--paste-node-in-view
-                  "* (skg (node (id id-1) writeProtected (viewRequests editableView))) First\n") ))
+                  "* (skg node (gnid id-1) writeProtected (viewRequests editableView)) First\n") ))
     (should (string-suffix-p
-             "\n* (skg (node (id id-1) writeProtected)) Title from stack\n"
+             "\n* (skg node (gnid id-1) writeProtected) Title from stack\n"
              (car result)))
     (should (string-prefix-p "NOTE:" (cdr result))) ))
 
@@ -395,7 +395,7 @@ the first occurrence of AFTER (or at buffer start), then return
 (ert-deftest test-skg-id-and-repo-of-a-ghost ()
   "A ghost's metadata yields its id, from '(gnid X)', and its repo,
 from '(skgRepos (nodeRepo R))'."
-  (let ((sexp '(skg (ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))))))
+  (let ((sexp '(skg ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))))
     (should (skg--metadata-sexp-contains-id-p sexp))
     (should (equal (skg--extract-id-from-metadata-sexp sexp) "gone"))
     (should (equal (skg--extract-repo-from-metadata-sexp sexp) "main"))))
@@ -403,11 +403,11 @@ from '(skgRepos (nodeRepo R))'."
 ;;; Finding a headline by its viewnode ID
 
 (defconst test-skg-goto-viewnode-id-buffer
-  (concat "* (skg (node (id 1) (repo main)) (vnid 0a)) 1\n"
-          "** (skg (node (id 2) (repo main)) (vnid 0bc)) 2\n"
-          "** (skg (node (id 3) (repo main)) (vnid 0b)) 3\n"
+  (concat "* (skg (vnid 0a) node (gnid 1) (skgRepos (nodeRepo main))) 1\n"
+          "** (skg (vnid 0bc) node (gnid 2) (skgRepos (nodeRepo main))) 2\n"
+          "** (skg (vnid 0b) node (gnid 3) (skgRepos (nodeRepo main))) 3\n"
           "body text mentioning (vnid 0d)\n"
-          "* (skg (node (id 4) (repo main))) 4 typed\n")
+          "* (skg node (gnid 4) (skgRepos (nodeRepo main))) 4 typed\n")
   "Test buffer for `skg-goto-viewnode-id'.")
 
 (defun test-skg--line-start-of (text)
@@ -429,7 +429,7 @@ from the search."
     (heralds-minor-mode 1)
     (goto-char (point-min))
     (org-cycle) ;; fold the first headline's subtree
-    (let (( target (test-skg--line-start-of "(vnid 0b)) 3") ))
+    (let (( target (test-skg--line-start-of "(skg (vnid 0b) node") ))
       (should (equal (skg-goto-viewnode-id "0b") target))
       (should (equal (point) target))
       (should-not (invisible-p (point))))))

@@ -53,14 +53,14 @@ there, cycling starts at index 0."
 (defun skg-sexp-edit--cycle-values-for-field (field-name field-value)
   "Return the list of values to cycle through for FIELD-NAME.
 FIELD-VALUE is the current headline text, needed for repo defaulting.
-Every field but repo cycles as 'shared/metadata-fields.json' says for
+Every field but the nodeRepo of '(skgRepos ...)' cycles as 'shared/metadata-fields.json' says for
 the kind of the headline being edited: a value offered only to an
 editable headline is left out when the edit buffer sets writeProtected
 to true, and one offered only to a removed member when the headline's
 metadata lacks '(diff (rel removed))'. The diff view's restore
 requests are described in 'docs/diff-view.org', \"Restoring what a
 change removed\". Returns nil if the field is not cycleable."
-  (if (string= field-name "repo") ;; from the config
+  (if (string= field-name "nodeRepo") ;; from the config
       (skg-sexp-edit--repo-cycle-values field-value)
     (skg-metadata-fields-cycle-values
      skg-sexp-edit--kind
@@ -150,7 +150,7 @@ Dispatch is based on the parent headline text."
                                       arguments))
                         " ")))))
        ;; Skgrepo with no config: prompt
-       ((string= parent "repo")
+       ((string= parent "nodeRepo")
         (org-edit-headline (read-string "Repo: " field-value)))
        (t
         (user-error "Field '%s' is not cycleable" parent))))))

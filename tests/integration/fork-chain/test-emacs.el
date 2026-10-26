@@ -14,13 +14,13 @@
   (kill-emacs 1))
 
 (defun chain-test--buffer-showing (skgid)
-  "Return a live skg view buffer whose text mentions (id ID)."
+  "Return a live skg view buffer whose text mentions (gnid ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-id) skg-view-id
-                 (string-match-p (regexp-quote (format "(id %s)" skgid))
+                 (string-match-p (regexp-quote (format "(gnid %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))
@@ -43,11 +43,11 @@
   ;; 1. Open P (public); its content is the foreign N.
   (let ((p-buf (chain-test--reopen-P)))
     (with-current-buffer p-buf
-      (unless (string-match-p "(id N)" (buffer-string))
+      (unless (string-match-p "(gnid N)" (buffer-string))
         (test-fail "P's view does not show foreign N:\n%s" (buffer-string)))
       ;; 2. Implicit fork: make N editable and edit its title.
       (goto-char (point-min))
-      (unless (re-search-forward "^.*(id N) (repo foreign).*$" nil t)
+      (unless (re-search-forward "^.*(gnid N) (skgRepos (nodeRepo foreign)).*$" nil t)
         (test-fail "could not find N's headline:\n%s" (buffer-string)))
       (let* ((line (match-string 0))
              (edited (replace-regexp-in-string
@@ -63,7 +63,7 @@
     (with-current-buffer confirm-buf
       ;; Pick the clone's skgrepo (required), then approve.
       (goto-char (point-min))
-      (re-search-forward "^\\* (skg (node (repo ")
+      (re-search-forward "^\\* (skg node (skgRepos (nodeRepo ")
       (beginning-of-line)
       (skg--change-repo-at-point "public")
       (skg-approve-fork)))
@@ -93,12 +93,12 @@
     (unless confirm-buf (test-fail "no fork-confirmation for the clone appeared"))
     (with-current-buffer confirm-buf
       (goto-char (point-min))
-      (unless (re-search-forward "^\\* (skg (node (repo " nil t)
+      (unless (re-search-forward "^\\* (skg node (skgRepos (nodeRepo " nil t)
         (test-fail "could not find the clone-to-be headline:\n%s" (buffer-string)))
       (beginning-of-line)
       (skg--change-repo-at-point "private")
       (skg-approve-fork)))
-  (message "✓ the public clone was forked into a private clone (repo rotated)")
+  (message "✓ the public clone was forked into a private clone (skgRepos (nodeRepo rotated))")
 
   ;; 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
   ;;    node -- is now shown in N's place, still marked (overridesHere N).
@@ -113,7 +113,7 @@
                     (while (re-search-forward "(overridesHere N)" nil t)
                       (let ((line (buffer-substring-no-properties
                                    (line-beginning-position) (line-end-position))))
-                        (when (string-match-p "(repo private)" line)
+                        (when (string-match-p "(skgRepos (nodeRepo private))" line)
                           (throw 'found t))))
                     nil))))
             10)))

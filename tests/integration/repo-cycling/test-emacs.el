@@ -18,7 +18,7 @@
   "Return the repo value headline text in the sexp-edit buffer."
   (save-excursion
     (goto-char (point-min))
-    (when (re-search-forward "^\\*\\*\\* repo$" nil t)
+    (when (re-search-forward "^\\*\\*\\* nodeRepo$" nil t)
       (outline-next-heading)
       (string-trim (org-get-heading t t t t)))))
 
@@ -34,7 +34,7 @@
         (and (with-current-buffer b
                             (derived-mode-p 'skg-content-view-mode))
              (with-current-buffer b
-               (string-match-p "(id x)"
+               (string-match-p "(gnid x)"
                  (buffer-substring-no-properties
                   (point-min) (point-max))))))
       (buffer-list))))
@@ -67,7 +67,7 @@
   (setq integration-test-phase "phase-3")
   ;; Position point on the skgrepo value headline
   (goto-char (point-min))
-  (re-search-forward "^\\*\\*\\* repo$" nil t)
+  (re-search-forward "^\\*\\*\\* nodeRepo$" nil t)
   (outline-next-heading)
   ;; Cycle right
   (skg-sexp-edit-cycle-right)

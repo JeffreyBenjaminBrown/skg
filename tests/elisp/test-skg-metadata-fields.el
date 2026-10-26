@@ -16,10 +16,10 @@
 (ert-deftest test-kind-of-sexp ()
   "A metadata sexp's kind is that of its first atom the table names,
 bare or heading a list, after any marker; nil for no kind."
-  (dolist (case '(((skg (node (id abc) (repo jeff))) . "unrestricted node")
-                  ((skg focused (node (id abc))) . "unrestricted node")
-                  ((skg (ghost (gnid g) (skgRepos (nodeRepo r)))) . "ghost")
-                  ((skg alias (relRepo r)) . "alias")
+  (dolist (case '(((skg node (gnid abc) (skgRepos (nodeRepo jeff))) . "unrestricted node")
+                  ((skg focused node (gnid abc)) . "unrestricted node")
+                  ((skg ghost (gnid g) (skgRepos (nodeRepo r))) . "ghost")
+                  ((skg alias (skgRepos (relRepo r))) . "alias")
                   ((skg (flag noSearchMatching)) . "flag")
                   ((skg (subscribeeFolder changed)) . "folder")
                   ((skg folded tombstone) . "tombstone")
@@ -45,15 +45,15 @@ bare or heading a list, after any marker; nil for no kind."
 
 (ert-deftest test-fillIn-minimal-sexp ()
   "Filling in a minimal UnrestrictedVognode inserts all default fields."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
-    ;; Should have: skg, node, id : abc, repo : jeff,
+    ;; Should have: skg, node, gnid : abc, skgRepos : nodeRepo : jeff,
     ;; write-protected : false (default), noClaim : false (default),
     ;; editRequest : none (default), viewRequests : none (default)
-    (should (= (length headlines) 14)) ;; each key *and each value* is a separate headline
+    (should (= (length headlines) 15)) ;; each key *and each value* is a separate headline
     ;; Check default fields are present
     (should (cl-find "writeProtected" headlines
                      :key #'cdr :test #'string=))
@@ -70,7 +70,7 @@ bare or heading a list, after any marker; nil for no kind."
 
 (ert-deftest test-fillIn-with-write-protected ()
   "Filling in a sexp with bare writeProtected shows 'true' child."
-  (let* ((sexp '(skg (node (id abc) (repo jeff) writeProtected)))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (lines (split-string filledIn "\n"))
@@ -89,8 +89,8 @@ bare or heading a list, after any marker; nil for no kind."
 (ert-deftest test-fillIn-noClaim ()
   "Filling in offers noClaim as a bare atom: 'false (default)' on a
 member, 'true' on a non-member."
-  (dolist (case '(((skg (node (id abc) (repo jeff))) . "false (default)")
-                  ((skg (node (id abc) (repo jeff) noClaim)) . "true")))
+  (dolist (case '(((skg node (gnid abc) (skgRepos (nodeRepo jeff))) . "false (default)")
+                  ((skg node (gnid abc) (skgRepos (nodeRepo jeff)) noClaim) . "true")))
     (let* ((org-text (sexp-to-org (car case)))
            (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
            (lines (split-string filledIn "\n"))
@@ -107,7 +107,7 @@ member, 'true' on a non-member."
 
 (ert-deftest test-strip-unmodified-returns-original ()
   "Stripping an unmodified filled-in org returns the original sexp."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -122,21 +122,22 @@ member, 'true' on a non-member."
   "Stripping writeProtected=true produces bare atom in sexp."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** jeff\n"
-                           "*** writeProtected\n"
-                           "**** true\n"
-                           "*** noClaim\n"
-                           "**** false (default)\n"
-                           "*** editRequest\n"
-                           "**** none (default)\n"
-                           "*** viewRequests\n"
-                           "**** none (default)"))
+                           "** writeProtected\n"
+                           "*** true\n"
+                           "** noClaim\n"
+                           "*** false (default)\n"
+                           "** editRequest\n"
+                           "*** none (default)\n"
+                           "** viewRequests\n"
+                           "*** none (default)"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (id abc) (repo jeff) writeProtected))))))
+    (should (equal result '(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected)))))
 
 ;;
 ;; Strip: accepts bare 'false' (without '(default)') as the default value
@@ -146,21 +147,22 @@ member, 'true' on a non-member."
   "Stripping accepts bare 'false' as the default value."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** jeff\n"
-                           "*** writeProtected\n"
-                           "**** false\n"
-                           "*** noClaim\n"
-                           "**** false\n"
-                           "*** editRequest\n"
-                           "**** none\n"
-                           "*** viewRequests\n"
-                           "**** none"))
+                           "** writeProtected\n"
+                           "*** false\n"
+                           "** noClaim\n"
+                           "*** false\n"
+                           "** editRequest\n"
+                           "*** none\n"
+                           "** viewRequests\n"
+                           "*** none"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (id abc) (repo jeff)))))))
+    (should (equal result '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))))))
 
 ;;
 ;; Round-trip: fill in then strip with no edits = identity
@@ -168,7 +170,7 @@ member, 'true' on a non-member."
 
 (ert-deftest test-round-trip-minimal ()
   "Round-trip: fill in then strip on minimal sexp is identity."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -177,7 +179,7 @@ member, 'true' on a non-member."
 
 (ert-deftest test-round-trip-with-write-protected ()
   "Round-trip: fill in then strip preserves bare writeProtected."
-  (let* ((sexp '(skg (node (id abc) (repo jeff) writeProtected)))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -186,7 +188,7 @@ member, 'true' on a non-member."
 
 (ert-deftest test-round-trip-with-editrequest-delete ()
   "Round-trip: fill in then strip preserves (editRequest delete)."
-  (let* ((sexp '(skg (node (id abc) (repo jeff) (editRequest delete))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff)) (editRequest delete)))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -195,7 +197,7 @@ member, 'true' on a non-member."
 
 (ert-deftest test-round-trip-with-editrequest-merge ()
   "Round-trip: fill in then strip preserves (editRequest (merge XYZ))."
-  (let* ((sexp '(skg (node (id abc) (repo jeff) (editRequest (merge XYZ)))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff)) (editRequest (merge XYZ))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -203,24 +205,25 @@ member, 'true' on a non-member."
     (should (equal result sexp))))
 
 ;;
-;; Canonical ordering: id and repo first, editable fields, write-protected stats last
+;; Canonical ordering: what says what the headline is (kind atom, gnid,
+;; skgRepos) first, editable fields, write-protected stats last
 ;;
 
 (ert-deftest test-canonical-ordering ()
   "Fields appear in canonical order after filling in."
-  (let* ((sexp '(skg (node (repo jeff) (graphStats 42) (id abc) writeProtected)))
+  (let* ((sexp '(skg node (skgRepos (nodeRepo jeff)) (graphStats 42) (gnid abc) writeProtected))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (level-3 (mapcar #'cdr
+         (level-2 (mapcar #'cdr
                           (cl-remove-if-not
-                           (lambda (hl) (= (car hl) 3))
+                           (lambda (hl) (= (car hl) 2))
                            headlines))))
-    ;; Order should be: id, repo, write-protected, noClaim,
-    ;; editRequest, viewRequests, graphStats
-    (should (equal level-3
-                   '("id" "repo" "writeProtected" "noClaim"
+    ;; Order should be: node, skgRepos, gnid, write-protected,
+    ;; noClaim, editRequest, viewRequests, graphStats
+    (should (equal level-2
+                   '("node" "skgRepos" "gnid" "writeProtected" "noClaim"
                      "editRequest" "viewRequests" "graphStats")))))
 
 ;;
@@ -231,17 +234,18 @@ member, 'true' on a non-member."
   "Strip handles merge with org link [[id:XYZ][label]]."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** jeff\n"
-                           "*** editRequest\n"
-                           "**** merge [[id:XYZ][some label]]"))
+                           "** editRequest\n"
+                           "*** merge [[id:XYZ][some label]]"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (repo jeff)
-                               (editRequest (merge XYZ))))))))
+                   '(skg node (gnid abc) (skgRepos (nodeRepo jeff))
+                         (editRequest (merge XYZ)))))))
 
 ;;
 ;; Strip: noClaim true -> the bare atom
@@ -251,16 +255,17 @@ member, 'true' on a non-member."
   "Stripping noClaim=true produces the bare atom in the sexp."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** jeff\n"
-                           "*** noClaim\n"
-                           "**** true"))
+                           "** noClaim\n"
+                           "*** true"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (repo jeff) noClaim))))))
+                   '(skg node (gnid abc) (skgRepos (nodeRepo jeff)) noClaim)))))
 
 ;;
 ;; Strip: viewRequests with actual values -> kept as-is
@@ -270,20 +275,21 @@ member, 'true' on a non-member."
   "Stripping viewRequests with actual values keeps them."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** jeff\n"
-                           "*** viewRequests\n"
-                           "**** folder\n"
-                           "***** aliases\n"
-                           "**** folder\n"
-                           "***** containers"))
+                           "** viewRequests\n"
+                           "*** folder\n"
+                           "**** aliases\n"
+                           "*** folder\n"
+                           "**** containers"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (repo jeff)
-                               (viewRequests (folder aliases) (folder containers))))))))
+                   '(skg node (gnid abc) (skgRepos (nodeRepo jeff))
+                         (viewRequests (folder aliases) (folder containers)))))))
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)
@@ -293,29 +299,31 @@ member, 'true' on a non-member."
 (ert-deftest test-strip-empty-node-skeleton ()
   "Stripping the all-childless skeleton keeps only the repo field.
 Every editable field -- including viewRequests -- is childless, so each
-is dropped key-and-all, leaving (skg (node (repo only)))."
+is dropped key-and-all, leaving (skg node (skgRepos (nodeRepo only)))."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** repo\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** only\n"
-                           "*** writeProtected\n"
-                           "*** noClaim\n"
-                           "*** editRequest\n"
-                           "*** viewRequests"))
+                           "** writeProtected\n"
+                           "** noClaim\n"
+                           "** editRequest\n"
+                           "** viewRequests"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (repo only)))))))
+    (should (equal result '(skg node (skgRepos (nodeRepo only)))))))
 
 (ert-deftest test-strip-viewrequests-childless-dropped ()
   "A childless viewRequests field is dropped, not kept as a bare atom."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** repo\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** only\n"
-                           "*** viewRequests"))
+                           "** viewRequests"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (repo only)))))))
+    (should (equal result '(skg node (skgRepos (nodeRepo only)))))))
 
 ;;
 ;; Repo defaults
@@ -323,7 +331,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
 
 (ert-deftest test-fillIn-with-default-repo-marks-matching ()
   "Filling in with default-repo marks matching repo value."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
          (lines (split-string filledIn "\n"))
@@ -333,7 +341,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
 
 (ert-deftest test-fillIn-with-default-repo-leaves-nonmatching ()
   "Filling in with default-repo leaves non-matching repo value bare."
-  (let* ((sexp '(skg (node (id abc) (repo bob))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo bob))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
          (lines (split-string filledIn "\n"))
@@ -344,12 +352,12 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
 
 (ert-deftest test-fillIn-inserts-default-repo-when-missing ()
   "Filling in a node with no repo inserts default repo."
-  (let* ((sexp '(skg (node (id abc))))
+  (let* ((sexp '(skg node (gnid abc)))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
-    (should (cl-find "repo" headlines :key #'cdr :test #'string=))
+    (should (cl-find "nodeRepo" headlines :key #'cdr :test #'string=))
     (should (cl-find "jeff (default)" headlines
                      :key #'cdr :test #'string=))))
 
@@ -357,29 +365,31 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
   "Stripping repo with '(default)' suffix removes the suffix."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** jeff (default)"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (id abc) (repo jeff)))))))
+    (should (equal result '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))))))
 
 (ert-deftest test-strip-repo-bare-value ()
   "Stripping repo without '(default)' keeps the value as-is."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** repo\n"
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** skgRepos\n"
+                           "*** nodeRepo\n"
                            "**** bob"))
          (stripped (skg-metadata-fields-strip-defaults-from-org org-text test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (id abc) (repo bob)))))))
+    (should (equal result '(skg node (gnid abc) (skgRepos (nodeRepo bob)))))))
 
 (ert-deftest test-round-trip-with-default-repo ()
   "Round-trip with default-repo: fill in then strip is identity."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -392,7 +402,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind "jeff"))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (repo jeff)))))))
+    (should (equal result '(skg node (skgRepos (nodeRepo jeff)))))))
 
 ;;
 ;; Bug: skg-view-metadata was passing hardcoded "* skg\n** node"
@@ -402,18 +412,18 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
 
 (ert-deftest test-fillIn-preserves-existing-repo ()
   "Filling in a sexp that already has repo preserves it."
-  (let* ((sexp '(skg (node (id abc) (repo public)
-                           (rels "C5"))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo public))
+                     (rels "C5")))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Repo field must be present
-    (should (cl-find "repo" headlines :key #'cdr :test #'string=))
+    (should (cl-find "nodeRepo" headlines :key #'cdr :test #'string=))
     ;; Repo value must be "public" (not missing)
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; ID must be preserved
-    (should (cl-find "id" headlines :key #'cdr :test #'string=))
+    (should (cl-find "gnid" headlines :key #'cdr :test #'string=))
     (should (cl-find "abc" headlines :key #'cdr :test #'string=))
     ;; the rels herald must be preserved (as non-canonical, appended at end)
     (should (cl-find "rels" headlines :key #'cdr :test #'string=))))
@@ -423,7 +433,7 @@ is dropped key-and-all, leaving (skg (node (repo only)))."
 sexp<->org bijection is symbol-based, so the display-only herald strings
 -- which are stripped before this path anyway -- are not round-tripped
 here; see test-round-trip-with-links-in-herald's removal.)"
-  (let* ((sexp '(skg (node (id abc) (repo public))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo public))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (stripped (skg-metadata-fields-strip-defaults-from-org filledIn test--node-kind))
@@ -433,15 +443,15 @@ here; see test-round-trip-with-links-in-herald's removal.)"
 (ert-deftest test-fillIn-real-world-metadata ()
   "Filling in a real-world metadata sexp (from a bug report)
 preserves repo and all fields."
-  (let* ((sexp '(skg (node (id 6972d099)
-                           (repo public)
-                           (rels "C5 4(1,1)L"))))
+  (let* ((sexp '(skg node (gnid 6972d099)
+                     (skgRepos (nodeRepo public))
+                     (rels "C5 4(1,1)L")))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (lines (split-string filledIn "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Repo must be present
-    (should (cl-find "repo" headlines :key #'cdr :test #'string=))
+    (should (cl-find "nodeRepo" headlines :key #'cdr :test #'string=))
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; All editable defaults must be present
     (should (cl-find "writeProtected" headlines :key #'cdr :test #'string=))
@@ -464,7 +474,7 @@ preserves repo and all fields."
 
 (ert-deftest test-fillIn-prepends-display-title ()
   "Filling in with a display title prepends the title group."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn
           (skg-metadata-fields-fillIn-defaults-in-org
@@ -479,7 +489,7 @@ preserves repo and all fields."
 
 (ert-deftest test-fillIn-with-empty-display-title-does-not-prepend ()
   "Filling in with an empty display title leaves metadata first."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn
           (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind nil ""))
@@ -489,7 +499,7 @@ preserves repo and all fields."
 
 (ert-deftest test-strip-removes-display-title ()
   "Stripping removes the display-only title group before conversion."
-  (let* ((sexp '(skg (node (id abc) (repo jeff))))
+  (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn
           (skg-metadata-fields-fillIn-defaults-in-org
@@ -535,31 +545,31 @@ link typed as an id saves as its id; a default among several values
 is dropped."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
-                           "*** id\n"
-                           "**** abc\n"
-                           "*** editRequest\n"
-                           "**** relRepo r\n"
-                           "*** viewRequests\n"
-                           "**** editableView\n"
-                           "**** none (default)\n"
-                           "**** folder containers"))
+                           "** gnid\n"
+                           "*** abc\n"
+                           "** editRequest\n"
+                           "*** relRepo r\n"
+                           "** viewRequests\n"
+                           "*** editableView\n"
+                           "*** none (default)\n"
+                           "*** folder containers"))
          (stripped (skg-metadata-fields-strip-defaults-from-org
                     org-text test--node-kind)))
     (should (equal (org-to-sexp stripped)
-                   '(skg (node (id abc)
-                               (editRequest (relRepo r))
-                               (viewRequests editableView
-                                             (folder containers))))))
+                   '(skg node (gnid abc)
+                         (editRequest (relRepo r))
+                         (viewRequests editableView
+                                       (folder containers)))))
     (should (equal (org-to-sexp
                     (skg-metadata-fields-strip-defaults-from-org
-                     "* skg\n** node\n*** editRequest\n**** merge [[id:x][a title]]"
+                     "* skg\n** node\n** editRequest\n*** merge [[id:x][a title]]"
                      test--node-kind))
-                   '(skg (node (editRequest (merge x))))))
+                   '(skg node (editRequest (merge x)))))
     (should (equal (org-to-sexp
                     (skg-metadata-fields-strip-defaults-from-org
-                     "* skg\n** node\n*** editRequest\n**** flag noSearchMatching false"
+                     "* skg\n** node\n** editRequest\n*** flag noSearchMatching false"
                      test--node-kind))
-                   '(skg (node (editRequest (flag noSearchMatching false))))))))
+                   '(skg node (editRequest (flag noSearchMatching false)))))))
 
 (ert-deftest test-cycle-values-honor-the-conditions ()
   "A value offered only to an editable headline, or only to a removed

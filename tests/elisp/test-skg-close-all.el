@@ -29,7 +29,7 @@
   (let ((buf (get-buffer-create name)))
     (with-current-buffer buf
       (erase-buffer)
-      (insert "* (skg (node (id fake-id) (repo main))) fake title\n")
+      (insert "* (skg node (gnid fake-id) (skgRepos (nodeRepo main))) fake title\n")
       (skg-content-view-mode)
       (setq skg-view-id (concat "test-view-id-" name))
       (set-buffer-modified-p nil))
@@ -117,7 +117,7 @@ in plain `org-mode', so `skg-buffer-p' must not claim it."
         (progn
           (with-current-buffer buf
             (erase-buffer)
-            (insert "* (skg (node (id real-file-id) (repo main))) real title\n")
+            (insert "* (skg node (gnid real-file-id) (skgRepos (nodeRepo main))) real title\n")
             (org-mode)
             (save-buffer))
           (should (buffer-live-p buf))

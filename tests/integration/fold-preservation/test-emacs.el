@@ -48,8 +48,8 @@
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
-      (insert (concat "* (skg (node (repo main))) a\n"
-                      "* (skg (node (repo main))) b\n"
+      (insert (concat "* (skg node (skgRepos (nodeRepo main))) a\n"
+                      "* (skg node (skgRepos (nodeRepo main))) b\n"
                       "** c\n"
                       "** d\n"
                       "*** d1\n"
@@ -153,7 +153,7 @@
    (lambda (b)
      (and (string-match-p "diff-view: all changes" (buffer-name b))
           (with-current-buffer b
-            (string-match-p "(id dvroot)" (buffer-string)))))
+            (string-match-p "(gnid dvroot)" (buffer-string)))))
    (buffer-list)))
 
 (defun diffView-goto-headline (regexp)

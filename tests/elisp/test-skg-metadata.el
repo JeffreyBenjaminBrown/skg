@@ -20,12 +20,12 @@
       ((result (skg-parse-headline-metadata "title")))
     (should (null result)))
   (let ;; Test id and value only - should parse correctly with empty title
-      ((result (skg-parse-headline-metadata "(skg (id 1) value)")))
+      ((result (skg-parse-headline-metadata "(skg (gnid 1) value)")))
     (should result)
     (let ((alist (car result))
           (set (cadr result))
           (title (caddr result)))
-      (should (equal alist '(("id" . "1"))))
+      (should (equal alist '(("gnid" . "1"))))
       (should (equal set '("value")))
       (should (equal title ""))))
   (let ;; Test complex metadata with title
@@ -43,11 +43,11 @@
   "Test skg-parse-metadata-sexp with various inputs."
 
   (let ;; Test id and value
-      ((result (skg-parse-metadata-sexp "(skg (id 1) value)")))
+      ((result (skg-parse-metadata-sexp "(skg (gnid 1) value)")))
     (should result)
     (let ((alist (car result))
           (set (cadr result)))
-      (should (equal alist '(("id" . "1"))))
+      (should (equal alist '(("gnid" . "1"))))
       (should (equal set '("value")))))
   (let ;; Test complex metadata
       ((result (skg-parse-metadata-sexp "(skg a b (c d) (e f))")))
@@ -90,7 +90,7 @@ Returns the parsed s-expression or nil if not found."
   "Return the first metadata sexp whose node id is ID."
   (cl-find-if
    (lambda (sexp)
-     (equal (skg-sexp-cdr-at-path sexp '(skg node id))
+     (equal (skg-sexp-cdr-at-path sexp '(skg gnid))
             (list (intern skgid))))
    (test-skg--all-metadata-sexps)))
 
@@ -104,15 +104,15 @@ and leave the headline's own metadata alone."
                (lambda () (error "The command must not save"))))
       (with-temp-buffer
         (org-mode)
-        (insert "* (skg (node (id 1))) title")
+        (insert "* (skg node (gnid 1)) title")
         (goto-char (point-min))
         (funcall (car pair))
         (let ((result (test-skg--extract-metadata-sexp)))
           (should (skg-sexp-subtree-p
-                   result `(skg (node (viewRequests ,(cdr pair))))))
-          (should (skg-sexp-subtree-p result '(skg (node (id 1)))))
+                   result `(skg node (viewRequests ,(cdr pair)))))
+          (should (skg-sexp-subtree-p result '(skg node (gnid 1))))
           (should-not (skg-sexp-subtree-p
-                       result '(skg (node writeProtected)))))))))
+                       result '(skg node writeProtected))))))))
 
 (ert-deftest test-skg-write-protect-keybindings ()
   "C-c s w and C-c s W request write-protection."
@@ -127,7 +127,7 @@ and leave the headline's own metadata alone."
    (equal
     (skg-strip-metadata-from-org-text
      (concat
-      "* (skg (node (id 1) (repo public))) root\n"
+      "* (skg node (gnid 1) (skgRepos (nodeRepo public))) root\n"
       "body line\n"
       "** (skg alias (diff (rel added))) alias title\n"
       "** plain child\n"))
@@ -141,7 +141,7 @@ and leave the headline's own metadata alone."
   "Test skg-view-without-metadata does not open a buffer without a region."
   (with-temp-buffer
     (let ((before (buffer-list)))
-      (insert "* (skg (node (id 1))) root")
+      (insert "* (skg node (gnid 1)) root")
       (goto-char (point-min))
       (skg-view-without-metadata)
       (should (equal before (buffer-list))))))
@@ -155,8 +155,8 @@ and leave the headline's own metadata alone."
           (switch-to-buffer source-buffer)
           (insert
            (concat
-            "* (skg (node (id 1))) root\n"
-            "** (skg (node (id 2))) child\n"))
+            "* (skg node (gnid 1)) root\n"
+            "** (skg node (gnid 2)) child\n"))
           (goto-char (point-min))
           (push-mark (point-max) nil t)
           (activate-mark)
@@ -191,7 +191,7 @@ the folder commands are the way to show a node's partners."
   "Test skg-set-repo replaces the node repo field."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id 1) (repo public))) title")
+    (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public))) title")
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                (lambda (current-skgrepo)
@@ -201,19 +201,19 @@ the folder commands are the way to show a node's partners."
     (let ((result (test-skg--extract-metadata-sexp)))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (id 1) (repo private)))))
+               '(skg node (gnid 1) (skgRepos (nodeRepo private)))))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (viewStats (homeRepoHerald ⌂:private))))))
+               '(skg node (viewStats (homeRepoHerald ⌂:private)))))
       (should-not (skg-sexp-subtree-p
                    result
-                   '(skg (node (repo public))))))))
+                   '(skg node (skgRepos (nodeRepo public))))))))
 
 (ert-deftest test-skg-set-repo-updates-displayed-repo-herald ()
   "Test skg-set-repo changes the repo herald for the current node."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id 1) (repo public) (viewStats (homeRepoHerald ⌂:public)))) title")
+    (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public)) (viewStats (homeRepoHerald ⌂:public))) title")
     (goto-char (point-min))
     (heralds-minor-mode 1)
     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
@@ -236,29 +236,29 @@ the folder commands are the way to show a node's partners."
   "Test skg-set-merge-request adds a merge editRequest."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id acquirer) (repo public))) title")
+    (insert "* (skg node (gnid acquirer) (skgRepos (nodeRepo public))) title")
     (goto-char (point-min))
     (skg-set-merge-request "acquiree")
     (let ((result (test-skg--extract-metadata-sexp)))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (id acquirer) (repo public)
-                           (editRequest (merge acquiree)))))))))
+               '(skg node (gnid acquirer) (skgRepos (nodeRepo public))
+                     (editRequest (merge acquiree))))))))
 
 (ert-deftest test-skg-set-merge-request-with-link-replaces-editrequest ()
   "Test skg-set-merge-request accepts org links and replaces old editRequests."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg (node (id acquirer) (repo public) (editRequest delete))) title")
+    (insert "* (skg node (gnid acquirer) (skgRepos (nodeRepo public)) (editRequest delete)) title")
     (goto-char (point-min))
     (skg-set-merge-request "[[id:acquiree][Acquiree title]]")
     (let ((result (test-skg--extract-metadata-sexp)))
       (should (skg-sexp-subtree-p
                result
-               '(skg (node (editRequest (merge acquiree))))))
+               '(skg node (editRequest (merge acquiree)))))
       (should-not (skg-sexp-subtree-p
                    result
-                   '(skg (node (editRequest delete))))))))
+                   '(skg node (editRequest delete)))))))
 
 (ert-deftest test-skg-install-linkstack-minibuffer-bindings ()
   "Test merge-request prompts install linkstack bindings."
@@ -290,15 +290,15 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id root) (repo public))) root\n"
-      "** (skg (node (id content-child) (repo public))) content child\n"
-      "*** (skg (node (id content-grandchild) (repo public))) content grandchild\n"
-      "** (skg (node (id mismatched-content) (repo foreign))) mismatched content\n"
-      "*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch\n"
-      "** (skg (node (id link-child) (repo public) noClaim)) link child\n"
-      "*** (skg (node (id under-link) (repo public))) under link\n"
+      "* (skg node (gnid root) (skgRepos (nodeRepo public))) root\n"
+      "** (skg node (gnid content-child) (skgRepos (nodeRepo public))) content child\n"
+      "*** (skg node (gnid content-grandchild) (skgRepos (nodeRepo public))) content grandchild\n"
+      "** (skg node (gnid mismatched-content) (skgRepos (nodeRepo foreign))) mismatched content\n"
+      "*** (skg node (gnid public-under-mismatch) (skgRepos (nodeRepo public))) public under mismatch\n"
+      "** (skg node (gnid link-child) (skgRepos (nodeRepo public)) noClaim) link child\n"
+      "*** (skg node (gnid under-link) (skgRepos (nodeRepo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
-      "*** (skg (node (id under-non-vognode) (repo public))) under non-vognode\n"))
+      "*** (skg node (gnid under-non-vognode) (skgRepos (nodeRepo public))) under non-vognode\n"))
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                (lambda (current-skgrepo)
@@ -311,25 +311,25 @@ the folder commands are the way to show a node's partners."
                   "public-under-mismatch"))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id skgid)
-               '(skg (node (repo private)))))
+               '(skg node (skgRepos (nodeRepo private)))))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id skgid)
-               '(skg (node (viewStats (homeRepoHerald ⌂:private)))))))
+               '(skg node (viewStats (homeRepoHerald ⌂:private))))))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-sexp-by-id "mismatched-content")
-             '(skg (node (repo foreign)))))
+             '(skg node (skgRepos (nodeRepo foreign)))))
     (should-not (skg-sexp-subtree-p
                  (test-skg--metadata-sexp-by-id "mismatched-content")
-                 '(skg (node (repo private)))))
+                 '(skg node (skgRepos (nodeRepo private)))))
     (dolist (skgid '("link-child"
                   "under-link"
                   "under-non-vognode"))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id skgid)
-               '(skg (node (repo public)))))
+               '(skg node (skgRepos (nodeRepo public)))))
       (should-not (skg-sexp-subtree-p
                    (test-skg--metadata-sexp-by-id skgid)
-                   '(skg (node (repo private))))))))
+                   '(skg node (skgRepos (nodeRepo private))))))))
 
 (ert-deftest test-skg-replace-content-with-link-from-body ()
   "Test replacing the current branch from point in the node body."
@@ -337,12 +337,12 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
-      "** (skg (node (id p) (repo public))) P\n"
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
+      "** (skg node (gnid p) (skgRepos (nodeRepo public))) P\n"
       "body point starts here\n"
       "*** (skg aliasFolder) aliases\n"
-      "*** (skg (node (id c) (repo public) writeProtected)) child\n"
-      "** (skg (node (id p) (repo public) writeProtected)) P elsewhere\n"))
+      "*** (skg node (gnid c) (skgRepos (nodeRepo public)) writeProtected) child\n"
+      "** (skg node (gnid p) (skgRepos (nodeRepo public)) writeProtected) P elsewhere\n"))
     (goto-char (point-min))
     (search-forward "body point")
     (let ((save-count 0))
@@ -356,9 +356,9 @@ the folder commands are the way to show a node's partners."
        (equal
         (buffer-string)
         (concat
-         "* (skg (node (id r) (repo public))) R\n"
+         "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
          "** [[id:p][P]]\n"
-         "** (skg (node (id p) (repo public) writeProtected)) P elsewhere\n"))))))
+         "** (skg node (gnid p) (skgRepos (nodeRepo public)) writeProtected) P elsewhere\n"))))))
 
 (ert-deftest test-skg-replace-content-with-link-confirms-linked-headline ()
   "Test link-bearing headlines ask for confirmation and simplify labels."
@@ -366,8 +366,8 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
-      "** (skg (node (id p) (repo public))) P has [[https://x][X]] and [[id:y]]\n"))
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
+      "** (skg node (gnid p) (skgRepos (nodeRepo public))) P has [[https://x][X]] and [[id:y]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
@@ -385,7 +385,7 @@ the folder commands are the way to show a node's partners."
        (equal
         (buffer-string)
         (concat
-         "* (skg (node (id r) (repo public))) R\n"
+         "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
          "** [[id:p][P has X and id:y]]\n"))))))
 
 (ert-deftest test-skg-replace-content-with-link-cancel-linked-headline ()
@@ -394,8 +394,8 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (let ((original
            (concat
-            "* (skg (node (id r) (repo public))) R\n"
-            "** (skg (node (id p) (repo public))) P has [[id:x][X]]\n")))
+            "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
+            "** (skg node (gnid p) (skgRepos (nodeRepo public))) P has [[id:x][X]]\n")))
       (insert original)
       (goto-char (point-min))
       (forward-line 1)
@@ -417,8 +417,8 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
-      "** (skg (node (repo public))) P\n"))
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
+      "** (skg node (skgRepos (nodeRepo public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
@@ -436,8 +436,8 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo foreign))) R\n"
-      "** (skg (node (id p) (repo public))) P\n"))
+      "* (skg node (gnid r) (skgRepos (nodeRepo foreign))) R\n"
+      "** (skg node (gnid p) (skgRepos (nodeRepo public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
@@ -455,8 +455,8 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public) writeProtected)) R\n"
-      "** (skg (node (id p) (repo public))) P\n"))
+      "* (skg node (gnid r) (skgRepos (nodeRepo public)) writeProtected) R\n"
+      "** (skg node (gnid p) (skgRepos (nodeRepo public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0))
@@ -474,10 +474,10 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
       "** note\n"
       "see [[id:p][P]]\n"
-      "** (skg (node (id s) (repo public))) sibling\n"))
+      "** (skg node (gnid s) (skgRepos (nodeRepo public))) sibling\n"))
     (goto-char (point-min))
     (search-forward "[[id:p][P]]")
     (let ((save-count 0))
@@ -491,9 +491,9 @@ the folder commands are the way to show a node's partners."
        (equal
         (buffer-string)
         (concat
-         "* (skg (node (id r) (repo public))) R\n"
-         "** (skg (node (id p) writeProtected (viewRequests editableView))) P\n"
-         "** (skg (node (id s) (repo public))) sibling\n"))))))
+         "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
+         "** (skg node (gnid p) writeProtected (viewRequests editableView)) P\n"
+         "** (skg node (gnid s) (skgRepos (nodeRepo public))) sibling\n"))))))
 
 (ert-deftest test-skg-replace-link-with-content-warns-for-existing-node ()
   "Test replacing an existing node warns because it might orphan it."
@@ -501,8 +501,8 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
-      "** (skg (node (id old) (repo public))) see [[id:p][P]]\n"))
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
+      "** (skg node (gnid old) (skgRepos (nodeRepo public))) see [[id:p][P]]\n"))
     (goto-char (point-min))
     (forward-line 1)
     (let ((save-count 0)
@@ -527,7 +527,7 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
       "** [[id:a][A]]\n"
       "[[id:b][B]]\n"))
     (goto-char (point-min))
@@ -547,7 +547,7 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
       "** [[https://example.com][web]]\n"))
     (goto-char (point-min))
     (forward-line 1)
@@ -566,7 +566,7 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public))) R\n"
+      "* (skg node (gnid r) (skgRepos (nodeRepo public))) R\n"
       "** [[id:p][P]]\n"
       "*** child\n"))
     (goto-char (point-min))
@@ -586,7 +586,7 @@ the folder commands are the way to show a node's partners."
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (repo public) writeProtected)) R\n"
+      "* (skg node (gnid r) (skgRepos (nodeRepo public)) writeProtected) R\n"
       "** [[id:p][P]]\n"))
     (goto-char (point-min))
     (forward-line 1)
@@ -639,58 +639,58 @@ leaving the buffer as it was."
   "The request goes inside the ghost's form."
   (should (skg-sexp-subtree-p
            (test-skg--metadata-after
-            "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) (vnid 0d)) g"
+            "* (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) g"
             #'skg-restore-deleted-node)
-           '(skg (ghost (gnid g) (editRequest restoreNode))))))
+           '(skg ghost (gnid g) (editRequest restoreNode)))))
 
 (ert-deftest test-skg-restore-removed-membership-marks-a-removed-member ()
   "An editable removed member, under a node or a ghost,
 and a write-protected folder member carrying '(rel removed)' all take
 the request."
   (dolist (headline
-           '("* (skg (node (id r) (repo main))) r
-** (skg (node (id x) (repo main) noClaim (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
-             "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed)))) g
-** (skg (node (id x) (repo main) noClaim (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x"
-             "* (skg (node (id r) (repo main))) r
-** (skg (node (id c) (repo main))) c
+           '("* (skg node (gnid r) (skgRepos (nodeRepo main))) r
+** (skg (vnid 0c) node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (leaves 1 rel))) x"
+             "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed))) g
+** (skg (vnid 0c) node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (leaves 1 rel))) x"
+             "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
+** (skg node (gnid c) (skgRepos (nodeRepo main))) c
 *** (skg containerFolder) containers
-**** (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) (vnid 0o)) d"))
+**** (skg (vnid 0o) node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed) (properties changed) (leaves 1 rel all))) d"))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-after
               headline #'skg-restore-removed-membership)
-             '(skg (node (editRequest restoreRel)))))))
+             '(skg node (editRequest restoreRel))))))
 
 (ert-deftest test-skg-restore-commands-refuse-the-wrong-kind ()
   "Each command refuses a headline of the wrong kind at once."
   (should (equal (test-skg--refusal-of
-                  "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))) g"
+                  "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) g"
                   #'skg-restore-removed-membership)
                  "This node is deleted; restore it first (skg-restore-deleted-node)"))
   (dolist (headline
-           '("* (skg (node (id x) (repo main) (diff (rel added)))) x"
-             "* (skg (node (id x) (repo main))) x"
+           '("* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel added))) x"
+             "* (skg node (gnid x) (skgRepos (nodeRepo main))) x"
              ;; a root stands for no relationship
-             "* (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed)))) d"
+             "* (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) d"
              ;; a member is no removed member
-             "* (skg (node (id r) (repo main))) r
-** (skg (node (id x) (repo main) (diff (rel removed)))) x"
+             "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
+** (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel removed))) x"
              ;; a node of the containerward chain
-             "* (skg (node (id r) (repo main))) r
+             "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
 ** (skg containerFolder) containers
-*** (skg (node (id c) (repo main) writeProtected)) c
-**** (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed)))) d"
+*** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
+**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) d"
              ;; a node of the chain under another folder's member
-             "* (skg (node (id r) (repo main))) r
+             "* (skg node (gnid r) (skgRepos (nodeRepo main))) r
 ** (skg subscriberFolder) subscribers
-*** (skg (node (id s) (repo main) writeProtected)) s
-**** (skg (node (id d) (repo main) noClaim writeProtected (diff (rel removed)))) d"))
+*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
+**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) d"))
     (should (equal (test-skg--refusal-of
                     headline #'skg-restore-removed-membership)
                    "Only a removed membership can be restored")))
   (dolist (headline
-           '("* (skg (node (id x) (repo main) (diff (rel removed)))) x"
-             "* (skg (unknown (id u)))"
+           '("* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel removed))) x"
+             "* (skg unknown (gnid u))"
              "* (skg tombstone)"))
     (should (equal (test-skg--refusal-of headline #'skg-restore-deleted-node)
                    "Only a node deleted since HEAD can be restored; restoreNode belongs on a ghost (skg-restore-deleted-node)"))))
@@ -743,21 +743,21 @@ unchanged."
                          "fork" "flags" "folder"))
         (atom-values '("false (default)" "true")))
     (dolist (case
-             `(("* (skg (node (id x) (repo main))) x"
+             `(("* (skg node (gnid x) (skgRepos (nodeRepo main))) x"
                 ("writeProtected" . ,atom-values)
                 ("noClaim" . ,atom-values)
                 ("editRequest" . ("none (default)" "delete" "merge"
                                   "relRepo" "flag"))
                 ("viewRequests" . ,view-requests))
-               ("* (skg (node (id x) (repo main) writeProtected)) x"
+               ("* (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x"
                 ("editRequest" . ("none (default)" "relRepo")))
-               ("* (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x"
+               ("* (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x"
                 ("editRequest" . ("none (default)" "delete" "merge"
                                   "relRepo" "flag" "restoreRel")))
-               ("* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed)))) g"
+               ("* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed))) g"
                 ("editRequest" . ("none (default)" "restoreNode"))
                 ("viewRequests" . ("none (default)" "tombstone")))
-               ("* (skg (unknown (id u)))"
+               ("* (skg unknown (gnid u))"
                 ("editRequest" . ("none (default)" "relRepo")))
                ("* (skg alias) an alias"
                 ("editRequest" . ("none (default)" "relRepo")))
@@ -787,16 +787,16 @@ the value as a list; an untouched default is stripped on every kind."
   (dolist (case
            '(("* (skg alias) an alias" ("editRequest") 1
               "* (skg alias (editRequest (relRepo r))) an alias")
-             ("* (skg (unknown (id u)))" ("editRequest") 1
-              "* (skg (unknown (id u) (editRequest (relRepo r))))")
-             ("* (skg (ghost (gnid g) (skgRepos (nodeRepo main)))) g" ("editRequest") 1
-              "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode))) g")
-             ("* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed)))) g" ("viewRequests") 1
-              "* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed)))) g")
-             ("* (skg (node (id x) (repo main))) x" ("viewRequests") 6
-              "* (skg (node (id x) (repo main) (viewRequests (folder containers)))) x")
-             ("* (skg (node (id x) (repo main))) x" ("editRequest") 4
-              "* (skg (node (id x) (repo main) (editRequest (flag noSearchMatching true)))) x")))
+             ("* (skg unknown (gnid u))" ("editRequest") 1
+              "* (skg unknown (gnid u) (editRequest (relRepo r)))")
+             ("* (skg ghost (gnid g) (skgRepos (nodeRepo main))) g" ("editRequest") 1
+              "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)) g")
+             ("* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed))) g" ("viewRequests") 1
+              "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed))) g")
+             ("* (skg node (gnid x) (skgRepos (nodeRepo main))) x" ("viewRequests") 6
+              "* (skg node (gnid x) (skgRepos (nodeRepo main)) (viewRequests (folder containers))) x")
+             ("* (skg node (gnid x) (skgRepos (nodeRepo main))) x" ("editRequest") 4
+              "* (skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true))) x")))
     (test-skg--with-metadata-editor-on
      (car case)
      (lambda (source)

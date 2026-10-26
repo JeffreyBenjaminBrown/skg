@@ -12,7 +12,7 @@
   (declare (indent 1))
   `(let ,(mapcar (lambda (name)
                    `(,name (skg-open-org-buffer-from-text
-                            nil "* (skg (node (id x))) x\n"
+                            nil "* (skg node (gnid x)) x\n"
                             ,(format "*test-dirty-%s*" name))))
                  names)
      (unwind-protect (progn ,@body)
@@ -146,7 +146,7 @@ confirmation buffer) neither asks nor counts as dirty."
     (cl-letf (( (symbol-function 'run-at-time)
                 (lambda (&rest _) (error "asked during rerender")) ))
       (with-current-buffer b
-        (skg-replace-buffer-with-new-content nil "* (skg (node (id y))) y\n")
+        (skg-replace-buffer-with-new-content nil "* (skg node (gnid y)) y\n")
         (should-not (buffer-modified-p))))))
 
 ;;; test-skg-dirty-view-confirmation.el ends here

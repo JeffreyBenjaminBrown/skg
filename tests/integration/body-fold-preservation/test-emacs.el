@@ -65,10 +65,10 @@ metadata stripped from headlines so headlines read like `* title'."
       (let ((inhibit-read-only t)) (erase-buffer))
       (insert
        (concat
-        "* (skg (node (repo main))) root\n"
+        "* (skg node (skgRepos (nodeRepo main))) root\n"
         "root body line one\n"
         "root body line two\n"
-        "** (skg (node (repo main))) child\n"
+        "** (skg node (skgRepos (nodeRepo main))) child\n"
         "child body line\n"))
       (skg-content-view-mode)
       (setq skg-view-id (org-id-uuid))
@@ -123,7 +123,7 @@ ACTUAL:
    (lambda (b)
      (and (string-match-p "diff-view: all changes" (buffer-name b))
           (with-current-buffer b
-            (string-match-p "(id dvroot)" (buffer-string)))))
+            (string-match-p "(gnid dvroot)" (buffer-string)))))
    (buffer-list)))
 
 (defun bfp-run-diffView-scenario ()
@@ -140,7 +140,7 @@ Returns a short diagnostic string on failure, nil on success."
     (skg-test-wait-for-response 20)
     (switch-to-buffer buf)
     (goto-char (point-min))
-    (re-search-forward "(id dvroot)")
+    (re-search-forward "(gnid dvroot)")
     (beginning-of-line)
     (dotimes (_ 2) (org-cycle))
     (let ((before (bfp-snapshot)))

@@ -78,7 +78,7 @@ skg-config-dir is set and skg--owned-repos works."
   "C-return on a root headline should prompt for repo in minibuffer,
 insert metadata with chosen repo, and not open the sexp-edit buffer."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (should (org-at-heading-p))
@@ -95,12 +95,12 @@ insert metadata with chosen repo, and not open the sexp-edit buffer."
 
        ;; Original headline unchanged.
        (should (string-match-p
-                "^\\* (skg (node (id x) (repo public))) x$"
+                "^\\* (skg node (gnid x) (skgRepos (nodeRepo public))) x$"
                 content))
 
        ;; New headline has metadata with chosen skgrepo "private".
        (should (string-match-p
-                "^\\* (skg (node (repo private))) $"
+                "^\\* (skg node (skgRepos (nodeRepo private))) $"
                 content))
 
        ;; Exactly two headlines.
@@ -124,7 +124,7 @@ without prompting."
                  "path = \"owned/only\"\n"
                  "")))
     (test--with-skg-content-view
-     "* (skg (node (id x) (repo only))) x\n"
+     "* (skg node (gnid x) (skgRepos (nodeRepo only))) x\n"
      one-repo-config
      (lambda ()
        (should (org-at-heading-p))
@@ -141,7 +141,7 @@ without prompting."
        (let ((content (buffer-substring-no-properties
                        (point-min) (point-max))))
          (should (string-match-p
-                  "^\\* (skg (node (repo only))) $"
+                  "^\\* (skg node (skgRepos (nodeRepo only))) $"
                   content)))))))
 
 ;; Test 2b: The prompt follows the server's inheritance walk.
@@ -150,13 +150,13 @@ without prompting."
   "C-return prompts for a repo exactly when the new headline cannot
 inherit one: not below a folder or a ghost whose viewparent is a node,
 but below a tombstone."
-  (dolist (case '(("* (skg (node (id x) (repo public))) x\n** (skg subscribeeFolder)\n*** (skg (node (id y) (repo public))) y\n"
+  (dolist (case '(("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg subscribeeFolder)\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    nil)
-                  ("* (skg (node (id x) (repo public))) x\n** (skg (ghost (gnid d) (skgRepos (nodeRepo public)))) d\n*** (skg (node (id y) (repo public))) y\n"
+                  ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg ghost (gnid d) (skgRepos (nodeRepo public))) d\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    nil)
-                  ("* (skg (node (id x) (repo public))) x\n** (skg bodyFolded (node (id m) (repo public))) m\n*** (skg (node (id y) (repo public))) y\n"
+                  ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg bodyFolded node (gnid m) (skgRepos (nodeRepo public))) m\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    nil)
-                  ("* (skg (node (id x) (repo public))) x\n** (skg tombstone)\n*** (skg (node (id y) (repo public))) y\n"
+                  ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg tombstone)\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    t)))
     (test--with-skg-content-view
      (car case)
@@ -170,7 +170,7 @@ but below a tombstone."
            (org-insert-heading-respect-content))
          (should (eq prompted (cadr case)))
          (should (eq (and (string-match-p
-                           "^\\*\\*\\* (skg (node (repo private))) $"
+                           "^\\*\\*\\* (skg node (skgRepos (nodeRepo private))) $"
                            (buffer-substring-no-properties
                             (point-min) (point-max)))
                           t)
@@ -227,7 +227,7 @@ but below a tombstone."
   "When a headline already has metadata, skg-view-metadata should
 open the sexp-edit buffer (not prompt in minibuffer)."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (should (org-at-heading-p))
@@ -253,7 +253,7 @@ open the sexp-edit buffer (not prompt in minibuffer)."
 (ert-deftest test-view-repo-list-includes-all-repos ()
   "skg-view-repo-list should list every configured repo and path."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-with-foreign-repo
    (lambda ()
      (unwind-protect
@@ -277,7 +277,7 @@ open the sexp-edit buffer (not prompt in minibuffer)."
 (ert-deftest test-repo-change-prompt-starts-with-current-repo ()
   "skg--prompt-for-repo-change should put current repo in editable text."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-public-and-private
    (lambda ()
      (cl-letf (((symbol-function 'completing-read)
@@ -300,7 +300,7 @@ open the sexp-edit buffer (not prompt in minibuffer)."
   "skg--prompt-for-repo-set completes the prefix repo-set choices:
 the repos in privacy order, then \"all\"."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-with-interleaved-repo-sets
    (lambda ()
      (cl-letf (((symbol-function 'completing-read)
@@ -323,7 +323,7 @@ the repos in privacy order, then \"all\"."
 (ert-deftest test-config-readers-handle-interleaved-repo-tables ()
   "Elisp config readers should not confuse [[repos]] and [[repo_sets]]."
   (test--with-skg-content-view
-   "* (skg (node (id x) (repo public))) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n"
    test--config-with-interleaved-repo-sets
    (lambda ()
      (should (equal (skg--repo-names) '("public" "private")))
@@ -362,12 +362,13 @@ and shows the title under a `title' group."
                      (2 . "my title")
                      (1 . "skg")
                      (2 . "node")
-                     (3 . "repo")
+                     (2 . "skgRepos")
+                     (3 . "nodeRepo")
                      (4 . "only")
-                     (3 . "writeProtected")
-                     (3 . "noClaim")
-                     (3 . "editRequest")
-                     (3 . "viewRequests"))))))
+                     (2 . "writeProtected")
+                     (2 . "noClaim")
+                     (2 . "editRequest")
+                     (2 . "viewRequests"))))))
 
 (ert-deftest test-empty-node-org-text-blank-title ()
   "With a blank title, `title' is shown childless (nothing under it)."
@@ -381,7 +382,7 @@ and shows the title under a `title' group."
 ;; in place and opens the view with skgrepo pre-filled.
 
 (ert-deftest test-edit-metadata-empty-opens-view ()
-  "C-c v m on a metadata-less headline populates (skg (node (repo only)))
+  "C-c v m on a metadata-less headline populates (skg node (skgRepos (nodeRepo only)))
 in place and opens the empty-node view: repo pre-filled, others childless."
   (test--with-skg-content-view
    "* a new node\n"
@@ -392,7 +393,7 @@ in place and opens the empty-node view: repo pre-filled, others childless."
        ;; The source headline now carries minimal metadata.
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (repo only))) a new node$"
+                  "^\\* (skg node (skgRepos (nodeRepo only))) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))
        ;; The edit buffer shows the skeleton.
@@ -402,13 +403,14 @@ in place and opens the empty-node view: repo pre-filled, others childless."
              (with-current-buffer edit-buf
                (let ((content (buffer-substring-no-properties
                                (point-min) (point-max))))
-                 (should (string-match-p "^\\*\\*\\* repo\n\\*\\*\\*\\* only$"
-                                         content))
-                 (should (string-match-p "^\\*\\*\\* writeProtected$" content))
-                 (should (string-match-p "^\\*\\*\\* viewRequests$" content))
+                 (should (string-match-p
+                          "^\\*\\* skgRepos\n\\*\\*\\* nodeRepo\n\\*\\*\\*\\* only$"
+                          content))
+                 (should (string-match-p "^\\*\\* writeProtected$" content))
+                 (should (string-match-p "^\\*\\* viewRequests$" content))
                  ;; childless: no value lines under the editable fields.
-                 (should-not (string-match-p "^\\*\\*\\*\\* false" content))
-                 (should-not (string-match-p "^\\*\\*\\*\\* none" content))
+                 (should-not (string-match-p "^\\*\\*\\* false" content))
+                 (should-not (string-match-p "^\\*\\*\\* none" content))
                  ;; title group present and read-only.
                  (should (string-match-p "^\\* title$" content))
                  (should (string-match-p "^\\*\\* a new node$" content))))
@@ -417,7 +419,7 @@ in place and opens the empty-node view: repo pre-filled, others childless."
 ;; Round-trip: applying the untouched view yields just the skgrepo.
 
 (ert-deftest test-edit-metadata-empty-apply-untouched ()
-  "Applying the untouched empty-node view yields (skg (node (repo only)))."
+  "Applying the untouched empty-node view yields (skg node (skgRepos (nodeRepo only)))."
   (test--with-skg-content-view
    "* a new node\n"
    test--config-one-repo
@@ -428,14 +430,14 @@ in place and opens the empty-node view: repo pre-filled, others childless."
          (skg-sexp-edit--apply))
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (repo only))) a new node$"
+                  "^\\* (skg node (skgRepos (nodeRepo only))) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 
 ;; Round-trip: a field the user populates survives; the rest stay na.
 
 (ert-deftest test-edit-metadata-empty-apply-with-write-protected ()
-  "Populating writeProtected=true in the view yields (skg (node (repo only) writeProtected)),
+  "Populating writeProtected=true in the view yields (skg node (skgRepos (nodeRepo only)) writeProtected),
 while the untouched fields contribute no keys."
   (test--with-skg-content-view
    "* a new node\n"
@@ -444,16 +446,16 @@ while the untouched fields contribute no keys."
      (let ((source-buffer (current-buffer)))
        (skg-view-metadata)
        (with-current-buffer (test--skg-edit-buffer)
-         ;; Simulate the user adding a level-4 child under write-protected and
+         ;; Simulate the user adding a level-3 child under write-protected and
          ;; cycling it to true.
          (goto-char (point-min))
-         (re-search-forward "^\\*\\*\\* writeProtected$" nil t)
+         (re-search-forward "^\\*\\* writeProtected$" nil t)
          (end-of-line)
-         (insert "\n**** true")
+         (insert "\n*** true")
          (skg-sexp-edit--apply))
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (repo only) writeProtected)) a new node$"
+                  "^\\* (skg node (skgRepos (nodeRepo only)) writeProtected) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 

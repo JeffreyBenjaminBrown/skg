@@ -39,7 +39,7 @@
 
 (let* ((data (getenv "SKG_TEST_DATA_DIR"))
        (view-text
-        (concat "* (skg (node (id src) (repo public))) "
+        (concat "* (skg node (gnid src) (skgRepos (nodeRepo public))) "
                 "Repo [[id:old-dest][café]]\n"
                 "[[id:gone][gone]] [[id:private-node][private]]\n"))
        (buffer (skg-open-org-buffer-from-text

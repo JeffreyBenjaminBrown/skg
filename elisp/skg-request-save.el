@@ -867,8 +867,9 @@ the forks) or decline with C-c C-k."
 
 (defun skg--fork-repos-from-confirmation-buffer ()
   "Walk the fork-confirmation buffer; return an alist ((N . REPO) ...).
-Each level-1 headline is a clone-to-be carrying (repo REPO) and no
-id; each of its level-2 children is an original carrying (id N). The
+Each level-1 headline is a clone-to-be carrying (skgRepos (nodeRepo
+REPO)) and no gnid; each of its level-2 children is an original
+carrying (gnid N). The
 clone's REPO (rotated by the user, or the default) is paired with each
 child's id N -- the key by which the server applies the chosen repo."
   (let ((pairs nil)

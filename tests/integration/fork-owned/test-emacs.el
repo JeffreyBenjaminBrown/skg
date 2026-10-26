@@ -15,23 +15,23 @@
   (kill-emacs 1))
 
 (defun fork-test--buffer-showing (skgid)
-  "Return a live skg view buffer whose text mentions (id ID)."
+  "Return a live skg view buffer whose text mentions (gnid ID)."
   (seq-find
    (lambda (b)
      (and (buffer-live-p b)
           (with-current-buffer b
             (and (boundp 'skg-view-id) skg-view-id
-                 (string-match-p (regexp-quote (format "(id %s)" skgid))
+                 (string-match-p (regexp-quote (format "(gnid %s)" skgid))
                                  (buffer-substring-no-properties
                                   (point-min) (point-max)))))))
    (buffer-list)))
 
 (defun fork-test--goto-headline (skgid)
-  "Move point onto the headline carrying (id ID) in the current buffer.
+  "Move point onto the headline carrying (gnid ID) in the current buffer.
 Fails the test if it is not found."
   (goto-char (point-min))
   (unless (re-search-forward
-           (regexp-quote (format "(id %s) (repo owned)" skgid)) nil t)
+           (regexp-quote (format "(gnid %s) (skgRepos (nodeRepo owned))" skgid)) nil t)
     (test-fail "could not find %s's headline:\n%s" skgid (buffer-string))))
 
 (defun integration-test-fork-owned ()
@@ -45,7 +45,7 @@ Fails the test if it is not found."
   (let ((q-buf (skg-test-wait-for (lambda () (fork-test--buffer-showing "Q")) 10)))
     (unless q-buf (test-fail "Q's view never appeared"))
     (with-current-buffer q-buf
-      (unless (string-match-p "(id M)" (buffer-string))
+      (unless (string-match-p "(gnid M)" (buffer-string))
         (test-fail "Q's view does not show its content M:\n%s" (buffer-string)))
 
       ;; 2. Forking a dirty buffer is refused: no confirmation appears.
@@ -66,7 +66,7 @@ Fails the test if it is not found."
                       (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
     (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
     (with-current-buffer confirm-buf
-      (unless (string-match-p "(id M)" (buffer-string))
+      (unless (string-match-p "(gnid M)" (buffer-string))
         (test-fail "confirmation buffer does not list M:\n%s" (buffer-string)))
       (message "✓ skg-fork-node produced a fork-confirmation listing M")
       ;; Approving before picking a skgrepo is refused.
@@ -77,7 +77,7 @@ Fails the test if it is not found."
       (message "✓ approve refused until a repo is picked")
       ;; Pick the clone's skgrepo, then approve.
       (goto-char (point-min))
-      (re-search-forward "^\\* (skg (node (repo ")
+      (re-search-forward "^\\* (skg node (skgRepos (nodeRepo ")
       (beginning-of-line)
       (skg--change-repo-at-point "owned")
       (skg-approve-fork)))
@@ -151,7 +151,7 @@ Fails the test if it is not found."
                         (let ((b (get-buffer "*SKG Fork Confirmation*")))
                           (and b
                                (with-current-buffer b
-                                 (string-match-p "(id M3)" (buffer-string)))
+                                 (string-match-p "(gnid M3)" (buffer-string)))
                                b)))
                       10)))
     (unless confirm-buf (test-fail "no fork-confirmation for M3 appeared"))

@@ -108,8 +108,8 @@ produces -- as an overlay (never buffer text), colored tokens inside
 plain parens. Fields producing no herald get none."
   (skg-test-install-herald-rules)
   (with-temp-buffer
-    (insert "* skg\n** node\n*** repo\n**** main\n*** writeProtected\n"
-            "*** noClaim\n**** true\n")
+    (insert "* skg\n** node\n** skgRepos\n*** nodeRepo\n**** main\n** writeProtected\n"
+            "** noClaim\n*** true\n")
     (org-mode)
     (skg-sexp-edit--decorate-with-heralds)
     (let ((hint-on-line
@@ -127,10 +127,10 @@ plain parens. Fields producing no herald get none."
                                           (1+ (line-end-position)))))))
                (and ov (substring-no-properties
                         (overlay-get ov 'after-string)))))))
-      (should (equal (funcall hint-on-line "*** writeProtected") " (\u262e)"))
-      (should-not (funcall hint-on-line "*** noClaim"))
+      (should (equal (funcall hint-on-line "** writeProtected") " (\u262e)"))
+      (should-not (funcall hint-on-line "** noClaim"))
       (should-not (funcall hint-on-line "**** main"))
-      (should-not (funcall hint-on-line "*** repo"))
+      (should-not (funcall hint-on-line "*** nodeRepo"))
       ;; The buffer text is untouched: applying must not see hints.
       (should-not (string-match-p "(\u262e)" (buffer-string))))))
 

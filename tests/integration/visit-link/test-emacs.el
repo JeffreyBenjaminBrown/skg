@@ -76,7 +76,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
   (skg--request-text-search "has" nil nil nil)
   (message "Sent text-search request")
 
-  (unless (wait-for-buffer (skg-search-buffer-name "has") "(id src)" 5)
+  (unless (wait-for-buffer (skg-search-buffer-name "has") "(gnid src)" 5)
     (test-fail "Timeout waiting for search results")))
 
 (defun phase-1-visit-src ()
@@ -90,7 +90,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
             (message "Search results: %s" content)
 
             ;; Verify search found src
-            (unless (string-match-p "(id src)" content)
+            (unless (string-match-p "(gnid src)" content)
               (test-fail "Expected src node in search results, got: %s" content))
 
             (test-pass "Found src in search results")
@@ -98,7 +98,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
             ;; Position cursor on the src metadata
             ;; so skg-goto can extract the id.
             (goto-char (point-min))
-            (if (search-forward "(id src)" nil t)
+            (if (search-forward "(gnid src)" nil t)
                 (progn
                   (goto-char (match-beginning 0))
                   (message "Line: %s"
@@ -111,7 +111,7 @@ Returns t if found, nil if timeout. TIMEOUT-SECONDS defaults to 5."
                   ;; (src's title contains a [[id:dest][...]] link)
                   (unless (wait-for-content-view "\\[\\[id:dest\\]" 5)
                     (test-fail "Timeout waiting for src content view")))
-              (test-fail "Could not find (id src) in search results"))))
+              (test-fail "Could not find (gnid src) in search results"))))
       (test-fail "Search buffer not found"))))
 
 (defun phase-2-visit-dest ()

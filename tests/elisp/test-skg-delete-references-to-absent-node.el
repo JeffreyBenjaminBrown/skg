@@ -11,8 +11,8 @@
 (defun test--with-unknown-view (body)
   "Run BODY at a PhantomUnknown headline in a temporary SKG view."
   (with-temp-buffer
-    (insert "* (skg (node (id recorder) (repo main))) recorder\n"
-            "** (skg (unknown (id gone)))\n")
+    (insert "* (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder\n"
+            "** (skg unknown (gnid gone))\n")
     (skg-content-view-mode)
     (setq-local skg-view-id "test-unknown-view")
     (set-buffer-modified-p nil)
@@ -22,7 +22,7 @@
 
 (ert-deftest test-delete-absent-references-requires-an-unknown-and-clean-views ()
   (with-temp-buffer
-    (insert "* (skg (node (id recorder) (repo main))) recorder\n")
+    (insert "* (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder\n")
     (skg-content-view-mode)
     (should-error (skg-delete-references-to-absent-node) :type 'user-error))
   (test--with-unknown-view

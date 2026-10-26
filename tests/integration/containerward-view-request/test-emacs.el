@@ -45,12 +45,12 @@
       (erase-buffer)
       (org-mode)
       (setq skg-view-id (org-id-uuid))
-      (insert "* (skg (node (id 0) (repo main))) 0\n")
-      (insert "** (skg (node (id 1))) 1\n")
-      (insert "*** (skg (node (id 11))) 11\n")
-      (insert "*** (skg (node (id 12))) 12\n")
-      (insert "**** (skg (node (id 121))) 121\n")
-      (insert "*** (skg (node (id 13))) 13\n")
+      (insert "* (skg node (gnid 0) (skgRepos (nodeRepo main))) 0\n")
+      (insert "** (skg node (gnid 1)) 1\n")
+      (insert "*** (skg node (gnid 11)) 11\n")
+      (insert "*** (skg node (gnid 12)) 12\n")
+      (insert "**** (skg node (gnid 121)) 121\n")
+      (insert "*** (skg node (gnid 13)) 13\n")
       (message "✓ Created initial buffer with full structure")
 
       ;; Save to establish relationships
@@ -71,14 +71,14 @@
     (when buffer
       (with-current-buffer buffer
         (erase-buffer)
-        (insert "* (skg (node (id 1) (repo main))) 1\n")
-        (insert "** (skg (node (id 11))) 11\n")
-        (insert "** (skg (node (id 12))) 12\n")
-        (insert "*** (skg (node (id 121))) 121\n")
-        (insert "** (skg (node (id 13))) 13\n")
+        (insert "* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n")
+        (insert "** (skg node (gnid 11)) 11\n")
+        (insert "** (skg node (gnid 12)) 12\n")
+        (insert "*** (skg node (gnid 121)) 121\n")
+        (insert "** (skg node (gnid 13)) 13\n")
         (message "✓ Created new buffer without node 0")
 
-        ;; Position on line 3 (** (skg (id 12)) 12)
+        ;; Position on line 3 (** (skg (gnid 12)) 12)
         (goto-char (point-min))
         (forward-line 2)
         (message "✓ Positioned on node 12 (line 3)")
@@ -117,14 +117,14 @@
                     "*** 121\n"
                     "** 13\n"))
            (expected
-            (concat "* (skg (node (id 1) (repo main) (rels (contains (in 1) (out 3))))) 1\n"
-                    "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11\n"
-                    "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12\n"
+            (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (in 1) (out 3)))) 1\n"
+                    "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11\n"
+                    "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 12\n"
                     "*** (skg containerFolder)\n"
-                    "**** (skg (node (id 1) (repo main) writeProtected (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle))) 1\n"
-                    "***** (skg (node (id 0) (repo main) noClaim writeProtected (rels (contains (out 1 (ancestors 1)))))) 0\n"
-                    "*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121\n"
-                    "** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13\n")))
+                    "**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle)) 1\n"
+                    "***** (skg node (gnid 0) (skgRepos (nodeRepo main)) noClaim writeProtected (rels (contains (out 1 (ancestors 1))))) 0\n"
+                    "*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 121\n"
+                    "** (skg node (gnid 13) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13\n")))
 
       (message "Buffer-Content with metadata: %s" buffer-content)
       (message "Expected buffer-content with metadata: %s" expected)

@@ -49,7 +49,7 @@
              (let ((buf (find-content-view-buffer)))
                (when buf
                  (with-current-buffer buf
-                   (string-match-p "(id a)"
+                   (string-match-p "(gnid a)"
                                    (buffer-substring-no-properties
                                     (point-min) (point-max))))))))
     (test-fail "Timeout waiting for the \"all changes\" buffer"))
@@ -60,7 +60,7 @@
   (let ((content (with-current-buffer (find-content-view-buffer)
                    (buffer-substring-no-properties
                     (point-min) (point-max)))))
-    (unless (string-match-p "(ghost (gnid b)" content)
+    (unless (string-match-p "ghost (gnid b)" content)
       (test-fail "No ghost b in buffer. Content:\n%s" content))
     (test-pass "Ghost b present")))
 
@@ -69,7 +69,7 @@
   (let ((buf (find-content-view-buffer)))
     (switch-to-buffer buf)
     (goto-char (point-min))
-    (unless (re-search-forward "(ghost (gnid b)" nil t)
+    (unless (re-search-forward "ghost (gnid b)" nil t)
       (test-fail "Could not find ghost b line"))
     (beginning-of-line)
     (message "  Positioned on: %s"
