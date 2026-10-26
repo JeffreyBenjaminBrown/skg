@@ -298,32 +298,12 @@ walk ends at a tombstone or a property."
   (save-excursion
     (catch 'answer
       (while (org-up-heading-safe)
-        (let (( kind (skg--headline-kind-at-point) ))
-          (cond ((eq kind 'node) (throw 'answer t))
-                ((or (null kind)
-                     (memq kind '(ghost unknown))
-                     (string-suffix-p "Folder" (symbol-name kind))))
+        (let (( kind (alist-get 'kind (skg-metadata-fields-kind-of-sexp
+                                      (skg--metadata-sexp-at-point-or-nil))) ))
+          (cond ((equal kind "occurrence") (throw 'answer t))
+                ((member kind '(nil "ghost" "unknown" "folder")))
                 (t (throw 'answer nil)))))
       nil)))
-
-(defun skg--headline-kind-at-point ()
-  "The kind of the headline at point, as its kind atom among the
-top-level elements of its metadata, bare or heading a list (node,
-ghost, tombstone, aliasFolder, alias ...; see
-'shared/metadata-fields.json'); `node' for metadata that names no
-kind, which the server reads as a node's; nil for a headline without
-metadata."
-  (let* (( split (skg-split-as-stars-metadata-title
-                  (skg-get-current-headline-text)) )
-         ( metadata-str (and split (cadr split)) ))
-    (when (and metadata-str (not (string-empty-p metadata-str)))
-      (or (seq-some (lambda (element)
-                      (let (( atom (if (consp element) (car element) element) ))
-                        (and atom (symbolp atom)
-                             (skg-shared-metadata-kind (symbol-name atom))
-                             atom)))
-                    (cdr (read metadata-str)))
-          'node))))
 
 (advice-add 'org-insert-heading-respect-content :after
             #'skg-sexp-edit--after-insert-headline)

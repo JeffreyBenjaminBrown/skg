@@ -331,27 +331,6 @@ end
 
 -- ── a skgrepo for a new headline ───────────────────────────────────
 
----The kind of the headline at LINE_NUMBER, as its kind's atom among
----the top-level elements of its metadata, bare or heading a list
----(node, ghost, tombstone, aliasFolder, alias, flag ...), or nil for a
----headline without metadata or without a kind 'shared/metadata-fields.json'
----names. Mirrors skg--headline-kind-at-point.
----@param line_number integer
----@return string|nil
-function M.headline_kind_atom (line_number)
-  local sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  if not sexpr.is_list(sexp) then return nil end
-  for i = 2, #sexp do
-    local form = sexp[i]
-    local head = sexpr.is_list(form) and form[1] or form
-    if sexpr.is_symbol(head) then
-      local atom = sexpr.atom_text(head)
-      if shared.metadata_kind(atom) then return atom end
-    end
-  end
-  return nil
-end
-
 ---Whether the save can give the headline at LINE_NUMBER a skgrepo by
 ---inheritance, as the server's walk rootward decides
 ---('skgrepo_of_nearest_occurrence_ancestor'): it passes through
@@ -368,11 +347,12 @@ function M.headline_can_inherit_skgrepo_p (line_number)
     local level = metadata.outline_level(line)
     line = level and metadata.parent_headline_line(line, level)
     if not line then return false end
-    local kind = M.headline_kind_atom(line)
-    if kind == 'node' then return true end
-    if not (kind == nil
-            or kind == 'unknown' or kind == 'ghost'
-            or kind:match('Folder$')) then
+    local kind = fields.kind_of_sexp(
+      metadata.metadata_sexp_at_line_or_nil(line))
+    local kind_name = kind and kind.kind
+    if kind_name == 'occurrence' then return true end
+    if not (kind_name == nil or kind_name == 'unknown'
+            or kind_name == 'ghost' or kind_name == 'folder') then
       return false end
   end
 end

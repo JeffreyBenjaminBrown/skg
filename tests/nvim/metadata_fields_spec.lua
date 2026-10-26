@@ -51,7 +51,10 @@ describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
       assert.are.equal(kind_name,
         fields.kind_of_sexp(sexpr.read(sexp_text)).kind, sexp_text)
     end
-    assert.is_nil(fields.kind_of_sexp(sexpr.read('(skg (relRepo r))')))
+    assert.are.equal('occurrence',
+      fields.kind_of_sexp(sexpr.read('(skg (relRepo r))')).kind)
+    assert.are.equal('occurrence',
+      fields.kind_of_sexp(sexpr.read('(skg)')).kind)
     assert.is_nil(fields.kind_of_sexp(sexpr.read('(foo)')))
   end)
 end)

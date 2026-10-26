@@ -28,14 +28,17 @@
 
 (defun skg-metadata-fields-kind-of-sexp (sexp)
   "The kind of the metadata SEXP, '(skg ...)', from
-'shared/metadata-fields.json', or nil: the kind of the first atom of
-SEXP, bare or heading a list, that the table names."
-  (when (consp sexp)
-    (cl-some (lambda (element)
-               (let (( atom (if (consp element) (car element) element) ))
-                 (and atom (symbolp atom)
-                      (skg-shared-metadata-kind (symbol-name atom)))))
-             (cdr sexp))))
+'shared/metadata-fields.json': the kind of the first atom of SEXP,
+bare or heading a list, that the table names, or, when it names none,
+the occurrence's, since the server reads such metadata as a node's.
+Nil when SEXP is no '(skg ...)'."
+  (when (eq (car-safe sexp) 'skg)
+    (or (cl-some (lambda (element)
+                   (let (( atom (if (consp element) (car element) element) ))
+                     (and atom (symbolp atom)
+                          (skg-shared-metadata-kind (symbol-name atom)))))
+                 (cdr sexp))
+        (skg-shared-metadata-kind "node"))))
 
 (defun skg-metadata-fields-field-names (kind)
   "The names of the fields a user may set on KIND, in the table's order."

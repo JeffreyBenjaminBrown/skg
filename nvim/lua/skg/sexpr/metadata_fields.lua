@@ -24,12 +24,15 @@ local M = {}
 -- ── The table ──────────────────────────────────────────────────────
 
 ---The kind of the metadata SEXP, '(skg ...)', from
----'shared/metadata-fields.json', or nil: the kind of the first atom of
----SEXP, bare or heading a list, that the table names.
+---'shared/metadata-fields.json': the kind of the first atom of SEXP,
+---bare or heading a list, that the table names, or, when it names
+---none, the occurrence's, since the server reads such metadata as a
+---node's. Nil when SEXP is no '(skg ...)'.
 ---@param sexp any
 ---@return table|nil
 function M.kind_of_sexp (sexp)
-  if not parse.is_list(sexp) then return nil end
+  if not (parse.is_list(sexp) and sexp[1] == parse.symbol('skg')) then
+    return nil end
   for i = 2, #sexp do
     local atom = sexp[i]
     if parse.is_list(atom) then atom = atom[1] end
@@ -38,7 +41,7 @@ function M.kind_of_sexp (sexp)
       if kind then return kind end
     end
   end
-  return nil
+  return shared.metadata_kind('node')
 end
 
 ---The names of the fields a user may set on KIND, in the table's order.

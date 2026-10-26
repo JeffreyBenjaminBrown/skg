@@ -15,7 +15,8 @@
 
 (ert-deftest test-kind-of-sexp ()
   "A metadata sexp's kind is that of its first atom the table names,
-bare or heading a list, after any marker; nil for no kind."
+bare or heading a list, after any marker; the occurrence's when it
+names none; nil for what is no '(skg ...)'."
   (dolist (case '(((skg node (gnid abc) (skgRepos (nodeRepo jeff))) . "occurrence")
                   ((skg focused node (gnid abc)) . "occurrence")
                   ((skg ghost (gnid g) (skgRepos (nodeRepo r))) . "ghost")
@@ -23,7 +24,8 @@ bare or heading a list, after any marker; nil for no kind."
                   ((skg (flag noSearchMatching)) . "flag")
                   ((skg subscribeeFolder) . "folder")
                   ((skg folded tombstone) . "tombstone")
-                  ((skg (relRepo r)) . nil)
+                  ((skg (relRepo r)) . "occurrence")
+                  ((skg) . "occurrence")
                   ((foo) . nil)))
     (should (equal (alist-get 'kind (skg-metadata-fields-kind-of-sexp
                                      (car case)))

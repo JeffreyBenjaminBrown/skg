@@ -108,6 +108,7 @@ describe('the skgrepo prompt after inserting a headline', function ()
         { '** (skg ghost (gnid d) (skgRepos (nodeRepo public))) d', false },
         { '** (skg unknown (gnid u))', false },
         { '** (skg bodyFolded node (gnid m) (skgRepos (nodeRepo public))) m', false },
+        { '** (skg (gnid n) (skgRepos (nodeRepo public))) n', false },
         { '** (skg tombstone)', true } }) do
         content_view_with(table.concat({
           '* (skg node (gnid x) (skgRepos (nodeRepo public))) x',

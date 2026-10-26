@@ -156,6 +156,8 @@ but below a tombstone."
                    nil)
                   ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg bodyFolded node (gnid m) (skgRepos (nodeRepo public))) m\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    nil)
+                  ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg (gnid n) (skgRepos (nodeRepo public))) n\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
+                   nil)
                   ("* (skg node (gnid x) (skgRepos (nodeRepo public))) x\n** (skg tombstone)\n*** (skg node (gnid y) (skgRepos (nodeRepo public))) y\n"
                    t)))
     (test--with-skg-content-view
