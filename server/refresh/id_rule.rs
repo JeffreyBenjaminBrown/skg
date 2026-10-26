@@ -127,7 +127,8 @@ pub(crate) fn rekind_vognode (
       let editable : bool =
         drawn_occurrence_is_editable (tree, parent, &pid, walk);
       let occurrence : Occurrence =
-        occurrence_from_truth (&pid, editable, claims, walk) ?;
+        occurrence_from_truth (
+          &pid, EditabilityAndClaim { editable, claims }, walk) ?;
       let occurrence : Occurrence = Occurrence {
         relationshipEditRequest : requests . relationship_edit_request . clone (),
         .. occurrence };
@@ -289,19 +290,26 @@ fn refresh_ghost_in_place (
                            warrant         : ghost . warrant,
                            .. fresh }; }}}
 
+/// How an occurrence the refresh draws stands: whether it is
+/// editable, and whether it claims membership of its viewparent's
+/// list.
+pub(crate) struct EditabilityAndClaim {
+  pub editable : bool,
+  pub claims   : bool,
+}
+
 /// An occurrence of 'pid' as the truth has it, editable (with its
 /// body) or write-protected.
 pub(crate) fn occurrence_from_truth (
-  pid      : &ID,
-  editable : bool,
-  claims   : bool,
-  walk     : &Walk,
+  pid                   : &ID,
+  editability_and_claim : EditabilityAndClaim,
+  walk                  : &Walk,
 ) -> Result<Occurrence, Box<dyn Error>> {
   let node : &GraphnodeInRust = walk . truth . graph . get (pid)
     . ok_or ("occurrence_from_truth: the truth lacks the node") ?;
   Ok ( Occurrence {
-    claimsMembership : claims,
-    editability      : if editable {
+    claimsMembership : editability_and_claim . claims,
+    editability      : if editability_and_claim . editable {
       Editability::Editable { body : node . body . clone (), edit_request : None }
     } else { Editability::WriteProtected },
     .. default_occurrence (

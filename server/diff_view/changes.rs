@@ -12,15 +12,14 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::diff_view::change_leaves::{
   ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::diff_view::change_viewnodes::{
-  append_acquired_folder, append_old_text,
-  mk_changeset_marker_viewnode, mk_homeSkgrepoMove_viewnode};
+  mk_acquired_folder_viewnode, mk_changeset_marker_viewnode,
+  mk_homeSkgrepoMove_viewnode, mk_old_text_viewnode};
 use crate::types::list::{Diff_Item, interleaved_diff_without_reorders};
 use crate::types::misc::ID;
 use crate::types::viewnode::{
   ChangesetMarkerKind, Existence, Folder, Viewnode, ViewnodeKind,
-  viewforest_root_viewnode, viewnode_of};
+  viewnode_of};
 
-use ego_tree::{NodeId, Tree};
 use std::collections::HashSet;
 use std::hash::Hash;
 
@@ -90,39 +89,45 @@ impl ChangedAspects {
     self . recorded . contains (&( relation, aspect )) }
 }
 
-/// A scratch tree whose root holds what an editable node holds ahead
-/// of its content, in order, partner folders aside: for a node in C, its old
-/// text, its home skgrepo move, its "it acquired" folder, its alias, ID and
-/// flags folders that changed, and its content and relRepo markers,
-/// each as 'aspects' says; then, in the order-only buffer, its
-/// order-only marker.
+/// Where the node stands, for its front change viewnodes: whether it
+/// is in C, and whether the buffer is the order-only one and its
+/// content changed in order only.
+pub(crate) struct FrontChangeViewnodeConditions {
+  pub in_c       : bool,
+  pub order_only : bool,
+}
+
+/// What an editable node holds ahead of its content, in order,
+/// partner folders aside: for a node in C, its old text, its home
+/// skgrepo move, its "it acquired" folder, its alias, ID and flags
+/// folders that changed, and its content and relRepo markers, each
+/// as 'aspects' says; then, in the order-only buffer, its order-only
+/// marker. Each is one viewnode; the refresh draws what lies under
+/// it at its own visit.
 pub(crate) fn model_of_front_change_viewnodes (
   straddle   : &GraphStraddle,
   pid        : &ID,
   aspects    : &ChangedAspects,
-  in_c       : bool,
-  order_only : bool,
-) -> Tree<Viewnode> {
-  let mut model : Tree<Viewnode> = Tree::new (model_root ());
-  let root : NodeId = model . root () . id ();
-  if in_c {
+  conditions : FrontChangeViewnodeConditions,
+) -> Vec<Viewnode> {
+  let mut model : Vec<Viewnode> = Vec::new ();
+  if conditions . in_c {
     if aspects . text {
-      append_old_text (&mut model, root, straddle, pid); }
+      model . extend ( mk_old_text_viewnode (straddle, pid) ); }
     if aspects . home_skgrepo {
-      if let Some (homeSkgrepoMove) = mk_homeSkgrepoMove_viewnode (straddle, pid) {
-        append (&mut model, root, homeSkgrepoMove); }}
-    append_acquired_folder (&mut model, root, straddle, pid);
-    append_changed_property_folders (&mut model, root, aspects);
+      model . extend ( mk_homeSkgrepoMove_viewnode (straddle, pid) ); }
+    model . extend ( mk_acquired_folder_viewnode (straddle, pid) );
+    model . extend ( changed_property_folders (aspects) );
     if aspects . recorded_changed (
       NodeRelation::Contains, RelationshipAspect::Existence ) {
-      append ( &mut model, root,
+      model . push (
         mk_changeset_marker_viewnode (ChangesetMarkerKind::Content) ); }
     if aspects . recorded_changed (
       NodeRelation::Contains, RelationshipAspect::RelRepo ) {
-      append ( &mut model, root,
+      model . push (
         mk_changeset_marker_viewnode (ChangesetMarkerKind::RelRepo) ); }}
-  if order_only {
-    append ( &mut model, root,
+  if conditions . order_only {
+    model . push (
       mk_changeset_marker_viewnode (ChangesetMarkerKind::OrderOnly) ); }
   model }
 
@@ -148,21 +153,15 @@ pub(crate) fn changed_partner_folder_kinds (
 /// The node's alias, ID and flags folders whose list changed, drawn
 /// empty: the refresh fills each from its goal, the union of the two
 /// graphs' lists.
-fn append_changed_property_folders (
-  tree    : &mut Tree<Viewnode>,
-  treeid  : NodeId,
+fn changed_property_folders (
   aspects : &ChangedAspects,
-) {
-  for (changed, kind) in [ ( aspects . aliases,   Folder::Alias ),
-                           ( aspects . extra_ids, Folder::ID ),
-                           ( aspects . flags,     Folder::flags () ) ] {
-    if changed {
-      append ( tree, treeid, viewnode_of ( ViewnodeKind::Folder (kind) )); }}}
-
-/// The root of a scratch tree.
-fn model_root (
-) -> Viewnode {
-  viewforest_root_viewnode () }
+) -> Vec<Viewnode> {
+  [ ( aspects . aliases,   Folder::Alias ),
+    ( aspects . extra_ids, Folder::ID ),
+    ( aspects . flags,     Folder::flags () ) ] . into_iter ()
+    . filter ( |(changed, _)| *changed )
+    . map ( |(_, kind)| viewnode_of ( ViewnodeKind::Folder (kind) ))
+    . collect () }
 
 /// The entries of the union of two lists, in the order of their
 /// interleaved diff, each added if only the new list holds it and
@@ -180,11 +179,3 @@ pub(crate) fn union_with_existence<T : Clone + Eq + Hash + Ord> (
           ( ! old_set . contains (&x) ) . then_some (Existence::Added);
         (x, existence) }, } )
     . collect () }
-
-/// Append 'viewnode' under 'treeid'.
-fn append (
-  tree     : &mut Tree<Viewnode>,
-  treeid   : NodeId,
-  viewnode : Viewnode,
-) -> NodeId {
-  tree . get_mut (treeid) . unwrap () . append (viewnode) . id () }

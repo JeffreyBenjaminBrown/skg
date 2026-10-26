@@ -42,9 +42,8 @@ use crate::refresh::goal::{
   subscriber_of_subscribee_as_such};
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
-  IdRuleAnswer, entombstone, entombstone_gone_change, ghost_from_head, id_rule,
-  occurrence_from_truth,
-  rekind_vognode};
+  EditabilityAndClaim, IdRuleAnswer, entombstone, entombstone_gone_change,
+  ghost_from_head, id_rule, occurrence_from_truth, rekind_vognode};
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
 use crate::refresh::diff_view;
@@ -569,7 +568,8 @@ fn draw_item (
         let editable : bool =
           drawn_occurrence_is_editable (tree, parent, &pid, walk);
         let occurrence : Occurrence =
-          occurrence_from_truth (&pid, editable, claims, walk) ?;
+          occurrence_from_truth (
+            &pid, EditabilityAndClaim { editable, claims }, walk) ?;
         let mut viewnode : Viewnode = viewnode_of ( ViewnodeKind::Vognode (
           Vognode::Occurrence ( Occurrence {
             viewStats : ViewnodeStats { warrant : item . warrant,

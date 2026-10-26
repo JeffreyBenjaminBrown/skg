@@ -22,10 +22,11 @@ use skg::org_to_text::{viewforest_to_string, viewforest_tree_to_string};
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::diff_view::change_viewnodes::{
-  append_acquired_folder, append_old_text,
-  mk_changeset_marker_viewnode, mk_historical_viewnode, mk_relRepo_move_viewnode};
+  mk_acquired_folder_viewnode, mk_body_diff_viewnode, mk_changeset_marker_viewnode,
+  mk_historical_viewnode, mk_old_text_viewnode, mk_relRepo_move_viewnode};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
+use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
   ChangesetMarkerKind, Existence, ChangeViewnode, Folder, Viewnode, ViewnodeKind,
@@ -139,9 +140,16 @@ fn buffer_with_every_new_viewnode (
   for kind in ChangesetMarkerKind::ALL . into_iter () . rev () {
     tree . get_mut (p) . unwrap () . prepend (
       mk_changeset_marker_viewnode (kind) ); }
-  { let a : NodeId = treeid_of (&tree, "a");
-    append_old_text (&mut tree, a, &straddle, &ID::from ("a"))
-      . expect ("a's text changed"); }
+  { // a's old text, its body diff under it.
+    let a : NodeId = treeid_of (&tree, "a");
+    let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
+                          ( straddle . before . get (&ID::from ("a")) . unwrap (),
+                            straddle . after  . get (&ID::from ("a")) . unwrap () );
+    let old_text : NodeId = tree . get_mut (a) . unwrap () . append (
+      mk_old_text_viewnode (&straddle, &ID::from ("a"))
+        . expect ("a's text changed") ) . id ();
+    tree . get_mut (old_text) . unwrap () . append ( mk_body_diff_viewnode (
+      before . body . as_deref (), after . body . as_deref () )); }
   { let mut b_mut = tree . get_mut (b) . unwrap ();
     b_mut . append ( viewnode_of (ViewnodeKind::ChangeViewnode ( ChangeViewnode::HomeSkgrepoMove {
         skgrepo_change : SkgrepoChange { old : SkgrepoName::from ("main"),
@@ -151,10 +159,15 @@ fn buffer_with_every_new_viewnode (
       relRepo_before : Some (SkgrepoName::from ("main")),
       relRepo_after  : Some (SkgrepoName::from ("elsewhere")) } )
       . expect ("the relationship moved") ); }
-  { let acq : NodeId = treeid_of (&tree, "acq");
-    let folder : NodeId =
-      append_acquired_folder (&mut tree, acq, &straddle, &ID::from ("acq"))
-      . expect ("acq acquired 'acquired'");
+  { // acq's "it acquired" folder, holding the ghost of what it acquired.
+    let acq : NodeId = treeid_of (&tree, "acq");
+    let folder : NodeId = tree . get_mut (acq) . unwrap () . append (
+      mk_acquired_folder_viewnode (&straddle, &ID::from ("acq"))
+        . expect ("acq acquired 'acquired'") ) . id ();
+    for acquiree in straddle . acquirees_of (&ID::from ("acq")) {
+      tree . get_mut (folder) . unwrap () . append (
+        mk_historical_viewnode (&straddle, &acquiree, None)
+          . expect ("an acquiree is in the before-graph") ); }
     move_to_first_child (&mut tree, acq, folder) ?; }
   { // The acquiree, a second root.
     let root : NodeId = tree . root () . id ();

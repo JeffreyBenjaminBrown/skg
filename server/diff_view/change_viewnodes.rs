@@ -14,35 +14,25 @@ use crate::types::viewnode::{
   Folder, Ghost, ChangeViewnode,
   Viewnode, ViewnodeKind, Vognode, Warrant, viewnode_of};
 
-use ego_tree::{NodeId, Tree};
 use similar::{ChangeTag, TextDiff};
 
-/// Under 'parent', the old text of the node 'pid', with a body diff
-/// under it when the body changed. None (and nothing appended) when
-/// its text did not change.
-pub fn append_old_text (
-  tree     : &mut Tree<Viewnode>,
-  parent   : NodeId,
+/// The old text of the node 'pid', its title or body as HEAD has it
+/// where either changed; None when neither did. Its body diff is a
+/// child of its own ('mk_body_diff_viewnode').
+pub fn mk_old_text_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
-) -> Option<NodeId> {
+) -> Option<Viewnode> {
   let (before, after) : (&GraphnodeInRust, &GraphnodeInRust) =
     ( straddle . before . get (pid) ?, straddle . after . get (pid) ? );
   let title_changed : bool = before . title != after . title;
   let body_changed  : bool = before . body  != after . body;
   if ! title_changed && ! body_changed { return None; }
-  let old_text : Viewnode = viewnode_of ( ViewnodeKind::ChangeViewnode (
+  Some ( viewnode_of ( ViewnodeKind::ChangeViewnode (
     ChangeViewnode::OldText {
       title : title_changed . then ( || before . title . clone () ),
       body  : body_changed
-              . then ( || before . body . clone () . unwrap_or_default () ) } ));
-  let old_text_treeid : NodeId =
-    tree . get_mut (parent) ? . append (old_text) . id ();
-  if body_changed {
-    tree . get_mut (old_text_treeid) ? . append (
-      mk_body_diff_viewnode (
-        before . body . as_deref (), after . body . as_deref () )); }
-  Some (old_text_treeid) }
+              . then ( || before . body . clone () . unwrap_or_default () ) } ))) }
 
 /// The line diff from 'old' to 'new': each line prefixed by ' '
 /// (unchanged), '-' (removed) or '+' (added).
@@ -120,22 +110,12 @@ pub fn mk_historical_viewnode (
         claimsMembership    : false,
         warrant         : Warrant::ByHead } ))) } ) }
 
-/// Under 'parent' (the acquirer 'pid'), an "it acquired" folder of
-/// the ghosts of the nodes it acquired since HEAD. None
-/// (and nothing appended) when it acquired none.
-pub fn append_acquired_folder (
-  tree     : &mut Tree<Viewnode>,
-  parent   : NodeId,
+/// The "it acquired" folder of the acquirer 'pid', drawn empty: its
+/// members, the ghosts of the nodes it acquired since HEAD, are its
+/// goal's. None when it acquired none.
+pub fn mk_acquired_folder_viewnode (
   straddle : &GraphStraddle,
   pid      : &ID,
-) -> Option<NodeId> {
-  let acquirees : Vec<ID> = straddle . acquirees_of (pid);
-  if acquirees . is_empty () { return None; }
-  let folder : NodeId = tree . get_mut (parent) ? . append (
-    viewnode_of ( ViewnodeKind::Folder (
-      Folder::Acquired ))) . id ();
-  for acquiree in &acquirees {
-    if let Some (ghost) = mk_historical_viewnode (straddle, acquiree, None) {
-      tree . get_mut (folder) ? . append (ghost); }}
-  Some (folder) }
-
+) -> Option<Viewnode> {
+  if straddle . acquirees_of (pid) . is_empty () { return None; }
+  Some ( viewnode_of ( ViewnodeKind::Folder (Folder::Acquired) )) }

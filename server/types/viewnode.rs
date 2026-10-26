@@ -1300,12 +1300,11 @@ pub fn mk_writeProtected_viewnode (
                             Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
-/// Convert an editable Viewnode to write-protected.
+/// Convert an editable Viewnode to write-protected and 'noClaim'.
 /// Discards body, edit_request and the editable-view request.
 /// Errors if the input is not an Occurrence.
-pub fn mk_writeProtected_from_viewnode (
+pub fn mk_writeProtected_noClaim_from_viewnode (
   mut viewnode : Viewnode,
-  claimsMembership : bool,
 ) -> Result < Viewnode, String > {
   match &mut viewnode . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (t)) => {
@@ -1313,11 +1312,11 @@ pub fn mk_writeProtected_from_viewnode (
       // (the other view_requests, graphStats,
       // viewStats, and any field added later) is preserved rather
       // than silently reset.
-      t . claimsMembership = claimsMembership;
+      t . claimsMembership = false;
       t . write_protect ();
       Ok (viewnode) },
     _ => Err (
-      "mk_writeProtected_from_viewnode: expected Occurrence"
+      "mk_writeProtected_noClaim_from_viewnode: expected Occurrence"
         . to_string () ) }}
 
 /// Create a Viewnode with *nearly* full metadata control.

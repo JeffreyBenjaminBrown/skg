@@ -24,8 +24,8 @@
 use crate::diff_view::change_viewnodes::{
   mk_body_diff_viewnode, mk_relRepo_move_viewnode};
 use crate::diff_view::changes::{
-  ChangedAspects, changed_partner_folder_kinds, model_of_front_change_viewnodes,
-  union_with_existence};
+  ChangedAspects, FrontChangeViewnodeConditions, changed_partner_folder_kinds,
+  model_of_front_change_viewnodes, union_with_existence};
 use crate::diff_view::pruned_change_view::{
   PrunedChangeViewSets, prunedChangeView_sets_of_buffer};
 use crate::graph_straddle::types::{GraphStraddle, Partner};
@@ -102,14 +102,13 @@ pub(crate) fn content_goal (
     . filter ( |partner| partner . existence != Some (Existence::Removed) )
     . map ( |partner| partner . id . clone () )
     . collect () ) . into_iter () . collect ();
-  Some ( Goal::new (
+  Some ( Goal::ordered (
     partners . iter ()
     . filter ( |partner| match partner . existence {
       Some (Existence::Removed) => straddle . node_in_either_graph (&partner . id),
       _ => kept . contains (&partner . id), } )
     . map (partner_item)
-    . collect (),
-    true )) }
+    . collect () )) }
 
 /// The containers of a node of the containerward chain, over the
 /// straddle.
@@ -118,13 +117,12 @@ pub(crate) fn chain_goal (
   walk : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
-  Some ( Goal::new (
+  Some ( Goal::unordered (
     straddle . partners (pid, RelationRole::CONTAINER) . iter ()
     . filter ( |partner| partner . existence != Some (Existence::Removed)
                          || straddle . node_in_either_graph (&partner . id) )
     . map (partner_item)
-    . collect (),
-    false )) }
+    . collect () )) }
 
 /// A ghost's old content, where content stands: its content at HEAD.
 pub(crate) fn ghost_content_goal (
@@ -132,10 +130,9 @@ pub(crate) fn ghost_content_goal (
   walk : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
-  Some ( Goal::new (
+  Some ( Goal::ordered (
     straddle . partners (pid, RelationRole::CONTENT) . iter ()
-    . map (partner_item) . collect (),
-    true )) }
+    . map (partner_item) . collect () )) }
 
 /// A partner folder's members over the straddle. In a folder whose
 /// membership the save reads, a removed member that neither graph has
@@ -147,7 +144,7 @@ pub(crate) fn folder_goal (
   walk        : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
-  Some ( Goal::new (
+  Some ( Goal::with_order (
     straddle . partners (described, member_role) . iter ()
     . filter ( |partner| partner . existence != Some (Existence::Removed)
                          || ! kind . is_editable ()
@@ -183,27 +180,25 @@ pub(crate) fn property_goal (
           . find ( |alias| alias . member == *text )
           . filter ( |alias| alias . relRepo != node . home_skgrepo )
           . map ( |alias| alias . relRepo . clone () ) };
-      Goal::new (
+      Goal::ordered (
         union_with_existence ( &texts (before), &texts (after) ) . into_iter ()
         . map ( |(text, existence)| GoalItem {
           relRepo : relRepo_after (&text),
           .. item ( GoalMember::Alias (text), existence ) } )
-        . collect (),
-        true ) },
+        . collect () ) },
     Folder::ID => {
       let ids = |node : Option<&GraphnodeInRust>| -> Vec<ID> {
         node . map ( |node| once ( node . pid . clone () )
                      . chain ( node . extra_ids . iter () . cloned () ) . collect () )
           . unwrap_or_default () };
-      Goal::new (
+      Goal::unordered (
         union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
         . map ( |(id, existence)| item ( GoalMember::Id (id), existence ) )
-        . collect (),
-        false ) },
+        . collect () ) },
     _ => {
       let has = |node : Option<&GraphnodeInRust>, flag : &Flag| -> bool {
         node . is_some_and ( |node| node . flags . contains (flag) ) };
-      Goal::new (
+      Goal::unordered (
         Flag::ALL . into_iter ()
         . filter_map ( |flag| {
           let existence : Option<Existence> =
@@ -213,8 +208,7 @@ pub(crate) fn property_goal (
               (true,  true)  => None,
               (false, false) => return None, };
           Some ( item ( GoalMember::Flag (flag), existence )) } )
-        . collect (),
-        false ) }, } ) }
+        . collect () ) }, } ) }
 
 /// The two acquisition folders' goals: under an acquirer, the ghosts
 /// of the nodes it acquired since HEAD; under a ghost, the node that
@@ -231,18 +225,16 @@ pub(crate) fn acquisition_goal (
     ViewnodeKind::Vognode (vognode) => vognode . gnid () . clone (),
     _ => return None, };
   Some ( match kind {
-    Folder::Acquired => Goal::new (
+    Folder::Acquired => Goal::unordered (
       straddle . acquirees_of (&described_gnid) . into_iter ()
       . map ( |acquiree| GoalItem {
         warrant : Warrant::ByHead,
         .. GoalItem::by_graph ( GoalMember::Gnid (acquiree) ) } )
-      . collect (),
-      false ),
-    _ => Goal::new (
+      . collect () ),
+    _ => Goal::unordered (
       straddle . acquirer_of (&described_gnid) . into_iter ()
       . map ( |acquirer| GoalItem::by_graph ( GoalMember::Gnid (acquirer) ))
-      . collect (),
-      false ), } ) }
+      . collect () ), } ) }
 
 //
 // The change viewnodes
@@ -319,13 +311,12 @@ fn expected_change_viewnodes (
       let aspects : ChangedAspects =
         if in_c { ChangedAspects::of_node (straddle . change_leaves (), pid) }
         else { ChangedAspects::default () };
-      let model : Tree<Viewnode> = model_of_front_change_viewnodes (
-        straddle, pid, &aspects, in_c,
-        buffer_kind == DiffViewBufferKind::OrderOnlyChanges
-          && straddle . order_only_pids () . contains (pid) );
-      let fronts : Vec<Viewnode> =
-        model . root () . children () . map ( |child| child . value () . clone () )
-        . collect ();
+      let fronts : Vec<Viewnode> = model_of_front_change_viewnodes (
+        straddle, pid, &aspects,
+        FrontChangeViewnodeConditions {
+          in_c,
+          order_only : buffer_kind == DiffViewBufferKind::OrderOnlyChanges
+                       && straddle . order_only_pids () . contains (pid) } );
       let is_marker = |viewnode : &Viewnode| -> bool {
         matches! ( change_key (viewnode), Some (ChangeKey::ChangesetMarker (_)) ) };
       let partner_folders : Vec<Viewnode> =

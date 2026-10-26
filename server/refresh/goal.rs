@@ -83,7 +83,20 @@ impl GoalItem {
 }
 
 impl Goal {
-  pub fn new (
+  /// A goal whose warranted children take its order.
+  pub fn ordered (
+    items : Vec<GoalItem>,
+  ) -> Goal {
+    Goal::with_order (items, true) }
+
+  /// A goal whose warranted children keep the buffer's order.
+  pub fn unordered (
+    items : Vec<GoalItem>,
+  ) -> Goal {
+    Goal::with_order (items, false) }
+
+  /// For a goal whose order is computed, as a folder kind's is.
+  pub fn with_order (
     items   : Vec<GoalItem>,
     ordered : bool,
   ) -> Goal {
@@ -174,10 +187,9 @@ fn chain_goal (
     graph . inbound_pids_for_relation_gated (
       pid, NodeRelation::Contains, walk . truth . restriction ),
     walk );
-  Goal::new ( containers . into_iter ()
-              . map ( |gnid| GoalItem::by_graph (GoalMember::Gnid (gnid)) )
-              . collect (),
-              false ) }
+  Goal::unordered ( containers . into_iter ()
+                    . map ( |gnid| GoalItem::by_graph (GoalMember::Gnid (gnid)) )
+                    . collect () ) }
 
 /// An occurrence's content: its 'contains' list, its unresolved
 /// members as raw IDs, less the restricted members; for a
@@ -212,7 +224,7 @@ fn content_goal (
                    . map ( |member| member . member . into_id () )
                    . collect () ),
     walk );
-  gnid_goal (contents, &relRepos, true) }
+  Goal::ordered ( gnid_items (contents, &relRepos) ) }
 
 /// When the occurrence at 'treeid' is a subscribee as such (a member
 /// of a subscribee folder that the folder's relation warrants), its
@@ -250,18 +262,20 @@ fn folder_goal (
       property_goal (kind, &described_pid () ?, walk),
     Folder::AcquiredBy | Folder::Acquired =>
       Some ( diff_view::acquisition_goal (tree, folder, kind, walk)
-             . unwrap_or_else ( || Goal::new (Vec::new (), false) )),
+             . unwrap_or_else ( || Goal::unordered (Vec::new ()) )),
     Folder::HiddenInSubscribee => {
       let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
-      Some ( gnid_goal ( hidden_in_subscribee (
-                           &party_pid (parties . subscribee ?) ?,
-                           &party_pid (parties . subscriber) ?, walk ),
-                         &HashMap::new (), false )) },
+      Some ( Goal::unordered ( gnid_items (
+        hidden_in_subscribee (
+          &party_pid (parties . subscribee ?) ?,
+          &party_pid (parties . subscriber) ?, walk ),
+        &HashMap::new () ))) },
     Folder::HiddenOutsideOfSubscribee => {
       let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
-      Some ( gnid_goal ( hidden_outside_of_subscribees (
-                           &party_pid (parties . subscriber) ?, walk ),
-                         &HashMap::new (), true )) },
+      Some ( Goal::ordered ( gnid_items (
+        hidden_outside_of_subscribees (
+          &party_pid (parties . subscriber) ?, walk ),
+        &HashMap::new () ))) },
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
@@ -281,7 +295,8 @@ fn folder_goal (
             &graph . outbound_member_keys_for_relation_gated (
               &described, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
-      Some ( gnid_goal (members, &relRepos, kind . goal_is_ordered ()) ) }, } }
+      Some ( Goal::with_order ( gnid_items (members, &relRepos),
+                                kind . goal_is_ordered () )) }, } }
 
 /// What 'subscriber' hides in the content of 'subscribee', less the
 /// restricted members: the goal of the compound folder
@@ -329,39 +344,34 @@ fn property_goal (
     return Some (goal); }
   let node : &GraphnodeInRust = walk . truth . graph . get (pid) ?;
   Some ( match kind {
-    Folder::Alias => Goal::new (
+    Folder::Alias => Goal::ordered (
       node . aliases . or_default () . iter ()
         . map ( |alias| GoalItem {
           relRepo : ( alias . relRepo != node . home_skgrepo )
                     . then ( || alias . relRepo . clone () ),
           .. GoalItem::by_graph ( GoalMember::Alias ( alias . member . clone () )) } )
-        . collect (),
-      true ),
-    Folder::ID => Goal::new (
+        . collect () ),
+    Folder::ID => Goal::unordered (
       once ( node . pid . clone () )
         . chain ( node . extra_ids . iter () . cloned () )
         . map ( |id| GoalItem::by_graph (GoalMember::Id (id)) )
-        . collect (),
-      false ),
-    _ => Goal::new (
+        . collect () ),
+    _ => Goal::unordered (
       Flag::ALL . into_iter ()
         . filter ( |flag| node . flags . contains (flag) )
         . map ( |flag| GoalItem::by_graph (GoalMember::Flag (flag)) )
-        . collect (),
-      false ), } ) }
+        . collect () ), } ) }
 
-/// A goal of gnids, each warranted by the truth.
-fn gnid_goal (
+/// Goal items of gnids, each warranted by the truth.
+fn gnid_items (
   gnids    : Vec<ID>,
   relRepos : &HashMap<ID, SkgrepoName>,
-  ordered  : bool,
-) -> Goal {
-  Goal::new ( gnids . into_iter ()
-              . map ( |gnid| GoalItem {
-                relRepo : relRepos . get (&gnid) . cloned (),
-                .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } )
-              . collect (),
-              ordered ) }
+) -> Vec<GoalItem> {
+  gnids . into_iter ()
+    . map ( |gnid| GoalItem {
+      relRepo : relRepos . get (&gnid) . cloned (),
+      .. GoalItem::by_graph ( GoalMember::Gnid (gnid) ) } )
+    . collect () }
 
 /// The relRepos of the members of 'recorder''s list that resolve to no
 /// node, where they differ from the recorder's home.
