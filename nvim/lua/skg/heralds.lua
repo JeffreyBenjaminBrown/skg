@@ -766,17 +766,18 @@ end
 ---@param row integer
 ---@param lines string[]
 function M.reapply_to_folder_ancestors (buf, row, lines)
-  local level = math.huge
-  for ancestor = math.min(row, #lines - 1), 0, -1 do -- none when ROW < 0
-    local stars = lines[ancestor + 1]:match('^(%*+)%s')
-    if stars and #stars < level then
-      level = #stars
-      if lines[ancestor + 1]:find('Folder', 1, true) then
-        vim.api.nvim_buf_clear_namespace(
-          buf, M.namespace, ancestor, ancestor + 1)
-        M.apply_to_line(buf, ancestor, lines) end
-      if level <= 1 then return end
-    end
+  local headline_index = math.min(row, #lines - 1) + 1 -- 1-based
+  while headline_index >= 1
+        and not lines[headline_index]:match('^%*+%s') do
+    headline_index = headline_index - 1 end
+  if headline_index < 1 then return end -- also when ROW < 0
+  local indices = readiness().ancestor_indices_in_lines(
+    lines, headline_index, math.huge)
+  table.insert(indices, 1, headline_index)
+  for _, index in ipairs(indices) do
+    if lines[index]:find('Folder', 1, true) then
+      vim.api.nvim_buf_clear_namespace(buf, M.namespace, index - 1, index)
+      M.apply_to_line(buf, index - 1, lines) end
   end
 end
 

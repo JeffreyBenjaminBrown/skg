@@ -241,18 +241,13 @@ enclosing the one at POS, since a folder's herald depends on its
 members and on their children."
   (save-excursion
     (goto-char pos)
-    (let ((level (skg--headline-level-on-line)))
-      (dotimes (_ 2)
-        (when (and level
-                   (> level 1)
-                   (re-search-backward
-                    (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
-                    nil t))
-          (setq level (skg--headline-level-on-line))
-          (when (skg--folder-atom (skg--metadata-sexp-at-point-or-nil))
-            (heralds-clear-overlays-in-region (line-beginning-position)
-                                              (line-end-position))
-            (heralds-apply-to-line)))))))
+    (dolist (ancestor-start (skg--ancestor-headline-starts-on-line 2))
+      (when ancestor-start
+        (goto-char ancestor-start)
+        (when (skg--folder-atom (skg--metadata-sexp-at-point-or-nil))
+          (heralds-clear-overlays-in-region (line-beginning-position)
+                                            (line-end-position))
+          (heralds-apply-to-line))))))
 
 (defun heralds-apply-to-line ()
   "On the current line, lens only the first (skg ...) occurrence.

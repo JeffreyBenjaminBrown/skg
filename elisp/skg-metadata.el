@@ -935,10 +935,21 @@ looks for the parents only of a headline carrying 'noClaim'."
   "The metadata of the COUNT nearest ancestor headlines of the headline
 on the line at point, nearest first, nil where one has none or there
 is none. Reads headline levels by their stars."
+  (mapcar (lambda (ancestor-start)
+            (and ancestor-start
+                 (save-excursion
+                   (goto-char ancestor-start)
+                   (skg--metadata-sexp-at-point-or-nil))))
+          (skg--ancestor-headline-starts-on-line count)))
+
+(defun skg--ancestor-headline-starts-on-line (count)
+  "Where the COUNT nearest ancestor headlines of the headline on the
+line at point begin, nearest first, nil where there is none. Reads
+headline levels by their stars, so it works in any buffer."
   (save-excursion
     (beginning-of-line)
     (let ((level (skg--headline-level-on-line))
-          (ancestors '()))
+          (ancestor-starts '()))
       (dotimes (_ count)
         (if (and level
                  (> level 1)
@@ -946,10 +957,10 @@ is none. Reads headline levels by their stars."
                   (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
                   nil t))
             (progn (setq level (skg--headline-level-on-line))
-                   (push (skg--metadata-sexp-at-point-or-nil) ancestors))
+                   (push (point) ancestor-starts))
           (setq level nil)
-          (push nil ancestors)))
-      (nreverse ancestors))))
+          (push nil ancestor-starts)))
+      (nreverse ancestor-starts))))
 
 (defun skg--headline-level-on-line ()
   "The number of stars of the headline on the line at point, or nil

@@ -289,18 +289,34 @@ end
 ---@return table
 function M.ancestor_sexps_in_lines (lines, index, count)
   local ancestors = {}
+  for generation, ancestor_index
+      in ipairs(M.ancestor_indices_in_lines(lines, index, count)) do
+    ancestors[generation] =
+      metadata.metadata_sexp_of_line(lines[ancestor_index]) end
+  return ancestors
+end
+
+---The indices in LINES of the COUNT nearest ancestor headlines of the
+---headline LINES[INDEX], nearest first; fewer when it has fewer.
+---LINES are a buffer's lines, 1-based.
+---@param lines string[]
+---@param index integer
+---@param count integer
+---@return integer[]
+function M.ancestor_indices_in_lines (lines, index, count)
+  local ancestor_indices = {}
   local level = headline_level(lines[index])
   local ancestor_index = index
-  for generation = 1, count do
+  for _ = 1, count do
     if not (level and level > 1) then break end
     repeat ancestor_index = ancestor_index - 1
     until ancestor_index < 1
           or (headline_level(lines[ancestor_index]) or level) < level
     if ancestor_index < 1 then break end
     level = headline_level(lines[ancestor_index])
-    ancestors[generation] = metadata.metadata_sexp_of_line(lines[ancestor_index])
+    table.insert(ancestor_indices, ancestor_index)
   end
-  return ancestors
+  return ancestor_indices
 end
 
 ---Whether the headline is ready: one that names leaves, on all the
