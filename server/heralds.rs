@@ -477,12 +477,6 @@ pub fn herald_rule_table () -> HeraldRule {
         vec! [ rule ("editRequest", vec! [
           leaf ("restoreNode", "restore node") ]) ],
         change_fact_rules_for_two_objects () ] . concat ()),
-      // A restricted vognode is anonymous and dataless: the bare
-      // atom 'restrictedNode' (see RestrictedVognode), like the other dataless
-      // non-vognode atoms. Its id/repo would leak hidden content, so
-      // they are not emitted.
-      crule ("restrictedNode", vec! [
-        s ("node from restricted skgrepo") ]),
       rule ("node", [ vec! [
         vac ("id"),
         vac ("repo"),
@@ -694,7 +688,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // The viewnode ID that ends every wrapper; its value is value position.
     "vnid",
     // Form heads, from org_to_text.rs:
-    "node", "deleted", "unknown", "restrictedNode",
+    "node", "deleted", "unknown",
     "tombstone", "historical",
     // Keys inside node / deleted / unknown forms:
     "id", "repo",

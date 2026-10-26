@@ -198,3 +198,69 @@ Unrelated: "Directory not empty" at cleanup, as in slice 0; it
 passed alone and in every later full run.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slice 0.
+** Slice 2: hidden means tombstone
+*** What's done
+**** the save keeps hidden members, proven first
+'tests/hidden_nodes.rs' saves under "public" a view drawn under
+it (the hidden members have no headline) and a view switched to
+it from "all"; both keep the hidden content member after its
+anchor and the hidden subscribee. It passed against the code
+before the kind went (commit 3f40d8e7), and after. Disk
+supplementation already covered a hidden member with no
+headline, so it was not extended.
+**** the presence answer
+'InRustGraph::gnid_presence_gated' answers 'GnidPresence'
+('Present', 'Hidden', 'Absent'), beside the gated accessors in
+'relation_accessors.rs', with a unit test.
+**** the kind goes
+'Vognode::Restricted', 'RestrictedVognode', the atom (refused
+as unknown, bare or as a form), its herald rule, its rows in
+'shared/' and its rendering case. A switch entombstones every
+occurrence of a now-hidden node; a second test pins that the
+switched view shows only a tombstone holding the hidden node's
+child, and that a switch back draws the node again beside it.
+'TODO/problems.org' line 48 moved to 'TODO/DONE/problems.org'.
+*** Deviations from the plan's "how"
+**** one entombstoning pass, asking the graph
+'entombstone_hidden_occurrences' ('server/skgrepo_sets.rs')
+replaces 'anonymize_now_restricted_vognodes' and
+'apply_skgrepo_set_to_viewforest' (they were the same code). It
+asks the presence answer, not the viewnode's home skgrepo, so
+the switch prepass now takes the graph. Its callers: the switch
+prepass, 'finish_viewforest' (moved first in that tail, so the
+orphan marks see a tombstone's children as under a dead parent:
+they now claim nothing) and the search view.
+**** two converters the plan did not name
+The search view's overPrivateText exclusion ('text_release.rs')
+and the content reconciler's safety net also made the kind. The
+first entombstones; the second, which the goal makes
+unreachable ('omit_restricted_members'), is now an error.
+**** a tombstone where the placeholder stood
+Validation lets a tombstone be a view root, as it let a retained
+restricted root; the fork's skgrepo inference stops at a
+tombstone, as at the placeholder. The switch's prune drops the
+property members and change viewnodes under any tombstone, not
+only under a now-hidden node's.
+**** smaller choices
+'Vognode::skgid' returns '&ID': with the kind gone no vognode
+lacks one. The 18 fixtures: the placeholder lines in four Rust
+test files were converted by
+'tests/results/slice2/convert_restricted_fixtures.py' (8 lines);
+the other references were test logic, adapted by hand: tests of
+editing the placeholder's text and of its herald were deleted,
+client cases that duplicated a tombstone case were dropped, and
+'test-skg-readable-ids.el' carries its hidden ID in a node form.
+*** What's imperfect about what's done
+**** a tombstone reads DELETED
+The tombstone herald says "DELETED" over a hidden node's
+children, which is false there. Reported in 'TODO/problems.org'
+for the heralds slice.
+*** Suite failures and their classification
+**** first failure: tests naming the removed kind
+Expected fixture adaptation: they failed to compile; adapted as
+above.
+**** rebuild::complete_aliasfolder::all_tests, once
+Unrelated: "Directory not empty" at cleanup in the full run, as
+in slices 0 and 1; it passes alone.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 and 1.

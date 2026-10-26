@@ -186,8 +186,8 @@ pub fn is_in_containerward_chain (
     current = parent; }}
 
 /// Whether 'node' is a chain node as the walk draws it: write-protected
-/// (or a phantom or a restricted vognode, for a container it cannot
-/// show), carrying no change facts. So a non-member the user typed
+/// (or a phantom, for a container it cannot show), carrying no change
+/// facts. So a non-member the user typed
 /// under a folder's member, which is editable, is not one,
 /// and neither is what that member's own visit adds there (a removed
 /// member, a historical phantom), which carries change facts.

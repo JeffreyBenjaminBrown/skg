@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   authorize_prepared_rerenders,
@@ -56,10 +57,10 @@ pub fn handle_skgrepo_set_request (
 
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a repo-set switch
 /// re-renders open views in place rather than closing them.  Each
-/// view gets the convert-and-prune prepass (now-restricted unrestricted vognodes
-/// become RestrictedVognodes; childless restricted branches, properties of
-/// restricted recorders, tombstones and the folders these leave empty
-/// are pruned, and the rest keeps its viewnode IDs), then completion with
+/// view gets the convert-and-prune prepass (occurrences of now-hidden
+/// nodes become tombstones; childless tombstones, the properties of the
+/// nodes they replaced and the folders these leave empty are pruned,
+/// and the rest keeps its viewnode IDs), then completion with
 /// PartnerFolder creation
 /// enabled, because a switch can also activate skgrepos, revealing
 /// members and folders.  Results stream via the rerender-all message
@@ -89,10 +90,11 @@ fn set_skgrepo_restriction (
         return; }};
   let mut prepared =
   { let target : SkgrepoRestriction = restriction . clone ();
+    let graph : Arc<InRustGraph> = Arc::clone (&runtime . graph);
     let prepass = |viewforest : &mut ViewForest|
       -> Result<(), Box<dyn std::error::Error>> {
       convert_and_prune_for_skgrepo_switch (
-        viewforest . as_internal_tree_mut (), &target ) };
+        viewforest . as_internal_tree_mut (), &graph, &target ) };
     prepare_rerender_views_with_runtime (
       env, runtime, views_state,
       Some (&target), Some (&prepass),

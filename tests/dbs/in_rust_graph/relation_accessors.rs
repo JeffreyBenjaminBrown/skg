@@ -1,11 +1,15 @@
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition,
+  GnidPresence,
   NodeRelation,
   RelationRole,
 };
 use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgrepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
+use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
+
+use std::collections::BTreeSet;
 
 fn node (
   pid       : &str,
@@ -238,3 +242,28 @@ fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
       [ID::from ("alias"), ID::from ("unknown")]),
     skgid_set (&["known", "unknown", "points-at-unknown"]));
 }
+
+// A node the restriction excludes is hidden, by its pid or an extra
+// ID; without a restriction, or under 'all', it is present; a gnid
+// no node answers to is absent, whatever the restriction.
+#[test]
+fn gnid_presence_gated_tells_hidden_from_absent () {
+  let mut private : Graphnode = node ("private", &["private-extra"], &[], &[], &[]);
+  private . home_skgrepo = SkgrepoName::from ("private");
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
+    node ("public", &[], &[], &[], &[]), private ]);
+  let only_main : SkgrepoRestriction = SkgrepoRestriction {
+    name     : SkgrepoSetName ("main" . to_string ()),
+    skgrepos : BTreeSet::from ([ SkgrepoName::from ("main") ]) };
+  let all : SkgrepoRestriction = SkgrepoRestriction {
+    name     : SkgrepoSetName ("all" . to_string ()),
+    skgrepos : BTreeSet::new () };
+  let presence = |gnid : &str, restriction : Option<&SkgrepoRestriction>|
+    graph . gnid_presence_gated (&ID::from (gnid), restriction);
+  assert_eq! ( presence ("public", Some (&only_main)), GnidPresence::Present );
+  assert_eq! ( presence ("private", Some (&only_main)), GnidPresence::Hidden );
+  assert_eq! ( presence ("private-extra", Some (&only_main)), GnidPresence::Hidden );
+  assert_eq! ( presence ("private", Some (&all)), GnidPresence::Present );
+  assert_eq! ( presence ("private", None), GnidPresence::Present );
+  assert_eq! ( presence ("nowhere", Some (&only_main)), GnidPresence::Absent );
+  assert_eq! ( presence ("nowhere", None), GnidPresence::Absent ); }

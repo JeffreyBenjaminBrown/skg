@@ -23,6 +23,16 @@ pub enum NodeRelation {
   Overrides,
 }
 
+/// What the gated graph answers for a gnid ('gnid_presence_gated').
+/// A hidden node is one the graph has and the skgrepo restriction
+/// keeps out of view; it is not an absent one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GnidPresence {
+  Present,
+  Hidden,
+  Absent,
+}
+
 /// One relationship: 'recorder' lists 'member' (a primary ID, or the
 /// stored ID when it resolves to no node) under 'relation'. The save's
 /// strandeds computation and the change leaves both name relationships so.
@@ -210,6 +220,24 @@ impl InRustGraph {
     match self . pid_of (raw_member) {
       Some (pid) => RelationshipMemberKey::ResolvedPid (pid),
       None => RelationshipMemberKey::UnresolvedRawId (raw_member . clone ()), } }
+
+  /// Whether the gated graph has the node 'gnid' names (a pid or an
+  /// extra ID): 'Present' when its home skgrepo is in the skgrepo
+  /// restriction, or there is none ('restriction' None or 'all');
+  /// 'Hidden' when the graph has it and the restriction excludes its
+  /// home; 'Absent' when the graph has no such node.
+  pub fn gnid_presence_gated (
+    &self,
+    gnid        : &ID,
+    restriction : Option<&crate::skgrepo_sets::SkgrepoRestriction>,
+  ) -> GnidPresence {
+    match self . pid_and_skgrepo (gnid) {
+      None => GnidPresence::Absent,
+      Some ((_pid, home)) => match restriction {
+        Some (set) if ! set . is_all ()
+                      && ! set . contains_skgrepo (&home) =>
+          GnidPresence::Hidden,
+        _ => GnidPresence::Present, }, }}
 
   /// Stored outbound members for one relationship. Unlike the PID-oriented
   /// accessors, this preserves an unresolved raw ID and its relRepo.

@@ -263,10 +263,7 @@ fn viewnode_to_string_without_viewnode_id (
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
       Ok ( phantomHistorical_metadata_to_string (
         viewnode . foldAndFocus, historical,
-        &viewnode . change_facts, &viewnode . readiness_request )),
-    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
-      Ok ( restricted_node_metadata_to_string (
-        viewnode . foldAndFocus )) } }
+        &viewnode . change_facts, &viewnode . readiness_request )), } }
 
 /// The position atoms a headline carries, in their order on the wire.
 fn foldAndFocus_atoms (
@@ -571,18 +568,6 @@ fn phantomUnknown_metadata_to_string (
                            . map (relationshipEditRequest_form) );
   unknown_parts . extend ( change_fact_forms (facts, request) );
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
-  parts . join (" ") }
-
-/// Render a restricted vognode as the bare atom 'restrictedNode',
-/// like the other dataless non-vognode atoms (aliasFolder, subscribeeFolder,
-/// ...). It carries no id/repo/etc. -- those describe content the
-/// user hid by restricting the skgrepo-set, so emitting them would leak
-/// (see RestrictedVognode).
-fn restricted_node_metadata_to_string (
-  foldAndFocus    : FoldAndFocus,
-) -> String {
-  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . push ( "restrictedNode" . to_string () );
   parts . join (" ") }
 
 /// Render metadata for a tombstone:

@@ -3,14 +3,15 @@ use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
 use crate::types::env::find_skgrepo_with_optional_tantivy;
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
 pub use crate::types::misc::SkgrepoSetName;
 use crate::types::nodes::complete::Graphnode;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_restricted_viewnode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::Vognode;
 use crate::test_utils::cleanup_test_tantivy;
 
-use ego_tree::{NodeId, NodeMut, Tree};
+use ego_tree::{NodeId, Tree};
 use futures::executor::block_on;
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
@@ -78,25 +79,29 @@ pub fn require_skgrepo_set_all (
     "{} requires no skgrepo restriction (the skgrepo-set all); current skgrepo restriction is {}. Switch the repo-set to all first.",
     what, restriction . name )) }
 
-pub fn apply_skgrepo_set_to_viewforest (
-  viewforest : &mut Tree<Viewnode>,
+/// Entombstone every occurrence of a node the skgrepo restriction
+/// hides (see 'GnidPresence'): the tombstone keeps the occurrence's
+/// children and says nothing of the node. A node the graph lacks is
+/// not hidden, and is left for whatever handles a vanished node.
+pub fn entombstone_hidden_occurrences (
+  viewforest  : &mut Tree<Viewnode>,
+  graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
 ) {
   if restriction . is_all () {
     return; }
-  let skgids : Vec<NodeId> =
+  let hidden : Vec<NodeId> =
     viewforest . root () . descendants ()
+    . filter ( |n| match &n . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          graph . gnid_presence_gated (&t . skgid, Some (restriction))
+          == GnidPresence::Hidden,
+        _ => false } )
     . map ( |n| n . id () )
     . collect ();
-  for skgid in skgids {
-    let mut node_mut : NodeMut<Viewnode> =
-      viewforest . get_mut (skgid) . unwrap ();
-    let convert : bool = matches! ( &node_mut . value () . kind,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if ! restriction . contains_skgrepo (&t . home_skgrepo) );
-    if convert {
-      node_mut . value () . kind =
-        mk_restricted_viewnode () . kind; }}}
+  for treeid in hidden {
+    viewforest . get_mut (treeid) . unwrap () . value ()
+      . replace_kind (ViewnodeKind::Tombstone); }}
 
 pub fn titles_for_skgrepo_set_for_test (
   config : &SkgConfig,

@@ -828,14 +828,13 @@ else nil."
                  (cdr metadata-sexp))))
 
 (defun skg--vognode-sexp-p (metadata-sexp)
-  "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode, a
-phantom (deleted, unknown or historical) or a restricted node."
+  "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode or
+a phantom (deleted, unknown or historical)."
   (and (consp metadata-sexp)
        (or (skg--unrestrictedNode-sexp-p metadata-sexp)
            (skg-sexp-subtree-p metadata-sexp '(skg (deleted)))
            (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))
-           (skg-sexp-subtree-p metadata-sexp '(skg (historical)))
-           (memq 'restrictedNode (cdr metadata-sexp)))))
+           (skg-sexp-subtree-p metadata-sexp '(skg (historical))))))
 
 (defun skg--read-id-or-link (prompt)
   "Read an ID or link with linkstack paste/pop bindings in the minibuffer."

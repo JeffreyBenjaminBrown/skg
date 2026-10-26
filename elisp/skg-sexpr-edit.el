@@ -256,7 +256,7 @@ inheritance, as the server's walk rootward decides
 phantoms and folders, and through headlines without metadata, which
 inherit the same way; the first other ancestor must be an
 unrestricted vognode.  A root cannot inherit, nor can a headline whose
-walk ends at a restricted vognode, a tombstone or a property."
+walk ends at a tombstone or a property."
   (save-excursion
     (catch 'answer
       (while (org-up-heading-safe)
@@ -271,7 +271,7 @@ walk ends at a restricted vognode, a tombstone or a property."
 (defun skg--headline-kind-at-point ()
   "The kind of the headline at point, as the symbol that heads its
 metadata after the markers 'focused', 'folded' and 'bodyFolded'
-(node, deleted, restrictedNode, aliasFolder, alias ...), or nil for a
+(node, deleted, tombstone, aliasFolder, alias ...), or nil for a
 headline without metadata."
   (let* (( split (skg-split-as-stars-metadata-title
                   (skg-get-current-headline-text)) )

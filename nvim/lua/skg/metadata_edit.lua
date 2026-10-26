@@ -333,7 +333,7 @@ end
 local markers = { focused = true, folded = true, bodyFolded = true }
 
 ---The kind of the headline at LINE_NUMBER, as the atom that heads its
----metadata after the markers (node, deleted, restrictedNode,
+---metadata after the markers (node, deleted, tombstone,
 ---aliasFolder, alias ...), or nil for a headline without metadata.
 ---Mirrors skg--headline-kind-at-point.
 ---@param line_number integer
@@ -355,7 +355,7 @@ end
 ---phantoms and folders, and through headlines without metadata, which
 ---inherit the same way; the first other ancestor must be an
 ---unrestricted vognode. A root cannot inherit, nor can a headline
----whose walk ends at a restricted vognode, a tombstone or a property.
+---whose walk ends at a tombstone or a property.
 ---Mirrors skg--headline-can-inherit-skgrepo-p.
 ---@param line_number integer
 ---@return boolean

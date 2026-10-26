@@ -48,7 +48,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::write_graph_straddle_back;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
-use crate::skgrepo_sets::{SkgrepoRestriction, apply_skgrepo_set_to_viewforest};
+use crate::skgrepo_sets::{SkgrepoRestriction, entombstone_hidden_occurrences};
 use crate::to_org::util::EditableMap;
 use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
@@ -601,11 +601,12 @@ pub fn rerender_view (
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
 /// post-save re-render (rerender_view, above). Given a viewforest whose UnrestrictedVognode
 /// content has already been completed, it:
+///   - entombstones the occurrences of nodes the skgrepo restriction
+///     hides, so the orphan marks below see their children,
 ///   - marks view-root and orphan membership,
 ///   - validates membership against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one),
 ///   - computes graph- then viewnode stats,
-///   - applies the skgrepo restriction,
 ///   - gives a viewnode ID to each viewnode that lacks one, from
 ///     'viewnode_id_record', which it brings up to date with the forest
 ///     (the end-of-completion pass, after the prune and after
@@ -620,6 +621,8 @@ pub fn finish_viewforest (
   config             : &SkgConfig,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result<String, Box<dyn Error>> {
+  if let Some (restriction) = skgrepo_restriction {
+    entombstone_hidden_occurrences ( viewforest, graph, restriction ); }
   mark_view_roots_as_members ( viewforest );
   // §A (Jeff's invariant): an Unrestricted survivor left under a non-container parent
   // (a phantom / Deleted / Tombstone) is a non-dead generalized orphan and
@@ -640,8 +643,6 @@ pub fn finish_viewforest (
   set_viewnodestats_in_viewforest (
     viewforest, graph, &container_to_contents, &content_to_containers, config,
     skgrepo_restriction );
-  if let Some (restriction) = skgrepo_restriction {
-    apply_skgrepo_set_to_viewforest ( viewforest, restriction ); }
   viewnode_id_record . assign_viewnode_ids (viewforest);
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "viewforest_to_string" ). entered();

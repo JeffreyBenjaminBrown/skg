@@ -419,7 +419,7 @@ pub fn root_skgids_of_buffer (
 ) -> BTreeSet<ID> {
   viewforest . roots ()
     . filter_map ( |root| match &root . value () . kind {
-      ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
+      ViewnodeKind::Vognode (vognode) => Some ( vognode . skgid () . clone () ),
       _ => None, } )
     . collect () }
 

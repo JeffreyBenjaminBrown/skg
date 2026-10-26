@@ -1,3 +1,25 @@
+* Problems found while reviewing the view-ids run (2026-10-23; fixed 2026-10-26)
+  The report is under 'tests/results/review18/'.
+** After a switch back, the restricted placeholder stays beside its node
+  Switching to 'public' turned the private node s into the anonymous
+  'restrictedNode' placeholder, still holding its public child s1.
+  Switching back to 'all' left the placeholder where it was and drew s
+  again beside it, with s1 under it, so s1 appears twice. The
+  placeholder has no ID, so no reconciler matches it to s; under the
+  one rule it should be converted (a restricted vognode with a subtree
+  becomes a dead viewnode) or, better, become s again. Same report,
+  case 4.
+  Jeff (2026-10-23): not worth fixing unless it is very little code,
+  and it is not: the placeholder drops the node's ID on purpose, so a
+  revival needs the ID remembered per vid, a pass at the switch back
+  and a test. Left open; no fix planned.
+  Fixed by slice 2 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org',
+  as the one rule asked: the restricted placeholder is gone, and a
+  switch entombstones every occurrence of a now-hidden node, so s
+  becomes a tombstone holding s1. Switching back draws s again
+  beside the tombstone, which still holds a write-protected s1 that
+  claims nothing, until the user removes it; nothing revives the
+  tombstone as s. Pinned by 'tests/hidden_nodes.rs'.
 * Problems found while reviewing the view-ids run (2026-10-23; settled 2026-10-24)
   Each was run by a throwaway test; the reports are under
   'tests/results/review18/'. The decisions are in

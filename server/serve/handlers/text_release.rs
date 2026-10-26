@@ -12,7 +12,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::viewnode::{
-  Viewnode, ViewnodeKind, Vognode, mk_restricted_viewnode};
+  Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use sexp::{Atom, Sexp};
@@ -149,7 +149,7 @@ pub fn challenge_response (
   ] )) )
 }
 
-/// Replace overPrivateText unrestricted nodes with text-free restricted vognodes. Search
+/// Entombstone the occurrences of overPrivateText nodes. Search
 /// exclusion uses this after enrichment so the partner folders it draws
 /// cannot broaden the choice made before the Tantivy query.
 pub fn exclude_overPrivateText_nodes_from_viewforest (
@@ -173,7 +173,7 @@ pub fn exclude_overPrivateText_nodes_from_viewforest (
     if should_convert {
       let mut node : NodeMut<crate::types::viewnode::Viewnode> =
         viewforest . get_mut (treeid) . unwrap ();
-      node . value () . replace_kind ( mk_restricted_viewnode () . kind ); }}
+      node . value () . replace_kind ( ViewnodeKind::Tombstone ); }}
 }
 
 fn canonical_overPrivateText_pids (

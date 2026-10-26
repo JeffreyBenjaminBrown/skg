@@ -337,10 +337,10 @@ impl ViewnodeIdRecord {
 
 /// The pids a view "contains" for collateral detection (views_containing): the
 /// primary ids of its Unrestricted vognodes -- the only kind backed by a
-/// real, current graphnode that this view renders meaningfully. Restricted
-/// placeholders are excluded: they are anonymous placeholders whose rerender shows
-/// nothing about the node, so a save touching that node need not re-render this
-/// view (its unrestricted descendants register themselves). Deleted / Unknown / Diff
+/// real, current graphnode that this view renders meaningfully. A tombstone
+/// standing for a hidden node shows nothing about the node, so a save
+/// touching that node need not re-render this view (its unrestricted
+/// descendants register themselves). Deleted / Unknown / Diff
 /// phantom are excluded too: they are not graph members. The single source of
 /// which kinds count: update_view derives its pids through it, and the de-novo
 /// caller (multi_root_view_via_env) computes the pids it passes to register_view

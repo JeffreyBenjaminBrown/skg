@@ -162,10 +162,6 @@
 (skg folded aliasFolder)
 ---- text: aliases
 ---- styles: message*7
-==== placeholders: restricted node
-(skg restrictedNode)
----- text: node from restricted skgrepo
----- styles: message*28
 ==== carriers: two subscribers, one the parent
 (skg (node (id x) (rels (subscribesTo (in 2 (ancestors 1))))))
 ---- text: 2aS

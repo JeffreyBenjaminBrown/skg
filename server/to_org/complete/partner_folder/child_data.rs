@@ -242,11 +242,10 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     // ordered, in the buffer's order.
     if kind . goal_is_ordered () { KeptChildOrder::FollowsGoal }
     else { KeptChildOrder::Unmoved },
-    // A RestrictedVognode child is unmanaged
-    // (the API doc's "Restricted-skgrepo nodes"): the goal omits
-    // every restricted member, and a retained placeholder already in the
-    // folder survives as an unmanaged child (preserved as-is, not
-    // goal-matched), so it needs no id.
+    // A tombstone child is unmanaged (the API doc's
+    // "Restricted-skgrepo nodes"): the goal omits every hidden member,
+    // and a tombstone standing where one was survives as an unmanaged
+    // child (preserved as-is, not goal-matched), so it needs no id.
     |vn : &Viewnode| skgid_a_folder_child_stands_for (vn, graph) . is_some (),
     |vn : &Viewnode| skgid_a_folder_child_stands_for (vn, graph) . ok_or_else ( || format! (
       "{}: managed child not a normal graphnode", label )),

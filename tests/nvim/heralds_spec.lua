@@ -154,13 +154,6 @@ describe('skg.heralds', function ()
     heralds.disable(buf)
   end)
 
-  it('displays the restricted vognode as a message', function ()
-    local chunks = heralds.chunks_from_metadata('(skg restrictedNode)')
-    assert.are.equal('node from restricted skgrepo',
-                     heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldMessage', chunks[1][2])
-  end)
-
   it('self-heals a missing rule table via the fetcher', function ()
     -- Mirrors test-heralds-self-heals-missing-rule-table: the stubbed
     -- fetcher stands in for the server answering the re-request.

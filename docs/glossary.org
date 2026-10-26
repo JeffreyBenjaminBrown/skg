@@ -510,9 +510,11 @@ the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
 connection currently shows; the skgrepo-set =all= means no
 restriction. A skgrepo inside it is *unrestricted*, one outside it
-*restricted*, and so are their nodes: an unrestricted vognode is shown
-in full, a restricted one only as an anonymous placeholder
-(=restrictedNode=).
+*restricted*, and so are their nodes. A node in a restricted skgrepo
+is *hidden*: the gated graph answers 'hidden' for it, as distinct
+from 'present' and 'absent' ('GnidPresence'), and the view shows
+nothing of it. Where an occurrence of it stood when the restriction
+tightened, a tombstone stands, holding the occurrence's children.
 
 *** owned, foreign
 
@@ -982,11 +984,10 @@ neighborhood independently in the before and after graph snapshots.
 *** vognode, non-vognode
 
 A *vognode* is a viewnode representing a graphnode ('Vognode' in
-'server/types/viewnode.rs'). It is one of three kinds:
-- *unrestricted*: the graphnode is in an unrestricted skgrepo, so the view shows it;
-- *restricted*: it is in a restricted skgrepo, so the view shows only an
-  anonymous, dataless placeholder;
+'server/types/viewnode.rs'). It is one of two kinds:
+- *unrestricted*: the graphnode is in the graph, so the view shows it;
 - a *phantom*: the graphnode is no longer in the graph, or never was.
+A hidden node has no vognode (see the skgrepo restriction above).
 
 The other viewnodes are *non-vognodes*: folders, properties, the buffer
 root and tombstones. They describe their viewparent, or its
@@ -1211,7 +1212,7 @@ walk prefers a member to a non-member
 ([[*editability rule, editable map][editability rule]]), a
 retained copy never keeps the editability claim from its node's
 member. A leaf, and any viewnode of another kind (a phantom, a
-restricted vognode, a property, a folder), is
+property, a folder), is
 [[*tombstone, entombstone][entombstoned]]. Of several copies of one
 key, the one kept as the member is the editable one, else the first;
 each other copy with a subtree is retained write-protected, its
@@ -1254,7 +1255,7 @@ skgrepo records.
 *** save-inert
 
 A viewnode is *save-inert* if it emits no fieldIntents: phantoms,
-restricted vognodes, and the diff view's properties, among
+tombstones, and the diff view's properties, among
 them removed aliases and IDs. Its descendants may still emit them, so save
 extraction still visits them.
 

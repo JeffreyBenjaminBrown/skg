@@ -53,7 +53,7 @@ pub fn match_key (
   match &viewnode . kind {
     ViewnodeKind::Vognode (vognode) =>
       skgid_a_folder_child_stands_for (viewnode, graph)
-      . or_else ( || vognode . skgid () . cloned () )
+      . or_else ( || Some ( vognode . skgid () . clone () ))
       . map (MatchKey::Graphnode),
     ViewnodeKind::PropertyMember (member) =>
       Some ( MatchKey::Kind ( propertyMember_kind (member) )),

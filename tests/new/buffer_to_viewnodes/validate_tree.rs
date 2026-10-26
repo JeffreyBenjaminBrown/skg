@@ -12,7 +12,8 @@ use skg::test_utils::run_with_test_stores;
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use skg::types::maybe_placed_viewnode::{MpVognode, MpViewnodeKind};
+use skg::types::maybe_placed_viewnode::MpViewnodeKind;
+use ego_tree::NodeId;
 
 const FIXTURES : &str =
   "tests/merge/merge_nodes/fixtures";
@@ -760,50 +761,18 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
 }
 
 #[test]
-fn test_restricted_placeholder_content_edits_rejected_at_parse_time () {
-  let input_with_title_edit : &str =
-    indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (restrictedNode (id hidden) (repo private))) edited title
-    "};
-  let (_viewforest, parsing_errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input_with_title_edit) . unwrap ();
-  assert!(
-    parsing_errors . iter () . any ( |e| matches!(
-      e, BufferValidationError::Other (msg)
-         if msg . contains ("Restricted vognode content cannot be edited"))),
-    "Changing a restricted vognode title should be rejected. Parse errors: {:?}",
-    parsing_errors );
-
-  let input_with_body_edit : &str =
-    indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (restrictedNode (id hidden) (repo private)))
-      edited body
-    "};
-  let (_viewforest2, parsing_errors2, _warnings__viewforest2)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input_with_body_edit) . unwrap ();
-  assert!(
-    parsing_errors2 . iter () . any ( |e| matches!(
-      e, BufferValidationError::Other (msg)
-         if msg . contains ("Restricted vognode content cannot be edited"))),
-    "Adding restricted vognode body text should be rejected. Parse errors: {:?}",
-    parsing_errors2 );
-}
-
-#[test]
-fn test_restricted_placeholder_unrestricted_children_allowed_locally () {
-  // The retained case ('docs/api-and-formats.org', "Restricted-skgrepo
-  // nodes: omission, retention, and save preservation"): a restricted node
-  // stays on screen because of its unrestricted children, so a
-  // RestrictedVognode with unrestricted children must pass.
+fn a_tombstone_holding_a_visible_child_passes_local_validation () {
+  // Where a switch of the skgrepo restriction hid a node, a tombstone
+  // stands, holding the node's visible children ('docs/api-and-formats.org',
+  // "Restricted-skgrepo nodes: omission, retention, and save
+  // preservation"), under a node or as a view root.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (restrictedNode (id hidden) (repo private)))
-      *** (skg (node (id child) (repo main))) unrestricted child
+      ** (skg tombstone)
+      *** (skg (node (id child) (repo main))) visible child
+      * (skg tombstone)
+      ** (skg (node (id other) (repo main))) another visible child
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -812,61 +781,31 @@ fn test_restricted_placeholder_unrestricted_children_allowed_locally () {
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
-
   let config : SkgConfig = validation_config ();
-  let restricted_skgid = viewforest . root () . traverse ()
-    . filter_map ( |edge| match edge {
-      ego_tree::iter::Edge::Open (node_ref)
-        if matches! (
-          node_ref . value () . kind,
-          MpViewnodeKind::Vognode (
-            MpVognode::Restricted (_))) =>
-          Some (node_ref . id ()),
-      _ => None, })
-    . next ()
-    . expect ("restricted vognode should exist");
-
-  validate_local_structure (
-      &viewforest, restricted_skgid, &config)
-    . expect (
-      "a Restricted vognode with an unrestricted child (the retained case) must pass validation");
+  let tombstones : Vec<NodeId> = viewforest . root () . descendants ()
+    . filter ( |node_ref| matches! ( node_ref . value () . kind,
+                                     MpViewnodeKind::Tombstone ))
+    . map ( |node_ref| node_ref . id () )
+    . collect ();
+  assert_eq! ( tombstones . len (), 2 );
+  for treeid in tombstones
+    . into_iter ()
+    . chain ( viewforest . first_root () . map ( |r| r . id () )) {
+    validate_local_structure (&viewforest, treeid, &config)
+      . expect ("a tombstone, its parent and its children pass validation"); }
 }
 
 #[test]
-fn test_restricted_placeholder_under_unrestrictedVognode_allowed_locally () {
-  let input : &str =
-    indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (restrictedNode (id hidden) (repo private)))
-    "};
-  let (viewforest, parsing_errors, _warnings_viewforest)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input) . unwrap ();
-  assert_eq! (
-    parsing_errors . len(), 0,
-    "Test fixture should not have parse errors: {:?}",
-    parsing_errors );
-
-  let config : SkgConfig = validation_config ();
-  let root_skgid = viewforest . first_root ()
-    . expect ("root child should exist")
-    . id ();
-  validate_local_structure (&viewforest, root_skgid, &config)
-    . expect ("UnrestrictedVognode should accept a restricted vognode child");
-}
-
-#[test]
-fn restricted_placeholder_does_not_collide_with_content () {
-  // A restricted vognode is anonymous and is not a content member
-  // (its membership is owned by the disk weave), so it cannot
+fn a_tombstone_does_not_collide_with_content () {
+  // A tombstone is not a content member (where it stands for a hidden
+  // node, the disk weave owns that membership), so it cannot
   // duplicate a real content child's id -- the buffer validates even
-  // when an unrestricted child happens to be the very node the placeholder
-  // stands in for.
+  // when a visible child is the very node the tombstone stood for.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (node (id hidden) (repo main))) unrestricted child
-      ** (skg restrictedNode)
+      ** (skg (node (id hidden) (repo main))) visible child
+      ** (skg tombstone)
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -875,14 +814,12 @@ fn restricted_placeholder_does_not_collide_with_content () {
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
-
   let config : SkgConfig = validation_config ();
   let root_skgid = viewforest . first_root ()
     . expect ("root child should exist")
     . id ();
   validate_local_structure (&viewforest, root_skgid, &config)
-    . expect (
-      "a restricted vognode must not collide with content");
+    . expect ("a tombstone must not collide with content");
 }
 
 #[test]

@@ -54,7 +54,7 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, Existence, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder, PhantomDeleted,
-  PhantomHistorical, RestrictedVognode, PhantomUnknown,
+  PhantomHistorical, PhantomUnknown,
   Editability, RelationshipEditRequest, ViewnodeId,
 };
 use crate::types::maybe_placed_viewnode::{
@@ -105,9 +105,6 @@ pub struct ViewnodeMetadata {
   pub unknown_node_skgid: Option<ID>,
   pub unknown_relRepo : Option<SkgrepoName>,
   pub unknown_relRepo_request : Option<SkgrepoName>,
-  // When true, this is a restricted-skgrepo placeholder: an anonymous,
-  // dataless atom (see RestrictedVognode). It carries no id/repo/etc.
-  pub is_restricted_node : bool,
 }
 
 pub fn default_metadata() -> ViewnodeMetadata {
@@ -134,8 +131,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     is_tombstone: false,
     unknown_node_skgid: None,
     unknown_relRepo: None,
-    unknown_relRepo_request: None,
-    is_restricted_node: false, }}
+    unknown_relRepo_request: None, }}
 
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
@@ -174,17 +170,6 @@ pub fn viewnode_from_metadata (
               &[ headline . clone () ] )))
           } else { None },
           None )
-      } else if metadata . is_restricted_node {
-        let error : Option<BufferValidationError> =
-          if body . is_some ()
-          || ! title . is_empty () {
-            Some ( BufferValidationError::Other ( with_org_subheadlines (
-              "Restricted vognode content cannot be edited.",
-              &[ headline . clone () ] )))
-          } else { None };
-        ( MpViewnodeKind::Vognode (
-            MpVognode::Restricted ( RestrictedVognode ) ),
-          error, None )
       } else if metadata . is_tombstone {
         ( MpViewnodeKind::Tombstone, None, None )
       } else if metadata . is_historical_node {
@@ -340,7 +325,6 @@ pub fn viewnode_from_metadata (
                MpViewnodeKind::Folder (_)
                | MpViewnodeKind::BufferRoot
                | MpViewnodeKind::Tombstone
-               | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
                | MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) );
   ( MpViewnode { foldAndFocus      : metadata . foldAndFocus,
                  kind,
@@ -448,8 +432,6 @@ pub fn parse_metadata_to_viewnodemd (
             // (unknown (id X)) -- placeholder for a referenced
             // node with no record anywhere. No skgrepo/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
-          "restrictedNode" => {
-            parse_restrictednode_sexp ( &items[1..], &mut result ) ?; },
           "relRepo" => {
             if items . len () != 2 {
               return Err (
@@ -522,11 +504,6 @@ pub fn parse_metadata_to_viewnodemd (
           "focused"  => result . foldAndFocus . focused = true,
           "folded"   => result . foldAndFocus . folded = true,
           "bodyFolded" => result . foldAndFocus . bodyFolded = true,
-          // A restricted vognode is a dataless bare atom
-          // (see RestrictedVognode). The legacy field-bearing list form
-          // '(restrictedNode ...)' is still tolerated by the List arm
-          // above so a stale buffer round-trips.
-          "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::Alias { text: String::new(), relRepo: None, relationshipEditRequest: None } ) ),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
@@ -613,7 +590,6 @@ fn check_where_the_edit_request_sits (
     metadata . non_vognode . is_none ()
     && ! is_phantom
     && ! metadata . is_tombstone
-    && ! metadata . is_restricted_node
     && metadata . unknown_node_skgid . is_none ();
   match &metadata . edit_request {
     Some (NodeEditRequest::RestoreNode) if metadata . is_historical_node =>
@@ -757,19 +733,6 @@ fn parse_unknownnode_sexp (
             "Unknown 'unknown' key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in unknown sexp"
                            . to_string () ); }} }
-  Ok (( )) }
-
-/// Parse the legacy list form '(restrictedNode ...)'. The server now
-/// emits the bare atom 'restrictedNode' (handled in the atom arm), but an
-/// older server's field-bearing list form is tolerated here -- its
-/// children (id/repo/membership/overridesHere) are discarded -- so a
-/// stale buffer still round-trips. A restricted vognode is an
-/// anonymous, dataless atom (see RestrictedVognode).
-fn parse_restrictednode_sexp (
-  _items   : &[Sexp],
-  metadata : &mut ViewnodeMetadata,
-) -> Result<(), String> {
-  metadata . is_restricted_node = true;
   Ok (( )) }
 
 /// The one atom argument of the form whose head is 'head'.

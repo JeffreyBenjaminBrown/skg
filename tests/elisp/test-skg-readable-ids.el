@@ -104,7 +104,7 @@
                  (lambda (_proc _string) nil)))
         (insert
          (format
-          "* (skg (restrictedNode (id %s) (repo private)))\n* (skg (node (id %s) (repo public))) unrestricted\n"
+          "* (skg (node (id %s) (repo private)))\n* (skg (node (id %s) (repo public))) unrestricted\n"
           test-skg-readable-ids--id-restricted
           test-skg-readable-ids--id-unrestricted))
         (setq skg-readable-ids--buffer-generation 0)

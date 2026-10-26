@@ -49,7 +49,7 @@ use crate::to_org::util::mark_view_roots_as_members;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::skgrepo_sets::apply_skgrepo_set_to_viewforest;
+use crate::skgrepo_sets::entombstone_hidden_occurrences;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::viewnode::Viewnode;
@@ -429,8 +429,9 @@ fn enrich_search_buffer_snapshot (
     & payload . graphnodestats . content_to_containers,
     &runtime . config,
     Some (skgrepo_restriction) );
-  apply_skgrepo_set_to_viewforest (
+  entombstone_hidden_occurrences (
     &mut viewforest,
+    &runtime . graph,
     skgrepo_restriction );
   if ! payload . include_overPrivateText_telescopes {
     exclude_overPrivateText_nodes_from_viewforest (

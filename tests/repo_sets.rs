@@ -27,7 +27,6 @@ use skg::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::types::errors::SaveError;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, TantivyIndex, members_of, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
@@ -62,11 +61,8 @@ fn all_tests
       s . reset ("search_filters_restricted_repos_before_ranking_and_truncation", fixtures) ?;
       search_filters_restricted_skgrepos_before_ranking_and_truncation (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_placeholder_in_buffer_does_not_drive_contains", fixtures) ?;
-      restricted_placeholder_in_buffer_does_not_drive_contains (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("saving_edits_to_restricted_placeholder_content_are_rejected", fixtures) ?;
-      saving_edits_to_restricted_placeholder_content_are_rejected (
+      s . reset ("tombstone_in_buffer_does_not_drive_contains", fixtures) ?;
+      tombstone_in_buffer_does_not_drive_contains (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("restricted_repo_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_skgrepo_search_and_save_work_together_end_to_end (
@@ -74,11 +70,11 @@ fn all_tests
       s . reset ("the_containerward_chain_stops_before_a_restricted_container", fixtures) ?;
       the_containerward_chain_stops_before_a_restricted_container (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("stale_restricted_placeholders_under_folders_save_without_error", fixtures) ?;
-      stale_restricted_placeholders_under_folders_save_without_error (
+      s . reset ("tombstones_under_folders_save_without_error", fixtures) ?;
+      tombstones_under_folders_save_without_error (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo", fixtures) ?;
-      restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo (
+      s . reset ("tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo", fixtures) ?;
+      tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("weave_preserves_omitted_restricted_content_members", fixtures) ?;
       weave_preserves_omitted_restricted_content_members (
@@ -91,8 +87,8 @@ fn all_tests
 /// PIN (the override-substitution-across-switch case,
 /// 'docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
 /// retention, and save preservation"): a shown override substitute whose
-/// skgrepo goes restricted on a skgrepo-set switch becomes an anonymous
-/// bare-atom 'restrictedNode'; the rerender shows the original directly (a
+/// skgrepo goes restricted on a skgrepo-set switch becomes a tombstone;
+/// the rerender shows the original directly (a
 /// restricted overrider does not substitute) with no leak of the
 /// overrider's title or id, retaining the overrider's unrestricted
 /// descendant; and the container's contains still saves to the original,
@@ -172,8 +168,8 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
           . viewforest_id_to_view (&viewforest_id)
           . expect ("the switched view should still be registered");
         viewforest_to_string (forest, config) ? };
-      assert! ( view_public . contains ("restrictedNode"),
-        "the overrider should become an anonymous restricted vognode:\n{}",
+      assert! ( view_public . contains ("tombstone"),
+        "the overrider should become a tombstone:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-original"),
         "the original N should be shown directly:\n{}", view_public );
@@ -183,7 +179,7 @@ fn override_substitute_across_skgrepo_switch_anonymizes_and_keeps_original (
       assert! ( ! view_public . contains ("ovr-sub-overrider"),
         "the restricted overrider's id must not leak:\n{}", view_public );
       assert! ( ! view_public . contains ("overridesHere"),
-        "an anonymous restricted vognode carries no override marker:\n{}",
+        "a tombstone carries no override marker:\n{}",
         view_public );
       assert! ( view_public . contains ("ovr-sub-child"),
         "the overrider's unrestricted descendant is retained:\n{}",
@@ -434,28 +430,27 @@ async fn search_filters_restricted_skgrepos_before_ranking_and_truncation (
          and display truncation" );
       Ok (( )) }
 
-async fn restricted_placeholder_in_buffer_does_not_drive_contains (
+async fn tombstone_in_buffer_does_not_drive_contains (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // A restricted vognode is write-protected: it emits no save intention
-  // for its container. Its presence and position in the container's
-  // contains are owned by the disk merge (weave), not the buffer. So
-  // reordering the placeholder cannot move its disk member, and a
-  // stale placeholder for a node absent from disk is not resurrected.
+  // A tombstone where a hidden node stood emits no save intention for
+  // its container. The hidden node's presence and position in the
+  // container's contains are owned by the disk merge (weave), not the
+  // buffer. So moving the tombstone cannot move its disk member.
   // (Disk root.contains = [active-a, private-a, active-b]; private-a's
   // skgrepo is restricted under the "public" set.)
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("public" . to_string ())) ?;
-      { // The user drags the placeholder to the end. The save keeps
+      { // The user drags the tombstone to the end. The save keeps
         // private-a at its disk position (after active-a), not the
         // buffer position, and writes no SaveNode for it.
         let reordered = indoc! {"
           * (skg (node (id root) (repo public))) root
           ** (skg (node (id active-a) (repo public) writeProtected)) active-a
           ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (restrictedNode (id private-a) (repo private)))
+          ** (skg tombstone)
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
@@ -467,55 +462,11 @@ async fn restricted_placeholder_in_buffer_does_not_drive_contains (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
-          "reordering a write-protected placeholder must not move its disk \
-           member" );
+          "moving a tombstone must not move the hidden disk member" );
         assert! (
           ! save_skgids (&instructions) . contains (&ID::from ("private-a")),
-          "a restricted vognode must not produce a SaveNode" ); }
-      { // A stale placeholder for a node not in root's disk contains
-        // (private-removed) must not be resurrected into contains; the
-        // real invisible member (private-a) is still preserved.
-        let stale = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (restrictedNode (id private-removed) (repo private)))
-        "};
-        let instructions : Vec<NodeInstruction> =
-          buffer_to_validated_saveplan (
-            stale, config, Some (&restriction) ) ?
-          . 1 . node_instructions;
-        let graph = graph_handle_from_config (config)? . load_full ();
-        let contains : Vec<ID> =
-          members_of (& saved_or_graph_node_by_skgid (
-            &instructions, "root", &graph) . contains);
-        assert_eq! (
-          contains,
-          vec![ ID::from ("active-a"), ID::from ("private-a"),
-                ID::from ("active-b") ],
-          "a stale placeholder absent from disk must not be resurrected" );
-        assert! (
-          ! contains . contains (&ID::from ("private-removed")),
-          "private-removed must not appear in contains" ); }
+          "the hidden node must not produce a SaveNode" ); }
       Ok (( )) }
-
-async fn saving_edits_to_restricted_placeholder_content_are_rejected (
-  config : &SkgConfig,
-  _tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-      let buffer = indoc! {"
-        * (skg (node (id root) (repo public))) root
-        ** (skg (restrictedNode (id private-a) (repo private))) edited title
-        This body edit should be rejected.
-      "};
-      let result =
-        buffer_to_validated_saveplan (
-          buffer, config, None ) ;
-      assert! (
-        matches! ( result, Err (SaveError::BufferValidationErrors { .. }) ),
-        "editing restricted vognode title/body should be rejected: {:?}",
-        result );
-	      Ok (( )) }
 
 async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
   config : &SkgConfig,
@@ -726,18 +677,18 @@ fn titles_by_skgids_omits_restricted_skgrepo_titles (
     "restricted-skgrepo title lookup must omit private-a" );
   Ok (( )) }
 
-async fn stale_restricted_placeholders_under_folders_save_without_error (
+async fn tombstones_under_folders_save_without_error (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // ('docs/api-and-formats.org', "Restricted-skgrepo nodes: omission,
-  // retention, and save preservation") the formerly-unsavable buffer. A
-  // buffer rendered before a skgrepo-set switch can hold RestrictedVognodes
-  // under folders; saving it must not error.
+  // retention, and save preservation"): a buffer switched to a
+  // restriction can hold tombstones under folders, where hidden
+  // members stood; saving it must not error.
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
         ** (skg subscriberFolder)
-        *** (skg (restrictedNode (id private-a) (repo private)))
+        *** (skg tombstone)
         ** (skg (node (id active-b) (repo public) writeProtected)) active-b
       "};
       let restriction : SkgrepoRestriction =
@@ -747,24 +698,24 @@ async fn stale_restricted_placeholders_under_folders_save_without_error (
         buffer_to_validated_saveplan (
           buffer, config, Some (&restriction) ) ;
       assert! ( result . is_ok (),
-        "a RestrictedVognode under a folder must not block saving: {:?}",
+        "a tombstone under a folder must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
-async fn restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo (
+async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // A restricted vognode emits no subscribesTo membership, just as
-  // it emits no contains relationship_axes: 'subscribesTo' is
+  // A tombstone emits no subscribesTo membership, just as it emits
+  // no contains relationship_axes: 'subscribesTo' is
   // order-meaningful, but the disk merge (weave) owns invisible
-  // subscribees, so a buffer-present placeholder must not feed the
+  // subscribees, so a tombstone where one stood must not feed the
   // recorder's subscribeeFolder. (root has no subscribesTo on disk, so the
   // unrestricted member is the only one written.)
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
         ** (skg subscribeeFolder)
-        *** (skg (restrictedNode (id private-a) (repo private)))
+        *** (skg tombstone)
         *** (skg (node (id active-b) (repo public) writeProtected)) active-b
       "};
       let restriction : SkgrepoRestriction =
@@ -779,7 +730,7 @@ async fn restricted_subscribee_placeholder_does_not_contribute_to_subscribesTo (
           saved_node_by_skgid (&instructions, "root")
             . subscribesTo . or_default () ),
         vec! [ ID::from ("active-b") ],
-        "the restricted vognode must not be a subscribee member" );
+        "the tombstone must not be a subscribee member" );
       Ok (( )) }
 
 async fn weave_preserves_omitted_restricted_content_members (

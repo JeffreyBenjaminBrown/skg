@@ -234,8 +234,8 @@ pub fn entombstone_generalized_orphan_folder (
 ///   leaf does not self-dispatch, so it is still converted below.)
 /// - any other non-vognode child (a Property, a tombstone) -> convert
 ///   it to a tombstone;
-/// - any other child (a non-member vognode -- a non-member Unrestricted or an
-///   Restricted -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
+/// - any other child (a non-member Unrestricted vognode, or any Phantom:
+///   Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_folder_child (
   tree  : &mut Tree<Viewnode>,
   child : NodeId,

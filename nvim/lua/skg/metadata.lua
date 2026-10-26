@@ -671,8 +671,8 @@ function M.partner_folder_atom (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it a vognode's: an UnrestrictedVognode, a phantom
----(deleted, unknown or historical) or a restricted node?
+---@return boolean is it a vognode's: an UnrestrictedVognode or a phantom
+---(deleted, unknown or historical)?
 function M.vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
   if M.unrestrictedNode_sexp_p(metadata_sexp) then return true end
@@ -681,8 +681,7 @@ function M.vognode_sexp_p (metadata_sexp)
                          { SKG, { sexpr.symbol(head) } }) then
       return true end
   end
-  return compare.subtree_p(metadata_sexp,
-                           { SKG, sexpr.symbol('restrictedNode') })
+  return false
 end
 
 ---@param line_number integer

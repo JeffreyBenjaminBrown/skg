@@ -341,7 +341,7 @@ fn keys_named_at (
 
 /// The ID a vognode's leaves are keyed by: a historical phantom's as
 /// written (a node of the before-graph), any other's resolved by
-/// 'pid_of'. None for a restricted vognode or a non-vognode.
+/// 'pid_of'. None for a non-vognode.
 pub(crate) fn vognode_leaf_pid (
   viewnode : &Viewnode,
   pid_of   : &dyn Fn (&ID) -> ID,
@@ -350,7 +350,7 @@ pub(crate) fn vognode_leaf_pid (
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
       Some ( h . skgid . clone () ),
     ViewnodeKind::Vognode (vognode) =>
-      Some ( pid_of ( vognode . skgid () ? )),
+      Some ( pid_of ( vognode . skgid () )),
     _ => None, } }
 
 /// Set or clear the marks the requests name, at their fingerprints
@@ -415,7 +415,7 @@ fn grandparent_pid (
   node : NodeRef<Viewnode>,
 ) -> Option<ID> {
   match &node . parent () ? . parent () ? . value () . kind {
-    ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
+    ViewnodeKind::Vognode (vognode) => Some ( vognode . skgid () . clone () ),
     _ => None, } }
 
 /// The readiness summary of a buffer of the diff view, from

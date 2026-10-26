@@ -231,7 +231,7 @@ async fn pipeline_restricted_subtree (
       let input : &str =
         indoc! {"
             * (skg (node (id root) (repo main))) root
-            ** (skg (restrictedNode (id hidden) (repo main)))
+            ** (skg tombstone)
             *** (skg (node (id stowaway) (repo main))) stowaway
             "};
       let (plan, _) =
@@ -244,9 +244,9 @@ async fn pipeline_restricted_subtree (
       assert_eq!(
         members_of (&saved_node_by_skgid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new(),
-        "the restricted node emits no contains membership; under a \
-         restricted set the weave restores it from disk (see \
-         tests/repo_sets.rs)" );
+        "the tombstone emits no contains membership; under a \
+         restricted set the weave restores a hidden node's from disk \
+         (see tests/repo_sets.rs)" );
       Ok (( )) }
 
 async fn pipeline_phantom_subtree (

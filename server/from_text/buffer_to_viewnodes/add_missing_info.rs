@@ -171,8 +171,7 @@ fn make_alias_if_appropriate(
 /// new headline below a historical phantom or in a partner folder
 /// inherits from the vognode above them. Any other kind ends the walk
 /// and supplies none: the buffer root (so a bare headline at top level
-/// is refused at validation), a tombstone, a restricted vognode, a
-/// property.
+/// is refused at validation), a tombstone, a property.
 /// A write-protected ancestor's skgrepo is the one its ID will have
 /// after this save (WRITEPROTECTED_SKGREPOS_AFTER_SAVE), not the one it
 /// shows.
@@ -217,8 +216,7 @@ fn skgrepo_of_nearest_unrestricted_ancestor (
         } else { at . home_skgrepo . clone () },
       MpViewnodeKind::Vognode (MpVognode::Phantom (_))
         | MpViewnodeKind::Folder (_) => continue,
-      MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-        | MpViewnodeKind::PropertyMember (_)
+      MpViewnodeKind::PropertyMember (_)
         | MpViewnodeKind::ChangeViewnode (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone => return None, }}

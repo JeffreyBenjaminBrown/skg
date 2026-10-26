@@ -46,8 +46,8 @@ pub fn reconcile_subscribeeFolder_children (
   let goal_list : Vec<ID> =
     // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): omit every restricted
     // subscribee from the goal (the weave preserves them at save). A
-    // retained restricted vognode already in the tree survives anyway
-    // -- the folder reconciler treats it as unmanaged, not goal-matched.
+    // tombstone where a now-hidden one stood survives anyway -- the
+    // folder reconciler treats it as unmanaged, not goal-matched.
     omit_restricted_members (
       context . worktree_subscribees . clone (), skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );

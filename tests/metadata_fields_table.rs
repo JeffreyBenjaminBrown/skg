@@ -90,7 +90,7 @@ fn every_kind_atom (
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired => (), } }
   [ "node", "historical", "deleted", "unknown",
-    "restrictedNode", "tombstone", "forestRoot" ]
+    "tombstone", "forestRoot" ]
     . iter () . map ( |atom| atom . to_string () )
     . chain ( members . iter ()
               . map ( |m| m . repr_in_client () . to_string () ))

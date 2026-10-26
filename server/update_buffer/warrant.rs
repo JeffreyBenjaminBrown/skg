@@ -153,7 +153,7 @@ fn vognode_gnid (
   node : NodeRef<Viewnode>,
 ) -> Option<ID> {
   match &node . value () . kind {
-    ViewnodeKind::Vognode (vognode) => vognode . skgid () . cloned (),
+    ViewnodeKind::Vognode (vognode) => Some ( vognode . skgid () . clone () ),
     _ => None, } }
 
 /// The pid of the node 'gnid' names, or 'gnid' itself when the graph

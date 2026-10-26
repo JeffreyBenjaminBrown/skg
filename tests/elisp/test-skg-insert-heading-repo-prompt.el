@@ -149,15 +149,13 @@ without prompting."
 (ert-deftest test-insert-heading-prompts-only-when-it-cannot-inherit ()
   "C-return prompts for a repo exactly when the new headline cannot
 inherit one: not below a folder whose viewparent is a node, but below a
-restricted vognode or a tombstone."
+tombstone."
   (dolist (case '(("* (skg (node (id x) (repo public))) x\n** (skg subscribeeFolder)\n*** (skg (node (id y) (repo public))) y\n"
                    nil)
                   ("* (skg (node (id x) (repo public))) x\n** (skg (deleted (id d) (repo public))) d\n*** (skg (node (id y) (repo public))) y\n"
                    nil)
                   ("* (skg (node (id x) (repo public))) x\n** (skg bodyFolded (node (id m) (repo public))) m\n*** (skg (node (id y) (repo public))) y\n"
                    nil)
-                  ("* (skg (node (id x) (repo public))) x\n** (skg restrictedNode)\n*** (skg (node (id y) (repo public))) y\n"
-                   t)
                   ("* (skg (node (id x) (repo public))) x\n** (skg tombstone)\n*** (skg (node (id y) (repo public))) y\n"
                    t)))
     (test--with-skg-content-view

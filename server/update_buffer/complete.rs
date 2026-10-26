@@ -343,10 +343,7 @@ fn dispatch_node_update (
       if visit_as_unrestrictedVognode =>
       visit_normal_node (tree, treeid, context) ?,
     _ => {
-      // No-op for: Restricted (an anonymous restricted vognode -- it carries no
-      // identity, and flipping it to a "DELETED" placeholder would leak that
-      // a hidden node vanished; it just lingers until the next full
-      // rerender drops it), Unknown (unresolvable-id placeholder),
+      // No-op for: Unknown (unresolvable-id placeholder),
       // Deleted, Historical, Tombstone, Property leaves and BufferRoot.
       // The prune sweep handles empty/dead nodes.
     } }

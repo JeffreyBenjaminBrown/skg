@@ -2,7 +2,7 @@
 /// Nodes of the graph are represented via the 'Graphnode' type.
 /// Nodes of the tree are represented via the 'Viewnode' type.
 /// Some 'Viewnode's represent graphnodes, which need not exist; these are
-/// 'Vognode's (unrestricted, restricted, or phantom).
+/// 'Vognode's (unrestricted or phantom).
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
@@ -109,8 +109,8 @@ pub struct Viewnode {
   pub foldAndFocus    : FoldAndFocus,
   pub kind            : ViewnodeKind,
   /// The diff view's display facts. Empty on a kind that never
-  /// carries a change (a folder, a restricted vognode, the buffer
-  /// root, a tombstone, 'BodyDiff'), and outside the diff view.
+  /// carries a change (a folder, the buffer root, a tombstone,
+  /// 'BodyDiff'), and outside the diff view.
   pub change_facts      : ChangeFacts,
   /// Save intent, like 'relationshipEditRequest', but allowed on a
   /// write-protected occurrence, and beside an edit request.
@@ -164,13 +164,14 @@ impl ViewnodeKind {
                      if ! folder . members_are_properties () ) }
 }
 
-/// A viewnode that represents a graphnode, which need not exist: Unrestricted
-/// and Restricted vognodes represent current graphnodes; a Phantom
-/// represents a missing or historical one.
+/// A viewnode that represents a graphnode, which need not exist: an
+/// Unrestricted vognode represents a current graphnode; a Phantom
+/// represents a missing or historical one. A node the skgrepo
+/// restriction hides has no vognode: its occurrence is entombstoned
+/// ('entombstone_hidden_occurrences').
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Unrestricted   (UnrestrictedVognode),
-  Restricted (RestrictedVognode), // From a skgrepo that is restricted (see 'docs/api-and-formats.org', "skgrepo-sets").
   Phantom  (Phantom),
 }
 
@@ -196,10 +197,8 @@ pub enum Phantom {
 /// ARISES: during post-save / collateral re-render, when
 /// a node already materialized in the view turns up in
 /// `deleted_by_this_save_pids`. An Unrestricted content child flips here via
-/// `mutate_unrestrictedVognode_to_deletednode`. (A Restricted node is not flipped: it is an
-/// anonymous restricted vognode, and turning it into a DELETED placeholder would leak that a
-/// hidden node vanished, so it just lingers until the next full rerender drops
-/// it.) So it marks a node that genuinely no longer exists in the graph, killed
+/// `mutate_unrestrictedVognode_to_deletednode`. So it marks a node that
+/// genuinely no longer exists in the graph, killed
 /// by a completed save (this buffer's or a shared one's) -- not a git artifact.
 ///
 /// USED: save-inert -- it generates no fieldIntents and is excluded from its
@@ -284,28 +283,6 @@ pub struct PhantomHistorical {
   /// request a phantom carries; consumed after the save.
   pub restoreNode_request : bool,
 }
-
-/// An anonymous "something from a restricted repo is/was here"
-/// vognode. It carries no data on purpose: a restricted node's id,
-/// skgrepo, title, etc. describe content the user hid by restricting
-/// the skgrepo restriction, so rendering any of it would leak.
-///
-/// SCOPE: a RestrictedVognode arises only from a skgrepo-set reduction of an
-/// already-rendered buffer ('update_buffer/repo_switch.rs' converts
-/// now-restricted Unrestricted nodes in place), where it is kept to host
-/// already-extended unrestricted descendants. A de-novo render under a
-/// restricted set never creates one: restricted content members are
-/// omitted from goal lists ('omit_restricted_members') and their content
-/// is never extended (completion does nothing at a restricted node's
-/// visit). So a public node reachable only through a private parent
-/// simply does not appear on a fresh restricted view.
-///
-/// Being dataless, it is save-inert everywhere: it emits no save intention
-/// (its membership is owned by disk supplementation), is not a collateral
-/// pid, is unmanaged by every reconciler (preserved as-is, never
-/// goal-matched), and renders as the bare atom 'restrictedNode'.
-#[derive( Debug, Clone, PartialEq )]
-pub struct RestrictedVognode;
 
 pub type UnrestrictedVognode   = UnrestrictedVognode_Generic < ID, SkgrepoName >;
 pub type MpUnrestrictedVognode = UnrestrictedVognode_Generic < Option < ID >,
@@ -869,13 +846,12 @@ impl ChangesetMarkerKind {
 }
 
 impl Vognode {
-  /// None for a Restricted vognode: it is an anonymous restricted vognode with
-  /// no id (see RestrictedVognode). A phantom returns the id it stands for.
-  pub fn skgid (&self) -> Option<&ID> {
+  /// The id the vognode stands for; a phantom's is that of the node
+  /// it stands for.
+  pub fn skgid (&self) -> &ID {
     match self {
-      Vognode::Unrestricted   (t) => Some (&t . skgid),
-      Vognode::Restricted (_) => None,
-      Vognode::Phantom  (p) => Some (p . skgid ()),
+      Vognode::Unrestricted   (t) => &t . skgid,
+      Vognode::Phantom  (p) => p . skgid (),
     } }
 
   pub fn pid_and_skgrepo (
@@ -883,12 +859,11 @@ impl Vognode {
   ) -> Option<(&ID, &SkgrepoName)> {
     match self {
       Vognode::Unrestricted   (t) => Some ((&t . skgid, &t . home_skgrepo)),
-      Vognode::Restricted (_) => None,
       Vognode::Phantom  (p) => p . pid_and_skgrepo (),
     } }
 
   /// Whether this vognode represents a current graphnode
-  /// (Unrestricted or Restricted), as opposed to a phantom.
+  /// (an Unrestricted one), as opposed to a phantom.
   pub fn is_current_graphnode (&self) -> bool {
     ! matches! (self, Vognode::Phantom (_)) }
 }
@@ -1097,15 +1072,14 @@ impl Viewnode {
       ViewnodeKind::Folder (folder) => folder . title (),
       ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone
-        | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
-        | ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+        | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) =>
         "",
     }}
 
   /// What a message says of this headline.
   pub fn headline_name (&self) -> HeadlineName {
     let graphnode_id : Option<&ID> = match &self . kind {
-      ViewnodeKind::Vognode (vognode) => vognode . skgid (),
+      ViewnodeKind::Vognode (vognode) => Some (vognode . skgid ()),
       _ => None };
     HeadlineName::of ( self . viewnode_id . as_ref (), graphnode_id,
                        self . title () ) }
@@ -1120,7 +1094,6 @@ impl Viewnode {
       ViewnodeKind::PropertyMember (member) => member . body (),
       ViewnodeKind::ChangeViewnode (change) => change . body (),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
-        | ViewnodeKind::Vognode (Vognode::Restricted (_))
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone => None,
     }}
@@ -1140,15 +1113,15 @@ impl Viewnode {
     }}
 
   /// The id of a vognode that represents a current graphnode: None
-  /// for phantoms, restricted vognodes and non-vognodes.
+  /// for phantoms and non-vognodes.
   pub fn skgid_if_current_graphnode (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (v) if v . is_current_graphnode () => v . skgid (),
+      ViewnodeKind::Vognode (v) if v . is_current_graphnode () => Some (v . skgid ()),
       _ => None,
     }}
 
   /// The id of an Unrestricted vognode. None for everything else
-  /// (Restricted vognodes, phantoms, folders, non-vognodes, BufferRoot).
+  /// (phantoms, folders, non-vognodes, BufferRoot).
   pub fn unrestricted_skgid (&self) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
@@ -1277,11 +1250,6 @@ pub fn mk_unknown_viewnode (
       skgid,
       relRepo         : None,
       relationshipEditRequest : None, } ) )) ) }
-
-pub fn mk_restricted_viewnode (
-) -> Viewnode {
-  viewnode_of ( ViewnodeKind::Vognode (
-    Vognode::Restricted ( RestrictedVognode ) )) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.

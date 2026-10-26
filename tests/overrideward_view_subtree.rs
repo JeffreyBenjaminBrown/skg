@@ -24,7 +24,7 @@ use skg::serve::handlers::text_search::render_enriched_search_buffer::{
   collect_override_folder_member_skgids,
   insert_partner_folders_into_search_view};
 use skg::skgrepo_sets::{
-  SkgrepoRestriction, SkgrepoSetName, apply_skgrepo_set_to_viewforest};
+  SkgrepoRestriction, SkgrepoSetName, entombstone_hidden_occurrences};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_as_members;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName, TantivyIndex};
@@ -120,7 +120,7 @@ async fn end_to_end_render_shows_a_suppressed_node_in_a_folder_with_heralds (
     & stats . container_to_contents,
     & stats . content_to_containers,
     config, Some (restriction) );
-  apply_skgrepo_set_to_viewforest ( &mut viewforest, restriction );
+  entombstone_hidden_occurrences ( &mut viewforest, &graph, restriction );
   let buffer : String = viewforest_to_string ( &viewforest, config ) ?;
 
   let level_of = |needle : &str| -> usize {

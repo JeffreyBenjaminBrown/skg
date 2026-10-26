@@ -1,6 +1,6 @@
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::viewnode::{mk_restricted_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::mk_unknown_viewnode;
 use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend_editable_map};
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -35,7 +35,6 @@ use std::sync::Arc;
 
 enum ContentReality {
   Real, // Real content: Exists in worktree, and parent contains it at this position.
-  Restricted,
   Unknown, // A content id that resolves to nothing (a dangling reference) -> an Unknown phantom, rather than aborting the whole view.
 }
 
@@ -235,8 +234,8 @@ fn reconcile_content_children (
   let apparent_content_skgids : Vec<ID> =
     // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits every
     // restricted member from the goal (the weave preserves them at save).
-    // A retained restricted vognode already in the tree survives
-    // anyway -- it is unmanaged by this reconciler, not goal-matched.
+    // A tombstone where a now-hidden node stood survives anyway --
+    // it is unmanaged by this reconciler, not goal-matched.
     omit_restricted_members (
       apparent_content_skgids, skgrepo_restriction,
       |skgid : &ID| graph_snap . pid_and_skgrepo (skgid)
@@ -574,7 +573,7 @@ pub fn unintegrated_content_skgids (
 
 /// Reconcile the node's non-parentIgnored UnrestrictedVognode children
 /// against the goal list of content IDs. Missing children are created
-/// as editable, restricted or unknown viewnodes as appropriate.
+/// as editable or unknown viewnodes as appropriate.
 fn complete_content_children (
   tree               : &mut Tree<Viewnode>,
   node               : NodeId,
@@ -607,11 +606,10 @@ fn complete_content_children (
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling relationship.
         => true,
-      // A RestrictedVognode is unmanaged: never matched against the goal
-      // list, so it is preserved as-is (a retained placeholder hosting
-      // already-extended unrestricted descendants) and needs no id. The goal
-      // omits every restricted member (omit_restricted_members), so it is
-      // never created here either.
+      // Everything else is unmanaged: never matched against the goal
+      // list, so it is preserved as-is. A tombstone standing for a
+      // hidden node is one such; the goal omits every hidden member
+      // (omit_restricted_members), so none is created here either.
       _ => false },
     |vn : &Viewnode| match &vn . kind {
       // Unrestricted and Unknown children participate. Collected
@@ -650,8 +648,6 @@ fn complete_content_children (
               { t . overridesHere =
                   Some ( skgid . clone() ); }
               vn }},
-        ContentReality::Restricted =>
-          mk_restricted_viewnode (),
         ContentReality::Unknown => {
           let mut unknown : Viewnode = mk_unknown_viewnode ( skgid . clone() );
           if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =
@@ -760,7 +756,6 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))  => 2,
         // A historical phantom is a former member, standing where the member was.
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))  => 2,
-        ViewnodeKind::Vognode (Vognode::Restricted (_)) => 2,
         // PhantomUnknown is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
         // a non-vognode.
@@ -775,8 +770,7 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
 
 
 /// WHAT IT DOES: Maps each child of 'node' to a ChildData:
-/// determines title, skgrepo, and whether it is real, restricted
-/// or unknown.
+/// determines title, skgrepo, and whether it is real or unknown.
 ///
 /// MOTIVATION: We pre-extract what will be needed
 /// by the last argument to complete_content_children,
@@ -813,9 +807,6 @@ fn build_child_creation_data (
             if t . claimsMembership
             => { m . insert( t . collected_skgid (),
                              t . home_skgrepo . clone()); },
-          // No Restricted arm: a restricted child is never a goal member
-          // (omit_restricted_members drops it), so it needs no
-          // already-present entry here.
           _ => {}, }}
       m };
   let mut result : HashMap<ID, ChildData> = HashMap::new();
@@ -852,17 +843,11 @@ fn build_child_creation_data (
     if skgrepo_restriction
       . is_some_and ( |restriction| !restriction . contains_skgrepo (&child_skgrepo) )
     {
-      // Omission precedes substitution: a restricted original shows
-      // nothing (this arm is the safety net; the goal list normally
-      // omitted it already), so its overrider is not consulted.
-      result . insert( skgid . clone(),
-                     ChildData { title: String::new (),
-                                 home_skgrepo: child_skgrepo,
-                                 body: None,
-                                 kind: ContentReality::Restricted,
-                                 relRepo: None,
-                                 shown_skgid : None } );
-      continue; }
+      // The goal omits every hidden member ('omit_restricted_members'),
+      // so this is a broken invariant, not something to draw.
+      return Err ( format! (
+        "build_child_creation_data: the goal names {}, which the skgrepo restriction hides",
+        skgid . 0 ) . into () ); }
     let shown_skgid : Option<ID> =
       if substitution_enabled {
         let resolution : OverrideResolution =

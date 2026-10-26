@@ -268,9 +268,9 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 }
 
 #[test]
-fn restricted_placeholders_emit_neither_savenode_nor_contains () {
-  // Raw extraction (no skgrepo set / weave): a restricted vognode
-  // emits no save intention at all. It produces no SaveNode, and it
+fn tombstones_emit_neither_savenode_nor_contains () {
+  // Raw extraction (no skgrepo set / weave): a tombstone, as stands
+  // where a hidden node was, emits no save intention at all. It produces no SaveNode, and it
   // does not appear in its container's extracted contains -- the
   // container's membership of an invisible node is owned by the disk
   // merge (weave), exercised under a restricted skgrepo set in
@@ -279,7 +279,7 @@ fn restricted_placeholders_emit_neither_savenode_nor_contains () {
     indoc! {"
             * (skg (node (id root) (repo main))) root
             ** (skg (node (id active-a) (repo main))) unrestricted A
-            ** (skg (restrictedNode (id hidden) (repo private)))
+            ** (skg tombstone)
             ** (skg (node (id active-b) (repo main))) unrestricted B
         "};
   let viewforest : Tree<Viewnode> =
@@ -290,11 +290,11 @@ fn restricted_placeholders_emit_neither_savenode_nor_contains () {
   assert_eq!(
     save_skgids (&instructions),
     vec![ID::from ("root"), ID::from ("active-a"), ID::from ("active-b")],
-    "restricted vognodes should not produce SaveNodes");
+    "tombstones should not produce SaveNodes");
   assert_eq!(
     members_of (&saved_node_by_skgid (&instructions, "root") . contains),
     vec![ID::from ("active-a"), ID::from ("active-b")],
-    "a restricted vognode is not an extracted content member");
+    "a tombstone is not an extracted content member");
 }
 
 #[test]

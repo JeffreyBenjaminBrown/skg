@@ -1,62 +1,42 @@
 /// Applying a repo-set switch to an already-rendered view
 /// (the API doc's "Restricted-skgrepo nodes").  Two passes:
-/// convert every Unrestricted viewnode from a now-restricted skgrepo into an
-/// RestrictedVognode, and every deleted or unknown phantom whose
-/// relationship or node a now-restricted skgrepo records (a deleted
-/// phantom's home skgrepo; an unknown phantom's relRepo, or, when it
-/// has none, its recorder's home) into a tombstone, then prune (DFS
-/// postorder, so emptied parents prune in the same sweep) the leaves
-/// the restriction hides, and only those:
-/// - RestrictedVognode leaf;
-/// - Property leaf whose owning vognode (grandparent) is restricted;
+/// entombstone every occurrence of a node the new restriction hides,
+/// and every deleted or unknown phantom whose relationship or node a
+/// now-restricted skgrepo records (a deleted phantom's home skgrepo;
+/// an unknown phantom's relRepo, or, when it has none, its recorder's
+/// home), then prune (DFS postorder, so emptied parents prune in the
+/// same sweep) the leaves the restriction hides, and only those:
 /// - Tombstone leaf;
-/// - PropertyFolder or PartnerFolder emptied by this prune (one that
-///   was empty before it stays).
+/// - property member or change viewnode leaf whose grandparent (the
+///   viewnode it describes) is a tombstone;
+/// - folder emptied by this prune (one that was empty before it
+///   stays).
 /// Everything else stays as it was, with its viewnode ID: folders and
 /// their members, write-protected or not, the completion (run with
 /// folder creation enabled) then refreshes under the new skgrepo
 /// restriction, as it refreshes them at a save.
 
-use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::skgrepo_sets::{SkgrepoRestriction, entombstone_hidden_occurrences};
 use crate::types::misc::SkgrepoName;
 use crate::types::viewnode::{
-  mk_restricted_viewnode, Folder, Phantom, Viewnode,
-  ViewnodeKind, Vognode };
+  Folder, Phantom, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::error::Error;
 
 pub fn convert_and_prune_for_skgrepo_switch (
-  tree   : &mut Tree<Viewnode>,
+  tree        : &mut Tree<Viewnode>,
+  graph       : &InRustGraph,
   restriction : &SkgrepoRestriction,
 ) -> Result<(), Box<dyn Error>> {
-  // The phantoms first, while their recorders are still unrestricted.
+  // The phantoms first, while their recorders are still occurrences.
   convert_now_restricted_phantoms (tree, restriction);
-  anonymize_now_restricted_vognodes (tree, restriction);
+  entombstone_hidden_occurrences (tree, graph, restriction);
   let root : NodeId = tree . root () . id ();
   prune_children_postorder (tree, root) ?;
   Ok (( )) }
-
-fn anonymize_now_restricted_vognodes (
-  tree   : &mut Tree<Viewnode>,
-  restriction : &SkgrepoRestriction,
-) {
-  if restriction . is_all () { return; }
-  let skgids : Vec<NodeId> =
-    tree . root () . descendants ()
-    . map ( |n| n . id () )
-    . collect ();
-  for skgid in skgids {
-    let conversion : Option<ViewnodeKind> =
-      tree . get (skgid)
-      . and_then ( |n| match &n . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-            if ! restriction . contains_skgrepo (&t . home_skgrepo)
-            => Some ( mk_restricted_viewnode () . kind ),
-          _ => None } );
-    if let Some (kind) = conversion {
-      tree . get_mut (skgid) . unwrap () . value () . replace_kind (kind); }}}
 
 /// A phantom shows its node's ID, and a deleted one its last title and
 /// body, so one that a now-restricted skgrepo records becomes a tombstone:
@@ -134,17 +114,15 @@ fn should_prune (
     . ok_or ("should_prune: node not found") ?;
   let is_leaf : bool =
     ! node_ref . has_children ();
-  let grandparent_is_restricted : bool =
+  let grandparent_is_tombstone : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
     . map ( |gp| matches! ( &gp . value () . kind,
-                            ViewnodeKind::Vognode (Vognode::Restricted (_)) ))
+                            ViewnodeKind::Tombstone ))
     . unwrap_or (false);
   Ok ( match &node_ref . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
-      is_leaf,
     ViewnodeKind::PropertyMember (_) | ViewnodeKind::ChangeViewnode (_) =>
-      is_leaf && grandparent_is_restricted,
+      is_leaf && grandparent_is_tombstone,
     ViewnodeKind::Folder (Folder::ID)
       | ViewnodeKind::Folder (Folder::Alias)
       | ViewnodeKind::Folder (Folder::Flags { .. })

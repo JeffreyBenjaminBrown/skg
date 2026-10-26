@@ -3,7 +3,9 @@
 // A node is hidden when the skgrepo restriction excludes its home
 // skgrepo ('docs/api-and-formats.org', "Restricted-skgrepo nodes").
 // A save under a restriction keeps the hidden members of the nodes
-// it writes, which disk supplementation owns.
+// it writes, which disk supplementation owns; and a tightened
+// restriction leaves no trace of a hidden node in an open view but a
+// tombstone over its children.
 //
 // The fixture, written by the test:
 //   public  : r contains a, h, b and subscribes to hs; a; b; s1.
@@ -92,6 +94,47 @@ fn a_save_under_a_restriction_keeps_the_hidden_members (
         assert_eq! ( members_of ( r . subscribesTo . or_default () ),
                      vec! [ ID::from ("hs") ],
                      "the hidden subscribee hs stays" ); }
+      Ok (( )) } ) }
+
+/// A view of r drawn under "all", switched to "public": where h stood
+/// is a tombstone holding s1, and nothing names h or shows its text.
+/// Switched back to "all", the view draws h again beside the
+/// tombstone.
+#[test]
+fn a_tightened_restriction_leaves_a_tombstone_over_the_hidden_nodes_children (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture (case . path ()) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      let opened : String = open_view_of_r (f, None) ?;
+      assert! ( opened . contains ("h secret"),
+                "under all the view shows h:\n{}", opened );
+      let switched : String = switch (f, &mut restriction, "public") ?;
+      assert_no_trace_of_the_hidden_nodes ("the switched view", &switched);
+      assert! ( ! switched . contains ("restrictedNode"),
+                "no restricted placeholder:\n{}", switched );
+      let headlines : Vec<&str> = switched . lines ()
+        . filter ( |line| line . starts_with ('*') ) . collect ();
+      let tombstone : usize = headlines . iter ()
+        . position ( |line| line . starts_with ("** ")
+                            && line . contains (" tombstone") )
+        . unwrap_or_else ( || panic! (
+          "a tombstone stands where h stood:\n{}", switched ));
+      assert! ( headlines . get (tombstone + 1) . is_some_and (
+                  |line| line . starts_with ("*** ")
+                         && line . contains ("(id s1)") ),
+                "the tombstone holds s1:\n{}", switched );
+      { // switching back draws h again; the tombstone, which says
+        // nothing of what it stood for, stays beside it with s1
+        let back : String = switch (f, &mut restriction, "all") ?;
+        assert! ( back . contains (") h secret\n"),
+                  "the switch back draws h:\n{}", back );
+        assert! ( back . contains (" tombstone"),
+                  "the tombstone stays:\n{}", back ); }
       Ok (( )) } ) }
 
 fn assert_no_trace_of_the_hidden_nodes (

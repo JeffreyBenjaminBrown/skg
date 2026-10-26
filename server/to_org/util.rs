@@ -448,9 +448,7 @@ pub fn get_skgid_from_viewnode_at (
       tree, treeid, |viewnode| viewnode . kind . clone() )?;
   match node_kind {
     ViewnodeKind::Vognode (v) if v . is_current_graphnode ()
-      => v . skgid () . cloned () . ok_or_else (
-           || "get_skgid_from_viewnode_at: restricted vognode has no id"
-              . into () ),
+      => Ok ( v . skgid () . clone () ),
     _ => Err ( "get_skgid_from_viewnode_at: caller must pass a non-phantom vognode" . into() ),
   }}
 
@@ -539,7 +537,6 @@ pub fn unrestrictedVognode_in_tree_is_writeProtected (
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Ok (t . is_writeProtected ()),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => Ok (true),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-      | ViewnodeKind::Vognode (Vognode::Restricted (_))
       | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) => Ok (false),
     _                                                => Err (
       "is_writeProtected: caller must pass a vognode" . into( )),

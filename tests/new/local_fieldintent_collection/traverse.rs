@@ -200,21 +200,20 @@ fn editable_member_of_write_protected_folder_emits_for_itself_only () {
     assert_eq!( recorder . subscribesTo, None ); }}
 
 #[test]
-fn editable_child_of_restricted_vognode_emits () {
+fn editable_child_of_tombstone_emits () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id root) (repo main))) root
-      ** (skg (restrictedNode (id hidden) (repo private)))
+      ** (skg tombstone)
       *** (skg (node (id stowaway) (repo main))) stowaway
       "} );
   { let stowaway : &FieldIntentsForOneId = entry (&collected, "stowaway");
     assert!( stowaway . title_and_body . is_some() ); }
-  assert!( collected . by_pid . get (&ID::from ("hidden")) . is_none(),
-           "the restricted node itself emits nothing" );
   assert_eq!( entry (&collected, "root") . contains,
               Some (vec![]),
-              "the restricted node is not content of its parent; its \
-               membership is owned by the disk weave" ); }
+              "the tombstone is not content of its parent; where it \
+               stands for a hidden node, the disk weave owns that \
+               membership" ); }
 
 #[test]
 fn editable_node_inside_historical_phantom_subtree_emits () {

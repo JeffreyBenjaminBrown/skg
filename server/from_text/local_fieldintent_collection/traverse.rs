@@ -74,12 +74,6 @@ fn visit (
   match &node_ref . value() . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       visit_unrestricted_vognode (node_ref, t, context, collected),
-    ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
-      // A Restricted vognode is anonymous and emits nothing; its
-      // membership is owned by disk supplementation, not extraction. With no
-      // identity it owns no defining folder, so (like a tombstone) any
-      // folder found under it stays silent.
-      recurse_under_vognode (node_ref, None, None, collected),
     ViewnodeKind::Vognode (Vognode::Phantom (p)) =>
       recurse_under_vognode (
         node_ref,
@@ -95,6 +89,11 @@ fn visit (
           is_saveEligible : false } ),
         None, collected),
     ViewnodeKind::Tombstone =>
+      // A tombstone emits nothing. Where it stands for a node the
+      // skgrepo restriction hides, that node's membership is owned
+      // by disk supplementation, not extraction. With no identity it
+      // owns no defining folder, so any folder found under it stays
+      // silent.
       recurse_under_vognode (node_ref, None, None, collected),
     ViewnodeKind::BufferRoot =>
       // A BufferRoot is unreachable as a child, but the traversal
@@ -413,8 +412,8 @@ fn dedup_members_by_skgid (
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
 /// explicit '(editRequest (relRepo NAME))' request, if any (see
-/// 'FieldIntent').  (Restricted
-/// children are not members here: the overriddenFolder omits restricted
+/// 'FieldIntent').  (Hidden
+/// nodes are not members here: the overriddenFolder omits hidden
 /// members from display, and the set-difference merge preserves
 /// them at save; see the API doc's "Restricted-skgrepo nodes".)
 fn partnerFolder_members (
@@ -436,10 +435,9 @@ fn partnerFolder_members (
 /// This returns the members of a SubscribeeFolder: its Unrestricted children
 /// that pass the PartnerFolder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
-/// the same reason), restricted children contribute nothing:
+/// the same reason), a tombstone contributes nothing:
 /// 'subscribesTo' is order-meaningful, but disk supplementation (its weave)
-/// already restores invisible subscribees at their disk position, so
-/// a buffer-present restricted vognode must not feed this list.
+/// already restores invisible subscribees at their disk position.
 /// Each member is paired with its headline's explicit
 /// '(editRequest (relRepo NAME))' request, if any.
 #[allow(non_snake_case)]
@@ -466,15 +464,14 @@ fn subscribeeFolder_members (
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'FieldIntent').
 ///
-/// Restricted children contribute nothing here: a restricted node emits
-/// no save intention for its container. Its membership in the
+/// Hidden nodes contribute nothing here: a hidden node has no
+/// occurrence in the buffer (at most a tombstone where one stood), so
+/// it emits no save intention for its container. Its membership in the
 /// container's contains is owned entirely by disk supplementation
 /// ('preserve_invisible_members' -> weave in from_text/weave.rs),
-/// which restores invisible members from disk at their disk position.
-/// Including a buffer-present restricted child would let a stale or
-/// concurrently-edited buffer resurrect a member that was
-/// authoritatively removed, and would persist reorderings of a
-/// write-protected placeholder.
+/// which restores invisible members from disk at their disk position,
+/// so a stale or concurrently-edited buffer cannot resurrect a member
+/// that was authoritatively removed, nor move one.
 fn content_members (
   node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<SkgrepoName>)> {

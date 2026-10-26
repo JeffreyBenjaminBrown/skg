@@ -107,7 +107,6 @@ describe('the skgrepo prompt after inserting a headline', function ()
         { '** (skg subscribeeFolder)', false },
         { '** (skg (deleted (id d) (repo public))) d', false },
         { '** (skg bodyFolded (node (id m) (repo public))) m', false },
-        { '** (skg restrictedNode)', true },
         { '** (skg tombstone)', true } }) do
         content_view_with(table.concat({
           '* (skg (node (id x) (repo public))) x',

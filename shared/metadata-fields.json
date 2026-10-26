@@ -67,8 +67,6 @@
                  "acquiredByFolder", "acquiredFolder" ],
       "fields_at": "top",
       "fields": [] },
-    { "kind": "restricted node", "atoms": [ "restrictedNode" ], "fields_at": "top",
-      "fields": [] },
     { "kind": "tombstone", "atoms": [ "tombstone" ], "fields_at": "top",
       "fields": [] },
     { "kind": "buffer root", "atoms": [ "forestRoot" ], "fields_at": "top",

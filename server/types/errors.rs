@@ -10,7 +10,7 @@ use std::io;
 #[derive (Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HeadlineName {
   pub title        : String, // empty when the headline has none
-  pub graphnode_id : Option<ID>, // None for a folder, a property, a restricted vognode, or a typed headline without one
+  pub graphnode_id : Option<ID>, // None for a folder, a property, a tombstone, or a typed headline without one
   pub viewnode_id  : Option<ViewnodeId>, // None for a headline typed, or copied, since the last render
 }
 

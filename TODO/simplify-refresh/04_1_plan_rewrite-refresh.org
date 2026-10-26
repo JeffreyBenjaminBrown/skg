@@ -832,7 +832,7 @@ occurrence; the two moves move from 'ViewnodeStats' to
 where a field's home changed its form, and the parser accepts
 the same text. Tests: the suite; the metadata-fields table
 test.
-** TODO Slice 2: hidden means tombstone
+** DONE Slice 2: hidden means tombstone
 The in-Rust graph gains a presence answer for a gnid
 ('present', 'hidden', 'absent') beside the gated accessors.
 Every place that creates or converts to 'Vognode::Restricted'

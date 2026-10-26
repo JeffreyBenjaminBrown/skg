@@ -77,8 +77,6 @@ pub fn validate_local_structure (
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         => Vec::new(),
       MpViewnodeKind::Tombstone => Vec::new(),
-      MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-        => validate_restricted_node(tree, treeid),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => Vec::new(),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))
@@ -305,19 +303,16 @@ fn validate_subscribeefolder (
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_unrestricted ()
            || matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted subscribee may sit here as an save-inert display placeholder; it emits no subscribesTo membership (the API doc's "Restricted-skgrepo nodes")
-                      | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
+                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) // a former member, in the diff view; save-inert
                       | MpViewnodeKind::Folder (
                           Folder::HiddenOutsideOfSubscribee) )))
-    { errors . push( "SubscribeeFolder's children must include only UnrestrictedVognodes, Unknown, historical or restricted vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
+    { errors . push( "SubscribeeFolder's children must include only UnrestrictedVognodes, tombstones, Unknown or historical vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         t . claimsMembership,
-      MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
-        true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) =>
@@ -353,18 +348,14 @@ fn validate_relation_folder (
            || ( *partnerFolder == Folder::Overridden
                 && matches! ( &node . kind,
                               MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
-           || matches!(&node . kind,
-                       MpViewnodeKind::Vognode (MpVognode::Restricted (_))) // tolerated from stale buffers; unmanaged, so an ordinary rerender keeps it (the API doc's "Restricted-skgrepo nodes")
            || matches!(&node . kind, // a former member, in the diff view; save-inert
                        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))))
-    { errors . push(format!("{}'s children must include only UnrestrictedVognodes, restricted vognodes, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
+    { errors . push(format!("{}'s children must include only UnrestrictedVognodes, tombstones, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . claimsMembership,
-      MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-        => true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         if *partnerFolder == Folder::Overridden => true,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))
@@ -575,30 +566,6 @@ fn validate_id_property (
     { errors . push("ID property must have an IDFolder parent." . to_string()); }
   errors }
 
-fn validate_restricted_node (
-  tree    : &Tree<MpViewnode>,
-  treeid  : NodeId,
-) -> Vec<String> {
-  // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): a RestrictedVognode may
-  // sit under a folder (a stale buffer from before a skgrepo-set
-  // switch) or under another vognode, and it may have children (the
-  // retained case: a restricted node kept on screen because of its
-  // unrestricted children).  Its own content stays write-protected -- the
-  // parser rejects title/body text on it -- so the only structural
-  // demand left is a parent that can carry it at all.
-  let mut errors : Vec<String> = Vec::new();
-  if !generation_exists_and_includes(
-    tree, treeid, -1, false,
-    |node| node . is_unrestricted ()
-           || matches! ( &node . kind,
-                         MpViewnodeKind::Vognode (MpVognode::Restricted (_))
-                         | MpViewnodeKind::Folder (_)
-                         | MpViewnodeKind::Tombstone
-                         | MpViewnodeKind::BufferRoot )) // a RestrictedVognode can be a view root: a root that went restricted but was retained for its unrestricted children
-    { errors . push("Restricted vognode must have an UnrestrictedVognode, folder or Tombstone parent, or be a view root."
-                    . to_string()); }
-  errors }
-
 /// The identity + child-structure checks shared by an UnrestrictedVognode and a phantom:
 /// id present, no
 /// wrong-structure child, and distinct content-child ids. `label` ("UnrestrictedVognode"
@@ -771,9 +738,9 @@ pub fn nonignored_children_have_distinct_skgids (
           => t . collected_skgid (),
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
           Some (u . skgid . clone()),
-        // A restricted vognode is not a content member (its
-        // membership is owned by disk supplementation), so it does not
-        // participate in content-id distinctness.
+        // A tombstone is not a content member (where it stands for a
+        // hidden node, disk supplementation owns that membership), so
+        // it does not participate in content-id distinctness.
         _ => None };
     if let Some (skgid) = content_skgid {
       if !seen . insert(skgid) {

@@ -189,8 +189,8 @@ pub enum KeptChildOrder {
 /// write-protected occurrence holds no member. An extra copy of a
 /// duplicate is write-protected whatever it was, its members made
 /// non-members, since the save refuses two editable occurrences of
-/// one node. Any other child -- a leaf, a non-vognode, a phantom or a
-/// restricted vognode -- is entombstoned, and the prune that ends the
+/// one node. Any other child -- a leaf, a non-vognode or a phantom
+/// -- is entombstoned, and the prune that ends the
 /// completion removes the tombstone once it is childless
 /// ('prune_self_deletable_when_empty'), so that whatever stands below
 /// it survives.

@@ -68,9 +68,9 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
             map . entry ( t . skgid . clone () )
               . or_insert_with ( || ancestor_skgrepo . clone () ); }
           break; }
-        ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
-          // A restricted vognode is a real container boundary too (and
-          // never an owned skgrepo): infer nothing.
+        ViewnodeKind::Tombstone =>
+          // A tombstone is a container boundary too (it may stand for
+          // a node the skgrepo restriction hides): infer nothing.
           break,
         _ =>
           // A non-vognode (folder, etc.): skip it and keep walking rootward.
@@ -116,7 +116,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
           if ! config . skgrepo_is_owned (& pt . home_skgrepo) {
             map . insert ( t . skgid . clone (), pt . skgid . clone () ); }
           break; }
-        ViewnodeKind::Vognode (Vognode::Restricted (_)) =>
+        ViewnodeKind::Tombstone =>
           break,
         _ =>
           // A non-vognode (folder, etc.): skip it and keep walking rootward.

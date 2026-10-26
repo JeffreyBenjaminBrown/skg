@@ -215,8 +215,8 @@ pub fn partnerFolder_members_in_graph (
     } else { graph . other_member_pids_gated (
       viewparent_pid, recorder_role, skgrepo_restriction ) };
   Some ( // Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): these folders omit
-         // restricted members. A RestrictedVognode child already in the
-         // folder is unmanaged, so an ordinary rerender never removes it.
+         // hidden members. A tombstone child already in the folder is
+         // unmanaged, so an ordinary rerender never removes it.
     omit_restricted_members (
       members, skgrepo_restriction, skgrepo_resolver )) }
 

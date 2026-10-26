@@ -181,7 +181,7 @@ fn idFolder_membership_errors (
 /// failing after a skgrepo-set switch). With chains the shown node can
 /// be a middle link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
-/// fact. Facts on retained RestrictedVognodes are checked identically.
+/// fact.
 /// The explicit graph is required, so every present fact is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
@@ -200,9 +200,6 @@ fn overridesHere_fact_errors (
             Some (original) =>
               ( t . skgid . clone (), original . clone () ),
             None => continue },
-        // A restricted vognode is anonymous: it carries no override
-        // fact, so it can never mismatch.
-        MpViewnodeKind::Vognode (MpVognode::Restricted (_)) => continue,
         _ => continue };
     let chain_ok : bool =
       match &carrier {
@@ -263,13 +260,13 @@ fn validate_view_roots (
     if ! matches! (
       &root . value () . kind,
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
-        | MpViewnodeKind::Vognode (MpVognode::Restricted (_)) // a retained restricted root (the API doc's "Restricted-skgrepo nodes")
+        | MpViewnodeKind::Tombstone // e.g. a root the skgrepo restriction hides, kept for its children (the API doc's "Restricted-skgrepo nodes")
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be UnrestrictedVognodes, restricted vognodes, deleted nodes, Unknown phantoms or historical phantoms."
+          "View roots must be UnrestrictedVognodes, tombstones, deleted nodes, Unknown phantoms or historical phantoms."
           . to_string () )); }}}
 
 /// No two nodes with the same ID may carry editable view requests,

@@ -113,26 +113,17 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
 }
 
 #[test]
-fn test_org_to_uninterpreted_nodes2_restricted_placeholder() {
-  // The server emits the bare atom 'restrictedNode'; this legacy
-  // field-bearing list form is tolerated (parsed leniently, fields
-  // discarded) so a stale buffer still round-trips. Either way it is
-  // an anonymous, dataless, titleless placeholder.
-  let input: &str =
-    indoc! {"
-            * (skg (restrictedNode (id hidden) (repo private)))
-        "};
-
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let tree_roots: Vec<_> =
-    viewforest . root() . children() . collect();
-  assert_eq!(tree_roots . len(), 1);
-  assert!( matches!( &tree_roots[0] . value() . kind,
-    MpViewnodeKind::Vognode (MpVognode::Restricted (_)) ),
-    "expected a RestrictedVognode" );
-  assert_eq!(tree_roots[0] . value() . title(), "");
-  assert_eq!(tree_roots[0] . value() . body(), None);
+fn test_org_to_uninterpreted_nodes2_restrictedNode_is_refused() {
+  // A node the skgrepo restriction hides is drawn as a tombstone; the
+  // atom 'restrictedNode' is no longer part of the metadata, in either
+  // of the forms it once took.
+  for input in [ "* (skg restrictedNode)\n",
+                 "* (skg (restrictedNode (id hidden) (repo private)))\n" ] {
+    let parsed = org_to_uninterpreted_nodes (input);
+    let refused : bool = match &parsed {
+      Err (_) => true,
+      Ok ((_, errors)) => ! errors . is_empty (), };
+    assert! ( refused, "{:?} must be refused: {:?}", input, parsed . map ( |p| p . 1 )); }
 }
 
 #[test]

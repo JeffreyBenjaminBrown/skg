@@ -707,8 +707,8 @@ Opens a blank Skg content view in which to create new nodes.
 Every node needs a skgrepo.
 A headline inherits one from the nearest node above it,
 passing through folders and phantoms;
-a root, or a headline below a restricted vognode, a tombstone
-or a property, needs its skgrepo chosen explicitly.
+a root, or a headline below a tombstone or a property,
+needs its skgrepo chosen explicitly.
 nvim-orgmode's insert-heading actions (org_meta_return and
 org_insert_heading_respect_content) prompt for it when the new
 headline cannot inherit one; '<localleader>ss' on a headline

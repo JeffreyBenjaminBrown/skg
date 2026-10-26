@@ -168,7 +168,6 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     mk_writeProtected_viewnode ( ID::from ("w"), SkgrepoName::from ("main"),
                                  "w" . into (), false ),
     mk_unknown_viewnode (ID::from ("u")),
-    mk_restricted_viewnode (),
     viewnode_of (ViewnodeKind::Tombstone),
     viewnode_of (ViewnodeKind::Folder (Folder::Container)),
     viewnode_of (ViewnodeKind::Folder (Folder::Alias)),

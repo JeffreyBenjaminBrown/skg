@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, with_org_subheadlines};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, Folder, PropertyMember, ChangeViewnode, PhantomDeleted, PhantomHistorical, RestrictedVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
+use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, Folder, PropertyMember, ChangeViewnode, PhantomDeleted, PhantomHistorical, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -52,7 +52,6 @@ impl MpViewnodeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
   Unrestricted   (MpUnrestrictedVognode),
-  Restricted (RestrictedVognode),
   Phantom  (MpPhantom),
 }
 
@@ -98,8 +97,6 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         Ok (ViewnodeKind::Vognode (
           Vognode::Unrestricted (UnrestrictedVognode::try_from (t)?))),
-      MpViewnodeKind::Vognode (MpVognode::Restricted (i)) =>
-        Ok (ViewnodeKind::Vognode (Vognode::Restricted (i))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d)))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
@@ -162,8 +159,6 @@ impl From<ViewnodeKind> for MpViewnodeKind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         MpViewnodeKind::Vognode (
           MpVognode::Unrestricted (MpUnrestrictedVognode::from (t))),
-      ViewnodeKind::Vognode (Vognode::Restricted (i)) =>
-        MpViewnodeKind::Vognode (MpVognode::Restricted (i)),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
@@ -300,7 +295,6 @@ impl MpViewnode {
       MpViewnodeKind::Folder (folder) => folder . title (),
       MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
-        | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         "", }}
 
@@ -334,8 +328,6 @@ impl MpViewnode {
         format!("historical:{}", h . skgid . 0),
       MpViewnodeKind::Tombstone =>
         "tombstone" . to_string (),
-      MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
-        "restricted" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         format!("unknown:{}", u . skgid . 0), }}
 
@@ -353,7 +345,6 @@ impl MpViewnode {
       MpViewnodeKind::ChangeViewnode (change) => change . body (),
       MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
-        | MpViewnodeKind::Vognode (MpVognode::Restricted (_))
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         None, }}
 
@@ -366,9 +357,6 @@ impl MpViewnode {
         Some (&d . skgid),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
         Some (&h . skgid),
-      // A restricted vognode is anonymous: no id.
-      MpViewnodeKind::Vognode (MpVognode::Restricted (_)) =>
-        None,
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         Some (&u . skgid),
       MpViewnodeKind::Folder (_)

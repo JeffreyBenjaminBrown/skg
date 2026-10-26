@@ -136,30 +136,6 @@ at its floor (low), and the birth letter \"C\" (low)."
                              ( overlays-at herald-start ))) )
         ( should-not display-overlay )) )) )
 
-(ert-deftest test-heralds-restricted-node-display ()
-  "An anonymous restricted vognode displays as a message herald.
-The server emits the bare atom `restrictedNode' (like the other
-dataless non-vognode atoms) -- it carries no id/repo, because those
-would leak content the user hid by restricting the repo-set."
-  (with-temp-buffer
-    (insert "(skg restrictedNode)")
-    (let ((result (heralds-from-metadata
-                   "(skg restrictedNode)")))
-      (should (equal (substring-no-properties result)
-                     "node from restricted skgrepo"))
-      (should (eq (get-text-property 0 'face result)
-                  'heralds-message-face)))
-    (heralds-minor-mode 1)
-    (let* ((display-overlay
-            (cl-find-if (lambda (ov) (overlay-get ov 'display))
-                        (overlays-at (point-min))))
-           (display-text (overlay-get display-overlay 'display)))
-      (should display-overlay)
-      (should (equal (substring-no-properties display-text)
-                     "node from restricted skgrepo"))
-      (should (eq (get-text-property 0 'face display-text)
-                  'heralds-message-face)))))
-
 (ert-deftest test-heralds-survive-major-mode-switch ()
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."

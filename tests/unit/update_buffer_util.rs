@@ -1,8 +1,8 @@
 use super::*;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
-  DiffChange, Existence, Folder, mk_editable_viewnode, mk_restricted_viewnode,
-  mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of };
+  DiffChange, Existence, Folder, mk_editable_viewnode,
+  mk_unknown_viewnode, mk_writeProtected_viewnode, viewforest_root_viewnode, viewnode_of };
 use ego_tree::Tree;
 
 // The orderkey closure is fallible: a managed child whose kind the
@@ -14,11 +14,11 @@ fn managed_child_of_wrong_kind_yields_err_not_panic () {
   let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   t . get_mut (root) . unwrap () . append (
-    mk_restricted_viewnode () );
+    mk_unknown_viewnode (ID::from ("u")) );
   let result : Result<RepairSummary<ID>, Box<dyn Error>> =
     complete_managed_children_in_viewforest (
       &mut t, root, KeptChildOrder::FollowsGoal,
-      |_vn : &Viewnode| true, // the managed predicate admits the Restricted child
+      |_vn : &Viewnode| true, // the managed predicate admits the unknown child
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode))
           => Ok ( unrestrictedVognode . skgid . clone () ),
@@ -60,7 +60,7 @@ fn an_unwarranted_child_is_converted_never_detached () {
                            "l" . into (), None )) . id ();
   let folder : NodeId = t . get_mut (root) . unwrap () . append (
     viewnode_of ( ViewnodeKind::Folder (Folder::Acquired) )) . id ();
-  t . get_mut (folder) . unwrap () . append ( mk_restricted_viewnode () );
+  t . get_mut (folder) . unwrap () . append ( mk_unknown_viewnode (ID::from ("u")) );
   let childless : NodeId = t . get_mut (root) . unwrap () . append (
     viewnode_of ( ViewnodeKind::Folder (Folder::Container) )) . id ();
   assert_eq! ( convert_unwarranted_child (

@@ -1167,9 +1167,9 @@ explanation. With chains the honest carrier may be a middle link
 (shown when a later link's mentioner is hidden), so the check accepts
 any node on the chain and rejects only off-chain facts. A
 skgrepo-set switch that makes a
-shown substitute's skgrepo restricted turns it into an anonymous
-=restrictedNode= (the fact does not survive -- a restricted node is
-dataless); the original it stood for is preserved in its container's
+shown substitute's skgrepo restricted turns it into a tombstone (the
+fact does not survive -- a tombstone says nothing of what stood
+there); the original it stood for is preserved in its container's
 contains by disk supplementation.
 
 * skgconfig.toml
@@ -1583,9 +1583,9 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 ** Restricted-skgrepo nodes: omission, retention, and save preservation
 
 Under a restricted skgrepo-set, rendering omits nodes from restricted
-skgrepos entirely -- content, subscribees, and every PartnerFolder's
-members alike. No restricted vognode appears, and omission is recursive: an
-omitted container's whole branch is omitted, unrestricted descendants
+skgrepos (/hidden/ nodes) entirely -- content, subscribees, and every
+PartnerFolder's members alike. Omission is recursive: an omitted
+container's whole branch is omitted, unrestricted descendants
 included (they stay reachable by search or direct visit).
 
 Saving preserves what rendering omitted: an omitted relationship
@@ -1593,28 +1593,30 @@ member cannot be deleted (or even seen), so the save merges the
 buffer's visible lists with the disk lists -- order-preserving (the
 anchored weave) for =contains= and =subscribesTo=, set-difference
 for =overrides=. Edits to visible members, including
-deletions, are honored.
+deletions, are honored. A hidden member needs no headline for this:
+the disk supplies it.
 
-The one place a restricted node still appears is retention: when a
-skgrepo-set switch is applied to an open view (an already-rendered
-buffer), a restricted node with unrestricted viewchildren stays on screen
-as an anonymous restricted vognode, so its unrestricted descendants are not
-orphaned:
+When a skgrepo-set switch is applied to an open view (an
+already-rendered buffer), every occurrence of a now-hidden node
+becomes a tombstone, which keeps the occurrence's viewchildren, so
+its visible descendants are not orphaned:
 
 #+begin_example
-(skg restrictedNode)
+(skg tombstone)
 #+end_example
 
-The restricted vognode is dataless by design: a restricted node's id, skgrepo,
-and title all describe content the user hid by restricting the
-skgrepo-set, so emitting any of it would leak. It carries no id or
-skgrepo and renders titleless. It is save-inert: it emits no fieldIntent
-(its membership in its parent's list is owned entirely by disk
-supplementation, not the buffer), it is not a collateral re-render target, and
-editing its (empty) title/body is a buffer validation error. Its
-unrestricted children remain fully editable. A de-novo render under a
-restricted set never produces one -- restricted members are omitted and
-their content is never extended.
+A tombstone says nothing of what stood there: no id, skgrepo or
+title, so nothing the user hid by restricting the skgrepo-set leaks.
+A childless one is pruned, as are the property members and change
+viewnodes of the node it replaced and the folders that prune empties.
+It is save-inert: it emits no fieldIntent (a hidden node's membership
+in its parent's list is owned entirely by disk supplementation, not
+the buffer), and it is not a collateral re-render target. Its
+children remain occurrences, claiming nothing. Switching back draws the
+hidden node again; the tombstone stays beside it until its children
+are gone. A de-novo render under a restricted set never produces
+one -- hidden members are omitted and their content is never
+extended.
 
 Edits to restricted nodes themselves are /suppressed/ at save, not
 fatal: any nodeInstruction that would write a restricted skgrepo is
