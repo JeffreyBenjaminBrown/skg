@@ -924,7 +924,7 @@ its members. Both clients' renderers ('heralds-minor-mode.el',
 follow. Tests: the herald conformance test; the rendering
 cases in both clients; both client unit suites; the
 integration suite.
-*** Corrections carried from slices 0, 2 and 3
+*** Corrections carried from slices 0, 2, 3 and 4
 Two display facts the earlier slices left wrong, for this
 slice to set right with the rest of the table. First, ⊥ moved
 from the front of a node's heralds to after the relationship
@@ -940,7 +940,14 @@ read "something stood here", styled as "DELETED" is today, and
 that problem entry moves to 'TODO/DONE/problems.org'. Third, a
 ghost carrying a pending 'tombstone' view request (slice 3)
 shows no herald for it; it will show one as the other view
-requests do ("req:tombstone").
+requests do ("req:tombstone"). Fourth, slice 4 added a lens
+directive '(WHEN KIND... RULE...)' to both clients, because
+with every part at the top level the lens could not tell a
+node's '(diff ...)' from a property's or an unknown's. This
+slice decides whether the directive stays once '(view ...)'
+and '(diff ...)' are the only nested forms; if it stays, it is
+documented in 'docs/heralds.org' and in the lens engines'
+headers, and the rule-table conformance test covers it.
 ** TODO Slice 7: the parser's twin goes
 The parse mints a gnid for a headline without one and gives a
 headline without a repo its nearest occurrence ancestor's as
@@ -1075,6 +1082,14 @@ coin or reuse, and does its code cite anything under 'TODO/';
 the answer goes in 'progress.org'. Tests: none beyond reading
 the docs end to end against the code.
 
+*** Corrections carried from slice 4
+Two facts of the grammar as built that "The metadata" above
+does not state, for the docs to say: a headline whose metadata
+names no kind atom is a node (the clients write '(skg folded)'
+on a headline that has no metadata yet); and five kinds carry
+their parameter inside a small form rather than as a separate
+part, '(flag F)', '(oldText ASPECT)', '(homeSkgrepoMove ...)',
+'(relRepoMove ...)' and '(changesetMarker K)'.
 * Verification and completion
 At the end of every slice: 'cargo check --all-targets' clean;
 'bash/nextest.sh' green. At the end of slices 0, 2, 3, 4, 5,

@@ -454,3 +454,9 @@ in the next full run.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 to 3, with either
 client.
+** Orchestrator's corrections after slice 4 (2026-10-26)
+Inserted into the plan: under slice 6, decide and document the
+lens directive WHEN; under slice 13, document the default kind
+(a headline without a kind atom is a node) and the five kinds
+that keep their parameter in a small form.
+
