@@ -180,3 +180,21 @@ node c wp
     node p wp noClaim
       node q wp noClaim
         node top wp noClaim" ); }
+
+#[test]
+fn a_subscriptions_request_completes_a_subscribee_folder_already_there () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { subscribesTo  : msv_ids (&["e"]),
+                hidesFromSubs : msv_ids (&["o"]), .. node ("s") },
+    node ("e"), node ("o"), ]);
+  let input : String = formatdoc! ("
+    * {} s
+    ** (skg subscribeeFolder)
+    *** {} e
+    ", occ ("s", "(viewRequests (folder subscribesTo))"), occ ("e", "writeProtected") );
+  assert_eq! ( run (&input, &graph) . outline (), "\
+node s
+  subscribeeFolder
+    node e wp
+    hiddenOutsideOfSubscribeeFolder folded
+      node o wp" ); }

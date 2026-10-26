@@ -743,3 +743,188 @@ parameter instead of an empty graph. Noted for the review: the
 'SkgrepoName::not_found' sentinel for a headline nothing can
 give a repo.
 
+** Slice 8: the refresh module, unwired
+Stopped before marking the slice DONE, at the stop the plan
+expects: one rule this slice was given cannot be written as
+code beside "The model, stateless". Everything else in the
+slice is written, tested and committed. See "Choices
+determining the future".
+*** What's done and went well
+**** the module
+'server/refresh/': 'refresh_viewforest' (mod.rs) takes the
+viewforest, the truth ('Truth': graph, config, restriction),
+the mode ('CompletionMode'), the budget and, in the diff view,
+the readiness store; it returns the text and the corrections
+('corrections.rs'). The walk is level order; at each parent
+'ladder.rs' runs the eight rungs; 'id_rule.rs', 'goal.rs',
+'extent.rs', 'ancestry.rs' (moved, with the new rows),
+'diff_view.rs' and 'tail.rs' as the code map names them.
+Nothing calls it. The goal computers and the stats pass are
+the old walk's ('partnerFolder_members_in_graph', the two
+compound goal lists, 'unintegrated_content_skgids',
+'omit_restricted_members', the graph and viewnode stats, the
+diff view's change viewnode builders and readiness facts).
+**** the suite
+'tests/refresh/', 71 tests, one file per rung (re_kind,
+merge, warrant, claims, reinstate, reorder, substitution,
+requests) and ancestry, diff_view, tail. Every test refreshes
+its output again and asserts that the text is unchanged and
+nothing is corrected (the fixpoint); a mutation (drawing
+claims under a write-protected folder) made two tests fail.
+**** the corrections from slices 1 and 3
+'Folder::is_editable' is asked at the save's sites (the diff
+view's dangling removed members, the two repair-warning
+sites; commit f79cb992). For slice 3's: below.
+**** commits
+f79cb992 (is_editable), d06d1a4e ('Warrant::ByHead', the
+stats pass's 'WarrantsAndMemberClaims', the diff view's
+builders opened to the crate), 1de8fc14 (the module for
+content views, the diff mode inert), and the diff-view mode
+with these notes and two fixes its tests found (in
+'ladder.rs').
+*** The stop: slice 3's correction and the stateless model
+**** the two rules
+The correction carried from slice 3: "the module will turn
+that occurrence [of P, whose parent's list names P's extra ID
+X] into the unknown X where it stands ... as 're-kind' says".
+"The model, stateless": everything is decided from the buffer
+and the truth as they are now; the inputs are the viewforest,
+the truth, the mode, the budget, the straddle and the store.
+With the ID rule: does the list of the headline's parent name
+this gnid?
+**** the case
+A save deleted P, which had the extra ID X; P's parent lists X
+(a list the save could not edit). The buffer's occurrence
+stands for P (the parse gives an occurrence its pid). Now
+neither the graph nor the buffer knows that X was P's: the
+ID rule asks whether the list names P (no) and makes the
+occurrence a tombstone, and the reinstate draws the unknown X
+beside it. Only the deleted set, which slice 3 removed, held
+the pairing. A test in 'tests/refresh/re_kind.rs' ("a deleted
+node that its parent listed by an extra ID") pins what the
+module does. In the diff view HEAD knows P, so the occurrence
+becomes P's ghost, in place, and the ghost stands for X too
+(a test in 'tests/refresh/diff_view.rs').
+**** the options
+- Recommended: drop the correction. The model as written gives
+  the tombstone and the unknown; the user loses only the
+  occurrence's vnid, fold state and children's place (they
+  stay under the tombstone).
+- Or match by position: an occurrence no node answers to takes
+  a list entry that nothing answers to and no child stands for.
+  That is a guess, which can pair the wrong headline.
+- Or give the refresh a state the model excludes (the
+  deleted nodes' extra IDs, from the save).
+*** Deviations from the plan's "how"
+**** editableView is fulfilled before the walk
+'fulfill_editableView_requests' makes the requested occurrence
+editable, and write-protects the node's other one, before any
+visit, so that the occurrence that loses its editability never
+draws content first. The rest of the requests are
+fulfilled at the child's visit (rung 8).
+**** the budget write-protects at the visit
+A drawn occurrence is editable when the budget is not spent;
+at its own visit, one the budget no longer allows is
+write-protected and draws nothing ('settle_budget_at_visit').
+So the budget bounds extensions as the old walk's does.
+Occurrences in the input keep their editability.
+**** the ordered folders
+The refresh's 'folder_goal_is_ordered' adds the hidden folder
+to 'Folder::goal_is_ordered', as rung 6 lists it. Changing
+'goal_is_ordered' itself broke the old walk's test
+'partner_folder_matrix' (it keeps a user's order in the hidden
+folder), so slice 9 can merge the two.
+**** the warrant and the claims live where they can
+'ByHead' is a variant now (d06d1a4e); the printer writes it
+'ghostWarrant' (the old walk never sets it, so no buffer
+changes). The stats pass keeps the warrants the ladder set
+('WarrantsAndMemberClaims::AlreadySet'). A ghost and an
+unknown have no warrant field: the ladder computes theirs and
+uses it, and the ghost kind is its own herald.
+**** the change viewnodes, as today's diff view draws them
+An editable occurrence in C holds, recomputed in place, what
+'model_of_front_change_viewnodes' gives, then its changed
+partner folders, then its markers; a write-protected one holds
+none (they are entombstoned). A body diff is its old text's; a
+relRepo move is decided where its member is tagged; an
+acquired-by folder is its ghost's. Folders are drawn empty and
+filled at their own visits.
+**** smaller choices
+- The subscribee folder keeps the folder of what the
+  subscriber hides outside its subscribees last; the
+  subscriptions request draws it (folded) in the subscribee
+  folder, new or already there.
+- In the diff view two goal items can name one node (a list
+  entry the worktree does not resolve, which HEAD resolves to
+  a node HEAD's list names too): the reinstate draws what the
+  ID rule makes of each only once.
+- A subscribee as such is known by its warrant, not its claim.
+- The ancestry table moved to 'server/refresh/ancestry.rs'
+  (its rows 'Occurrence', 'Ghost', 'OccurrenceOrGhost',
+  'OldText'); 'server/update_buffer/ancestry.rs' reads it.
+- Corrections: reinstated, entombstoned, marked noClaim,
+  merged, re-kinded, edit request dropped. An emptied folder's
+  tombstone and a substitution are not reported.
+*** Readings of "The model"
+**** unwarranted means not warranted by the truth
+Rung 4 marks noClaim on what HEAD alone warrants too: a claim
+there would make the save restore the relationship.
+**** where the chain is
+A vognode is in the chain when its parent is a write-protected
+occurrence that is a member of a folder whose members carry
+the chain, or itself in the chain. An editable member's
+children are content.
+**** a node acquired since HEAD is not back
+In the diff view, a gnid HEAD had as a node that a nodeMerge
+made another node's extra ID answers the first question no:
+its headline stays the ghost. In a content view it is an
+occurrence of the acquirer, in place.
+**** no default folders
+The model draws a folder only on request or when the buffer
+holds one; the old walk's default subscribee folder and
+hidden-in folder are not drawn. Slice 9's fixtures will show
+it.
+**** a folder with no goal
+A folder left childless is entombstoned, and so pruned, unless
+the save reads its membership or it is the flags folder (the
+pitfall "the prune and its list"). ID folders stay in content
+views (the old rerender removed them first).
+**** substitution
+As today: content of an editable occurrence, not under an
+overridden node shown raw; but in every refresh, an existing
+raw member included (the old walk did so only in the saved
+view), since the model is stateless.
+**** an entombstoned ghost keeps its children
+As every tombstone does; slice 3's 'entombstone_ghost' dropped
+what the diff view had drawn under it. The tombstone request's
+test asserts only its own refresh (the open question).
+*** What's imperfect about what's done
+For slice 9: the ID folder is not editable, so its members
+carry noClaim, and the alias, unknown and folder members under
+a write-protected parent too (the printer writes the atom,
+as decided for slice 0); the save's ID check and alias reader
+must stop reading the claim there. For slice 11: the
+'Warrant' of an unknown is not stored.
+*** Changes to the plan's envisioned order
+None.
+*** Choices determining the future
+The stop above: which option slice 3's correction takes. Until
+then the slice's headline stays TODO.
+*** Suite failures and their classification
+**** first failure: partner_folder_matrix::relationship_matrix
+A regression of mine, reverted: 'goal_is_ordered' with the
+hidden folder made the old walk sort a hidden folder the user
+had reordered (above). 'bash/nextest.sh' at the end: 1002 of
+1002.
+**** subscribee_folder_empty_persists::all_tests, once
+Unrelated: the "Directory not empty" cleanup flake.
+** Orchestrator's decisions after slice 8 (2026-10-27)
+The stop was on the orchestrator's own correction from slice 3
+(the extra-ID re-kind); withdrawn, since it needs state the
+model excludes. Slice 8 is DONE. Inserted under slice 9: the
+deferred printer rule and the removal of the readers that keyed
+on the atom, the save's ID check and alias reader off the claim
+under write-protected parents and in the ID folder, and the
+default folders kept as today (the plan had not mentioned them;
+the module drew none).
+

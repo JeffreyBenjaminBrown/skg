@@ -321,7 +321,7 @@ fn reinstate (
   goal   : &Goal,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let present : HashSet<GoalMember> =
+  let mut present : HashSet<GoalMember> =
     tree . get (parent) . unwrap () . children ()
     . filter_map ( |child| member_of_child (child . value ()) )
     . collect ();
@@ -329,6 +329,11 @@ fn reinstate (
     if present . contains (&item . member) { continue; }
     let Some (drawn) = draw_item (tree, parent, item, goal, walk) ?
       else { continue; };
+    if let Some (member) = member_of_child (&drawn) {
+      // In the diff view two items can name one node: a list entry
+      // the worktree cannot resolve, which HEAD resolves to a node
+      // HEAD's list also names. Its ghost stands for both.
+      if ! present . insert (member) { continue; }}
     let treeid : NodeId =
       tree . get_mut (parent) . unwrap () . append (drawn) . id ();
     after_drawing (tree, parent, treeid, walk) ?; }
@@ -668,33 +673,46 @@ fn folders_of_relation (
     FolderRelation::Mentioners    => vec! [ Folder::Mentioner ], } }
 
 /// Add each of 'folders' the occurrence at 'treeid' lacks, ahead of
-/// its other children, in the order given. A subscribee folder comes
-/// with the compound folder of what the subscriber hides outside its
-/// subscribees, folded.
+/// its other children, in the order given. A subscribee folder holds
+/// the compound folder of what the subscriber hides outside its
+/// subscribees, folded when it is new.
 fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   folders : &[Folder],
 ) {
-  let has = |tree : &Tree<Viewnode>, under : NodeId, folder : &Folder| -> bool {
-    tree . get (under) . unwrap () . children () . any ( |child| matches! (
-      &child . value () . kind,
-      ViewnodeKind::Folder (present)
-        if discriminant (present) == discriminant (folder) )) };
   let mut added : Vec<NodeId> = Vec::new ();
   for folder in folders {
-    if has (tree, treeid, folder) { continue; }
-    let folder_treeid : NodeId = tree . get_mut (treeid) . unwrap ()
-      . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
-    if matches! ( folder, Folder::Subscribee ) {
-      let mut hidden_outside : Viewnode = viewnode_of (
+    let folder_treeid : NodeId = match child_folder (tree, treeid, folder) {
+      Some (present) => present,
+      None => {
+        let new : NodeId = tree . get_mut (treeid) . unwrap ()
+          . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
+        added . push (new);
+        new }, };
+    if matches! ( folder, Folder::Subscribee )
+       && child_folder (tree, folder_treeid, &Folder::HiddenOutsideOfSubscribee) . is_none ()
+    { let mut hidden_outside : Viewnode = viewnode_of (
         ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) );
       hidden_outside . foldAndFocus . folded = true;
-      tree . get_mut (folder_treeid) . unwrap () . append (hidden_outside); }
-    added . push (folder_treeid); }
+      tree . get_mut (folder_treeid) . unwrap () . append (hidden_outside); }}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}
+
+/// The child of 'under' that is a folder of the kind of 'folder' (a
+/// flags folder whatever its text), if any.
+fn child_folder (
+  tree   : &Tree<Viewnode>,
+  under  : NodeId,
+  folder : &Folder,
+) -> Option<NodeId> {
+  tree . get (under) . unwrap () . children ()
+    . find ( |child| matches! (
+      &child . value () . kind,
+      ViewnodeKind::Folder (present)
+        if discriminant (present) == discriminant (folder) ))
+    . map ( |child| child . id () ) }
 
 /// Write-protect the occurrence at 'treeid' and every occurrence of
 /// its content subtree.

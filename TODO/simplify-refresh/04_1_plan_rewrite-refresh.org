@@ -967,7 +967,7 @@ generic 'UnrestrictedVognode_Generic' and the conversions go;
 'add_missing_info.rs' shrinks to the alias treatment or goes.
 Tests: 'tests/new/local_fieldintent_collection/' and the
 parse tests adapted; the suite.
-** TODO Slice 8: the refresh module, unwired
+** DONE Slice 8: the refresh module, unwired
 'server/refresh/' is written as "The model" says, for both
 modes, with the extent rules, the ladder, the merge, the
 substitution, the requests, the chain drawing and the tail,
@@ -998,13 +998,13 @@ folder is one whose membership the save reads: the subscribee,
 overridden, hidden-outside and alias folders), so this slice
 will give 'Folder' an 'is_editable' method and use it at the
 save's sites in place of 'goal_is_ordered'.
-From slice 3: the ID rule re-kinds in place. Slice 3, working
-in the old walk, entombstones an occurrence of P whose parent's
-list names P's extra ID X and lets the reconciler draw the
-unknown X beside the tombstone. The module will turn that
-occurrence into the unknown X where it stands, keeping its
-vnid, fold state and children, as "re-kind" says; a unit test
-in 'tests/refresh/' covers the extra-ID case.
+From slice 3, withdrawn at slice 8's stop: the orchestrator
+had asked that an occurrence of a deleted P whose parent's list
+names P's extra ID X become the unknown X in place. Nothing
+the refresh is given records that X was P's once P is gone
+(only the deleted set did), so the stateless model cannot do
+it: the occurrence is entombstoned and the unknown X is drawn
+beside it, as slice 3 left it. The ID rule stands as written.
 ** TODO Slice 9: content views on it
 'render_initial_view' and 'rerender_view' call
 'refresh_viewforest' in content-view mode. The content-view
@@ -1020,7 +1020,7 @@ unwarranted children kept with 'noClaim' and ⊥ rather than
 entombstoned, chain nodes not reinstated, no yield);
 'tests/idempotence' over all content-view fixtures; the
 integration suite.
-*** Correction carried from slice 3
+*** Corrections carried from slices 0, 3 and 8
 Slice 3 left a ghost met in a content view alone, because the
 old walk never visits one there. The ID rule gives a content
 view no ghost clause, so this slice entombstones such a ghost
@@ -1030,6 +1030,30 @@ saves the diff view's viewnodes through a content-view save
 and expects them back unchanged; it will become a test of the
 wire alone (parse then print) or a diff-view save, since a
 content-view refresh will not keep ghosts.
+From slice 0, deferred to here: the printer writes no
+'noClaim' under a write-protected parent from this slice on,
+and the readers that keyed on the atom there go with the old
+walk: the refusal 'MemberChildOfWriteProtectedOccurrence' and
+the folder comparison by claim in 'write_protected_edits.rs'
+(a child typed under a write-protected occurrence is an
+unwarranted note, not an error), 'is_in_containerward_chain'
+(the refresh knows a chain node by position), and the
+editability helpers. Slice 8 noted that members under
+write-protected parents and in the ID folder now carry
+'noClaim', so the save's ID check and alias reader must stop
+reading the claim there.
+From slice 8: the module draws no default folders, which the
+plan never mentioned. Today a fresh editable occurrence (a
+de novo root, or one an editable-view request makes editable)
+gets its subscribee folder when the node subscribes, and the
+hidden-outside folder with it
+('create_partnerFolders_for_fresh_nodes').
+That is what the user sees and expects, so this slice keeps
+it: the stub's roots and a newly editable occurrence carry a
+'(folder subscribesTo)' request when the node subscribes, and
+the refresh fulfils it as any folder request, drawing the
+hidden-outside folder beside the subscribees as today. A test
+shows a subscribing root drawn with both folders.
 ** TODO Slice 10: the search buffer, and the corrections channel
 The search enrichment builds its stub (the hits as
 write-protected roots with a '(folder containers)' request)

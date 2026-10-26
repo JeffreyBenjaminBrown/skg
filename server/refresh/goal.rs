@@ -16,6 +16,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
+use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
 use crate::refresh::ancestry::required_ancestor_of;
 use crate::refresh::diff_view;
@@ -28,7 +29,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::forest::in_content_position;
 use crate::types::viewnode::{
-  Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant};
+  Existence, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant};
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
@@ -58,6 +59,10 @@ pub(crate) struct GoalItem {
   /// For a gnid nothing answers to: its relationship's relRepo, when
   /// that differs from the recorder's home (the unknown's herald).
   pub relRepo : Option<SkgrepoName>,
+  /// In the diff view, the item's existence change in its list.
+  pub rel     : Option<Existence>,
+  /// In the diff view, the partner the item is, over the straddle.
+  pub partner : Option<Partner>,
 }
 
 /// A parent's goal: its items, and whether the children it warrants
@@ -72,7 +77,8 @@ impl GoalItem {
   pub fn by_graph (
     member : GoalMember,
   ) -> GoalItem {
-    GoalItem { member, warrant : Warrant::ByGraph, relRepo : None } }
+    GoalItem { member, warrant : Warrant::ByGraph,
+               relRepo : None, rel : None, partner : None } }
 }
 
 impl Goal {

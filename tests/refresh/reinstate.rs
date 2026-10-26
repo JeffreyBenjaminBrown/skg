@@ -163,3 +163,35 @@ node s
           node e wp noClaim
       node k",
     "h, a folder member, carries its chain" ); }
+
+#[test]
+fn a_buffer_of_many_kinds_is_a_fixpoint () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains      : ids (&["c", "n", "x", "s"]),
+                aliases       : MSV::Specified ( rel_partners_at_relRepo (
+                  &SkgrepoName::from ("main"), vec! [ "alias" . to_string () ] )),
+                .. node ("p") },
+    Graphnode { contains : ids (&["c1", "c2"]), .. node ("c") },
+    node ("c1"), node ("c2"), node ("n"),
+    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") },
+    Graphnode { subscribesTo  : msv_ids (&["e"]),
+                hidesFromSubs : msv_ids (&["h", "away"]), .. node ("s") },
+    Graphnode { contains : ids (&["h", "k", "c"]), .. node ("e") },
+    node ("h"), node ("k"), node ("away"),
+    Graphnode { contains : ids (&["p"]), .. node ("q") },
+    Graphnode { contains : ids (&["q"]), .. node ("top") }, ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg aliasFolder)
+    *** (skg alias) gone
+    ** {} c
+    *** {} note
+    ** {} s
+    *** (skg subscribeeFolder)
+    * {} c1
+    ", occ ("p", "(viewRequests (folder containers) flags (folder overrides))"),
+       occ ("c", "writeProtected"), occ ("q", "writeProtected"),
+       occ ("s", "(viewRequests (folder subscribesTo))"),
+       occ ("c1", "(viewRequests writeProtectedSubtreeView)") );
+  let run : Run = run_in ( &input, &graph, None, CompletionMode::ContentView, 3 );
+  assert! ( run . outline () . contains ("unknown x"), "{}", run . outline () ); }

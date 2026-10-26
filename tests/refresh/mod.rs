@@ -7,19 +7,23 @@
 
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{
   MSV, RelPartner, Skgrepo, SkgrepoName, SkgrepoSetName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{
   ChangeViewnode, PropertyMember, ViewnodeId, Warrant};
+use crate::types::views_state::DiffViewBufferKind;
 
 use ego_tree::NodeRef;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 mod ancestry;
 mod claims;
+mod diff_view;
 mod merge;
 mod re_kind;
 mod reinstate;
@@ -71,6 +75,14 @@ pub(super) fn graph (
   nodes : &[Graphnode],
 ) -> InRustGraph {
   InRustGraph::from_graphnodes (nodes) }
+
+/// A straddle whose HEAD is 'before' and whose worktree is 'after'.
+pub(super) fn straddle (
+  before : &[Graphnode],
+  after  : &[Graphnode],
+) -> GraphStraddle {
+  GraphStraddle::new ( Arc::new (graph (before)), Arc::new (graph (after)),
+                       "head" . to_string (), 0 ) }
 
 /// What one refresh made.
 pub(super) struct Run {
