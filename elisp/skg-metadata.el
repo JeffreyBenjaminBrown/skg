@@ -727,8 +727,13 @@ Does not save; call `skg-request-save-buffer' afterward."
 may sit on it depends also on where it stands
 (`skg--restoreRel-position-at-point-p')."
   (and (skg--occurrence-sexp-p metadata-sexp)
-       (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
-              '(removed))))
+       (skg--relationship-removed-p metadata-sexp)))
+
+(defun skg--relationship-removed-p (metadata-sexp)
+  "Non-nil when METADATA-SEXP's '(diff ...)' says its relationship was
+removed, by a '(rel removed)'."
+  (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
+         '(removed)))
 
 (defun skg--restoreRel-position-at-point-p ()
   "Non-nil iff the headline at point stands where a restoreRel may:
@@ -927,8 +932,7 @@ warrants is no detachment."
   (let ((view (cdr (assq 'view (cdr metadata-sexp)))))
     (not (or (memq 'noWarrant view)
              (memq 'ghostWarrant view)
-             (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
-                    '(removed))))))
+             (skg--relationship-removed-p metadata-sexp)))))
 
 (defun skg--editable-parent-p (parent-sexp grandparent-sexp)
   "Non-nil when a headline under a parent with PARENT-SEXP, whose own
