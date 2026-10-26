@@ -954,13 +954,6 @@ carries no fork atom."
   (and (listp message-list)
        message-list))
 
-(defun skg-messages-to-org-string (messages)
-  "Convert MESSAGES (from the server) to org-buffer text.
-Each message becomes its own headline."
-  (if (listp messages)
-      (mapconcat (lambda (message) (concat "* " message)) messages "\n")
-    (concat "* " messages)))
-
 (defun skg-errors-and-warnings-to-org-string (errors warnings)
   "Convert ERRORS and WARNINGS to one org buffer with two sections."
   (let ((sections nil))
@@ -977,8 +970,6 @@ Each message becomes its own headline."
                                warnings "\n"))
             sections))
     (mapconcat #'identity (nreverse sections) "\n")))
-
-(defalias 'skg-errors-to-org-string #'skg-messages-to-org-string)
 
 (defun skg-handle-save-sexp (sexp-string)
   "Parse and handle save response s-exp.

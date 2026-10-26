@@ -304,17 +304,6 @@ otherwise generate a new UUID."
   (when (boundp 'skg-rust-tcp-proc)
     (skg-send-close-view-id skg-rust-tcp-proc skg-view-id)))
 
-(defun skg--other-unsaved-skg-buffers ()
-  "Return modified skg view buffers other than the current buffer."
-  (let ((self (current-buffer))
-        (result nil))
-    (dolist (buf (buffer-list))
-      (when (and (not (eq buf self))
-                 (buffer-local-value 'skg-view-id buf)
-                 (buffer-modified-p buf))
-        (push buf result)))
-    result))
-
 (defun skg-find-buffer-by-view-id (view-id)
   "Find the buffer whose skg-view-id matches VIEW-ID."
   (cl-find-if (lambda (buf)

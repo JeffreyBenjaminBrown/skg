@@ -185,44 +185,6 @@ function M.strip_structural_colons (cells)
   return kept
 end
 
----Convert lens TOKENS to virtual-text chunks: tokens separated by a
----space, except tokens marked abut, which join the preceding token
----with no separator; structural colons stripped; styles mapped to
----highlight groups, with consecutive same-style characters grouped.
----Returns nil when TOKENS is empty (no herald, no extmark).
----@param tokens table[]
----@return table[]|nil chunks {{text, hlgroup_or_empty}, ...}
-function M.tokens_to_chunks (tokens)
-  if #tokens == 0 then return nil end
-  local cells = {}
-  for index, token in ipairs(tokens) do
-    if index > 1 and not token.abut then
-      table.insert(cells, { character = ' ', style = nil }) end
-    for _, cell in ipairs(
-        M.strip_structural_colons(M.token_character_cells(token))) do
-      table.insert(cells, cell) end
-  end
-  local chunks = {}
-  local current_text = nil
-  local current_style = nil
-  local function flush ()
-    if current_text and #current_text > 0 then
-      table.insert(chunks,
-        { current_text,
-          M.style_highlight_group(current_style) or 'Normal' }) end
-  end
-  for _, cell in ipairs(cells) do
-    if current_text ~= nil and cell.style == current_style then
-      current_text = current_text .. cell.character
-    else
-      flush()
-      current_text = cell.character
-      current_style = cell.style end
-  end
-  flush()
-  return chunks
-end
-
 ---@param chunks table[]|nil
 ---@return string the display text of CHUNKS
 function M.chunks_text (chunks)
@@ -497,9 +459,13 @@ function M.render_rel_facts (sexp)
   return chunks
 end
 
----Like `tokens_to_chunks', but the first sentinel token is replaced
----by REL_CHUNKS (the rendered relationship-herald spans), and any
----later one is dropped: the rule table emits the sentinel from both
+---Convert lens TOKENS to virtual-text chunks: tokens separated by a
+---space, except tokens marked abut, which join the preceding token
+---with no separator; structural colons stripped; styles mapped to
+---highlight groups, with consecutive same-style characters grouped;
+---nil when there is nothing to show (no herald, no extmark). The first
+---sentinel token is replaced by REL_CHUNKS (the rendered
+---relationship-herald spans), and any later one is dropped: the rule table emits the sentinel from both
 ---the 'rels' and the 'props' rule, so a headline with both carries
 ---two. When REL_CHUNKS is nil every sentinel -- which should then be
 ---absent -- is dropped.

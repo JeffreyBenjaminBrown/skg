@@ -11,19 +11,6 @@ function M.message_list_nonempty_p (message_list)
   return type(message_list) == 'table' and #message_list > 0
 end
 
----MESSAGES as org text, one headline each.
----@param messages string[]|string
----@return string
-function M.messages_to_org_string (messages)
-  if type(messages) == 'table' then
-    local lines = {}
-    for _, message in ipairs(messages) do
-      table.insert(lines, '* ' .. message) end
-    return table.concat(lines, '\n')
-  end
-  return '* ' .. tostring(messages)
-end
-
 ---The Emacs chords that server messages name, each with the Neovim
 ---binding that plays it (skg.keymaps).
 M.neovim_bindings_of_emacs_chords = {

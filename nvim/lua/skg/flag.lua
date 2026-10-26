@@ -143,7 +143,6 @@ end
 function M.set_search_matching () request(false) end
 function M.set_search_matching_recursive () request(true) end
 
-M._recursive_targets = recursive_targets
 M._apply = apply
 M._request = request
 
