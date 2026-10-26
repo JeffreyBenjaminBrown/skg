@@ -886,11 +886,6 @@ impl Vognode {
       Vognode::Ghost        (g) => Some ((&g . gnid, &g . home_skgrepo)),
       Vognode::Unknown      (_) => None,
     } }
-
-  /// Whether this vognode represents a current graphnode
-  /// (an occurrence), as opposed to a ghost or an unknown.
-  pub fn is_current_graphnode (&self) -> bool {
-    matches! (self, Vognode::Occurrence (_)) }
 }
 
 impl DiffChange {
@@ -1144,14 +1139,6 @@ impl Viewnode {
   pub fn is_occurrence (&self) -> bool {
     matches! ( &self . kind,
                ViewnodeKind::Vognode (Vognode::Occurrence (_)) ) }
-
-  /// The id of a vognode that represents a current graphnode: None
-  /// for ghosts, unknowns and non-vognodes.
-  pub fn gnid_if_current_graphnode (&self) -> Option<&ID> {
-    match &self . kind {
-      ViewnodeKind::Vognode (v) if v . is_current_graphnode () => Some (v . gnid ()),
-      _ => None,
-    }}
 
   /// The id of an occurrence. None for everything else
   /// (ghosts, unknowns, folders, non-vognodes, BufferRoot).

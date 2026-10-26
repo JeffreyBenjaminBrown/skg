@@ -35,7 +35,7 @@ use crate::refresh::extent::{
   Extent, drawn_occurrence_is_editable, extent_of_parent, settle_budget_at_visit};
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
-  hidden_outside_of_subscribees, member_of_child, occurrence_pid,
+  hidden_outside_of_subscribees, member_of_child,
   subscriber_of_subscribee_as_such};
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
@@ -887,7 +887,7 @@ fn add_folders (
         walk . added_folders . insert (new);
         new }, };
     let hides_outside_its_subscribees = || -> bool {
-      occurrence_pid ( tree . get (treeid) . unwrap () )
+      tree . get (treeid) . unwrap () . value () . occurrence_gnid ()
         . is_some_and ( |subscriber|
           ! hidden_outside_of_subscribees (&subscriber, walk) . is_empty () ) };
     if matches! ( folder, Folder::Subscribee )

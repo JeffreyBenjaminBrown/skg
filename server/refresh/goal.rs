@@ -228,7 +228,7 @@ pub(crate) fn subscriber_of_subscribee_as_such (
   if ! matches! ( folder . value () . kind,
                   ViewnodeKind::Folder (Folder::Subscribee) ) {
     return None; }
-  occurrence_pid ( folder . parent () ? ) }
+  folder . parent () ? . value () . occurrence_gnid () . cloned () }
 
 /// A folder's goal, by kind.
 fn folder_goal (
@@ -239,7 +239,8 @@ fn folder_goal (
 ) -> Option<Goal> {
   let graph : &InRustGraph = walk . truth . graph;
   let ancestor_pid = |i : usize| -> Option<ID> {
-    occurrence_pid ( tree . get ( required_ancestor_of (tree, folder, i) ? ) ? ) };
+    tree . get ( required_ancestor_of (tree, folder, i) ? ) ?
+      . value () . occurrence_gnid () . cloned () };
   match kind {
     Folder::Alias | Folder::ID | Folder::Flags { .. } =>
       property_goal (kind, &ancestor_pid (0) ?, walk),
@@ -391,11 +392,3 @@ fn omit_restricted (
     gnids, walk . truth . restriction,
     |gnid : &ID| graph . pid_and_skgrepo (gnid) . map ( |(_, home)| home )) }
 
-/// The pid of the occurrence 'node', if it is one.
-pub(crate) fn occurrence_pid (
-  node : NodeRef<Viewnode>,
-) -> Option<ID> {
-  match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      Some ( occurrence . gnid . clone () ),
-    _ => None, } }

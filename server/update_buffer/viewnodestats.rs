@@ -251,8 +251,8 @@ fn subscriber_above_subscribee_viewparent (
   if ! matches! ( &folder . value () . kind,
                   ViewnodeKind::Folder (Folder::Subscribee) )
   { return None; }
-  occurrence_pid_at (tree, subscribee . id ()) ?;
-  occurrence_pid_at (tree, folder . parent () ? . id ()) }
+  subscribee . value () . occurrence_gnid () ?;
+  folder . parent () ? . value () . occurrence_gnid () . cloned () }
 
 fn parent_kind_of (
   tree   : &Tree<Viewnode>,
@@ -284,20 +284,13 @@ fn tracked_ancestors (
       loop {
         match required_ancestor_of (tree, *folder_treeid, i) {
           Some (anc_gnid) => {
-            if let Some (pid) = occurrence_pid_at (tree, anc_gnid) {
-              out . push ( (pid, i + 2) ); }
+            if let Some (pid) = tree . get (anc_gnid) . and_then (
+                                  |anc| anc . value () . occurrence_gnid () ) {
+              out . push ( (pid . clone (), i + 2) ); }
             i += 1; }
           _ => break, } }
       out }
     ParentKind::Other => Vec::new (), } }
-
-fn occurrence_pid_at (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-) -> Option<ID> {
-  match & tree . get (treeid) ? . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (t)) => Some ( t . gnid . clone () ),
-    _ => None, } }
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
 /// relation it is a member of on each side relative to 'node_pid'.
@@ -496,7 +489,7 @@ fn set_relRepo (
           else { break 'compute None; }; // compound partner folders
           let Some (anchor_pid) =
             tree . get (folder_treeid) . unwrap () . parent ()
-            . and_then ( |p| occurrence_pid_at (tree, p . id ()) )
+            . and_then ( |p| p . value () . occurrence_gnid () . cloned () )
           else { break 'compute None; };
           if role . is_first_role () {
             // This position's own node owns the outbound relationship (e.g.
