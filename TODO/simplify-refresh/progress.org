@@ -1215,3 +1215,15 @@ alone and in the later full runs.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 to 9, with either
 client; the other 34 pass with each.
+** Orchestrator's notes after slice 10 (2026-10-26)
+No correction inserted. For Jeff, a third open question: a
+search hit found by an alias shows the alias in phase 1 and the
+node's title after enrichment, since the refresh takes a
+write-protected title from the graph; the old enrichment kept
+the alias. Options: show the node's title in both phases and
+the matching alias as a member of the hit's alias folder; or
+let the search stub mark the hit's title as the alias, which
+the model would have to allow. For the review: the enrichment
+thread now only writes a payload, kept for the protocol's
+timing; a candidate for removal if the timing does not need it.
+
