@@ -1071,6 +1071,17 @@ in a buffer of their own; the warning sink and
 correction made in a collateral view reaches the warnings
 buffer under that view's headline; both client unit suites;
 the integration suite.
+*** Correction carried from slice 9
+Slice 9 reports every child the refresh draws as a correction
+"reinstated", so a save that extends content, or a fresh view,
+produces one warning per headline drawn. A correction is a
+headline the refresh changed because the buffer contradicted
+the truth; drawing the content of an occurrence first extended,
+the members of a folder first requested, or the roots of a stub
+is extent, not correction. This slice makes the corrections
+list exclude those, so that a reinstatement is reported only
+where a list already drawn was missing a member, and tests
+that a fresh view and a plain save report nothing.
 ** TODO Slice 11: the diff view on it
 'complete_viewforest_with_graph_straddle' calls
 'refresh_viewforest' in diff-view mode: the goal's HEAD part,
@@ -1087,6 +1098,13 @@ walk. 'visit.rs', the align and tagging of
 methods the refresh no longer asks. Tests: the diff-view tests
 adapted; 'tests/idempotence' over the diff-view fixtures; the
 integration suite.
+*** Corrections carried from slice 9
+Slice 9 left a temporary adapter,
+'claims_as_the_old_walk_reads_them', which restores the claims
+the old diff walk expects after a content-view refresh; it goes
+with the old walk in this slice, and a grep confirms it. Slice
+9 also listed in 'progress.org' what of the old walk stays for
+this slice and why; that list is the deletion list here.
 ** TODO Slice 12: the renames
 'skgid' becomes 'gnid' everywhere ('ID' stays as the type
 name): about 2300 occurrences in the server, 1100 in tests,

@@ -736,7 +736,7 @@ Expected fixture adaptation (above). Then 'bash/nextest.sh':
 931 of 931 passed. No file under elisp/, nvim/ or shared/
 changed, and no buffer text, so the client and integration
 suites were not run.
-** Orchestrator's correction after slice 7 (2026-10-27)
+** Orchestrator's correction after slice 7 (2026-10-26)
 Inserted under slice 12: the parse's "resolve IDs through the
 graph or read them as written" choice becomes an explicit
 parameter instead of an empty graph. Noted for the review: the
@@ -918,7 +918,7 @@ had reordered (above). 'bash/nextest.sh' at the end: 1002 of
 1002.
 **** subscribee_folder_empty_persists::all_tests, once
 Unrelated: the "Directory not empty" cleanup flake.
-** Orchestrator's decisions after slice 8 (2026-10-27)
+** Orchestrator's decisions after slice 8 (2026-10-26)
 The stop was on the orchestrator's own correction from slice 3
 (the extra-ID re-kind); withdrawn, since it needs state the
 model excludes. Slice 8 is DONE. Inserted under slice 9: the
@@ -1104,3 +1104,31 @@ runs. The last full run: 993 of 994.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 to 7, with either
 client.
+** Orchestrator's corrections after slice 9 (2026-10-26)
+Inserted under slice 10: corrections exclude what the refresh
+draws as extent (a first extension, a first folder request, a
+stub's roots), so a fresh view and a plain save report nothing.
+Inserted under slice 11: the temporary adapter
+'claims_as_the_old_walk_reads_them' goes with the old walk, and
+slice 9's list of what stays is slice 11's deletion list. The
+two dates above that said 2026-10-27 were the orchestrator's
+error; the machine's clock says 2026-10-26.
+** Open question for Jeff: nested tombstones after a deletion
+Slice 9 reports that deleting a node whose folders were drawn
+leaves, in every other open view, the folders' members under
+two nested tombstones (the occurrence's, then the unsayable
+folder's). The model says a tombstone keeps its children and
+the refresh never detaches, so this follows the rules; the old
+walk dropped those members. It is clutter, and the members are
+occurrences of live nodes that nothing warrants. Options: keep
+the rule (the user prunes by hand); let a tombstone whose
+parent is a tombstone dissolve into it, so one tombstone holds
+the members (one level less, nothing lost); or drop the members
+of an unsayable folder, as the old walk did, which loses notes
+the user drew under them. The orchestrator did not decide.
+** Handover (2026-10-26 ~06:00 UTC)
+Jeff's Claude Code restarted during slice 9. Session host-f7
+took over; this session (host-7a) finished slice 9's triage and
+handed the run to host-f7, which launches slices 10 to 13 and
+writes 05_review.org.
+
