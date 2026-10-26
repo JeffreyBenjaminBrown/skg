@@ -143,7 +143,7 @@ pub fn all_changes_view (
 
 /// The round-trip invariant for a buffer of the diff view:
 /// saved unchanged, it changes no file, reports no error, and is
-/// reconciled to itself.
+/// refreshed to itself.
 pub fn saves_back_unchanged (
   case                 : &str,
   skgrepos             : &[&str],
@@ -161,7 +161,7 @@ pub fn saves_back_unchanged (
                  "saving the buffer unchanged must not change the graph:\n{}",
                  text );
     assert_eq! ( response . saved_view, text,
-                 "the reconciled buffer must be the buffer saved" );
+                 "the refreshed buffer must be the buffer saved" );
     Ok (( )) }) }
 
 pub fn ids (

@@ -30,7 +30,7 @@ pub struct ChangeFacts {
   pub leaves   : Option<LeavesFact>,
   /// Some(OLD to NEW) in the skgrepo-changes buffer of the diff
   /// view, on an occurrence whose node's home skgrepo moved from OLD
-  /// to NEW since HEAD. The buffer's pass sets it after completion
+  /// to NEW since HEAD. The refresh's tail sets it
   /// ('set_homeSkgrepoMove_facts_in_viewforest'); the printer writes
   /// it as '(homeSkgrepoMove (old OLD) (new NEW))' in '(diff ...)',
   /// which the parser skips. Herald "-OLD +NEW".
@@ -119,7 +119,7 @@ pub struct Viewnode {
   /// None on a kind that never carries a change.
   pub readiness_request : Option<ReadinessRequest>,
   /// The viewnode ID, printed '(vnid X)'. None until the view assigns
-  /// one, at the end of a completion ('ViewnodeIdRecord' in
+  /// one, at the refresh's tail ('ViewnodeIdRecord' in
   /// 'server/types/views_state.rs'); a parsed viewnode keeps the one
   /// its headline carried.
   pub viewnode_id       : Option<ViewnodeId>,
@@ -476,8 +476,8 @@ pub enum PropertyMember {
 }
 
 /// A headline the diff view adds to describe a change. Display-only
-/// and save-inert: the validator ignores them, and the diff view's
-/// reconciler draws them and knows them by their kind. Each but
+/// and save-inert: the validator ignores them, and the refresh draws
+/// them in the diff view and knows them by their kind. Each but
 /// BodyDiff is a change-forest leaf or commit readiness aggregate, so
 /// its viewnode carries '(ready ...)' and a readiness request.
 #[derive( Debug, Clone, PartialEq )]
@@ -628,7 +628,7 @@ impl FolderRelation {
 ///   content subtree.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
 ///   node into a private fork that overrides it. Consumed on the save
-///   path (fork detection), not during view completion.
+///   path (fork detection), not by the refresh.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
   Folder (FolderRelation),
@@ -670,8 +670,8 @@ impl Occurrence {
   /// The collected ID: what this viewnode contributes to its
   /// parent's collected lists -- the 'overridesHere' original when
   /// the node is shown in place of one, else its own ID. Save
-  /// extraction, the distinctness validators and the content
-  /// reconciler's orderkey all read this, never the raw 'id', so a
+  /// extraction, the distinctness validators and the refresh's goal
+  /// member ('member_of_child') all read this, never the raw 'id', so a
   /// shown overrider round-trips to the original member instead of
   /// rewriting its parent's contains.
   pub fn collected_gnid (&self) -> ID {

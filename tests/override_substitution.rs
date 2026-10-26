@@ -2,7 +2,7 @@
 //
 // Override substitution ('docs/override.org', "Automatic override
 // substitution"):
-// when completion would create a viewnode for node N as recursive
+// when the refresh would draw a viewnode for node N as recursive
 // content, and an owned, visible R overrides N, it shows R
 // instead, marked '(overridesHere N)' -- and saving such a view
 // round-trips to the original IDs, so a container's contains list is

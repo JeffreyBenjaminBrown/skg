@@ -1,5 +1,5 @@
 // Saving a buffer of the diff view: the save consumes its
-// readiness requests, the buffer is reconciled over the fresh graph
+// readiness requests, the buffer is refreshed over the fresh graph
 // straddle with its readiness read from the store, and the response
 // carries the readiness summary
 // ('docs/diff-view.org', "The readiness summary").
@@ -275,7 +275,7 @@ fn summary (
     changes_not_editable_here } }
 
 /// Save 'buffer' with 'pid' (an editable occurrence on a line
-/// starting 'prefix') marked for deletion; return the reconciled
+/// starting 'prefix') marked for deletion; return the refreshed
 /// buffer, after checking that saving it again changes nothing.
 fn save_deleting (
   f      : &mut Fixture,
@@ -290,7 +290,7 @@ fn save_deleting (
       &node, &format! ("{} (editRequest delete)", node), 1 ));
   let saved : String = save_cleanly (f, &all_changes_view (), &deleting) ? . saved_view;
   assert_eq! ( save_cleanly (f, &all_changes_view (), &saved) ? . saved_view, saved,
-               "the reconciled buffer is a fixed point" );
+               "the refreshed buffer is a fixed point" );
   Ok (saved) }
 
 /// A node deleted in the buffer is shown as the pruned change view shows a

@@ -13,7 +13,7 @@
 ///   save, then N is hidden from R.
 /// - If N is a claimsMembership viewchild of E but is not
 ///   graph-content of E, then it is not a hiderel edit.
-///   This does not touch it. The completion/rerender pipeline
+///   This does not touch it. The refresh of the save's rerender
 ///   will mark it noClaim.
 /// .
 /// Resolution cannot run during collection, even in principle: it

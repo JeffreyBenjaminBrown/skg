@@ -267,7 +267,7 @@ fn validate_view_roots (
 /// write-protect request; on different occurrences of a node the two
 /// move editability, and are fine.
 /// A request on an editable node, or on one with content children,
-/// is fine: completion hands it to the node's content children.
+/// is fine: the refresh hands it to the node's content children.
 /// Children typed under a write-protected occurrence are refused
 /// elsewhere, by 'errors_for_writeProtected_occurrences'.
 fn validate_editable_view_requests (

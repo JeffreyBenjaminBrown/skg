@@ -345,7 +345,7 @@ async fn test_editable_view_limit_5_or_6 (
 // ===================================================
 // Gen 2 has 4 children (121, 122, 123, 124).
 // Any limit from 1 to 4 hits the limit on the first generation,
-// so the sibling group is completed, all are write-protected,
+// so the sibling group is drawn whole, all are write-protected,
 // and the grandchild generation is not visited at all.
 
 async fn test_editable_view_limit_1_to_4 (
@@ -434,7 +434,7 @@ async fn test_editable_view_conflicting (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Node 12 appears twice:
-      // - First as a regular child of 1 (will be editable after completion)
+      // - First as a regular child of 1 (will be editable after the refresh)
       // - Second with an editable view request
       let input_org_text = indoc! {"
         * (skg node (gnid 1) (skgRepos (nodeRepo main))) 1

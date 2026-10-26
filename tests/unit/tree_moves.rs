@@ -72,7 +72,7 @@ fn placing_created_children_moves_no_kept_one () {
   let (mut tree, root, [a, _b, c]) = three_children ();
   let d : NodeId = tree . root_mut () . append (4) . id ();
   let e : NodeId = tree . root_mut () . append (5) . id ();
-  // The model orders them e, c, a, d; b is not the reconciler's.
+  // The model orders them e, c, a, d; b is not the refresh's.
   place_created_children_after_their_model_predecessors (
     &mut tree, root, &[e, c, a, d], &HashSet::from ([d, e]) ) . unwrap ();
   assert_eq! ( values (&tree, root), vec! [5, 1, 4, 2, 3] );

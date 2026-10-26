@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(idempotence::)'
 //
-// Completion is a fixpoint. Re-rendering an already-rendered buffer,
+// The refresh is a fixpoint. Re-rendering an already-rendered buffer,
 // with no edits and an unchanged graph, must yield byte-identical output. This is
 // the property the whole local-update refactor rests on (order-robust, no
 // accumulating drift across saves), so it deserves a regression guard.
@@ -111,7 +111,7 @@ async fn rerender_is_idempotent_impl (
     rerender_once (&first, config, tantivy) . await ?;
 
   assert_eq! ( first, second,
-    "completion is not a fixpoint: a second rerender of an unchanged buffer \
+    "the refresh is not a fixpoint: a second rerender of an unchanged buffer \
      changed it.\n--- first rerender ---\n{}\n--- second rerender ---\n{}",
     first, second );
   Ok (( )) }

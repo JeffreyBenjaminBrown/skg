@@ -1,5 +1,5 @@
-// Kept children keep their order ('docs/diff-view.org', "What a
-// reconciler keeps"): a reconciler never moves a child it keeps, and
+// Kept children keep their order ('docs/diff-view.org', "What the
+// refresh keeps"): the refresh never moves a child it keeps, and
 // the containerward walk visits containers in ID order, so a first
 // render is deterministic.
 //

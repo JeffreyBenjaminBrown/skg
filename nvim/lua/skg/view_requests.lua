@@ -1,6 +1,6 @@
 -- PURPOSE: Commands that request viewbranches by adding a
 -- (viewRequests ...) atom to the headline at point and saving,
--- letting the server fulfill the request during completion. The
+-- letting the server fulfill the request during the refresh. The
 -- folder commands auto-save: (folder RELNAME) builds both folders of
 -- the relation, and a containers folder carries, under each member,
 -- its containerward chain. Also the editable-view and write-protect

@@ -16,8 +16,9 @@ use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
 
-/// The five graph relations whose flags the H/S/O/L checks consult via
-/// the in-Rust graph (contains is checked via the containment maps).
+/// The four graph relations whose flags the H/S/O/L checks consult via
+/// the in-Rust graph (contains, the fifth, is checked via the
+/// containment maps).
 const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::LinksTo,
   NodeRelation::HidesFromSubs,
@@ -431,7 +432,7 @@ fn birth_facts_for_folder (
 /// Sets omitted_body on the occurrence at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one
 /// the rendering hides. Herald "B" on the ☮. False
-/// without a graph handle (some tests): better no B than a wrong one.
+/// without a graph: better no B than a wrong one.
 fn set_omitted_body (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
@@ -461,8 +462,8 @@ fn set_omitted_body (
 /// (see 'RelationRole::is_first_role') -- then compares the relationship's
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: no
-/// graph handle; membership is not Member (not a genuine member
-/// here); a compound partner folder
+/// graph; the viewnode does not stand as a member here
+/// ('stands_as_member'); a compound partner folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded relationship; unresolvable homes;
 /// or the skgrepo equalling the default.

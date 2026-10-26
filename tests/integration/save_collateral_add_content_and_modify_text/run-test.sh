@@ -5,7 +5,7 @@
 # - Backs up and resets test data (a.skg and b.skg) to clean state
 # - Starts an independent skg server with test config
 # - Uses Emacs to test that editing a title and adding a child in one buffer
-#   propagates to another open buffer via collateral completion
+#   propagates to another open buffer via its collateral rerender
 # - Cleans up test artifacts and restores original state
 
 set -e  # Exit on any error

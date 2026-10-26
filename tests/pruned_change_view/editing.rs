@@ -30,7 +30,7 @@ use std::io::BufReader;
 use std::net::TcpStream;
 
 /// Deleting the changed ID folders changes nothing: the save writes
-/// no file, and the reconciled buffer shows the folders again.
+/// no file, and the refreshed buffer shows the folders again.
 #[test]
 fn a_deleted_id_folder_respawns (
 ) -> Result<(), Box<dyn Error>> {
@@ -70,7 +70,7 @@ fn editing_the_id_folder_aborts_the_save (
     Ok (( )) }) }
 
 /// A save does not restore a removed alias: ali's removed alias a1
-/// is not an alias, so ali keeps a2 and a3, and the reconciled buffer
+/// is not an alias, so ali keeps a2 and a3, and the refreshed buffer
 /// shows a1 as removed again.
 #[test]
 fn a_removed_alias_is_not_restored_by_a_save (
@@ -130,7 +130,7 @@ fn deleted_images_of_removed_members_respawn (
     Ok (( )) }) }
 
 /// A child added under an editable node of the buffer is created on
-/// disk, and the reconciled buffer shows it as new, in a new
+/// disk, and the refreshed buffer shows it as new, in a new
 /// relationship.
 #[test]
 fn a_new_child_is_created_and_shown_as_new (

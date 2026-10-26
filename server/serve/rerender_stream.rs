@@ -100,7 +100,7 @@ pub(crate) fn prepare_rerender_views_where (
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
       env, runtime, skgrepo_restriction );
-  // A buffer of the diff view is reconciled over a graph straddle
+  // A buffer of the diff view is refreshed over a graph straddle
   // brought up to date from the connection's. Streaming the rerenders
   // writes it back, as a save does.
   context . graph_straddle = views_state . graph_straddle . clone ();

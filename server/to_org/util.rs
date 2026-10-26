@@ -14,7 +14,7 @@ use std::io;
 // ======================================================
 
 /// Fetch a Graphnode from the in-Rust graph or disk. Resolves id→(pid,skgrepo)
-/// via 'pid_and_repo_from_id', then reads. Makes a Viewnode with
+/// via 'InRustGraph::pid_and_skgrepo', then reads. Makes a Viewnode with
 /// validated title. Returns both.
 /// Returns Ok(None) when GNID has no record anywhere -- not as a
 /// primary pid or extra_id in the captured graph.

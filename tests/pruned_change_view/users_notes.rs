@@ -1,5 +1,5 @@
 // What the user adds under what the diff view rendered survives every
-// rerender ('docs/diff-view.org', "What a reconciler keeps").
+// rerender ('docs/diff-view.org', "What the refresh keeps").
 //
 // The 'users_notes' fixture: a (retitled) contains x, which b no
 // longer contains; b holds x as a removed member, x's first

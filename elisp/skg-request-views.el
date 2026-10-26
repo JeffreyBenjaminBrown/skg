@@ -2,7 +2,7 @@
 ;;;
 ;;; Commands that request viewbranches by adding a (viewRequests ...)
 ;;; atom to the headline at point and saving, letting Rust fulfill the
-;;; request during completion. The folder commands,
+;;; request during the refresh. The folder commands,
 ;;; `skg-show-folderOf-*', auto-save: (folder RELNAME) builds both
 ;;; folders of the relation (one for containers and mentioners). A
 ;;; containers folder carries, under each member, that member's

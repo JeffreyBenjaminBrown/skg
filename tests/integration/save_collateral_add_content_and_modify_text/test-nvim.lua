@@ -7,14 +7,8 @@
 -- "c" of a (no metadata -- the server reads it as an occurrence with
 -- a random UUID). Verifies that buffer B's save response reflects the
 -- changes (title, new node with UUID). Then checks collateral buffer
--- A.
---
--- Known limitation: collateral completion currently fails when the
--- saved buffer introduced a brand-new node, because
--- build_child_creation_data can't find a skgrepo for the new UUID. So
--- buffer A picks up the title change and the new child c anyway (per
--- the elisp test's phase 5 -- the collateral update does succeed
--- here).
+-- A, which the refresh of its collateral rerender gives the new title
+-- and the new child c, reporting c as a buffer correction of A.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(20)

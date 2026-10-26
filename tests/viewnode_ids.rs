@@ -321,7 +321,7 @@ async fn an_unknown_viewnode_id_is_dropped (
             counter_before, counter_after );
   Ok (( )) }
 
-/// The record's end-of-completion pass gives a viewnode ID to each viewnode
+/// The record's pass at the refresh's tail gives a viewnode ID to each viewnode
 /// without one, in buffer order, never one the counter has passed
 /// (so not one a viewnode cut from the buffer had), never one spelled
 /// like a number, and knows the viewnode IDs the forest holds and no

@@ -13,8 +13,9 @@ use crate::types::misc::{ID, SkgrepoName};
 /// regardless (the weave / set-difference merge treat unresolvable as
 /// invisible).  A tombstone standing where a now-restricted node was (one
 /// kept because it hosts visible descendants after a skgrepo-set
-/// reduction) does not come back through the goal list: each
-/// reconciler treats it as an unmanaged child, preserved as-is.
+/// reduction) does not come back through the goal list: the refresh
+/// keeps it while it holds anything, and its tail prunes it once it
+/// holds nothing.
 pub fn omit_restricted_members (
   goal     : Vec<ID>,
   restriction : Option<&SkgrepoRestriction>,

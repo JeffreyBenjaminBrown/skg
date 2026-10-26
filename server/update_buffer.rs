@@ -63,7 +63,7 @@ pub struct RerenderAfterSaveContext<'a> {
   pub errors        : Vec<String>,
   pub warnings      : Vec<String>,
   pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
-  /// The graph straddle a buffer of the diff view is completed
+  /// The graph straddle a buffer of the diff view is refreshed
   /// over, brought up to date by 'current_graph_straddle_in_slot' when
   /// the first such buffer is rerendered. A caller that holds the
   /// connection's straddle sets it, and keeps what it becomes.
@@ -152,7 +152,7 @@ pub fn update_views_after_save (
   let mut saved_view_mut : ViewForest = saved_view;
   let mut saved_viewnode_id_record : ViewnodeIdRecord =
     // The parsed buffer carries viewnode IDs; the view's record says which
-    // it knows, before any reconciler runs.
+    // it knows, before the refresh runs.
     viewforest_id_from_request_result . as_ref () . ok ()
     . map ( |viewforest_id| views_state . open_views . viewnode_id_record_of (viewforest_id) )
     . unwrap_or_default ();
@@ -160,12 +160,12 @@ pub fn update_views_after_save (
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The skgsave-commit has happened, so every `(editRequest ...)` in the
   // submitted view is now consumed input. Clear all request carriers at this
-  // one boundary before completion can echo any of them into the response.
-  // `viewRequests` remain: those are fulfilled by completion below.
+  // one boundary before the refresh can echo any of them into the response.
+  // `viewRequests` remain: those are fulfilled by the refresh below.
   saved_view_mut . consume_edit_requests_after_save ();
   // Gate the occurrences already in the forests before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
-  // below covers nodes introduced by completion.
+  // below covers nodes introduced by the refresh.
   if let Some (restriction) = skgrepo_restriction {
     let mut input_candidates : Vec<ID> =
       occurrence_gnids_in_viewforest (&saved_view_mut);
@@ -283,7 +283,7 @@ fn occurrence_gnids_in_viewforest (
 /// overridden node.  The buffer which *created* a fork is the exception: once
 /// the save's skgsave-commit happens, continuing to show its foreign root would make the next
 /// edit attempt another fork.  Replace only roots named by this save's exact
-/// ForkSpecs; content occurrences are handled by content reconciliation.
+/// ForkSpecs; content occurrences are substituted by the refresh.
 fn replace_saved_view_fork_roots (
   viewforest : &mut ViewForest,
   fork_specs : &[ForkSpec],

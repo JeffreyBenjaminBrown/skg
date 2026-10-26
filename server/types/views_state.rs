@@ -257,11 +257,11 @@ impl ViewnodeIdRecord {
     record . record_known_viewnode_ids_in (viewforest);
     record }
 
-  /// After a parse, before any reconciler runs: drop every viewnode ID
+  /// After a parse, before the refresh runs: drop every viewnode ID
   /// the record does not know -- one typed by hand, or brought back by
   /// an old copy of the buffer's text -- so that its headline gets a
-  /// fresh one at the end of the completion, and the counter is not
-  /// moved by it.
+  /// fresh one at the refresh's tail, and the counter is not moved by
+  /// it.
   pub fn drop_unknown_viewnode_ids_in_parsed_viewforest (
     &self,
     viewforest : &mut Tree<Viewnode>,
@@ -278,7 +278,7 @@ impl ViewnodeIdRecord {
       if is_unknown {
         viewnode . viewnode_id = None; }}}
 
-  /// The end-of-completion pass, after the prune and just before the
+  /// The refresh's last step at its tail, after the prune and just before the
   /// text is rendered: give a fresh viewnode ID to every viewnode (but the
   /// buffer root) that lacks one, in buffer order, and make the record
   /// know the viewnode ID of every viewnode the forest holds and

@@ -1,7 +1,7 @@
-// Every reconciler of the diff view matches by key among all the
-// children of a node, whoever drew them: a child of a key its model
+// The refresh of the diff view matches by key among all the
+// children of a node, whoever drew them: a child of a key its goal
 // has is adopted, and a second child of that key is a duplicate,
-// retained or entombstoned ('docs/diff-view.org', "What a reconciler
+// retained or entombstoned ('docs/diff-view.org', "What the refresh
 // keeps"). Each case below once drew a second child of one key.
 //
 // Fixtures: 'requested_alias_folder' (x, with the alias xa1, its body
@@ -61,7 +61,7 @@ fn assert_one_child_with (
                "one child of {:?} should contain {:?}, in\n{}", parent, key, buffer ); }
 
 /// Saved unchanged, 'buffer' reports no error and no warning, changes
-/// no file, and is reconciled to itself.
+/// no file, and is refreshed to itself.
 fn assert_saves_back_cleanly (
   f      : &mut Fixture,
   buffer : &str,

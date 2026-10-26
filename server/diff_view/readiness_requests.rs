@@ -16,7 +16,7 @@
 //! unready ('find_contradictory_readiness_requests', which reads
 //! 'NamedLeafSet').
 //!
-//! After view completion of a buffer of the diff view, the
+//! At the tail of the refresh of a buffer of the diff view, the
 //! '(ready ...)' change facts are set from the store, and the
 //! '(leaves ...)' facts, which tell the clients what a request on a
 //! headline may name, from the same rule

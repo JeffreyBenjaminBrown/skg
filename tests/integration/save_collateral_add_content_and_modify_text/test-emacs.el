@@ -4,11 +4,9 @@
 ;;; From buffer B, edits a's title and adds a new child "c" of a (no
 ;;; metadata — the server reads it as an occurrence with a random UUID).
 ;;; Verifies that buffer B's save response reflects the changes (title,
-;;; new node with UUID). Then checks collateral buffer A.
-;;;
-;;; Known limitation: collateral completion currently fails when the saved
-;;; buffer introduced a brand-new node, because build_child_creation_data
-;;; can't find a skgrepo for the new UUID. So buffer A is not updated.
+;;; new node with UUID). Then checks collateral buffer A, which the
+;;; refresh of its collateral rerender gives the new title and the new
+;;; child c, reporting c as a buffer correction of A.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")

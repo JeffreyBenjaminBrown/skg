@@ -141,8 +141,8 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_claimants ||
-                          // A ghost or an unknown has no membership field and is implicitly
-                          // a member (content), so it is never filtered here.
+                          // Only an occurrence is filtered: a ghost or an
+                          // unknown counts here, whatever it claims.
                           !matches!(&c . value() . kind,
                                     ViewnodeKind::Vognode (Vognode::Occurrence (t))
                                     if ! t . claimsMembership || ! claims_are_read ))

@@ -159,10 +159,10 @@ fn collateral_partner_folder_update_and_warning_scoping
         response . warnings );
       Ok (( )) } )) }
 
-/// A member the folder reconciler adds at a later visit gets its
+/// A member the refresh adds to a folder at a later visit gets its
 /// containerward chain. N's view shows S in its subscriberFolder; C
 /// contains T. A save of T's view that makes T subscribe to N
-/// rerenders N's view collaterally, its folder reconciler adding T,
+/// rerenders N's view collaterally, its refresh adding T to the folder,
 /// under which hangs T's chain: C, write-protected and claiming nothing.
 #[test]
 fn a_member_added_at_a_later_visit_gets_its_chain

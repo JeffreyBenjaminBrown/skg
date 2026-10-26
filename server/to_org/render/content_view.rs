@@ -1,6 +1,7 @@
 /// PURPOSE:
 /// Build a string intended as buffer-text,
-/// to represent an 'inital view' (content relationships only).
+/// to represent an initial view: the roots' content, their
+/// containers folders and their default folders.
 ///
 /// METHOD: the de-novo render (multi_root_view_via_env ->
 /// render_initial_view) is the refresh of a stub forest of the
@@ -48,7 +49,8 @@ pub fn multi_root_view (
 
 /// The parts-based de-novo entry -- a thin shim that assembles a
 /// SkgEnv and routes through the de-novo render (multi_root_view_via_env). Used only
-/// by tests (production calls multi_root_view_via_env directly).
+/// by tests (production calls multi_root_view_via_env or
+/// multi_root_view_via_runtime directly).
 /// The shim builds a fixture-local graph from disk and, when Tantivy is not
 /// supplied, uses an empty in-RAM search index.
 fn multi_root_view_inner (
@@ -61,8 +63,8 @@ fn multi_root_view_inner (
   let tantivy_owned : TantivyIndex = match tantivy_index {
     Some (t) => t . clone (),
     None     => empty_in_ram_tantivy_index () ?, };
-  // Build the in-Rust graph from the skgrepo .skg files so view completion's content
-  // reconcile can resolve extra_ids (graph_snap.pid_of) -- a node's contains may
+  // Build the in-Rust graph from the skgrepo .skg files so the refresh's
+  // content goal can resolve extra_ids (graph_snap.pid_of) -- a node's contains may
   // reference another node by an extra_id. Production's env carries the real
   // graph already; this shim is test-only, so a per-call file read is
   // fine.
@@ -76,7 +78,7 @@ fn multi_root_view_inner (
     &env, root_gnids, skgrepo_restriction ) }
 
 /// The de-novo view (render_initial_view). Takes a SkgEnv (carries
-/// config/driver/tantivy/graph) and refreshes a stub forest of the
+/// the shared runtime: config, graph and Tantivy index) and refreshes a stub forest of the
 /// requested roots.
 pub fn multi_root_view_via_env (
   env                : &SkgEnv,

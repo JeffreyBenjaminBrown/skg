@@ -199,7 +199,7 @@ Keys:
                recurse into.
 
 Grammar handled:
-  RULE        ::= [STYLE] (INTERC-BODY | SIMPLE-BODY)
+  RULE        ::= [STYLE] (INTERC-BODY | WHEN-BODY | SIMPLE-BODY)
   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
   WHEN-BODY   ::= WHEN LABEL... CHILDREN...
   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
@@ -329,9 +329,8 @@ Two modes depending on whether the rule has a LABEL:
   the sub-rules against it and emit one combined token.
 - Without LABEL: run the sub-rules against OBJECT itself and emit
   at most one combined token. Used when the server already emits
-  the raw atoms at the current level (e.g. `(containers N)' and
-  `(contents M)' as siblings inside `(graphStats ...)') and no
-  wrapper form is needed.
+  the raw atoms at the current level and no wrapper form is
+  needed.
 
 In both modes, each sub-rule contributes one slot; nonempty slots
 are joined with the header's SEPARATOR; a literal-string prefix is

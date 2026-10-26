@@ -2,10 +2,11 @@
 /// metadata. Emacs and Neovim render semantic relationship facts and
 /// their per-character styles themselves.
 ///
-/// The data lives here; the code that uses the data (the lens
-/// engine, 'elisp/skg-sexpr/skg-lens.el') lives entirely in Emacs.
-/// Emacs fetches the table over the "herald rules" endpoint at
-/// connect time and hands it, unchanged, to that engine. Rust never
+/// The data lives here; the code that uses the data, the lens
+/// engine, lives in the clients ('elisp/skg-sexpr/skg-lens.el',
+/// 'nvim/lua/skg/sexpr/lens.lua'). Each client fetches the table over the
+/// "herald rules" endpoint at connect time and hands it, unchanged,
+/// to its engine. Rust never
 /// interprets labels, and takes each rule's style by name from
 /// 'shared/herald-styles.json'; the conformance test in
 /// 'tests/unit/heralds.rs' guarantees that the table and the metadata

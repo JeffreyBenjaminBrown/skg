@@ -13,7 +13,7 @@
 // saves.  The second also places a note in the folder, then makes u
 // subscribe to n from a view of u: n's view, rerendered collaterally,
 // keeps every child where it stood and shows u after the kept members
-// ('docs/diff-view.org', "What a reconciler keeps").
+// ('docs/diff-view.org', "What the refresh keeps").
 
 use std::error::Error;
 use std::io::BufReader;
@@ -122,7 +122,7 @@ async fn write_protected_folder_order_is_preserved_impl (
   assert_member_order (
     &second_save, "(gnid t)", "(gnid r)", "after second (unchanged) save" );
   assert_eq! ( first_save, second_save,
-    "the reordered view must be a completion fixpoint" );
+    "the reordered view must be a fixpoint of the refresh" );
   Ok (( )) }
 
 #[test]

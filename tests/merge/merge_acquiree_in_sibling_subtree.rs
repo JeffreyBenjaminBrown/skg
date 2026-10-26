@@ -1,6 +1,7 @@
 // cargo test --test merge merge_acquiree_in_sibling_subtree -- --nocapture
 //
-// Regression test for a rerender-path bug in the merge pipeline.
+// The saved view's rerender after a nodeMerge resolves the
+// acquiree's ID to its acquirer.
 //
 // Graph fixture:
 //   a contains [b]
@@ -11,21 +12,13 @@
 // acquiree.
 //
 // After the save, a.skg still lists b in its contains, and b has
-// become an extra_id of d. The fresh-view path resolves that
-// extra_id transparently (pid_and_repo_from_id does a primary-
-// or-extra lookup), so opening a afresh shows a -> d correctly.
+// become an extra_id of d. The refresh resolves each member of a's
+// contains to its node's pid, so the saved view's rerender shows d
+// under a, not a ghost of b.
 //
-// The rerender path (rerender_view -> complete_viewtree ->
-// reconcile_content_children -> content_goal_list) does not
-// resolve extra_ids. It walks a.contains = [b] verbatim, matches
-// the existing pid=b child in a's viewforest, and lets the
-// deleted_by_this_save_pids check mutate it into a ghost.
-// Result: the saved-view rerender shows a -> (deleted b) instead
-// of a -> d.
-//
-// This test asserts the correct post-merge rendering:
+// This test asserts the post-merge rendering:
 //   * a
-//   ** d           <-- (previously: ** (deleted b), which is wrong)
+//   ** d
 //   * c
 //   ** d
 //   *** MERGED: b

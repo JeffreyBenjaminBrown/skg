@@ -74,8 +74,8 @@ pub fn move_after<T> (
 /// Place each of 'created' that 'in_model_order' lists right after
 /// the child listed before it, or first among the children of
 /// 'parent' when it is listed first; every other child stays where
-/// it stands. This is how a reconciler places what it creates without
-/// moving what it keeps ('docs/diff-view.org', "What a reconciler
+/// it stands. This is how the refresh places what it creates without
+/// moving what it keeps ('docs/diff-view.org', "What the refresh
 /// keeps"): 'in_model_order' is its kept and created children in the
 /// order of its model.
 pub fn place_created_children_after_their_model_predecessors<T> (

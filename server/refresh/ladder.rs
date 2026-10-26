@@ -20,7 +20,10 @@
 //!  7. substitution: in a content view an overridden node is shown as
 //!     its overrider;
 //!  8. requests: each child's view requests are fulfilled and dropped.
-//! Before them, the budget is settled for P ('extent.rs'); between 5
+//! Before them, the budget is settled for P ('extent.rs'), an
+//! editable-view request on P extends the content P already shows
+//! ('extend_requested_content'), and P's default folders are added
+//! ('add_default_folders'); then P's goal is computed. Between 5
 //! and 6 the diff view draws its change viewnodes and tags the
 //! children with their changes ('diff_view.rs'); after 6, in a
 //! subscribee folder, the folder of what the subscriber hides outside
@@ -402,7 +405,8 @@ pub(crate) fn set_warrant (
 // 4. claims
 //
 
-/// Under the buffer root every root claims. Under an editable
+/// Under the buffer root every occurrence root claims; any other root
+/// keeps what it carries. Under an editable
 /// occurrence or an editable folder, each child that claims and that
 /// the truth does not warrant (a ghost warrant included: the worktree
 /// lacks that relationship) is marked 'noClaim'. Under any other

@@ -330,7 +330,7 @@ fn validate_subscribeefolder (
 
 /// PURPOSE: See the error messages it could return.
 /// PITFALL: Does not check whether the members are correct for the graph;
-/// save extraction and completion decide relation meaning later.
+/// the save's extraction and the refresh decide relation meaning later.
 fn validate_relation_folder (
   tree     : &Tree<Viewnode>,
   treeid   : NodeId,
