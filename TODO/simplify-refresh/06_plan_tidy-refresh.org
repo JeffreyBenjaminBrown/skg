@@ -1144,6 +1144,11 @@ Read the readability report's item 6 and the duplication
 report's items 11 and 12 first. The printer's placement of the
 forms ('org_to_text.rs', 'viewnode_to_string') is the
 reference for both editors.
+*** Corrections carried from slice 4
+Both editors' strip and repo-cycling code still handle a
+nodeRepo marked "(default)", which nothing writes any more;
+delete that handling with its tests, and let the case file
+below carry no such value.
 *** the case file
 Write 'tests/shared/metadata-editor-cases.txt', modeled on
 'tests/shared/herald-rendering-cases.txt': for each kind of

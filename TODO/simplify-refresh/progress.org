@@ -2456,3 +2456,24 @@ suffix from a nodeRepo value, and the repo cycling still handles
 one, though nothing writes it now; slice 7 aligns the editors.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 4 (2026-10-26)
+Launched 23:22 UTC, reported 23:38 UTC: sixteen minutes, the
+last few waiting on the integration suite. One correction
+inserted, under slice 7, from the agent's finding: both
+editors still handle a nodeRepo marked "(default)" that nothing
+writes. The deviations are sound: Neovim had the same relRepo
+herald bug and got the same fix and case; the startup-warnings
+handler stopped calling the buffer-replacing helper rather
+than changing it, since three other buffers rely on
+replacement; the kind reader defaults metadata naming no kind
+to the occurrence's kind in both clients, which changes
+Neovim's skgrepo-inheritance walk to match Emacs; the Neovim
+commands are ':SkgDetach' and ':SkgAttach' by that client's
+convention. A throwaway batch-Emacs check over the 90 metadata
+forms the server writes showed the 'graphStats' special cases
+dead, so they went with the pitfall rewritten for typed
+metadata only. Suites: Emacs 412 of 412, Neovim 399, nextest
+969 of 969 on the second run (the cleanup flake once, passing
+alone), integration 34 of 35 with the pre-existing failure.
+
