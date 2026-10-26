@@ -302,13 +302,16 @@ member of a write-protected folder, or with an ID missing."
       (format "%s" (car values)))))
 
 (defun skg--node-edit-request-at-point-p ()
-  "Whether the occurrence headline at point already requests delete or merge."
+  "Whether the occurrence headline at point already requests delete or
+merge: its '(editRequest ...)' holds a part that is neither a relRepo
+request nor a readiness request."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
          (values (and (skg--occurrence-sexp-p metadata)
                       (skg-sexp-cdr-at-path metadata '(skg editRequest)))))
-    (and values
-         (not (and (consp (car values))
-                   (eq (caar values) 'relRepo))))))
+    (seq-some (lambda (part)
+                (not (or (eq (car-safe part) 'relRepo)
+                         (skg--readiness-request-p part))))
+              values)))
 
 (defun skg--alias-headline-p ()
   "Return non-nil when point is on an alias property headline."

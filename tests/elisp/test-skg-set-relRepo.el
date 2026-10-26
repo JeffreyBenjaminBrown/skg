@@ -250,6 +250,28 @@ request pending in '(editRequest ...)'."
      (should (string-match-p "(editRequest (ready rel)))"
                              (test--buffer-line 1))))))
 
+(ert-deftest test-apply-relRepo-under-a-readiness-request ()
+  "A readiness request alone in '(editRequest ...)' does not block a
+relRepo request, as a delete does."
+  (test--with-skg-content-view
+   (concat
+    "* (skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest (ready rel))) x\n"
+    "* (skg node (gnid y) (skgRepos (nodeRepo public)) (editRequest (unready))) y\n"
+    "* (skg node (gnid z) (skgRepos (nodeRepo public)) (editRequest delete (ready))) z\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (should-not (skg--node-edit-request-at-point-p))
+     (skg--apply-relRepo-choice "private")
+     (should (string-match-p "(editRequest (relRepo private) (ready rel)))"
+                             (test--buffer-line 1)))
+     (forward-line 1)
+     (should-not (skg--node-edit-request-at-point-p))
+     (forward-line 1)
+     (should (skg--node-edit-request-at-point-p))
+     (should-error (skg--apply-relRepo-choice "private")
+                   :type 'user-error))))
+
 (ert-deftest test-apply-relRepo-remove-without-atom-is-noop ()
   "The no-override choice without an atom changes nothing."
   (test--with-skg-content-view
