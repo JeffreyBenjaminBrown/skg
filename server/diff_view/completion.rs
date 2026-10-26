@@ -17,10 +17,11 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
 use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::env::{RuntimeGeneration, SkgEnv};
+use crate::types::env::RuntimeGeneration;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord};
+use crate::update_buffer::{DiffViewRerender, RerenderPassContext};
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use std::collections::BTreeSet;
@@ -52,10 +53,10 @@ pub fn complete_viewforest_with_graph_straddle (
                                readiness_store : store },
     runtime . config . initial_node_limit, buffer_correction_policy ) }
 
-/// Rerender a buffer of the diff view: bring the straddle in
-/// 'graph_straddle_slot' up to date, and refresh the buffer over it.
+/// Rerender a buffer of the diff view: bring the straddle in the
+/// context's slot up to date, and refresh the buffer over it.
 /// Only for the "integrate unshown changes" request
-/// ('integrate_unshown_changes') does it make occurrences editable or
+/// ('DiffViewRerender::integrate_unshown_changes') does it make occurrences editable or
 /// append roots: before the refresh each node of the recomputed U
 /// without an editable occurrence becomes editable at its first
 /// content occurrence; after it, the content origins of the recomputed
@@ -64,25 +65,26 @@ pub fn complete_viewforest_with_graph_straddle (
 /// request draws is what the user asked for, as a fresh view's is, so
 /// it reports no buffer corrections.
 pub fn rerender_diffView_buffer (
-  graph_straddle_slot       : &mut Option<Arc<GraphStraddle>>,
-  runtime                   : &RuntimeGeneration,
-  env                       : &SkgEnv,
-  restriction               : Option<&SkgrepoRestriction>,
-  diffView_buffer_kind      : DiffViewBufferKind,
-  integrate_unshown_changes : bool,
-  buffer_correction_policy         : &BufferCorrectionPolicy,
-  viewforest                : &mut ViewForest,
-  viewnode_id_record        : &mut ViewnodeIdRecord,
+  context            : &mut RerenderPassContext<'_>,
+  rerender           : DiffViewRerender,
+  viewforest         : &mut ViewForest,
+  viewnode_id_record : &mut ViewnodeIdRecord,
 ) -> Result<Refreshed, Box<dyn Error>> {
+  let DiffViewRerender { buffer_kind : diffView_buffer_kind,
+                         integrate_unshown_changes } = rerender;
+  let runtime : &RuntimeGeneration = &context . runtime;
+  let restriction : Option<&SkgrepoRestriction> = context . skgrepo_restriction;
+  let buffer_correction_policy : &BufferCorrectionPolicy =
+    &context . buffer_correction_policy;
   let straddle : Arc<GraphStraddle> =
     current_graph_straddle_in_slot (
-      graph_straddle_slot, &runtime . config, runtime . graph . clone () )
+      &mut context . graph_straddle, &runtime . config, runtime . graph . clone () )
     . map_err ( |e| format! (
       "Cannot rerender the diff view buffer: {}", e )) ?;
   let standing_roots : BTreeSet<ID> = root_gnids_of_buffer (viewforest);
   if integrate_unshown_changes {
     ensure_editableOccurrences_exist (&straddle, diffView_buffer_kind, viewforest); }
-  let store : MutexGuard<ReadinessStore> = env . runtime . lock_readiness_store ();
+  let store : MutexGuard<ReadinessStore> = context . env . runtime . lock_readiness_store ();
   let refreshed : Refreshed = complete_viewforest_with_graph_straddle (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
     buffer_correction_policy, viewforest, viewnode_id_record ) ?;

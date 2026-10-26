@@ -15,7 +15,7 @@ use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
-  PreparedRerenders, PreparedView, prepare_rerender_views_where,
+  PreparedRerenders, prepare_rerender_views_where,
   stream_empty_rerender, stream_prepared_rerenders};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
@@ -24,7 +24,7 @@ use crate::serve::util::{
 use crate::skgrepo_sets::{SkgrepoRestriction, require_skgrepo_set_all};
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
-use crate::update_buffer::RerenderOptions;
+use crate::update_buffer::{RerenderOptions, RerenderedView};
 
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -78,7 +78,7 @@ fn integrate_unshown_changes (
     RerenderOptions::for_integrating_unshown_changes,
     |registered_viewforest_id, _| *registered_viewforest_id == viewforest_id );
   let (Some (view), Some (straddle)) :
-    (Option<&PreparedView>, Option<&Arc<GraphStraddle>>) =
+    (Option<&RerenderedView>, Option<&Arc<GraphStraddle>>) =
     (prepared . views . first (), prepared . graph_straddle . as_ref ())
     else { return Err ( prepared . errors . join ("\n") ); };
   let summary : BufferReadinessSummary =

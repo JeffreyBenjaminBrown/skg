@@ -10,8 +10,7 @@
 //! ('write_graph_straddle_back'), as a save does with its own.
 
 use crate::graph_straddle::types::GraphStraddle;
-use crate::refresh::Refreshed;
-use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, ViewBufferCorrections};
+use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, ViewBufferCorrections};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -21,29 +20,19 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::tree::forest::ViewForest;
-use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord, ViewState};
+use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewState};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::{
-  rerender_view, RerenderAfterSaveContext, RerenderOptions};
+  RerenderOptions, RerenderPassContext, RerenderedView, rerender_open_view};
 
-use futures::executor::block_on;
 use std::net::TcpStream;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-pub(crate) struct PreparedView {
-  pub(crate) viewforest_id : ViewforestId,
-  text                     : String,
-  buffer_corrections              : Vec<BufferCorrection>,
-  pub(crate) viewforest    : ViewForest,
-  viewnode_id_record       : ViewnodeIdRecord,
-}
-
 pub(crate) struct PreparedRerenders {
   runtime  : std::sync::Arc<RuntimeGeneration>,
   pub(crate) viewforest_ids : Vec<ViewforestId>,
-  pub(crate) views    : Vec<PreparedView>,
+  pub(crate) views    : Vec<RerenderedView>,
   pub(crate) errors   : Vec<String>,
   warnings : Vec<String>,
   pub(crate) graph_straddle : Option<Arc<GraphStraddle>>, // the connection's, as the rerenders brought it up to date
@@ -97,45 +86,21 @@ pub(crate) fn prepare_rerender_views_where (
   let viewforest_ids : Vec<ViewforestId> = views_state . open_views . views . iter ()
     .filter (|(viewforest_id, state)| include (viewforest_id, state))
     .map (|(viewforest_id, _)| viewforest_id . clone ()) . collect ();
-  let mut context : RerenderAfterSaveContext =
-    RerenderAfterSaveContext::without_save_with_runtime (
-      env, runtime, skgrepo_restriction );
-  // A buffer of the diff view is refreshed over a graph straddle
-  // brought up to date from the connection's. Streaming the rerenders
-  // writes it back, as a save does.
-  context . graph_straddle = views_state . graph_straddle . clone ();
-  context . buffer_correction_policy = buffer_correction_policy;
-  let mut rendered_views : Vec<PreparedView> = Vec::new ();
+  let mut context : RerenderPassContext = RerenderPassContext::new (
+    env, runtime, skgrepo_restriction,
+    // A buffer of the diff view is refreshed over a graph straddle
+    // brought up to date from the connection's. Streaming the
+    // rerenders writes it back, as a save does.
+    views_state . graph_straddle . clone (),
+    buffer_correction_policy );
+  let mut rendered_views : Vec<RerenderedView> = Vec::new ();
   for viewforest_id in &viewforest_ids {
-    let mut viewforest : ViewForest = match
-      views_state . open_views . viewforest_id_to_view (viewforest_id) {
-        Some (f) => f . clone (),
-        None => {
-          context . errors . push ( format! (
-            "View {}: no viewforest found",
-            viewforest_id . repr_in_client () ));
-          continue; } };
-    let mut viewnode_id_record : ViewnodeIdRecord =
-      views_state . open_views . viewnode_id_record_of (viewforest_id);
-    match block_on ( async {
-      let _span : tracing::span::EnteredSpan =
-        tracing::info_span! (
-          "rerender_view (rerender-all)"
-        ) . entered ();
-      rerender_view (
-        &mut viewforest,
-        &mut viewnode_id_record,
-        &mut context,
-        rerender_options (
-          views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) )) } )
-    { Ok (Refreshed { text, buffer_corrections }) => {
-        rendered_views . push ( PreparedView {
-          viewforest_id : viewforest_id . clone (), text, buffer_corrections,
-          viewforest, viewnode_id_record } ); },
-      Err (e) => {
-        context . errors . push ( format! (
-          "View {}: {}",
-          viewforest_id . repr_in_client (), e )); }} }
+    let _span : tracing::span::EnteredSpan =
+      tracing::info_span! ( "rerender_view (rerender-all)" ) . entered ();
+    match rerender_open_view (
+      viewforest_id, views_state, &mut context, rerender_options )
+    { Ok (rendered) => rendered_views . push (rendered),
+      Err (e) => context . errors . push (e), }}
   PreparedRerenders {
     runtime : context . runtime . clone (),
     viewforest_ids,

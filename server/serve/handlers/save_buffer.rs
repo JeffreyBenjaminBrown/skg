@@ -32,6 +32,7 @@ use crate::diff_view::restore_requests::{
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::serve::handlers::text_release::{
+  TextReleaseDecision, challenge_response,
   approved_pids_from_request as text_approved_pids_from_request,
 };
 use crate::serve::handlers::save_dependencies::{
@@ -123,6 +124,71 @@ pub struct SavePointPosition {
 }
 
 impl SaveResponse {
+  /// The response of a save that skgsave-committed and rerendered.
+  pub fn saved (
+    saved_view         : String,
+    errors             : Vec<String>,
+    warnings           : Vec<String>,
+    readiness_summary  : Option<BufferReadinessSummary>,
+    buffer_corrections : Vec<ViewBufferCorrections>,
+  ) -> SaveResponse {
+    SaveResponse { saved_view, errors, warnings, readiness_summary,
+                   buffer_corrections,
+                   .. SaveResponse::empty () } }
+
+  /// A save that skgsave-committed nothing, asking to review the
+  /// relationships its home skgrepo moves would strand.
+  pub fn strandeds_confirmation (
+    warnings  : Vec<String>,
+    strandeds : Vec<StrandedRelationship>,
+  ) -> SaveResponse {
+    SaveResponse { warnings,
+                   strandeds_confirmation : Some (strandeds),
+                   .. SaveResponse::empty () } }
+
+  /// A save that skgsave-committed nothing, asking to approve
+  /// publishing overPrivateText telescopes.
+  pub fn hoist_confirmation (
+    warnings   : Vec<String>,
+    candidates : Vec<HoistCandidate>,
+  ) -> SaveResponse {
+    SaveResponse { warnings,
+                   hoist_confirmation : Some (candidates),
+                   .. SaveResponse::empty () } }
+
+  /// A save that skgsave-committed nothing, holding the fork-confirmation
+  /// buffer and its prompt.
+  pub fn fork_confirmation (
+    warnings : Vec<String>,
+    buffer   : String,
+    prompt   : String,
+  ) -> SaveResponse {
+    SaveResponse { saved_view : buffer, warnings,
+                   fork_confirmation : Some (prompt),
+                   .. SaveResponse::empty () } }
+
+  /// A save whose rerender holds text the restriction may not
+  /// release without approval: the challenge, and no text.
+  pub fn text_release_challenge (
+    decision : &TextReleaseDecision,
+  ) -> SaveResponse {
+    SaveResponse { text_release_confirmation : challenge_response (decision),
+                   .. SaveResponse::empty () } }
+
+  fn empty (
+  ) -> SaveResponse {
+    SaveResponse {
+      saved_view                : String::new (),
+      errors                    : Vec::new (),
+      warnings                  : Vec::new (),
+      save_point_position       : None,
+      fork_confirmation         : None,
+      hoist_confirmation        : None,
+      text_release_confirmation : None,
+      strandeds_confirmation    : None,
+      readiness_summary         : None,
+      buffer_corrections        : Vec::new (), } }
+
   /// Format: ((content "...") (errors (...)) (warnings (...))
   /// (corrections (...)) POINT... (readiness-summary ...)), where the
   /// point entries and the readiness summary are there when the save
@@ -758,18 +824,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       strandeds . iter () . partition ( |stranded| stranded . raised_automatically );
     match strandeds_review {
       StrandedsReview::NotReviewed if ! asked . is_empty () =>
-        return Ok ( SaveResponse {
-          saved_view          : String::new (),
-          errors              : Vec::new (),
-          warnings            : parse_warnings,
-          save_point_position : None,
-          fork_confirmation   : None,
-          hoist_confirmation  : None,
-          text_release_confirmation : None,
-          strandeds_confirmation : Some (
-            asked . into_iter () . cloned () . collect () ),
-          readiness_summary   : None,
-          buffer_corrections         : Vec::new (), } ),
+        return Ok ( SaveResponse::strandeds_confirmation (
+          parse_warnings, asked . into_iter () . cloned () . collect () )),
       StrandedsReview::NotReviewed => {},
       StrandedsReview::Reviewed (chosen) => {
         let chosen : Vec<&StrandedRelationship> = asked . into_iter ()
@@ -785,18 +841,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &nonmerge_nodeInstructions, &nodeMerges, &runtime . config ) ?;
   if hoist_needs_confirmation (
       &hoist_candidates, approved_hoist_pids ) {
-    return Ok ( SaveResponse {
-      saved_view          : String::new (),
-      errors              : Vec::new (),
-      warnings            : parse_warnings,
-      save_point_position : None,
-      fork_confirmation   : None,
-      hoist_confirmation  : Some (hoist_candidates),
-      text_release_confirmation : None,
-      strandeds_confirmation : None,
-      readiness_summary   : None,
-      buffer_corrections         : Vec::new (),
-    } ); }
+    return Ok ( SaveResponse::hoist_confirmation (
+      parse_warnings, hoist_candidates )); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
   nonmerge_nodeInstructions . extend (
@@ -808,20 +854,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // and on approval re-issues the save with (approved-forks . "true").
     // (Monogamy and skgrepo validation already ran in
     // buffer_to_validated_saveplan, so every fork here is admissible.)
-    return Ok ( SaveResponse {
-      saved_view          : build_fork_confirmation_buffer (&fork_specs),
-      errors              : Vec::new (),
-      warnings            : parse_warnings,
-      save_point_position : None,
-      fork_confirmation   : Some (
-        format! ( "{} node(s) will be forked. Save again to approve, \
-                   or kill this buffer to decline.",
-                  fork_specs . len () )),
-      hoist_confirmation  : None,
-      text_release_confirmation : None,
-      strandeds_confirmation : None,
-      readiness_summary   : None,
-      buffer_corrections         : Vec::new (), } ); }
+    return Ok ( SaveResponse::fork_confirmation (
+      parse_warnings,
+      build_fork_confirmation_buffer (&fork_specs),
+      format! ( "{} node(s) will be forked. Save again to approve, \
+                 or kill this buffer to decline.",
+                fork_specs . len () ))); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'overrides = [N]' relationship rides in the same

@@ -33,7 +33,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::SaveResponse;
 use crate::serve::handlers::text_release::{
-  TextReleaseDecision, challenge_response, decide,
+  TextReleaseDecision, decide,
 };
 use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::write_graph_straddle_back;
@@ -53,17 +53,21 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Instant;
 
-pub struct RerenderAfterSaveContext<'a> {
+/// What one rerender pass shares across the views it rerenders: a
+/// save's, or a request's that rerenders open views
+/// ('prepare_rerender_views_where').
+pub struct RerenderPassContext<'a> {
   pub env           : &'a SkgEnv,
+  /// The runtime generation every view of the pass is refreshed
+  /// against.
   pub runtime       : Arc<RuntimeGeneration>,
-  pub graph_snap    : Arc<InRustGraph>,
   pub errors        : Vec<String>,
   pub warnings      : Vec<String>,
   pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
   /// The graph straddle a buffer of the diff view is refreshed
   /// over, brought up to date by 'current_graph_straddle_in_slot' when
-  /// the first such buffer is rerendered. A caller that holds the
-  /// connection's straddle sets it, and keeps what it becomes.
+  /// the first such buffer is rerendered. The caller sets the
+  /// connection's, and keeps what it becomes.
   pub graph_straddle                 : Option<Arc<GraphStraddle>>,
   /// Which changes the rerenders report as no buffer corrections: a
   /// save's rerender sets the nodes it deleted, a skgrepo-set switch
@@ -72,45 +76,30 @@ pub struct RerenderAfterSaveContext<'a> {
   pub buffer_correction_policy       : BufferCorrectionPolicy,
 }
 
-impl<'a> RerenderAfterSaveContext<'a> {
-  fn with_runtime (
-    env : &'a SkgEnv,
-    runtime : Arc<RuntimeGeneration>,
-    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
-  ) -> RerenderAfterSaveContext<'a> {
-    RerenderAfterSaveContext {
-      env,
-      graph_snap : runtime . graph . clone (),
-      runtime,
-      errors : Vec::new (),
-      warnings : Vec::new (),
-      skgrepo_restriction,
-      graph_straddle : None,
-      buffer_correction_policy : BufferCorrectionPolicy::default (),
-    }}
-
-  pub fn without_save (
-    env                : &'a SkgEnv,
-    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
-  ) -> RerenderAfterSaveContext<'a> {
-    RerenderAfterSaveContext::with_runtime (
-      env, env . runtime_snapshot (), skgrepo_restriction ) }
-
-  pub fn without_save_with_runtime (
-    env : &'a SkgEnv,
-    runtime : Arc<RuntimeGeneration>,
-    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
-  ) -> RerenderAfterSaveContext<'a> {
-    RerenderAfterSaveContext::with_runtime (
-      env, runtime, skgrepo_restriction ) }
+impl<'a> RerenderPassContext<'a> {
+  pub fn new (
+    env                      : &'a SkgEnv,
+    runtime                  : Arc<RuntimeGeneration>,
+    skgrepo_restriction      : Option<&'a SkgrepoRestriction>,
+    graph_straddle           : Option<Arc<GraphStraddle>>,
+    buffer_correction_policy : BufferCorrectionPolicy,
+  ) -> RerenderPassContext<'a> {
+    RerenderPassContext {
+      env, runtime, skgrepo_restriction, graph_straddle,
+      buffer_correction_policy,
+      errors   : Vec::new (),
+      warnings : Vec::new (), } }
 }
 
-struct RenderedCollateralView {
-  viewforest_id  : ViewforestId,
-  text           : String,
-  buffer_corrections    : Vec<BufferCorrection>,
-  viewforest     : ViewForest,
-  viewnode_id_record : ViewnodeIdRecord,
+/// An open view, rerendered in memory: its new text, what the refresh
+/// corrected, and the viewforest and vnid record that replace the
+/// registered ones once the rerender is released.
+pub(crate) struct RerenderedView {
+  pub(crate) viewforest_id      : ViewforestId,
+  pub(crate) text               : String,
+  pub(crate) buffer_corrections : Vec<BufferCorrection>,
+  pub(crate) viewforest         : ViewForest,
+  pub(crate) viewnode_id_record : ViewnodeIdRecord,
 }
 
 /// PURPOSE:
@@ -136,13 +125,10 @@ pub fn update_views_after_save (
   fork_specs                  : &[ForkSpec],
   deleted_by_the_save         : HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  let mut context : RerenderAfterSaveContext =
-    // Snapshot the in-Rust graph once for this save's rerender pass.
-    RerenderAfterSaveContext::with_runtime (
-      env, runtime, skgrepo_restriction );
-  context . buffer_correction_policy =
-    BufferCorrectionPolicy::after_a_save_deleting (deleted_by_the_save);
-  context . graph_straddle = views_state . graph_straddle . clone ();
+  let mut context : RerenderPassContext = RerenderPassContext::new (
+    env, runtime, skgrepo_restriction,
+    views_state . graph_straddle . clone (),
+    BufferCorrectionPolicy::after_a_save_deleting (deleted_by_the_save) );
   let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
     viewforest_id_from_request_result . as_ref () . ok ()
     . and_then ( |viewforest_id| views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
@@ -173,20 +159,9 @@ pub fn update_views_after_save (
           occurrence_gnids_in_viewforest (viewforest) ); }}
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &input_candidates,
-      &context . graph_snap, text_approved_pids );
+      &context . runtime . graph, text_approved_pids );
     if matches! (release, TextReleaseDecision::Challenge { .. }) {
-      return Ok ( SaveResponse {
-        saved_view          : String::new (),
-        errors              : Vec::new (),
-        warnings            : Vec::new (),
-        save_point_position : None,
-        fork_confirmation   : None,
-        hoist_confirmation  : None,
-        strandeds_confirmation : None,
-        text_release_confirmation : challenge_response (&release),
-        readiness_summary   : None,
-        buffer_corrections         : Vec::new (),
-      } ); }}
+      return Ok ( SaveResponse::text_release_challenge (&release) ); }}
   let saved : Refreshed =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
@@ -199,10 +174,12 @@ pub fn update_views_after_save (
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| buffer_readiness_summary_for (
       env, straddle, &saved_view_mut ) );
-  let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
+  let mut collateral_views : Vec<RerenderedView> = Vec::new ();
   for curi in &collateral_viewforest_ids {
-    match rerender_collateral_view (
-      curi . clone (), views_state, &mut context )
+    let _span : tracing::span::EnteredSpan =
+      tracing::info_span!( "rerender_view (collateral)" ). entered();
+    match rerender_open_view (
+      curi, views_state, &mut context, RerenderOptions::ordinary )
     { Ok (rendered) => collateral_views . push (rendered),
       Err (e) => context . errors . push (e), }}
   // Everything textual is now staged in memory. Decide before changing the
@@ -215,21 +192,10 @@ pub fn update_views_after_save (
   if let Some (restriction) = skgrepo_restriction {
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &release_candidates,
-      &context . graph_snap, text_approved_pids );
+      &context . runtime . graph, text_approved_pids );
     match release {
       decision @ TextReleaseDecision::Challenge { .. } => {
-        return Ok ( SaveResponse {
-          saved_view          : String::new (),
-          errors              : Vec::new (),
-          warnings            : Vec::new (),
-          save_point_position : None,
-          fork_confirmation   : None,
-          hoist_confirmation  : None,
-          strandeds_confirmation : None,
-          text_release_confirmation : challenge_response (&decision),
-          readiness_summary   : None,
-          buffer_corrections         : Vec::new (),
-        } ); }
+        return Ok ( SaveResponse::text_release_challenge (&decision) ); }
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
@@ -238,12 +204,12 @@ pub fn update_views_after_save (
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
     buffer_corrections . extend ( ViewBufferCorrections::of (viewforest_id, saved . buffer_corrections) );
     views_state . open_views . update_view (
-      &context . graph_snap, viewforest_id, saved_view_mut, saved_viewnode_id_record );
+      &context . runtime . graph, viewforest_id, saved_view_mut, saved_viewnode_id_record );
     for rendered in collateral_views {
       buffer_corrections . extend ( ViewBufferCorrections::of (
         &rendered . viewforest_id, rendered . buffer_corrections ));
       views_state . open_views . update_view (
-        &context . graph_snap,
+        &context . runtime . graph,
         &rendered . viewforest_id, rendered . viewforest,
         rendered . viewnode_id_record );
       send_response_with_length_prefix (
@@ -252,17 +218,9 @@ pub fn update_views_after_save (
           TcpToClient::CollateralView,
           & format_single_view_sexp (
             &rendered . viewforest_id, &rendered . text) )); }}
-  Ok ( SaveResponse {
-    saved_view          : saved . text,
-    errors              : context . errors,
-    warnings            : context . warnings,
-    save_point_position : None,
-    fork_confirmation   : None,
-    hoist_confirmation  : None,
-    strandeds_confirmation : None,
-    text_release_confirmation : None,
-    readiness_summary,
-    buffer_corrections, } ) }
+  Ok ( SaveResponse::saved (
+    saved . text, context . errors, context . warnings,
+    readiness_summary, buffer_corrections )) }
 
 fn occurrence_gnids_in_viewforest (
   viewforest : &ViewForest,
@@ -313,40 +271,34 @@ fn replace_saved_view_fork_roots (
   Ok (())
 }
 
-fn rerender_collateral_view (
-  viewforest_id : ViewforestId,
-  views_state : &ViewsState,
-  context     : &mut RerenderAfterSaveContext<'_>,
-) -> Result<RenderedCollateralView, String> {
-  let mut viewforest : ViewForest = match
-    views_state . open_views . viewforest_id_to_view (&viewforest_id) {
-      Some (f) => f . clone (),
-      None => {
-        return Err ( format! (
-          "Collateral view {}: no viewforest found",
-          viewforest_id . repr_in_client () )); } };
+/// Rerender the open view 'viewforest_id' in memory, with the options
+/// 'rerender_options' gives for its buffer kind in the diff view, if
+/// any; the registered view is untouched. An error names the view.
+pub(crate) fn rerender_open_view (
+  viewforest_id    : &ViewforestId,
+  views_state      : &ViewsState,
+  context          : &mut RerenderPassContext<'_>,
+  rerender_options : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
+) -> Result<RerenderedView, String> {
+  let mut viewforest : ViewForest =
+    views_state . open_views . viewforest_id_to_view (viewforest_id)
+    . cloned ()
+    . ok_or_else ( || format! ( "View {}: no viewforest found",
+                                viewforest_id . repr_in_client () )) ?;
   let mut viewnode_id_record : ViewnodeIdRecord =
-    views_state . open_views . viewnode_id_record_of (&viewforest_id);
-  let diffView_buffer_kind : Option<DiffViewBufferKind> =
-    views_state . open_views . diffView_buffer_kind_of_view (&viewforest_id);
-  let refreshed : Refreshed =
-    { let _span : tracing::span::EnteredSpan =
-        tracing::info_span!( "rerender_view (collateral)" ). entered();
-      rerender_view (
-        &mut viewforest,
-        &mut viewnode_id_record,
-        context,
-        RerenderOptions::ordinary (diffView_buffer_kind)
-      ) . map_err (
-        |e| format!( "Collateral view {}: {}",
-                      viewforest_id . repr_in_client (), e)) ? };
-  Ok (RenderedCollateralView {
-    viewforest_id,
-    text        : refreshed . text,
+    views_state . open_views . viewnode_id_record_of (viewforest_id);
+  let options : RerenderOptions = rerender_options (
+    views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) );
+  let refreshed : Refreshed = rerender_view (
+    &mut viewforest, &mut viewnode_id_record, context, options )
+    . map_err ( |e| format! ( "View {}: {}",
+                              viewforest_id . repr_in_client (), e )) ?;
+  Ok ( RerenderedView {
+    viewforest_id      : viewforest_id . clone (),
+    text               : refreshed . text,
     buffer_corrections : refreshed . buffer_corrections,
     viewforest,
-    viewnode_id_record,
-  }) }
+    viewnode_id_record, } ) }
 
 /// Render a fresh content view: the refresh of a stub
 /// ('stub_of_fresh_content_view') in content-view mode, which draws
@@ -400,16 +352,20 @@ pub(crate) fn stub_of_fresh_content_view (
     viewforest . append_root (root); }
   viewforest }
 
-/// How 'rerender_view' treats a view, beyond what its context says.
-/// Each case of rerender has its own constructor, which names every
-/// field.
+/// How 'rerender_view' treats a view, beyond what its context says:
+/// a content view, or a buffer of the diff view.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct RerenderOptions {
-  /// Some for a buffer of the diff view.
-  pub diffView_buffer                       : Option<DiffViewBufferKind>,
-  /// True only for the "integrate unshown changes" request; matters
-  /// only in a buffer of the diff view.
-  pub integrate_unshown_changes             : bool,
+pub enum RerenderOptions {
+  ContentView,
+  DiffView (DiffViewRerender),
+}
+
+/// How a buffer of the diff view is rerendered.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DiffViewRerender {
+  pub buffer_kind               : DiffViewBufferKind,
+  /// True only for the "integrate unshown changes" request.
+  pub integrate_unshown_changes : bool,
 }
 
 impl RerenderOptions {
@@ -420,46 +376,46 @@ impl RerenderOptions {
   pub fn ordinary (
     diffView_buffer : Option<DiffViewBufferKind>,
   ) -> RerenderOptions {
-    RerenderOptions {
-      diffView_buffer,
-      integrate_unshown_changes             : false, } }
+    RerenderOptions::of_buffer (diffView_buffer, false) }
 
   /// The buffer of the diff view named by an "integrate unshown
   /// changes" request.
   pub fn for_integrating_unshown_changes (
     diffView_buffer : Option<DiffViewBufferKind>,
   ) -> RerenderOptions {
-    RerenderOptions {
-      diffView_buffer,
-      integrate_unshown_changes             : true, } }
+    RerenderOptions::of_buffer (diffView_buffer, true) }
+
+  fn of_buffer (
+    diffView_buffer           : Option<DiffViewBufferKind>,
+    integrate_unshown_changes : bool,
+  ) -> RerenderOptions {
+    match diffView_buffer {
+      None => RerenderOptions::ContentView,
+      Some (buffer_kind) => RerenderOptions::DiffView (
+        DiffViewRerender { buffer_kind, integrate_unshown_changes } ), } }
 }
 
 /// Bring an open view up to date with the graph and render it,
 /// returning its text and its buffer corrections. It is refreshed
 /// ('refresh_viewforest'), from what it holds and the graph as they
-/// are now: a content view ('options . diffView_buffer' None) in
-/// content-view mode; a buffer of the diff view in diff-view mode,
-/// over the graph straddle, brought up to date in 'context'
-/// ('rerender_diffView_buffer', which says what the "integrate unshown
-/// changes" request, 'options . integrate_unshown_changes', adds).
+/// are now: a content view in content-view mode; a buffer of the diff
+/// view in diff-view mode, over the graph straddle, brought up to date
+/// in 'context' ('rerender_diffView_buffer', which says what the
+/// "integrate unshown changes" request adds).
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord, // the view's, which assigns the viewnode IDs its new viewnodes get
-  context       : &mut RerenderAfterSaveContext<'_>,
+  context       : &mut RerenderPassContext<'_>,
   options       : RerenderOptions,
 ) -> Result<Refreshed, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "refresh_viewforest" ). entered();
-  let result : Refreshed = match options . diffView_buffer {
-    None => refresh_content_view (
+  let result : Refreshed = match options {
+    RerenderOptions::ContentView => refresh_content_view (
       viewforest, viewnode_id_record, context ) ?,
-    Some (diffView_buffer_kind) => rerender_diffView_buffer (
-      &mut context . graph_straddle, &context . runtime, context . env,
-      context . skgrepo_restriction, diffView_buffer_kind,
-      options . integrate_unshown_changes,
-      &context . buffer_correction_policy,
-      viewforest, viewnode_id_record ) ?, };
+    RerenderOptions::DiffView (diffView_rerender) => rerender_diffView_buffer (
+      context, diffView_rerender, viewforest, viewnode_id_record ) ?, };
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -468,7 +424,7 @@ pub fn rerender_view (
 fn refresh_content_view (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
-  context            : &mut RerenderAfterSaveContext<'_>,
+  context            : &mut RerenderPassContext<'_>,
 ) -> Result<Refreshed, Box<dyn Error>> {
   refresh_content_viewforest (
     viewforest, viewnode_id_record,
