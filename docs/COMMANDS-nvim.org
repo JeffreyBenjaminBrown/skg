@@ -60,7 +60,7 @@ but from the graph itself.
 *** <localleader>dR : :SkgDeleteRecursive
 Same as Delete, but also marks every occurrence viewdescendant
 of the node at point. Descendent headlines that are not occurrences
-(phantoms, aliasFolder, id-folder, etc.) are skipped.
+(ghosts, unknowns, aliasFolder, id-folder, etc.) are skipped.
 
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
@@ -466,7 +466,7 @@ existing =editRequest= are refused.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
-non-member branches, restricted nodes, and phantoms. Save with
+branches carrying =noClaim=, ghosts and unknowns. Save with
 =:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
@@ -661,7 +661,7 @@ and a viewchild of an editable occurrence whose skgrepo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its viewdescendants,
-including non-vognodes and phantoms,
+including non-vognodes, ghosts and unknowns,
 are removed from the view and replaced by a same-level headline
 whose title is an =[[id:...][...]]= link to the original node.
 
@@ -719,7 +719,7 @@ Opens a blank Skg content view in which to create new nodes.
 **** why
 Every node needs a skgrepo.
 A headline inherits one from the nearest node above it,
-passing through folders and phantoms;
+passing through folders, ghosts and unknowns;
 a root, or a headline below a tombstone or a property,
 needs its skgrepo chosen explicitly.
 nvim-orgmode's insert-heading actions (org_meta_return and

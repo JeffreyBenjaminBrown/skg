@@ -51,7 +51,7 @@ but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
 Same as skg-delete, but also marks every occurrence viewdescendant
 of the node at point. Descendent headlines that are not occurrences
-(phantoms, aliasFolder, id-folder, etc.) are skipped.
+(ghosts, unknowns, aliasFolder, id-folder, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
@@ -469,13 +469,13 @@ The write-protected warning and the save's handling of relationships
 described under =C-c s s= apply here too, across the whole subtree.
 *** C-c s x : skg-set-flag-search-matching
 Prompts between =search matching= and =no search matching=, with shift-arrow
-cycling, and stages an idempotent request on the saved unrestricted node at point.
+cycling, and stages an idempotent request on the saved occurrence at point.
 It refuses foreign and write-protected nodes and conflicts with another
 =editRequest=. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
-subtree only. Non-vognodes, non-member children, restricted nodes, and
-phantoms are pruned. Repeated PIDs are changed once; ineligible descendants
+subtree only. Non-vognodes, children carrying =noClaim=, ghosts and
+unknowns are pruned, with what stands under them. Repeated PIDs are changed once; ineligible descendants
 are skipped and reported in =*Messages*=.
 *** C-c s m : skg-set-merge-request
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
@@ -772,7 +772,7 @@ and a viewchild of an editable occurrence whose skgrepo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its viewdescendants,
-including non-vognodes and phantoms,
+including non-vognodes, ghosts and unknowns,
 are removed from the view and replaced by a same-level headline
 whose title is an =[[id:...][...]]= link to the original node.
 
@@ -862,7 +862,7 @@ Opens a blank Skg content view in which to create new nodes.
 **** why
 Creating a headline through Skg's commands prompts for any skgrepo it
 cannot inherit: a headline inherits one from the nearest node above it,
-passing through folders and phantoms, so a root, or a headline below a
+passing through folders, ghosts and unknowns, so a root, or a headline below a
 tombstone or a property, prompts.  Save
 validation also catches a node whose skgrepo was omitted when the
 headline was entered as plain text.
