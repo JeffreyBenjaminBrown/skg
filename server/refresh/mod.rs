@@ -1,7 +1,7 @@
 //! The refresh: the one operation that takes a buffer, parsed and
 //! validated, and the truth, and returns the corrected buffer
-//! ('TODO/simplify-refresh/04_1_plan_rewrite-refresh.org', "The model,
-//! stateless"). Everything is decided from the buffer and the truth
+//! ('docs/data-model_technical.org', "The refresh: how a view follows
+//! the graph"). Everything is decided from the buffer and the truth
 //! as they are now.
 //!
 //! The walk is level order from the roots. A parent's own kind is

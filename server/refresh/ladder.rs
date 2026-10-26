@@ -1,7 +1,6 @@
 //! The ladder: the corrections the refresh applies at each parent P
-//! to its children, in order ('TODO/simplify-refresh/
-//! 04_1_plan_rewrite-refresh.org', "the ladder, per parent, in
-//! order"):
+//! to its children, in order ('docs/data-model_technical.org', "The
+//! walk and the ladder"):
 //!  1. re-kind: each child that stands for a gnid becomes what the ID
 //!     rule says, where it stands; each descriptor (folder, property
 //!     member, change viewnode) whose position the ancestry table

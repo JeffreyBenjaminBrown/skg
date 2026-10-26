@@ -1499,3 +1499,142 @@ parser's deliberate refusal of the retired atoms and the two
 words with another sense; slice 13 also retires the old folder
 type names from 58 comments. No code correction.
 
+
+** Slice 13: docs and the two-question check
+*** What's done
+**** the docs, by file
+- 'docs/data-model_technical.org': a new section, "The refresh:
+  how a view follows the graph", the model as built (kinds, ID
+  rule, claim and warrant, goal, walk and ladder, ancestry table,
+  extent and budget, tail, corrections).
+- 'docs/glossary.org': the reconciler entries (reconciler,
+  managed child, key, adopt, retain as non-member, the editable
+  map and claim, view completion, per-visit step, shallow model
+  subtree) and "phantom", "non-member", "display fact" give way
+  to: declared parts and derived facts, claims membership and
+  pending detachment, warranted, ghost and unknown, the refresh,
+  the truth, mode, gnid, the ID rule, goal, the ladder and
+  unsayable, merge of siblings, extent and the node budget, the
+  editability rule, corrections, 'IdResolution'. The diff view's
+  terms follow the flat grammar.
+- 'docs/api-and-formats.org': view and edit requests, the save's
+  write-protected check, the diff view's rerender, integrate,
+  the skgrepo switch, the stats paragraphs, override
+  substitution, the metadata headers (no kind atom is a node; the
+  five kinds with a small form; the two-slot editRequest;
+  'noClaim' on lost members and on a ghost), the tombstone.
+- 'docs/diff-view.org': its intro, "Change facts on the wire",
+  the restoreRel paragraph, the property folders' members.
+- 'docs/heralds.org': a section "What the server serves, and what
+  the clients add"; the readiness request's place.
+- 'coding-advice/architecture.md': the refresh, and the viewnode
+  grammar as built. 'docs/README.org' points at the new section.
+- Beyond the slice's list, for grep B and for the facts: both
+  COMMANDS files, 'sharing-model.org', 'override.org' (which
+  said collateral views never substitute, and linked a deleted
+  file).
+**** the comments
+The old folder type names are gone from comments under
+'server/' (the wire atom in prose, the variant in code); one
+"display facts" comment went too; the parser's header gained the
+ghost's 'noClaim' and '(view ...)'.
+**** verified against the code
+Each section written was read against the code it names:
+'refresh/mod.rs', 'ladder.rs', 'id_rule.rs', 'goal.rs',
+'extent.rs', 'tail.rs', 'corrections.rs', 'ancestry.rs',
+'refresh/diff_view.rs' (outline), 'update_buffer.rs' (the stub,
+'rerender_view', the save's rerender), 'completion_mode.rs',
+'skgrepo_switch.rs', 'write_protected_edits.rs', the parser's
+'parts_of_kind' and its request checks, the printer's claim and
+warrant atoms, 'restoreRel_stands_where_it_may',
+'stands_as_member', 'IdResolution', 'Folder' methods, both
+clients' herald synthesis and the flag command's recursion. A
+script checked every code name and path the changed docs cite;
+none is missing.
+*** Deviations from the plan's "how"
+**** the model's home is the technical data model
+The docs had no place stating the refresh whole, and three
+module comments and two tests cited the plan for it. The new
+section in 'docs/data-model_technical.org' is that place, and
+they cite it now.
+**** a changed folder hands the lens nothing
+The correction says the clients synthesize '(FOLDER changed)'.
+As built (slice 6) they do not: a client that sees a changed
+folder draws its herald itself, from 'folder_heralds', in place
+of the lens's. The two atoms the lens does get are
+'(repoBoundary LABEL)' and 'pendingDetachment'. The docs say so.
+**** noClaim on a lost member is the ladder's
+Slice 5 had the stats pass set it; since slice 9 the claims rung
+marks it, where claims are read. A lost ID carries none, since
+the ID folder reads no claims. The docs say so.
+**** 36 comment lines, not 58
+The survey found 36 comment lines naming the old types under
+'server/' (43 names). The other matches are user-visible
+messages (28 string lines, 'local.rs' and 'save_buffer.rs') and
+two current identifiers ('IDFolder_Edited',
+'FlagsFolderSurface'); both left as they are.
+*** The two-question check
+**** what terms did this plan's code coin or reuse
+New to the codebase: 'gnid', 'noClaim' and 'claimsMembership',
+'noWarrant', 'ghostWarrant' and 'Warrant', 'Ghost', 'Truth',
+'Walk', 'Refreshed', 'Correction' and '(corrections ...)',
+'skgrepoLabels', 'pendingDetachment', 'repoBoundary',
+'skgRepos' and 'nodeRepo', 'FoldAndFocus', 'ChangeViewnode',
+'PropertyMember', 'IdResolution' (a module 'id_resolution.rs'
+existed in another sense and went in slice 7), the lens's WHEN.
+Reused in the sense they had: goal, tombstone, entombstone,
+reinstate, stub, chain, budget, occurrence, unwarranted, claim
+(membership claim). Coined by the code and now in the docs:
+"descriptor" ('refresh/ancestry.rs': a folder, property member
+or change viewnode), "the ID rule", "extent", "re-kind".
+Collisions, each now qualified in the glossary:
+- "ladder": the refresh's rungs, and the privacy ladder (the
+  skgrepos in privacy order) the docs already used;
+- "merge": the sibling merge ('merge_siblings',
+  'CorrectionKind::Merged') against names.org's rule that
+  "merge" is never bare; the glossary says "merge of siblings";
+- "claim": the membership claim; the retired editability claim
+  ('EditableMap') is gone with its entry.
+Noticed, not changed: in six places slice 12's rename left an
+occurrence bound as 'restriction'
+('Vognode::Occurrence (restriction)', in 'update_buffer.rs',
+'viewnode.rs', 'save_dependencies/mod.rs'); and an older rename
+left 'IgnoredForeignPidFolderlision' ("collision", from
+bf39cc7b, before this plan).
+**** does its code cite anything under TODO/
+Yes, seven sites, all added by this plan (slices 3, 8 and 9):
+the module comments of 'refresh/mod.rs', 'ladder.rs' and
+'refresh/diff_view.rs', the comments of
+'tests/retain_or_entombstone_then_prune.rs',
+'tests/idempotence.rs' and 'tests/refresh/diff_view.rs' (which
+cited this file), and the integration test
+'save_collateral_delete_then_edit_under_it/README/detail.org'.
+Each now cites the docs or nothing; a grep for "TODO/" and the
+plan's file names under 'server/', 'tests/', 'elisp/' and
+'nvim/' finds none.
+*** The verification greps
+A finds 12 lines, all the deliberate refusal: the parser's four
+('parse_metadata_sexp.rs', its header and its two refusals) and
+eight in four tests of the refusal or the atoms' absence
+('metadata_grammar.rs', 'uninterpreted2.rs',
+'change_facts_metadata.rs', 'hidden_nodes.rs'). B and C find
+nothing.
+*** What's imperfect
+**** bash/all-tests.sh empties tests/results/
+It begins with 'rm -rf tests/results'. Running it, as this slice
+must, deleted every earlier slice's logs and scripts there (the
+paths under 'tests/results/' this file cites), and this slice's
+surveys and edit scripts. They were ignored by git and are not
+recoverable.
+**** comments still speak of completion
+46 comment lines under 'server/' still say "completion",
+"reconcile" or "the walk", some naming surviving files
+('diff_view/completion.rs', 'update_buffer/reconcile/'). The
+plan's renames did not reach them; slice 13's brief names only
+the folder types.
+*** Suite failures and their classification
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 12, with either
+client, in the run and its retry. 'bash/all-tests.sh': build,
+ERT, plenary, nextest (956 of 956) and doctests pass;
+integration 68 of 70.

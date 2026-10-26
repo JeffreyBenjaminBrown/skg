@@ -116,8 +116,8 @@ async fn rerender_is_idempotent_impl (
   Ok (( )) }
 
 // The refresh is a fixpoint over every content-view fixture
-// ('TODO/simplify-refresh/04_1_plan_rewrite-refresh.org', "the
-// fixpoint"): for each fixture folder under 'tests/' and each node in
+// ('docs/data-model_technical.org', "The refresh: how a view follows
+// the graph"): for each fixture folder under 'tests/' and each node in
 // it, the fresh content view of the node, parsed and refreshed again
 // over the same graph, comes back as it was, and the second refresh
 // corrects nothing. A fixture folder whose graph does not load (one

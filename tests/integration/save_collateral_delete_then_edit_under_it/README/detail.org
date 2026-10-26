@@ -1,5 +1,4 @@
-Since slice 3 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
-no ghost stands outside the diff view: an occurrence whose node a save deleted
+No ghost stands outside the diff view: an occurrence whose node a save deleted
 becomes a tombstone, which the prune removes when childless, view
 roots included. Where this file says =DeletedNode= or =(deleted ...)=,
 read a tombstone; buffer 2 no longer shows 11 ('brief.org').

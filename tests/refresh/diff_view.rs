@@ -83,9 +83,9 @@ fn a_tombstone_request_entombstones_a_ghost () {
     ** {} c
     ** (skg ghost (gnid d) (skgRepos (nodeRepo main)) (viewRequests tombstone)) d
     ", occ ("p", ""), occ ("c", "writeProtected") );
-  // Only this refresh is asserted: whether the next one draws the
-  // ghost again, as the goal's HEAD part says, is a question still
-  // open (TODO/simplify-refresh/progress.org).
+  // Only this refresh is asserted. The next one draws the ghost
+  // again, as the goal's HEAD part says ('docs/diff-view.org',
+  // "Dismissing a ghost").
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &straddle . after, config : &config,
                               restriction : None };

@@ -1,7 +1,6 @@
-//! The refresh's diff-view mode ('TODO/simplify-refresh/
-//! 04_1_plan_rewrite-refresh.org', "ghosts and the diff view" and
-//! "change viewnodes"). Outside the diff view every function here
-//! answers None or does nothing.
+//! The refresh's diff-view mode ('docs/diff-view.org', "The refresh
+//! over the straddle" and "Change viewnodes and tags"). Outside the
+//! diff view every function here answers None or does nothing.
 //!
 //! The goal's HEAD part: over the graph straddle a parent's goal is
 //! the union of its lists in the two graphs

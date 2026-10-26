@@ -1125,7 +1125,7 @@ and tests of fully written text) pass an empty graph to mean
 gives the choice a name, an enum parameter such as
 'IdResolution { ThroughGraph (&InRustGraph), AsWritten }', and
 no caller constructs an empty graph for the purpose.
-** TODO Slice 13: docs and the two-question check
+** DONE Slice 13: docs and the two-question check
 'docs/glossary.org' (every entry that says phantom,
 non-member, entry, filter folder, save input, display fact,
 placeholder, the reconciler vocabulary),

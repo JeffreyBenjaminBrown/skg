@@ -1,8 +1,8 @@
 // cargo nextest run --test grouped_overrides -E 'test(retain_or_entombstone_then_prune::)'
 //
 // What the refresh keeps of what the graph no longer warrants
-// ('TODO/simplify-refresh/04_1_plan_rewrite-refresh.org', "The
-// model, stateless"): it never detaches. A child the graph no longer
+// ('docs/data-model_technical.org', "The refresh: how a view follows
+// the graph"): it never detaches. A child the graph no longer
 // warrants stays where it stands, unwarranted ('noWarrant'), and,
 // where its parent reads claims, claiming nothing ('noClaim'); it
 // keeps its editability and its subtree. Siblings standing for one
