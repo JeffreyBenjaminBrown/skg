@@ -17,7 +17,7 @@ Does not save; call `skg-request-save-buffer' afterward."
   (interactive "P")
   (if recursive
       (skg-delete-recursive)
-    (skg-edit-metadata-at-point '(skg node (editRequest delete)))
+    (skg--write-edit-request 'delete 'node)
     (forward-line)
     (message "This change will only be applied when you save the buffer.")))
 
@@ -31,8 +31,7 @@ call `skg-request-save-buffer' afterward."
     (user-error "Not on a headline"))
   (save-excursion
     (let ((start-level (org-outline-level)))
-      (skg-edit-metadata-at-point
-       '(skg node (editRequest delete))) ;; mark this one
+      (skg--write-edit-request 'delete 'node) ;; mark this one
       (outline-next-heading)
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
@@ -41,8 +40,7 @@ call `skg-request-save-buffer' afterward."
                (meta (and parts (nth 1 parts))))
           (when (and meta (not (string-empty-p meta))
                      (skg-sexp-subtree-p (read meta) '(skg node)))
-            (skg-edit-metadata-at-point ;; mark a descendent
-             '(skg node (editRequest delete)))))
+            (skg--write-edit-request 'delete 'node))) ;; mark a descendent
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
@@ -1276,42 +1274,51 @@ readiness request, '(ready OBJECT...)' or '(unready OBJECT...)'."
 
 (defun skg--metadata-with-readiness-request (metadata-sexp request)
   "METADATA-SEXP with REQUEST as the readiness request of its
-'(editRequest ...)': any readiness request there replaced, the other
-request kept, REQUEST last. A nil REQUEST removes it, and with it an
-'(editRequest ...)' left empty. A headline without '(editRequest ...)'
-gets one, before its derived facts."
-  (let* ((parts (cdr metadata-sexp))
-         (old (assq 'editRequest parts))
-         (kept (seq-remove #'skg--readiness-request-p (cdr old)))
-         (new (when (or kept request)
-                (append '(editRequest) kept (and request (list request))))))
-    (skg--derived-facts-last
-     (cons 'skg
-           (cond ((and old new)
-                  (mapcar (lambda (part) (if (eq part old) new part)) parts))
-                 (old (remq old parts))
-                 (new (append parts (list new)))
-                 (t parts))))))
+'(editRequest ...)' (`skg--metadata-with-editRequest-parts'): any
+readiness request there replaced, the edit request kept."
+  (skg--metadata-with-editRequest-parts
+   metadata-sexp #'skg--readiness-request-p request))
 
 (defun skg--metadata-with-edit-request (metadata-sexp request)
   "METADATA-SEXP with REQUEST as the edit request of its
-'(editRequest ...)': any edit request there replaced, its readiness
-request kept after it. A nil REQUEST removes the edit request, and
-with it an '(editRequest ...)' left empty. A headline without
-'(editRequest ...)' gets one, before its derived facts. The
-counterpart of `skg--metadata-with-readiness-request'."
+'(editRequest ...)' (`skg--metadata-with-editRequest-parts'): any edit
+request there replaced, the readiness request kept."
+  (skg--metadata-with-editRequest-parts
+   metadata-sexp
+   (lambda (part) (not (skg--readiness-request-p part)))
+   request))
+
+(defun skg--metadata-with-editRequest-parts (metadata-sexp replaced-p request)
+  "METADATA-SEXP with REQUEST in place of each part of its
+'(editRequest ...)' that REPLACED-P accepts, the other parts kept. In
+the form the edit request comes before the readiness request, as the
+server writes them. A nil REQUEST removes the replaced parts, and with
+them an '(editRequest ...)' left empty. A headline without
+'(editRequest ...)' gets one where the server writes it
+\('occurrence_metadata_to_string', server/org_to_text.rs): before
+its '(viewRequests ...)' and its derived facts."
   (let* ((parts (cdr metadata-sexp))
          (old (assq 'editRequest parts))
-         (kept (seq-filter #'skg--readiness-request-p (cdr old)))
-         (new (when (or request kept)
-                (append '(editRequest) (and request (list request)) kept))))
-    (skg--derived-facts-last
-     (cons 'skg
-           (cond ((and old new)
-                  (mapcar (lambda (part) (if (eq part old) new part)) parts))
-                 (old (remq old parts))
-                 (new (append parts (list new)))
-                 (t parts))))))
+         (requests (append (seq-remove replaced-p (cdr old))
+                           (and request (list request))))
+         (new (when requests
+                (append '(editRequest)
+                        (seq-remove #'skg--readiness-request-p requests)
+                        (seq-filter #'skg--readiness-request-p requests)))))
+    (cons 'skg
+          (cond ((and old new)
+                 (mapcar (lambda (part) (if (eq part old) new part)) parts))
+                (old (remq old parts))
+                (new (let ((after-it ;; the parts the server writes after it
+                            (seq-drop-while
+                             (lambda (part)
+                               (not (memq (car-safe part)
+                                          '(viewRequests view diff))))
+                             parts)))
+                       (append (butlast parts (length after-it))
+                               (list new)
+                               after-it)))
+                (t parts)))))
 
 (defun skg--write-edit-request (request &optional kind)
   "Make REQUEST the edit request of the headline at point, keeping the
@@ -1319,15 +1326,31 @@ readiness request its '(editRequest ...)' holds
 \(`skg--metadata-with-edit-request'). A nil REQUEST removes the edit
 request. KIND, when given, is the kind atom a headline without
 metadata gets."
-  (let* ((metadata-sexp (skg--metadata-sexp-at-point-or-nil))
-         (edit-request
-          (assq 'editRequest
-                (cdr (skg--metadata-with-edit-request
-                      metadata-sexp request)))))
-    (skg-edit-metadata-at-point
-     `(skg ,@(and kind (list kind))
-           ,@(and metadata-sexp '((DELETE (editRequest))))
-           ,@(and edit-request (list edit-request))))))
+  (skg--write-editRequest-parts
+   (lambda (part) (not (skg--readiness-request-p part)))
+   request kind))
+
+(defun skg--write-editRequest-parts (replaced-p request &optional kind)
+  "Rewrite the metadata of the headline at point as
+`skg--metadata-with-editRequest-parts' gives it for REPLACED-P and
+REQUEST, so that the '(editRequest ...)' stands where the server
+writes it. KIND, when given, is the kind atom a headline without
+metadata gets. Off a headline, does nothing. Routes the rewrite
+through `skg-replace-current-line' (see 'elisp/PITFALLs.org')."
+  (when (org-at-heading-p)
+    (let* ((split (skg-split-as-stars-metadata-title
+                   (skg-get-current-headline-text)))
+           (metadata-text (nth 1 split))
+           (metadata-sexp (if (string-empty-p metadata-text)
+                              (cons 'skg (and kind (list kind)))
+                            (read metadata-text))))
+      (skg-replace-current-line
+       (skg-format-headline
+        (nth 0 split)
+        (substring-no-properties
+         (format "%S" (skg--metadata-with-editRequest-parts
+                       metadata-sexp replaced-p request)))
+        (nth 2 split))))))
 
 (defun skg--derived-facts-last (metadata-sexp)
   "METADATA-SEXP with its derived facts, '(view ...)' then '(diff ...)',

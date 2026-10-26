@@ -97,11 +97,9 @@ true-content subtree.  This modifies metadata but does not save."
                  (message "Search matching staged for 1 node. Save to apply."))))))))))
 
 (defun skg--stamp-search-matching-request (no-search-matching)
-  (skg-edit-metadata-at-point
-   `(skg node
-         (editRequest
-          (flag noSearchMatching
-                ,(if no-search-matching 'true 'false))))))
+  (skg--write-edit-request
+   `(flag noSearchMatching ,(if no-search-matching 'true 'false))
+   'node))
 
 (defun skg--stage-flag-search-matching-recursive (desired)
   "Stage DESIRED uniformly through the true-content subtree at point."

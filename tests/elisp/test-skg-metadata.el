@@ -835,3 +835,27 @@ the value as a list; an untouched default is stripped on every kind."
        (should (equal (with-current-buffer source
                         (string-trim (buffer-string)))
                       (nth 3 case)))))))
+
+(ert-deftest test-skg-write-edit-request-places-it-as-the-server-does ()
+  "An edit request goes first in the headline's '(editRequest ...)',
+before its readiness request, and a new '(editRequest ...)' stands
+where the server writes one: before the view requests and the derived
+facts."
+  (cl-flet ((write (line request &optional kind)
+              (with-temp-buffer
+                (org-mode)
+                (insert line "\n")
+                (goto-char (point-min))
+                (skg--write-edit-request request kind)
+                (car (split-string (buffer-string) "\n" t)))))
+    (should (equal (write "* (skg node (gnid k) (viewRequests editableView) (view cycle) (diff (node added))) k"
+                          'delete)
+                   "* (skg node (gnid k) (editRequest delete) (viewRequests editableView) (view cycle) (diff (node added))) k"))
+    (should (equal (write "* (skg node (gnid k) (editRequest (ready node)) (view cycle)) k"
+                          '(merge j))
+                   "* (skg node (gnid k) (editRequest (merge j) (ready node)) (view cycle)) k"))
+    (should (equal (write "* (skg node (gnid k) (editRequest (merge j) (ready node))) k"
+                          nil)
+                   "* (skg node (gnid k) (editRequest (ready node))) k"))
+    (should (equal (write "* k" 'delete 'node)
+                   "* (skg node (editRequest delete)) k"))))

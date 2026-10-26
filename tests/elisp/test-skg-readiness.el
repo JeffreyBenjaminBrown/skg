@@ -57,7 +57,8 @@ without a title ends in a space, as 'skg-format-headline' writes it."
 (ert-deftest test-skg-write-readiness-request-places-it-in-the-editRequest ()
   "The request replaces any other readiness request as the last part of
 the headline's '(editRequest ...)', keeping the other request there; a
-headline without the form gets one, before its derived facts."
+headline without the form gets one where the server writes it, before
+its view requests and its derived facts."
   (cl-flet ((write (line ready objects)
               (with-temp-buffer
                 (org-mode)
@@ -73,7 +74,7 @@ headline without the form gets one, before its derived facts."
                    "* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest delete (unready node)) (viewRequests editableView) (diff (node added) (leaves 1 node))) k"))
     (should (equal (write "* (skg node (gnid k) (skgRepos (nodeRepo r)) (viewRequests editableView) (view cycle) (diff (node added) (leaves 1 node))) k"
                           t '(node))
-                   "* (skg node (gnid k) (skgRepos (nodeRepo r)) (viewRequests editableView) (editRequest (ready node)) (view cycle) (diff (node added) (leaves 1 node))) k"))
+                   "* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest (ready node)) (viewRequests editableView) (view cycle) (diff (node added) (leaves 1 node))) k"))
     (should (equal (write "** (skg alias (diff (rel added) (leaves 1))) a"
                           t nil)
                    "** (skg alias (editRequest (ready)) (diff (rel added) (leaves 1))) a"))

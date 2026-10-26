@@ -256,16 +256,11 @@ that marks (READY non-nil) or unmarks the leaves on OBJECTS: '(ready
 OBJECTS)' or '(unready OBJECTS)', the last part of the headline's
 '(editRequest ...)', which stands at the top level of its metadata,
 whatever its kind. The headline's other edit request stays. A
-headline without '(editRequest ...)' gets one, before its derived
-facts."
-  (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
-         (request (cons (if ready 'ready 'unready) objects))
-         (edit-request
-          (assq 'editRequest
-                (cdr (skg--metadata-with-readiness-request
-                      metadata-sexp request)))))
-    (skg-edit-metadata-at-point
-     `(skg (ENSURE ,edit-request)))))
+headline without '(editRequest ...)' gets one where the server writes
+it (`skg--metadata-with-editRequest-parts')."
+  (skg--current-headline-metadata-sexp) ;; refuses a headline without
+  (skg--write-editRequest-parts #'skg--readiness-request-p
+                                (cons (if ready 'ready 'unready) objects)))
 
 ;;; Moving between headlines with change facts
 ;;; A headline with change facts is one whose metadata carries a
