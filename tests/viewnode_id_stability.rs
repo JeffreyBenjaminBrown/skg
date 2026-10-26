@@ -13,29 +13,17 @@
 // and d in c's subscribee folder. Under the restriction "public", s is
 // a tombstone holding s1.
 
-use crate::git_fixture::{Fixture, OwnedSkgrepos, save_cleanly, with_git_fixture};
-use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
+use crate::git_fixture::{
+  Fixture, OwnedSkgrepos, open_content_view, save_cleanly, switch_skgrepo_set,
+  with_git_fixture, write_unchanged_skgrepos};
 
 use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};
-use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
-use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::test_utils::{extract_string_field_from_sexp, read_all_lp_messages, skg_env_from_parts};
-use skg::to_org::render::content_view::multi_root_view;
-use skg::types::env::SkgEnv;
-use skg::types::misc::ID;
-use skg::types::viewnode::Viewnode;
 use skg::types::views_state::ViewforestId;
 
-use ego_tree::Tree;
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fs;
-use std::io::BufReader;
-use std::net::TcpStream;
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
 
 const VIEW : &str = "view of r";
 
@@ -99,23 +87,12 @@ fn write_fixture (
     ("s1", "pid: s1\ntitle: s1\n"), ];
   let private : &[(&str, &str)] = &[
     ("s", "pid: s\ntitle: s secret\ncontains:\n- s1\n"), ];
-  for (skgrepo, files) in [("public", public), ("private", private)] {
-    for side in ["head", "worktree"] {
-      let folder = dir . join (skgrepo) . join (side);
-      fs::create_dir_all (&folder) ?;
-      for (name, text) in files {
-        fs::write ( folder . join (format! ("{}.skg", name)), text ) ?; }}}
-  Ok (( )) }
+  write_unchanged_skgrepos (dir, &[("public", public), ("private", private)]) }
 
 fn open_view_of_r (
   f : &mut Fixture,
 ) -> Result<String, Box<dyn Error>> {
-  let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
-    multi_root_view (&f . config, Some (&f . tantivy), &[ ID::from ("r") ]) ?;
-  f . views_state . open_views . register_view (
-    &f . graph . load_full (), ViewforestId::ContentView (VIEW . into ()),
-    tree, &pids );
-  Ok (text) }
+  open_content_view (f, "r", VIEW, None) }
 
 fn save (
   f    : &mut Fixture,
@@ -130,25 +107,7 @@ fn switch (
   restriction : &mut SkgrepoRestriction,
   name        : &str,
 ) -> Result<String, Box<dyn Error>> {
-  let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
-  let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-    Arc::new (Mutex::new (None));
-  let search_cancelled : Arc<AtomicBool> = Arc::new (AtomicBool::new (false));
-  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  handle_skgrepo_set_request (
-    &mut stream,
-    &format! ("((request . \"set skgrepo restriction\") (name . \"{}\"))\n", name),
-    &env, &mut f . views_state, restriction,
-    &enrichment_slot, &search_cancelled );
-  drop (stream);
-  let messages : Vec<String> = read_all_lp_messages ( &mut BufReader::new (read_end) );
-  let rerendered : Option<String> = messages . iter ()
-    . find ( |message| message . contains ("rerender-view")
-                       && message . contains (&format! ("(view-id \"{}\")", VIEW)) )
-    . and_then ( |message| extract_string_field_from_sexp (
-      &message [ message . find ('(') ? .. ], "content" ));
-  Ok ( rerendered . unwrap_or_else (
-    || panic! ( "the switch to {} rerenders the view: {:?}", name, messages )) ) }
+  Ok ( switch_skgrepo_set (f, restriction, name, VIEW) ? . 0 ) }
 
 //
 // Comparing buffers by viewnode ID

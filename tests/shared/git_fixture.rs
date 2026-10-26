@@ -12,12 +12,20 @@ use skg::graph_straddle::types::GraphStraddle;
 use skg::metadata_canon::{viewnode_id_atom_of, with_viewnode_id_atom, without_viewnode_ids};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
+use skg::serve::handlers::text_search::SearchEnrichmentPayload;
+use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::test_utils::{
-  cleanup_test_tantivy, copy_dir_all, graph_handle_from_config,
-  read_all_lp_messages, update_from_and_rerender_buffer_test};
-use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
+  cleanup_test_tantivy, copy_dir_all, extract_string_field_from_sexp,
+  graph_handle_from_config, read_all_lp_messages, skg_env_from_parts,
+  update_from_and_rerender_buffer_test};
+use skg::to_org::render::content_view::{multi_root_view, multi_root_view_with_skgrepo_set};
+use skg::types::env::SkgEnv;
+use skg::types::misc::{ID, SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
+use skg::types::viewnode::Viewnode;
 use skg::types::views_state::{OpenViews, ViewforestId};
 
+use ego_tree::Tree;
 use futures::executor::block_on;
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
@@ -25,6 +33,8 @@ use std::fs;
 use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 pub struct Fixture {
@@ -187,3 +197,74 @@ pub fn skg_files (
                     path . file_name () . unwrap () . to_string_lossy () ),
           fs::read_to_string (&path) ? ); }}}
   Ok (files) }
+
+//
+// Fixtures of two skgrepos, and a content view under a restriction
+//
+
+/// Write each skgrepo's files, by name without '.skg', to both its
+/// 'head' and its 'worktree' under 'dir', so that they agree.
+pub fn write_unchanged_skgrepos (
+  dir      : &Path,
+  skgrepos : &[(&str, &[(&str, &str)])],
+) -> Result<(), Box<dyn Error>> {
+  for (skgrepo, files) in skgrepos {
+    for side in ["head", "worktree"] {
+      let folder : PathBuf = dir . join (skgrepo) . join (side);
+      fs::create_dir_all (&folder) ?;
+      for (name, text) in *files {
+        fs::write ( folder . join (format! ("{}.skg", name)), text ) ?; }}}
+  Ok (( )) }
+
+/// Draw a content view of 'root', under 'restriction' when one is
+/// given, and register it as 'view'.
+pub fn open_content_view (
+  f           : &mut Fixture,
+  root        : &str,
+  view        : &str,
+  restriction : Option<&SkgrepoRestriction>,
+) -> Result<String, Box<dyn Error>> {
+  let roots : [ID; 1] = [ ID::from (root) ];
+  let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =
+    match restriction {
+      Some (restriction) => multi_root_view_with_skgrepo_set (
+        &f . config, Some (&f . tantivy), &roots, restriction ) ?,
+      None => multi_root_view (&f . config, Some (&f . tantivy), &roots) ?, };
+  f . views_state . open_views . register_view (
+    &f . graph . load_full (), ViewforestId::ContentView (view . into ()),
+    tree, &pids );
+  Ok (text) }
+
+/// Switch to the skgrepo-set 'name'; return 'view' as rerendered,
+/// and the "rerender-done" message, which carries the buffer
+/// corrections.
+pub fn switch_skgrepo_set (
+  f           : &mut Fixture,
+  restriction : &mut SkgrepoRestriction,
+  name        : &str,
+  view        : &str,
+) -> Result<(String, String), Box<dyn Error>> {
+  let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
+  let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
+    Arc::new (Mutex::new (None));
+  let search_cancelled : Arc<AtomicBool> = Arc::new (AtomicBool::new (false));
+  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
+  handle_skgrepo_set_request (
+    &mut stream,
+    &format! ("((request . \"set skgrepo restriction\") (name . \"{}\"))\n", name),
+    &env, &mut f . views_state, restriction,
+    &enrichment_slot, &search_cancelled );
+  drop (stream);
+  let messages : Vec<String> = read_all_lp_messages ( &mut BufReader::new (read_end) );
+  let rerendered : Option<String> = messages . iter ()
+    . find ( |message| message . contains ("rerender-view")
+                       && message . contains (&format! ("(view-id \"{}\")", view)) )
+    . and_then ( |message| extract_string_field_from_sexp (
+      &message [ message . find ('(') ? .. ], "content" ));
+  let done : String = messages . iter ()
+    . find ( |message| message . contains ("rerender-done") )
+    . cloned ()
+    . unwrap_or_else ( || panic! ( "the switch to {} ends: {:?}", name, messages ));
+  Ok (( rerendered . unwrap_or_else (
+          || panic! ( "the switch to {} rerenders the view: {:?}", name, messages )),
+        done )) }
