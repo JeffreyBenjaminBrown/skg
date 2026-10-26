@@ -36,9 +36,7 @@
         { "name": "noClaim", "shape": "atom", "default": "false",
           "values": [ { "value": "true" } ] },
         { "name": "editRequest", "shape": "one", "default": "none",
-          "values": [ { "value": "restoreNode" } ] },
-        { "name": "viewRequests", "shape": "some", "default": "none",
-          "values": [ { "value": "tombstone" } ] } ] },
+          "values": [ { "value": "restoreNode" } ] } ] },
     { "kind": "unknown", "atoms": [ "unknown" ],
       "fields": [
         { "name": "noClaim", "shape": "atom", "default": "false",

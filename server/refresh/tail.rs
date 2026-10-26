@@ -68,6 +68,11 @@ fn set_derived_facts (
 /// goes when empty ('folder_goes_when_empty'), as it would have been
 /// entombstoned had it been childless at its visit. Focus moves to the
 /// parent of what is removed.
+///
+/// A tombstone that holds anything stays, even when all it holds is
+/// tombstones: nested tombstones after a deletion are by design.
+/// Collapsing them into one was considered and rejected, because it
+/// could confuse the user about what stood where.
 fn prune_childless_tombstones (
   tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {

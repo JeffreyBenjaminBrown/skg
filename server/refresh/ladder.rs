@@ -290,9 +290,8 @@ fn merge_fold_and_focus (
 
 /// The result carries the union of the view requests, and the
 /// relationship request of whichever carried one; on a ghost, the
-/// tombstone and restoreNode requests, if either carried them. The
-/// node edit request rides with the editability
-/// ('merge_editability').
+/// restoreNode request, if either carried it. The node edit request
+/// rides with the editability ('merge_editability').
 fn merge_requests (
   result         : &mut ViewnodeKind,
   merged_sibling : &ViewnodeKind,
@@ -305,7 +304,6 @@ fn merge_requests (
         result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
     ( ViewnodeKind::Vognode (Vognode::Ghost (result)),
       ViewnodeKind::Vognode (Vognode::Ghost (merged)) ) => {
-      result . tombstone_request   |= merged . tombstone_request;
       result . restoreNode_request |= merged . restoreNode_request; },
     ( ViewnodeKind::Vognode (Vognode::Unknown (result)),
       ViewnodeKind::Vognode (Vognode::Unknown (merged)) ) => {
@@ -797,10 +795,10 @@ fn is_overridden_and_shown_raw (
 /// Fulfill and drop each child's view requests: a write-protect
 /// request write-protects the occurrence (and, for the subtree form,
 /// its content subtree); a folder or flags request adds the folders,
-/// which their own visits fill from their goals; a tombstone request
-/// entombstones a ghost. An editable-view request was fulfilled
-/// before the walk ('fulfill_editableView_requests'), and a fork
-/// request is the save's: it stays.
+/// which their own visits fill from their goals. An editable-view
+/// request was fulfilled before the walk
+/// ('fulfill_editableView_requests'), and a fork request is the save's:
+/// it stays.
 fn fulfill_view_requests (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -813,10 +811,6 @@ fn fulfill_view_requests (
           occurrence . view_requests . iter () . copied ()
           . filter ( |request| *request != ViewRequest::Fork )
           . collect (),
-        ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
-          if ghost . tombstone_request {
-            entombstone (tree, child, walk); }
-          continue; },
         _ => continue, };
     if requests . is_empty () { continue; }
     let mut requests : Vec<ViewRequest> = requests;
@@ -831,7 +825,7 @@ fn fulfill_view_requests (
         ViewRequest::Folder (relation) =>
           folders . extend ( folders_of_relation (*relation) ),
         ViewRequest::Flags => folders . push (Folder::flags ()),
-        ViewRequest::Editable | ViewRequest::Fork | ViewRequest::Tombstone => {}, }}
+        ViewRequest::Editable | ViewRequest::Fork => {}, }}
     add_folders (tree, child, &folders, walk);
     if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut tree . get_mut (child) . unwrap () . value () . kind
@@ -855,7 +849,7 @@ fn folder_request_rank (
     ViewRequest::Flags                                  => 6,
     ViewRequest::Editable | ViewRequest::WriteProtected
       | ViewRequest::WriteProtectedSubtree
-      | ViewRequest::Fork | ViewRequest::Tombstone      => 7, } }
+      | ViewRequest::Fork                               => 7, } }
 
 /// The folders a '(folder RELNAME)' request adds: both of the
 /// relation's, or the one whose other side the node shows without a

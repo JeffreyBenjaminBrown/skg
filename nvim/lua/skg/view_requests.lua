@@ -4,8 +4,7 @@
 -- folder commands auto-save: (folder RELNAME) builds both folders of
 -- the relation, and a containers folder carries, under each member,
 -- its containerward chain. Also the editable-view and write-protect
--- requests (no auto-save), the explicit fork, and the diff view's
--- ghost tombstone requests (auto-save). The Lua port of
+-- requests (no auto-save) and the explicit fork. The Lua port of
 -- elisp/skg-request-views.el.
 
 local focus = require('skg.focus')
@@ -89,51 +88,6 @@ function M.fork_node ()
     vim.notify('Save the buffer before forking.')
     return end
   M.request_view_and_save('fork')
-end
-
--- The diff view's ghosts ('docs/diff-view.org'): a ghost stays where
--- it is drawn until its node is back or the user entombstones it.
-
-M.not_a_ghost = 'Only a ghost can be entombstoned'
-M.no_ghost_in_buffer = 'No ghost in this buffer'
-
----The edit that stamps the tombstone view request onto a ghost.
----@return any
-local function tombstone_request_edit ()
-  return sexpr.read('(skg (viewRequests tombstone))')
-end
-
----Ask the next save to entombstone the ghost at point: it keeps what
----the user put under it and drops what the diff view drew there; a
----childless tombstone is pruned. Refuses on any other headline. Saves.
-function M.request_ghost_tombstone ()
-  local line = focus.owning_headline_line()
-  if not (line
-          and metadata.ghost_sexp_p(
-                metadata.metadata_sexp_at_line_or_nil(line))) then
-    error(M.not_a_ghost, 0) end
-  metadata.edit_metadata_at_line(line, tombstone_request_edit())
-  require('skg.save').request_save_buffer()
-end
-
----Ask the next save to entombstone every ghost in the buffer, as
----M.request_ghost_tombstone does one, then save once. With no ghost,
----says so and does not save.
-function M.request_buffer_ghosts_tombstone ()
-  local ghost_lines = {}
-  local line = metadata.next_headline_line(0)
-  while line do
-    if metadata.ghost_sexp_p(metadata.metadata_sexp_at_line_or_nil(line))
-    then table.insert(ghost_lines, line) end
-    line = metadata.next_headline_line(line)
-  end
-  if #ghost_lines == 0 then
-    vim.notify(M.no_ghost_in_buffer)
-    return end
-  for _, ghost_line in ipairs(ghost_lines) do
-    metadata.edit_metadata_at_line(ghost_line, tombstone_request_edit())
-  end
-  require('skg.save').request_save_buffer()
 end
 
 return M

@@ -199,8 +199,8 @@ Folder labels, =alias=, =ID= and the flag rows describe their view
 positions. The flags folder spells out =had ID before import=, =was
 overloaded during org-roam import=, and =no search matching= when true.
 =req:folder:...=, =req:flags=, =req:editable=,
-=req:write-protected= and =req:write-protected-subtree= request a view;
-on a ghost, =req:tombstone= asks the save to entombstone it. =delete=, =merge:...=, =request:no search matching=
+=req:write-protected= and =req:write-protected-subtree= request a view.
+=delete=, =merge:...=, =request:no search matching=
 or =request:search matching=, and in the diff view =restore membership=
 and =restore node=, are save requests.
 

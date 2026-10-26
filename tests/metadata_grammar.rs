@@ -51,7 +51,7 @@ fn each_kind_prints_its_parts_beside_its_atom (
     rendered ( viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
       gnid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
       title : "g" . into (), body : None,
-      restoreNode_request : true, tombstone_request : false,
+      restoreNode_request : true,
       claimsMembership : true, isWarranted : Warrant::ByGraph } )))),
     "ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)" );
   assert_eq! (

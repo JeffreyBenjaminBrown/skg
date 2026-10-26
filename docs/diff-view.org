@@ -309,8 +309,9 @@ state only on a viewnode it draws (a context node's body and a
 container folder start folded, the rest open).
 
 A root stays until the buffer is closed, whatever becomes of the
-changes under it, or until the user entombstones its ghost
-("Dismissing a ghost"). A commit is an ordinary rerender: the roots
+changes under it. A ghost is a pending change: it is shown until it
+is restored or its deletion is committed. A commit is an ordinary
+rerender: the roots
 stand as plain context with their change viewnodes entombstoned; a
 ghost root whose node the commit deleted, now in neither graph,
 becomes a tombstone, which keeps what stood under it, and one whose
@@ -602,21 +603,6 @@ claiming it. A change that no longer differs from HEAD leaves the
 change view; what the buffer still holds of it is kept as "What the
 refresh keeps" describes.
 
-* Dismissing a ghost
-A ghost stays where it stands until the user dismisses it. C-c r t
-('skg-request-ghost-tombstone'; Neovim '<localleader>rt',
-':SkgRequestGhostTombstone') writes '(viewRequests tombstone)' into
-the ghost at point and saves; C-c r T
-('skg-request-buffer-ghosts-tombstone'; Neovim '<localleader>rT',
-':SkgRequestBufferGhostsTombstone') does it to every ghost in the
-buffer, in one save. The request is a view request: the save changes
-no file, and its refresh makes the ghost a tombstone, which, as every
-tombstone does, keeps its children: what the user put under it and
-what the diff view drew there (its old content, its acquisition
-folder); left childless, it is pruned. The parser refuses the request
-on anything but a ghost. A ghost root, once gone, is not drawn again;
-a ghost under a node that contained it at HEAD is, at that node's next
-refresh, since the node's goal holds what HEAD alone warrants.
 * Stage and commit
 C-c r c ('skg-stage-and-commit') prompts once for a message and sends
 "stage and commit". The server stages the changed '.skg' files of

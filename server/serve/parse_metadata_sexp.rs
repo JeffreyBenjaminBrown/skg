@@ -20,7 +20,6 @@
 ///     a node.
 ///   ghost (gnid ID) (skgRepos (nodeRepo REPO)) [noClaim]
 ///         [(editRequest [restoreNode] [READINESS])]
-///         [(viewRequests tombstone)]
 ///   unknown (gnid ID) [(skgRepos (relRepo REPO))] [noClaim]
 ///           [(editRequest [(relRepo REPO)] [READINESS])]
 ///   alias [(skgRepos (relRepo REPO))] [noClaim]
@@ -208,8 +207,6 @@ pub fn viewnode_from_metadata (
             restoreNode_request : matches! (
               metadata . edit_request,
               Some (NodeEditRequest::RestoreNode) ),
-            tombstone_request : metadata . view_requests
-              . contains (&ViewRequest::Tombstone),
             claimsMembership : metadata . claimsMembership,
             isWarranted : Warrant::ByGraph, // a derived fact: the refresh sets it
           } )), None, None )
@@ -681,9 +678,6 @@ pub const RESTORE_REL_ON_A_DELETED_NODE : &str =
 /// What the parser says to a restoreNode anywhere but on a ghost.
 pub const RESTORE_NODE_ON_A_NODE_NOT_DELETED : &str =
   "Only a node deleted since HEAD can be restored; restoreNode belongs on a ghost (skg-restore-deleted-node)";
-/// What the parser says to a tombstone request anywhere but on a ghost.
-pub const TOMBSTONE_REQUEST_ON_A_NON_GHOST : &str =
-  "Only a ghost can be entombstoned; the tombstone view request belongs on a ghost (skg-request-ghost-tombstone)";
 /// What the parser says to a restoreRel anywhere but on a removed
 /// membership.
 pub const RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP : &str =
@@ -706,22 +700,16 @@ fn misplaced_restore_request_message (
     _ => None, } }
 
 /// A ghost carries no edit request but restoreNode, and no view
-/// request but tombstone, which nothing else carries; restoreRel sits
-/// only on an occurrence, and the save checks its position.
+/// request; restoreRel sits only on an occurrence, and the save checks
+/// its position.
 /// The other requests keep the places their own checks give them.
 fn check_where_the_edit_request_sits (
   metadata : &ViewnodeMetadata,
 ) -> Result<(), String> {
   let is_occurrence : bool =
     metadata . names_an_occurrence ();
-  if metadata . view_requests . contains (&ViewRequest::Tombstone)
-     && ! metadata . is_ghost
-  { return Err ( TOMBSTONE_REQUEST_ON_A_NON_GHOST . to_string () ); }
-  if metadata . is_ghost
-     && metadata . view_requests . iter ()
-        . any ( |request| *request != ViewRequest::Tombstone )
-  { return Err ( "A ghost accepts no view request but tombstone"
-                 . to_string () ); }
+  if metadata . is_ghost && ! metadata . view_requests . is_empty ()
+  { return Err ( "A ghost accepts no view request" . to_string () ); }
   match &metadata . edit_request {
     Some (NodeEditRequest::RestoreNode) if metadata . is_ghost =>
       Ok (( )),
@@ -923,7 +911,6 @@ fn parse_viewrequests_sexp (
         else if atom == "writeProtectedSubtreeView" { ViewRequest::WriteProtectedSubtree }
         else if atom == "fork" { ViewRequest::Fork }
         else if atom == "flags" { ViewRequest::Flags }
-        else if atom == "tombstone" { ViewRequest::Tombstone }
         else { return Err ( format! (
           "Invalid view request atom: {}", atom )); } },
       Sexp::List (sub) if sub . len () == 2 => {

@@ -595,18 +595,6 @@ earlier unready change".
 *** <localleader>rpr : :SkgDiffViewGotoPreviousReadyChange
 Like <localleader>rnr, backward. Before the first one it says "No
 earlier ready change".
-*** <localleader>rt : :SkgRequestGhostTombstone
-In a buffer of the diff view, on a ghost (a node deleted since HEAD,
-shown =☮=), requests that the save entombstone it, then saves. A ghost
-otherwise stays where the diff view drew it until its node is back.
-The tombstone keeps what you put under the ghost and drops what the
-diff view drew there; a childless tombstone is pruned. On any other
-headline it refuses with "Only a ghost can be entombstoned". (Emacs:
-C-c r t.)
-*** <localleader>rT : :SkgRequestBufferGhostsTombstone
-The same for every ghost in the buffer, with one save. In a buffer
-without a ghost it says "No ghost in this buffer" and does not save.
-(Emacs: C-c r T.)
 ** <localleader>m : other graph modifications
 *** <localleader>mc : :SkgReplaceLinkWithContent
 Replace the leaf at point with a content relationship to the
@@ -766,7 +754,7 @@ at its default when it is absent, and cycles through the values
 that kind takes, as 'shared/metadata-fields.json' lists them:
 a write-protected node is offered no delete, merge or flag request,
 a removed member is also offered restoreRel,
-a ghost restoreNode and the tombstone view request.
+a ghost restoreNode.
 A value that needs more (merge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied.

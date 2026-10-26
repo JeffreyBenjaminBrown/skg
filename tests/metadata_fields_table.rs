@@ -131,15 +131,14 @@ fn view_request_wire_name (
     ViewRequest::Editable               => "editableView",
     ViewRequest::WriteProtected         => "writeProtectedView",
     ViewRequest::WriteProtectedSubtree  => "writeProtectedSubtreeView",
-    ViewRequest::Fork                   => "fork",
-    ViewRequest::Tombstone              => "tombstone", } }
+    ViewRequest::Fork                   => "fork", } }
 
 fn every_view_request (
 ) -> Vec<ViewRequest> {
   vec! [ ViewRequest::Folder (FolderRelation::Aliases),
          ViewRequest::Flags, ViewRequest::Editable,
          ViewRequest::WriteProtected, ViewRequest::WriteProtectedSubtree,
-         ViewRequest::Fork, ViewRequest::Tombstone ] }
+         ViewRequest::Fork ] }
 
 /// A minimal headline metadata of the kind whose head atom is 'atom'.
 fn example_of_kind (

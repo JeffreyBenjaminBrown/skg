@@ -56,23 +56,6 @@
   right. Found while slice 6 of
   'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org' taught the
   stripping to keep the colon of "⌂:LABEL"; left as it was.
-* Problems noticed while executing plan 04.1, slice 3 (2026-10-26)
-** FIX PLANNED: A dismissed ghost under its former container comes back
-  Slice 3 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
-  adds the view request '(viewRequests tombstone)', which
-  entombstones a ghost ('docs/diff-view.org', "Dismissing a
-  ghost"). On a ghost root it sticks. On a ghost under a node that
-  contained it at HEAD it lasts one rerender: the node's next visit
-  recomputes its removed members from the straddle and draws the
-  ghost again. The plan's model does the same (its ladder
-  reinstates every goal item without a child, HEAD's part
-  included, and is stateless), so dismissing such a ghost cannot
-  last without either a remembered dismissal or a rule that HEAD's
-  part of a goal is not reinstated once its ghost is gone. Tested
-  by 'a_ghost_member_entombstoned_goes_from_its_container'
-  ('tests/pruned_change_view/ghost_tombstone.rs'), which checks
-  only the save that carries the request; a throwaway test saving
-  once more saw the ghost drawn again under q.
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Emacs's relRepo info request always sends a nil recorder
   'skg-set-relRepo' asks the server which skgrepos a relationship may

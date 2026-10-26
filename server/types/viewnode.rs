@@ -228,9 +228,9 @@ pub struct Unknown {
 /// ('server/diff_view/change_viewnodes.rs'): under each former
 /// container as a former member, or as a view root; or, in place, from
 /// an occurrence whose node a save deleted. Its own old content hangs
-/// beneath it, recursing into deleted members. It stays until the
-/// user entombstones it ('(viewRequests tombstone)'), and becomes an
-/// occurrence again, in place, when its node is back.
+/// beneath it, recursing into deleted members. It is a pending change:
+/// it stays until it is restored or the deletion is committed, and
+/// becomes an occurrence again, in place, when its node is back.
 ///
 /// USED: write-protected: it emits no fieldIntents of its own, and
 /// the vognodes under it are not its members. When it claims
@@ -252,10 +252,6 @@ pub struct Ghost {
   /// the save write the node back as HEAD recorded it. The only edit
   /// request a ghost carries; consumed after the save.
   pub restoreNode_request : bool,
-  /// True when the user asked, by '(viewRequests tombstone)', that the
-  /// next refresh entombstone this ghost. The only view request a
-  /// ghost carries; the refresh fulfills it.
-  pub tombstone_request : bool,
   /// Whether the save reads the ghost's gnid as an entry of its
   /// viewparent's list. The refresh lets a ghost claim only where the
   /// worktree's list still names its gnid (a dangling reference to a
@@ -624,9 +620,6 @@ pub enum ViewRequest {
   WriteProtected,
   WriteProtectedSubtree,
   Fork,
-  /// Entombstone this ghost, keeping what stands under it. Valid
-  /// only on a ghost, where it becomes 'Ghost::tombstone_request'.
-  Tombstone,
 }
 
 //
@@ -972,10 +965,9 @@ impl ViewRequest {
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
-  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 6] =
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 5] =
     [ "folder", "flags", "editableView",
-      "writeProtectedView", "writeProtectedSubtreeView",
-      "tombstone" ];
+      "writeProtectedView", "writeProtectedSubtreeView" ];
 }
 
 impl ViewnodeId {
@@ -1214,8 +1206,7 @@ impl fmt::Display for ViewRequest {
       ViewRequest::Editable    => write! (f, "editableView"),
       ViewRequest::WriteProtected        => write! (f, "writeProtectedView"),
       ViewRequest::WriteProtectedSubtree => write! (f, "writeProtectedSubtreeView"),
-      ViewRequest::Fork        => write! (f, "fork"),
-      ViewRequest::Tombstone   => write! (f, "tombstone"), } } }
+      ViewRequest::Fork        => write! (f, "fork"), } } }
 
 //
 // Defaults

@@ -117,7 +117,6 @@ pub fn mk_historical_viewnode (
         title        : before . title . clone (),
         body         : before . body . clone (),
         restoreNode_request : false,
-        tombstone_request   : false,
         claimsMembership    : false,
         isWarranted         : Warrant::ByHead } ))) } ) }
 

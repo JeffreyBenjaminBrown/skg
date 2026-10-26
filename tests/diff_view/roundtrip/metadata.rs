@@ -164,7 +164,6 @@ fn a_ghost_round_trips () {
           gnid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : Some ("its body\n" . into ()),
           restoreNode_request : false,
-          tombstone_request : false,
           claimsMembership : true, isWarranted : Warrant::ByGraph } ))),
       ChangeFacts {
         change   : DiffChange { node : Some (Existence::Removed),
@@ -216,7 +215,6 @@ fn a_ghost_round_trips_with_its_restore_request () {
           gnid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : None,
           restoreNode_request : true,
-          tombstone_request : false,
           claimsMembership : true, isWarranted : Warrant::ByGraph } ))),
       ChangeFacts {
         change : DiffChange { node : Some (Existence::Removed),

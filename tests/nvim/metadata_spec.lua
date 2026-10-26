@@ -458,8 +458,7 @@ describe('skg.metadata commands', function ()
                           'relRepo', 'flag', 'restoreRel' } } },
       { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
           .. ' (diff (node removed))) g',
-        { editRequest = { 'none (default)', 'restoreNode' },
-          viewRequests = { 'none (default)', 'tombstone' } } },
+        { editRequest = { 'none (default)', 'restoreNode' } } },
       { '* (skg unknown (gnid u))',
         { editRequest = { 'none (default)', 'relRepo' } } },
       { '* (skg alias) an alias',
@@ -505,8 +504,6 @@ describe('skg.metadata commands', function ()
           '* (skg unknown (gnid u) (editRequest (relRepo r)))' },
         { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))) g', 'editRequest', 1,
           '* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)) g' },
-        { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))) g', 'viewRequests', 1,
-          '* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone)) g' },
         { '* (skg node (gnid x) (skgRepos (nodeRepo main))) x', 'viewRequests', 6,
           '* (skg node (gnid x) (skgRepos (nodeRepo main)) (viewRequests (folder containers))) x' },
         { '* (skg node (gnid x) (skgRepos (nodeRepo main))) x', 'editRequest', 4,
@@ -572,8 +569,8 @@ describe('skg.metadata keybinding surface', function ()
     assert.are.equal('SetMergeRequest', by_lhs['sm'])
     assert.are.equal('RestoreDeletedNode', by_lhs['sn'])
     assert.are.equal('RestoreRemovedMembership', by_lhs['sl'])
-    assert.are.equal('RequestGhostTombstone', by_lhs['rt'])
-    assert.are.equal('RequestBufferGhostsTombstone', by_lhs['rT'])
+    assert.is_nil(by_lhs['rt'])
+    assert.is_nil(by_lhs['rT'])
   end)
 
   it("opens the container folder with '<localleader>lc'", function ()

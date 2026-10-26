@@ -794,7 +794,7 @@ show FIELD with its value on the next line."
 fields 'shared/metadata-fields.json' gives that kind, each at its
 default when absent; cycles each through the values the headline may
 take (a write-protected node is offered no delete, merge or flag, a
-removed member restoreRel, a ghost restoreNode and tombstone); shows
+removed member restoreRel, a ghost restoreNode); shows
 no field on a kind that has none; and saves an untouched view
 unchanged."
   (require 'skg-sexpr-edit)
@@ -815,8 +815,7 @@ unchanged."
                 ("editRequest" . ("none (default)" "delete" "merge"
                                   "relRepo" "flag" "restoreRel")))
                ("* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed))) g"
-                ("editRequest" . ("none (default)" "restoreNode"))
-                ("viewRequests" . ("none (default)" "tombstone")))
+                ("editRequest" . ("none (default)" "restoreNode")))
                ("* (skg unknown (gnid u))"
                 ("editRequest" . ("none (default)" "relRepo")))
                ("* (skg alias) an alias"
@@ -851,8 +850,6 @@ the value as a list; an untouched default is stripped on every kind."
               "* (skg unknown (gnid u) (editRequest (relRepo r)))")
              ("* (skg ghost (gnid g) (skgRepos (nodeRepo main))) g" ("editRequest") 1
               "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)) g")
-             ("* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed))) g" ("viewRequests") 1
-              "* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed))) g")
              ("* (skg node (gnid x) (skgRepos (nodeRepo main))) x" ("viewRequests") 6
               "* (skg node (gnid x) (skgRepos (nodeRepo main)) (viewRequests (folder containers))) x")
              ("* (skg node (gnid x) (skgRepos (nodeRepo main))) x" ("editRequest") 4

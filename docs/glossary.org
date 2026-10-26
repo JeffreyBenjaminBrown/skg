@@ -135,9 +135,9 @@ declared part; see "override substitution".
 Both are requests the client writes into metadata and the server
 consumes. A *view request* (=(viewRequests ...)=: =folder=,
 =flags=, =editableView=, =writeProtectedView=,
-=writeProtectedSubtreeView=, and on a ghost =tombstone=) asks for more
-of the view (viewbranches), changes which occurrence of a node is
-editable, or dismisses a ghost; the refresh fulfills it and drops it.
+=writeProtectedSubtreeView=) asks for more of the view
+(viewbranches) or changes which occurrence of a node is editable; the
+refresh fulfills it and drops it.
 (=fork= is also written as a view request, but the save consumes
 it.) An *edit request* (=(editRequest ...)=: =delete=, =merge=, =flag=,
 =relRepo=, and in the diff view =restoreRel= on a removed membership
@@ -501,8 +501,9 @@ The two vognodes that stand for no node of the graph
 A *ghost*, drawn only in the diff view, stands for a node HEAD has
 and the worktree lacks, write-protected, with HEAD's title and body
 (=ghost (gnid ID) (skgRepos (nodeRepo REPO))=); it accepts
-=restoreNode= and the =tombstone= view request
-('docs/diff-view.org', "deleted and new nodes"). A ghost claims
+=restoreNode= and no view request, and is shown until it is
+restored or its deletion is committed ('docs/diff-view.org', "deleted
+and new nodes"). A ghost claims
 membership only where its viewparent's list in the worktree still
 names its gnid, a dangling reference to a node HEAD has, and the save
 then keeps that gnid in the list, as it keeps an unknown's; anywhere

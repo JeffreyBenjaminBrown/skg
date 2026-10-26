@@ -490,8 +490,8 @@ since the command searches the current buffer.
     the buffer lacks is drawn.
     The server sets a fold state only on a viewnode it draws: a
     context node's body starts folded. A root stays until the
-    buffer is closed, or until the user entombstones its ghost
-    (=tombstone= under "View requests"); a ghost root whose node a
+    buffer is closed. A ghost, a pending change, is shown until it is
+    restored or its deletion is committed; a ghost root whose node a
     commit deleted, now in neither graph, becomes a tombstone, pruned
     when it holds nothing.
   - Logic: =server/serve/handlers/diff_view.rs=, =server/diff_view/=
@@ -1019,15 +1019,8 @@ no folder unasked but where something changed.
   node into a private fork that overrides it. Consumed on the save path
   at fork detection (the refresh leaves it alone), then dropped. Emitted
   by =skg-fork-node= (=C-c m f=).
-- =tombstone= — in the diff view, on a ghost only (the parser refuses
-  it elsewhere, and refuses any other view request on a ghost): make
-  the ghost a tombstone, which, as every tombstone does, keeps its
-  children (what the user put under it and what the diff view drew
-  there), and is pruned when it holds nothing. A ghost under a node that contained it at HEAD is drawn
-  again by a later rerender of that node; a ghost root is not. Emitted
-  by =skg-request-ghost-tombstone= (=C-c r t=) on the ghost at point
-  and =skg-request-buffer-ghosts-tombstone= (=C-c r T=) on every ghost
-  in the buffer; each saves.
+
+A ghost takes no view request; the parser refuses one there.
 
 ** Edit requests: (editRequest ...)
 
@@ -1516,7 +1509,7 @@ node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
      [(view ...)] [(diff ...)]
 ghost (gnid ID) (skgRepos (nodeRepo R)) [noClaim]
       [(editRequest [restoreNode] [READINESS])]
-      [(viewRequests tombstone)] [(view ...)] [(diff ...)]
+      [(view ...)] [(diff ...)]
 unknown (gnid ID) [(skgRepos (relRepo R))] [noClaim]
         [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
 alias [(skgRepos (relRepo R))] [noClaim]
@@ -1731,9 +1724,8 @@ claims membership only where its viewparent's worktree list still
 names its gnid; elsewhere, where claims are read, it carries
 =noClaim=, and where nothing warrants it, =(view noWarrant)= (never
 =ghostWarrant=: the kind is its own herald). It may carry
-=(editRequest restoreNode)= (see "Edit requests: (editRequest ...)")
-and =(viewRequests tombstone)= (see "View requests: (viewRequests
-...)").
+=(editRequest restoreNode)= (see "Edit requests: (editRequest ...)"),
+and no view request.
 **** =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
 It sits under a node whose text changed; its headline is the old
 title, its body the old body.

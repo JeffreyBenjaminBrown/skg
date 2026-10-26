@@ -707,20 +707,6 @@ unready change".
 *** C-c r p r : skg-diffView-goto-previous-ready-change
 Like C-c r n r, backward. Before the first one it says "No earlier
 ready change".
-*** C-c r t : skg-request-ghost-tombstone
-In a buffer of the diff view, on a ghost (a node deleted since HEAD,
-shown =☮ ∃-=), entombstones it, then saves. A ghost stays where the
-diff view drew it, across saves, until it is entombstoned (or its
-node comes back). The save replaces it with a tombstone, keeping
-what you put under it and dropping what the diff view drew there; a
-tombstone left with no children vanishes. On any other headline it
-refuses at once, with "Only a ghost can be entombstoned; the
-tombstone view request belongs on a ghost
-(skg-request-ghost-tombstone)".
-*** C-c r T : skg-request-buffer-ghosts-tombstone
-Like C-c r t, on every ghost in the buffer at once, then saves once.
-With no ghost in the buffer it says "No ghost in this buffer." and
-does not save.
 ** C-c m : other graph modifications
 *** C-c m c : skg-replace-link-with-content
 Replace the leaf at point with a content relationship to the
@@ -797,7 +783,7 @@ it through the values that kind takes,
 as 'shared/metadata-fields.json' lists them:
 a write-protected node is offered no delete, merge or flag request,
 a removed member is also offered restoreRel,
-a ghost restoreNode and the tombstone view request.
+a ghost restoreNode.
 A value that needs more (merge's target, relRepo's skgrepo,
 a flag and its value, a folder's relation) prompts for it.
 A field left at its default is dropped when the edit is applied

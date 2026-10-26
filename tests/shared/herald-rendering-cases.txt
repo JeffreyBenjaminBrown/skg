@@ -264,10 +264,6 @@
 (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed) (rel removed)))
 ---- text: ᗣ☮ restore node ∃- ~-
 ---- styles: ghost*1 crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
-==== diff view: a ghost with a pending tombstone request
-(skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed) (rel removed)))
----- text: ᗣ☮ req:tombstone ∃- ~-
----- styles: ghost*1 crucial*1 -*1 nonstandard*13 -*1 nonstandard*2 -*1 nonstandard*2
 ==== diff view: a new member whose node object is ready
 (skg node (gnid x) (diff (node added) (rel added) (ready node)))
 ---- text: ∃+✓ ~+

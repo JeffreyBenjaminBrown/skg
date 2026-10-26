@@ -285,7 +285,6 @@ fn refresh_ghost_in_place (
     if let ViewnodeKind::Vognode (Vognode::Ghost (ghost_mut)) =
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { *ghost_mut = Ghost { restoreNode_request : ghost . restoreNode_request,
-                           tombstone_request   : ghost . tombstone_request,
                            claimsMembership    : ghost . claimsMembership,
                            isWarranted         : ghost . isWarranted,
                            .. fresh }; }}}

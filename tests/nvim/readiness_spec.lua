@@ -356,8 +356,8 @@ describe('skg.readiness', function ()
     -- A readiness request goes before '(viewRequests ...)' and the
     -- derived forms, where the server writes it.
     assert.are.same(
-      { '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (ready node)) (viewRequests tombstone) (diff (node removed) (leaves 1 node))) d' },
-      run({ '* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (viewRequests tombstone) (diff (node removed) (leaves 1 node))) d' },
+      { '* (skg node (gnid d) (skgRepos (nodeRepo r)) (editRequest (ready node)) (viewRequests editableView) (diff (node added) (leaves 1 node))) d' },
+      run({ '* (skg node (gnid d) (skgRepos (nodeRepo r)) (viewRequests editableView) (diff (node added) (leaves 1 node))) d' },
           1, readiness.cycle_commit_ready))
   end)
 

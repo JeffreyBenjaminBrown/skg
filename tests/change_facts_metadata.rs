@@ -135,7 +135,7 @@ fn ghosts_and_unknowns_round_trip_their_readiness_requests () {
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
           gnid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
           title : "D" . into (), body : None,
-          restoreNode_request : false, tombstone_request : false,
+          restoreNode_request : false,
           claimsMembership : true, isWarranted : Warrant::ByGraph, } ))),
       facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
       request (false, &[DiffObject::Node]) ),

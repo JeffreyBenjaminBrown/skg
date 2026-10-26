@@ -500,7 +500,7 @@ fn occurrence_metadata_to_string (
 ///   [focused] [folded] [bodyFolded] ghost (gnid X)
 ///   (skgRepos (nodeRepo R)) [noClaim]
 ///   [(editRequest [restoreNode] [READINESS])]
-///   [(viewRequests tombstone)] [(view noWarrant)] [(diff ...)]
+///   [(view noWarrant)] [(diff ...)]
 fn ghost_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   ghost           : &Ghost,
@@ -518,8 +518,6 @@ fn ghost_metadata_to_string (
     . chain ( editRequest_form (
       ghost . restoreNode_request . then ( || "restoreNode" . to_string () ),
       request ))
-    . chain ( ghost . tombstone_request . then (
-      || "(viewRequests tombstone)" . to_string () ))
     . chain ( view_form (
       ( ghost . isWarranted == Warrant::No ) . then ( || "noWarrant" . to_string () )
       . into_iter () . collect () ))

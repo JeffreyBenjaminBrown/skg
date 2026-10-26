@@ -186,8 +186,11 @@ of a gnid its viewparent's list names and no node answers to. A
 *descriptor* describes its viewparent: a folder, a property member
 (an alias, an ID or a flag in its property folder) or a change
 viewnode. A *tombstone* says only that something stood there, and
-holds the children of what it replaced. The buffer root holds the
-roots.
+holds the children of what it replaced. A tombstone whose only
+children are tombstones stays, as after deleting a node and what it
+contained: these nested tombstones are by design, and collapsing them
+was considered and rejected because it could confuse the user. The
+buffer root holds the roots.
 
 *** The ID rule
 What a headline standing for a gnid becomes is decided by four
@@ -305,8 +308,7 @@ goal, and runs the *ladder*, its corrections in order, weakest first:
    overridesHere fact");
 8. requests: each child's view requests are fulfilled and dropped
    (=writeProtectedView=, =writeProtectedSubtreeView=, =(folder
-   REL)=, =flags=, and on a ghost =tombstone=); =fork= stays for the
-   save. An edit request is carried through untouched unless the
+   REL)=, =flags=); =fork= stays for the save. An edit request is carried through untouched unless the
    child's new kind has no slot for it, in which case it is dropped
    and reported.
 In the diff view, between rungs 5 and 6, the change viewnodes P
@@ -372,8 +374,12 @@ has no slot for, named as a subtree is named, by viewnode ID and
 title. What the refresh draws as extent is no correction: the content
 of an occurrence it extends first, the members of a folder it added,
 a fresh view's content; nor, in the diff view, a change viewnode
-drawn or gone, since those describe the straddle. So a fresh view and
-a plain save report nothing. The callers tag each view's corrections
+drawn or gone, since those describe the straddle. Nor is a change
+the buffer was not wrong about, which the caller names
+(=BufferCorrectionPolicy=): a tombstone left where the saving user's
+own save deleted the node, and, after a change of the skgrepo
+restriction, a member drawn or a headline entombstoned. So a fresh
+view and a plain save report nothing. The callers tag each view's corrections
 with its view ID (=ViewCorrections=), the =save-result= and
 =rerender-done= responses carry them, and both clients append them to
 their warnings buffer, under one headline per view

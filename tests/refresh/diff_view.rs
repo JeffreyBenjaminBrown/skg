@@ -1,9 +1,9 @@
 // The diff view: the goal also holds what HEAD alone warrants (a ghost
 // for a node HEAD has and the worktree lacks, under the parent that
 // contained it at HEAD; a ghost warrant, 'ByHead', on what HEAD alone
-// relates to its parent); a ghost is retained until the user
-// entombstones it, and becomes an occurrence again, in place, when its
-// node is back; change viewnodes are recomputed in place.
+// relates to its parent); a ghost, a pending change, stays until it is
+// restored or committed, and becomes an occurrence again, in place, when
+// its node is back; change viewnodes are recomputed in place.
 
 use super::*;
 use crate::types::viewnode::Existence;
@@ -70,39 +70,6 @@ fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
 node p
   node g wp" );
   assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Rekinded ("node") ] ); }
-
-#[test]
-fn a_tombstone_request_entombstones_a_ghost () {
-  let straddle : GraphStraddle = straddle (
-    &[ Graphnode { contains : ids (&["c", "d"]), .. node ("p") },
-       node ("c"), node ("d") ],
-    &[ Graphnode { contains : ids (&["c"]), .. node ("p") },
-       node ("c") ] );
-  let input : String = formatdoc! ("
-    * {} p
-    ** {} c
-    ** (skg ghost (gnid d) (skgRepos (nodeRepo main)) (viewRequests tombstone)) d
-    ", occ ("p", ""), occ ("c", "writeProtected") );
-  // Only this refresh is asserted. The next one draws the ghost
-  // again, as the goal's HEAD part says ('docs/diff-view.org',
-  // "Dismissing a ghost").
-  let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph : &straddle . after, config : &config,
-                              restriction : None };
-  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&straddle . after));
-  let refreshed : Refreshed = refresh_viewforest (
-    &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::DiffView { straddle : &straddle,
-                               buffer_kind : DiffViewBufferKind::AllChanges },
-    100, Some (&ReadinessStore::default ()),
-    &BufferCorrectionPolicy::default () ) . unwrap ();
-  assert_eq! ( outline (&forest), "\
-node p
-  changesetMarker content
-  node c wp" );
-  assert! ( refreshed . corrections . iter ()
-            . any ( |c| c . kind == CorrectionKind::Entombstoned && c . title == "d" ),
-            "{:?}", refreshed . corrections ); }
 
 #[test]
 fn a_property_head_alone_has_is_a_member_with_a_ghost_warrant () {
