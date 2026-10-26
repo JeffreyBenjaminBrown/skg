@@ -256,6 +256,10 @@
 (skg node (gnid x) (editRequest (merge y)))
 ---- text: merge:y
 ---- styles: nonstandard*7
+==== node: a relRepo request
+(skg node (gnid x) (editRequest (relRepo priv)))
+---- text: request:~priv
+---- styles: nonstandard*13
 ==== diff view: a request to restore a removed membership
 (skg node (gnid x) noClaim writeProtected (editRequest restoreRel) (view noWarrant) (diff (rel removed)))
 ---- text: ⊥☮ restore membership ~-

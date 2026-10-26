@@ -122,7 +122,8 @@ end
 ---Is CHARACTER in the keep-class of the structural-colon rule?
 ---(Alphanumerics, '+', ' ' and '-' keep an adjacent colon, since they
 ---often appear as label values or separators. A colon after '⌂' stays
----too, as in "⌂:LABEL", which M.strip_structural_colons sees to.)
+---too, as in "⌂:LABEL", and one before '~', as in "request:~NAME",
+---which M.strip_structural_colons sees to.)
 ---@param character string|nil one character, possibly multibyte
 ---@return boolean
 function M.keeps_adjacent_colon (character)
@@ -147,7 +148,8 @@ end
 
 ---Remove structural colons from CELLS: a colon is structural when
 ---the character before or after it is outside the keep-class, unless
----the character before it is '⌂'. The scan mirrors the elisp regex's
+---the character before it is '⌂' (as in "⌂:LABEL") or the one after
+---it is '~' (as in "request:~NAME"). The scan mirrors the elisp regex's
 ---two alternatives, left to right and non-overlapping ('(X):' -> X,
 ---then ':(Y)' -> Y).
 ---@param cells table[]
@@ -166,6 +168,7 @@ function M.strip_structural_colons (cells)
       i = i + 2
     elseif this.character == ':' and following
            and not (previous and previous.character == '⌂')
+           and following.character ~= '~'
            and not M.keeps_adjacent_colon(following.character) then
       table.insert(kept, following)
       i = i + 2

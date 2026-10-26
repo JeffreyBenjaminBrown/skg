@@ -116,11 +116,12 @@ stripped when either side is non-alphanumeric."
 A colon is structural when either the character before or after
 it is non-alphanumeric (and not `-', `+', or space, which we keep
 since they often appear as label values or separators), except a
-colon after `⌂', which reads as in \"⌂:LABEL\".
+colon after `⌂', which reads as in \"⌂:LABEL\", and a colon before
+`~', which reads as in \"request:~NAME\".
 `replace-regexp-in-string' preserves text properties of the kept
 characters, which is what we need so ranges' styles survive."
   (replace-regexp-in-string
-   "\\([^[:alnum:]+ ⌂-]\\):\\|\\([^⌂]\\|\\`\\):\\([^[:alnum:]+ -]\\)"
+   "\\([^[:alnum:]+ ⌂-]\\):\\|\\([^⌂]\\|\\`\\):\\([^[:alnum:]+ ~-]\\)"
    "\\1\\2\\3"
    s))
 
