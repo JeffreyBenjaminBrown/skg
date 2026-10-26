@@ -18,7 +18,7 @@ end
 local function has_request (line, value)
   local meta = metadata.metadata_sexp_at_line_or_nil(line)
   return compare.subtree_p(meta, sexpr.read(string.format(
-    '(skg (node (editRequest (flag noSearchMatching %s))))', value)))
+    '(skg node (editRequest (flag noSearchMatching %s)))', value)))
 end
 
 describe('skg.flag staging', function ()
@@ -44,28 +44,28 @@ describe('skg.flag staging', function ()
   end)
 
   it('stamps the exact set and clear request shapes', function ()
-    buffer_with({ '* (skg (node (id root) (repo main))) root' })
+    buffer_with({ '* (skg node (gnid root) (skgRepos (nodeRepo main))) root' })
     flag._apply(1, true, false)
     assert.is_true(has_request(1, 'true'))
 
-    buffer_with({ '* (skg (node (id root) (repo main))) root' })
+    buffer_with({ '* (skg node (gnid root) (skgRepos (nodeRepo main))) root' })
     flag._apply(1, false, false)
     assert.is_true(has_request(1, 'false'))
   end)
 
   it('recurses only through true content and skips ineligible PIDs', function ()
     buffer_with({
-      '* (skg (node (id root) (repo main))) root',
-      '** (skg (node (id child) (repo main))) child',
-      '** (skg (node (id child) (repo main))) duplicate child',
-      '** (skg (node (id protected) (repo main) writeProtected)) protected',
-      '** (skg (node (id foreign) (repo elsewhere))) foreign',
-      '** (skg (node (id conflict) (repo main) (editRequest delete))) conflict',
-      '** (skg (node (id link) (repo main) noClaim)) link',
-      '*** (skg (node (id under-link) (repo main))) under link',
+      '* (skg node (gnid root) (skgRepos (nodeRepo main))) root',
+      '** (skg node (gnid child) (skgRepos (nodeRepo main))) child',
+      '** (skg node (gnid child) (skgRepos (nodeRepo main))) duplicate child',
+      '** (skg node (gnid protected) (skgRepos (nodeRepo main)) writeProtected) protected',
+      '** (skg node (gnid foreign) (skgRepos (nodeRepo elsewhere))) foreign',
+      '** (skg node (gnid conflict) (skgRepos (nodeRepo main)) (editRequest delete)) conflict',
+      '** (skg node (gnid link) (skgRepos (nodeRepo main)) noClaim) link',
+      '*** (skg node (gnid under-link) (skgRepos (nodeRepo main))) under link',
       '** (skg aliasFolder) aliases',
-      '*** (skg (node (id under-folder) (repo main))) under folder',
-      '* (skg (node (id sibling) (repo main))) sibling' })
+      '*** (skg node (gnid under-folder) (skgRepos (nodeRepo main))) under folder',
+      '* (skg node (gnid sibling) (skgRepos (nodeRepo main))) sibling' })
 
     flag._apply(1, true, true)
 
@@ -85,7 +85,7 @@ describe('skg.flag staging', function ()
       return 'no search matching'
     end
     local buf = buffer_with({
-      '* (skg (node (id root) (repo main))) root' })
+      '* (skg node (gnid root) (skgRepos (nodeRepo main))) root' })
     flag._request(false)
     assert.is_truthy(sent:find('(request . "flag state")', 1, true))
     vim.api.nvim_buf_set_lines(buf, 0, 0, false, { 'preamble' })

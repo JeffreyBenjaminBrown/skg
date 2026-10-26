@@ -27,7 +27,8 @@ M.help_text =
   .. ' S-left/S-right cycle values.'
 
 ---Edit the metadata sexp on the current headline. With no metadata,
----populates a minimal (skg (node (repo X))) in place and opens the
+---populates a minimal (skg node (skgRepos (nodeRepo X))) in place and
+---opens the
 ---empty-node view over it: skgrepo pre-filled, the other editable
 ---fields childless, so an untouched apply yields just the skgrepo.
 function M.edit_metadata ()
@@ -49,7 +50,7 @@ function M.edit_metadata ()
       metadata.unrestrictedNode_sexp_p(sexp) and split.title or nil) end
   M.open_edit_buffer(org_text, source_buf, line_number,
                      #split.stars, #split.metadata, kind)
-  M.goto_field_value('repo')
+  M.goto_field_value('nodeRepo')
 end
 
 ---Populate minimal metadata on the metadata-less headline, then open
@@ -68,7 +69,7 @@ function M.open_empty_node_view (source_buf, line_number, split)
     source_buf, line_number,
     #new_split.stars, #new_split.metadata,
     shared.metadata_kind('node'))
-  M.goto_field_value('repo')
+  M.goto_field_value('nodeRepo')
 end
 
 ---Org text for the empty-node metadata view: REPO pre-filled;
@@ -85,10 +86,11 @@ function M.empty_node_org_text (skgrepo, title)
     table.insert(headlines, { level = 2, text = title }) end
   table.insert(headlines, { level = 1, text = 'skg' })
   table.insert(headlines, { level = 2, text = 'node' })
-  table.insert(headlines, { level = 3, text = 'repo' })
+  table.insert(headlines, { level = 2, text = 'skgRepos' })
+  table.insert(headlines, { level = 3, text = 'nodeRepo' })
   table.insert(headlines, { level = 4, text = skgrepo })
   for _, name in ipairs(fields.field_names(shared.metadata_kind('node'))) do
-    table.insert(headlines, { level = 3, text = name })
+    table.insert(headlines, { level = 2, text = name })
   end
   return fields.headlines_to_org(headlines)
 end
@@ -190,7 +192,7 @@ end
 ---@param field_value string
 ---@return string[]|nil
 function M.cycle_values_for_field (field_name, field_value)
-  if field_name == 'repo' then
+  if field_name == 'nodeRepo' then
     return M.repo_cycle_values(field_value) end
   return fields.cycle_values(M.edit_buffer_kind(), field_name,
                              M.editable_p(),
@@ -316,7 +318,7 @@ function M.cycle (direction)
       metadata.replace_line(line,
         string.rep('*', level) .. ' ' .. table.concat(texts, ' '))
     end
-  elseif parent == 'repo' then
+  elseif parent == 'nodeRepo' then
     local answer = vim.fn.input('Repo: ', field_value)
     if answer ~= '' then
       metadata.replace_line(line,
@@ -329,13 +331,11 @@ end
 
 -- ── a skgrepo for a new headline ───────────────────────────────────
 
----Atoms in '(skg ...)' that precede a headline's kind and are not it.
-local markers = { focused = true, folded = true, bodyFolded = true }
-
----The kind of the headline at LINE_NUMBER, as the atom that heads its
----metadata after the markers (node, ghost, tombstone,
----aliasFolder, alias ...), or nil for a headline without metadata.
----Mirrors skg--headline-kind-at-point.
+---The kind of the headline at LINE_NUMBER, as its kind's atom among
+---the top-level elements of its metadata, bare or heading a list
+---(node, ghost, tombstone, aliasFolder, alias, flag ...), or nil for a
+---headline without metadata or without a kind 'shared/metadata-fields.json'
+---names. Mirrors skg--headline-kind-at-point.
 ---@param line_number integer
 ---@return string|nil
 function M.headline_kind_atom (line_number)
@@ -343,8 +343,11 @@ function M.headline_kind_atom (line_number)
   if not sexpr.is_list(sexp) then return nil end
   for i = 2, #sexp do
     local form = sexp[i]
-    local atom = sexpr.atom_text(sexpr.is_list(form) and form[1] or form)
-    if not markers[atom] then return atom end
+    local head = sexpr.is_list(form) and form[1] or form
+    if sexpr.is_symbol(head) then
+      local atom = sexpr.atom_text(head)
+      if shared.metadata_kind(atom) then return atom end
+    end
   end
   return nil
 end

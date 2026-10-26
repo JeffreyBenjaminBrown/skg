@@ -62,7 +62,7 @@ local function find_all_changes_buffer (timeout_secs)
       if vim.api.nvim_buf_is_valid(buf)
          and vim.api.nvim_buf_get_name(buf):find(
                'diff-view: all changes', 1, true)
-         and T.buffer_text(buf):find('(id a)', 1, true) then
+         and T.buffer_text(buf):find('(gnid a)', 1, true) then
         return buf
       end
     end
@@ -84,7 +84,7 @@ T.check(true, 'The "all changes" buffer loaded')
 print('=== PHASE 2: Verify ghost b ===')
 do
   local content = T.buffer_text(all_changes)
-  T.check(content:find('(ghost (gnid b)', 1, true) ~= nil,
+  T.check(content:find('ghost (gnid b)', 1, true) ~= nil,
           string.format('No ghost b. Content: %s', content))
 end
 
@@ -95,7 +95,7 @@ do
   local lines = vim.api.nvim_buf_get_lines(all_changes, 0, -1, false)
   local ghost_line = nil
   for lnum, line in ipairs(lines) do
-    if line:find('(ghost (gnid b)', 1, true) then
+    if line:find('ghost (gnid b)', 1, true) then
       ghost_line = lnum break end
   end
   if not ghost_line then T.fail('Could not find ghost b line') end

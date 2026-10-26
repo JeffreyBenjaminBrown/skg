@@ -839,8 +839,27 @@ and then headline text.
 The metadata is an s-expression containing bare values and key-value pairs,
 wrapped in "(skg ...)" -- something like
 #+begin_example
- (skg (id long-string) repeated (key value) another-value)
+ (skg (vnid 0a) folded node (gnid long-string) (skgRepos (nodeRepo main)) writeProtected)
 #+end_example
+Every headline has this one shape: its viewnode ID first, then the
+position atoms (=focused=, =folded=, =bodyFolded=), then its kind,
+and every part of the headline beside the kind at the top level, in
+any order. The kind is a bare atom (=node=, =ghost=, =unknown=,
+=alias=, =id=, =tombstone=, a folder atom, =bodyDiff=), or, for a kind
+with a parameter, a small form naming it (=(flag F)=, =(oldText
+ASPECT)=, the two moves, =(changesetMarker KIND)=, a changed folder's
+=(FOLDER changed)=). A headline naming no kind is a node. Each kind
+takes only its own parts; =(gnid ID)= names the node a node, a
+ghost or an unknown stands for, and =(skgRepos (nodeRepo REPO)
+[(relRepo REPO)])= its home skgrepo and the skgrepo recording its
+relationship to its viewparent, the relRepo written only when it
+differs from the default (a ghost has no relRepo; an unknown and an
+alias have only one). The parser refuses the retired spellings
+(=(node ...)=, =(ghost ...)= and =(unknown ...)= as forms, =(id
+ID)=, =(repo REPO)=, a top-level =(relRepo REPO)=, a relRepo or
+=overridesHere= inside =(viewStats ...)=, =nonMember=,
+=restrictedNode=, =(deleted ...)=, =(historical ...)=) with a message
+naming the grammar.
 
 Any such string is valid metadata
 (although much of it might be ignored by Emacs),
@@ -856,7 +875,7 @@ if and only if it adheres to the following:
     whitespace is represented as a quoted string atom; server-rendered skgrepo
     names and repo-derived herald values use this form automatically.
 
-Inside a =(node ...)= form, the bare atom =noClaim= says the node
+On a node, the bare atom =noClaim= says the node
 takes no part in the membership represented by its viewparent: it is
 preserved and displayed but does not alter the parent's membership on
 save. A member carries nothing, and so does a view root.
@@ -957,7 +976,7 @@ node's heralds.
 the graph. A save that succeeds consumes every request in the buffer
 it saves, after its graph edits; a save that stops for a confirmation
 or fails leaves them in the buffer. A headline carries at most one. The
-heralds are nonstandard. The five requests on a =(node ...)=, and the
+heralds are nonstandard. The five requests on a node, and the
 one on a ghost:
 
 - =delete= — delete the node. Herald "delete". Written by =skg-delete=
@@ -1013,7 +1032,7 @@ What the save does with the two restore requests is described in
 
 ** Stats metadata: graphStats and viewStats
 
-Generated display facts decorate a =(node ...)= and are never save input.
+Generated display facts decorate a node and are never save input.
 =server/herald_tokens.rs= assembles graph counts and occurrence facts into
 one semantic =(rels ...)= form. Clients render it; the wire contains no
 assembled glyphs, omitted numerals or colors. For example:
@@ -1390,9 +1409,9 @@ in-memory types those keys correspond to are in
 =Folder=, =PropertyMember=, the diff view's =ChangeViewnode=, and its
 =ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
 
-Every viewnode's metadata ends with its viewnode ID, =(vnid X)=, where
-X is one or more lowercase letters and digits: =(skg (node (id 1) (repo
-main)) (vnid 0a))=. It identifies the viewnode within its buffer for the
+Every viewnode's metadata starts with its viewnode ID, =(vnid X)=, where
+X is one or more lowercase letters and digits: =(skg (vnid 0a) node
+(gnid 1) (skgRepos (nodeRepo main)))=. It identifies the viewnode within its buffer for the
 life of the buffer. The server assigns one, from the view's counter in
 base 36 (two characters at least, skipping any spelled like a number,
 such as =05= or =1e5=), to every viewnode that lacks one at the end of a
@@ -1422,7 +1441,7 @@ remains the established bare non-vognode atom:
 =hiddenOutsideOfSubscribeeFolder=, =containerFolder=, =mentionerFolder=,
 or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
-A tombstone is written =(skg tombstone (vnid X))=: it has
+A tombstone is written =(skg (vnid X) tombstone)=: it has
 no ID, no change facts and no title (the parser discards text typed on
 its line), and holds only what stands below it. A reconciler
 makes one of a child the graph no longer warrants, an occurrence
@@ -1472,7 +1491,7 @@ removed)=, which marks it as one the save does not read.
 **** =(properties changed)= -- the node's other properties
 The node is in both graphs and its file records a change ("modified",
 herald =M=), on a member, a removed member, a folder member or a
-root. Never beside =(node ...)=, and never on a phantom.
+root. Never beside =(node added)= or =(node removed)=, and never on a phantom.
 **** =(leaves N OBJECT...)= -- on every viewnode that names leaves
 It gives the OBJECTs a request there may name (=node= and/or =rel= on
 a vognode or historical phantom, each worth one leaf; =all= on a
@@ -1545,12 +1564,11 @@ it marks its file.
 Its headline is the alias or the ID, carrying
 =(diff (rel removed) ...)=: a member with a ghost warrant. Saving
 reads no alias from it and does not count it among the node's IDs.
-**** =(ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...)= -- a ghost
+**** =ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...= -- a ghost
 It is a node HEAD has and the worktree lacks, with HEAD's title and
 body, drawn only in the diff view. Its ID is written =(gnid ID)= and
-its home skgrepo =(skgRepos (nodeRepo REPO))=, the spellings every
-kind that stands for a node will take; the other kinds still write
-=(id ID)= and =(repo REPO)=. It may carry =(editRequest restoreNode)=
+its home skgrepo =(skgRepos (nodeRepo REPO))=, as a node's are. It
+may carry =(editRequest restoreNode)=
 (see "Edit requests: (editRequest ...)") and =(viewRequests
 tombstone)= (see "View requests: (viewRequests ...)").
 **** =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
@@ -1583,12 +1601,12 @@ in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
 
 *** Examples
 #+begin_example
-(skg (node (id 7) (repo main) (diff (node added) (rel added) (leaves 2 node rel) (ready node))))
-(skg (node (id 8) (repo main) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (ready all))))
-(skg (node (id 9) (repo main) noClaim writeProtected (diff (rel removed) (leaves 1 rel))))
+(skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (ready node)))
+(skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (ready all)))
+(skg node (gnid 9) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed) (leaves 1 rel)))
 (skg alias (diff (rel added) (leaves 1) (readyRequest)))
 (skg alias (diff (rel removed) (leaves 1) (ready)))
-(skg (ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))))
+(skg ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))
 (skg (oldText title) (diff (leaves 1) (ready)))
 (skg (changesetMarker content) (diff (leaves 3 all) (ready all)))
 (skg (changesetMarker content) (diff (leaves 3 all) (readyRequest all)))

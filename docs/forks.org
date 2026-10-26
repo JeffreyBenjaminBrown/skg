@@ -63,7 +63,7 @@ new node itself needs an owned skgrepo too:
   settles on — just as a new node under an owned parent lands in that
   parent's skgrepo.
 - A new headline whose metadata *names an owned skgrepo* (e.g.
-  =(skg (node (repo my-notes)))=) both places the new node there and
+  =(skg node (skgRepos (nodeRepo my-notes)))=) both places the new node there and
   /specifies/ the clone's skgrepo (when all such new children agree),
   so the confirmation flow asks nothing beyond the approve.
 - A new headline that explicitly names a *foreign* skgrepo is an

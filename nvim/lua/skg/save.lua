@@ -898,8 +898,9 @@ function M.show_fork_confirmation (content, save_buf)
 end
 
 ---Walk the fork-confirmation buffer for {id, repo} pairs: each
----level-1 headline is a clone-to-be carrying (repo REPO) and no
----id; each of its level-2 children is an original carrying (id N).
+---level-1 headline is a clone-to-be carrying (skgRepos (nodeRepo
+---REPO)) and no gnid; each of its level-2 children is an original
+---carrying (gnid N).
 ---@param buf integer
 ---@return table[]
 function M.fork_repos_from_confirmation_buffer (buf)

@@ -13,7 +13,7 @@ T.client.connect()
 herald_rules.request_herald_rules()
 T.check(T.wait_for_response(10), 'herald rules arrived')
 
-local view_text = '* (skg (node (id src) (repo public))) '
+local view_text = '* (skg node (gnid src) (skgRepos (nodeRepo public))) '
   .. 'Repo [[id:old-dest][café]]\n'
   .. '[[id:gone][gone]] [[id:private-node][private]]\n'
 local buf = buffer.open_org_buffer_from_text(

@@ -12,9 +12,9 @@ local content_view = require('skg.content_view')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
 
----Return a live skg view buffer whose text mentions (id ID).
+---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (skgid)
-  local needle = '(id ' .. skgid .. ')'
+  local needle = '(gnid ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then
@@ -58,12 +58,12 @@ content_view.request_single_root_content_view_from_id('P')
 local p_buf = T.wait_for(function () return buffer_showing('P') end, 10)
 T.check(p_buf, "P's view never appeared")
 vim.api.nvim_set_current_buf(p_buf)
-T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
+T.check(T.buffer_text(p_buf):find('(gnid N)', 1, true),
         "P's view does not show its foreign content N")
 
 -- 2. Make N editable (drop its 'writeProtected' atom) and edit its title
 --    -- the fork gesture.
-local n_line = goto_line_containing('(id N) (repo foreign)',
+local n_line = goto_line_containing('(gnid N) (skgRepos (nodeRepo foreign))',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
@@ -80,14 +80,14 @@ local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
 local confirm_text = T.buffer_text(confirm_buf)
-T.check(confirm_text:find('(id N)', 1, true),
+T.check(confirm_text:find('(gnid N)', 1, true),
         'confirmation buffer does not list N')
 T.check(confirm_text:find('Fork confirmation', 1, true),
         'confirmation buffer lacks its header')
 print('fork-confirmation buffer lists N')
 
 -- 5. Pick the clone's skgrepo (required), then approve.
-local clone_line = goto_line_starting_with('* (skg (node (repo ',
+local clone_line = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()

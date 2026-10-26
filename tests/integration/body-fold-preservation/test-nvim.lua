@@ -75,10 +75,10 @@ end
 ---@return integer bufnr
 local function bfp_build_buffer (name)
   local content = table.concat({
-    '* (skg (node (repo main))) root',
+    '* (skg node (skgRepos (nodeRepo main))) root',
     'root body line one',
     'root body line two',
-    '** (skg (node (repo main))) child',
+    '** (skg node (skgRepos (nodeRepo main))) child',
     -- Two body lines: vim cannot close a single-line fold (the
     -- documented one-line-body deviation in skg/folds.lua), so a
     -- one-line child body could never reach scenario B's folded
@@ -140,7 +140,7 @@ local function diffView_all_changes_buffer ()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b)
        and vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
-       and T.buffer_text(b):find('(id dvroot)', 1, true) then
+       and T.buffer_text(b):find('(gnid dvroot)', 1, true) then
       return b end
   end
   return nil
@@ -194,7 +194,7 @@ local function bfp_run_diffView_scenario ()
   T.wait_for_response(20)
   vim.api.nvim_set_current_buf(diffView)
   folds.hide_entry(line_containing(diffView, '(oldText body)'))
-  folds.hide_entry(line_containing(diffView, '(id dvchild)'))
+  folds.hide_entry(line_containing(diffView, '(gnid dvchild)'))
   local before = bfp_snapshot(diffView)
   print(string.format('--- snapshot BEFORE save ---\n%s', before))
   for _, expected in ipairs({

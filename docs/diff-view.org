@@ -270,8 +270,8 @@ same mark. The relRepo changeset marker, "some content relationships
 changed skgrepo", sits under the recorder when a content relationship
 moved. Mentions have no relRepo.
 *** deleted and new nodes
-A deleted node is shown as its ghost, written '(ghost (gnid ID)
-(skgRepos (nodeRepo REPO)) ...)': write-protected,
+A deleted node is shown as its ghost, written 'ghost (gnid ID)
+(skgRepos (nodeRepo REPO)) ...': write-protected,
 with HEAD's title and body, under each former container. Its old
 content stands beneath it, recursing into deleted members. Its
 existence is one leaf. An acquiree's phantom holds a derived,
@@ -399,7 +399,7 @@ member survives every rerender; when the removed member goes stale
 (a commit makes the removal part of HEAD, or the relationship
 returns), the note stands under a non-member occurrence of it,
 which keeps the editability the removed member had.
-A new note there that names no skgrepo ('(repo NAME)') inherits that
+A new note there that names no skgrepo ('(skgRepos (nodeRepo NAME))') inherits that
 of its nearest ancestor that is an unrestricted vognode, through the
 phantoms and folders between them
 ('inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'), as

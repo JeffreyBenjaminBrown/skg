@@ -1,3 +1,20 @@
+* Herald-system drift found while designing override-ancestry-in-search-results (2026-07-21; fixed 2026-10-26)
+** fork.rs hand-emits a (viewStats parentOverrides) atom that no longer renders
+   server/from_text/fork.rs:266 writes '(viewStats parentOverrides)' on
+   the original under its clone-to-be in the fork-confirmation buffer,
+   to mark it with the old red "pO" herald. But 'parentOverrides' is no
+   longer a ViewNodeStats field and has no rule in server/heralds.rs
+   (grep finds none), so the lens engine renders nothing for it -- the
+   "this is the node your clone overrides" cue is silently gone from the
+   fork-confirmation buffer. Fix: emit the equivalent under the new
+   grammar (an 'aO'-style token, or a dedicated viewStats atom with a
+   heralds.rs rule), or drop the dead atom deliberately. Needs a Jeff
+   decision on whether that cue is still wanted.
+   Fixed by slice 4 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org',
+   which rewrote the buffer's headlines to the metadata grammar
+   ('fork_clone_headline', 'forked_original_headline') and dropped the
+   dead atom, as the plan decided; the buffer's explanation no longer
+   promises a "pO" mark.
 * Problems found while reviewing the view-ids run (2026-10-23; fixed 2026-10-26)
   The report is under 'tests/results/review18/'.
 ** After a switch back, the restricted placeholder stays beside its node

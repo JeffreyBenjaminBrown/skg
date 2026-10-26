@@ -41,10 +41,10 @@ end
 describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
   it('finds the kind of the first atom the table names', function ()
     for sexp_text, kind_name in pairs({
-        ['(skg (node (id abc) (repo jeff)))'] = 'unrestricted node',
-        ['(skg focused (node (id abc)))'] = 'unrestricted node',
-        ['(skg (ghost (gnid g) (skgRepos (nodeRepo r))))'] = 'ghost',
-        ['(skg alias (relRepo r))'] = 'alias',
+        ['(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'] = 'unrestricted node',
+        ['(skg focused node (gnid abc))'] = 'unrestricted node',
+        ['(skg ghost (gnid g) (skgRepos (nodeRepo r)))'] = 'ghost',
+        ['(skg alias (skgRepos (relRepo r)))'] = 'alias',
         ['(skg (flag noSearchMatching))'] = 'flag',
         ['(skg (subscribeeFolder changed))'] = 'folder',
         ['(skg folded tombstone)'] = 'tombstone' }) do
@@ -58,21 +58,21 @@ end)
 
 describe('skg.sexpr.metadata_fields.headlines_to_org', function ()
   it('converts a headline list to org text', function ()
-    assert.are.equal('* skg\n** node\n*** id\n**** abc',
+    assert.are.equal('* skg\n** node\n** gnid\n*** abc',
       fields.headlines_to_org({
         { level = 1, text = 'skg' }, { level = 2, text = 'node' },
-        { level = 3, text = 'id' }, { level = 4, text = 'abc' } }))
+        { level = 2, text = 'gnid' }, { level = 3, text = 'abc' } }))
   end)
 end)
 
 describe('skg.sexpr.metadata_fields filling in', function ()
   it('inserts all default fields into a minimal UnrestrictedVognode', function ()
     local headlines =
-      filledIn_headlines('(skg (node (id abc) (repo jeff)))')
-    -- skg, node, id/abc, skgrepo/jeff, write-protected/false, noClaim/false,
-    -- editRequest/none, viewRequests/none:
+      filledIn_headlines('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))')
+    -- skg, node, gnid/abc, skgRepos/nodeRepo/jeff, writeProtected/false,
+    -- noClaim/false, editRequest/none, viewRequests/none:
     -- each key and each value is a separate headline.
-    assert.are.equal(14, #headlines)
+    assert.are.equal(15, #headlines)
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
     assert.is_not_nil(find_text(headlines, 'false (default)'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
@@ -81,7 +81,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
 
   it('shows a true child for a bare writeProtected', function ()
     local headlines =
-      filledIn_headlines('(skg (node (id abc) (repo jeff) writeProtected))')
+      filledIn_headlines('(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected)')
     local write_protected_index = find_text(headlines, 'writeProtected')
     assert.is_not_nil(write_protected_index)
     assert.are.equal('true', headlines[write_protected_index + 1].text)
@@ -89,8 +89,8 @@ describe('skg.sexpr.metadata_fields filling in', function ()
 
   it('offers noClaim as a bare atom', function ()
     for sexp_text, value in pairs({
-        ['(skg (node (id abc) (repo jeff)))'] = 'false (default)',
-        ['(skg (node (id abc) (repo jeff) noClaim))'] = 'true' }) do
+        ['(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'] = 'false (default)',
+        ['(skg node (gnid abc) (skgRepos (nodeRepo jeff)) noClaim)'] = 'true' }) do
       local headlines = filledIn_headlines(sexp_text)
       local noClaim_index = find_text(headlines, 'noClaim')
       assert.is_not_nil(noClaim_index)
@@ -100,165 +100,165 @@ describe('skg.sexpr.metadata_fields filling in', function ()
 
   it('orders fields canonically', function ()
     local headlines = filledIn_headlines(
-      '(skg (node (repo jeff) (graphStats 42) (id abc) writeProtected))')
-    local level_3 = {}
+      '(skg node (skgRepos (nodeRepo jeff)) (graphStats 42) (gnid abc) writeProtected)')
+    local level_2 = {}
     for _, headline in ipairs(headlines) do
-      if headline.level == 3 then
-        table.insert(level_3, headline.text) end
+      if headline.level == 2 then
+        table.insert(level_2, headline.text) end
     end
     assert.are.same(
-      { 'id', 'repo', 'writeProtected', 'noClaim',
+      { 'node', 'gnid', 'skgRepos', 'writeProtected', 'noClaim',
         'editRequest', 'viewRequests', 'graphStats' },
-      level_3)
+      level_2)
   end)
 end)
 
 describe('skg.sexpr.metadata_fields stripping', function ()
   it('is identity on unmodified filled-in text', function ()
-    assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
-      round_trip('(skg (node (id abc) (repo jeff)))'))
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
+      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'))
   end)
 
   it('collapses writeProtected=true to a bare atom', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff) writeProtected))'),
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected)'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** jeff',
-        '*** writeProtected', '**** true',
-        '*** noClaim', '**** false (default)',
-        '*** editRequest', '**** none (default)',
-        '*** viewRequests', '**** none (default)' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** jeff',
+        '** writeProtected', '*** true',
+        '** noClaim', '*** false (default)',
+        '** editRequest', '*** none (default)',
+        '** viewRequests', '*** none (default)' }, '\n')))
   end)
 
   it('accepts bare default spellings without (default)', function ()
-    assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** jeff',
-        '*** writeProtected', '**** false',
-        '*** noClaim', '**** false',
-        '*** editRequest', '**** none',
-        '*** viewRequests', '**** none' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** jeff',
+        '** writeProtected', '*** false',
+        '** noClaim', '*** false',
+        '** editRequest', '*** none',
+        '** viewRequests', '*** none' }, '\n')))
   end)
 
   it('round-trips a bare writeProtected', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff) writeProtected))'),
-      round_trip('(skg (node (id abc) (repo jeff) writeProtected))'))
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected)'),
+      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo jeff)) writeProtected)'))
   end)
 
   it('round-trips (editRequest delete)', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' (editRequest delete)))'),
-      round_trip('(skg (node (id abc) (repo jeff)'
-                 .. ' (editRequest delete)))'))
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' (editRequest delete))'),
+      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' (editRequest delete))'))
   end)
 
   it('round-trips (editRequest (merge XYZ))', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' (editRequest (merge XYZ))))'),
-      round_trip('(skg (node (id abc) (repo jeff)'
-                 .. ' (editRequest (merge XYZ))))'))
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' (editRequest (merge XYZ)))'),
+      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' (editRequest (merge XYZ)))'))
   end)
 
   it('extracts the id from a merge org link', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' (editRequest (merge XYZ))))'),
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' (editRequest (merge XYZ)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** jeff',
-        '*** editRequest', '**** merge [[id:XYZ][some label]]' },
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** jeff',
+        '** editRequest', '*** merge [[id:XYZ][some label]]' },
         '\n')))
   end)
 
   it('collapses noClaim=true to a bare atom', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' noClaim))'),
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' noClaim)'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** jeff',
-        '*** noClaim', '**** true' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** jeff',
+        '** noClaim', '*** true' }, '\n')))
   end)
 
   it('keeps populated viewRequests', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo jeff)'
-                 .. ' (viewRequests (folder aliases) (folder containers))))'),
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff))'
+                 .. ' (viewRequests (folder aliases) (folder containers)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** jeff',
-        '*** viewRequests', '**** folder', '***** aliases',
-        '**** folder', '***** containers' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** jeff',
+        '** viewRequests', '*** folder', '**** aliases',
+        '*** folder', '**** containers' }, '\n')))
   end)
 
   it('drops every childless editable field of the empty-node skeleton',
      function ()
-    assert.are.same(sexpr.read('(skg (node (repo only)))'),
+    assert.are.same(sexpr.read('(skg node (skgRepos (nodeRepo only)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** repo', '**** only',
-        '*** writeProtected', '*** noClaim',
-        '*** editRequest', '*** viewRequests' }, '\n')))
+        '* skg', '** node', '** skgRepos', '*** nodeRepo', '**** only',
+        '** writeProtected', '** noClaim',
+        '** editRequest', '** viewRequests' }, '\n')))
   end)
 
   it('drops a childless viewRequests rather than keeping a bare atom',
      function ()
-    assert.are.same(sexpr.read('(skg (node (repo only)))'),
+    assert.are.same(sexpr.read('(skg node (skgRepos (nodeRepo only)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** repo', '**** only',
-        '*** viewRequests' }, '\n')))
+        '* skg', '** node', '** skgRepos', '*** nodeRepo', '**** only',
+        '** viewRequests' }, '\n')))
   end)
 end)
 
 describe('skg.sexpr.metadata_fields repo defaults', function ()
   it('marks a matching repo value with (default)', function ()
     local headlines = filledIn_headlines(
-      '(skg (node (id abc) (repo jeff)))', 'jeff')
+      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', 'jeff')
     assert.is_not_nil(find_text(headlines, 'jeff (default)'))
   end)
 
   it('leaves a non-matching repo value bare', function ()
     local headlines = filledIn_headlines(
-      '(skg (node (id abc) (repo bob)))', 'jeff')
+      '(skg node (gnid abc) (skgRepos (nodeRepo bob)))', 'jeff')
     assert.is_not_nil(find_text(headlines, 'bob'))
     assert.is_nil(find_text(headlines, 'bob (default)'))
   end)
 
   it('inserts the default repo when missing', function ()
     local headlines =
-      filledIn_headlines('(skg (node (id abc)))', 'jeff')
-    assert.is_not_nil(find_text(headlines, 'repo'))
+      filledIn_headlines('(skg node (gnid abc))', 'jeff')
+    assert.is_not_nil(find_text(headlines, 'nodeRepo'))
     assert.is_not_nil(find_text(headlines, 'jeff (default)'))
   end)
 
   it('strips the (default) suffix from a repo value', function ()
-    assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** jeff (default)' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** jeff (default)' }, '\n')))
   end)
 
   it('keeps a bare repo value as-is', function ()
-    assert.are.same(sexpr.read('(skg (node (id abc) (repo bob)))'),
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo bob)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** repo', '**** bob' }, '\n')))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** skgRepos', '*** nodeRepo', '**** bob' }, '\n')))
   end)
 
   it('round-trips with a default repo', function ()
-    assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
-      round_trip('(skg (node (id abc) (repo jeff)))', 'jeff'))
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
+      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', 'jeff'))
   end)
 
   it('round-trips a new node with no repo', function ()
     local filledIn = fields.fillIn_defaults_in_org(
       '* skg\n** node', node_kind, 'jeff')
     local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
-    assert.are.same(sexpr.read('(skg (node (repo jeff)))'),
+    assert.are.same(sexpr.read('(skg node (skgRepos (nodeRepo jeff)))'),
       bijection.org_to_sexp(stripped))
   end)
 end)
@@ -267,25 +267,25 @@ describe('skg.sexpr.metadata_fields real-world metadata', function ()
   it('preserves an existing repo and appends non-canonical fields',
      function ()
     local headlines = filledIn_headlines(
-      '(skg (node (id abc) (repo public) (rels "C5")))')
-    assert.is_not_nil(find_text(headlines, 'repo'))
+      '(skg node (gnid abc) (skgRepos (nodeRepo public)) (rels "C5"))')
+    assert.is_not_nil(find_text(headlines, 'nodeRepo'))
     assert.is_not_nil(find_text(headlines, 'public'))
-    assert.is_not_nil(find_text(headlines, 'id'))
+    assert.is_not_nil(find_text(headlines, 'gnid'))
     assert.is_not_nil(find_text(headlines, 'abc'))
     assert.is_not_nil(find_text(headlines, 'rels'))
   end)
 
   it('round-trips id + repo', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (repo public)))'),
-      round_trip('(skg (node (id abc) (repo public)))'))
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo public)))'),
+      round_trip('(skg node (gnid abc) (skgRepos (nodeRepo public)))'))
   end)
 
   it('fills in real-world metadata with a herald field', function ()
     local headlines = filledIn_headlines(
-      '(skg (node (id 6972d099) (repo public)'
-      .. ' (rels "C5 4(1,1)L")))')
-    assert.is_not_nil(find_text(headlines, 'repo'))
+      '(skg node (gnid 6972d099) (skgRepos (nodeRepo public))'
+      .. ' (rels "C5 4(1,1)L"))')
+    assert.is_not_nil(find_text(headlines, 'nodeRepo'))
     assert.is_not_nil(find_text(headlines, 'public'))
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
     assert.is_not_nil(find_text(headlines, 'noClaim'))
@@ -297,7 +297,7 @@ end)
 describe('skg.sexpr.metadata_fields display title', function ()
   it('prepends the title group', function ()
     local headlines = filledIn_headlines(
-      '(skg (node (id abc) (repo jeff)))', nil, 'actual title')
+      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', nil, 'actual title')
     assert.are.same(
       { { level = 1, text = 'title' },
         { level = 2, text = 'actual title' },
@@ -308,17 +308,17 @@ describe('skg.sexpr.metadata_fields display title', function ()
 
   it('does not prepend an empty title', function ()
     local headlines = filledIn_headlines(
-      '(skg (node (id abc) (repo jeff)))', nil, '')
+      '(skg node (gnid abc) (skgRepos (nodeRepo jeff)))', nil, '')
     assert.are.same({ level = 1, text = 'skg' }, headlines[1])
   end)
 
   it('is removed again by stripping', function ()
     local org_text = bijection.sexp_to_org(
-      sexpr.read('(skg (node (id abc) (repo jeff)))'))
+      sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'))
     local filledIn = fields.fillIn_defaults_in_org(
       org_text, node_kind, nil, 'actual title')
     local stripped = fields.strip_defaults_from_org(filledIn, node_kind)
-    assert.are.same(sexpr.read('(skg (node (id abc) (repo jeff)))'),
+    assert.are.same(sexpr.read('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'),
       bijection.org_to_sexp(stripped))
   end)
 end)
@@ -350,20 +350,20 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
 
   it('writes values with arguments as lists', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (editRequest (relRepo r))'
-                 .. ' (viewRequests editableView (folder containers))))'),
+      sexpr.read('(skg node (gnid abc) (editRequest (relRepo r))'
+                 .. ' (viewRequests editableView (folder containers)))'),
       strip_to_sexp(table.concat({
-        '* skg', '** node', '*** id', '**** abc',
-        '*** editRequest', '**** relRepo r',
-        '*** viewRequests', '**** editableView', '**** none (default)',
-        '**** folder containers' }, '\n')))
-    assert.are.same(sexpr.read('(skg (node (editRequest (merge x))))'),
-      strip_to_sexp('* skg\n** node\n*** editRequest\n'
-                    .. '**** merge [[id:x][a title]]'))
+        '* skg', '** node', '** gnid', '*** abc',
+        '** editRequest', '*** relRepo r',
+        '** viewRequests', '*** editableView', '*** none (default)',
+        '*** folder containers' }, '\n')))
+    assert.are.same(sexpr.read('(skg node (editRequest (merge x)))'),
+      strip_to_sexp('* skg\n** node\n** editRequest\n'
+                    .. '*** merge [[id:x][a title]]'))
     assert.are.same(
-      sexpr.read('(skg (node (editRequest (flag noSearchMatching false))))'),
-      strip_to_sexp('* skg\n** node\n*** editRequest\n'
-                    .. '**** flag noSearchMatching false'))
+      sexpr.read('(skg node (editRequest (flag noSearchMatching false)))'),
+      strip_to_sexp('* skg\n** node\n** editRequest\n'
+                    .. '*** flag noSearchMatching false'))
   end)
 
   it('honors the conditions on values', function ()
@@ -375,6 +375,6 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
       fields.cycle_values(node_kind, 'editRequest', true, true))
     assert.are.same({ 'false (default)', 'true' },
       fields.cycle_values(node_kind, 'writeProtected', false, false))
-    assert.is_nil(fields.cycle_values(node_kind, 'repo', true, false))
+    assert.is_nil(fields.cycle_values(node_kind, 'nodeRepo', true, false))
   end)
 end)

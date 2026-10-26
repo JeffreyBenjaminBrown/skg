@@ -22,7 +22,7 @@ print('Content: ' .. content)
 -- The exact expected text, like the emacs test: the server's content
 -- ends with a newline, which survives as a final empty buffer line.
 T.check(T.without_viewnode_ids(content) ==
-        '* (skg (node (id 1) (repo main))) 1\n',
+        '* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n',
         'buffer content exactly matches expected')
 
 -- PHASE 2: save.
@@ -43,11 +43,12 @@ local updated = T.buffer_text(view)
 T.write_file('saved-rebuilt.log', updated)
 print('Updated buffer content: ' .. updated)
 
-T.check(updated:find('%* %(skg %(node %(id 1%) %(repo main%)'),
+T.check(updated:find(
+          '%* %(skg [^\n]-node %(gnid 1%) %(skgRepos %(nodeRepo main%)%)'),
         'the original node survived the save')
 local new_uuid =
-  updated:match('%*%* %(skg %(node %(id ([^%)]+)%) %(repo main%)'
-                .. '.-%)%) 2')
+  updated:match('%*%* %(skg [^\n]-node %(gnid ([^%) ]+)%)'
+                .. ' %(skgRepos %(nodeRepo main%)%)[^\n]-%) 2')
 T.check(new_uuid, 'the new node gained a server-assigned id')
 print('Extracted new UUID: ' .. tostring(new_uuid))
 

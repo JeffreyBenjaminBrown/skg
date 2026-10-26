@@ -43,12 +43,12 @@ print('=== PHASE 1: Establishing relationships on disk ===')
 local view_id = buffer.generate_uuid()
 local buffer_name = 'skg://containerward-view-request-test'
 local initial_content = table.concat({
-  '* (skg (node (id 0) (repo main))) 0',
-  '** (skg (node (id 1))) 1',
-  '*** (skg (node (id 11))) 11',
-  '*** (skg (node (id 12))) 12',
-  '**** (skg (node (id 121))) 121',
-  '*** (skg (node (id 13))) 13',
+  '* (skg node (gnid 0) (skgRepos (nodeRepo main))) 0',
+  '** (skg node (gnid 1)) 1',
+  '*** (skg node (gnid 11)) 11',
+  '*** (skg node (gnid 12)) 12',
+  '**** (skg node (gnid 121)) 121',
+  '*** (skg node (gnid 13)) 13',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
   initial_content, buffer_name, view_id)
@@ -62,16 +62,16 @@ print('Relationships established on disk')
 -- PHASE 2: replace the buffer with a structure that omits node 0.
 print('=== PHASE 2: Creating new buffer without node 0 ===')
 local new_content = table.concat({
-  '* (skg (node (id 1) (repo main))) 1',
-  '** (skg (node (id 11))) 11',
-  '** (skg (node (id 12))) 12',
-  '*** (skg (node (id 121))) 121',
-  '** (skg (node (id 13))) 13',
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1',
+  '** (skg node (gnid 11)) 11',
+  '** (skg node (gnid 12)) 12',
+  '*** (skg node (gnid 121)) 121',
+  '** (skg node (gnid 13)) 13',
 }, '\n')
 buf = buffer.open_org_buffer_from_text(new_content, buffer_name, view_id)
 print('Created new buffer without node 0')
 
--- Position on line 3 ('** (skg (node (id 12))) 12').
+-- Position on line 3 ('** (skg node (gnid 12)) 12').
 vim.api.nvim_win_set_cursor(0, { 3, 0 })
 print('Positioned on node 12 (line 3)')
 
@@ -94,16 +94,16 @@ local expected_without_metadata =
   .. '*** 121\n'
   .. '** 13\n'
 local expected =
-  '* (skg (node (id 1) (repo main) (rels (contains (in 1) (out 3))))) 1\n'
-  .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11\n'
-  .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12\n'
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (in 1) (out 3)))) 1\n'
+  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11\n'
+  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 12\n'
   .. '*** (skg containerFolder)\n'
-  .. '**** (skg (node (id 1) (repo main) writeProtected'
-     .. ' (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle))) 1\n'
-  .. '***** (skg (node (id 0) (repo main) noClaim writeProtected'
-     .. ' (rels (contains (out 1 (ancestors 1)))))) 0\n'
-  .. '*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121\n'
-  .. '** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13\n'
+  .. '**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected'
+     .. ' (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle)) 1\n'
+  .. '***** (skg node (gnid 0) (skgRepos (nodeRepo main)) noClaim writeProtected'
+     .. ' (rels (contains (out 1 (ancestors 1))))) 0\n'
+  .. '*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 121\n'
+  .. '** (skg node (gnid 13) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13\n'
 
 print('Buffer-Content with metadata: ' .. buffer_content)
 print('Expected buffer-content with metadata: ' .. expected)

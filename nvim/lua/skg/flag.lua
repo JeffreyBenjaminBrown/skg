@@ -15,7 +15,7 @@ local request_namespace = vim.api.nvim_create_namespace('skg-flag-request')
 
 local function edit_request_p (meta)
   local values = metadata.sexp_cdr_at_path(meta,
-    { 'skg', 'node', 'editRequest' })
+    { 'skg', 'editRequest' })
   return values ~= nil and #values > 0
 end
 
@@ -33,7 +33,7 @@ end
 
 local function stamp (line, desired)
   metadata.edit_metadata_at_line(line, sexpr.read(string.format(
-    '(skg (node (editRequest (flag noSearchMatching %s))))',
+    '(skg (editRequest (flag noSearchMatching %s)))',
     desired and 'true' or 'false')))
 end
 

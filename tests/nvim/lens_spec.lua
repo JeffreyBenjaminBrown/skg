@@ -197,3 +197,47 @@ describe('skg.sexpr.lens INTERC', function ()
             .. ' (deletedN "-N") (addedR "R")))'))
   end)
 end)
+
+describe('skg.sexpr.lens WHEN', function ()
+  it('applies its children to the object holding the label atom',
+     function ()
+    assert.are.same({ 'G', 'R:a' },
+      texts('(skg ghost (gnid x) (owner a))',
+            '(skg (WHEN ghost (ghost "G") (gnid) (owner "R:" (ANY IT))))'))
+  end)
+
+  it('fires on a list headed by the label too', function ()
+    assert.are.same({ 'c' },
+      texts('(skg (folder changed))',
+            '(skg (WHEN folder (folder (changed "c"))))'))
+  end)
+
+  it('fires on any one of several labels', function ()
+    assert.are.same({ '+' },
+      texts('(skg idFolder (diff added))',
+            '(skg (WHEN aliasFolder idFolder (diff (added "+"))))'))
+  end)
+
+  it('emits nothing when no label is held', function ()
+    assert.are.same({},
+      texts('(skg node (gnid x) (diff added))',
+            '(skg (WHEN ghost unknown (diff (added "+"))))'))
+  end)
+
+  it('emits its children in order, beside the other rules', function ()
+    assert.are.same({ 'F', 'b', 'a' },
+      texts('(skg folded node a b)',
+            '(skg (folded "F") (WHEN node (b "b") (a "a"))'
+            .. ' (WHEN ghost (a "never")))'))
+  end)
+
+  it('prefixes its string children, keeping sub-rule styles',
+     function ()
+    local out = transform(
+      '(skg alias (skgRepos (relRepo r)))',
+      '(skg (WHEN alias "~" (skgRepos (UGLY relRepo (ANY IT)))))')
+    assert.are.same({ '~r' }, lens.token_texts(out))
+    assert.is_nil(lens.style_at(out[1], 1))
+    assert.are.equal(sexpr.symbol('UGLY'), lens.style_at(out[1], 2))
+  end)
+end)

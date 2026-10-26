@@ -21,14 +21,15 @@ T.arm_timeout(40)
 
 local metadata = require('skg.metadata')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 
 -- ── helpers ───────────────────────────────────────────────────────
 
 ---(depth type title) triples for every headline in BUF that carries
----skg metadata; headlines without metadata are skipped. Type is
----derived from the second element of the (skg ...) form: node,
----ghost, tombstone, aliasFolder, etc. The port of
----save_collateral_break_cycle/test-helpers.el's
+---skg metadata; headlines without metadata are skipped. Type is the
+---kind atom among the top-level elements of the (skg ...) form, bare
+---or heading a list: node, ghost, tombstone, aliasFolder, etc. The
+---port of save_collateral_break_cycle/test-helpers.el's
 ---headline-types-and-titles.
 ---@param buf integer
 ---@return table[]
@@ -39,12 +40,13 @@ local function headline_types_and_titles (buf)
     if split and split.metadata ~= '' then
       local ok, sexp = pcall(sexpr.read, split.metadata)
       if ok and sexpr.is_list(sexp) and #sexp >= 2 then
-        local type_elem = sexp[2]
         local type_sym = nil
-        if sexpr.is_list(type_elem) and #type_elem >= 1 then
-          type_sym = sexpr.atom_text(type_elem[1])
-        elseif sexpr.is_symbol(type_elem) then
-          type_sym = sexpr.atom_text(type_elem)
+        for i = 2, #sexp do
+          local element = sexp[i]
+          local head = sexpr.is_list(element) and element[1] or element
+          if type_sym == nil and sexpr.is_symbol(head)
+             and shared.metadata_kind(sexpr.atom_text(head)) then
+            type_sym = sexpr.atom_text(head) end
         end
         if type_sym then
           table.insert(result,
@@ -166,11 +168,11 @@ do
   local line_11 = nth_line_with_title(buf1, '11', 1)
   T.check(line_11, "phase 2: found node '11' in buffer 1")
   metadata.edit_metadata_at_line(line_11,
-    sexpr.read('(skg (node (viewRequests (folder aliases))))'))
+    sexpr.read('(skg node (viewRequests (folder aliases)))'))
 end
 vim.api.nvim_buf_set_lines(buf1, -1, -1, false, {
-  '* (skg (node (id subee) (repo main))) subee',
-  '** (skg (node (id subee-1) (repo main))) subee-1' })
+  '* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee',
+  '** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1' })
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 2: save response arrived')
 print('Buffer 1 after multi-root save:\n' .. T.buffer_text(buf1))
@@ -197,9 +199,9 @@ vim.api.nvim_buf_set_name(buf2, 'skg://skg-test-buf2')
 vim.bo[buf2].filetype = 'org'
 vim.b[buf2].skg_view_id = require('skg.buffer').generate_uuid()
 vim.api.nvim_buf_set_lines(buf2, 0, -1, false, {
-  '* (skg (node (id 11) (repo main) writeProtected)) 11',
-  '* (skg (node (id subee) (repo main))) subee',
-  '** (skg (node (id subee-1) (repo main))) subee-1' })
+  '* (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11',
+  '* (skg node (gnid subee) (skgRepos (nodeRepo main))) subee',
+  '** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1' })
 vim.api.nvim_set_current_buf(buf2)
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 3: save response arrived')
@@ -214,7 +216,7 @@ print('=== PHASE 4: Delete 11 from buffer 2 ===')
 -- Remove write-protected, add editRequest delete, and save buffer 2.
 vim.api.nvim_set_current_buf(buf2)
 metadata.edit_metadata_at_line(1,
-  sexpr.read('(skg (node (DELETE writeProtected) (editRequest delete)))'))
+  sexpr.read('(skg node (DELETE writeProtected) (editRequest delete))'))
 print('Buffer 2 after metadata edit:\n' .. T.buffer_text(buf2))
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 4: save response arrived')
@@ -284,7 +286,7 @@ print('=== PHASE 8: Add new-root under tombstone in buffer 1 ===')
 -- deleted node, buffer 1 no longer contains a tombstone, so this
 -- phase now exercises adding a top-level root via metadata-only
 -- insertion (the BufferRoot, like a tombstone, supplies no skgrepo
--- to inherit, so explicit (repo main) is still required).
+-- to inherit, so explicit (skgRepos (nodeRepo main)) is still required).
 vim.api.nvim_set_current_buf(buf1)
 do
   local subee_row = nth_line_with_title(buf1, 'subee', 1)
@@ -293,7 +295,7 @@ do
   local insertion_row = end_of_subtree_row(buf1, subee_row)
   insert_lines_before(buf1, insertion_row,
     { string.rep('*', subee_depth)
-      .. ' (skg (node (repo main))) new-root' })
+      .. ' (skg node (skgRepos (nodeRepo main))) new-root' })
 end
 print('Buffer 1 after inserting new-root:\n' .. T.buffer_text(buf1))
 require('skg.save').request_save_buffer()

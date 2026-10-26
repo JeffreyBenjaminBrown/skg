@@ -6,7 +6,7 @@ describe('skg.recovery', function ()
 
   before_each(function ()
     require('skg.herald_rules').install_rules(
-      require('skg.sexpr.parse').read('(skg (node (id)))'))
+      require('skg.sexpr.parse').read('(skg node (gnid))'))
   end)
 
   after_each(function ()

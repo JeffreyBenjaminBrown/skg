@@ -53,7 +53,7 @@ describe('skg.content_view responses', function ()
   it('opens a buffer holding the served view', function ()
     serve_content(
       '((response-type content-view)'
-      .. ' (content "* (skg (node (id abc))) served title\n** child")'
+      .. ' (content "* (skg node (gnid abc)) served title\n** child")'
       .. ' (errors ()) (warnings ()))')
     content_view.request_single_root_content_view_from_id('abc')
     local opened = nil
@@ -66,7 +66,7 @@ describe('skg.content_view responses', function ()
     local buf = vim.api.nvim_get_current_buf()
     assert.are.equal('skg://served title',
                      vim.api.nvim_buf_get_name(buf))
-    assert.are.equal('* (skg (node (id abc))) served title',
+    assert.are.equal('* (skg node (gnid abc)) served title',
       vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1])
     assert.is_truthy(vim.b[buf].skg_view_id)
   end)

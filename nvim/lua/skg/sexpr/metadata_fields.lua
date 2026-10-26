@@ -167,19 +167,14 @@ function M.group_children (headlines, child_level)
 end
 
 ---The index in HEADLINES of the headline whose children are KIND's
----fields: the kind's own headline when they sit in its form, else the
----root.
+---fields: the root, '(skg ...)', since every kind's fields stand
+---beside its atom at the top level.
 ---@param headlines table[]
 ---@param kind table
 ---@return integer
 function M.container_index (headlines, kind)
   for index, headline in ipairs(headlines) do
-    if kind.fields_at == 'form' then
-      if headline.level == 2
-         and vim.tbl_contains(kind.atoms, vim.trim(headline.text)) then
-        return index end
-    elseif headline.level == 1 then
-      return index end
+    if headline.level == 1 then return index end
   end
   error('skg.sexpr.metadata_fields: no headline holds the fields of a '
         .. kind.kind)
@@ -241,11 +236,11 @@ function M.maybe_prepend_title (headlines, display_title)
 end
 
 ---CHILDREN (headline groups at CHILD_LEVEL) in canonical order, flat,
----each of KIND's fields filled in. In a form the canonical order is id
----and repo (a ghost's gnid and skgRepos), then the fields, and the
----other children follow; beside the kind's atom, at top level, the
----other children (the markers and the atom, which say what the
----headline is) lead and the fields follow.
+---each of KIND's fields filled in. The canonical order is the order the
+---server writes: what precedes the kind's atom (the viewnode ID and the
+---markers) and the atom itself, which say what the headline is; then
+---its gnid and skgRepos; then KIND's fields; then the other children,
+---in the order they came.
 ---@param children table[][]
 ---@param child_level integer
 ---@param kind table
@@ -253,14 +248,29 @@ end
 ---@return table[]
 function M.fillIn_and_reorder (children, child_level, kind,
                                default_skgrepo)
-  local in_form = kind.fields_at == 'form'
-  local canonical = in_form and { 'id', 'gnid', 'repo', 'skgRepos' } or {}
+  local leading_count = 0
+  for index, group in ipairs(children) do
+    if vim.tbl_contains(kind.atoms, vim.trim(group[1].text)) then
+      leading_count = index
+      break end
+  end
+  local canonical = { 'gnid', 'skgRepos' }
   for _, name in ipairs(M.field_names(kind)) do
     table.insert(canonical, name) end
+  local leading = {}
   local group_by_name = {}
-  for _, group in ipairs(children) do
+  local others = {}
+  for index, group in ipairs(children) do
     local name = vim.trim(group[1].text)
-    if group_by_name[name] == nil then group_by_name[name] = group end
+    if index <= leading_count then
+      for _, headline in ipairs(group) do
+        table.insert(leading, headline) end
+    elseif vim.tbl_contains(canonical, name) then
+      if group_by_name[name] == nil then group_by_name[name] = group end
+    else
+      for _, headline in ipairs(group) do
+        table.insert(others, headline) end
+    end
   end
   local filledIn = {}
   for _, name in ipairs(canonical) do
@@ -269,20 +279,13 @@ function M.fillIn_and_reorder (children, child_level, kind,
                      default_skgrepo)) do
       table.insert(filledIn, headline) end
   end
-  local others = {}
-  for _, group in ipairs(children) do
-    if not vim.tbl_contains(canonical, vim.trim(group[1].text)) then
-      for _, headline in ipairs(group) do
-        table.insert(others, headline) end
-    end
-  end
-  if in_form then return M.concatenated(filledIn, others) end
-  return M.concatenated(others, filledIn)
+  return M.concatenated(leading, filledIn, others)
 end
 
 ---The headlines that show the child NAME of KIND, whose group is GROUP
 ---or nil when absent: a missing field at its default, a bare atom with a
----'true' child, a skgrepo matching DEFAULT_SKGREPO marked '(default)'.
+---'true' child, a node's skgrepo matching DEFAULT_SKGREPO marked
+---'(default)', or DEFAULT_SKGREPO so marked when the node has none.
 ---@param name string
 ---@param group table[]|nil
 ---@param child_level integer
@@ -296,16 +299,44 @@ function M.fillIn_one (name, group, child_level, kind, default_skgrepo)
              { level = child_level + 1, text = M.shown_default(field) } } end
   if field and #group == 1 and field.shape == 'atom' then
     return { group[1], { level = child_level + 1, text = 'true' } } end
-  if name == 'repo' and default_skgrepo and group == nil then
-    return { { level = child_level, text = 'repo' },
-             { level = child_level + 1,
-               text = default_skgrepo .. ' (default)' } } end
-  if name == 'repo' and default_skgrepo and #group == 2
-     and vim.trim(group[2].text) == default_skgrepo then
-    return { group[1],
-             { level = child_level + 1,
-               text = default_skgrepo .. ' (default)' } } end
+  if name == 'skgRepos' and default_skgrepo
+     and vim.tbl_contains(kind.atoms, 'node') then
+    return M.skgRepos_with_default(group, child_level, default_skgrepo) end
   return group or {}
+end
+
+---GROUP, a node's skgRepos (or nil when absent), with its nodeRepo
+---shown as DEFAULT_SKGREPO marked '(default)' when it is missing or
+---equals DEFAULT_SKGREPO.
+---@param group table[]|nil
+---@param child_level integer
+---@param default_skgrepo string
+---@return table[]
+function M.skgRepos_with_default (group, child_level, default_skgrepo)
+  local shown_default = { { level = child_level + 1, text = 'nodeRepo' },
+                          { level = child_level + 2,
+                            text = default_skgrepo .. ' (default)' } }
+  if group == nil then
+    return M.concatenated({ { level = child_level, text = 'skgRepos' } },
+                          shown_default) end
+  local repo_groups =
+    M.group_children(vim.list_slice(group, 2), child_level + 1)
+  local result = { group[1] }
+  local has_nodeRepo = false
+  for _, repo_group in ipairs(repo_groups) do
+    if vim.trim(repo_group[1].text) == 'nodeRepo' then
+      has_nodeRepo = true
+      if #repo_group == 2
+         and vim.trim(repo_group[2].text) == default_skgrepo then
+        repo_group = shown_default end
+    end
+    for _, headline in ipairs(repo_group) do
+      table.insert(result, headline) end
+  end
+  if not has_nodeRepo then
+    return M.concatenated({ group[1] }, shown_default,
+                          vim.list_slice(result, 2)) end
+  return result
 end
 
 -- ── Strip ──────────────────────────────────────────────────────────
@@ -378,12 +409,32 @@ function M.strip_one (group, child_level, kind)
     if #values == 0 then return nil end
     return M.concatenated({ { level = child_level, text = name } }, values)
   end
-  if name == 'repo' then
-    if value_text == nil then return nil end
-    return { { level = child_level, text = name },
-             { level = child_level + 1,
-               text = M.strip_default_suffix(value_text) } } end
+  if name == 'skgRepos' then
+    return M.skgRepos_as_saved(group, child_level) end
   return group
+end
+
+---GROUP, a skgRepos at CHILD_LEVEL, as it saves: each skgrepo without
+---a '(default)' suffix, one with no value dropped, and nil when none is
+---left.
+---@param group table[]
+---@param child_level integer
+---@return table[]|nil
+function M.skgRepos_as_saved (group, child_level)
+  local result = { group[1] }
+  for _, repo_group in ipairs(
+      M.group_children(vim.list_slice(group, 2), child_level + 1)) do
+    if #repo_group > 1 then
+      table.insert(result, repo_group[1])
+      table.insert(result,
+        { level = repo_group[2].level,
+          text = M.strip_default_suffix(repo_group[2].text) })
+      for i = 3, #repo_group do
+        table.insert(result, repo_group[i]) end
+    end
+  end
+  if #result == 1 then return nil end
+  return result
 end
 
 ---VALUE_GROUP, one value of FIELD, as it saves: a value that takes

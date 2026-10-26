@@ -15,9 +15,9 @@ local metadata = require('skg.metadata')
 local save = require('skg.save')
 local view_requests = require('skg.view_requests')
 
----Return a live skg view buffer whose text mentions (id ID).
+---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (skgid)
-  local needle = '(id ' .. skgid .. ')'
+  local needle = '(gnid ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then
@@ -70,11 +70,11 @@ print('Starting override-chain integration test...')
 -- 1. Open P (public); its content is the foreign N.
 local p_buf = reopen_P()
 vim.api.nvim_set_current_buf(p_buf)
-T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
+T.check(T.buffer_text(p_buf):find('(gnid N)', 1, true),
         "P's view does not show foreign N")
 
 -- 2. Implicit fork: make N editable and edit its title.
-local n_line = goto_line_containing('(id N) (repo foreign)',
+local n_line = goto_line_containing('(gnid N) (skgRepos (nodeRepo foreign))',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
@@ -88,7 +88,7 @@ save.request_save_buffer()
 local confirm_buf_1 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_1, 'no fork-confirmation for N appeared')
 vim.api.nvim_set_current_buf(confirm_buf_1)
-local clone_line_1 = goto_line_starting_with('* (skg (node (repo ',
+local clone_line_1 = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line_1, 'public')
 save.approve_fork()
@@ -112,11 +112,11 @@ view_requests.fork_node()
 local confirm_buf_2 = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf_2, 'no fork-confirmation for the clone appeared')
 vim.api.nvim_set_current_buf(confirm_buf_2)
-local clone_line_2 = goto_line_starting_with('* (skg (node (repo ',
+local clone_line_2 = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line_2, 'private')
 save.approve_fork()
-print('the public clone was forked into a private clone (repo rotated)')
+print('the public clone was forked into a private clone (skgRepos (nodeRepo rotated))')
 
 -- 7. Reopen P (all skgrepos unrestricted): the chain end D -- a private-repo
 --    node -- is now shown in N's place, still marked (overridesHere N).
@@ -124,7 +124,7 @@ p_buf = reopen_P()
 local function chain_end_shown ()
   for _, line in ipairs(vim.api.nvim_buf_get_lines(p_buf, 0, -1, false)) do
     if line:find('(overridesHere N)', 1, true)
-       and line:find('(repo private)', 1, true) then
+       and line:find('(skgRepos (nodeRepo private))', 1, true) then
       return true
     end
   end

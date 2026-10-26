@@ -21,13 +21,13 @@ do -- SKG_CONFIG_FILE, the analog of the elisp test's skg-config-dir
 end
 
 ---The skgrepo value headline text in the metadata edit buffer (the
----child of the '*** repo' headline). Port of
+---child of the '*** nodeRepo' headline). Port of
 ---repo-value-in-edit-buffer.
 ---@return string|nil
 local function repo_value_in_edit_buffer ()
   local last = vim.api.nvim_buf_line_count(0)
   for line = 1, last do
-    if metadata.line_text(line):match('^%*%*%* repo$') then
+    if metadata.line_text(line):match('^%*%*%* nodeRepo$') then
       local value_line = metadata.next_headline_line(line)
       if value_line then
         return vim.trim(
@@ -50,7 +50,7 @@ require('skg.content_view').request_single_root_content_view_from_id('x')
 local content_view = T.wait_for(function ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
-       and T.buffer_text(buf):find('(id x)', 1, true) then
+       and T.buffer_text(buf):find('(gnid x)', 1, true) then
       return buf
     end
   end
@@ -96,7 +96,7 @@ local after_wrap = repo_value_in_edit_buffer()
 print(string.format('  After 3x S-right: %s', tostring(after_wrap)))
 T.check(after_wrap == 'public',
         "Three S-rights wraps back to 'public'")
-local cycle_values = metadata_edit.cycle_values_for_field('repo', 'public')
+local cycle_values = metadata_edit.cycle_values_for_field('nodeRepo', 'public')
 local foreign_offered = false
 for _, value in ipairs(cycle_values or {}) do
   if value == 'foreign' then foreign_offered = true end

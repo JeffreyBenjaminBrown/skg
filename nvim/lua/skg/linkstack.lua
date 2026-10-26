@@ -126,8 +126,8 @@ function M.insert_node_from_entry (entry)
   end
   local node_text = string.format(
     request_editable_view
-      and '(skg (node (id %s) writeProtected (viewRequests editableView))) %s'
-      or '(skg (node (id %s) writeProtected)) %s',
+      and '(skg node (gnid %s) writeProtected (viewRequests editableView)) %s'
+      or '(skg node (gnid %s) writeProtected) %s',
     entry[1], entry[2])
   local line = metadata.line_text()
   local col = vim.api.nvim_win_get_cursor(0)[2]

@@ -182,8 +182,8 @@ Constructed in two steps:
    standalone subee root:
 
 #+begin_example
-  * (skg (node (id subee) (repo main))) subee
-  ** (skg (node (id subee-1) (repo main))) subee-1
+  * (skg node (gnid subee) (skgRepos (nodeRepo main))) subee
+  ** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1
 #+end_example
 
    Then save to register the multi-root view with the server.
@@ -225,9 +225,9 @@ and call =skg-request-save-buffer= to register the view.
 Buffer content before save:
 
 #+begin_example
-  * (skg (node (id 11) (repo main) writeProtected)) 11
-  * (skg (node (id subee) (repo main))) subee
-  ** (skg (node (id subee-1) (repo main))) subee-1
+  * (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11
+  * (skg node (gnid subee) (skgRepos (nodeRepo main))) subee
+  ** (skg node (gnid subee-1) (skgRepos (nodeRepo main))) subee-1
 #+end_example
 
 After saving, the server completes the tree and sends back the
@@ -361,7 +361,7 @@ Expected headline-titles:
 
 Insert =new-root= as a sibling of =subee= under the depth-3
 =Tombstone= (formerly =subscribeeFolder=) in buffer 1. Repo
-metadata must be supplied explicitly (=(repo main)=) because
+metadata must be supplied explicitly (=(skgRepos (nodeRepo main))=) because
 =Tombstone= has no repo to inherit from.
 
 This exercises:
@@ -529,7 +529,7 @@ empty-titled lines, not their original non-vognode names.
 
 However, I should verify whether =skg-split-as-stars-metadata-title=
 can parse =(skg tombstone)= at all. It might fail if it
-expects =(skg (node ...))= structure.
+expects =(skg node ...)= structure.
 
 ** The notation in the prompt (resolved)
 
@@ -539,9 +539,9 @@ The prompt uses shorthand throughout: =** (deleted)= means a
 are the literal org-mode rendering.
 
 The actual rendering would be:
-- =(deleted)= → =(skg (deleted (id 11) (repo main))) 11=
+- =(deleted)= → =(skg (deleted (gnid 11) (skgRepos (nodeRepo main)))) 11=
 - =(tombstone)= → =(skg tombstone)= (no title)
-- =(writeProtected) 11= → =(skg (node (id 11) (repo main) writeProtected)) 11=
+- =(writeProtected) 11= → =(skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected) 11=
 
 ** Childless DeletedNode stays in tree (resolved)
 
@@ -594,7 +594,7 @@ syntax (like =skg-remove-focused-metadata= uses =(DELETE focused)=).
 
 So the two calls would be:
 1. =(skg-edit-metadata-at-point '(skg (DELETE writeProtected)))=
-2. =(skg-edit-metadata-at-point '(skg (node (editRequest delete))))=
+2. =(skg-edit-metadata-at-point '(skg node (editRequest delete)))=
 
 I should verify that these work before relying on them in the test.
 

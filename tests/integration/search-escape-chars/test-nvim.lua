@@ -8,7 +8,7 @@ T.arm_timeout(20)
 local search = require('skg.search')
 local buffer = require('skg.buffer')
 
----Run QUERY and verify the search buffer contains (id EXPECTED_ID).
+---Run QUERY and verify the search buffer contains (gnid EXPECTED_ID).
 ---@param query string
 ---@param expected_skgid string
 local function test_one_escape_query (query, expected_skgid)
@@ -20,7 +20,7 @@ local function test_one_escape_query (query, expected_skgid)
   T.check(T.wait_for_response(),
           string.format('search enrichment settled for query %q', query))
   local content = T.buffer_text(search_buf)
-  local needle = string.format('(id %s)', expected_skgid)
+  local needle = string.format('(gnid %s)', expected_skgid)
   if content:find(needle, 1, true) then
     print(string.format('PASS: found %s for query %q', needle, query))
   else

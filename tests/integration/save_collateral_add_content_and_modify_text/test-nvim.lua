@@ -66,7 +66,7 @@ local function relation_from_sexp (sexp)
   local chain_node_role = nil
   if non_member then
     chain_node_role = role_of_chain_node_from_rels(metadata.sexp_cdr_at_path(
-      sexp, { 'skg', 'node', 'rels' }))
+      sexp, { 'skg', 'rels' }))
   end
   if chain_node_role then return chain_node_role end
   if non_member then return 'noClaim' end

@@ -45,7 +45,7 @@ describe('skg mixed Markdown/Org import', function ()
     end)
     helpers.install_fixture_herald_rules()
     local dirty = buffer.open_org_buffer_from_text(
-      '* (skg (node (id dirty))) Unsaved\nlocal edit',
+      '* (skg node (gnid dirty)) Unsaved\nlocal edit',
       'skg://dirty', 'dirty-view_id')
     vim.bo[dirty].modified = true
     importer.import_md_and_org('/container/notes', 'private')

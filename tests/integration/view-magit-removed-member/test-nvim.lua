@@ -44,7 +44,7 @@ local function find_all_changes_buffer (timeout_secs)
       if vim.api.nvim_buf_is_valid(buf)
          and vim.api.nvim_buf_get_name(buf):find(
                'diff-view: all changes', 1, true)
-         and T.buffer_text(buf):find('(id a)', 1, true) then
+         and T.buffer_text(buf):find('(gnid a)', 1, true) then
         return buf
       end
     end
@@ -55,7 +55,7 @@ end
 ---@param line string
 ---@return boolean does LINE show b as a removed member?
 local function is_removed_member_line (line)
-  return line:find('(id b)', 1, true) ~= nil
+  return line:find('(gnid b)', 1, true) ~= nil
      and line:find('(diff (rel removed)', 1, true) ~= nil
 end
 

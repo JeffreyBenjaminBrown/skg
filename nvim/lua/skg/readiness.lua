@@ -41,26 +41,12 @@ local function child_with_head (list, key)
   return nil
 end
 
----The list in METADATA_SEXP that holds its '(diff ...)' form: the
----form among its elements that holds one, as a vognode's or a
----ghost's does, if one does, else the whole sexp, as a property's
----or a changed folder's.
----@param metadata_sexp any
----@return any
-function M.host (metadata_sexp)
-  for i = 2, #metadata_sexp do
-    local element = metadata_sexp[i]
-    if sexpr.is_list(element) and child_with_head(element, 'diff') then
-      return element end
-  end
-  return metadata_sexp
-end
-
----The '(diff ...)' form of METADATA_SEXP, or nil.
+---The '(diff ...)' form of METADATA_SEXP, which every kind keeps at
+---the top level, or nil.
 ---@param metadata_sexp any
 ---@return any|nil
 function M.diff_form (metadata_sexp)
-  return child_with_head(M.host(metadata_sexp), 'diff')
+  return child_with_head(metadata_sexp, 'diff')
 end
 
 ---The (KEY ...) part of METADATA_SEXP's '(diff ...)' form, or nil.
@@ -287,15 +273,14 @@ end
 
 ---Replace the readiness request of the headline at LINE_NUMBER with
 ---one that marks (READY true) or unmarks the leaves on OBJECTS. The
----request is the last part of the headline's '(diff ...)' form, which
----lies under '(node ...)' or a ghost's form, or at top level
----on a property. A headline without the form gets one.
+---request is the last part of the headline's '(diff ...)' form, at
+---the top level of its metadata. A headline without the form gets
+---one.
 ---@param line_number integer
 ---@param ready boolean
 ---@param objects string[]
 function M.write_request (line_number, ready, objects)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  local host = M.host(metadata_sexp)
   local request = { sexpr.symbol(ready and 'readyRequest'
                                  or 'unreadyRequest') }
   for _, object in ipairs(objects) do
@@ -308,12 +293,8 @@ function M.write_request (line_number, ready, objects)
                               { sexpr.symbol('unreadyRequest') } })
   end -- else a missing form is appended whole, so it holds no DELETE
   table.insert(diff_edit, request)
-  local instruction = { sexpr.symbol('skg') }
-  if host == metadata_sexp then
-    table.insert(instruction, diff_edit)
-  else
-    table.insert(instruction, { host[1], diff_edit }) end
-  metadata.edit_metadata_at_line(line_number, instruction)
+  metadata.edit_metadata_at_line(line_number,
+                                 { sexpr.symbol('skg'), diff_edit })
 end
 
 ---A request on the headline at LINE_NUMBER, with how many leaves it

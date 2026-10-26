@@ -64,7 +64,7 @@ describe('skg stage and commit', function ()
     vim.notify = function (text) table.insert(notices, text) end
     server = serve(requests)
     local view = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://diff-view: all changes',
+      '* (skg node (gnid a)) a', 'skg://diff-view: all changes',
       'diff-view: all changes')
     stage_and_commit.stage_and_commit()
     vim.wait(3000, function ()
@@ -124,7 +124,7 @@ describe('skg stage and commit', function ()
 
   it('refuses a dirty view and an empty message', function ()
     local view = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'a-view_id')
+      '* (skg node (gnid a)) a', 'skg://a', 'a-view_id')
     vim.bo[view].modified = true
     local ok, err = pcall(stage_and_commit.stage_and_commit)
     assert.is_false(ok)

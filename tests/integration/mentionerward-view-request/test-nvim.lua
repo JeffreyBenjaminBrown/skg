@@ -15,9 +15,9 @@ local metadata = require('skg.metadata')
 local view_requests = require('skg.view_requests')
 
 local base_buffer_text =
-  '* (skg (node (id 1) (repo main))) 1\n'
-  .. '** (skg (node (id 11))) 11\n'
-  .. '** (skg (node (id 12))) 12\n'
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n'
+  .. '** (skg node (gnid 11)) 11\n'
+  .. '** (skg node (gnid 12)) 12\n'
 
 ---TEXT with all metadata and body content removed except the id
 ---headline's stars and title. Port of strip-metadata-and-bodies.
@@ -79,19 +79,19 @@ end
 print('=== SKG Mentionerward View Request Integration Test ===')
 
 local expected_line0 =
-  '* (skg (node (id 1) (repo main)'
-  .. ' (rels (contains (out 2))))) 1\n'
-  .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n'
-  .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n'
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main))'
+  .. ' (rels (contains (out 2)))) 1\n'
+  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n'
+  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n'
 local expected_line2 = expected_line0
 local expected_changed =
-  '* (skg (node (id 1) (repo main)'
-  .. ' (rels (contains (out 2))))) 1\n'
-  .. '** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1))))) 11\n'
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main))'
+  .. ' (rels (contains (out 2)))) 1\n'
+  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n'
   .. '*** (skg mentionerFolder)\n'
-  .. '**** (skg (node (id l-11) (repo main) writeProtected'
-  .. ' (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2))))) [[id:11][a link to 11]]\n'
-  .. '** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 12\n'
+  .. '**** (skg node (gnid l-11) (skgRepos (nodeRepo main)) writeProtected'
+  .. ' (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2)))) [[id:11][a link to 11]]\n'
+  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'
 local expected_with_link =
   '* 1\n** 11\n*** \n**** [[id:11][a link to 11]]\n** 12\n' -- '*** ' the folder

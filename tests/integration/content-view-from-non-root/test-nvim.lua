@@ -30,9 +30,13 @@ T.check(view, 'no content view buffer was created')
 print('=== PHASE 2: Verifying the containers folder holding parent ===')
 local text = T.buffer_text(view)
 print('Buffer:\n' .. text)
-local lines = vim.api.nvim_buf_get_lines(view, 0, -1, false)
+-- The viewnode ID leads each headline's metadata; the prefixes below
+-- do not spell it.
+local lines = vim.split(
+  T.without_viewnode_ids(table.concat(
+    vim.api.nvim_buf_get_lines(view, 0, -1, false), '\n')), '\n')
 
-local child_root_prefix = '* (skg (node (id child)'
+local child_root_prefix = '* (skg node (gnid child)'
 local root_line = nil
 for _, line in ipairs(lines) do
   if line:sub(1, #child_root_prefix) == child_root_prefix then
@@ -61,7 +65,7 @@ T.check(lines[2] and lines[2]:sub(1, #'** (skg containerFolder') == '** (skg con
   string.format(
     "the root's first child is not its containers folder; buffer:\n%s", text))
 
-local parent_headline_prefix = '*** (skg (node (id parent)'
+local parent_headline_prefix = '*** (skg node (gnid parent)'
 local parent_line = nil
 for _, line in ipairs(lines) do
   if line:sub(1, #parent_headline_prefix) == parent_headline_prefix then
@@ -73,7 +77,7 @@ T.check(parent_line, string.format(
   'no level-3 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(id parent) (repo main) writeProtected (rels (contains (out 1 (ancestors 2))) (birth (contains out 2)))', 1, true) ~= nil,
+    '(gnid parent) (skgRepos (nodeRepo main)) writeProtected (rels (contains (out 1 (ancestors 2))) (birth (contains out 2)))', 1, true) ~= nil,
   string.format(
     'parent is not a write-protected member of the folder; '
     .. 'line: %s', parent_line))

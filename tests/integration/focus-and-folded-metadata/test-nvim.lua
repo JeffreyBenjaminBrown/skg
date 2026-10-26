@@ -23,12 +23,12 @@ print('=== SKG Focus and Folded Atoms Integration Test ===')
 -- PHASE 1: create the test buffer.
 print('=== PHASE 1: Creating test buffer ===')
 local content = table.concat({
-  '* (skg (node (id 1) (repo main))) 1',
-  '** (skg (node (id 2))) 2',
-  '** (skg (node (id 3))) 3',
-  '*** (skg (node (id 4))) 4',
-  '*** (skg (node (id 5))) 5',
-  '** (skg (node (id 6))) 6',
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1',
+  '** (skg node (gnid 2)) 2',
+  '** (skg node (gnid 3)) 3',
+  '*** (skg node (gnid 4)) 4',
+  '*** (skg node (gnid 5)) 5',
+  '** (skg node (gnid 6)) 6',
 }, '\n')
 local buf = buffer.open_org_buffer_from_text(
   content, 'skg://focus-and-folded-metadata-test')
@@ -40,7 +40,7 @@ print('Saved initial buffer state to initial.log')
 -- Position point on headline 3 (the third headline).
 local headline_3_line = nil
 for line = 1, vim.api.nvim_buf_line_count(buf) do
-  if metadata.line_text(line):find('(id 3)', 1, true) then
+  if metadata.line_text(line):find('(gnid 3)', 1, true) then
     headline_3_line = line
     break
   end
@@ -59,7 +59,7 @@ print('Moved point to headline 2')
 
 local current_line = vim.api.nvim_get_current_line()
 print('Current line: ' .. current_line)
-T.check(current_line:find('(id 2)', 1, true) ~= nil, 'on headline 2')
+T.check(current_line:find('(gnid 2)', 1, true) ~= nil, 'on headline 2')
 
 -- Debug: check invisibility of each headline.
 print('=== Checking invisibility status ===')
@@ -98,7 +98,7 @@ local line_5_invisible = folds.line_invisible_p(5)
 
 T.check(not has_focused_metadata, 'focused atom removed from buffer')
 T.check(not has_folded_metadata, 'folded atoms removed from buffer')
-T.check(final_line:find('(id 2)', 1, true) ~= nil,
+T.check(final_line:find('(gnid 2)', 1, true) ~= nil,
         'point is on headline 2 (focused headline)')
 T.check(line_4_invisible, 'headline 4 is invisible (folded)')
 T.check(line_5_invisible, 'headline 5 is invisible (folded)')

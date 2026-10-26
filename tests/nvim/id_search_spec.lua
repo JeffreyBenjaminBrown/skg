@@ -6,8 +6,8 @@ local id_search = require('skg.id_search')
 
 local navigation_text = table.concat({
   '* no id',
-  '* (skg (node (id 1))) 1 has a [[id:2][link to 2]]',
-  '* (skg (node (id 2))) 2',
+  '* (skg node (gnid 1)) 1 has a [[id:2][link to 2]]',
+  '* (skg node (gnid 2)) 2',
   '* no id',
   '' }, '\n')
 
@@ -77,7 +77,7 @@ describe('skg.id_search navigation', function ()
     buffer_with(table.concat({
       'raw 3861db2c-7f16-4814-b403-52b5e05d5e0a uuid',
       'file 557a869b-02ba-4c59-a5d3-5fb469a12353.skg here',
-      '* (skg (node (id meta-id))) title with [[id:link-id][lab]]' },
+      '* (skg node (gnid meta-id)) title with [[id:link-id][lab]]' },
       '\n'))
     vim.api.nvim_win_set_cursor(0, { 1, 10 })
     assert.are.equal('3861db2c-7f16-4814-b403-52b5e05d5e0a',
@@ -93,7 +93,7 @@ describe('skg.id_search navigation', function ()
 
   it('reads the gnid and repo of a ghost', function ()
     local sexp = require('skg.sexpr.parse').read(
-      '(skg (ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))))')
+      '(skg ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))')
     assert.are.equal('gone', id_search.extract_id_from_metadata_sexp(sexp))
     assert.are.equal('main', id_search.extract_repo_from_metadata_sexp(sexp))
   end)
@@ -130,11 +130,11 @@ describe('skg.id_search.goto_viewnode_id', function ()
   -- Mirrors the test-skg-goto-viewnode-id tests of
   -- test-skg-id-search.el.
   local text = table.concat({
-    '* (skg (node (id 1) (repo main)) (vnid 0a)) 1',
-    '** (skg (node (id 2) (repo main)) (vnid 0bc)) 2',
-    '** (skg (node (id 3) (repo main)) (vnid 0b)) 3',
+    '* (skg (vnid 0a) node (gnid 1) (skgRepos (nodeRepo main))) 1',
+    '** (skg (vnid 0bc) node (gnid 2) (skgRepos (nodeRepo main))) 2',
+    '** (skg (vnid 0b) node (gnid 3) (skgRepos (nodeRepo main))) 3',
     'body text mentioning (vnid 0d)',
-    '* (skg (node (id 4) (repo main))) 4 typed',
+    '* (skg node (gnid 4) (skgRepos (nodeRepo main))) 4 typed',
     '' }, '\n')
 
   after_each(function ()

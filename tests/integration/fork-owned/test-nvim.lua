@@ -16,9 +16,9 @@ local metadata = require('skg.metadata')
 local save = require('skg.save')
 local view_requests = require('skg.view_requests')
 
----Return a live skg view buffer whose text mentions (id ID).
+---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (skgid)
-  local needle = '(id ' .. skgid .. ')'
+  local needle = '(gnid ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then
@@ -53,11 +53,11 @@ local function goto_line_containing (snippet, description)
   T.fail(description or ('could not find a line containing: ' .. snippet))
 end
 
----Move the cursor onto the headline carrying (id ID) (repo owned) in
+---Move the cursor onto the headline carrying (gnid ID) (skgRepos (nodeRepo owned)) in
 ---the current buffer. Fails the test if it is not found.
 local function goto_owned_headline (skgid)
   return goto_line_containing(
-    string.format('(id %s) (repo owned)', skgid),
+    string.format('(gnid %s) (skgRepos (nodeRepo owned))', skgid),
     string.format("could not find %s's headline", skgid))
 end
 
@@ -82,7 +82,7 @@ content_view.request_single_root_content_view_from_id('Q')
 local q_buf = T.wait_for(function () return buffer_showing('Q') end, 10)
 T.check(q_buf, "Q's view never appeared")
 vim.api.nvim_set_current_buf(q_buf)
-T.check(T.buffer_text(q_buf):find('(id M)', 1, true),
+T.check(T.buffer_text(q_buf):find('(gnid M)', 1, true),
         "Q's view does not show its content M")
 
 -- 2. Forking a dirty buffer is refused: no confirmation appears.
@@ -102,7 +102,7 @@ view_requests.fork_node()
 local confirm_buf = T.wait_for_buffer('skg://fork-confirmation', 10)
 T.check(confirm_buf, 'no fork-confirmation buffer appeared')
 vim.api.nvim_set_current_buf(confirm_buf)
-T.check(T.buffer_text(confirm_buf):find('(id M)', 1, true),
+T.check(T.buffer_text(confirm_buf):find('(gnid M)', 1, true),
         'confirmation buffer does not list M')
 print('fork_node produced a fork-confirmation listing M')
 -- Approving before picking a skgrepo is refused.
@@ -111,7 +111,7 @@ T.check(not approved_early_ok,
         'approve must be refused until a repo is picked')
 print('approve refused until a repo is picked')
 -- Pick the clone's skgrepo, then approve.
-local clone_line = goto_line_starting_with('* (skg (node (repo ',
+local clone_line = goto_line_starting_with('* (skg node (skgRepos (nodeRepo ',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned')
 save.approve_fork()
@@ -176,7 +176,7 @@ view_requests.fork_node()
 -- so wait until it actually shows M3 before dismissing it.
 local m3_confirm_buf = T.wait_for(function ()
   local buf = find_buffer_named('skg://fork-confirmation')
-  return buf and T.buffer_text(buf):find('(id M3)', 1, true) and buf
+  return buf and T.buffer_text(buf):find('(gnid M3)', 1, true) and buf
 end, 10)
 T.check(m3_confirm_buf, 'no fork-confirmation for M3 appeared')
 -- Dismiss by killing the buffer directly -- no approve, no decline.

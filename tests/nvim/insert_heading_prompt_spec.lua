@@ -87,36 +87,36 @@ describe('the skgrepo prompt after inserting a headline', function ()
 
   for _, action in ipairs(actions) do
     it(action .. ' on a root prompts and writes the skgrepo', function ()
-      content_view_with('* (skg (node (id x) (repo public))) x')
+      content_view_with('* (skg node (gnid x) (skgRepos (nodeRepo public))) x')
       assert.is_true(run_action(action, { 'public', 'private' }))
-      assert.is_true(has_line('* (skg (node (id x) (repo public))) x'))
-      assert.is_true(has_line('* (skg (node (repo private))) '))
+      assert.is_true(has_line('* (skg node (gnid x) (skgRepos (nodeRepo public))) x'))
+      assert.is_true(has_line('* (skg node (skgRepos (nodeRepo private))) '))
       assert.is_false(edit_buffer_open_p())
     end)
 
     it(action .. ' uses the only owned skgrepo without a prompt',
        function ()
-      content_view_with('* (skg (node (id x) (repo only))) x')
+      content_view_with('* (skg node (gnid x) (skgRepos (nodeRepo only))) x')
       assert.is_false(run_action(action, { 'only' }))
-      assert.is_true(has_line('* (skg (node (repo only))) '))
+      assert.is_true(has_line('* (skg node (skgRepos (nodeRepo only))) '))
     end)
 
     it(action .. ' prompts only when the headline cannot inherit',
        function ()
       for _, case in ipairs({
         { '** (skg subscribeeFolder)', false },
-        { '** (skg (ghost (gnid d) (skgRepos (nodeRepo public)))) d', false },
-        { '** (skg (unknown (id u)))', false },
-        { '** (skg bodyFolded (node (id m) (repo public))) m', false },
+        { '** (skg ghost (gnid d) (skgRepos (nodeRepo public))) d', false },
+        { '** (skg unknown (gnid u))', false },
+        { '** (skg bodyFolded node (gnid m) (skgRepos (nodeRepo public))) m', false },
         { '** (skg tombstone)', true } }) do
         content_view_with(table.concat({
-          '* (skg (node (id x) (repo public))) x',
+          '* (skg node (gnid x) (skgRepos (nodeRepo public))) x',
           case[1],
-          '*** (skg (node (id y) (repo public))) y' }, '\n'), '^%*%*%* ')
+          '*** (skg node (gnid y) (skgRepos (nodeRepo public))) y' }, '\n'), '^%*%*%* ')
         assert.are.equal(case[2], run_action(action, { 'public', 'private' }),
                          case[1])
         assert.are.equal(case[2],
-                         has_line('*** (skg (node (repo private))) '),
+                         has_line('*** (skg node (skgRepos (nodeRepo private))) '),
                          case[1])
         vim.api.nvim_buf_delete(0, { force = true })
       end
@@ -125,7 +125,7 @@ describe('the skgrepo prompt after inserting a headline', function ()
   end
 
   it('leaves a buffer that is no content view alone', function ()
-    content_view_with('* (skg (node (id x) (repo public))) x')
+    content_view_with('* (skg node (gnid x) (skgRepos (nodeRepo public))) x')
     vim.b.skg_content_view = nil
     assert.is_false(run_action(actions[1], { 'public', 'private' }))
     assert.is_true(has_line('* '))

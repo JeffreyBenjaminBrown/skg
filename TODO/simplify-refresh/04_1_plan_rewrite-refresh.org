@@ -871,7 +871,7 @@ roots included. Tests: 'tests/collateral_delete',
 tests adapted; a test that a deleted root in a content view
 vanishes on refresh and a buffer may end with no roots; a test
 of each client command.
-** TODO Slice 4: the grammar's shape
+** DONE Slice 4: the grammar's shape
 The printer writes, and the parser reads, the shape under "The
 metadata", with the facts left in their old homes for now:
 '(vnid X)' first; every kind a bare atom with its parts at the

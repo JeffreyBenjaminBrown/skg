@@ -61,7 +61,7 @@ describe('skg.search', function ()
     server = helpers.connect_to_fake_server(function () end)
     search.request_text_search('still enriching', false, false, false)
     local buf = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'view_id-a')
+      '* (skg node (gnid a)) a', 'skg://a', 'view_id-a')
     local ok, err = pcall(save.request_save_buffer)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find(
@@ -93,8 +93,8 @@ describe('skg.search', function ()
       if line:find('"text search"', 1, true) then
         respond(helpers.framed(
           '((response-type search-results)'
-          .. ' (content "* (skg (node (id r1))) first result'
-          .. '\\n* (skg (node (id r2))) second result"))'))
+          .. ' (content "* (skg node (gnid r1)) first result'
+          .. '\\n* (skg node (gnid r2)) second result"))'))
         -- Immediately ask for the snapshot, as the server does.
         respond(helpers.framed(
           '((response-type request-snapshot)'
@@ -103,8 +103,8 @@ describe('skg.search', function ()
         snapshot = line
         respond(helpers.framed(
           '((response-type search-enrichment) (terms "dog")'
-          .. ' (content "* (skg (node (id r1))) first result'
-          .. ' enriched\\n* (skg (node (id r2))) second result'
+          .. ' (content "* (skg node (gnid r1)) first result'
+          .. ' enriched\\n* (skg node (gnid r2)) second result'
           .. ' enriched") (warnings ()))'))
       end
     end)
@@ -157,12 +157,12 @@ describe('skg.search', function ()
       if line:find('"text search"', 1, true) then
         respond(helpers.framed(
           '((response-type search-results)'
-          .. ' (content "* (skg (node (id pick-me)))'
+          .. ' (content "* (skg node (gnid pick-me))'
           .. ' chosen [[id:inner][with link]] title"))'))
       end
     end)
     local skgrepo = buffer.open_org_buffer_from_text(
-      '* (skg (node (id src))) repo\nbody line ',
+      '* (skg node (gnid src)) repo\nbody line ',
       'skg://repo', 'view_id-repo')
     vim.api.nvim_win_set_cursor(0, { 2, 9 })
     search_make_link.search_make_link('chosen')
@@ -198,7 +198,7 @@ describe('skg.search', function ()
       if line:find('"text search"', 1, true) then
         respond(helpers.framed(
           '((response-type search-results)'
-          .. ' (content "* (skg (node (id r1))) result"))'))
+          .. ' (content "* (skg node (gnid r1)) result"))'))
       end
     end)
     search.search('plain')

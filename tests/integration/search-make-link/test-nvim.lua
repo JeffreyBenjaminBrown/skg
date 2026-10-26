@@ -113,7 +113,7 @@ local function pick_target_and_finish (search_terms)
   local lines = vim.api.nvim_buf_get_lines(search_buf, 0, -1, false)
   local target_line, target_col
   for i, line in ipairs(lines) do
-    local start = line:find('(id target)', 1, true)
+    local start = line:find('(gnid target)', 1, true)
     if start then target_line, target_col = i, start - 1 break end
   end
   if not target_line then

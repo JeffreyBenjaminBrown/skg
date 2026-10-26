@@ -40,12 +40,12 @@ describe('skg.linkstack push', function ()
 
   it('pushes the metadata id from anywhere on the line', function ()
     buffer_with(table.concat({
-      '* (skg (node (id 1))) [[id:2][link to 2]]',
-      '* (skg (node (id 3))) [[id:2][link to 4]] hello',
-      '* (skg (fake metadata]] [[id:fake-link)(]]',
-      '* (skg (node (id 6))) just a title' }, '\n'))
+      '* (skg node (gnid 1)) [[id:2][link to 2]]',
+      '* (skg node (gnid 3)) [[id:2][link to 4]] hello',
+      '* (skg (fake metadata]] [[id:fake-link) (]]',
+      '* (skg node (gnid 6)) just a title' }, '\n'))
     for _, skgid in ipairs({ '1', '3', '6' }) do
-      cursor_on(string.format('(id %s)', skgid), 2)
+      cursor_on(string.format('(gnid %s)', skgid), 2)
       local before = #state.linkstack
       linkstack.id_push()
       assert.are.equal(before + 1, #state.linkstack)
@@ -63,7 +63,7 @@ describe('skg.linkstack push', function ()
   end)
 
   it('pushes the inline link when point is on one', function ()
-    buffer_with('* (skg (node (id outer-id))) outer with'
+    buffer_with('* (skg node (gnid outer-id)) outer with'
                 .. ' [[id:inner-id][inner label]] inside')
     cursor_on('inner label', 3)
     linkstack.id_push()
@@ -73,9 +73,9 @@ describe('skg.linkstack push', function ()
 
   it('stacks pushes most-recent-first', function ()
     buffer_with(table.concat({
-      '* (skg (node (id a))) a',
-      '** (skg (node (id b))) b has a [[id:a][link to a]]',
-      '* (skg (node (id c))) c' }, '\n'))
+      '* (skg node (gnid a)) a',
+      '** (skg node (gnid b)) b has a [[id:a][link to a]]',
+      '* (skg node (gnid c)) c' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
     linkstack.id_push()
     -- From the title area of line 2, off the inline link. (The elisp
@@ -103,7 +103,7 @@ describe('skg.linkstack paste and pop', function ()
     buffer_with('')
     linkstack.paste_node()
     assert.are.equal(
-      '* (skg (node (id id-1) writeProtected)) Title from stack\n',
+      '* (skg node (gnid id-1) writeProtected) Title from stack\n',
       buffer_text())
     assert.are.same({ { 'id-1', 'Title from stack' } },
                     state.linkstack)
@@ -113,7 +113,7 @@ describe('skg.linkstack paste and pop', function ()
     state.linkstack = { { 'id-2', 'Second' }, { 'id-1', 'First' } }
     buffer_with('')
     linkstack.pop_node()
-    assert.are.equal('* (skg (node (id id-2) writeProtected)) Second\n',
+    assert.are.equal('* (skg node (gnid id-2) writeProtected) Second\n',
                      buffer_text())
     assert.are.same({ { 'id-1', 'First' } }, state.linkstack)
   end)
@@ -135,11 +135,11 @@ describe('skg.linkstack paste and pop', function ()
 
   it('in a view, paste_node requests a editable view', function ()
     local text, notified = paste_node_in_view(
-      '* (skg (node (id id-1) writeProtected)) Elsewhere')
+      '* (skg node (gnid id-1) writeProtected) Elsewhere')
     assert.are.equal(
-      '* (skg (node (id id-1) writeProtected)) Elsewhere\n'
-      .. '* (skg (node (id id-1) writeProtected'
-      .. ' (viewRequests editableView))) Title from stack\n',
+      '* (skg node (gnid id-1) writeProtected) Elsewhere\n'
+      .. '* (skg node (gnid id-1) writeProtected'
+      .. ' (viewRequests editableView)) Title from stack\n',
       text)
     assert.is_nil(notified)
   end)
@@ -147,10 +147,10 @@ describe('skg.linkstack paste and pop', function ()
   it('beside a writable occurrence, paste_node stays write-protected',
      function ()
     local text, notified = paste_node_in_view(
-      '* (skg (node (id id-1) (repo main))) Writable')
+      '* (skg node (gnid id-1) (skgRepos (nodeRepo main))) Writable')
     assert.are.equal(
-      '* (skg (node (id id-1) (repo main))) Writable\n'
-      .. '* (skg (node (id id-1) writeProtected)) Title from stack\n',
+      '* (skg node (gnid id-1) (skgRepos (nodeRepo main))) Writable\n'
+      .. '* (skg node (gnid id-1) writeProtected) Title from stack\n',
       text)
     assert.are.equal('NOTE: Pasting node write-protected because a writable'
                      .. ' occurrence is already present in this same buffer.',
@@ -159,10 +159,10 @@ describe('skg.linkstack paste and pop', function ()
 
   it('a pending editable view request counts as writable', function ()
     local text, notified = paste_node_in_view(
-      '* (skg (node (id id-1) writeProtected'
-      .. ' (viewRequests editableView))) First')
+      '* (skg node (gnid id-1) writeProtected'
+      .. ' (viewRequests editableView)) First')
     assert.is_truthy(text:find(
-      '\n* (skg (node (id id-1) writeProtected)) Title from stack\n',
+      '\n* (skg node (gnid id-1) writeProtected) Title from stack\n',
       1, true))
     assert.are.equal('NOTE:', notified:sub(1, 5))
   end)
@@ -174,7 +174,7 @@ describe('skg.linkstack paste and pop', function ()
     vim.api.nvim_win_set_cursor(0, { 1, 3 })
     linkstack.paste_node()
     assert.are.equal(
-      '** (skg (node (id id-1) writeProtected)) Title from stack',
+      '** (skg node (gnid id-1) writeProtected) Title from stack',
       buffer_text())
   end)
 

@@ -32,8 +32,8 @@ describe('skg.diff_view', function ()
      function ()
     local requested = {}
     local answers = {
-      ['all changes'] = '* (skg (node (id a))) a',
-      ['skgrepo changes'] = '* (skg (node (id b))) b' }
+      ['all changes'] = '* (skg node (gnid a)) a',
+      ['skgrepo changes'] = '* (skg node (gnid b)) b' }
     server = helpers.connect_to_fake_server(function (line, respond)
       local name = line:match('%(buffer %. "([^"]*)"%)')
       if name then

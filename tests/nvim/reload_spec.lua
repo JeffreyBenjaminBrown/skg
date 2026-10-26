@@ -30,7 +30,7 @@ describe('skg.reload', function ()
     -- Mirrors test-skg-reload.el's herald-table preservation.
     local herald_rules = require('skg.herald_rules')
     local rules = require('skg.sexpr.parse').read(
-      '(skg (focused) (node (id)))')
+      '(skg (focused) node (gnid))')
     herald_rules.install_rules(rules)
     reload.reload()
     local reloaded = require('skg.herald_rules')

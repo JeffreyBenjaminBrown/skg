@@ -8,9 +8,9 @@ T.arm_timeout(30)
 local content_view = require('skg.content_view')
 local buffer = require('skg.buffer')
 
----Return a live skg view buffer whose text mentions (id ID).
+---Return a live skg view buffer whose text mentions (gnid ID).
 local function raw_view_buffer_showing (skgid)
-  local needle = '(id ' .. skgid .. ')'
+  local needle = '(gnid ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) then
       local view_id = vim.b[buf].skg_view_id
@@ -33,7 +33,8 @@ T.check(raw_buf, 'ordinary visit did not open a raw view of Z')
 local raw_content = T.buffer_text(raw_buf)
 T.check(raw_content:find('cooking', 1, true),
         "raw view lacks Z's title")
-T.check(not raw_content:match('\n%*%* %(skg %(node %(id R%).-noClaim'),
+T.check(not raw_content:match(
+          '\n%*%* %(skg [^\n]-node %(gnid R%)[^\n]-noClaim'),
         'ordinary visit injected overrider R as an independent sibling')
 print('ordinary visit opened raw Z without an overrider sibling')
 

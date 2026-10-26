@@ -32,7 +32,7 @@ describe('skg integrate unshown changes', function ()
     server = helpers.connect_to_fake_server(function (line)
       table.insert(requests, line) end)
     local view = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://diff-view: all changes',
+      '* (skg node (gnid a)) a', 'skg://diff-view: all changes',
       'diff-view: all changes')
     vim.api.nvim_set_current_buf(view)
     vim.bo[view].modified = true
@@ -56,12 +56,12 @@ describe('skg integrate unshown changes', function ()
         '((response-type rerender-lock) (lock-views ("diff-view: all changes")))'))
       respond(helpers.framed(
         '((response-type rerender-view) (view-id "diff-view: all changes")'
-        .. ' (content "* (skg (node (id b))) b"))'))
+        .. ' (content "* (skg node (gnid b)) b"))'))
       respond(helpers.framed(
         '((response-type rerender-done) (errors ()) (warnings ()))'))
     end)
     local view = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://diff-view: all changes',
+      '* (skg node (gnid a)) a', 'skg://diff-view: all changes',
       'diff-view: all changes')
     vim.api.nvim_set_current_buf(view)
     integrate_unshown_changes.diffView_integrate_unshown_changes()
@@ -74,7 +74,7 @@ describe('skg integrate unshown changes', function ()
       '(view-id . "diff-view: all changes")', 1, true))
     assert.is_truthy(vim.tbl_contains(
       notices, '1 of 3 changed files are ready'), vim.inspect(notices))
-    assert.are.same({ '* (skg (node (id b))) b' },
+    assert.are.same({ '* (skg node (gnid b)) b' },
                     vim.api.nvim_buf_get_lines(view, 0, -1, false))
   end)
 end)

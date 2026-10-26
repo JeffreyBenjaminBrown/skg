@@ -117,19 +117,19 @@ describe('skg.sexpr.parse printing', function ()
   it('round-trips the wire shapes of docs/api-and-formats.org', function ()
     round_trips('((request . "text search") (terms . "dog cat") '
                 .. '(regex . "false"))')
-    round_trips('((response-type save-result) (content "* (skg (node '
-                .. '(id 7))) hi") (errors ()) (warnings ("w1" "w2")))')
+    round_trips('((response-type save-result) (content "* (skg node '
+                .. '(gnid 7)) hi") (errors ()) (warnings ("w1" "w2")))')
     round_trips('((busy-initializing . "still loading"))')
     round_trips('((response-type "titles-by-ids") (content '
                 .. '((3861db2c-aaaa . "title one") (deadbeef . "two"))))')
-    round_trips('(skg (node (id 7) (repo main) (diff (node added) (rel added))))')
-    round_trips('(skg (node (id 9) (repo main) writeProtected '
-                .. '(diff (rel removed) (ready rel))))')
+    round_trips('(skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added)))')
+    round_trips('(skg node (gnid 9) (skgRepos (nodeRepo main)) writeProtected '
+                .. '(diff (rel removed) (ready rel)))')
     round_trips('(skg alias (diff (rel added)))')
     round_trips('(skg (oldText title))')
-    round_trips('(skg (node (id x) (viewStats (homeRepoHerald ⌂:public) '
-                .. 'cycle (overridesHere 4))))')
-    round_trips('(skg (node (id x) (rels "2(1,1)L 3S")))')
+    round_trips('(skg node (gnid x) (overridesHere 4) '
+                .. '(viewStats (homeRepoHerald ⌂:public) cycle))')
+    round_trips('(skg node (gnid x) (rels "2(1,1)L 3S"))')
   end)
 
   it('escapes strings exactly as the server does', function ()
@@ -144,8 +144,8 @@ describe('skg.sexpr.parse printing', function ()
   end)
 
   it('prints integers without decimal points', function ()
-    assert.are.equal('(id 7)',
-      sexpr.to_string({ sexpr.symbol('id'), 7 }))
+    assert.are.equal('(gnid 7)',
+      sexpr.to_string({ sexpr.symbol('gnid'), 7 }))
   end)
 
   it('prints the empty list readably', function ()
@@ -172,12 +172,12 @@ describe('skg.sexpr.parse.find_sexp_end', function ()
   -- Mirrors the find-sexp-end coverage in test-skg-sexpr-search.el.
   it('finds the end of a simple sexp', function ()
     assert.are.equal(3, sexpr.find_sexp_end('(a)'))
-    assert.are.equal(14, sexpr.find_sexp_end('(skg (node x)) title'))
+    assert.are.equal(12, sexpr.find_sexp_end('(skg node x) title'))
   end)
 
   it('handles herald characters that confuse Emacs forward-sexp',
      function ()
-    local line = '(skg (node (id 7) (viewStats (homeRepoHerald ⌂:pub))))'
+    local line = '(skg node (gnid 7) (viewStats (homeRepoHerald ⌂:pub)))'
     assert.are.equal(#line, sexpr.find_sexp_end(line))
   end)
 
@@ -187,9 +187,9 @@ describe('skg.sexpr.parse.find_sexp_end', function ()
   end)
 
   it('ignores parens inside strings', function ()
-    local line = '(skg (node (rels ")))((("))) tail'
+    local line = '(skg node (rels ")))(((")) tail'
     local ending = sexpr.find_sexp_end(line)
-    assert.are.equal('(skg (node (rels ")))(((")))',
+    assert.are.equal('(skg node (rels ")))((("))',
                      line:sub(1, ending))
   end)
 

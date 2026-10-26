@@ -186,16 +186,16 @@ describe('skg stream consumers', function ()
           .. ' (lock-views (view_id-a)))'))
         respond(helpers.framed(
           '((response-type rerender-view) (view-id view_id-a)'
-          .. ' (content "* (skg (node (id a))) a rerendered"))'))
+          .. ' (content "* (skg node (gnid a)) a rerendered"))'))
         respond(helpers.framed(
           '((response-type rerender-done) (errors ())'
           .. ' (warnings ("stale herald")))'))
       end
     end)
     local a = buffer.open_org_buffer_from_text(
-      '* (skg (node (id a))) a', 'skg://a', 'view_id-a')
+      '* (skg node (gnid a)) a', 'skg://a', 'view_id-a')
     local b = buffer.open_org_buffer_from_text(
-      '* (skg (node (id b))) b', 'skg://b', 'view_id-b')
+      '* (skg node (gnid b)) b', 'skg://b', 'view_id-b')
     rerender.request_rerender_all_views()
     -- Locked immediately; b unlocks on rerender-lock (not listed).
     assert.is_false(vim.bo[a].modifiable)
@@ -203,7 +203,7 @@ describe('skg stream consumers', function ()
       return lock.stream_in_progress == nil end, 10)
     assert.is_true(vim.bo[a].modifiable)
     assert.is_true(vim.bo[b].modifiable)
-    assert.are.equal('* (skg (node (id a))) a rerendered',
+    assert.are.equal('* (skg node (gnid a)) a rerendered',
       vim.api.nvim_buf_get_lines(a, 0, 1, false)[1])
     -- The warning channel fired (mirrors test-skg-warning-channel).
     local found = nil
@@ -255,7 +255,7 @@ describe('skg stream consumers', function ()
       end
     end)
     local view = buffer.open_org_buffer_from_text(
-      '* (skg (node (id p))) p\n** (skg (unknown (id gone-id))) ',
+      '* (skg node (gnid p)) p\n** (skg unknown (gnid gone-id)) ',
       'skg://p', 'view_id-p')
     vim.api.nvim_set_current_buf(view)
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
@@ -297,7 +297,7 @@ describe('skg stream consumers', function ()
       end
     end)
     local view = buffer.open_org_buffer_from_text(
-      '* (skg (node (id p))) p', 'skg://p', 'view_id-p')
+      '* (skg node (gnid p)) p', 'skg://p', 'view_id-p')
     vim.api.nvim_set_current_buf(view)
     local original_input = vim.fn.input
     local prompted = nil

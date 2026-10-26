@@ -89,8 +89,8 @@ describe('skg.modify_graph replacements', function ()
   end)
 
   local container_and_leaf = table.concat({
-    '* (skg (node (id parent) (repo public))) container',
-    '** (skg (node (id child) (repo public))) the leaf title',
+    '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+    '** (skg node (gnid child) (skgRepos (nodeRepo public))) the leaf title',
     'leaf body',
     '*** (skg aliasFolder) non-vognode viewnodes under it' }, '\n')
 
@@ -99,15 +99,15 @@ describe('skg.modify_graph replacements', function ()
     vim.api.nvim_win_set_cursor(0, { 3, 2 }) -- in the body
     modify_graph.replace_content_with_link()
     assert.are.equal(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
       '** [[id:child][the leaf title]]' }, '\n'), buffer_text())
     assert.are.equal(1, saved_count)
   end)
 
   it('rejects a node with no id', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
-      '** (skg (node (repo public))) no id here' }, '\n'))
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (skgRepos (nodeRepo public))) no id here' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
@@ -116,8 +116,8 @@ describe('skg.modify_graph replacements', function ()
 
   it('rejects a foreign container', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo foreign-src))) container',
-      '** (skg (node (id child) (repo public))) leaf' }, '\n'))
+      '* (skg node (gnid parent) (skgRepos (nodeRepo foreign-src))) container',
+      '** (skg node (gnid child) (skgRepos (nodeRepo public))) leaf' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
@@ -126,8 +126,8 @@ describe('skg.modify_graph replacements', function ()
 
   it('rejects a write-protected container', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo public) writeProtected)) container',
-      '** (skg (node (id child) (repo public))) leaf' }, '\n'))
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public)) writeProtected) container',
+      '** (skg node (gnid child) (skgRepos (nodeRepo public))) leaf' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
@@ -137,8 +137,8 @@ describe('skg.modify_graph replacements', function ()
   it('replaces a link with content, warning about existing nodes',
      function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
-      '** (skg (node (id old-node) (repo public)))'
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (gnid old-node) (skgRepos (nodeRepo public)))'
       .. ' see [[id:target][target label]]' }, '\n'))
     local notified = {}
     local original_notify = vim.notify
@@ -147,9 +147,9 @@ describe('skg.modify_graph replacements', function ()
     modify_graph.replace_link_with_content()
     vim.notify = original_notify
     assert.are.equal(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
-      '** (skg (node (id target) writeProtected (viewRequests'
-      .. ' editableView))) target label' }, '\n'), buffer_text())
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (gnid target) writeProtected (viewRequests'
+      .. ' editableView)) target label' }, '\n'), buffer_text())
     local warned = false
     for _, msg in ipairs(notified) do
       if tostring(msg):find('orphan') then warned = true end
@@ -161,24 +161,24 @@ describe('skg.modify_graph replacements', function ()
   it('rejects a leaf with several links, a non-id link, and'
      .. ' descendants', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
-      '** (skg (node (repo public))) [[id:a][one]] and'
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (skgRepos (nodeRepo public))) [[id:a][one]] and'
       .. ' [[id:b][two]]' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_link_with_content)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('exactly one link', 1, true))
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
-      '** (skg (node (repo public))) [[https://x][web link]]' },
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (skgRepos (nodeRepo public))) [[https://x][web link]]' },
       '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     ok, err = pcall(modify_graph.replace_link_with_content)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('not an id link', 1, true))
     buffer_with(table.concat({
-      '* (skg (node (id parent) (repo public))) container',
-      '** (skg (node (repo public))) [[id:a][one]]',
+      '* (skg node (gnid parent) (skgRepos (nodeRepo public))) container',
+      '** (skg node (skgRepos (nodeRepo public))) [[id:a][one]]',
       '*** a descendant' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     ok, err = pcall(modify_graph.replace_link_with_content)
@@ -196,7 +196,7 @@ describe('skg.view_requests', function ()
   end)
 
   it('stamps the request atom and auto-saves', function ()
-    buffer_with('* (skg (node (id n1))) title')
+    buffer_with('* (skg node (gnid n1)) title')
     view_requests.show_folderOf_aliases()
     assert.is_truthy(buffer_text():find(
       '(viewRequests (folder aliases))', 1, true))
@@ -204,7 +204,7 @@ describe('skg.view_requests', function ()
   end)
 
   it('set_editable stamps without saving', function ()
-    buffer_with('* (skg (node (id n3) writeProtected)) title')
+    buffer_with('* (skg node (gnid n3) writeProtected) title')
     view_requests.set_editable()
     assert.is_truthy(buffer_text():find(
       '(viewRequests editableView)', 1, true))
@@ -212,12 +212,12 @@ describe('skg.view_requests', function ()
   end)
 
   it('the write-protect requests stamp without saving', function ()
-    buffer_with('* (skg (node (id n5))) title')
+    buffer_with('* (skg node (gnid n5)) title')
     view_requests.request_write_protected()
     assert.is_truthy(buffer_text():find(
       '(viewRequests writeProtectedView)', 1, true))
     assert.is_falsy(buffer_text():find('writeProtected)', 1, true))
-    buffer_with('* (skg (node (id n6))) title')
+    buffer_with('* (skg node (gnid n6)) title')
     view_requests.request_write_protected_recursive()
     assert.is_truthy(buffer_text():find(
       '(viewRequests writeProtectedSubtreeView)', 1, true))
@@ -225,7 +225,7 @@ describe('skg.view_requests', function ()
   end)
 
   it('fork refuses a modified buffer', function ()
-    local buf = buffer_with('* (skg (node (id n4))) title')
+    local buf = buffer_with('* (skg node (gnid n4)) title')
     vim.bo[buf].modified = true
     local notified = nil
     local original_notify = vim.notify
@@ -239,11 +239,11 @@ describe('skg.view_requests', function ()
 
   -- The diff view's ghost tombstone requests, the ports of
   -- skg-request-ghost-tombstone and skg-request-buffer-ghosts-tombstone.
-  local ghost = '(skg (ghost (gnid g) (skgRepos (nodeRepo main))'
-    .. ' (diff (node removed) (rel removed))) (vnid 0g))'
-  local ghost_stamped = '(skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+  local ghost = '(skg (vnid 0g) ghost (gnid g) (skgRepos (nodeRepo main))'
+    .. ' (diff (node removed) (rel removed)))'
+  local ghost_stamped = '(skg (vnid 0g) ghost (gnid g)'
+    .. ' (skgRepos (nodeRepo main))'
     .. ' (diff (node removed) (rel removed)) (viewRequests tombstone))'
-    .. ' (vnid 0g))'
 
   it('request_ghost_tombstone stamps the ghost form and saves', function ()
     buffer_with('* ' .. ghost .. ' g\nits body')
@@ -256,8 +256,8 @@ describe('skg.view_requests', function ()
 
   it('request_ghost_tombstone refuses any other headline', function ()
     for _, text in ipairs({
-        '* (skg (node (id n) (repo main) (diff (node removed)))) n',
-        '* (skg (unknown (id u)))',
+        '* (skg node (gnid n) (skgRepos (nodeRepo main)) (diff (node removed))) n',
+        '* (skg unknown (gnid u))',
         '* (skg tombstone)',
         '* no metadata' }) do
       buffer_with(text)
@@ -272,28 +272,28 @@ describe('skg.view_requests', function ()
 
   it('request_buffer_ghosts_tombstone stamps every ghost, saves once',
      function ()
-    local node = '(skg (node (id n) (repo main)))'
-    local other_ghost = '(skg (ghost (gnid h) (skgRepos (nodeRepo main))))'
+    local node = '(skg node (gnid n) (skgRepos (nodeRepo main)))'
+    local other_ghost = '(skg ghost (gnid h) (skgRepos (nodeRepo main)))'
     buffer_with(table.concat({
       '* ' .. node .. ' n',
       '** ' .. ghost .. ' g',
-      '*** (skg (unknown (id u)))',
+      '*** (skg unknown (gnid u))',
       '*** ' .. other_ghost .. ' h',
       '* (skg tombstone)' }, '\n'))
     view_requests.request_buffer_ghosts_tombstone()
     assert.are.equal(table.concat({
       '* ' .. node .. ' n',
       '** ' .. ghost_stamped .. ' g',
-      '*** (skg (unknown (id u)))',
-      '*** (skg (ghost (gnid h) (skgRepos (nodeRepo main))'
-        .. ' (viewRequests tombstone))) h',
+      '*** (skg unknown (gnid u))',
+      '*** (skg ghost (gnid h) (skgRepos (nodeRepo main))'
+        .. ' (viewRequests tombstone)) h',
       '* (skg tombstone)' }, '\n'), buffer_text())
     assert.are.equal(1, saved_count)
   end)
 
   it('request_buffer_ghosts_tombstone without a ghost says so, no save',
      function ()
-    local text = '* (skg (node (id n) (repo main))) n\n** plain'
+    local text = '* (skg node (gnid n) (skgRepos (nodeRepo main))) n\n** plain'
     buffer_with(text)
     local notified = nil
     local original_notify = vim.notify
@@ -322,7 +322,7 @@ describe('skg.metadata_edit', function ()
 
   it('opens the filled-in view and applies an edit back', function ()
     local source_buf = buffer_with(
-      '* (skg (node (id abc) (repo public))) my title')
+      '* (skg node (gnid abc) (skgRepos (nodeRepo public))) my title')
     metadata_edit.edit_metadata()
     local edit_buf = vim.api.nvim_get_current_buf()
     assert.is_truthy(vim.api.nvim_buf_get_name(edit_buf)
@@ -338,7 +338,7 @@ describe('skg.metadata_edit', function ()
     metadata_edit.apply(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
-      '* (skg (node (id abc) (repo public) writeProtected)) my title',
+      '* (skg node (gnid abc) (skgRepos (nodeRepo public)) writeProtected) my title',
       buffer_text())
   end)
 
@@ -357,7 +357,7 @@ describe('skg.metadata_edit', function ()
     metadata_edit.apply(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
-      '* (skg (node (repo public))) just a plain headline',
+      '* (skg node (skgRepos (nodeRepo public))) just a plain headline',
       buffer_text())
   end)
 

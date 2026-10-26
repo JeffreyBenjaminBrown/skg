@@ -17,8 +17,8 @@ local lock = require('skg.lock')
 
 local content_buffer_name = 'skg://skg-content-view'
 local original_content =
-  '* (skg (node (id 1) (repo main))) 1\n'
-  .. '** (skg (node (id 1))) 1'
+  '* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1\n'
+  .. '** (skg node (gnid 1)) 1'
 
 local function test_invalid_save ()
   print('=== PHASE 1: Testing invalid save (duplicate ID without'
@@ -69,8 +69,8 @@ local function test_valid_save (content_buf)
 
   -- Fix up the previously-invalid child line: add 'writeProtected'. Mirrors
   -- the elisp's search-forward + replace-match on the exact text.
-  local old_child_line = '** (skg (node (id 1))) 1'
-  local new_child_line = '** (skg (node (id 1) writeProtected)) 1'
+  local old_child_line = '** (skg node (gnid 1)) 1'
+  local new_child_line = '** (skg node (gnid 1) writeProtected) 1'
   local lines = vim.api.nvim_buf_get_lines(content_buf, 0, -1, false)
   local found_line = nil
   for i, line in ipairs(lines) do

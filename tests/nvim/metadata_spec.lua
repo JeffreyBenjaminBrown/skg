@@ -47,15 +47,15 @@ describe('skg.metadata parsing', function ()
     assert.are.same({ stars = '* ', metadata = '', title = 'title' },
                     plain)
     local with_meta = metadata.split_as_stars_metadata_title(
-      '** (skg (node (id 1))) some title')
-    assert.are.equal('(skg (node (id 1)))', with_meta.metadata)
+      '** (skg node (gnid 1)) some title')
+    assert.are.equal('(skg node (gnid 1))', with_meta.metadata)
     assert.are.equal('some title', with_meta.title)
   end)
 
   it('parses metadata into alist and bare values', function ()
     -- Mirrors test-skg-parse-metadata-sexp.
-    local simple = metadata.parse_metadata_sexp('(skg (id 1) value)')
-    assert.are.same({ { key = 'id', value = '1' } }, simple.alist)
+    local simple = metadata.parse_metadata_sexp('(skg (gnid 1) value)')
+    assert.are.same({ { key = 'gnid', value = '1' } }, simple.alist)
     assert.are.same({ 'value' }, simple.bare_values)
     local complex =
       metadata.parse_metadata_sexp('(skg a b (c d) (e f))')
@@ -66,7 +66,7 @@ describe('skg.metadata parsing', function ()
 
   it('keeps graphStats/viewStats sub-sexps whole', function ()
     local parsed = metadata.parse_metadata_sexp(
-      '(skg (node x) (viewStats cycle (homeRepoHerald h)))')
+      '(skg node x (viewStats cycle (homeRepoHerald h)))')
     local found = nil
     for _, kv in ipairs(parsed.alist) do
       if kv.key == 'viewStats' then found = kv.value end
@@ -82,29 +82,29 @@ describe('skg.metadata commands', function ()
   end)
 
   it('delete marks the node for deletion', function ()
-    buffer_with('* (skg (node (id 1))) title')
+    buffer_with('* (skg node (gnid 1)) title')
     metadata.delete()
     assert.is_true(subtree_p(first_metadata_sexp(),
-      '(skg (node (editRequest delete)))'))
+      '(skg node (editRequest delete))'))
   end)
 
   it('delete_recursive skips non-unrestrictedNode descendants', function ()
     buffer_with(table.concat({
-      '* (skg (node (id root))) root',
-      '** (skg (node (id child))) child',
+      '* (skg node (gnid root)) root',
+      '** (skg node (gnid child)) child',
       '** (skg aliasFolder) aliases',
       '*** some alias',
-      '* (skg (node (id sibling))) sibling' }, '\n'))
+      '* (skg node (gnid sibling)) sibling' }, '\n'))
     metadata.delete_recursive()
     assert.is_true(subtree_p(metadata_sexp_by_id('root'),
-      '(skg (node (editRequest delete)))'))
+      '(skg node (editRequest delete))'))
     assert.is_true(subtree_p(metadata_sexp_by_id('child'),
-      '(skg (node (editRequest delete)))'))
+      '(skg node (editRequest delete))'))
     assert.is_false(subtree_p(
       metadata.metadata_sexp_at_line_or_nil(3),
-      '(skg (node (editRequest delete)))'))
+      '(skg node (editRequest delete))'))
     assert.is_false(subtree_p(metadata_sexp_by_id('sibling'),
-      '(skg (node (editRequest delete)))'))
+      '(skg node (editRequest delete))'))
   end)
 
   it('strips metadata from org text', function ()
@@ -112,14 +112,14 @@ describe('skg.metadata commands', function ()
     assert.are.equal(
       '* root\nbody line\n** alias title\n** plain child\n',
       metadata.strip_metadata_from_org_text(
-        '* (skg (node (id 1) (repo public))) root\n'
+        '* (skg node (gnid 1) (skgRepos (nodeRepo public))) root\n'
         .. 'body line\n'
         .. '** (skg alias (diff (rel added))) alias title\n'
         .. '** plain child\n'))
   end)
 
   it('view_without_metadata opens a stripped projection', function ()
-    buffer_with('* (skg (node (id 1))) root\n** (skg (node (id 2))) child')
+    buffer_with('* (skg node (gnid 1)) root\n** (skg node (gnid 2)) child')
     vim.fn.setpos("'<", { 0, 1, 1, 0 })
     vim.fn.setpos("'>", { 0, 2, 1, 0 })
     metadata.view_without_metadata()
@@ -129,7 +129,7 @@ describe('skg.metadata commands', function ()
 
   it('set_repo replaces repo and refreshes the herald', function ()
     -- Mirrors test-skg-set-repo.
-    buffer_with('* (skg (node (id 1) (repo public))) title')
+    buffer_with('* (skg node (gnid 1) (skgRepos (nodeRepo public))) title')
     local original = picker.prompt_for_repo_change
     picker.prompt_for_repo_change = function (current)
       assert.are.equal('public', current)
@@ -139,24 +139,24 @@ describe('skg.metadata commands', function ()
     picker.prompt_for_repo_change = original
     local result = first_metadata_sexp()
     assert.is_true(subtree_p(result,
-      '(skg (node (id 1) (repo private)))'))
+      '(skg node (gnid 1) (skgRepos (nodeRepo private)))'))
     assert.is_true(subtree_p(result,
-      '(skg (node (viewStats (homeRepoHerald ⌂:private))))'))
-    assert.is_false(subtree_p(result, '(skg (node (repo public)))'))
+      '(skg node (viewStats (homeRepoHerald ⌂:private)))'))
+    assert.is_false(subtree_p(result, '(skg node (skgRepos (nodeRepo public)))'))
   end)
 
   it('set_repo_recursive prunes non-members', function ()
     -- Mirrors test-skg-set-repo-recursive-prunes-non-members.
     buffer_with(table.concat({
-      '* (skg (node (id root) (repo public))) root',
-      '** (skg (node (id content-child) (repo public))) content child',
-      '*** (skg (node (id content-grandchild) (repo public))) content grandchild',
-      '** (skg (node (id mismatched-content) (repo foreign))) mismatched content',
-      '*** (skg (node (id public-under-mismatch) (repo public))) public under mismatch',
-      '** (skg (node (id link-child) (repo public) noClaim)) link child',
-      '*** (skg (node (id under-link) (repo public))) under link',
+      '* (skg node (gnid root) (skgRepos (nodeRepo public))) root',
+      '** (skg node (gnid content-child) (skgRepos (nodeRepo public))) content child',
+      '*** (skg node (gnid content-grandchild) (skgRepos (nodeRepo public))) content grandchild',
+      '** (skg node (gnid mismatched-content) (skgRepos (nodeRepo foreign))) mismatched content',
+      '*** (skg node (gnid public-under-mismatch) (skgRepos (nodeRepo public))) public under mismatch',
+      '** (skg node (gnid link-child) (skgRepos (nodeRepo public)) noClaim) link child',
+      '*** (skg node (gnid under-link) (skgRepos (nodeRepo public))) under link',
       '** (skg aliasFolder) aliases',
-      '*** (skg (node (id under-non-vognode) (repo public))) under non-vognode' },
+      '*** (skg node (gnid under-non-vognode) (skgRepos (nodeRepo public))) under non-vognode' },
       '\n'))
     local original = picker.prompt_for_repo_change
     picker.prompt_for_repo_change = function (current)
@@ -169,18 +169,18 @@ describe('skg.metadata commands', function ()
                           'content-grandchild',
                           'public-under-mismatch' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg (node (repo private)))'), skgid)
+        '(skg node (skgRepos (nodeRepo private)))'), skgid)
       assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg (node (viewStats (homeRepoHerald ⌂:private))))'), skgid)
+        '(skg node (viewStats (homeRepoHerald ⌂:private)))'), skgid)
     end
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
-      '(skg (node (repo foreign)))'))
+      '(skg node (skgRepos (nodeRepo foreign)))'))
     for _, skgid in ipairs({ 'link-child', 'under-link',
                           'under-non-vognode' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg (node (repo public)))'), skgid)
+        '(skg node (skgRepos (nodeRepo public)))'), skgid)
       assert.is_false(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg (node (repo private)))'), skgid)
+        '(skg node (skgRepos (nodeRepo private)))'), skgid)
     end
   end)
 
@@ -214,69 +214,69 @@ describe('skg.metadata commands', function ()
   it('set_repo_recursive warns about a write-protected occurrence', function ()
     -- Mirrors test-set-repo-recursive-warns-about-write-protected.
     buffer_with(table.concat({
-      '* (skg (node (id r) (repo private))) r',
-      '** (skg (node (id e) (repo private) writeProtected)) e',
-      '*** (skg (node (id f) (repo private))) f' }, '\n'))
+      '* (skg node (gnid r) (skgRepos (nodeRepo private))) r',
+      '** (skg node (gnid e) (skgRepos (nodeRepo private)) writeProtected) e',
+      '*** (skg node (gnid f) (skgRepos (nodeRepo private))) f' }, '\n'))
     local notices = notices_of_set_repo('public', true)
     assert.is_true(some_notice_matches(notices, 'not changed', ': e',
                                        'refuse'))
     assert.is_true(some_notice_matches(notices, 'WARNING', ':messages',
                                        'refuse'))
     assert.is_true(subtree_p(metadata_sexp_by_id('e'),
-      '(skg (node (repo private)))'))
+      '(skg node (skgRepos (nodeRepo private)))'))
     for _, skgid in ipairs({ 'r', 'f' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg (node (repo public)))'), skgid)
+        '(skg node (skgRepos (nodeRepo public)))'), skgid)
     end
   end)
 
   it('set_repo_recursive lets a repeat follow its editable occurrence', function ()
     -- Mirrors test-set-repo-recursive-repeat-follows-its-editable-occurrence.
     buffer_with(table.concat({
-      '* (skg (node (id r) (repo private))) r',
-      '** (skg (node (id a) (repo private))) a',
-      '*** (skg (node (id x) (repo private))) x',
-      '** (skg (node (id b) (repo private))) b',
-      '*** (skg (node (id x) (repo private) writeProtected)) x again' },
+      '* (skg node (gnid r) (skgRepos (nodeRepo private))) r',
+      '** (skg node (gnid a) (skgRepos (nodeRepo private))) a',
+      '*** (skg node (gnid x) (skgRepos (nodeRepo private))) x',
+      '** (skg node (gnid b) (skgRepos (nodeRepo private))) b',
+      '*** (skg node (gnid x) (skgRepos (nodeRepo private)) writeProtected) x again' },
       '\n'))
     local notices = notices_of_set_repo('trusted', true)
     assert.is_false(some_notice_matches(notices, 'not changed'))
     assert.is_false(some_notice_matches(notices, 'WARNING'))
     assert.is_true(subtree_p(metadata.metadata_sexp_at_line_or_nil(3),
-      '(skg (node (id x) (repo trusted)))'))
+      '(skg node (gnid x) (skgRepos (nodeRepo trusted)))'))
     assert.is_true(subtree_p(metadata.metadata_sexp_at_line_or_nil(5),
-      '(skg (node (id x) (repo private) writeProtected))'))
+      '(skg node (gnid x) (skgRepos (nodeRepo private)) writeProtected)'))
   end)
 
   it('set_repo on a write-protected occurrence warns and skips', function ()
     -- Mirrors test-set-repo-single-write-protected-warns-and-skips.
-    buffer_with('* (skg (node (id x) (repo private) writeProtected)) x')
+    buffer_with('* (skg node (gnid x) (skgRepos (nodeRepo private)) writeProtected) x')
     local notices = notices_of_set_repo('public', false)
     assert.is_true(some_notice_matches(notices, 'WARNING'))
     assert.is_true(subtree_p(first_metadata_sexp(),
-      '(skg (node (repo private)))'))
+      '(skg node (skgRepos (nodeRepo private)))'))
     assert.is_false(subtree_p(first_metadata_sexp(),
-      '(skg (node (repo public)))'))
+      '(skg node (skgRepos (nodeRepo public)))'))
   end)
 
   it('set_merge_request accepts a bare id', function ()
-    buffer_with('* (skg (node (id acquirer) (repo public))) title')
+    buffer_with('* (skg node (gnid acquirer) (skgRepos (nodeRepo public))) title')
     metadata.set_merge_request('acquiree')
     assert.is_true(subtree_p(first_metadata_sexp(),
-      '(skg (node (id acquirer) (repo public)'
-      .. ' (editRequest (merge acquiree))))'))
+      '(skg node (gnid acquirer) (skgRepos (nodeRepo public))'
+      .. ' (editRequest (merge acquiree)))'))
   end)
 
   it('set_merge_request accepts a link and replaces old requests',
      function ()
-    buffer_with('* (skg (node (id acquirer) (repo public)'
-                .. ' (editRequest delete))) title')
+    buffer_with('* (skg node (gnid acquirer) (skgRepos (nodeRepo public))'
+                .. ' (editRequest delete)) title')
     metadata.set_merge_request('[[id:acquiree][Acquiree title]]')
     local result = first_metadata_sexp()
     assert.is_true(subtree_p(result,
-      '(skg (node (editRequest (merge acquiree))))'))
+      '(skg node (editRequest (merge acquiree)))'))
     assert.is_false(subtree_p(result,
-      '(skg (node (editRequest delete)))'))
+      '(skg node (editRequest delete))'))
   end)
 
   -- The diff view's restore requests; mirrors the restore tests of
@@ -304,74 +304,75 @@ describe('skg.metadata commands', function ()
     return err
   end
 
-  it('restore_deleted_node marks a ghost, inside its form', function ()
-    buffer_with('* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
-                .. ' (diff (node removed) (rel removed))) (vnid 0d)) g')
+  it('restore_deleted_node marks a ghost', function ()
+    buffer_with('* (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main))'
+                .. ' (diff (node removed) (rel removed))) g')
     metadata.restore_deleted_node()
     assert.are.equal(
-      '* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
+      '* (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main))'
         .. ' (diff (node removed) (rel removed)) (editRequest restoreNode))'
-        .. ' (vnid 0d)) g',
+        .. ' g',
       buffer_text())
   end)
 
   it('restore_removed_membership marks a removed member, under a node'
      .. ' or a ghost, and a folder member', function ()
-    local removed_member = '** (skg (node (id x) (repo main) noClaim'
-      .. ' (diff (rel removed) (leaves 1 rel))) (vnid 0c)) x'
+    local removed_member = '** (skg (vnid 0c) node (gnid x)'
+      .. ' (skgRepos (nodeRepo main)) noClaim'
+      .. ' (diff (rel removed) (leaves 1 rel))) x'
     for _, headline in ipairs({
-      '* (skg (node (id r) (repo main))) r\n' .. removed_member,
-      '* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
-        .. ' (diff (node removed)))) g\n'
+      '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n' .. removed_member,
+      '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
+        .. ' (diff (node removed))) g\n'
         .. removed_member,
-      '* (skg (node (id r) (repo main))) r\n'
-        .. '** (skg (node (id c) (repo main))) c\n'
+      '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
+        .. '** (skg node (gnid c) (skgRepos (nodeRepo main))) c\n'
         .. '*** (skg containerFolder) containers\n'
-        .. '**** (skg (node (id d) (repo main) noClaim'
-        .. ' writeProtected (diff (rel removed) (properties changed)'
-        .. ' (leaves 1 rel all))) (vnid 0o)) d' }) do
+        .. '**** (skg (vnid 0o) node (gnid d) (skgRepos (nodeRepo main))'
+        .. ' noClaim writeProtected (diff (rel removed) (properties changed)'
+        .. ' (leaves 1 rel all))) d' }) do
       buffer_at_last_line(headline)
       metadata.restore_removed_membership()
       assert.is_true(subtree_p(last_metadata_sexp(),
-        '(skg (node (editRequest restoreRel)))'))
+        '(skg node (editRequest restoreRel))'))
     end
   end)
 
   it('the restore commands refuse the wrong kind of headline', function ()
     assert.are.equal(
       'This node is deleted; restore it first (skg-restore-deleted-node)',
-      refusal_of('* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
-                 .. ' (diff (node removed) (rel removed)))) g',
+      refusal_of('* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
+                 .. ' (diff (node removed) (rel removed))) g',
                  metadata.restore_removed_membership))
     for _, headline in ipairs({
-      '* (skg (node (id x) (repo main) (diff (rel added)))) x',
-      '* (skg (node (id x) (repo main))) x',
+      '* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel added))) x',
+      '* (skg node (gnid x) (skgRepos (nodeRepo main))) x',
       -- a root stands for no relationship
-      '* (skg (node (id d) (repo main) noClaim'
+      '* (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim'
         .. ' writeProtected'
-        .. ' (diff (rel removed)))) d',
+        .. ' (diff (rel removed))) d',
       -- a member is no removed member
-      '* (skg (node (id r) (repo main))) r\n'
-        .. '** (skg (node (id x) (repo main) (diff (rel removed)))) x',
+      '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
+        .. '** (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel removed))) x',
       -- a node of the containerward chain
-      '* (skg (node (id r) (repo main))) r\n'
+      '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
         .. '** (skg containerFolder) containers\n'
-        .. '*** (skg (node (id c) (repo main) writeProtected)) c\n'
-        .. '**** (skg (node (id d) (repo main) noClaim writeProtected'
-        .. ' (diff (rel removed)))) d',
+        .. '*** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c\n'
+        .. '**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected'
+        .. ' (diff (rel removed))) d',
       -- a node of the chain under another folder's member
-      '* (skg (node (id r) (repo main))) r\n'
+      '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
         .. '** (skg subscriberFolder) subscribers\n'
-        .. '*** (skg (node (id s) (repo main) writeProtected)) s\n'
-        .. '**** (skg (node (id d) (repo main) noClaim writeProtected'
-        .. ' (diff (rel removed)))) d' }) do
+        .. '*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s\n'
+        .. '**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected'
+        .. ' (diff (rel removed))) d' }) do
       assert.are.equal('Only a removed membership can be restored',
         refusal_of(headline, metadata.restore_removed_membership))
     end
     for _, headline in ipairs({
-      '* (skg (node (id x) (repo main) (diff (rel removed)))) x',
-      '* (skg (node (id x) (repo main) (diff (node removed)))) x',
-      '* (skg (unknown (id x))) x',
+      '* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (rel removed))) x',
+      '* (skg node (gnid x) (skgRepos (nodeRepo main)) (diff (node removed))) x',
+      '* (skg unknown (gnid x)) x',
       '* (skg tombstone) x' }) do
       assert.are.equal('Only a node deleted since HEAD can be restored;'
                        .. ' restoreNode belongs on a ghost'
@@ -411,21 +412,21 @@ describe('skg.metadata commands', function ()
                             'fork', 'flags', 'folder' }
     local atom_values = { 'false (default)', 'true' }
     for _, case in ipairs({
-      { '* (skg (node (id x) (repo main))) x',
+      { '* (skg node (gnid x) (skgRepos (nodeRepo main))) x',
         { writeProtected = atom_values, noClaim = atom_values,
           editRequest = { 'none (default)', 'delete', 'merge',
                           'relRepo', 'flag' },
           viewRequests = view_requests } },
-      { '* (skg (node (id x) (repo main) writeProtected)) x',
+      { '* (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x',
         { editRequest = { 'none (default)', 'relRepo' } } },
-      { '* (skg (node (id x) (repo main) noClaim (diff (rel removed)))) x',
+      { '* (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x',
         { editRequest = { 'none (default)', 'delete', 'merge',
                           'relRepo', 'flag', 'restoreRel' } } },
-      { '* (skg (ghost (gnid g) (skgRepos (nodeRepo main))'
-          .. ' (diff (node removed)))) g',
+      { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
+          .. ' (diff (node removed))) g',
         { editRequest = { 'none (default)', 'restoreNode' },
           viewRequests = { 'none (default)', 'tombstone' } } },
-      { '* (skg (unknown (id u)))',
+      { '* (skg unknown (gnid u))',
         { editRequest = { 'none (default)', 'relRepo' } } },
       { '* (skg alias) an alias',
         { editRequest = { 'none (default)', 'relRepo' } } },
@@ -466,16 +467,16 @@ describe('skg.metadata commands', function ()
       for _, case in ipairs({
         { '* (skg alias) an alias', 'editRequest', 1,
           '* (skg alias (editRequest (relRepo r))) an alias' },
-        { '* (skg (unknown (id u)))', 'editRequest', 1,
-          '* (skg (unknown (id u) (editRequest (relRepo r))))' },
-        { '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)))) g', 'editRequest', 1,
-          '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode))) g' },
-        { '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)))) g', 'viewRequests', 1,
-          '* (skg (ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone))) g' },
-        { '* (skg (node (id x) (repo main))) x', 'viewRequests', 6,
-          '* (skg (node (id x) (repo main) (viewRequests (folder containers)))) x' },
-        { '* (skg (node (id x) (repo main))) x', 'editRequest', 4,
-          '* (skg (node (id x) (repo main) (editRequest (flag noSearchMatching true)))) x' } }) do
+        { '* (skg unknown (gnid u))', 'editRequest', 1,
+          '* (skg unknown (gnid u) (editRequest (relRepo r)))' },
+        { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))) g', 'editRequest', 1,
+          '* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)) g' },
+        { '* (skg ghost (gnid g) (skgRepos (nodeRepo main))) g', 'viewRequests', 1,
+          '* (skg ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone)) g' },
+        { '* (skg node (gnid x) (skgRepos (nodeRepo main))) x', 'viewRequests', 6,
+          '* (skg node (gnid x) (skgRepos (nodeRepo main)) (viewRequests (folder containers))) x' },
+        { '* (skg node (gnid x) (skgRepos (nodeRepo main))) x', 'editRequest', 4,
+          '* (skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true))) x' } }) do
         local answers = { 'containers', 'noSearchMatching', 'true' }
         config.repo_names = function () return { 'r', 'main' } end
         vim.fn.input = function () return '[[id:m][a target]]' end
@@ -505,10 +506,10 @@ describe('skg.metadata commands', function ()
 
   it('beginning_of_line toggles between title and column zero',
      function ()
-    buffer_with('* (skg (node (id 1))) my title')
+    buffer_with('* (skg node (gnid 1)) my title')
     metadata.beginning_of_line()
     local title_col = vim.api.nvim_win_get_cursor(0)[2]
-    assert.are.equal(('* (skg (node (id 1))) '):len(), title_col)
+    assert.are.equal(('* (skg node (gnid 1)) '):len(), title_col)
     metadata.beginning_of_line()
     assert.are.equal(0, vim.api.nvim_win_get_cursor(0)[2])
   end)
@@ -552,7 +553,7 @@ describe('skg.metadata keybinding surface', function ()
     save.request_save_buffer = function () saves = saves + 1 end
     local ok, err = pcall(function ()
       require('skg.buffer').open_org_buffer_from_text(
-        '* (skg (node (id a))) a', 'skg://keymap-lc', 'keymap-lc-view_id')
+        '* (skg node (gnid a)) a', 'skg://keymap-lc', 'keymap-lc-view_id')
       vim.api.nvim_win_set_cursor(0, { 1, 0 })
       vim.api.nvim_feedkeys((vim.g.maplocalleader or '\\') .. 'lc', 'x', false)
       assert.are.equal(1, saves)

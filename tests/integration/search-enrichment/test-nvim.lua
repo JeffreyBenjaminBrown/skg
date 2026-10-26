@@ -15,14 +15,16 @@ T.arm_timeout(45)
 local search = require('skg.search')
 local buffer = require('skg.buffer')
 
----The full text of BUF's line beginning "* (skg (node (id leaf-b)", or
----nil. The Lua mirror of the elisp search-root-line regex, done
----line-by-line since Lua patterns have no multiline ^/$.
+---The full text of BUF's line beginning "* (skg node (gnid leaf-b)"
+---once its viewnode ID is dropped, or nil. The Lua mirror of the elisp
+---search-root-line regex, done line-by-line since Lua patterns have no
+---multiline ^/$.
 ---@param buf integer
 ---@return string|nil
 local function search_root_line (buf)
   for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
-    if line:find('^%* %(skg %(node %(id leaf%-b%)') then
+    if T.without_viewnode_ids(line)
+         :find('^%* %(skg node %(gnid leaf%-b%)') then
       return line
     end
   end
@@ -57,7 +59,7 @@ search.request_text_search('bravo', false, false, false)
 local buf = T.wait_for_buffer(buffer.search_buffer_name('bravo'))
 T.check(buf ~= nil, 'search buffer never created')
 assert_leaf_b_root_is_content(buf, 'immediate search results')
-T.check(T.buffer_text(buf):find('(repo "Mr Cheese")', 1, true) ~= nil,
+T.check(T.buffer_text(buf):find('(skgRepos (nodeRepo "Mr Cheese"))', 1, true) ~= nil,
   'spaced repo name is quoted in phase 1')
 print('search buffer created')
 
@@ -75,10 +77,12 @@ if not found then
 end
 assert_leaf_b_root_is_content(buf, 'enriched search results')
 do -- leaf-b's first child is its folded containers folder, holding container-a.
-  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local lines = vim.split(
+    T.without_viewnode_ids(table.concat(
+      vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')), '\n')
   local root = nil
   for index, line in ipairs(lines) do
-    if line:sub(1, #'* (skg (node (id leaf-b)') == '* (skg (node (id leaf-b)' then
+    if line:sub(1, #'* (skg node (gnid leaf-b)') == '* (skg node (gnid leaf-b)' then
       root = index
       break
     end
@@ -87,7 +91,7 @@ do -- leaf-b's first child is its folded containers folder, holding container-a.
           and lines[root + 1]:sub(1, #'** (skg folded containerFolder')
               == '** (skg folded containerFolder'
           and lines[root + 2]:find(
-                '*** (skg (node (id container-a) (repo "Mr Cheese") writeProtected ',
+                '*** (skg node (gnid container-a) (skgRepos (nodeRepo "Mr Cheese")) writeProtected ',
                 1, true) == 1,
           "leaf-b's folded containers folder holds container-a. Buffer content:\n"
           .. T.buffer_text(buf))

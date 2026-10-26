@@ -247,7 +247,7 @@ end
 ---@return boolean does METADATA_SEXP describe an UnrestrictedVognode?
 function M.unrestrictedNode_sexp_p (metadata_sexp)
   return metadata_sexp ~= nil
-         and compare.subtree_p(metadata_sexp, { SKG, { NODE } })
+         and compare.subtree_p(metadata_sexp, { SKG, NODE })
 end
 
 ---The values after LABEL-PATH in SEXP, as in skg-sexp-cdr-at-path.
@@ -276,20 +276,21 @@ function M.sexp_cdr_at_path (sexp, path)
 end
 
 ---@param metadata_sexp any
----@return string|nil the node's skgrepo
+---@return string|nil the node's skgrepo, if METADATA_SEXP is a node's
 function M.node_repo (metadata_sexp)
+  if not M.unrestrictedNode_sexp_p(metadata_sexp) then return nil end
   local values = M.sexp_cdr_at_path(metadata_sexp,
-                                    { 'skg', 'node', 'repo' })
+                                    { 'skg', 'skgRepos', 'nodeRepo' })
   if values and values[1] ~= nil then
     return sexpr.atom_text(values[1]) end
   return nil
 end
 
 ---@param metadata_sexp any
----@return string|nil the node's id
+---@return string|nil the node's id, if METADATA_SEXP is a node's
 function M.node_id (metadata_sexp)
-  local values = M.sexp_cdr_at_path(metadata_sexp,
-                                    { 'skg', 'node', 'id' })
+  if not M.unrestrictedNode_sexp_p(metadata_sexp) then return nil end
+  local values = M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'gnid' })
   if values and values[1] ~= nil then
     return sexpr.atom_text(values[1]) end
   return nil
@@ -298,8 +299,11 @@ end
 ---@return string|nil the ID of the unknown phantom whose headline is
 ---at point
 function M.unknown_id_at_point ()
-  local values = M.sexp_cdr_at_path(M.metadata_sexp_at_line_or_nil(nil),
-                                    { 'skg', 'unknown', 'id' })
+  local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
+  if not (metadata_sexp and compare.subtree_p(
+            metadata_sexp, { SKG, sexpr.symbol('unknown') })) then
+    return nil end
+  local values = M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'gnid' })
   if values and values[1] ~= nil then
     return sexpr.atom_text(values[1]) end
   return nil
@@ -309,22 +313,22 @@ end
 ---@return boolean is it a member: does it lack the bare noClaim atom?
 function M.node_member_p (metadata_sexp)
   return not compare.subtree_p(metadata_sexp,
-    { SKG, { NODE, sexpr.symbol('noClaim') } })
+    { SKG, sexpr.symbol('noClaim') })
 end
 
 ---@param metadata_sexp any
 ---@return boolean does it request an editable view?
 function M.node_requests_editable_view_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
-    { SKG, { NODE, { sexpr.symbol('viewRequests'),
-                     sexpr.symbol('editableView') } } })
+    { SKG, { sexpr.symbol('viewRequests'),
+             sexpr.symbol('editableView') } })
 end
 
 ---@param metadata_sexp any
 ---@return boolean does it carry the bare write-protected atom?
 function M.node_write_protected_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
-    { SKG, { NODE, sexpr.symbol('writeProtected') } })
+    { SKG, sexpr.symbol('writeProtected') })
 end
 
 ---@return boolean has the headline at point no skg metadata?
@@ -371,7 +375,7 @@ end
 ---(editRequest delete)). Does not save.
 function M.delete ()
   M.edit_metadata_at_point(
-    sexpr.read('(skg (node (editRequest delete)))'))
+    sexpr.read('(skg node (editRequest delete))'))
   vim.notify(
     'This change will only be applied when you save the buffer.')
 end
@@ -381,7 +385,7 @@ end
 ---skipped. Does not save.
 function M.delete_recursive ()
   if not M.at_headline_p() then error('Not on a headline') end
-  local edits = sexpr.read('(skg (node (editRequest delete)))')
+  local edits = sexpr.read('(skg node (editRequest delete))')
   local start_line = M.current_line_number()
   local start_level = M.outline_level(start_line)
   M.edit_metadata_at_line(start_line, edits)
@@ -444,7 +448,8 @@ function M.populate_minimal_node_metadata ()
   local skgrepo = picker.prompt_for_owned_repo()
   if not skgrepo then return nil end
   M.edit_metadata_at_point(
-    sexpr.read(string.format('(skg (node (repo %s)))', skgrepo)))
+    sexpr.read(string.format('(skg node (skgRepos (nodeRepo %s)))',
+                             skgrepo)))
   return skgrepo
 end
 
@@ -586,10 +591,9 @@ end
 ---@return integer 1
 function M.change_repo_at_line (line_number, new_skgrepo)
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (node (ENSURE (repo %s)) (viewStats)))', new_skgrepo)))
+    '(skg (skgRepos (ENSURE (nodeRepo %s))) (viewStats))', new_skgrepo)))
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (node (viewStats (ENSURE (homeRepoHerald ⌂:%s)))))',
-    new_skgrepo)))
+    '(skg (viewStats (ENSURE (homeRepoHerald ⌂:%s))))', new_skgrepo)))
   return 1
 end
 
@@ -606,7 +610,7 @@ function M.set_merge_request (acquiree_id_or_link)
   if acquiree_skgid == '' then
     error('Acquiree ID cannot be empty') end
   M.edit_metadata_at_point(sexpr.read(string.format(
-    '(skg (node (DELETE (editRequest)) (editRequest (merge %s))))',
+    '(skg node (DELETE (editRequest)) (editRequest (merge %s)))',
     acquiree_skgid)))
   vim.notify(string.format(
     'Merge request set for acquiree %s. Save to apply.', acquiree_skgid))
@@ -630,7 +634,7 @@ M.restore_rel_without_a_removed_membership =
 function M.ghost_sexp_p (metadata_sexp)
   return metadata_sexp ~= nil
          and compare.subtree_p(metadata_sexp,
-                               { SKG, { sexpr.symbol('ghost') } })
+                               { SKG, sexpr.symbol('ghost') })
 end
 
 ---@param metadata_sexp any
@@ -640,7 +644,7 @@ end
 function M.removed_membership_p (metadata_sexp)
   if not M.unrestrictedNode_sexp_p(metadata_sexp) then return false end
   local rel = M.sexp_cdr_at_path(metadata_sexp,
-                                 { 'skg', 'node', 'diff', 'rel' })
+                                 { 'skg', 'diff', 'rel' })
   return rel ~= nil and #rel == 1
          and sexpr.atom_text(rel[1]) == 'removed'
 end
@@ -680,7 +684,7 @@ function M.vognode_sexp_p (metadata_sexp)
   if M.unrestrictedNode_sexp_p(metadata_sexp) then return true end
   for _, head in ipairs({ 'unknown', 'ghost' }) do
     if compare.subtree_p(metadata_sexp,
-                         { SKG, { sexpr.symbol(head) } }) then
+                         { SKG, sexpr.symbol(head) }) then
       return true end
   end
   return false
@@ -752,7 +756,7 @@ function M.restore_deleted_node ()
   if not M.ghost_sexp_p(M.metadata_sexp_at_line_or_nil(nil)) then
     error(M.restore_node_on_a_node_not_deleted, 0) end
   M.edit_metadata_at_point(sexpr.read(
-    '(skg (ghost (DELETE (editRequest)) (editRequest restoreNode)))'))
+    '(skg (DELETE (editRequest)) (editRequest restoreNode))'))
   vim.notify('Restore request set. Save to apply.')
 end
 
@@ -768,7 +772,7 @@ function M.restore_removed_membership ()
           and M.restoreRel_position_p(nil)) then
     error(M.restore_rel_without_a_removed_membership, 0) end
   M.edit_metadata_at_point(sexpr.read(
-    '(skg (node (DELETE (editRequest)) (editRequest restoreRel)))'))
+    '(skg (DELETE (editRequest)) (editRequest restoreRel))'))
   vim.notify('Restore request set. Save to apply.')
 end
 
@@ -817,7 +821,7 @@ function M.delete_value_from_metadata (value)
     split.stars, M.reconstruct_metadata_sexp(parsed), split.title))
 end
 
----HOST_SEXP with the 'fork' symbol removed from its node's
+---HOST_SEXP with the 'fork' symbol removed from its
 ---(viewRequests ...) form, dropping that form entirely if it becomes
 ---empty. The result equals HOST_SEXP when there was no fork request.
 ---@param host_sexp any
@@ -828,22 +832,13 @@ function M.remove_fork_from_viewrequests (host_sexp)
   local result = { host_sexp[1] }
   for i = 2, #host_sexp do
     local element = host_sexp[i]
-    if sexpr.is_list(element) and element[1] == NODE then
-      local node = { NODE }
-      for j = 2, #element do
-        local node_element = element[j]
-        if sexpr.is_list(node_element)
-           and node_element[1] == VIEWREQUESTS then
-          local kept = { VIEWREQUESTS }
-          for k = 2, #node_element do
-            if node_element[k] ~= FORK then
-              table.insert(kept, node_element[k]) end
-          end
-          if #kept > 1 then table.insert(node, kept) end
-        else
-          table.insert(node, node_element) end
+    if sexpr.is_list(element) and element[1] == VIEWREQUESTS then
+      local kept = { VIEWREQUESTS }
+      for k = 2, #element do
+        if element[k] ~= FORK then
+          table.insert(kept, element[k]) end
       end
-      table.insert(result, node)
+      if #kept > 1 then table.insert(result, kept) end
     else
       table.insert(result, element) end
   end

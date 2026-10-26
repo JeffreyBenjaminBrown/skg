@@ -9,7 +9,7 @@ describe('skg.buffer naming', function ()
   it('extracts the top headline title, metadata stripped', function ()
     assert.are.equal('hello world',
       buffer.extract_top_headline_title(
-        '* (skg (node (id abc) (repo main))) hello world\n** child'))
+        '* (skg node (gnid abc) (skgRepos (nodeRepo main))) hello world\n** child'))
     assert.are.equal('plain title',
       buffer.extract_top_headline_title('* plain title'))
     assert.is_nil(buffer.extract_top_headline_title('no headline here'))
@@ -32,7 +32,7 @@ describe('skg.buffer naming', function ()
   it('names content views from their title', function ()
     assert.are.equal('skg://my title',
       buffer.content_view_buffer_name(
-        '* (skg (node (id x))) my title\nbody'))
+        '* (skg node (gnid x)) my title\nbody'))
     assert.has_error(function ()
       buffer.content_view_buffer_name('not org at all') end)
   end)
@@ -53,7 +53,7 @@ describe('skg.buffer lifecycle and registry', function ()
 
   before_each(function ()
     require('skg.herald_rules').install_rules(
-      require('skg.sexpr.parse').read('(skg (node (id)))'))
+      require('skg.sexpr.parse').read('(skg node (gnid))'))
     wipe_skg_buffers()
   end)
   after_each(wipe_skg_buffers)
@@ -61,7 +61,7 @@ describe('skg.buffer lifecycle and registry', function ()
   it('opens a view buffer with view_id, filetype and clean state',
      function ()
     local buf = buffer.open_org_buffer_from_text(
-      '* (skg (node (id x))) t\n** child', 'skg://t', 'view_id-1')
+      '* (skg node (gnid x)) t\n** child', 'skg://t', 'view_id-1')
     assert.are.equal('view_id-1', vim.b[buf].skg_view_id)
     assert.are.equal('org', vim.bo[buf].filetype)
     assert.are.equal('acwrite', vim.bo[buf].buftype)
@@ -111,7 +111,7 @@ describe('skg.buffer lifecycle and registry', function ()
     local file_buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(file_buf, vim.fn.tempname() .. '.skg.org')
     vim.api.nvim_buf_set_lines(file_buf, 0, -1, false,
-      { '* (skg (node (id real))) looks skg-ish but is a file' })
+      { '* (skg node (gnid real)) looks skg-ish but is a file' })
     vim.bo[file_buf].filetype = 'org'
     buffer.close_all_skg_buffers()
     assert.is_false(vim.api.nvim_buf_is_valid(view))
@@ -159,7 +159,7 @@ describe('skg.buffer confirmation before dirtying another view', function ()
   end
   local function open (name)
     return buffer.open_org_buffer_from_text(
-      '* (skg (node (id x))) ' .. name, 'skg://' .. name, 'view_id-' .. name)
+      '* (skg node (gnid x)) ' .. name, 'skg://' .. name, 'view_id-' .. name)
   end
   local function edit (buf)
     vim.api.nvim_buf_set_lines(buf, 1, 1, false, { 'edit' })
@@ -184,7 +184,7 @@ describe('skg.buffer confirmation before dirtying another view', function ()
     edit(b) settle()
     assert.are.equal(1, asked)
     assert.is_false(vim.bo[b].modified)
-    assert.are.equal('* (skg (node (id x))) b', buffer.text(b))
+    assert.are.equal('* (skg node (gnid x)) b', buffer.text(b))
     assert.is_true(vim.bo[a].modified)
   end)
 
@@ -218,7 +218,7 @@ describe('skg.buffer confirmation before dirtying another view', function ()
     local b = open('b')
     edit(a) settle()
     require('skg.save').replace_buffer_with_new_content(
-      b, '* (skg (node (id y))) y')
+      b, '* (skg node (gnid y)) y')
     settle()
     assert.are.equal(0, asked)
     assert.is_false(vim.bo[b].modified)

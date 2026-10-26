@@ -64,7 +64,7 @@ print('=== PHASE 1: Open the diff view ===')
 require('skg.diff_view').diffView_open()
 local all_changes = T.wait_for(function ()
   local buf = all_changes_buffer()
-  if buf and T.buffer_text(buf):find('(id r)', 1, true) then return buf end
+  if buf and T.buffer_text(buf):find('(gnid r)', 1, true) then return buf end
   return nil
 end)
 if not all_changes then T.fail('Timeout waiting for the "all changes" buffer') end
@@ -76,7 +76,7 @@ do
   for _, expected in ipairs({
       '(oldText title)',                    -- t's text edit
       '(homeSkgrepoMove (old alpha) (new beta))',  -- m's move
-      '(ghost (gnid d)',                    -- d's deletion
+      'ghost (gnid d)',                    -- d's deletion
       'acquiredFolder' }) do                -- x's nodeMerge
     T.check(text:find(expected, 1, true) ~= nil,
             'the "all changes" buffer shows ' .. expected)
@@ -159,7 +159,7 @@ local view = T.wait_for(function ()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_content_view
        and not vim.api.nvim_buf_get_name(buf):find('diff-view: ', 1, true)
-       and T.buffer_text(buf):find('(unknown (id d))', 1, true) then
+       and T.buffer_text(buf):find('unknown (gnid d)', 1, true) then
       return buf end
   end
   return nil
@@ -167,7 +167,7 @@ end)
 if not view then T.fail('Timeout waiting for a view of r showing d as unknown') end
 vim.api.nvim_set_current_buf(view)
 for lnum, line in ipairs(vim.api.nvim_buf_get_lines(view, 0, -1, false)) do
-  if line:find('(unknown (id d))', 1, true) then
+  if line:find('unknown (gnid d)', 1, true) then
     vim.api.nvim_win_set_cursor(0, { lnum, 0 }) break end
 end
 require('skg.investigate_unknown_node').investigate_unknown_node()

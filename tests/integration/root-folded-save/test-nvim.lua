@@ -23,15 +23,15 @@ print('=== PHASE 1: request single-root view from server ===')
 -- stays deterministic; then activate the skg fold model so the
 -- overview-fold step below takes effect exactly as in the real flow.
 local org_text = table.concat({
-  '* (skg (node (id rfs-root) (repo main))) rfs-root',
+  '* (skg node (gnid rfs-root) (skgRepos (nodeRepo main))) rfs-root',
   'rfs-root body',
-  '** (skg (node (id rfs-c1) (repo main))) rfs-c1',
+  '** (skg node (gnid rfs-c1) (skgRepos (nodeRepo main))) rfs-c1',
   'rfs-c1 body',
-  '** (skg (node (id rfs-c2) (repo main))) rfs-c2',
+  '** (skg node (gnid rfs-c2) (skgRepos (nodeRepo main))) rfs-c2',
   'rfs-c2 body',
-  '*** (skg (node (id rfs-g1) (repo main))) rfs-g1',
+  '*** (skg node (gnid rfs-g1) (skgRepos (nodeRepo main))) rfs-g1',
   'rfs-g1 body',
-  '** (skg (node (id rfs-c3) (repo main))) rfs-c3',
+  '** (skg node (gnid rfs-c3) (skgRepos (nodeRepo main))) rfs-c3',
   'rfs-c3 body',
 }, '\n')
 
@@ -74,7 +74,7 @@ local first_line = vim.api.nvim_buf_get_lines(view, 0, 1, false)[1] or ''
 print(result)
 print('First line: ' .. first_line)
 
-T.check(result:find('(id rfs-root)', 1, true) ~= nil,
+T.check(result:find('(gnid rfs-root)', 1, true) ~= nil,
         'Result kept the root headline')
 T.check(first_line:match('^%* ') ~= nil,
         'First line is a level-1 headline: ' .. first_line)

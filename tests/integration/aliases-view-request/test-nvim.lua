@@ -6,19 +6,24 @@ T.arm_timeout(30)
 
 local sexpr = require('skg.sexpr.parse')
 local metadata = require('skg.metadata')
+local shared = require('skg.shared')
 
----The kind symbol name from an skg METADATA_TEXT sexp, e.g.
----'(skg (node ...))' -> 'node', '(skg aliasFolder)' -> 'aliasFolder'.
----Port of skg-aliases--metadata-kind.
+---The kind symbol name from an skg METADATA_TEXT sexp: the kind atom
+---among its top-level elements, bare or heading a list, e.g.
+---'(skg (vnid 0a) node ...)' -> 'node', '(skg aliasFolder)' ->
+---'aliasFolder'. Port of skg-aliases--metadata-kind.
 ---@param metadata_text string
----@return string
+---@return string|nil
 local function metadata_kind (metadata_text)
   local sexp = sexpr.read(metadata_text)
-  local payload = sexp[2]
-  if sexpr.is_list(payload) then
-    return sexpr.atom_text(payload[1])
+  for i = 2, #sexp do
+    local element = sexp[i]
+    local head = sexpr.is_list(element) and element[1] or element
+    if sexpr.is_symbol(head)
+       and shared.metadata_kind(sexpr.atom_text(head)) then
+      return sexpr.atom_text(head) end
   end
-  return sexpr.atom_text(payload)
+  return nil
 end
 
 ---TEXT with metadata details and body content removed: each headline
@@ -90,8 +95,8 @@ end
 print('=== SKG Aliases View Request Integration Test ===')
 
 local expected_with_aliases =
-  '* (skg (node (id test-node) (repo main)'
-  .. ' (rels (aliases 2)))) Test Node\n'
+  '* (skg node (gnid test-node) (skgRepos (nodeRepo main))'
+  .. ' (rels (aliases 2))) Test Node\n'
   .. '** (skg aliasFolder)\n'
   .. '*** (skg alias) first alias\n'
   .. '*** (skg alias) second alias\n'

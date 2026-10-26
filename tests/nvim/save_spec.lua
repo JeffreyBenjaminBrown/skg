@@ -146,14 +146,14 @@ describe('skg.save strandeds confirmation', function ()
         else
           respond(helpers.framed(
             '((response-type save-result)'
-            .. ' (content "* (skg (node (id n) (repo public))) n")'
+            .. ' (content "* (skg node (gnid n) (skgRepos (nodeRepo public))) n")'
             .. ' (errors ()) (warnings ()))'))
         end
       end
     end)
     vim.api.nvim_list_uis = function () return { {} } end
     vim.fn.confirm = function () return 1 end -- All
-    open_view('* (skg (node (id n) (repo public))) n',
+    open_view('* (skg node (gnid n) (skgRepos (nodeRepo public))) n',
               'skg://strandeds', 'view_id-strandeds')
     save.request_save_buffer()
     vim.wait(3000, function () return #requests >= 2 end, 10)
@@ -195,9 +195,9 @@ describe('skg.save pipeline', function ()
           '((response-type save-lock) (lock-views ()))'))
         respond(helpers.framed(
           '((response-type save-result)'
-          .. ' (content "* (skg (node (id root)) focused) root'
+          .. ' (content "* (skg node (gnid root) focused) root'
           .. '\\nroot body'
-          .. '\\n** (skg (node (id child)) folded) child")'
+          .. '\\n** (skg node (gnid child) folded) child")'
           .. ' (errors ()) (warnings ())'
           .. ' (point-lines-below-focused-headline 1)'
           .. ' (point-column 3)'
@@ -205,7 +205,7 @@ describe('skg.save pipeline', function ()
       end
     end)
     local buf = open_view(
-      '* (skg (node (id root))) root\nroot body\nedited line',
+      '* (skg node (gnid root)) root\nroot body\nedited line',
       'skg://save-me', 'view_id-save')
     vim.api.nvim_win_set_cursor(0, { 2, 4 })
     save.request_save_buffer()
@@ -236,10 +236,10 @@ describe('skg.save pipeline', function ()
     local asked = 0
     local real_confirm = vim.fn.confirm
     vim.fn.confirm = function () asked = asked + 1 return 2 end
-    local dirty = open_view('* (skg (node (id a))) a', 'skg://a', 'view_id-a')
+    local dirty = open_view('* (skg node (gnid a)) a', 'skg://a', 'view_id-a')
     vim.api.nvim_buf_set_lines(dirty, 1, 1, false, { 'edit' })
     local clean = open_view(
-      '* (skg (node (id b))) b\n** (skg (node (id c))) c',
+      '* (skg node (gnid b)) b\n** (skg node (gnid c)) c',
       'skg://b', 'view_id-b')
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     save.buffer_snapshot_with_save_metadata(clean, true)
@@ -260,11 +260,11 @@ describe('skg.save pipeline', function ()
           .. ' (lock-views (view_id-collateral)))'))
       end
     end)
-    local saved = open_view('* (skg (node (id a))) a',
+    local saved = open_view('* (skg node (gnid a)) a',
                             'skg://a', 'view_id-saved')
-    local collateral = open_view('* (skg (node (id b))) b',
+    local collateral = open_view('* (skg node (gnid b)) b',
                                  'skg://b', 'view_id-collateral')
-    local bystander = open_view('* (skg (node (id c))) c',
+    local bystander = open_view('* (skg node (gnid c)) c',
                                 'skg://c', 'view_id-bystander')
     vim.api.nvim_set_current_buf(saved)
     save.request_save_buffer()
@@ -287,16 +287,16 @@ describe('skg.save pipeline', function ()
     -- Stream the collateral update, then the terminal result.
     respond_fn(helpers.framed(
       '((response-type collateral-view) (view-id view_id-collateral)'
-      .. ' (content "* (skg (node (id b))) b updated"))'))
+      .. ' (content "* (skg node (gnid b)) b updated"))'))
     vim.wait(3000, function ()
       return vim.bo[collateral].modifiable end, 10)
     assert.is_true(vim.bo[collateral].modifiable)
-    assert.are.equal('* (skg (node (id b))) b updated',
+    assert.are.equal('* (skg node (gnid b)) b updated',
       vim.api.nvim_buf_get_lines(collateral, 0, 1, false)[1])
     assert.is_false(vim.bo[saved].modifiable) -- still awaiting result
     respond_fn(helpers.framed(
       '((response-type save-result)'
-      .. ' (content "* (skg (node (id a))) a") (errors ())'
+      .. ' (content "* (skg node (gnid a)) a") (errors ())'
       .. ' (warnings ()))'))
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
@@ -313,12 +313,12 @@ describe('skg.save pipeline', function ()
           '((response-type save-lock) (lock-views ()))'))
       end
     end)
-    local saved = open_view('* (skg (node (id a))) a',
+    local saved = open_view('* (skg node (gnid a)) a',
                             'skg://a', 'view_id-saved')
-    local dirty = open_view('* (skg (node (id b))) b\nlocal edit',
+    local dirty = open_view('* (skg node (gnid b)) b\nlocal edit',
                             'skg://b', 'view_id-dirty')
     vim.bo[dirty].modified = true
-    local clean = open_view('* (skg (node (id c))) c',
+    local clean = open_view('* (skg node (gnid c)) c',
                             'skg://c', 'view_id-clean')
     vim.api.nvim_set_current_buf(saved)
     save.request_save_buffer()
@@ -331,7 +331,7 @@ describe('skg.save pipeline', function ()
     assert.is_true(vim.bo[clean].modifiable)
     respond_fn(helpers.framed(
       '((response-type save-result)'
-      .. ' (content "* (skg (node (id a))) a")'
+      .. ' (content "* (skg node (gnid a)) a")'
       .. ' (errors ()) (warnings ()))'))
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
@@ -339,9 +339,9 @@ describe('skg.save pipeline', function ()
   end)
 
   it('retains every lock after a malformed relaxation', function ()
-    local saved = open_view('* (skg (node (id a))) a',
+    local saved = open_view('* (skg node (gnid a)) a',
                             'skg://a', 'view_id-saved')
-    local other = open_view('* (skg (node (id b))) b',
+    local other = open_view('* (skg node (gnid b)) b',
                             'skg://b', 'view_id-other')
     lock.lock_all_skg_buffers()
     save.save_relax_lock_handler(
@@ -358,11 +358,11 @@ describe('skg.save pipeline', function ()
           '((response-type save-lock) (lock-views ()))'))
         respond(helpers.framed(
           '((response-type save-result)'
-          .. ' (content "* (skg (node (id a))) a")'
+          .. ' (content "* (skg node (gnid a)) a")'
           .. ' (errors ()) (warnings ("careful there")))'))
       end
     end)
-    open_view('* (skg (node (id a))) a', 'skg://warn', 'view_id-warn')
+    open_view('* (skg node (gnid a)) a', 'skg://warn', 'view_id-warn')
     save.request_save_buffer()
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
@@ -391,7 +391,7 @@ describe('skg.save pipeline', function ()
           .. ' (warnings ()))'))
       end
     end)
-    open_view('* (skg (node (id a))) a', 'skg://binding', 'view_id-binding')
+    open_view('* (skg node (gnid a)) a', 'skg://binding', 'view_id-binding')
     save.request_save_buffer()
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
@@ -422,7 +422,7 @@ describe('skg.save pipeline', function ()
 
   it('refuses a second save while one streams', function ()
     server = helpers.connect_to_fake_server(function () end)
-    open_view('* (skg (node (id a))) a', 'skg://guard', 'view_id-guard')
+    open_view('* (skg node (gnid a)) a', 'skg://guard', 'view_id-guard')
     save.request_save_buffer()
     local ok, err = pcall(save.request_save_buffer)
     assert.is_false(ok)
@@ -437,7 +437,7 @@ describe('skg.save pipeline', function ()
 
   it('a pending save blocks search until terminal cleanup', function ()
     server = helpers.connect_to_fake_server(function () end)
-    open_view('* (skg (node (id a))) a', 'skg://guard-search',
+    open_view('* (skg node (gnid a)) a', 'skg://guard-search',
               'view_id-guard-search')
     save.request_save_buffer()
     local ok, err = pcall(
@@ -475,8 +475,8 @@ describe('skg.save fork confirmation', function ()
 
   local fork_confirmation_payload =
     '((response-type fork-confirmation)'
-    .. ' (content "* (skg (node (repo PICK-A-REPO))) clone-to-be'
-    .. '\\n** (skg (node (id foreign-1))) the original")'
+    .. ' (content "* (skg node (skgRepos (nodeRepo PICK-A-REPO))) clone-to-be'
+    .. '\\n** (skg node (gnid foreign-1)) the original")'
     .. ' (to-minibuffer "Approve or decline the fork."))'
 
   local function save_and_get_confirmation ()
@@ -496,14 +496,14 @@ describe('skg.save fork confirmation', function ()
             '((response-type save-lock) (lock-views ()))'))
           respond(helpers.framed(
             '((response-type save-result)'
-            .. ' (content "* (skg (node (id foreign-1))) saved")'
+            .. ' (content "* (skg node (gnid foreign-1)) saved")'
             .. ' (errors ()) (warnings ()))'))
         end
       end
     end)
     local source = open_view(
-      '* (skg (node (id foreign-1)'
-      .. ' (viewRequests fork))) the original edited',
+      '* (skg node (gnid foreign-1)'
+      .. ' (viewRequests fork)) the original edited',
       'skg://source', 'view_id-origin')
     save.request_save_buffer()
     vim.wait(3000, function ()
@@ -518,12 +518,12 @@ describe('skg.save fork confirmation', function ()
     -- Mirrors the two-level skgrepo walk (+ no leak across parents).
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-      '* (skg (node (repo src-one))) clone one',
-      '** (skg (node (id orig-1))) original one',
+      '* (skg node (skgRepos (nodeRepo src-one))) clone one',
+      '** (skg node (gnid orig-1)) original one',
       '* metadata-less parent',
-      '** (skg (node (id orphan))) must not inherit src-one',
-      '* (skg (node (repo src-two))) clone two',
-      '** (skg (node (id orig-2))) original two' })
+      '** (skg node (gnid orphan)) must not inherit src-one',
+      '* (skg node (skgRepos (nodeRepo src-two))) clone two',
+      '** (skg node (gnid orig-2)) original two' })
     assert.are.same(
       { { 'orig-1', 'src-one' }, { 'orig-2', 'src-two' } },
       save.fork_repos_from_confirmation_buffer(buf))

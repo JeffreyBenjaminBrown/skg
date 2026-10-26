@@ -216,19 +216,6 @@ function M.token_text (token)
   return table.concat(pieces)
 end
 
----Find the first (rels ...) sub-list anywhere within SEXP, else nil.
----@param sexp any
----@return table|nil
-function M.find_rels (sexp)
-  if not sexpr.is_list(sexp) then return nil end
-  if sexp[1] == sexpr.symbol('rels') then return sexp end
-  for i = 1, #sexp do
-    local found = M.find_rels(sexp[i])
-    if found then return found end
-  end
-  return nil
-end
-
 -- ── relationship heralds: render the server's semantic facts ─────────
 -- All presentation lives here (letters, styles, order, count-omission,
 -- fractions); the server sends only facts. The letters and order come
@@ -439,12 +426,10 @@ end
 ---@param sexp any
 ---@return table[]|nil
 function M.render_rel_facts (sexp)
-  local rels = M.find_rels(sexp)
+  local rels = assq(sexp, 'rels')
   if not rels then return nil end
-  local node = assq(sexp, 'node')
-  local view_stats = assq(node, 'viewStats')
-  local overrides_here = assq(view_stats, 'overridesHere') ~= nil
-  local write_protected = has_atom(node, 'writeProtected')
+  local overrides_here = assq(sexp, 'overridesHere') ~= nil
+  local write_protected = has_atom(sexp, 'writeProtected')
   local birth = {}
   local birth_form = assq(rels, 'birth')
   if birth_form then

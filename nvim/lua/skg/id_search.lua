@@ -101,25 +101,28 @@ function M.metadata_sexp_contains_id_p (sexp)
   return M.extract_id_from_metadata_sexp(sexp) ~= nil
 end
 
----Where each shape that bears an id keeps it: an UnrestrictedVognode
----in '(node (id X))', a ghost in '(ghost (gnid X))'.
-local id_paths = { { 'skg', 'node', 'id' }, { 'skg', 'ghost', 'gnid' } }
+---The kinds whose headline bears an id and a skgrepo: an
+---UnrestrictedVognode and a ghost. Each keeps its id in '(gnid X)' and
+---its skgrepo in '(skgRepos (nodeRepo R))', beside its kind atom.
+local id_bearing_kinds = { 'node', 'ghost' }
 
----Where the same shapes keep their skgrepo: '(node (repo R))' and
----'(ghost (skgRepos (nodeRepo R)))'.
-local repo_paths = { { 'skg', 'node', 'repo' },
-                     { 'skg', 'ghost', 'skgRepos', 'nodeRepo' } }
-
----The first atom at any of PATHS in SEXP, or nil.
+---The first atom at PATH in SEXP, if SEXP is of one of the
+---id-bearing kinds; else nil.
 ---@param sexp any
----@param paths string[][]
+---@param path string[]
 ---@return string|nil
-local function first_atom_at_paths (sexp, paths)
-  for _, path in ipairs(paths) do
-    local values = metadata.sexp_cdr_at_path(sexp, path)
-    if values and values[1] ~= nil then
-      return sexpr.atom_text(values[1]) end
+local function first_atom_at_path_of_id_bearing_kind (sexp, path)
+  if not sexpr.is_list(sexp) then return nil end
+  local id_bearing = false
+  for _, kind in ipairs(id_bearing_kinds) do
+    for i = 2, #sexp do
+      if sexp[i] == sexpr.symbol(kind) then id_bearing = true end
+    end
   end
+  if not id_bearing then return nil end
+  local values = metadata.sexp_cdr_at_path(sexp, path)
+  if values and values[1] ~= nil then
+    return sexpr.atom_text(values[1]) end
   return nil
 end
 
@@ -128,14 +131,15 @@ end
 ---@param sexp any
 ---@return string|nil
 function M.extract_id_from_metadata_sexp (sexp)
-  return first_atom_at_paths(sexp, id_paths)
+  return first_atom_at_path_of_id_bearing_kind(sexp, { 'skg', 'gnid' })
 end
 
 ---The skgrepo from SEXP, same shapes as the id extractor.
 ---@param sexp any
 ---@return string|nil
 function M.extract_repo_from_metadata_sexp (sexp)
-  return first_atom_at_paths(sexp, repo_paths)
+  return first_atom_at_path_of_id_bearing_kind(
+    sexp, { 'skg', 'skgRepos', 'nodeRepo' })
 end
 
 ---If LINE_NUMBER's line has metadata bearing an id, the 0-based byte

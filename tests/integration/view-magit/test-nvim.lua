@@ -81,7 +81,7 @@ print('=== SKG View-Magit Integration Test ===')
 -- PHASE 0: connect and request a content view of x.
 print('=== PHASE 0: Init and request content view ===')
 require('skg.content_view').request_single_root_content_view_from_id('x')
-local content_view = find_content_view_buffer_matching('(id x)')
+local content_view = find_content_view_buffer_matching('(gnid x)')
 if not content_view then T.fail('Timeout waiting for content view of x') end
 T.check(true, 'Content view of x loaded')
 

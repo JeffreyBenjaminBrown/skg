@@ -40,7 +40,7 @@ local function phase_0_search ()
 
   local search_buf = T.wait_for_buffer(buffer.search_buffer_name('has'), 5)
   if not (search_buf
-          and T.buffer_text(search_buf):find('(id src)', 1, true)) then
+          and T.buffer_text(search_buf):find('(gnid src)', 1, true)) then
     T.fail('Timeout waiting for search results')
   end
   return search_buf
@@ -54,7 +54,7 @@ local function phase_1_visit_src (search_buffer)
 
   local content = T.buffer_text(search_buffer)
   print('Search results: ' .. content)
-  if not content:find('(id src)', 1, true) then
+  if not content:find('(gnid src)', 1, true) then
     T.fail('Expected src node in search results, got: ' .. content)
   end
   print('Found src in search results')
@@ -65,11 +65,11 @@ local function phase_1_visit_src (search_buffer)
   local lines = vim.api.nvim_buf_get_lines(search_buffer, 0, -1, false)
   local target_line, target_col
   for i, line in ipairs(lines) do
-    local start = line:find('(id src)', 1, true)
+    local start = line:find('(gnid src)', 1, true)
     if start then target_line, target_col = i, start - 1 break end
   end
   if not target_line then
-    T.fail('Could not find (id src) in search results')
+    T.fail('Could not find (gnid src) in search results')
   end
   vim.api.nvim_win_set_cursor(0, { target_line, target_col })
   print('Line: ' .. lines[target_line])

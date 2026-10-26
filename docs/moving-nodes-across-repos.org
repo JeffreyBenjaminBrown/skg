@@ -66,19 +66,19 @@ file stays put.
 ** what skg does internally
 *** the metadata representation
 There is no dedicated "move" command. Moves are inferred from a
-buffer save: if you change the =(repo ...)= entry inside a node's
+buffer save: if you change the =(nodeRepo ...)= entry inside a node's
 metadata sexp and save, skg detects the change and performs the move.
 
 For example, given a node whose =.skg= file currently lives in =public/=:
 
 #+begin_src org
-  * (skg (node (id b) (repo public))) b
+  * (skg node (gnid b) (skgRepos (nodeRepo public))) b
 #+end_src
 
 You change the metadata to:
 
 #+begin_src org
-  * (skg (node (id b) (repo private))) b
+  * (skg node (gnid b) (skgRepos (nodeRepo private))) b
 #+end_src
 
 When you save, skg compares the buffer's =repo= field for =b= to

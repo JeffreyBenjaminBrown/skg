@@ -51,7 +51,7 @@ describe('skg absent-reference cleanup', function ()
       end
     end)
     local unknown = buffer.open_org_buffer_from_text(
-      '* (skg (node (id recorder))) recorder\n** (skg (unknown (id gone)))',
+      '* (skg node (gnid recorder)) recorder\n** (skg unknown (gnid gone))',
       'skg://recorder', 'cleanup-view_id')
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     cleanup.request()
@@ -70,12 +70,12 @@ describe('skg absent-reference cleanup', function ()
 
   it('refuses a non-Unknown point and every dirty view', function ()
     local normal = buffer.open_org_buffer_from_text(
-      '* (skg (node (id recorder))) recorder', 'skg://recorder', 'normal-view_id')
+      '* (skg node (gnid recorder)) recorder', 'skg://recorder', 'normal-view_id')
     local ok, err = pcall(cleanup.request)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find('Unknown headline', 1, true))
     vim.api.nvim_buf_set_lines(normal, 0, -1, false, {
-      '* (skg (unknown (id gone)))' })
+      '* (skg unknown (gnid gone))' })
     vim.bo[normal].modified = true
     ok, err = pcall(cleanup.request)
     assert.is_false(ok)

@@ -26,6 +26,7 @@ local ANY = parse.symbol('ANY')
 local IT = parse.symbol('IT')
 local ABUT = parse.symbol('ABUT')
 local INTERC = parse.symbol('INTERC')
+local WHEN = parse.symbol('WHEN')
 
 ---The style keywords: each style name in 'shared/herald-styles.json',
 ---in capitals, as the served rule table spells it.
@@ -87,7 +88,8 @@ end
 ---effects. Both OBJECT and RULES are nested sexps whose first element
 ---at any level is an atom (the 'label'), except that a style
 ---directive may precede a rule's label. See the file header and the
----test suite for the rule grammar (ANY, IT, ABUT, INTERC, styles).
+---test suite for the rule grammar (ANY, IT, ABUT, INTERC, WHEN,
+---styles).
 ---@param object any
 ---@param rules any
 ---@return table[] tokens
@@ -102,16 +104,29 @@ end
 
 ---Parse RULE once and classify it.
 ---Grammar:
----  RULE        ::= [STYLE] (INTERC-BODY | SIMPLE-BODY)
+---  RULE        ::= WHEN-BODY | [STYLE] (INTERC-BODY | SIMPLE-BODY)
+---  WHEN-BODY   ::= WHEN LABEL... CHILDREN...
 ---  INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
 ---  SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
+---A WHEN body's LABELs are the symbols after WHEN, up to the first
+---list or string; its kind is 'when' (see 'apply_when').
 ---Classification for simple bodies: 'non_leaf' if any child is a
 ---list; 'any_leaf' if the label is ANY (and it is a leaf);
 ---'atomic_leaf' otherwise.
 ---@param rule any[]
----@return table header {kind, style, label, separator, abut, children}
+---@return table header {kind, style, label, labels, separator, abut, children}
 function M.rule_header (rule)
   local index = 1
+  if rule[index] == WHEN then
+    index = index + 1
+    local labels = {}
+    while parse.is_symbol(rule[index]) do
+      table.insert(labels, rule[index])
+      index = index + 1 end
+    return { kind = 'when', style = nil, label = nil, labels = labels,
+             separator = nil, abut = false,
+             children = M.elements_from(rule, index) }
+  end
   local style = nil
   if M.is_style_keyword(rule[index]) then
     style = rule[index]
@@ -152,8 +167,8 @@ end
 ---When any list child fires, the prefix is concatenated (no
 ---separator) before each of its outputs. When no list child fires but
 ---the prefix is non-empty, the prefix is emitted alone -- so rules
----like (CRUCIAL ghost "☮" (gnid) (skgRepos (nodeRepo))) serve as a label for the
----structure even when their sub-rules are vacuous.
+---like (CRUCIAL label "☮" (part)) serve as a label for the structure
+---even when their sub-rules are vacuous.
 ---@param object any[]
 ---@param header table
 ---@param current_style table|nil
@@ -199,6 +214,8 @@ end
 function M.dispatch (object, rule_child, current_style)
   if not parse.is_list(rule_child) then return {} end
   local header = M.rule_header(rule_child)
+  if header.kind == 'when' then
+    return M.apply_when(object, header, current_style) end
   if header.kind == 'interc' then
     return M.apply_interc(object, header, current_style) end
   if header.kind == 'any_leaf' then
@@ -206,6 +223,37 @@ function M.dispatch (object, rule_child, current_style)
   if header.kind == 'atomic_leaf' then
     return M.apply_ordinary_leaf(object, header, current_style) end
   return M.apply_non_leaf(object, header, current_style)
+end
+
+---Apply a WHEN HEADER, '(WHEN LABEL... CHILDREN...)', to OBJECT.
+---When OBJECT holds an element labeled one of the LABELs -- that atom
+---itself, or a list headed by it ('(flag noSearchMatching)') -- the
+---CHILDREN apply to OBJECT itself, as an INTERC rule without a label
+---applies its sub-rules, and their outputs are emitted in order (a
+---literal-string child is a prefix, as in any rule). Otherwise
+---nothing is emitted. This lets one '(skg ...)' table hold rules
+---that fire only for one kind of headline, whose parts stand beside
+---its kind atom: '(WHEN ghost (gnid) (skgRepos (nodeRepo)))'.
+---@param object any[]
+---@param header table
+---@param current_style table|nil
+---@return table[] tokens
+function M.apply_when (object, header, current_style)
+  for _, label in ipairs(header.labels) do
+    if M.object_holds_label(object, label) then
+      return M.transform_from(object, header, current_style) end
+  end
+  return {}
+end
+
+---Whether OBJECT has, among its elements from index 2, the atom LABEL
+---or a list headed by LABEL.
+---@param object any[]
+---@param label any
+---@return boolean
+function M.object_holds_label (object, label)
+  return #M.object_atomic_matches(object, label) > 0
+    or #M.object_children_with_label(object, label) > 0
 end
 
 ---Apply an INTERC HEADER to OBJECT. With a LABEL: one combined token

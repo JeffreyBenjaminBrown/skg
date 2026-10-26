@@ -20,7 +20,7 @@ function M.request_view_and_save (view_request_text)
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line, sexpr.read(string.format(
-    '(skg (node (viewRequests %s)))', view_request_text)))
+    '(skg node (viewRequests %s))', view_request_text)))
   require('skg.save').request_save_buffer()
 end
 
@@ -49,7 +49,7 @@ function M.set_editable ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line,
-    sexpr.read('(skg (node (viewRequests editableView)))'))
+    sexpr.read('(skg node (viewRequests editableView))'))
 end
 
 ---Request write-protection for the headline at point. At the next
@@ -64,7 +64,7 @@ function M.request_write_protected ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line,
-    sexpr.read('(skg (node (viewRequests writeProtectedView)))'))
+    sexpr.read('(skg node (viewRequests writeProtectedView))'))
 end
 
 ---Request write-protection for the headline at point and its whole
@@ -76,7 +76,7 @@ function M.request_write_protected_recursive ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end
   metadata.edit_metadata_at_line(line,
-    sexpr.read('(skg (node (viewRequests writeProtectedSubtreeView)))'))
+    sexpr.read('(skg node (viewRequests writeProtectedSubtreeView))'))
 end
 
 ---Fork the (owned) node at point: create a private clone that
@@ -97,10 +97,10 @@ end
 M.not_a_ghost = 'Only a ghost can be entombstoned'
 M.no_ghost_in_buffer = 'No ghost in this buffer'
 
----The edit that stamps the tombstone view request into a ghost's form.
+---The edit that stamps the tombstone view request onto a ghost.
 ---@return any
 local function tombstone_request_edit ()
-  return sexpr.read('(skg (ghost (viewRequests tombstone)))')
+  return sexpr.read('(skg (viewRequests tombstone))')
 end
 
 ---Ask the next save to entombstone the ghost at point: it keeps what

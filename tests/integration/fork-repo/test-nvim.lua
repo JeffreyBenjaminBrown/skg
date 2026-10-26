@@ -13,9 +13,9 @@ local content_view = require('skg.content_view')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
 
----Return a live skg view buffer whose text mentions (id ID).
+---Return a live skg view buffer whose text mentions (gnid ID).
 local function buffer_showing (skgid)
-  local needle = '(id ' .. skgid .. ')'
+  local needle = '(gnid ' .. skgid .. ')'
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) and vim.b[buf].skg_view_id ~= nil
        and T.buffer_text(buf):find(needle, 1, true) then
@@ -72,7 +72,7 @@ T.check(p_buf, "P's view never appeared")
 vim.api.nvim_set_current_buf(p_buf)
 
 -- 2. Make N editable and edit its title -- the fork gesture.
-local n_line = goto_line_containing('(id N) (repo foreign)',
+local n_line = goto_line_containing('(gnid N) (skgRepos (nodeRepo foreign))',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
@@ -93,7 +93,7 @@ vim.api.nvim_set_current_buf(confirm_buf)
 -- suggests the inferred skgrepo in a comment line (fork.rs; documented
 -- in COMMANDS.org and glossary.org), as the elisp original asserts too.
 local confirmation_text = T.buffer_text(confirm_buf)
-T.check(confirmation_text:find('(repo PICK-A-REPO)', 1, true),
+T.check(confirmation_text:find('(skgRepos (nodeRepo PICK-A-REPO))', 1, true),
         'clone-to-be carries the PICK-A-REPO placeholder')
 T.check(confirmation_text:find('Suggested repo for the clone'
                                .. ' below: owned', 1, true),
@@ -103,7 +103,7 @@ T.check(confirmation_text:find('Suggested repo for the clone'
 local clone_line = goto_line_starting_with('* (skg',
   'could not find the clone-to-be headline')
 metadata.change_repo_at_line(clone_line, 'owned2')
-T.check(T.buffer_text(confirm_buf):find('(repo owned2)', 1, true),
+T.check(T.buffer_text(confirm_buf):find('(skgRepos (nodeRepo owned2))', 1, true),
         'rotation did not set repo owned2')
 print("rotated the clone's repo to owned2")
 

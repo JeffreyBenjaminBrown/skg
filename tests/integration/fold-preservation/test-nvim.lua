@@ -17,7 +17,7 @@ local function diffView_all_changes_buffer ()
   for _, b in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(b)
        and vim.api.nvim_buf_get_name(b):find('diff-view: all changes', 1, true)
-       and T.buffer_text(b):find('(id dvroot)', 1, true) then
+       and T.buffer_text(b):find('(gnid dvroot)', 1, true) then
       return b end
   end
   return nil
@@ -39,8 +39,8 @@ print('=== SKG Fold Preservation Integration Test ===')
 -- PHASE 1: create the buffer with content.
 print('=== PHASE 1: Creating buffer with content ===')
 local content = table.concat({
-  '* (skg (node (repo main))) a',
-  '* (skg (node (repo main))) b',
+  '* (skg node (skgRepos (nodeRepo main))) a',
+  '* (skg node (skgRepos (nodeRepo main))) b',
   '** c',
   '** d',
   '*** d1',

@@ -367,3 +367,90 @@ the commands: in the diff view a ghost is a pending change,
 shown until it is restored or committed, and the stateless rule
 leaves no honest place to remember a dismissal.
 
+** Slice 4: the grammar's shape
+*** What's done
+The printer writes, and the parser reads, one flat shape:
+'(vnid X)' first, the position atoms, the kind as a bare atom,
+every part beside it at the top level, in any order on read.
+'(gnid X)' replaces '(id X)'; '(skgRepos (nodeRepo R)
+[(relRepo R)])' replaces '(repo R)' and the relRepo of the
+node's viewStats, the unknown's viewStats and the alias's top
+level. The parser classifies each element (position, kind or
+part), checks the parts against the kind ('parts_of_kind') and
+refuses the retired spellings naming 'METADATA_GRAMMAR'; the
+legacy rejection of top-level 'id', 'repo', 'view', 'code' is
+gone. 'fork.rs' writes its two headlines to the grammar
+('fork_clone_headline', 'forked_original_headline'), without
+the dead 'parentOverrides' ('TODO/problems.org' entry moved to
+'TODO/DONE/problems.org'). 'metadata_canon.rs' puts a vnid
+first. 'shared/metadata-fields.json' lost 'fields_at'. New
+tests: 'tests/metadata_grammar.rs'.
+*** Deviations from the plan's "how"
+**** the kinds with a parameter keep their small forms
+"Every kind a bare atom" names 'flag', 'oldText', the two moves
+and 'changesetMarker', but the plan gives their parameters no
+part to stand in. They keep '(flag F)', '(oldText ASPECT)',
+'(homeSkgrepoMove (old R) (new R))', '(relRepoMove ...)' and
+'(changesetMarker KIND)', the form's head being the kind, as
+'(FOLDER changed)' stays until slice 5.
+**** overridesHere moved to the top level now
+It is a declared part, which the shape puts beside the kind,
+and no later slice names its move, so it left '(viewStats ...)'
+in this slice, written after 'writeProtected'.
+**** a headline naming no kind is a node
+As '(skg focused)' was before: a client marks a new headline
+before it has metadata. So '(skg (diff (rel added)))' parses
+now (a node with a diff); its refusal test became a
+tombstone's.
+**** the herald table gained a WHEN directive
+With the parts flat, the lens could no longer tell a node's
+'(diff ...)' (∃+, ~+, M) from a property's (+, -) or an
+unknown's (~+, ~-). '(WHEN KIND... RULE...)' applies its rules
+to the headline when one of its elements is labeled KIND; the
+table puts the node's, the ghost's, the unknown's and the
+alias's rules, and the one-object diff rules, under WHENs, so
+every rendering case renders as before. Both clients' lens
+engines learned it. Slice 6 may keep or replace it.
+**** the clients
+Both clients read parts at the top level and find the kind by
+its atom (looked up in 'shared/metadata-fields.json'); new
+metadata is '(skg node (skgRepos (nodeRepo R)))'; the editors
+show 'skgRepos' and 'nodeRepo' where 'repo' stood, the fields at
+level 2 beside the kind. A fold command on a headline with no
+metadata still writes a kindless '(skg folded)', which the
+server reads as a node. The clients do not refuse the retired
+spellings themselves; they no longer match them, and the server
+refuses them.
+**** the fixtures were converted by three scripts
+'tests/results/slice4/convert_metadata_shape.py' (whole forms
+and '(skg' prefixes), 'convert_fragments.py' ('(id X)',
+'(repo X)' fragments) and 'convert_kind_fragments.py'
+('(node (gnid ...' fragments); the rest by hand: tests that
+matched '(skg ...' prefixes against lines whose vnid is now
+first compare without the vnid, fragments that closed the node
+form lost one paren, and two protocol responses the fragment
+script wrongly touched were restored.
+*** Suite failures and their classification
+**** first failure: 71 Rust tests
+Expected fixture adaptation: prefixes that met the vnid now
+first, closing parens of the old node form, offsets after
+'(id ', messages naming the old parser's keys, the fork
+buffer's 'parentOverrides', and malformed cases that the flat
+shape makes well-formed. A throwaway run with vnids unprinted
+('nextest-experiment-no-vnids.log') failed only tests that
+need vnids, so no negative assertion passes vacuously.
+**** client unit suites: 93 ERT tests, several plenary specs
+Expected fixture adaptation: label paths of the old forms, the
+metadata editor's levels, and parens the script left where an
+old form spanned joined strings. Both suites pass in full.
+**** integration (Emacs): 6 tests
+Expected fixture adaptation: their scripts read the kind as the
+second element (now the vnid) or used the old paths; fixed in
+the scripts and 'save_collateral_break_cycle/test-helpers.el'.
+**** dangling_reference_renders_unknown_node, once
+Unrelated: "Directory not empty" at cleanup in a full run, the
+flake slices 0 to 3 met in two other tests; it passes alone and
+in the next full run.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 3, with either
+client.

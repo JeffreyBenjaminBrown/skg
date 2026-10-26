@@ -49,10 +49,10 @@ local function test_title_search ()
   local content = T.buffer_text(search_buffer)
   print('Search results received')
   print('Content: ' .. content)
-  if content:find('(id apples)', 1, true) then
+  if content:find('(gnid apples)', 1, true) then
     print('PASS: Found apples node in search results')
   else
-    T.fail('Expected pattern: (id apples). Got: ' .. content)
+    T.fail('Expected pattern: (gnid apples). Got: ' .. content)
   end
   return search_buffer
 end
@@ -66,7 +66,7 @@ local function test_visit_link (search_buffer)
   local lines = vim.api.nvim_buf_get_lines(search_buffer, 0, -1, false)
   local target_line, target_col
   for i, line in ipairs(lines) do
-    local start = line:find('(id apples)', 1, true)
+    local start = line:find('(gnid apples)', 1, true)
     if start then
       target_line, target_col = i, start - 1
       break

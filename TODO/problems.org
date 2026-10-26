@@ -847,18 +847,6 @@ gap too. Details, options and questions:
    glyph column, 'glyph()', and that test -- or, if a fixed per-role
    glyph is still wanted somewhere, document where. Left alone for now
    (a self-consistent const + test, out of scope for the search feature).
-** FIX PLANNED: fork.rs hand-emits a (viewStats parentOverrides) atom that no longer renders
-   server/from_text/fork.rs:266 writes '(viewStats parentOverrides)' on
-   the original under its clone-to-be in the fork-confirmation buffer,
-   to mark it with the old red "pO" herald. But 'parentOverrides' is no
-   longer a ViewNodeStats field and has no rule in server/heralds.rs
-   (grep finds none), so the lens engine renders nothing for it -- the
-   "this is the node your clone overrides" cue is silently gone from the
-   fork-confirmation buffer. Fix: emit the equivalent under the new
-   grammar (an 'aO'-style token, or a dedicated viewStats atom with a
-   heralds.rs rule), or drop the dead atom deliberately. Needs a Jeff
-   decision on whether that cue is still wanted.
-
 * Herald rule-table retirement remains separate (reviewed 2026-09-23)
   The September herald audit rewrote 'api-and-formats.org' to document
   semantic '(rels ...)' facts and linked the user legend in
