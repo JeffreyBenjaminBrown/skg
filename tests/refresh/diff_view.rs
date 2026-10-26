@@ -69,7 +69,7 @@ fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
   assert_eq! ( run . outline (), "\
 node p
   node g wp" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Rekinded ("node") ] ); }
+  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
 
 #[test]
 fn a_property_head_alone_has_is_a_member_with_a_ghost_warrant () {

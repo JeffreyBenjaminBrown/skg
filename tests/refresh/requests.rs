@@ -195,7 +195,7 @@ node p
   assert! ( ! run . text . contains ("editRequest"), "{}", run . text );
   assert_eq! ( run . correction_kinds (),
                vec! [ CorrectionKind::EditRequestDropped,
-                      CorrectionKind::Rekinded ("unknown") ] ); }
+                      CorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
 
 #[test]
 fn a_search_stub_of_write_protected_hits_draws_each_hits_containers () {

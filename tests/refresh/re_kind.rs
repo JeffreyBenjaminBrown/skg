@@ -31,7 +31,7 @@ node p
   assert_eq! ( x . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
                "the unknown keeps the occurrence's vnid" );
   assert_eq! ( run . correction_kinds (),
-               vec! [ CorrectionKind::Rekinded ("unknown") ] ); }
+               vec! [ CorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
 
 #[test]
 fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
@@ -85,7 +85,7 @@ fn an_unknown_whose_node_appeared_becomes_an_occurrence () {
   assert_eq! ( run . outline (), "\
 node p
   node u" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Rekinded ("node") ] ); }
+  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
 
 #[test]
 fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {

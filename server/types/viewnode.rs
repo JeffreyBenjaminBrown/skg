@@ -180,6 +180,26 @@ pub enum Vognode {
   Unknown      (Unknown),
 }
 
+/// The kind of a vognode, without its payload.
+#[derive( Debug, Clone, Copy, PartialEq, Eq )]
+pub enum VognodeKind {
+  Occurrence,
+  Ghost,
+  Unknown,
+}
+
+impl VognodeKind {
+  /// The kind as a message names it, with its article: "an
+  /// occurrence", "a ghost", "an unknown".
+  pub fn with_article (
+    &self,
+  ) -> &'static str {
+    match self {
+      VognodeKind::Occurrence => "an occurrence",
+      VognodeKind::Ghost      => "a ghost",
+      VognodeKind::Unknown    => "an unknown", } }
+}
+
 /// A reference that resolves to nothing: a gnid that its parent's
 /// list names and no node answers to.
 ///

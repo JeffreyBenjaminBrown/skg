@@ -23,7 +23,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, NodeEditRequest, PropertyMember, RelationshipEditRequest,
-  Unknown, Occurrence, Viewnode, ViewnodeKind, Vognode, Warrant,
+  Unknown, Occurrence, Viewnode, ViewnodeKind, Vognode, VognodeKind, Warrant,
   default_occurrence};
 use crate::update_buffer::completion_mode::CompletionMode;
 
@@ -137,7 +137,7 @@ pub(crate) fn rekind_vognode (
         walk . drawn_editable . insert (child); }
       if requests . restore_node {
         walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
-      walk . corrections . record (tree, child, CorrectionKind::Rekinded ("node")); },
+      walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Occurrence)); },
     ( IdRuleAnswer::Ghost (pid), Vognode::Ghost (ghost) ) =>
       refresh_ghost_in_place (tree, child, ghost, &pid, walk),
     ( IdRuleAnswer::Ghost (pid), other ) => {
@@ -159,7 +159,7 @@ pub(crate) fn rekind_vognode (
       set_vognode_keeping_readiness (tree, child, Vognode::Ghost (ghost));
       if requests . any () {
         walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
-      walk . corrections . record (tree, child, CorrectionKind::Rekinded ("ghost")); },
+      walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Ghost)); },
     ( IdRuleAnswer::Unknown, Vognode::Unknown (unknown) ) => {
       let relRepo : Option<SkgrepoName> = goal_relRepo (parent_goal, &gnid);
       if let ViewnodeKind::Vognode (Vognode::Unknown (unknown_mut)) =
@@ -183,7 +183,7 @@ pub(crate) fn rekind_vognode (
           claimsMembership        : true, } ));
       if dropped {
         walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
-      walk . corrections . record (tree, child, CorrectionKind::Rekinded ("unknown")); },
+      walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Unknown)); },
     ( IdRuleAnswer::Tombstone, other ) => {
       forget_editable_occurrence (&other, child, walk);
       entombstone (tree, child, walk); }, }

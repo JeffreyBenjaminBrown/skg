@@ -16,7 +16,7 @@
 
 use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
-use crate::types::viewnode::{Viewnode, ViewnodeId};
+use crate::types::viewnode::{Viewnode, ViewnodeId, VognodeKind};
 use crate::types::views_state::ViewforestId;
 
 use sexp::{Atom, Sexp};
@@ -38,8 +38,8 @@ pub enum CorrectionKind {
   /// viewnode merge's result, which has a fresh vnid.
   SiblingsMerged,
   /// By the ID rule the headline became this kind of vognode, where
-  /// it stands: "node", "ghost" or "unknown".
-  Rekinded (&'static str),
+  /// it stands.
+  Rekinded (VognodeKind),
   /// An edit request the headline's new kind has no slot for was
   /// dropped.
   EditRequestDropped,
@@ -72,7 +72,7 @@ impl Correction {
       CorrectionKind::SiblingsMerged =>
         "Merged duplicate viewnode siblings into this one." . to_string (),
       CorrectionKind::Rekinded (kind) =>
-        format! ("Made a headline a {}, as the graph has it.", kind),
+        format! ("Made a headline {}, as the graph has it.", kind . with_article ()),
       CorrectionKind::EditRequestDropped =>
         "Dropped an edit request its headline has no slot for." . to_string (), };
     with_org_subheadlines (

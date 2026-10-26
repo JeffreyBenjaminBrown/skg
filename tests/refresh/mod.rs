@@ -14,7 +14,7 @@ use crate::types::misc::{
   MSV, RelPartner, Skgrepo, SkgrepoName, SkgrepoSetName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
 use crate::types::viewnode::{
-  ChangeViewnode, PropertyMember, ViewnodeId, Warrant};
+  ChangeViewnode, PropertyMember, ViewnodeId, VognodeKind, Warrant};
 use crate::types::views_state::DiffViewBufferKind;
 
 use ego_tree::NodeRef;
