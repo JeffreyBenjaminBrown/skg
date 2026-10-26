@@ -42,11 +42,11 @@
 /// 'folder_heralds' in 'shared/herald-styles.json'.
 
 use crate::sexp_string::quote_sexp_string;
-use crate::types::misc::SkgConfig;
+use crate::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangesetMarkerKind, DiffChange, Folder, PropertyMember, ChangeViewnode,
-  DiffObject, ViewRequest};
+  DiffObject, ViewRequest, Warrant};
 
 use serde_json::Value;
 use std::collections::HashSet;
@@ -607,7 +607,7 @@ pub fn herald_rule_table () -> HeraldRule {
 /// rules of their own; a folder carries none.
 fn kinds_whose_diff_has_one_object (
 ) -> Vec<&'static str> {
-  PROPERTY_AND_CHANGE_KIND_ATOMS . into_iter ()
+  property_and_change_kind_atoms () . into_iter ()
     . filter ( |kind| *kind != "bodyDiff" )
     . collect () }
 
@@ -709,7 +709,7 @@ fn folder_heralds_inconsistencies (
   file : &Value,
 ) -> Vec<String> {
   let folder_atoms : HashSet<&str> =
-    all_folders () . iter () . map ( |folder| folder . repr_in_client () ) . collect ();
+    Folder::all () . iter () . map ( |folder| folder . repr_in_client () ) . collect ();
   let listed : HashSet<&str> =
     file ["folder_heralds"] ["write_protected"] . as_array ()
     . map ( |atoms| atoms . iter () . filter_map (Value::as_str) . collect () )
@@ -856,26 +856,42 @@ fn client_computed_atoms () -> Vec<&'static str> {
 /// Every kind atom the server writes: the kinds a WHEN may name.
 pub fn emittable_kind_atoms () -> HashSet<&'static str> {
   [ "node", "ghost", "unknown", "tombstone" ] . into_iter ()
-    . chain ( PROPERTY_AND_CHANGE_KIND_ATOMS )
-    . chain ( all_folders () . iter () . map ( |folder| folder . repr_in_client () ))
+    . chain ( property_and_change_kind_atoms () )
+    . chain ( Folder::all () . iter () . map ( |folder| folder . repr_in_client () ))
     . collect () }
 
-/// The kind atoms of the property members and the change viewnodes.
-const PROPERTY_AND_CHANGE_KIND_ATOMS : [&'static str; 8] =
-  [ "alias", "id", "flag", "oldText", "bodyDiff",
-    "homeSkgrepoMove", "relRepoMove", "changesetMarker" ];
-
-/// Every folder: the twelve partner folders, then the three property
-/// folders.
-fn all_folders () -> [Folder; 15] {
-  [ Folder::Subscribee, Folder::Subscriber,
-    Folder::Overridden, Folder::Overrider,
-    Folder::Hider, Folder::Hidden,
-    Folder::HiddenInSubscribee,
-    Folder::HiddenOutsideOfSubscribee,
-    Folder::Container, Folder::Mentioner,
-    Folder::AcquiredBy, Folder::Acquired,
-    Folder::ID, Folder::Alias, Folder::flags () ] }
+/// The kind atoms of the property members and the change viewnodes,
+/// as their 'repr_in_client' writes them, from one value of each kind.
+fn property_and_change_kind_atoms () -> Vec<&'static str> {
+  fn propertyMember_guard ( q : &PropertyMember ) { // compile error here = update the values below
+    match q {
+      PropertyMember::Alias { .. } | PropertyMember::ID { .. }
+        | PropertyMember::Flag { .. } => () }}
+  let _ = propertyMember_guard;
+  fn changeViewnode_guard ( q : &ChangeViewnode ) { // ditto
+    match q {
+      ChangeViewnode::OldText { .. }
+        | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
+        | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
+        => () }}
+  let _ = changeViewnode_guard;
+  let no_change = || -> SkgrepoChange { SkgrepoChange { old : SkgrepoName::from (""),
+                                     new : SkgrepoName::from ("") } };
+  [ PropertyMember::Alias { text : String::new (), relRepo : None,
+                            relationshipEditRequest : None,
+                            claimsMembership : true, warrant : Warrant::ByGraph },
+    PropertyMember::ID { gnid : ID::from (""), claimsMembership : true,
+                         warrant : Warrant::ByGraph },
+    PropertyMember::Flag { flag : Flag::ALL [0], title : String::new (),
+                           body : None, warrant : Warrant::ByGraph } ]
+    . iter () . map (PropertyMember::repr_in_client)
+    . chain ( [ ChangeViewnode::OldText { title : None, body : None },
+                ChangeViewnode::BodyDiff { diff : String::new () },
+                ChangeViewnode::HomeSkgrepoMove { skgrepo_change : no_change () },
+                ChangeViewnode::RelRepoMove { skgrepo_change : no_change () },
+                ChangeViewnode::ChangesetMarker { kind : ChangesetMarkerKind::Content } ]
+              . iter () . map (ChangeViewnode::repr_in_client) )
+    . collect () }
 
 /// The kinds every WHEN rule in the table names.
 pub fn when_kinds_in_rule_table () -> HashSet<&'static str> {
@@ -953,32 +969,6 @@ fn claim_emitted_atoms () -> Vec<&'static str> {
 /// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.
 fn property_and_folder_atoms () -> Vec<&'static str> {
-  fn folder_guard ( c : &Folder ) { // compile error here = update 'all_folders' 
-    match c {
-      Folder::Subscribee | Folder::Subscriber
-      | Folder::Overridden | Folder::Overrider
-      | Folder::Hider | Folder::Hidden
-      | Folder::HiddenInSubscribee
-      | Folder::HiddenOutsideOfSubscribee
-      | Folder::Container | Folder::Mentioner
-      | Folder::AcquiredBy | Folder::Acquired => (),
-      Folder::ID | Folder::Alias | Folder::Flags { .. } => () }}
-  let _ = folder_guard;
-  let all_property_atoms : [&'static str; 8] = {
-    fn propertyMember_guard ( q : &PropertyMember ) { // ditto
-      match q {
-        PropertyMember::Alias { .. } | PropertyMember::ID { .. }
-          | PropertyMember::Flag { .. }
-          => () }}
-    let _ = propertyMember_guard;
-    fn changeViewnode_guard ( q : &ChangeViewnode ) { // ditto
-      match q {
-        ChangeViewnode::OldText { .. }
-          | ChangeViewnode::BodyDiff { .. } | ChangeViewnode::HomeSkgrepoMove { .. }
-          | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
-          => () }}
-    let _ = changeViewnode_guard;
-    PROPERTY_AND_CHANGE_KIND_ATOMS };
   // The arguments the diff view's properties take in match
   // position (org_to_text.rs's 'property_metadata_to_string').
   let property_argument_atoms : Vec<&'static str> =
@@ -986,9 +976,9 @@ fn property_and_folder_atoms () -> Vec<&'static str> {
       ChangesetMarkerKind::ALL . into_iter ()
         . map (ChangesetMarkerKind::wire_name) . collect () ] . concat ();
   let mut out : Vec<&'static str> = Vec::new ();
-  out . extend ( all_folders () . iter ()
+  out . extend ( Folder::all () . iter ()
                  . map ( |c| c . repr_in_client () ) );
-  out . extend ( all_property_atoms );
+  out . extend ( property_and_change_kind_atoms () );
   out . extend ( property_argument_atoms );
   out }
 

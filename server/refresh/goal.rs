@@ -38,7 +38,6 @@ use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_gr
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
-use std::iter::once;
 
 /// What one goal item names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -375,15 +374,12 @@ fn property_goal (
   let node : &GraphnodeInRust = walk . truth . graph . get (pid) ?;
   Some ( match kind {
     Folder::Alias => Goal::ordered (
-      node . aliases . or_default () . iter ()
-        . map ( |alias| GoalItem {
-          relRepo : ( alias . relRepo != node . home_skgrepo )
-                    . then ( || alias . relRepo . clone () ),
-          .. GoalItem::by_graph ( GoalMember::Alias ( alias . member . clone () )) } )
+      node . aliases_with_relRepo_unless_home () . into_iter ()
+        . map ( |(text, relRepo)| GoalItem {
+          relRepo, .. GoalItem::by_graph ( GoalMember::Alias (text) ) } )
         . collect () ),
     Folder::ID => Goal::unordered (
-      once ( node . pid . clone () )
-        . chain ( node . extra_ids . iter () . cloned () )
+      node . ids () . into_iter ()
         . map ( |id| GoalItem::by_graph (GoalMember::Id (id)) )
         . collect () ),
     _ => Goal::unordered (

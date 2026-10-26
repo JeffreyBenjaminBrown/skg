@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::types::nodes::rust::GraphnodeInRust;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::save::PreparedSave;
@@ -13,7 +14,6 @@ use crate::types::viewnode::{
 use crate::types::views_state::ViewforestId;
 
 use std::collections::{HashMap, HashSet};
-use std::iter::once;
 
 pub(crate) struct SaveAffectedIds {
   before      : HashSet<ID>,
@@ -35,8 +35,7 @@ fn ids_of_deleted_nodes (
     . filter ( |gnid| after . pid_of (gnid) . is_none () )
     . filter_map ( |gnid| before . pid_of (gnid) )
     . filter_map ( |pid| before . get (&pid) )
-    . flat_map ( |node| once ( node . pid . clone () )
-                        . chain ( node . extra_ids . iter () . cloned () ))
+    . flat_map (GraphnodeInRust::ids)
     . collect () }
 
 impl SaveAffectedIds {

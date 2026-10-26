@@ -49,9 +49,8 @@ use crate::types::viewnode::{
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::iter::once;
 use std::mem::{Discriminant, discriminant};
 
 /// The straddle and the buffer, in the diff view.
@@ -174,12 +173,12 @@ pub(crate) fn property_goal (
     Folder::Alias => {
       let texts = |node : Option<&GraphnodeInRust>| -> Vec<String> {
         node . map ( |node| node . alias_texts () ) . unwrap_or_default () };
+      let relRepos_after : HashMap<String, Option<SkgrepoName>> =
+        after . map ( |node| node . aliases_with_relRepo_unless_home ()
+                             . into_iter () . collect () )
+        . unwrap_or_default ();
       let relRepo_after = |text : &String| -> Option<SkgrepoName> {
-        let node : &GraphnodeInRust = after ?;
-        node . aliases . or_default () . iter ()
-          . find ( |alias| alias . member == *text )
-          . filter ( |alias| alias . relRepo != node . home_skgrepo )
-          . map ( |alias| alias . relRepo . clone () ) };
+        relRepos_after . get (text) . cloned () . flatten () };
       Goal::ordered (
         union_with_existence ( &texts (before), &texts (after) ) . into_iter ()
         . map ( |(text, existence)| GoalItem {
@@ -188,9 +187,7 @@ pub(crate) fn property_goal (
         . collect () ) },
     Folder::ID => {
       let ids = |node : Option<&GraphnodeInRust>| -> Vec<ID> {
-        node . map ( |node| once ( node . pid . clone () )
-                     . chain ( node . extra_ids . iter () . cloned () ) . collect () )
-          . unwrap_or_default () };
+        node . map (GraphnodeInRust::ids) . unwrap_or_default () };
       Goal::unordered (
         union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
         . map ( |(id, existence)| item ( GoalMember::Id (id), existence ) )

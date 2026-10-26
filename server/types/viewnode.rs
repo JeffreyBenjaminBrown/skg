@@ -753,27 +753,34 @@ impl Folder {
       Folder::Flags { .. }              => "flagsFolder",
     }}
 
-  /// The folder a folder atom names; a flags folder comes with no
-  /// text.
+  /// The folder a folder atom names ('repr_in_client'); a flags
+  /// folder comes with no text.
   pub fn from_client_string (s : &str) -> Option<Folder> {
-    match s {
-      "subscribeeFolder"                => Some (Folder::Subscribee),
-      "subscriberFolder"                => Some (Folder::Subscriber),
-      "overriddenFolder"                => Some (Folder::Overridden),
-      "overriderFolder"                 => Some (Folder::Overrider),
-      "hiderFolder"                     => Some (Folder::Hider),
-      "hiddenFolder"                    => Some (Folder::Hidden),
-      "hiddenInSubscribeeFolder"        => Some (Folder::HiddenInSubscribee),
-      "hiddenOutsideOfSubscribeeFolder" => Some (Folder::HiddenOutsideOfSubscribee),
-      "containerFolder"                 => Some (Folder::Container),
-      "mentionerFolder"                 => Some (Folder::Mentioner),
-      "acquiredByFolder"                => Some (Folder::AcquiredBy),
-      "acquiredFolder"                  => Some (Folder::Acquired),
-      "aliasFolder"                     => Some (Folder::Alias),
-      "idFolder"                        => Some (Folder::ID),
-      "flagsFolder"                     => Some (Folder::flags ()),
-      _                                 => None,
-    } }
+    Folder::all () . into_iter ()
+      . find ( |folder| folder . repr_in_client () == s ) }
+
+  /// Every kind of folder: the twelve partner folders, then the three
+  /// property folders, a flags folder with no text.
+  pub fn all () -> [Folder; 15] {
+    fn guard ( folder : &Folder ) { // compile error here = update the list below
+      match folder {
+        Folder::Subscribee | Folder::Subscriber
+        | Folder::Overridden | Folder::Overrider
+        | Folder::Hider | Folder::Hidden
+        | Folder::HiddenInSubscribee
+        | Folder::HiddenOutsideOfSubscribee
+        | Folder::Container | Folder::Mentioner
+        | Folder::AcquiredBy | Folder::Acquired
+        | Folder::ID | Folder::Alias | Folder::Flags { .. } => () }}
+    let _ = guard;
+    [ Folder::Subscribee, Folder::Subscriber,
+      Folder::Overridden, Folder::Overrider,
+      Folder::Hider, Folder::Hidden,
+      Folder::HiddenInSubscribee,
+      Folder::HiddenOutsideOfSubscribee,
+      Folder::Container, Folder::Mentioner,
+      Folder::AcquiredBy, Folder::Acquired,
+      Folder::ID, Folder::Alias, Folder::flags () ] }
 
   pub fn title (&self) -> &str {
     match self {

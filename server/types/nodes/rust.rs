@@ -61,4 +61,23 @@ impl GraphnodeInRust {
     &self,
   ) -> Vec<String> {
     members_msv (&self . aliases) . or_default () . to_vec () }
+
+  /// Every ID of the node: its pid, then its extra IDs.
+  pub fn ids (
+    &self,
+  ) -> Vec<ID> {
+    std::iter::once ( self . pid . clone () )
+      . chain ( self . extra_ids . iter () . cloned () )
+      . collect () }
+
+  /// Each alias's text, in order, with its relRepo where that differs
+  /// from the node's home: what an alias headline names.
+  pub fn aliases_with_relRepo_unless_home (
+    &self,
+  ) -> Vec<(String, Option<SkgrepoName>)> {
+    self . aliases . or_default () . iter ()
+      . map ( |alias| ( alias . member . clone (),
+                        ( alias . relRepo != self . home_skgrepo )
+                          . then ( || alias . relRepo . clone () ) ))
+      . collect () }
 }
