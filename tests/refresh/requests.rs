@@ -38,6 +38,40 @@ node p
     node c1
   node d" ); }
 
+/// A request on an occurrence whose content is shown write-protected
+/// extends it: each child that claims membership becomes editable, as
+/// a drawn occurrence would, and draws its own content.
+#[test]
+fn editableView_extends_content_shown_write_protected () {
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} d
+    ", occ ("p", "(viewRequests editableView)"),
+       occ ("c", "writeProtected"), occ ("d", "writeProtected") );
+  assert_eq! ( run (&input, &family ()) . outline (), "\
+node p
+  node c
+    node c1
+  node d" ); }
+
+/// Within the budget: here it allows p's extension and c's, so d,
+/// reached after it is spent, stays write-protected.
+#[test]
+fn editableView_extends_content_shown_write_protected_within_the_budget () {
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} d
+    ", occ ("p", "(viewRequests editableView)"),
+       occ ("c", "writeProtected"), occ ("d", "writeProtected") );
+  assert_eq! ( run_in ( &input, &family (), None, CompletionMode::ContentView, 2 )
+               . outline (), "\
+node p
+  node c
+    node c1 wp
+  node d wp" ); }
+
 #[test]
 fn writeProtectedView_write_protects_the_occurrence_alone () {
   let input : String = formatdoc! ("
@@ -95,8 +129,8 @@ fn a_subscriptions_request_adds_the_subscribee_folder_and_drops_an_empty_subscri
 node s
   subscribeeFolder
     node e wp
-    hiddenOutsideOfSubscribeeFolder folded
-      node o wp" ); }
+    hiddenOutsideOfSubscribeeFolder
+      node o wp folded" ); }
 
 #[test]
 fn a_flags_request_adds_the_flags_folder_even_when_no_flag_is_true () {
@@ -196,5 +230,5 @@ fn a_subscriptions_request_completes_a_subscribee_folder_already_there () {
 node s
   subscribeeFolder
     node e wp
-    hiddenOutsideOfSubscribeeFolder folded
-      node o wp" ); }
+    hiddenOutsideOfSubscribeeFolder
+      node o wp folded" ); }

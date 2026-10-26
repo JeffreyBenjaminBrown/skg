@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_saves -E 'test(save::id_folder_outside_diff_view::)'
 //
-// Outside the diff view, every rerender removes the ID folders
-// ('remove_id_folders'). The parser lets a non-member sit under an
-// ID folder; the rerender keeps it, under the folder entombstoned as an
-// orphaned folder is, and drops the folder's entries.
+// Outside the diff view, an ID folder stays as the user put it, and
+// the refresh keeps it up to date. The parser lets an occurrence sit
+// under an ID folder; it claims nothing there (the folder is
+// write-protected), and the refresh keeps it, unwarranted.
 //
 // Fixture: two unrelated nodes, n and x.
 
@@ -67,16 +67,14 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
   let saved : String = save_buffer (
     buffer, config, tantivy, &graph, &mut views_state ) . await ?;
   println! ("Result of saving a non-member under an ID folder:\n{}", saved);
-  assert! ( ! saved . contains ("idFolder") && ! saved . contains ("(skg id)"),
-            "the rerender removes the ID folder and its entries:\n{}", saved );
-  let x_line : &str = saved . lines ()
-    . find ( |line| line . contains ("(gnid x)") )
-    . unwrap_or_else ( || panic! ("x must survive the rerender:\n{}", saved) );
-  assert! ( x_line . starts_with ("*** ") && x_line . contains ("noClaim"),
-            "x stays a non-member at its depth:\n{}", saved );
-  assert! ( saved . lines () . any ( |line|
-              line . starts_with ("** ") && line . contains ("tombstone") ),
-            "the folder that held x is a tombstone:\n{}", saved );
+  let lines : Vec<String> = saved . lines () . map ( |line|
+    skg::metadata_canon::without_viewnode_ids (line) ) . collect ();
+  assert_eq! ( lines, vec! [
+    "* (skg node (gnid n) (skgRepos (nodeRepo main))) n",
+    "** (skg idFolder)",
+    "*** (skg id) n",
+    "*** (skg node (gnid x) (skgRepos (nodeRepo main)) (view noWarrant)) x" ],
+    "the ID folder stays, holding x unwarranted:\n{}", saved );
   let again : String = save_buffer (
     &saved, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_eq! ( again, saved, "a further save changes nothing" );

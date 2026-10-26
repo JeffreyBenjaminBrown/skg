@@ -161,12 +161,12 @@ fn budget_aliasfolder_is_neutral (
     |config, tantivy| Box::pin ( test_budget_aliasfolder_is_neutral (config, tantivy) )) }
 
 #[test]
-fn budget_spent_on_a_node_with_members (
+fn a_smaller_budget_write_protects_nothing_already_shown (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-evcb-budget-spent-on-a-node-with-members", FIXTURES,
-    "/tmp/tantivy-test-evcb-budget-spent-on-a-node-with-members",
-    |config, tantivy| Box::pin ( test_budget_spent_on_a_node_with_members (config, tantivy) )) }
+    "skg-test-evcb-a-smaller-budget", FIXTURES,
+    "/tmp/tantivy-test-evcb-a-smaller-budget",
+    |config, tantivy| Box::pin ( test_a_smaller_budget_write_protects_nothing_already_shown (config, tantivy) )) }
 
 // ===================================================
 // Test: Editable view with an ample budget -> everything extends.
@@ -396,28 +396,13 @@ async fn test_editable_view_limit_1_to_4 (
       println!("Result with limit=1:\n{}", result_1);
       println!("Result with limit=4:\n{}", result_4);
 
-      // §5.5: the budget counts vognode extensions (cost 1 each), in BFS order:
-      // 1, 2, 11, 12, 13, then 12's content 121..124, ... A view root is never
-      // truncated (the user opened it), so roots 1 and 2 always extend; other
-      // vognodes reached after the budget is spent are left write-protected.
-      //
-      // limit=1: root 1 extends (budget 1->0) and shows its whole group 11,12,13;
-      // all three are then write-protected (budget spent), so 12 never extends and
-      // none of 121.. is created. Root 2 still extends (root exemption).
-      let expected_1 = indoc! {"
-        * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
-        ** (skg node (gnid 11) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
-        ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
-        * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
-      "};
-      // omittedBody marks only 12: the saved buffer showed 11 and 13
-      // editable with no body text, wiping their bodies, while
-      // write-protected 12 kept its body -- which this render hides.
-      // limit=4: extensions 1, 2, 11, 12 spend the budget. 12 (the 4th) showed its
-      // whole group 121..124, all write-protected (budget spent); 13 is reached
-      // after the budget is gone, so it too is write-protected.
-      let expected_4 = indoc! {"
+      // The budget counts the occurrences whose content is drawn, in
+      // level order, and bounds only the occurrences the refresh draws:
+      // those of the input keep their editability. So 1, 2, 11, 12 and
+      // 13 stay editable, 12 (asked to be) draws its content, and
+      // whether the budget is 1 or 4 it is spent by then (1, 2 and 11
+      // come first), so 121..124 are drawn write-protected.
+      let expected = indoc! {"
         * (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3))))) 1
         ** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11
         ** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 4))) (birth (contains in 1)))) 12
@@ -426,14 +411,14 @@ async fn test_editable_view_limit_1_to_4 (
         *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
         *** (skg node (gnid 123) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 123
         *** (skg node (gnid 124) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 124
-        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
+        ** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13
         * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
       "};
 
-      assert_metadata_eq!(result_1, expected_1,
-        "limit=1 creates only the first gen-2 child, writeProtected (§5.5)");
-      assert_metadata_eq!(result_4, expected_4,
-        "limit=4 creates all four gen-2 children, all writeProtected (§5.5)");
+      assert_metadata_eq!(result_1, expected,
+        "limit=1: 12's content is drawn write-protected");
+      assert_metadata_eq!(result_4, expected,
+        "limit=4: 12's content is drawn write-protected");
 
       Ok (( )) }
 
@@ -479,13 +464,13 @@ async fn test_editable_view_conflicting (
 
       let expected = indoc! {
         // The first 12 (child of 1) should become write-protected,
-        // its child 122 no longer a member.
+        // its child 122 kept, claiming nothing there (no atom).
         // The second 12 (root with request) should be extended.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
         "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1))))) 1
          ** (skg node (gnid 12) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12
-         *** (skg node (gnid 122) (skgRepos (nodeRepo main)) noClaim writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
+         *** (skg node (gnid 122) (skgRepos (nodeRepo main)) writeProtected (view omittedBody (rels (contains (in 1 (ancestors 1)) (out 1))))) 122
          * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 1))))) 12
          ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
          122 body
@@ -583,15 +568,14 @@ async fn test_editable_view_with_repeat (
       let expected = indoc! {
         // Upon saving, the write-protected view of node 12 had no effect, but the
         // editable view of 121 (editable in the *buffer*) deleted its
-        // children at extraction. In the rerender, node 12's editableView
-        // cascades (§5.3) a EVR onto its content child 121, which is Final
-        // and so clobbers the Tentative bare root 121 (§5.2). So the bare
-        // root 121 is now write-protected and 12's child 121 is the editable
-        // occurrence (childless, since the save emptied 121's contains).
-        "* (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1))))) 121
+        // children at extraction. In the rerender, root 121 keeps its
+        // editability, so the 121 that 12's request draws among its
+        // content is a repeat, and write-protected: the first editable
+        // occurrence wins, and nothing yields its editability.
+        "* (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1))))) 121
          * (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 4))))) 12
          12 body
-         ** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121
+         ** (skg node (gnid 121) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121
          ** (skg node (gnid 122) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 122
          122 body
          *** (skg node (gnid 1221) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 1221
@@ -603,7 +587,7 @@ async fn test_editable_view_with_repeat (
       "};
 
       assert_metadata_eq!(result, expected,
-        "Editable view should mark repeated nodes as writeProtected");
+        "Editable view should mark a drawn repeat as writeProtected");
 
       Ok (( )) }
 
@@ -933,10 +917,10 @@ async fn save_view (
 // A view of 12 shows it editable, with 121..124 editable under it
 // (and its containers folder, holding 1).
 // A write-protect request on root 12, in a save that also retitles
-// it, saves the title first; the rerender write-protects root 12 and
-// makes 121..124 non-members, still editable, with their own
-// content (1211 under 121) still members. A further save changes
-// nothing.
+// it, saves the title first; the rerender write-protects root 12
+// alone: 121..124 stay editable, claiming nothing under it (no claim
+// atom is written there), with their own content (1211 under 121)
+// still members. A further save changes nothing.
 async fn test_writeProtect_request_keeps_children_editable (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -965,9 +949,9 @@ async fn test_writeProtect_request_keeps_children_editable (
         lines_starting (&saved, "** (skg node (gnid 12");
       assert_eq! ( children . len (), 4, "{}", saved );
       assert! ( children . iter () . all ( |line|
-                  line . contains ("noClaim")
+                  ! line . contains ("noClaim")
                   && ! line . contains ("writeProtected") ),
-                "121..124 must be editable non-members:\n{}", saved );
+                "121..124 must be editable, with no claim atom:\n{}", saved );
       let grandchildren : Vec<&str> = // not the 1 in the containers folder
         lines_starting (&saved, "*** (skg node (gnid 12");
       assert_eq! ( grandchildren . len (), 3, "{}", saved );
@@ -1010,8 +994,8 @@ async fn test_writeProtect_subtree_request (
       assert! ( headlines . iter () . all ( |line| line . contains ("writeProtected") ),
                 "everything must be write-protected:\n{}", saved );
       assert! ( headlines [1 ..] . iter () . all ( |line|
-                  line . contains ("noClaim") ),
-                "every child must be a non-member:\n{}", saved );
+                  ! line . contains ("noClaim") ),
+                "under a write-protected parent no claim atom is written:\n{}", saved );
       assert! ( ! saved . contains ("viewRequests")
                 && ! saved . contains ("body\n"),
                 "no request, and no body, is left:\n{}", saved );
@@ -1052,10 +1036,12 @@ async fn test_writeProtect_request_on_a_writeProtected_occurrence (
 // A view of 1 and 12 shows root 12 editable, with 121..124, and the
 // 12 under 1 write-protected. One save requests root 12
 // write-protected and the 12 under 1 editable, and folds the 121
-// under root 12. 121..124 are then shown once under root 12, as
-// write-protected non-members, and editable under the 12 under 1.
-// An editable-view request on root 12 moves editability back: root
-// 12 adopts 121..124 as its members again, keeping the fold.
+// under root 12. The write-protect request write-protects root 12
+// alone: 121..124 stay editable under it, claiming nothing there, and
+// the 12 under 1, now editable, draws them as write-protected repeats.
+// An editable-view request on root 12 moves its editability back:
+// 121..124 under it are its editable members again, the 121 keeping
+// its fold, and under the 12 under 1 they stay write-protected.
 async fn test_writeProtect_and_editable_requests_move_editability_and_back (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1100,15 +1086,15 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
       assert_eq! ( ids_under (&moved, root_12), [ "121", "122", "123", "124" ],
                    "root 12 shows its content once:\n{}", moved );
       assert! ( content_under (&moved, root_12) . iter ()
-                  . all ( |line| line . contains ("writeProtected")
-                                 && line . contains ("noClaim") ),
-                "under root 12, write-protected non-members:\n{}", moved );
+                  . all ( |line| ! line . contains ("writeProtected")
+                                 && ! line . contains ("noClaim") ),
+                "under root 12, editable, with no claim atom:\n{}", moved );
       assert_eq! ( ids_under (&moved, under_1), [ "121", "122", "123", "124" ],
                    "{}", moved );
       assert! ( content_under (&moved, under_1) . iter ()
-                  . all ( |line| ! line . contains ("writeProtected")
+                  . all ( |line| line . contains ("writeProtected")
                                  && ! line . contains ("noClaim") ),
-                "under the 12 under 1, editable members:\n{}", moved );
+                "under the 12 under 1, write-protected members:\n{}", moved );
       let moved_back : String = save_view (
         &requesting_editable_at (
           &moved, "node (gnid 12) (skgRepos (nodeRepo main)) writeProtected" ),
@@ -1125,7 +1111,10 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
                 "root 12's content must be editable members again:\n{}", moved_back );
       assert! ( without_viewnode_ids (&content_under (&moved_back, root_12) [0])
                 . starts_with (folded_121),
-                "the adopted 121 keeps its fold:\n{}", moved_back );
+                "the 121 keeps its fold:\n{}", moved_back );
+      assert! ( content_under (&moved_back, under_1) . iter ()
+                  . all ( |line| line . contains ("writeProtected") ),
+                "under the 12 under 1, write-protected:\n{}", moved_back );
       Ok (( )) }
 
 // ===================================================
@@ -1134,8 +1123,9 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
 // In a view of 1, 13 is marked as not affecting its parent and saved:
 // 1 no longer contains 13, which stays under 1 as a non-member. A
 // save of another view of 1 puts 13 back in 1's content. The first
-// view, rerendered as collateral, adopts the retained 13 as 1's member
-// instead of showing a second 13 beside it.
+// view, rerendered as collateral, shows the retained 13 once, not a
+// second 13 beside it: warranted again, but still claiming nothing,
+// since a claim is the user's to make.
 async fn test_retained_content_node_is_shown_once (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1176,20 +1166,21 @@ async fn test_retained_content_node_is_shown_once (
       println! ("The first view after the other's save:\n{}", collateral);
       let thirteens : Vec<&str> = lines_starting (&collateral, "** (skg node (gnid 13) ");
       assert! ( thirteens . len () == 1
-                && ! thirteens [0] . contains ("noClaim"),
-                "13 is shown once, as 1's member:\n{}", collateral );
+                && thirteens [0] . contains ("noClaim")
+                && ! thirteens [0] . contains ("noWarrant"),
+                "13 is shown once, warranted again, its claim still the user's:\n{}",
+                collateral );
       Ok (( )) }
 
 // ===================================================
-// Test: the budget runs out at a node that shows members
+// Test: a smaller budget write-protects nothing already shown
 // ===================================================
 // A view of 1, opened with an ample budget, shows everything
 // editable, 12 with its members 121..124. Saved with a budget of 2,
-// the extensions of 1 and 11 spend it, so the rerender leaves 12
-// write-protected. A write-protected occurrence holds no member, so
-// 121..124 become non-members, keeping their own editability, and a
-// further save of the rerendered buffer is not refused.
-async fn test_budget_spent_on_a_node_with_members (
+// it draws nothing anew, and the budget bounds only what the refresh
+// draws: every occurrence keeps its editability, and a further save
+// changes nothing.
+async fn test_a_smaller_budget_write_protects_nothing_already_shown (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1209,31 +1200,23 @@ async fn test_budget_spent_on_a_node_with_members (
       config . initial_node_limit = 2;
       let saved : String = save_view (
         &opened, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
-      println! ("Result of a save that spends the budget at 12:\n{}", saved);
-      let twelve : Vec<&str> = lines_starting (&saved, "** (skg node (gnid 12) ");
-      assert! ( twelve . len () == 1 && twelve [0] . contains ("writeProtected"),
-                "the budget runs out at 12:\n{}", saved );
-      let members_of_twelve : Vec<&str> =
-        subtree_headlines (&saved, "** (skg node (gnid 12) ")
-        . into_iter ()
-        . filter ( |line| line . starts_with ("*** ") )
-        . collect ();
-      assert_eq! ( members_of_twelve . len (), 4, "{}", saved );
-      assert! ( members_of_twelve . iter () . all ( |line|
-                  line . contains ("noClaim") ),
-                "121..124 must be non-members under write-protected 12:\n{}", saved );
-      save_view (
+      println! ("Result of a save with a smaller budget:\n{}", saved);
+      assert! ( ! saved . contains ("writeProtected"),
+                "every occurrence keeps its editability:\n{}", saved );
+      let again : String = save_view (
         &saved, &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
+      assert_eq! ( again, saved, "a further save changes nothing" );
       Ok (( )) }
 
 // ===================================================
 // Test: a request claimed elsewhere leaves no member
 // ===================================================
 // Both roots carry an editable-view request, and the 12 under 1 shows
-// 122. Root 12 is made Final at its visit; root 1's cascade hands a
-// request to the 12 under 1, which, met later, yields: it is
-// write-protected and its member 122 becomes a non-member, so the
-// rerendered buffer saves unchanged.
+// 122. Root 12's request makes it 12's editable occurrence, so the 12
+// under 1 is write-protected, and root 1's request, extending its
+// content, cannot make it editable again. 122 stays under it, claiming
+// nothing there (no claim atom is written), so the rerendered buffer
+// saves unchanged.
 async fn test_a_request_claimed_elsewhere_leaves_no_member (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1272,6 +1255,6 @@ async fn test_a_request_claimed_elsewhere_leaves_no_member (
       let under_twelve : Vec<&str> =
         subtree_headlines (rerendered, "** (skg node (gnid 12) ");
       assert! ( ! under_twelve . is_empty ()
-                && under_twelve . iter () . all ( |line| line . contains ("noClaim") ),
-                "a write-protected occurrence holds no member:\n{}", rerendered );
+                && under_twelve . iter () . all ( |line| ! line . contains ("noClaim") ),
+                "under a write-protected occurrence no claim atom is written:\n{}", rerendered );
       Ok (( )) }

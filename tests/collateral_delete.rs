@@ -83,9 +83,9 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
 
       { // A write-protected image is not search-specific. A normal
         // multi-root content view can contain the same PID more than
-        // once; the later occurrence is write-protected. Every image
-        // of a node deleted by this save must become a tombstone before
-        // completion tries to refresh it from the post-delete graph.
+        // once; the later occurrence is write-protected (and the
+        // refresh merges such roots). Every image of a node deleted by
+        // this save must become a tombstone.
         let (view, pids, vf) =
           multi_root_view (
             config, Some (tantivy),
@@ -123,9 +123,14 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         . find ( |msg| msg . contains ("response-type collateral-view")
                        && msg . contains ("collat-del-write-protected-L") )
         . expect ("write-protected collateral view should be rerendered");
+      // The two roots of L merge; the tombstone where L stood keeps
+      // what was drawn under it (its containers folder, itself
+      // entombstoned, holding P).
       assert! (
-        write_protected_update . contains ("(content \"\")"),
-        "both the editable and write-protected images become childless tombstones, which the prune removes: {}",
+        ! write_protected_update . contains ("(gnid L)")
+        && without_viewnode_ids (write_protected_update) . contains (
+             "(content \"* (skg tombstone)\n** (skg tombstone)\n*** (skg node (gnid P)"),
+        "the image of L becomes a tombstone, holding what stood under it: {}",
         write_protected_update );
       Ok (( )) } )) }
 

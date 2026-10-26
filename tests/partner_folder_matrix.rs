@@ -234,11 +234,19 @@ async fn write_protected_reorder (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // Order preserved view-locally: member_b now before member_a.
-  fails . want_before (
-    &scenario, &resp . saved_view,
-    &format! ("(gnid {})", spec . member_b),
-    &format! ("(gnid {})", spec . member_a) );
+  // Order preserved view-locally: member_b now before member_a. But
+  // the hidden folder's goal has an order, its recorder's hides list,
+  // which its members take again.
+  if spec . atom == "hiddenFolder" {
+    fails . want_before (
+      &scenario, &resp . saved_view,
+      &format! ("(gnid {})", spec . member_a),
+      &format! ("(gnid {})", spec . member_b) );
+  } else {
+    fails . want_before (
+      &scenario, &resp . saved_view,
+      &format! ("(gnid {})", spec . member_b),
+      &format! ("(gnid {})", spec . member_a) ); }
   // Reordering is not a repair.
   if resp . warnings . iter () . any (
     |w| w . contains (&format! ("Repaired {}", spec . atom)) ) {
@@ -270,21 +278,16 @@ async fn write_protected_insert (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // The intruder is made a non-member (noClaim) in the rerendered view.
+  // The intruder stays in the rerendered view, unwarranted. Under a
+  // write-protected folder no child claims, so it carries no claim
+  // atom, and there is no claim to correct.
   { let intruder_after : &str = line_containing (
       &resp . saved_view, &format! ("(gnid {})", spec . intruder) );
-    if ! intruder_after . contains ("noClaim") {
+    if ! intruder_after . contains ("noWarrant")
+       || intruder_after . contains ("noClaim") {
       fails . record (&scenario, format! (
-        "intruder must be made a non-member (noClaim): {}",
+        "intruder must stay unwarranted, with no claim atom: {}",
         intruder_after )); } }
-  // ... and a warning says so.
-  if ! resp . warnings . iter () . any ( |w|
-      w . contains (&format! ("Repaired {}", spec . atom))
-      && w . contains ("non-members, since they are not members")
-      && w . contains (spec . intruder) ) {
-    fails . record (&scenario, format! (
-      "expected a made-a-non-member warning naming {}: {:?}",
-      spec . intruder, resp . warnings )); }
   Ok (( )) }
 
 async fn write_protected_delete (
@@ -312,10 +315,9 @@ async fn write_protected_delete (
   fails . want_contains (
     &scenario, &resp . saved_view,
     &format! ("(gnid {})", spec . member_a) );
-  // ... with a reinstatement warning.
+  // ... reported as a correction.
   if ! resp . warnings . iter () . any ( |w|
-      w . contains (&format! ("Repaired {}", spec . atom))
-      && w . contains ("reinstated")
+      w . contains ("Drew what the graph says belongs here.")
       && w . contains (spec . member_a) ) {
     fails . record (&scenario, format! (
       "expected a reinstated-member warning naming {}: {:?}",
@@ -387,8 +389,8 @@ fn relationship_matrix
 // ('docs/glossary.org', "foldering, the containerward chain, chain
 // node"). One subgraph per folder kind: the member m of
 // the owner's folder is contained by chain-c, which chain-cc contains.
-// Under m hang chain-c and, under it, chain-cc, each a
-// write-protected non-member, and the view saves back unchanged.
+// Under m hang chain-c and, under it, chain-cc, each
+// write-protected, claiming nothing, and the view saves back unchanged.
 //////////////////////////////////////////////////////////////
 
 struct ChainFolderSpec {
@@ -444,11 +446,11 @@ async fn member_carries_its_chain (
     lines . get (member_index + offset) . is_some_and ( |line|
       line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + offset)))
       && line . contains (&format! ("(gnid {})", skgid))
-      && line . contains ("noClaim") && line . contains ("writeProtected") ) };
+      && ! line . contains ("noClaim") && line . contains ("writeProtected") ) };
   if ! ( lines [member_index] . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1)))
          && chain_line (1, "chain-c") && chain_line (2, "chain-cc") ) {
     fails . record (&scenario, format! (
-      "{} should hold its chain, chain-c holding chain-cc, each a write-protected non-member:\n{}",
+      "{} should hold its chain, chain-c holding chain-cc, each write-protected, with no claim atom:\n{}",
       spec . member, buf )); }
   let resp : SaveResponse = save (&buf, config, tantivy, graph) . await ?;
   if ! resp . errors . is_empty () || ! resp . warnings . is_empty () {

@@ -116,16 +116,19 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
           &mut views_state ) . await ?;
 
       // The collateral view B must refresh from the just-saved graph:
-      // its subscribeeFolder now shows M but not N, even though S is
-      // editable there (the root). Before the
-      // fix, B kept N stale.
+      // its subscribeeFolder still shows M, and N, no longer a
+      // subscribee, is kept but claims nothing and is unwarranted, even
+      // though S is editable there (the root).
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );
       let b_collateral : &str = &collateral_views[0];
       assert! ( b_collateral . contains ("(gnid M)"),
         "M must remain in B's subscribeeFolder:\n{}", b_collateral );
-      assert! ( ! b_collateral . contains ("(gnid N)"),
-        "N must be gone from B's subscribeeFolder collaterally \
+      let n_line : &str = b_collateral . lines ()
+        . find ( |line| line . contains ("(gnid N)") )
+        . unwrap_or_else ( || panic! ( "N is kept:\n{}", b_collateral ));
+      assert! ( n_line . contains ("noClaim") && n_line . contains ("noWarrant"),
+        "N must be a non-claiming, unwarranted child of B's subscribeeFolder \
          (editable subscriber must refresh from the graph):\n{}",
         b_collateral );
       Ok (( )) } )) }

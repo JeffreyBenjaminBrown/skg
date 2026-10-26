@@ -4,7 +4,7 @@
 // ('server/to_org/extend/containerward_chain.rs'): a fresh content
 // view puts a containers folder on each root, and a '(folder
 // containers)' request draws one anywhere; under each member hangs
-// the chain, write-protected non-members up to the roots, a node met
+// the chain, write-protected, claiming nothing, up to the roots, a node met
 // before on the walk shown once more as a leaf.
 //
 // Fixture: m contains r; b and c contain m; d contains b and c (a
@@ -156,10 +156,10 @@ async fn a_root_shows_its_containers_folder_with_a_diamond_in_the_chain (
     * r
     ** containerFolder
     *** m writeProtected
-    **** b noClaim writeProtected
-    ***** d noClaim writeProtected
-    **** c noClaim writeProtected
-    ***** d noClaim writeProtected
+    **** b writeProtected
+    ***** d writeProtected
+    **** c writeProtected
+    ***** d writeProtected
     "}, "{}", buffer );
   let saved : String = save_view (
     &buffer, config, tantivy, &graph, &mut views_state, "view of r" ) . await ?;
@@ -181,8 +181,8 @@ fn a_cycle_in_the_chain_ends_in_a_leaf (
     * x
     ** containerFolder
     *** y writeProtected
-    **** x noClaim writeProtected
-    ***** y noClaim writeProtected
+    **** x writeProtected
+    ***** y writeProtected
     ** y
     *** x writeProtected
     "}, "{}", buffer );
@@ -217,9 +217,9 @@ async fn a_folder_request_draws_the_chain_under_its_members (
     *** m
     **** containerFolder
     ***** b writeProtected
-    ****** d noClaim writeProtected
+    ****** d writeProtected
     ***** c writeProtected
-    ****** d noClaim writeProtected
+    ****** d writeProtected
     **** r
     ** c
     *** m writeProtected
@@ -244,11 +244,11 @@ async fn a_request_on_a_chain_node_draws_a_containers_folder_under_it (
     * r
     ** containerFolder
     *** m writeProtected
-    **** b noClaim writeProtected
+    **** b writeProtected
     ***** containerFolder
     ****** d writeProtected
-    ***** d noClaim writeProtected
-    **** c noClaim writeProtected
-    ***** d noClaim writeProtected
+    ***** d writeProtected
+    **** c writeProtected
+    ***** d writeProtected
     "}, "{}", saved );
   Ok (( )) }

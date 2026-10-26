@@ -49,15 +49,21 @@ local function role_of_chain_node_from_rels (rels_body)
   return nil
 end
 
----Classify a parsed metadata SEXP's headline relation: a
----chain node's rolename, else 'noClaim' or 'member'. The
----port of test-helpers.el's headline--relation-from-sexp.
+---Classify a parsed metadata SEXP's headline relation: a chain node's
+---rolename, else 'noClaim' or 'member'. CLAIMS_NOTHING says it stands
+---under a write-protected node, where no child claims and none carries
+---the atom; CHAIN_NODE says it is a node of the containerward chain
+---(see position_of). The port of test-helpers.el's
+---headline--relation-from-sexp.
 ---@param sexp any|nil
+---@param claims_nothing boolean|nil
+---@param chain_node boolean|nil
 ---@return string
-local function relation_from_sexp (sexp)
-  local non_member = sexp ~= nil and not metadata.node_member_p(sexp)
+local function relation_from_sexp (sexp, claims_nothing, chain_node)
+  local non_member = claims_nothing
+    or (sexp ~= nil and not metadata.node_member_p(sexp))
   local chain_node_role = nil
-  if non_member then
+  if chain_node then
     chain_node_role = role_of_chain_node_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'view', 'rels' }))
   end
@@ -66,13 +72,50 @@ local function relation_from_sexp (sexp)
   return 'member'
 end
 
+---Whether SEXP's top level holds the symbol NAME.
+local function holds_atom (sexp, name)
+  if type(sexp) ~= 'table' then return false end
+  for _, element in ipairs(sexp) do
+    if element == sexpr.symbol(name) then return true end
+  end
+  return false
+end
+
+---The headline at DEPTH, by its position. STACK holds, nearest last,
+---{ depth, kind, write_protected, chain_node } for the headlines above
+---it, deeper ones already popped. Returns that record for this
+---headline and whether it claims nothing: a node under a
+---write-protected node claims nothing, and is a chain node when that
+---node is a folder's member or itself a chain node. The port of
+---test-helpers.el's headline--position-of.
+local function position_of (stack, depth, sexp, metadata_str)
+  local parent, grandparent = stack[#stack], stack[#stack - 1]
+  local kind = nil
+  if holds_atom(sexp, 'node') then kind = 'node'
+  elseif metadata_str and metadata_str:find('Folder') then kind = 'folder' end
+  local under_write_protected_node = kind == 'node' and parent ~= nil
+    and parent.kind == 'node' and parent.write_protected
+  local chain_node = under_write_protected_node
+    and (parent.chain_node or (grandparent ~= nil and grandparent.kind == 'folder'))
+  return { depth = depth, kind = kind,
+           write_protected = holds_atom(sexp, 'writeProtected'),
+           chain_node = chain_node or false },
+         under_write_protected_node or false
+end
+
+---Pop from STACK every record at DEPTH or deeper.
+local function pop_to (stack, depth)
+  while #stack > 0 and stack[#stack].depth >= depth do
+    table.remove(stack) end
+end
+
 ---(depth relation id) triples for every headline in BUF that carries
 ---an id; headlines without metadata are skipped. The port of
 ---test-helpers.el's headline-structure.
 ---@param buf integer
 ---@return table[]
 local function headline_structure (buf)
-  local result = {}
+  local result, stack = {}, {}
   for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
     local split = metadata.split_as_stars_metadata_title(line)
     if split then
@@ -82,9 +125,13 @@ local function headline_structure (buf)
         if ok then sexp = parsed end
       end
       local skgid = sexp and metadata.node_id(sexp) or nil
+      local depth = #(split.stars:match('^%*+'))
+      pop_to(stack, depth)
+      local record, claims_nothing = position_of(stack, depth, sexp, split.metadata)
+      table.insert(stack, record)
       if skgid then
         table.insert(result,
-          { #(split.stars:match('^%*+')), relation_from_sexp(sexp), skgid })
+          { depth, relation_from_sexp(sexp, claims_nothing, record.chain_node), skgid })
       end
     end
   end
@@ -165,10 +212,15 @@ print('Buffer A content after collateral update: '
       .. T.buffer_text(buf_a))
 assert_headline_structure(buf_a,
   { { 1, 'member', 'a' },
-    -- b no longer contains a: the stale member goes from a's
-    -- containers folder with its chain, and the empty folder with
-    -- it.
-    { 2, 'member', 'b' } },
+    -- b no longer contains a. The refresh keeps what stood there,
+    -- unwarranted: b stays in a's containers folder, with its chain
+    -- (a, then b, which no longer contains a), and a stays under b,
+    -- claiming nothing.
+    { 3, 'member', 'b' },
+    { 4, 'container', 'a' },
+    { 5, 'noClaim', 'b' },
+    { 2, 'member', 'b' },
+    { 3, 'noClaim', 'a' } },
   'phase 4: buffer A after collateral update')
 
 T.pass('PASS: All phases completed successfully!')

@@ -2,26 +2,22 @@
 /// Build a string intended as buffer-text,
 /// to represent an 'inital view' (content relationships only).
 ///
-/// METHOD: the de-novo render runs the single post-save view
-/// completion path (multi_root_view_via_env -> render_initial_view)
-/// over a stub forest. View completion (complete_viewforest) completes each node
-/// at its BFS visit, each root's visit drawing its containers folder
-/// with the containerward chain. After view completion, the shared
-/// finish_viewforest tail (server/update_buffer.rs)
-/// marks/validates membership, sets graph/view stats, applies the skgrepo set,
-/// and renders to string.
+/// METHOD: the de-novo render (multi_root_view_via_env ->
+/// render_initial_view) is the refresh of a stub forest of the
+/// requested roots ('refresh_viewforest'), each asking for its
+/// containers folder, which is drawn with the containerward chain.
 
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::Viewnode;
-use crate::types::views_state::{ViewnodeIdRecord, pids_from_viewforest};
+use crate::types::views_state::pids_from_viewforest;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::init::empty_in_ram_tantivy_index;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use crate::update_buffer::{finish_viewforest, render_initial_view};
+use crate::update_buffer::render_initial_view;
 use std::sync::Arc;
 
 use ego_tree::Tree;
@@ -51,7 +47,7 @@ pub fn multi_root_view (
 }
 
 /// The parts-based de-novo entry -- a thin shim that assembles a
-/// SkgEnv and routes through the single view completion path (multi_root_view_via_env). Used only
+/// SkgEnv and routes through the de-novo render (multi_root_view_via_env). Used only
 /// by tests (production calls multi_root_view_via_env directly).
 /// The shim builds a fixture-local graph from disk and, when Tantivy is not
 /// supplied, uses an empty in-RAM search index.
@@ -77,53 +73,28 @@ fn multi_root_view_inner (
     Arc::new (InRustGraph::from_graphnodes (&nodes)),
     tantivy_owned);
   multi_root_view_via_env (
-    &env, root_skgids, skgrepo_restriction,
-    // The test shims discard render warnings; the production
-    // caller (the single-root handler) surfaces them.
-    &mut Vec::new () ) }
+    &env, root_skgids, skgrepo_restriction ) }
 
-/// The de-novo view, built through the single view completion path
-/// (render_initial_view). Takes a SkgEnv (carries
-/// config/driver/tantivy/graph), runs view completion over a stub forest of the
-/// requested roots, then adds stats and renders.
-/// Warning strings the render produces (today only the
-/// compound-override-chain notice) are appended to 'warnings_out'.
+/// The de-novo view (render_initial_view). Takes a SkgEnv (carries
+/// config/driver/tantivy/graph) and refreshes a stub forest of the
+/// requested roots.
 pub fn multi_root_view_via_env (
   env                : &SkgEnv,
   root_skgids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
-    &runtime, root_skgids, skgrepo_restriction, warnings_out)
-
-}
+    &runtime, root_skgids, skgrepo_restriction ) }
 
 pub(crate) fn multi_root_view_via_runtime (
   runtime            : &crate::types::env::RuntimeGeneration,
   root_skgids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  warnings_out       : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
-  let mut viewforest : ViewForest =
-    { let (viewforest, render_warnings)
-        : (ViewForest, Vec<String>) =
-        render_initial_view (
-          runtime, root_skgids, skgrepo_restriction ) ?;
-      warnings_out . extend (render_warnings);
-      viewforest };
-  // The de-novo and post-save render tails are one shared helper, so
-  // the tail itself is caller-agnostic -- no mode flag.
-  let buffer_content : String =
-    finish_viewforest (
-      &mut viewforest,
-      // A new buffer's first viewnode IDs; 'register_view' reads the record
-      // back from the forest.
-      &mut ViewnodeIdRecord::default (),
-      &runtime . graph, &runtime . config,
-      skgrepo_restriction ) ?;
+  let (viewforest, buffer_content) : (ViewForest, String) =
+    render_initial_view ( runtime, root_skgids, skgrepo_restriction ) ?;
   // The pids the caller registers for this view -- the {Unrestricted, Restricted}
   // set, via the one shared skgrepo of which-kinds-count
   // (views_state::pids_from_viewforest), the same helper update_view uses post-save.

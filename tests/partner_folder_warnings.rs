@@ -1,14 +1,13 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_warnings::)'
 //
-// When the completion pass repairs a write-protected PartnerFolder in the
+// When the refresh corrects a write-protected PartnerFolder in the
 // view the user just saved, the save succeeds and
-// SaveResponse.warnings says what was repaired
+// SaveResponse.warnings carries its corrections
 // ('docs/sharing-model.org', "The write-protected folders: who
 // subscribes to, overrides, or hides this node"):
-// - a deleted generated member is reinstated, with a warning that
-//   explains membership is edited from the other side;
-// - a child placed as a member with a subtree, though not
-//   a member, is retained as non-member, with a warning.
+// - a deleted generated member is reinstated, a correction naming it;
+// - a child placed in the folder, which claims nothing there, stays,
+//   unwarranted, with nothing to correct.
 //
 // Fixture: r and t subscribe to n; the test explicitly asks for n's
 // subscription folders. x is an unrelated node the test places inside
@@ -25,7 +24,6 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::metadata_canon::viewnode_id_atom_of;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
@@ -130,26 +128,16 @@ async fn write_protected_folder_repairs_warn_impl (
     "save must succeed; got errors: {:?}", response . errors );
   let warning : &String =
     response . warnings . iter ()
-    . find ( |w| w . contains ("Repaired subscriberFolder") )
+    . find ( |w| w . starts_with ("Drew what the graph says belongs here.") )
     . unwrap_or_else (
-      || panic! ( "no subscriberFolder repair warning in {:?}",
+      || panic! ( "no correction reinstating r in {:?}",
                   response . warnings ));
-  { // The warning names the folder's viewnode ID.
-    let folder_viewnode_id : &str =
-      viewnode_id_atom_of ( line_containing (&complete_buffer, "subscriberFolder") )
-      . expect ("the rendered folder has a viewnode ID")
-      . trim_start_matches ("(vnid ") . trim_end_matches (')');
-    assert! ( warning . starts_with ("Repaired subscriberFolder under node n")
-              && warning . ends_with ( &format! (
-                "\n*** (untitled)\n- viewnode ID: {}. To find it: C-c g v {}\n",
-                folder_viewnode_id, folder_viewnode_id )),
-              "{}", warning ); }
-  assert! ( warning . contains ("reinstated 1 member(s): r"),
-            "{}", warning );
-  assert! ( warning . contains ("retained 1 child(ren) as non-members, since they are not members: x"),
-            "{}", warning );
-  assert! ( warning . contains ("edited from the other side"),
-            "{}", warning );
+  assert! ( warning . contains ("\n*** r\n- viewnode ID: "),
+            "the correction names r as a subtree: {}", warning );
+  assert_eq! ( response . warnings . iter ()
+               . filter ( |w| ! w . contains ("Headline text on a subscriberFolder") )
+               . count (), 1,
+               "the reinstatement is the only correction: {:?}", response . warnings );
   assert! ( response . warnings . iter ()
             . any ( |w| w . contains ("Headline text on a subscriberFolder") ),
     "discarded folder headline text must warn: {:?}",
@@ -158,8 +146,9 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( saved . contains ("(gnid r)"),
     "deleted member r must respawn:\n{}", saved );
   { let x_line_after : &str = line_containing (&saved, "(gnid x)");
-    assert! ( x_line_after . contains ("noClaim"),
-      "x must be rerendered as a non-member: {}", x_line_after ); }
+    assert! ( x_line_after . contains ("noWarrant")
+              && ! x_line_after . contains ("noClaim"),
+      "x must stay, unwarranted, with no claim atom: {}", x_line_after ); }
   assert! ( ! line_containing (&saved, "subscriberFolder")
               . contains ("HELLO"),
     "the folder headline edit must not survive the rerender:\n{}", saved );

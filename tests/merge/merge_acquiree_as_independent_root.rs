@@ -1,8 +1,7 @@
 // cargo test --test merge merge_acquiree_as_independent_root -- --nocapture
 //
-// Regression test for the preprocessing pass introduced to swap
-// acquiree pids to acquirer pids in the viewforest before rerender
-// walks it.
+// Regression test: after a nodeMerge, a viewnode whose pid is the
+// acquiree's stands for the acquirer when the view is refreshed.
 //
 // Graph fixture:
 //   b and d, both leaves, both at the main skgrepo.
@@ -20,14 +19,14 @@
 // nothing for top-level/non-member acquirees because reconcile
 // never runs on them.
 //
-// Correct behaviour: any viewnode with pid = acquiree should be
-// swapped to pid = acquirer *before* rerender. The preprocessing
-// pass rewriteInPlace_viewnodes_whose_id_is_newly_extra does that.
+// Correct behaviour: any viewnode with pid = acquiree stands for the
+// acquirer after the save: the refresh re-kinds it in place. The two
+// roots then stand for one node, siblings under the buffer root, and
+// the refresh merges them.
 //
 // Expected result:
-//   * d            <-- was b, rewritten to d (first in doc order -> editable)
+//   * d            <-- was b, now d (first in doc order -> editable)
 //   ** MERGED: b
-//   * d (write-protected)    <-- the original d root
 // (No tombstone anywhere.)
 
 use indoc::indoc;
@@ -88,16 +87,16 @@ async fn merge_acquiree_as_independent_root_impl (
   let lines : Vec<&str> = view . lines() . collect();
 
   // 1. No tombstone anywhere: acquiree b should have been
-  //    swapped to d by rewriteInPlace_viewnodes_whose_id_is_newly_extra.
+  //    re-kinded as d by the refresh.
   if view . contains ("tombstone") {
     failures . push (
       "saved view contains a tombstone -- the top-level \
        acquiree b was entombstoned as deleted instead of being swapped \
-       to its acquirer d by the preprocessing pass"
+       to its acquirer d by the refresh"
       . to_string() ); }
 
   // 2. The first top-level headline should reference (gnid d).
-  //    (It was originally pid=b; preprocessing rewrote it.)
+  //    (It was originally pid=b; the refresh re-kinded it.)
   let first_root : Option<&&str> =
     lines . iter () . find ( |l| l . starts_with ("* ") );
   match first_root {
@@ -109,20 +108,18 @@ async fn merge_acquiree_as_independent_root_impl (
           "first top-level headline does not reference (gnid d); \
            got: {}", l ) ); } } }
 
-  // 3. Both top-level headlines should reference (gnid d): the
-  //    rewritten b-root and the original d-root.
+  // 3. One top-level headline references (gnid d): the b-root and
+  //    the original d-root, siblings standing for one node, merge.
   let d_root_count : usize =
     lines . iter ()
     . filter ( |l| l . starts_with ("* ") && l . contains ("(gnid d)") )
     . count ();
-  if d_root_count != 2 {
+  if d_root_count != 1 {
     failures . push ( format! (
-      "expected 2 top-level (gnid d) headlines (rewritten b + \
-       original d); found {}", d_root_count )); }
+      "expected 1 top-level (gnid d) headline (the b-root and the \
+       d-root merged); found {}", d_root_count )); }
 
-  // 4. The MERGED: b preserver should appear in the view (under
-  //    whichever d root is editable -- the first one in doc
-  //    order, i.e. the rewritten-from-b root).
+  // 4. The MERGED: b preserver should appear in the view, under d.
   if ! view . contains ("MERGED: b") {
     failures . push (
       "text preserver 'MERGED: b' not found in rendered view"

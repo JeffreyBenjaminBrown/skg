@@ -96,7 +96,7 @@ fn a_removed_id_does_not_abort_the_save (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg id noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old"),
               "{}", buffer );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &buffer) ?;

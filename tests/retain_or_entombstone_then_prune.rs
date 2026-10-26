@@ -1,16 +1,14 @@
 // cargo nextest run --test grouped_overrides -E 'test(retain_or_entombstone_then_prune::)'
 //
-// Retain as non-member or tombstone, then prune ('docs/glossary.org',
-// "retain as non-member or tombstone, then prune"): a reconciler never
-// detaches. A child the graph no longer
-// warrants is converted -- a leaf, and every non-vognode, to a
-// tombstone that the prune ending the completion removes; an unrestricted
-// vognode with a subtree is retained as non-member, keeping its
-// editability if stale, write-protected if an extra copy of a
-// duplicate -- and a folder adopts such a non-member back when its
-// membership returns. The editability walk prefers a member to a
-// non-member. Each test rerenders a view over a fixture and saves the
-// result.
+// What the refresh keeps of what the graph no longer warrants
+// ('TODO/simplify-refresh/04_1_plan_rewrite-refresh.org', "The
+// model, stateless"): it never detaches. A child the graph no longer
+// warrants stays where it stands, unwarranted ('noWarrant'), and,
+// where its parent reads claims, claiming nothing ('noClaim'); it
+// keeps its editability and its subtree. Siblings standing for one
+// node merge. The first editable occurrence of a node keeps its
+// editability; a later one the refresh draws is write-protected. Each
+// test rerenders a view over a fixture and saves the result.
 //
 // Fixture 'main': k contains l and m, m contains mc; a, b and c contain
 // x, x contains xc, p contains b; al has the aliases one and two; d
@@ -47,26 +45,26 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-retain-or-entombstone-then-prune",
     |s| Box::pin ( async move {
-      s . reset ("a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember", main) ?;
-      a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
+      s . reset ("stale_content_is_kept_unwarranted", main) ?;
+      stale_content_is_kept_unwarranted (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected", main) ?;
-      a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected (
+      s . reset ("a_pasted_copy_beside_a_member_merges_into_it", main) ?;
+      a_pasted_copy_beside_a_member_merges_into_it (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_retained_editable_copy_yields_the_claim_to_a_member_met_later", main) ?;
-      a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
+      s . reset ("a_kept_editable_occurrence_keeps_its_editability", main) ?;
+      a_kept_editable_occurrence_keeps_its_editability (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns", main) ?;
-      a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns (
+      s . reset ("a_folder_member_kept_unwarranted_is_warranted_when_its_membership_returns", main) ?;
+      a_folder_member_kept_unwarranted_is_warranted_when_its_membership_returns (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_duplicate_member_leaves_one_member_and_one_retained_copy", main) ?;
-      a_duplicate_member_leaves_one_member_and_one_retained_copy (
+      s . reset ("duplicate_members_merge", main) ?;
+      duplicate_members_merge (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("an_editable_extra_copy_of_a_duplicate_is_writeProtected", main) ?;
-      an_editable_extra_copy_of_a_duplicate_is_writeProtected (
+      s . reset ("editable_duplicates_merge_with_their_content", main) ?;
+      editable_duplicates_merge_with_their_content (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_stale_alias_goes", main) ?;
-      a_stale_alias_goes (
+      s . reset ("a_stale_alias_is_kept_unwarranted", main) ?;
+      a_stale_alias_is_kept_unwarranted (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -167,13 +165,16 @@ fn the_lines_under (
     . map ( |line| line . to_string () )
     . collect () }
 
-fn is_writeProtected_nonMember (line : &str) -> bool {
-  line . contains ("noClaim") && line . contains ("writeProtected") }
+/// An unwarranted child of a parent that reads claims: it claims
+/// nothing, and the truth does not relate it to its parent.
+fn is_unwarranted_and_claims_nothing (line : &str) -> bool {
+  line . contains ("noClaim") && line . contains ("noWarrant") }
 
 /// k loses l (a leaf) and m (which holds mc), saved from a second view
-/// of k. The first view's rerender drops l and retains m as non-member,
-/// still editable, with mc still its content; that buffer saves.
-async fn a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
+/// of k. The first view's rerender keeps both, unwarranted and claiming
+/// nothing, m still editable, with mc still its content; that buffer
+/// saves.
+async fn stale_content_is_kept_unwarranted (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -195,11 +196,11 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
     &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  assert! ( lines_containing (first_view, "(gnid l)") . is_empty (),
-    "the stale leaf is gone:\n{}", first_view );
+  assert! ( is_unwarranted_and_claims_nothing ( &the_line (first_view, "** ", "(gnid l)") ),
+    "the stale leaf is kept, unwarranted:\n{}", first_view );
   let m : String = the_line (first_view, "** ", "(gnid m)");
-  assert! ( m . contains ("noClaim") && ! m . contains ("writeProtected"),
-    "the stale branch is retained as non-member, still editable:\n{}", first_view );
+  assert! ( is_unwarranted_and_claims_nothing (&m) && ! m . contains ("writeProtected"),
+    "the stale branch is kept, unwarranted, still editable:\n{}", first_view );
   let mc : String = the_line (first_view, "*** ", "(gnid mc)");
   assert! ( ! mc . contains ("noClaim") && ! mc . contains ("writeProtected"),
     "mc stays m's content:\n{}", first_view );
@@ -208,11 +209,13 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
   Ok (( )) }
 
 /// In a view of k, a write-protected copy of m holding a note is
-/// pasted, as a non-member, beside the member m. When k loses l and m,
-/// saved from a second view of k, the first view's rerender retains
-/// the member m as non-member, still editable, and leaves the pasted
-/// copy write-protected, its note under it; that buffer saves.
-async fn a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected (
+/// pasted, as a non-member, beside the member m. The two siblings stand
+/// for one node, so the refresh merges them: the first, the member m,
+/// survives, still editable, and the note joins its content. When k
+/// loses l and m, saved from a second view of k, the first view's
+/// rerender keeps that m, unwarranted, with mc and the note; that
+/// buffer saves.
+async fn a_pasted_copy_beside_a_member_merges_into_it (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -244,26 +247,23 @@ async fn a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected
     &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  let m_lines : Vec<String> = lines_containing (first_view, "(gnid m)");
-  assert_eq! ( m_lines . len (), 2, "two copies of m remain:\n{}", first_view );
-  assert! ( m_lines . iter () . any ( |line| line . contains ("noClaim")
-                                           && ! line . contains ("writeProtected") ),
-    "the stale member is retained as non-member, still editable:\n{}", first_view );
-  assert! ( m_lines . iter () . any ( |line| is_writeProtected_nonMember (line) ),
-    "the pasted copy stays a write-protected non-member:\n{}", first_view );
-  assert! ( the_line_after (first_view, "** ", "noClaim writeProtected")
-              . contains ("a note under the copy"),
-    "the note stands under the copy:\n{}", first_view );
+  let m : String = the_line (first_view, "** ", "(gnid m)");
+  assert! ( is_unwarranted_and_claims_nothing (&m) && ! m . contains ("writeProtected"),
+    "one m remains, unwarranted, still editable:\n{}", first_view );
+  let under_m : Vec<String> = the_lines_under (first_view, "** ", "(gnid m)");
+  assert! ( under_m . iter () . any ( |line| line . contains ("(gnid mc)") )
+            && under_m . iter () . any ( |line| line . contains ("a note under the copy") ),
+    "mc and the note stand under it:\n{}", first_view );
   save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
 /// A second view of k moves m, with mc, from k into l. The first
-/// view's rerender retains its m under k as non-member, editable, and
-/// the walk then meets l's new member m, which takes the claim: m
-/// under l is editable with mc its content, and the retained m yields,
-/// write-protected with its subtree. That buffer saves.
-async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
+/// view's rerender keeps its m under k, unwarranted, editable, with mc,
+/// and draws l's new member m, a repeat of a node whose editable
+/// occurrence stands elsewhere, so write-protected: nothing yields its
+/// editability. That buffer saves.
+async fn a_kept_editable_occurrence_keeps_its_editability (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -285,27 +285,25 @@ async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
   the_line (&second_view, "*** ", "(gnid m)"); // the second view moved m under l
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "** ", "(gnid m)") ),
-    "the retained m yields the claim:\n{}", first_view );
-  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "*** ", "(gnid mc)") ),
-    "with its subtree:\n{}", first_view );
+  let kept_m : String = the_line (first_view, "** ", "(gnid m)");
+  assert! ( is_unwarranted_and_claims_nothing (&kept_m)
+            && ! kept_m . contains ("writeProtected"),
+    "the m under k is kept, unwarranted, editable:\n{}", first_view );
+  let kept_mc : String = the_line (first_view, "*** ", "(gnid mc)");
+  assert! ( ! kept_mc . contains ("noClaim") && ! kept_mc . contains ("writeProtected"),
+    "with mc its content:\n{}", first_view );
   let member_m : String = the_line (first_view, "*** ", "(gnid m)");
-  assert! ( ! member_m . contains ("noClaim") && ! member_m . contains ("writeProtected"),
-    "l's member m takes the claim:\n{}", first_view );
-  let member_mc : String = the_line (first_view, "**** ", "(gnid mc)");
-  assert! ( ! member_mc . contains ("noClaim") && ! member_mc . contains ("writeProtected"),
-    "and its content is extended:\n{}", first_view );
+  assert! ( ! member_m . contains ("noClaim") && member_m . contains ("writeProtected"),
+    "l's member m is drawn write-protected:\n{}", first_view );
   save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
 /// A note typed under b in x's containerFolder. When b stops
-/// containing x, x's view keeps b there as a write-protected non-member
-/// holding the note; b's chain (p) goes with it. When
-/// b contains x again, the folder adopts the retained b as the member and
-/// creates no second one, b gets its chain back, before the note, and
-/// x's view saves.
-async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_returns (
+/// containing x, x's view keeps b there, unwarranted, holding the note
+/// and its chain (p). When b contains x again, b is warranted again,
+/// the folder holds no second b, and x's view saves.
+async fn a_folder_member_kept_unwarranted_is_warranted_when_its_membership_returns (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -338,9 +336,11 @@ async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_re
   let x_after_drop : &String = collateral_views . iter ()
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
-  assert! ( is_writeProtected_nonMember ( &the_line (x_after_drop, "*** ", "(gnid b)") ),
-    "the stale member is a write-protected non-member:\n{}", x_after_drop );
-  assert! ( the_line_after (x_after_drop, "*** ", "(gnid b)") . contains ("a note under b"),
+  let stale_b : String = the_line (x_after_drop, "*** ", "(gnid b)");
+  assert! ( stale_b . contains ("noWarrant") && stale_b . contains ("writeProtected"),
+    "the stale member is kept, unwarranted:\n{}", x_after_drop );
+  assert! ( the_lines_under (x_after_drop, "*** ", "(gnid b)") . iter ()
+              . any ( |line| line . contains ("a note under b") ),
     "the note stands under it:\n{}", x_after_drop );
   let (_, collateral_views) : (String, Vec<String>) = save_view (
     &format! ( "{}** (skg node (gnid x) (skgRepos (nodeRepo main))) x\n\
@@ -350,25 +350,24 @@ async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_re
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
   let member_b : String = the_line (x_after_return, "*** ", "(gnid b)");
-  assert! ( ! member_b . contains ("noClaim"),
-    "the retained b is the member again, and the only b in the folder:\n{}",
+  assert! ( ! member_b . contains ("noWarrant"),
+    "the kept b is warranted again, and the only b in the folder:\n{}",
     x_after_return );
   let under_b : Vec<String> = the_lines_under (x_after_return, "*** ", "(gnid b)");
   assert! ( under_b . len () == 2
-            && under_b [0] . contains ("(gnid p)")
-            && is_writeProtected_nonMember (&under_b [0])
-            && under_b [1] . contains ("a note under b"),
-    "b's chain is back, and the note still stands under it:\n{}", x_after_return );
+            && under_b . iter () . any ( |line| line . contains ("(gnid p)")
+                                                && line . contains ("writeProtected") )
+            && under_b . iter () . any ( |line| line . contains ("a note under b") ),
+    "b holds its chain and the note:\n{}", x_after_return );
   save_view ( x_after_return, &x_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
 /// The rerender of a stored view whose d holds two copies of e (a
 /// write-protected one holding ec, then an editable leaf) and two of f
-/// keeps the editable e as the member, retains the other as
-/// non-member, drops the second f, and gives a buffer the save
-/// accepts.
-async fn a_duplicate_member_leaves_one_member_and_one_retained_copy (
+/// merges each pair: the first e survives, editable since the other
+/// was, holding ec; one f remains. That buffer saves.
+async fn duplicate_members_merge (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -381,26 +380,26 @@ async fn a_duplicate_member_leaves_one_member_and_one_retained_copy (
      *** (skg node (gnid ec) (skgRepos (nodeRepo main))) ec\n\
      ** (skg node (gnid f) (skgRepos (nodeRepo main))) f\n\
      ** (skg node (gnid e) (skgRepos (nodeRepo main))) e\n\
-     ** (skg node (gnid f) (skgRepos (nodeRepo main))) f\n",
+     ** (skg node (gnid f) (skgRepos (nodeRepo main)) writeProtected) f\n",
     &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
-  let e_lines : Vec<String> = lines_containing (&view, "(gnid e)");
-  assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
-  assert! ( is_writeProtected_nonMember (&e_lines [0]),
-    "the write-protected copy is retained as non-member:\n{}", view );
-  assert! ( ! e_lines [1] . contains ("noClaim")
-            && ! e_lines [1] . contains ("writeProtected"),
-    "the editable copy is the member:\n{}", view );
+  let e : String = the_line (&view, "** ", "(gnid e)");
+  assert! ( ! e . contains ("noClaim") && ! e . contains ("writeProtected"),
+    "one e remains, the editable member:\n{}", view );
+  assert! ( the_line_after (&view, "** ", "(gnid e)") . contains ("(gnid ec)"),
+    "holding ec:\n{}", view );
   assert_eq! ( lines_containing (&view, "(gnid f)") . len (), 1,
-    "the extra leaf copy of f is gone:\n{}", view );
+    "one f remains:\n{}", view );
   save_view ( &view, &viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
 
-/// The rerender of a stored view whose d holds two editable copies of
-/// e, each holding ec, keeps one as the member and retains the other
-/// as a write-protected non-member, its ec a non-member; that buffer
-/// saves.
-async fn an_editable_extra_copy_of_a_duplicate_is_writeProtected (
+/// The rerender of a stored view whose d holds two copies of e, the
+/// first editable, the second write-protected, each holding ec, merges
+/// them, and then the two ec under the survivor: one e remains,
+/// editable, holding one ec; that buffer saves. (A buffer holds at
+/// most one editable occurrence of a node: validation refuses a saved
+/// one with two, and every other is the server's own output.)
+async fn editable_duplicates_merge_with_their_content (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -412,19 +411,14 @@ async fn an_editable_extra_copy_of_a_duplicate_is_writeProtected (
      ** (skg node (gnid e) (skgRepos (nodeRepo main))) e\n\
      *** (skg node (gnid ec) (skgRepos (nodeRepo main))) ec\n\
      ** (skg node (gnid f) (skgRepos (nodeRepo main))) f\n\
-     ** (skg node (gnid e) (skgRepos (nodeRepo main))) e\n\
-     *** (skg node (gnid ec) (skgRepos (nodeRepo main))) ec\n",
+     ** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected) e\n\
+     *** (skg node (gnid ec) (skgRepos (nodeRepo main)) writeProtected) ec\n",
     &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
-  let e_lines : Vec<String> = lines_containing (&view, "(gnid e)");
-  assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
-  // The reconciler puts what it converts before the members.
-  assert! ( is_writeProtected_nonMember (&e_lines [0]),
-    "the extra copy is retained write-protected:\n{}", view );
-  assert! ( ! e_lines [1] . contains ("noClaim")
-            && ! e_lines [1] . contains ("writeProtected"),
-    "one editable copy is the member:\n{}", view );
-  assert! ( the_line_after (&view, "** ", "noClaim writeProtected") . contains ("noClaim"),
-    "the extra copy holds no member:\n{}", view );
+  let e : String = the_line (&view, "** ", "(gnid e)");
+  assert! ( ! e . contains ("noClaim") && ! e . contains ("writeProtected"),
+    "one e remains, the editable member:\n{}", view );
+  let ec : String = the_line (&view, "*** ", "(gnid ec)");
+  assert! ( ! ec . contains ("noClaim"), "holding one ec:\n{}", view );
   save_view ( &view, &viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   Ok (( )) }
@@ -458,8 +452,8 @@ fn rerendered_stored_view (
   Ok ( rerendered [0] . clone () ) }
 
 /// al loses its alias one, saved from a second view of al; the first
-/// view's alias folder no longer shows it.
-async fn a_stale_alias_goes (
+/// view's alias folder keeps it, unwarranted and claiming nothing.
+async fn a_stale_alias_is_kept_unwarranted (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -483,8 +477,9 @@ async fn a_stale_alias_goes (
     &second_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  assert! ( lines_containing (first_view, "alias) one") . is_empty (),
-    "the stale alias is gone:\n{}", first_view );
+  assert! ( lines_containing (first_view, ") one") . iter ()
+              . any ( |line| is_unwarranted_and_claims_nothing (line) ),
+    "the stale alias is kept, unwarranted:\n{}", first_view );
   assert_eq! ( lines_containing (first_view, "alias) two") . len (), 1,
     "the other alias stays:\n{}", first_view );
   Ok (( )) }

@@ -28,6 +28,7 @@ mod ladder;
 mod tail;
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
@@ -78,6 +79,7 @@ pub fn refresh_viewforest (
     debug_assert! ( at_most_one_editable_occurrence_per_gnid (tree),
                     "the input holds two editable occurrences of one gnid" );
     fulfill_editableView_requests (tree, &mut walk);
+    keep_the_first_editable_occurrence_of_each_node (tree, &mut walk);
     walk . editable_gnids = editable_gnids_in (tree);
     walk_in_level_order (tree, &mut walk) ?; }
   let text : String = tail::finish (
@@ -97,9 +99,14 @@ pub(crate) struct Walk<'a> {
   /// The occurrences this refresh drew editable. At its visit, one
   /// that the spent budget allows no content becomes write-protected.
   pub drawn_editable : HashSet<NodeId>,
-  /// The occurrences that carried an editable-view request: in the
-  /// diff view only their extension may be charged to the budget.
+  /// The occurrences that carried an editable-view request, or to
+  /// which one passed ('extend_requested_content'): in the diff view
+  /// only their extension may be charged to the budget.
   pub had_editableView_request : HashSet<NodeId>,
+  /// The compound folders this refresh added. Their members are drawn
+  /// folded: in the clients' encoding a folder's collapse lives on its
+  /// members, since 'folded' on a headline hides it in its parent.
+  pub newborn_folders : HashSet<NodeId>,
   pub corrections    : CorrectionLog,
 }
 
@@ -113,6 +120,7 @@ impl<'a> Walk<'a> {
            editable_gnids           : HashSet::new (),
            drawn_editable           : HashSet::new (),
            had_editableView_request : HashSet::new (),
+           newborn_folders          : HashSet::new (),
            corrections              : CorrectionLog::default (), } }
 
   pub fn is_diff_view (
@@ -154,6 +162,32 @@ fn editable_gnids_in (
   tree . root () . descendants ()
     . filter_map ( |node| node . value () . editable_skgid () . cloned () )
     . collect () }
+
+/// Two editable occurrences in the input may stand for one node when
+/// a save made one's gnid an extra ID of the other's node (a
+/// nodeMerge). The first in level order stays editable; the others
+/// are write-protected, before any visit, so that none of them draws
+/// content first.
+fn keep_the_first_editable_occurrence_of_each_node (
+  tree : &mut Tree<Viewnode>,
+  walk : &mut Walk,
+) {
+  let mut seen : HashSet<ID> = HashSet::new ();
+  let mut repeats : Vec<NodeId> = Vec::new ();
+  let mut queue : VecDeque<NodeId> =
+    VecDeque::from ([ tree . root () . id () ]);
+  while let Some (treeid) = queue . pop_front () {
+    let node = tree . get (treeid) . unwrap ();
+    if let Some (gnid) = node . value () . editable_skgid () {
+      let pid : ID = match walk . truth . graph . gnid_presence_gated (
+                             gnid, walk . truth . restriction ) {
+        GnidPresence::Present => walk . truth . graph . pid_of (gnid)
+          . unwrap_or_else ( || gnid . clone () ),
+        _ => gnid . clone (), };
+      if ! seen . insert (pid) { repeats . push (treeid); }}
+    queue . extend ( node . children () . map ( |child| child . id () )); }
+  for repeat in repeats {
+    write_protect_occurrence (tree, repeat, walk); }}
 
 /// An editable-view request makes its occurrence the node's editable
 /// one, and any other editable occurrence of the node

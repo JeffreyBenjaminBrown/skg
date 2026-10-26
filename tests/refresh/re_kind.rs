@@ -106,6 +106,30 @@ fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
 node p
   node a wp" ); }
 
+/// a acquired b by a nodeMerge, and the buffer held an editable
+/// occurrence of each: b's, the root, comes first in level order, so
+/// it stays editable as a's, and a's below it is write-protected.
+#[test]
+fn of_two_editable_occurrences_a_nodeMerge_made_one_nodes_the_first_stays_editable () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { extra_ids : vec! [ ID::from ("b") ],
+                contains  : ids (&["a", "c"]),
+                .. node ("a") },
+    node ("c") ]);
+  let input : String = formatdoc! ("
+    * {} b
+    ** {} a
+    ", occ ("b", ""), occ ("a", "") );
+  let mut forest : ViewForest = parse (&input, &InRustGraph::new ());
+  let config : SkgConfig = config ();
+  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
+  refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,
+                       CompletionMode::ContentView, 100, None ) . unwrap ();
+  assert_eq! ( outline (&forest), "\
+node a
+  node a wp
+  node c" ); }
+
 #[test]
 fn a_deleted_node_that_its_parent_listed_by_an_extra_id_leaves_a_tombstone_and_an_unknown () {
   // n had the extra ID x, by which p lists it; a save deleted n. Its

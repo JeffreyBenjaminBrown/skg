@@ -1,3 +1,4 @@
+use crate::refresh::ancestry::parent_reads_claims;
 use crate::serve::util::sexp_to_client_string;
 use crate::types::misc::{SkgConfig, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
@@ -91,8 +92,12 @@ fn render_view_roots_to_string <'a> (
     level    : usize,
     config   : &SkgConfig,
   ) -> Result < String, Box<dyn Error> > {
+    let claims_are_read : bool = // under any other parent no child claims
+      node_ref . parent () . is_some_and ( |parent|
+        parent_reads_claims ( node_ref . tree (), parent . id () ));
     let mut out : String =
-      viewnode_to_text ( level, node_ref . value (), config )?;
+      viewnode_to_text_where_it_stands (
+        level, node_ref . value (), claims_are_read )?;
     for child in node_ref . children () {
       out . push_str (
         & render_node_subtree_to_org (
@@ -109,14 +114,25 @@ fn render_view_roots_to_string <'a> (
 
 /// Renders an Viewnode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
+/// Standing alone, it is read as standing where its claim is read.
 /// ERRORS: If viewnode is a BufferRoot.
 pub fn viewnode_to_text (
   level    : usize,
   viewnode : &Viewnode,
-  config   : &SkgConfig,
+  _config  : &SkgConfig,
+) -> Result < String, Box<dyn Error> > {
+  viewnode_to_text_where_it_stands (level, viewnode, true) }
+
+/// 'viewnode_to_text' for a viewnode whose viewparent reads its
+/// claim ('parent_reads_claims') when 'claims_are_read'. Elsewhere it
+/// carries no 'noClaim': no child there claims, whatever it carries.
+fn viewnode_to_text_where_it_stands (
+  level           : usize,
+  viewnode        : &Viewnode,
+  claims_are_read : bool,
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
-    viewnode_to_string (viewnode, config)?;
+    viewnode_to_string_where_it_stands (viewnode, claims_are_read)?;
   let title : &str = viewnode . title ();
   let body : Option < &String > = viewnode . body ();
   if metadata_str . is_empty () && title . is_empty () {
@@ -149,18 +165,29 @@ pub fn viewnode_to_text (
 ///            [(view FACT...)] [(diff FACT...)]
 /// every part standing at the top level, the derived facts gathered
 /// in '(view ...)' and '(diff ...)'.
+/// Standing alone, the viewnode is read as standing where its claim is
+/// read.
 pub fn viewnode_to_string (
   viewnode : &Viewnode,
   _config  : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
+  viewnode_to_string_where_it_stands (viewnode, true) }
+
+/// 'viewnode_to_string' for a viewnode whose claim is read where it
+/// stands when 'claims_are_read'; otherwise it carries no 'noClaim'.
+fn viewnode_to_string_where_it_stands (
+  viewnode        : &Viewnode,
+  claims_are_read : bool,
+) -> Result < String, Box<dyn Error> > {
   let parts_but_the_viewnode_id : String =
-    viewnode_to_string_without_viewnode_id (viewnode) ?;
+    viewnode_to_string_without_viewnode_id (viewnode, claims_are_read) ?;
   Ok ( match &viewnode . viewnode_id {
     None      => parts_but_the_viewnode_id,
     Some (viewnode_id) => format! ("(vnid {}) {}", viewnode_id, parts_but_the_viewnode_id), } ) }
 
 fn viewnode_to_string_without_viewnode_id (
-  viewnode     : &Viewnode,
+  viewnode        : &Viewnode,
+  claims_are_read : bool,
 ) -> Result < String, Box<dyn Error> > {
   let facts   : &ChangeFacts = &viewnode . change_facts;
   let request : &Option<ReadinessRequest> = &viewnode . readiness_request;
@@ -170,7 +197,7 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus, folder . repr_in_client () )),
     ViewnodeKind::PropertyMember (member) =>
       Ok ( propertyMember_metadata_to_string (
-        viewnode . foldAndFocus, member,
+        viewnode . foldAndFocus, member, claims_are_read,
         viewnode . is_ghostWarranted (), facts, request )),
     ViewnodeKind::ChangeViewnode (change) =>
       Ok ( changeViewnode_metadata_to_string (
@@ -182,10 +209,10 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus )),
     ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
       Ok ( unrestrictedVognode_metadata_to_string (
-        viewnode . foldAndFocus, unrestrictedVognode, facts, request )),
+        viewnode . foldAndFocus, unrestrictedVognode, claims_are_read, facts, request )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( phantomUnknown_metadata_to_string (
-        viewnode . foldAndFocus, unknown_node, facts, request )),
+        viewnode . foldAndFocus, unknown_node, claims_are_read, facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
         viewnode . foldAndFocus, ghost, facts, request )), } }
@@ -213,6 +240,7 @@ fn non_vognode_atom_metadata_to_string (
 fn propertyMember_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   member          : &PropertyMember,
+  claims_are_read : bool,
   ghostWarranted  : bool,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
@@ -232,13 +260,13 @@ fn propertyMember_metadata_to_string (
                             claimsMembership, .. } => {
       parts . push ( "alias" . to_string () );
       parts . extend ( skgRepos_form ( None, relRepo . as_ref () ));
-      parts . extend ( noClaim_atom (*claimsMembership) );
+      parts . extend ( noClaim_atom (*claimsMembership, claims_are_read) );
       parts . extend ( editRequest_form (
         relationshipEditRequest . as_ref () . map (relationshipEditRequest_element),
         request )); }
     PropertyMember::ID { claimsMembership, .. } => {
       parts . push ( "id" . to_string () );
-      parts . extend ( noClaim_atom (*claimsMembership) );
+      parts . extend ( noClaim_atom (*claimsMembership, claims_are_read) );
       parts . extend ( editRequest_form ( None, request )); }
     PropertyMember::Flag { flag, .. } => {
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
@@ -295,12 +323,14 @@ pub(crate) fn skgRepos_form (
   if repos . is_empty () { None }
   else { Some ( format! ( "(skgRepos {})", repos . join (" ") )) } }
 
-/// 'noClaim' for a child that claims no membership; a claimant
-/// carries nothing.
+/// 'noClaim' for a child that claims no membership where its claim is
+/// read; a claimant, and any child where no claim is read, carries
+/// nothing.
 fn noClaim_atom (
   claimsMembership : bool,
+  claims_are_read  : bool,
 ) -> Option<String> {
-  ( ! claimsMembership ) . then ( || "noClaim" . to_string () ) }
+  ( claims_are_read && ! claimsMembership ) . then ( || "noClaim" . to_string () ) }
 
 /// '(relRepo R)' or 'restoreRel', inside '(editRequest ...)'.
 fn relationshipEditRequest_element (
@@ -387,11 +417,13 @@ fn diff_form (
 fn unrestrictedVognode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   unrestrictedVognode : & UnrestrictedVognode,
+  claims_are_read     : bool,
   facts               : & ChangeFacts,
   request             : & Option<ReadinessRequest>,
 ) -> String {
   fn node_parts (
     unrestrictedVognode : & UnrestrictedVognode,
+    claims_are_read     : bool,
     facts     : & ChangeFacts,
     request   : & Option<ReadinessRequest>,
   ) -> Vec < String > {
@@ -446,7 +478,7 @@ fn unrestrictedVognode_metadata_to_string (
     parts . extend ( skgRepos_form (
       Some (&unrestrictedVognode . home_skgrepo),
       unrestrictedVognode . viewStats . relRepo . as_ref () ));
-    parts . extend ( noClaim_atom (unrestrictedVognode . claimsMembership) );
+    parts . extend ( noClaim_atom (unrestrictedVognode . claimsMembership, claims_are_read) );
     if unrestrictedVognode . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
@@ -463,7 +495,7 @@ fn unrestrictedVognode_metadata_to_string (
     parts . extend ( diff_form (facts) );
     parts }
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . extend ( node_parts (unrestrictedVognode, facts, request));
+  parts . extend ( node_parts (unrestrictedVognode, claims_are_read, facts, request));
   parts . join (" ") }
 
 /// Render metadata for a ghost:
@@ -498,6 +530,7 @@ fn ghost_metadata_to_string (
 fn phantomUnknown_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   unknown_node    : &Unknown,
+  claims_are_read : bool,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
@@ -505,7 +538,7 @@ fn phantomUnknown_metadata_to_string (
   parts . push ( "unknown" . to_string () );
   parts . push ( format! ("(gnid {})", unknown_node . skgid . 0) );
   parts . extend ( skgRepos_form ( None, unknown_node . relRepo . as_ref () ));
-  parts . extend ( noClaim_atom (unknown_node . claimsMembership) );
+  parts . extend ( noClaim_atom (unknown_node . claimsMembership, claims_are_read) );
   parts . extend ( editRequest_form (
     unknown_node . relationshipEditRequest . as_ref ()
       . map (relationshipEditRequest_element),

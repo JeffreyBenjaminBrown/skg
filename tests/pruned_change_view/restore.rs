@@ -34,17 +34,17 @@ use std::error::Error;
 const X_REMOVED_FROM_B : &str =
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant cycle)";
+  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view noWarrant cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
-  "*** (skg node (gnid s) (skgRepos (nodeRepo main)) noClaim writeProtected";
+  "*** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
-  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant)";
+  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected (view noWarrant)";
 const G_UNDER_Q : &str =
   "** (skg ghost (gnid g)";
 const GC_UNDER_G : &str =
-  "*** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim writeProtected";
+  "*** (skg node (gnid gc) (skgRepos (nodeRepo main)) writeProtected";
 const GC_REMOVED_FROM_R : &str =
   "** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim (view noWarrant) (diff";
 
@@ -229,7 +229,7 @@ fn restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member (
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let requested : String = edit_line (
       &buffer,
-      "***** (skg node (gnid p) (skgRepos (nodeRepo main)) noClaim writeProtected",
+      "***** (skg node (gnid p) (skgRepos (nodeRepo main)) writeProtected",
       |line : &str| line . replacen (
         "writeProtected", "writeProtected (editRequest restoreRel) (diff (rel removed))", 1 ));
     assert_ne! ( requested, buffer );

@@ -118,8 +118,13 @@ fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () 
 node s
   subscribeeFolder
     node e
+      hiddenInSubscribeeFolder
+        node h wp noClaim folded
+          node e wp noClaim
       node k
-  node i" ); }
+  node i",
+    "an editable subscribee as such also shows the folder of what its \
+     subscriber hides in it" ); }
 
 #[test]
 fn a_folder_omits_what_the_restriction_hides () {

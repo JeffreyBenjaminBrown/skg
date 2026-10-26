@@ -21,6 +21,7 @@ use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use ego_tree::Tree;
 use skg::types::viewnode::Viewnode;
+use skg::metadata_canon::without_viewnode_ids;
 
 async fn save (
   buf     : &str,
@@ -112,6 +113,35 @@ fn add_editable_view_requests_to_folder_members (
     { folder_stack . push ((depth, folder)); }}
   output . join ("\n") + "\n"
 }
+
+/// A subscribing root of a fresh view is drawn with its subscribee
+/// folder and, beside its subscribees, the folder of what it hides
+/// outside them, whose members are drawn folded: N subscribes to
+/// Subscribee and hides Hidden, which no subscribee contains.
+#[test]
+fn a_subscribing_root_is_drawn_with_its_subscription_folders
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-extend-partner-folder-member-subscribing-root",
+    "tests/extend_partner_folder_member/fixtures",
+    "/tmp/tantivy-test-extend-partner-folder-member-subscribing-root",
+    |config, tantivy| Box::pin ( async move {
+      let (n_view, _pids, _tree)
+        : (String, Vec<ID>, Tree<Viewnode>) =
+        multi_root_view (
+          config, Some (tantivy), &[ID::from ("N")] ) ?;
+      let outline : Vec<String> = without_viewnode_ids (&n_view) . lines ()
+        . filter ( |line| line . starts_with ('*') )
+        . map ( |line| line . split (" (skgRepos") . next () . unwrap () . to_string () )
+        . collect ();
+      assert_eq! ( outline [.. 5], [
+        "* (skg node (gnid N)",
+        "** (skg subscribeeFolder)",
+        "*** (skg node (gnid Subscribee)",
+        "*** (skg hiddenOutsideOfSubscribeeFolder)",
+        "**** (skg folded node (gnid Hidden)" ],
+        "{}", n_view );
+      Ok (( )) } )) }
 
 #[test]
 fn initial_and_as_such_editable_nodes_get_only_the_default_folders

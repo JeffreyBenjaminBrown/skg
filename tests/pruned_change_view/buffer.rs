@@ -137,7 +137,7 @@ fn a_node_its_only_container_dropped_is_editable_as_the_removed_member (
     "* (skg node (gnid ct)",
     "** (skg node (gnid k1) (skgRepos (nodeRepo public)) noClaim (view (rels",
     "*** (skg containerFolder)",
-    "**** (skg node (gnid ct) (skgRepos (nodeRepo public)) noClaim writeProtected",
+    "**** (skg node (gnid ct) (skgRepos (nodeRepo public)) writeProtected",
     "*** (skg node (gnid k1c) (skgRepos (nodeRepo public)) writeProtected" ] );
   assert_eq! ( node_lines (&buffer, "k1") . len (), 1, "{}", buffer );
   Ok (( )) }
@@ -153,7 +153,7 @@ fn alias_id_and_flag_changes_fill_their_folders (
     "*** (skg alias (diff (rel added) (leaves 1))) a3",
     "** (skg idFolder)",
     "*** (skg id) ali",
-    "*** (skg id noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old" ] );
+    "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old" ] );
   assert_lines_in_order ( &buffer, &[
     "** (skg idFolder)",
     "*** (skg id) acq",
@@ -175,7 +175,7 @@ fn a_subscription_change_shows_on_both_sides (
   assert_lines_in_order ( &buffer, &[
     "* (skg node (gnid s1)",
     "** (skg subscriberFolder)",
-    "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) noClaim writeProtected",
+    "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected",
     "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub" ] );
   Ok (( )) }
 
@@ -271,7 +271,7 @@ fn a_removed_container_stands_between_the_kept_ones (
     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels",
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
-    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected",
     "(diff (rel removed) (properties changed) (leaves 1 rel all))) b",
     "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected" ] );
   Ok (( )) }
@@ -291,10 +291,10 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
     "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels (contains (in 2) (out 1))) noWarrant) (diff (rel removed) (leaves 1 rel))) x",
     "*** (skg containerFolder)",
     "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
-    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected",
     "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
-    "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected",
-    "**** (skg node (gnid e) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected",
+    "**** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected",
     "*** (skg node (gnid xc) (skgRepos (nodeRepo main)) writeProtected",
     "* (skg node (gnid d)",
     "** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim (view (rels",
@@ -308,8 +308,9 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
 /// subscribes to s0; since HEAD, sub subscribes to s1; c contains s1
 /// and p contains sub. So the stub roots c and p show s1 and sub, and
 /// s1's changed subscriber folder holds sub, its relationship added,
-/// with sub's containerward chain under it: p, a write-protected
-/// non-member carrying no change facts. Likewise sub's changed
+/// with sub's containerward chain under it: p, write-protected, with
+/// no claim atom (under a write-protected parent nothing claims), and
+/// carrying no change facts. Likewise sub's changed
 /// subscribee folder holds s1, with c under it. The buffer saves back
 /// unchanged.
 #[test]
@@ -332,7 +333,7 @@ fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
       let chain_line : &str = lines . get (folder_index + 2) . copied () . unwrap_or ("");
       assert! ( chain_line . starts_with (
                   &format! ( "***** (skg node (gnid {}) ", chain_node ))
-                && chain_line . contains ("noClaim")
+                && ! chain_line . contains ("noClaim")
                 && chain_line . contains ("writeProtected")
                 && ! chain_line . contains ("(diff"),
                 "{}'s chain, {}, hangs under it:\n{}", member, chain_node, buffer ); }
@@ -360,7 +361,7 @@ fn a_chain_node_under_an_editable_removed_member_keeps_its_place_through_a_save 
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let chain_node : &str =
-      "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected";
+      "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_eq! ( without_viewnode_ids (&buffer) . matches (chain_node) . count (), 1, "{}", buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;
@@ -435,6 +436,6 @@ fn a_historical_phantoms_old_content_is_shown_as_removed_members (
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
     "** (skg ghost (gnid h) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) h",
-    "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled",
+    "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled",
     "**** (skg (oldText title) (diff (leaves 1))) m" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

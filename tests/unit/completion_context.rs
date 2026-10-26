@@ -1,15 +1,15 @@
-// The three constructors of 'CompletionContext' give the settings
-// that the literal constructions in 'render_initial_view',
+// The two constructors of 'CompletionContext' give the settings
+// that the literal constructions in
 // 'complete_viewforest_with_graph_straddle' and 'rerender_view'
 // wrote, field by field.
 
 use super::*;
 use crate::dbs::init::empty_in_ram_tantivy_index;
 use crate::graph_straddle::types::GraphStraddle;
-use crate::types::misc::{SkgConfig, SkgrepoSetName};
+use crate::types::misc::SkgConfig;
 use crate::types::views_state::DiffViewBufferKind;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 fn runtime () -> RuntimeGeneration {
   RuntimeGeneration {
@@ -23,11 +23,6 @@ fn straddle () -> GraphStraddle {
     Arc::new ( InRustGraph::from_graphnodes (&[]) ),
     Arc::new ( InRustGraph::from_graphnodes (&[]) ),
     String::new (), 0 ) }
-
-fn restriction () -> SkgrepoRestriction {
-  SkgrepoRestriction {
-    name     : SkgrepoSetName ("main" . to_string ()),
-    skgrepos : BTreeSet::from ([ SkgrepoName::from ("main") ]), } }
 
 /// The settings of a context that do not borrow mutable state.
 #[derive(Debug, PartialEq)]
@@ -61,27 +56,6 @@ fn settings_of (
     editable_before_completion     : context . editable_before_completion . clone (), } }
 
 #[test]
-fn for_content_view_gives_render_initial_views_settings () {
-  let runtime : RuntimeGeneration = runtime ();
-  let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
-  let restriction : SkgrepoRestriction = restriction ();
-  let mut editable_map : EditableMap = EditableMap::new ();
-  let mut errors : Vec<String> = Vec::new ();
-  let mut sink : Vec<CompletionWarning> = Vec::new ();
-  let context : CompletionContext = CompletionContext::for_content_view (
-    &runtime, &graph_snap, &mut editable_map, &mut errors,
-    Some (&restriction), &mut sink );
-  assert_eq! ( settings_of (&context), Settings {
-    skgrepo_restriction            : Some (restriction . clone ()),
-    node_budget                    : runtime . config . initial_node_limit,
-    create_partnerFolders_for_fresh_nodes : true,
-    substitute_existing_content_overrides : false,
-    has_warning_sink               : true,
-    diffView_mode                  : None,
-    nodes_before_completion        : HashSet::new (),
-    editable_before_completion     : HashSet::new (), } ); }
-
-#[test]
 fn for_diffView_gives_the_first_renderings_settings () {
   let runtime : RuntimeGeneration = runtime ();
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
@@ -102,43 +76,34 @@ fn for_diffView_gives_the_first_renderings_settings () {
     nodes_before_completion        : HashSet::new (),
     editable_before_completion     : HashSet::new (), } ); }
 
-/// Outside the diff view a rerender takes the restriction and the two
-/// flags it is given; in a buffer of the diff view it takes the first
-/// rendering's instead. Either way it keeps the sink and what the view
-/// held before.
+/// A rerender of a buffer of the diff view takes the first
+/// rendering's settings, and keeps the sink and what the view held
+/// before.
 #[test]
-fn for_rerender_gives_rerender_views_settings_in_and_out_of_the_diff_view () {
+fn for_rerender_gives_the_first_renderings_settings_and_keeps_the_rest () {
   let runtime : RuntimeGeneration = runtime ();
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let straddle : GraphStraddle = straddle ();
-  let restriction : SkgrepoRestriction = restriction ();
   let tree : Tree<Viewnode> =
     Tree::new ( crate::types::viewnode::viewforest_root_viewnode () );
   let some_node : NodeId = tree . root () . id ();
   let nodes_before : HashSet<NodeId> = HashSet::from ([ some_node ]);
-  for in_diffView in [false, true] {
-    let mut editable_map : EditableMap = EditableMap::new ();
-    let mut errors : Vec<String> = Vec::new ();
-    let mut sink : Vec<CompletionWarning> = Vec::new ();
-    let mode : CompletionMode =
-      if in_diffView {
-        CompletionMode::DiffView { straddle    : &straddle,
-                                   buffer_kind : DiffViewBufferKind::AllChanges }
-      } else { CompletionMode::ContentView };
-    let context : CompletionContext = CompletionContext::for_rerender (
-      &runtime, &graph_snap, &mut editable_map, &mut errors,
-      Some (&restriction),
-      true, true, Some (&mut sink), mode,
-      &nodes_before, &nodes_before );
-    assert_eq! ( settings_of (&context), Settings {
-      skgrepo_restriction            :
-        ( ! in_diffView ) . then ( || restriction . clone () ),
-      node_budget                    : runtime . config . initial_node_limit,
-      create_partnerFolders_for_fresh_nodes : ! in_diffView,
-      substitute_existing_content_overrides : ! in_diffView,
-      has_warning_sink               : true,
-      diffView_mode                  : in_diffView . then_some ((
-        &straddle as *const GraphStraddle, DiffViewBufferKind::AllChanges )),
-      nodes_before_completion        : nodes_before . clone (),
-      editable_before_completion     : nodes_before . clone (), },
-      "in the diff view: {}", in_diffView ); }}
+  let mut editable_map : EditableMap = EditableMap::new ();
+  let mut errors : Vec<String> = Vec::new ();
+  let mut sink : Vec<CompletionWarning> = Vec::new ();
+  let mode : CompletionMode =
+    CompletionMode::DiffView { straddle    : &straddle,
+                               buffer_kind : DiffViewBufferKind::AllChanges };
+  let context : CompletionContext = CompletionContext::for_rerender (
+    &runtime, &graph_snap, &mut editable_map, &mut errors,
+    Some (&mut sink), mode, &nodes_before, &nodes_before );
+  assert_eq! ( settings_of (&context), Settings {
+    skgrepo_restriction            : None,
+    node_budget                    : runtime . config . initial_node_limit,
+    create_partnerFolders_for_fresh_nodes : false,
+    substitute_existing_content_overrides : false,
+    has_warning_sink               : true,
+    diffView_mode                  : Some ((
+      &straddle as *const GraphStraddle, DiffViewBufferKind::AllChanges )),
+    nodes_before_completion        : nodes_before . clone (),
+    editable_before_completion     : nodes_before . clone (), } ); }

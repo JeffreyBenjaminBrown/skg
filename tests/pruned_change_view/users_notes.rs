@@ -21,7 +21,7 @@ use std::error::Error;
 
 const MEMBER_A : &str = "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected";
 const GRAFT_P  : &str =
-  "***** (skg node (gnid p) (skgRepos (nodeRepo main)) noClaim writeProtected";
+  "***** (skg node (gnid p) (skgRepos (nodeRepo main)) writeProtected";
 
 /// A note under a member of a changed container folder survives, and
 /// the member's role tree is still shown around it, once.
@@ -48,7 +48,7 @@ fn a_note_under_a_historical_phantom_survives (
   with_fixture ("users_notes", &["main"], |f| {
     let phantom : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
-      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed)";
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;

@@ -84,10 +84,15 @@
     (assert-headline-structure
      buf
      '((1 member "a")
-       ;; b no longer contains a: the stale member goes from a's
-       ;; containers folder with its chain, and the empty folder with
-       ;; it.
-       (2 member     "b"))
+       ;; b no longer contains a. The refresh keeps what stood there,
+       ;; unwarranted: b stays in a's containers folder, with its
+       ;; chain (a, then b, which no longer contains a), and a stays
+       ;; under b, claiming nothing.
+       (3 member "b")
+       (4 container "a")
+       (5 noClaim "b")
+       (2 member     "b")
+       (3 noClaim    "a"))
      "phase 4: buffer A after collateral update")))
 
 (defun run-all-tests ()

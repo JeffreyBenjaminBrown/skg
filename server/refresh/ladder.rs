@@ -34,7 +34,10 @@ use crate::refresh::corrections::CorrectionKind;
 use crate::refresh::extent::{
   Extent, drawn_occurrence_is_editable, extent_of_parent, settle_budget_at_visit};
 use crate::refresh::goal::{
-  Goal, GoalItem, GoalMember, goal_of_parent, member_of_child};
+  Goal, GoalItem, GoalMember, goal_of_parent, hidden_in_subscribee,
+  hidden_outside_of_subscribees, member_of_child, occurrence_pid,
+  subscriber_of_subscribee_as_such};
+use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
   IdRuleAnswer, entombstone, ghost_from_head, id_rule, occurrence_from_truth,
   rekind_vognode};
@@ -63,6 +66,8 @@ pub(crate) fn visit_parent (
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   settle_budget_at_visit (tree, parent, walk);
+  extend_requested_content (tree, parent, walk);
+  add_default_folders (tree, parent, walk);
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   merge_siblings (tree, parent, walk) ?;
@@ -81,6 +86,79 @@ pub(crate) fn visit_parent (
   fulfill_view_requests (tree, parent, walk) ?;
   entombstone_if_an_empty_folder (tree, parent);
   Ok (( )) }
+
+/// An editable-view request extends its occurrence's content, the
+/// content it shows included: each write-protected child that claims
+/// membership becomes editable as a drawn occurrence would (its node
+/// has no editable occurrence, and the budget allows), and extends its
+/// own content in turn, as if it carried the request.
+fn extend_requested_content (
+  tree   : &mut Tree<Viewnode>,
+  parent : NodeId,
+  walk   : &mut Walk,
+) {
+  if ! walk . had_editableView_request . contains (&parent)
+     || tree . get (parent) . unwrap () . value () . editable_skgid () . is_none ()
+  { return; }
+  for child in children_of (tree, parent) {
+    let gnid : ID = match &tree . get (child) . unwrap () . value () . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+        if occurrence . is_writeProtected () && occurrence . claimsMembership =>
+        occurrence . skgid . clone (),
+      _ => continue, };
+    if ! drawn_occurrence_is_editable (tree, parent, &gnid, walk) { continue; }
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+      &mut tree . get_mut (child) . unwrap () . value () . kind
+    { occurrence . editability = Editability::Editable { // the re-kind gives it its body
+        body : None, edit_request : None }; }
+    walk . editable_gnids . insert (gnid);
+    walk . drawn_editable . insert (child);
+    walk . had_editableView_request . insert (child); }}
+
+/// The folders a content view shows without being asked, as it
+/// always has: an occurrence that an editable-view request extends
+/// (a fresh view's roots among them) shows its subscribee folder when
+/// it subscribes to something the restriction shows (with the folder
+/// of what it hides outside its subscribees, when that holds
+/// anything); and an editable subscribee as such shows the folder of
+/// what its subscriber hides in it, when that holds anything. Not in
+/// the diff view.
+fn add_default_folders (
+  tree   : &mut Tree<Viewnode>,
+  parent : NodeId,
+  walk   : &mut Walk,
+) {
+  if walk . is_diff_view () { return; }
+  let Some (pid) = tree . get (parent) . unwrap () . value () . editable_skgid () . cloned ()
+    else { return; };
+  if walk . had_editableView_request . contains (&parent)
+     && partnerFolder_members_in_graph (
+          walk . truth . graph, walk . truth . config, &pid, &Folder::Subscribee,
+          walk . truth . restriction )
+        . is_some_and ( |members| ! members . is_empty () )
+  { let had_one : bool = child_folder (tree, parent, &Folder::Subscribee) . is_some ();
+    add_folders (tree, parent, &[ Folder::Subscribee ], walk);
+    // A new one goes after any folder the occurrence was asked for.
+    if let Some (subscribee_folder) = child_folder (tree, parent, &Folder::Subscribee)
+                                      . filter ( |_| ! had_one ) {
+      let last_leading_folder : Option<NodeId> =
+        tree . get (parent) . unwrap () . children ()
+        . take_while ( |child| matches! ( child . value () . kind, ViewnodeKind::Folder (_) ))
+        . filter ( |child| child . id () != subscribee_folder )
+        . map ( |child| child . id () )
+        . last ();
+      if let Some (folder) = last_leading_folder {
+        move_after (tree, folder, subscribee_folder)
+          . expect ("add_default_folders: both are children"); }}}
+  if let Some (subscriber) = subscriber_of_subscribee_as_such (tree, parent) {
+    if child_folder (tree, parent, &Folder::HiddenInSubscribee) . is_none ()
+       && ! hidden_in_subscribee (&pid, &subscriber, walk) . is_empty ()
+    { let folder : NodeId = tree . get_mut (parent) . unwrap ()
+        . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInSubscribee) ))
+        . id ();
+      move_to_first_child (tree, parent, folder)
+        . expect ("add_default_folders: the folder was just added");
+      walk . newborn_folders . insert (folder); }}}
 
 //
 // 1. re-kind
@@ -293,8 +371,11 @@ pub(crate) fn set_claim (
 // 5. reinstate
 //
 
-/// Draw every goal item that no child stands for, appended (the
-/// reorder then places it). A drawn occurrence is editable as
+/// Draw every goal item that no child stands for. Where the goal has
+/// an order it is appended, and the reorder places it; where it has
+/// none, it follows the last child the goal names (or, when none does,
+/// leads), so that what the user placed after the members stays after
+/// them. A drawn occurrence is editable as
 /// 'drawn_occurrence_is_editable' says; a member of a folder whose
 /// members carry the containerward chain gets its chain.
 fn reinstate (
@@ -307,6 +388,12 @@ fn reinstate (
     tree . get (parent) . unwrap () . children ()
     . filter_map ( |child| member_of_child (child . value ()) )
     . collect ();
+  let mut last_named : Option<NodeId> = // the child a drawn one follows, where the goal has no order
+    tree . get (parent) . unwrap () . children ()
+    . filter ( |child| member_of_child (child . value ())
+                       . is_some_and ( |member| goal . item_for (&member) . is_some () ))
+    . map ( |child| child . id () )
+    . last ();
   for item in &goal . items {
     if present . contains (&item . member) { continue; }
     let Some (drawn) = draw_item (tree, parent, item, goal, walk) ?
@@ -318,6 +405,11 @@ fn reinstate (
       if ! present . insert (member) { continue; }}
     let treeid : NodeId =
       tree . get_mut (parent) . unwrap () . append (drawn) . id ();
+    if ! goal . ordered {
+      match last_named {
+        Some (named) => move_after (tree, named, treeid) ?,
+        None => move_to_first_child (tree, parent, treeid) ?, }
+      last_named = Some (treeid); }
     after_drawing (tree, parent, treeid, walk) ?; }
   Ok (( )) }
 
@@ -332,7 +424,12 @@ fn after_drawing (
 ) -> Result<(), Box<dyn Error>> {
   if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_skgid () . cloned () {
     walk . editable_gnids . insert (gnid);
-    walk . drawn_editable . insert (treeid); }
+    walk . drawn_editable . insert (treeid);
+    if ! walk . is_diff_view ()
+       && walk . had_editableView_request . contains (&parent) {
+      // The request extends the content it draws, as it extends the
+      // content it shows ('extend_requested_content').
+      walk . had_editableView_request . insert (treeid); }}
   let carries_chain : bool =
     matches! ( &tree . get (parent) . unwrap () . value () . kind,
                ViewnodeKind::Folder (folder)
@@ -346,6 +443,9 @@ fn after_drawing (
     attach_containerward_chains_under_members (
       tree, &[treeid], walk . truth . graph, walk . truth . config,
       walk . truth . restriction, partners ) ?; }
+  if walk . newborn_folders . contains (&parent) {
+    // A folder's collapse lives on its members.
+    tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
   walk . corrections . record (tree, treeid, CorrectionKind::Reinstated);
   Ok (( )) }
 
@@ -623,6 +723,8 @@ fn fulfill_view_requests (
           continue; },
         _ => continue, };
     if requests . is_empty () { continue; }
+    let mut requests : Vec<ViewRequest> = requests;
+    requests . sort_by_key (folder_request_rank);
     let mut folders : Vec<Folder> = Vec::new ();
     for request in &requests {
       match request {
@@ -634,11 +736,30 @@ fn fulfill_view_requests (
           folders . extend ( folders_of_relation (*relation) ),
         ViewRequest::Flags => folders . push (Folder::flags ()),
         ViewRequest::Editable | ViewRequest::Fork | ViewRequest::Tombstone => {}, }}
-    add_folders (tree, child, &folders);
+    add_folders (tree, child, &folders, walk);
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { occurrence . view_requests . retain ( |request| *request == ViewRequest::Fork ); }}
   Ok (( )) }
+
+/// Where the folders a request adds stand among those added at one
+/// visit, first first: the containers folder, the mentioners, the
+/// aliases, then the subscription, override and hiding folders, the
+/// flags last. (A node's view requests are a set.)
+fn folder_request_rank (
+  request : &ViewRequest,
+) -> usize {
+  match request {
+    ViewRequest::Folder (FolderRelation::Containers)    => 0,
+    ViewRequest::Folder (FolderRelation::Mentioners)    => 1,
+    ViewRequest::Folder (FolderRelation::Aliases)       => 2,
+    ViewRequest::Folder (FolderRelation::SubscribesTo)  => 3,
+    ViewRequest::Folder (FolderRelation::Overrides)     => 4,
+    ViewRequest::Folder (FolderRelation::HidesFromSubs) => 5,
+    ViewRequest::Flags                                  => 6,
+    ViewRequest::Editable | ViewRequest::WriteProtected
+      | ViewRequest::WriteProtectedSubtree
+      | ViewRequest::Fork | ViewRequest::Tombstone      => 7, } }
 
 /// The folders a '(folder RELNAME)' request adds: both of the
 /// relation's, or the one whose other side the node shows without a
@@ -657,11 +778,13 @@ fn folders_of_relation (
 /// Add each of 'folders' the occurrence at 'treeid' lacks, ahead of
 /// its other children, in the order given. A subscribee folder holds
 /// the compound folder of what the subscriber hides outside its
-/// subscribees, folded when it is new.
+/// subscribees, when the subscriber hides something there; new, its
+/// members are drawn folded ('Walk::newborn_folders').
 fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   folders : &[Folder],
+  walk    : &mut Walk,
 ) {
   let mut added : Vec<NodeId> = Vec::new ();
   for folder in folders {
@@ -672,12 +795,17 @@ fn add_folders (
           . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
         added . push (new);
         new }, };
+    let hides_outside_its_subscribees = || -> bool {
+      occurrence_pid ( tree . get (treeid) . unwrap () )
+        . is_some_and ( |subscriber|
+          ! hidden_outside_of_subscribees (&subscriber, walk) . is_empty () ) };
     if matches! ( folder, Folder::Subscribee )
        && child_folder (tree, folder_treeid, &Folder::HiddenOutsideOfSubscribee) . is_none ()
-    { let mut hidden_outside : Viewnode = viewnode_of (
-        ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) );
-      hidden_outside . foldAndFocus . folded = true;
-      tree . get_mut (folder_treeid) . unwrap () . append (hidden_outside); }}
+       && hides_outside_its_subscribees ()
+    { let hidden_outside : NodeId = tree . get_mut (folder_treeid) . unwrap ()
+        . append ( viewnode_of (
+          ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
+      walk . newborn_folders . insert (hidden_outside); }}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}

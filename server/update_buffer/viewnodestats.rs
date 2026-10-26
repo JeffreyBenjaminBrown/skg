@@ -5,6 +5,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::herald_tokens::{
   AncestorFlags, BirthFact, RelationshipHeralds, Side, relationship_heralds_sexp };
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::refresh::ancestry::parent_reads_claims;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
   GraphnodeStats, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant };
@@ -94,11 +95,12 @@ fn set_viewnodestats_recursive (
         tree, treeid, &node_pid, ancestor_skgids );
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
+      let is_member_here : bool = stands_as_member (tree, treeid, warrants);
       set_herald_strings_in_viewnode (
-        tree, treeid, &node_pid, graph, restriction,
+        tree, treeid, &node_pid, is_member_here, graph, restriction,
         container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
-      set_relRepo (tree, treeid, graph, config);
+      set_relRepo (tree, treeid, is_member_here, graph, config);
       if sets_warrants {
         set_warrant (tree, treeid, graph, config, restriction); }
       Some (node_pid)
@@ -129,6 +131,31 @@ fn set_viewnodestats_recursive (
     if let Some ( ref pid ) = opt_pid
     { ancestor_skgids . remove (pid); } } }
 
+/// Whether the unrestricted vognode at 'treeid' stands as a member of
+/// its viewparent, for the facts its membership explains (its birth,
+/// its relRepo). Where the viewparent reads its children's claims
+/// ('parent_reads_claims'), and wherever the old walk set them
+/// ('SetByTheStatsPass'), that is its claim. Under any other parent a
+/// refreshed child claims nothing: a root stands as one, a folder's
+/// member does when the truth warrants it, and a write-protected
+/// occurrence's child does not.
+fn stands_as_member (
+  tree     : &Tree<Viewnode>,
+  treeid   : NodeId,
+  warrants : WarrantsAndMemberClaims,
+) -> bool {
+  let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &node . value () . kind
+    else { return false; };
+  let Some (parent) = node . parent () else { return t . claimsMembership; };
+  if warrants == WarrantsAndMemberClaims::SetByTheStatsPass
+     || parent_reads_claims (tree, parent . id ()) {
+    return t . claimsMembership; }
+  match &parent . value () . kind {
+    ViewnodeKind::BufferRoot => true,
+    ViewnodeKind::Folder (_) => t . viewStats . isWarranted == Warrant::ByGraph,
+    _ => false, } }
+
 /// What the unrestricted vognode at treeid is born of, and which ancestors to
 /// flag. The viewparent is at ancestor generation 1 (a non-vognode folder
 /// carries no flag); a folder member additionally flags the folder's
@@ -146,18 +173,18 @@ fn set_herald_strings_in_viewnode (
   tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
   node_pid              : &ID,
+  claimsMembership      : bool, // whether it stands as a member here ('stands_as_member')
   graph                 : Option<&InRustGraph>,
   restriction           : Option<&SkgrepoRestriction>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, claimsMembership, overridesHere)
-    : (GraphnodeStats, bool, bool) = {
+  let (gstats, overridesHere)
+    : (GraphnodeStats, bool) = {
     let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . claimsMembership,
-      t . overridesHere . is_some () ) };
+    ( t . graphStats . clone (), t . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
     None => return, }; // no stats -> no heralds
@@ -498,17 +525,18 @@ fn set_omitted_body (
 fn set_relRepo (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
+  claimsMembership : bool, // whether it stands as a member here ('stands_as_member')
   graph  : Option<&InRustGraph>,
   config : &SkgConfig,
 ) {
   let relRepo : Option<SkgrepoName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
-    let (node_pid, claimsMembership) : (ID, bool) = {
+    let node_pid : ID = {
       let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
-      ( t . collected_skgid (), t . claimsMembership ) };
+      t . collected_skgid () };
     if ! claimsMembership {
       // Not a genuine member at this position (a self-writer standing
       // as a non-member under a folder, or a node of the containerward
@@ -606,7 +634,7 @@ mod relationship_default_tests {
         "member" . to_string (), None ) ) . id ();
 
     set_relRepo (
-      &mut tree, member_treeid, Some (&graph), &config );
+      &mut tree, member_treeid, true, Some (&graph), &config );
     let ViewnodeKind::Vognode (Vognode::Unrestricted (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be unrestricted"); };

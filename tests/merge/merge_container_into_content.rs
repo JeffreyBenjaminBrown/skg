@@ -159,10 +159,9 @@ async fn merge_container_into_content_impl (
       "editRequest persists after merge execution"
       . to_string() ); }
 
-  // a should not appear as a tombstone: the preprocessing pass
-  // 'rewriteInPlace_viewnodes_whose_id_is_newly_extra' rewrites viewnodes whose pid
-  // became an extra-id (here, a is an extra-id of aa after the
-  // merge) to carry the acquirer's pid instead. The acquiree line
+  // a should not appear as a tombstone: the refresh re-kinds a
+  // viewnode whose pid became an extra-id (here, a is an extra-id of
+  // aa after the merge) to stand for the acquirer instead. The acquiree line
   // is displayed as a view of the acquirer, not as a tombstone.
   if view . contains ("tombstone") {
     failures . push (
@@ -170,7 +169,7 @@ async fn merge_container_into_content_impl (
        viewnode to have been rewritten to (gnid aa)"
       . to_string() ); }
 
-  // With the preprocessing pass, the root viewnode (originally
+  // After the refresh, the root viewnode (originally
   // pid=a) is rewritten to pid=aa and becomes the buffer's root
   // headline at '* ' level. Its content children (x, b, c, plus
   // the MERGED: a preserver) sit at '** '.

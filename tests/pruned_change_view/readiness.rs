@@ -78,12 +78,15 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let member : &str =
-      "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) noClaim writeProtected";
-    let marked : String = edit_line (
-      &buffer, member,
-      |line| line . replace (
-        "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub",
-        "(editRequest (ready rel all)) (diff (rel removed) (properties changed) (leaves 2 rel all))) sub" ));
+      "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected";
+    let removed_ending : &str =
+      "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub";
+    assert_eq! ( buffer . matches (removed_ending) . count (), 1,
+                 "sub is shown once as removed:\n{}", buffer );
+    let marked : String = buffer . replacen (
+      removed_ending,
+      "(editRequest (ready rel all)) (diff (rel removed) (properties changed) (leaves 2 rel all))) sub",
+      1 );
     assert_ne! ( marked, buffer, "the member shows its properties:\n{}", buffer );
     let saved : String = without_viewnode_ids (
       & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
@@ -112,7 +115,7 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let chain_node : &str =
-      "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected";
+      "***** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected";
     let marked : String = edit_line (
       &buffer, chain_node,
       |line| { assert! ( ! line . contains ("(diff"), "{}", line );
@@ -138,13 +141,13 @@ fn marking_a_removed_entry_marks_its_leaf (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = [ "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) a1",
-                            "*** (skg id noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old" ]
+                            "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1))) ali-old" ]
       . into_iter () . fold ( buffer, |marked, line|
         edit_line ( &marked, line, |line| line . replacen (
           "(diff (rel removed) (leaves 1)))", "(editRequest (ready)) (diff (rel removed) (leaves 1)))", 1 )) );
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     for line in [ "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1",
-                  "*** (skg id noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) ali-old" ] {
+                  "*** (skg id (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) ali-old" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
                 "{:?} must be ready:\n{}", line, saved ); }
     assert! ( ! without_viewnode_ids (&saved) . contains ("(editRequest"),

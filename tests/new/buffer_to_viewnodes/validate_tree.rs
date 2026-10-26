@@ -192,7 +192,7 @@ async fn test_find_buffer_errors_for_saving (
                 *** (skg unknown (gnid bad_child))
                 ** (skg alias) Alias with body problem and orphaned
                 This body should not exist on Alias
-                *** (skg node (gnid alias_child)) Any child of Alias (bad)
+                *** (skg node (gnid alias_child)) Any child of Alias (a note)
                 ** (skg alias) Alias under non-AliasFolder parent
                 * (skg alias) Root level Alias (bad)
                 * (skg node (gnid conflict) (skgRepos (nodeRepo main)) (editRequest delete)) Node with deletion conflict
@@ -228,15 +228,17 @@ async fn test_find_buffer_errors_for_saving (
         assert_eq!(aliasfolder_children_errors . len(), 1,
                    "Should find 1 'AliasFolder children must be Aliases' error"); }
 
-      // Alias must have no children ("Alias with body problem" has alias_child)
+      // An occurrence under an alias ("Alias with body problem" has
+      // alias_child) claims nothing there, as under any parent that
+      // reads no claims: it is a note, not an error.
       { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children") . unwrap();
         let alias_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                                if alias_children_re . is_match (msg)))
           . collect();
-        assert_eq!(alias_children_errors . len(), 1,
-                   "Should find 1 'Alias must have no children' error"); }
+        assert_eq!(alias_children_errors . len(), 0,
+                   "An occurrence under an alias is a note"); }
 
       // Alias must have AliasFolder parent
       // (3 aliases: "Alias with body problem", "Alias under non-AliasFolder", "Root level Alias")
@@ -852,8 +854,11 @@ fn duplicate_members_of_defining_folders_pass_validation () {
     validate_local_structure (&viewforest, folder_skgid, &config)
       . expect ("duplicate members of a defining folder should pass validation"); }}
 
+/// Under a write-protected folder no member claims membership, so the
+/// save reads no list there: duplicates are notes, which the refresh
+/// merges.
 #[test]
-fn duplicate_members_of_write_protected_folders_are_still_rejected () {
+fn duplicate_members_of_write_protected_folders_pass_validation () {
   let input : &str =
     indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
@@ -870,14 +875,8 @@ fn duplicate_members_of_write_protected_folders_are_still_rejected () {
     parsing_errors );
   let config : SkgConfig = validation_config ();
   for folder_skgid in partner_folder_treeids (&viewforest) {
-    let error = validate_local_structure (
-        &viewforest, folder_skgid, &config)
-      . expect_err (
-        "duplicate members of a write-protected folder should fail validation");
-    assert!(
-      error . message . contains ("must not have duplicate UnrestrictedVognode children"),
-      "Unexpected write-protected-folder validation error: {:?}",
-      error ); }}
+    validate_local_structure (&viewforest, folder_skgid, &config)
+      . expect ("duplicate members of a write-protected folder should pass validation"); }}
 
 fn partner_folder_treeids (
   viewforest : &ViewForest,

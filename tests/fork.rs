@@ -161,8 +161,8 @@ fn all_tests
       s . reset ("fork_round_trip", fixtures) ?;
       fork_round_trip (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("fork_collateral_rerender_without_substitution", fixtures) ?;
-      fork_collateral_rerender_without_substitution (
+      s . reset ("fork_collateral_rerender_substitutes_too", fixtures) ?;
+      fork_collateral_rerender_substitutes_too (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_monogamy", fixtures) ?;
       fork_monogamy (
@@ -828,11 +828,13 @@ async fn fork_round_trip (
     "P's contains must still point at N, not the clone {}", clone_skgid . 0 );
   Ok (( )) }
 
-/// An ordinary collateral rerender retains a raw original while refreshing
-/// its relationship heralds. Editing P as well as forking N makes the second
-/// P view collateral through the normal changed-PID path; no fork-specific
-/// invalidation or rendering path participates.
-async fn fork_collateral_rerender_without_substitution (
+/// A collateral rerender substitutes the clone for N, as every refresh
+/// of an editable occurrence's content does: the refresh decides from
+/// the buffer and the graph as they are now, not from which view made
+/// the override. Editing P as well as forking N makes the second P
+/// view collateral through the normal changed-PID path; no
+/// fork-specific invalidation or rendering path participates.
+async fn fork_collateral_rerender_substitutes_too (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -864,12 +866,7 @@ async fn fork_collateral_rerender_without_substitution (
     . viewforest_id_to_view (&collateral_viewforest_id)
     .ok_or ("the collateral view must remain open") ?;
   let collateral_text : String = viewforest_to_string (collateral, config) ?;
-  assert! ( collateral_text . contains ("(gnid N)"),
-    "the collateral view must retain raw N:\n{}", collateral_text );
-  assert! ( ! collateral_text . contains ("(overridesHere N)"),
-    "the collateral view must not substitute the clone:\n{}", collateral_text );
-  assert! ( collateral_text . contains ("(subscribesTo (in 1))")
-            && collateral_text . contains ("(overrides (in 1))"),
-    "the raw original must show its new inbound relationship heralds:\n{}",
-    collateral_text );
+  assert! ( collateral_text . contains ("(overridesHere N)")
+            && ! collateral_text . contains ("(gnid N)"),
+    "the collateral view must substitute the clone:\n{}", collateral_text );
   Ok (( )) }

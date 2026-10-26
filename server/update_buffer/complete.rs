@@ -92,29 +92,6 @@ pub(crate) struct CompletionContext<'a> {
 static NO_NODES                  : LazyLock<HashSet<NodeId>> = LazyLock::new (HashSet::new);
 
 impl<'a> CompletionContext<'a> {
-  /// A de-novo content view ('render_initial_view'): each fresh
-  /// editable node gets its default partner folders, and nothing
-  /// was there before. Repairs go to
-  /// 'warning_sink', which the caller drops.
-  pub(super) fn for_content_view (
-    runtime             : &'a RuntimeGeneration,
-    graph_snap          : &'a Arc<InRustGraph>,
-    editable_map        : &'a mut EditableMap,
-    errors              : &'a mut Vec<String>,
-    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
-    warning_sink        : &'a mut Vec<CompletionWarning>,
-  ) -> CompletionContext<'a> {
-    CompletionContext {
-      editable_map, runtime, graph_snap, errors,
-      skgrepo_restriction,
-      node_budget                    : runtime . config . initial_node_limit,
-      create_partnerFolders_for_fresh_nodes : true,
-      substitute_existing_content_overrides : false,
-      warning_sink                   : Some (warning_sink),
-      mode                           : CompletionMode::ContentView,
-      nodes_before_completion        : &NO_NODES,
-      editable_before_completion     : &NO_NODES, } }
-
   /// The first rendering of a buffer of the diff view
   /// ('complete_viewforest_with_graph_straddle'), the buffer of kind
   /// 'diffView_buffer_kind' over 'straddle'. It
@@ -142,44 +119,28 @@ impl<'a> CompletionContext<'a> {
       nodes_before_completion        : &NO_NODES,
       editable_before_completion     : &NO_NODES, } }
 
-  /// A rerender of an open view ('rerender_view'): after a save, for
-  /// rerender-all, or after a skgrepo-set switch. It carries the
-  /// repairs' sink and what the view held before.
-  /// In diff-view mode it completes that buffer of the diff view,
-  /// with the settings of 'for_diffView' whatever
-  /// 'skgrepo_restriction', 'create_partnerFolders_for_fresh_nodes'
-  /// and 'substitute_existing_content_overrides' say.
+  /// A rerender of a buffer of the diff view ('rerender_view'):
+  /// after a save, for rerender-all, or after a commit, over the
+  /// straddle of 'mode'. It has the settings of 'for_diffView', and
+  /// carries the repairs' sink and what the view held before.
   pub(super) fn for_rerender (
     runtime                        : &'a RuntimeGeneration,
     graph_snap                     : &'a Arc<InRustGraph>,
     editable_map                   : &'a mut EditableMap,
     errors                         : &'a mut Vec<String>,
-    skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
-    create_partnerFolders_for_fresh_nodes : bool,
-    substitute_existing_content_overrides : bool,
     warning_sink                   : Option<&'a mut Vec<CompletionWarning>>,
     mode                           : CompletionMode<'a>,
     nodes_before_completion        : &'a HashSet<NodeId>,
     editable_before_completion     : &'a HashSet<NodeId>,
   ) -> CompletionContext<'a> {
-    let settings : CompletionContext<'a> = match mode {
-      CompletionMode::DiffView { straddle, buffer_kind } => CompletionContext::for_diffView (
-        runtime, graph_snap, editable_map, errors, straddle, buffer_kind ),
-      CompletionMode::ContentView => CompletionContext {
-        editable_map, runtime, graph_snap, errors,
-        skgrepo_restriction,
-        node_budget                    : runtime . config . initial_node_limit,
-        create_partnerFolders_for_fresh_nodes,
-        substitute_existing_content_overrides,
-        warning_sink                   : None,
-        mode                           : CompletionMode::ContentView,
-        nodes_before_completion        : &NO_NODES,
-        editable_before_completion     : &NO_NODES, }, };
+    let CompletionMode::DiffView { straddle, buffer_kind } = mode
+      else { panic! ("for_rerender: a content view is refreshed, not completed") };
     CompletionContext {
       warning_sink,
       nodes_before_completion,
       editable_before_completion,
-      .. settings } }
+      .. CompletionContext::for_diffView (
+           runtime, graph_snap, editable_map, errors, straddle, buffer_kind ) } }
 }
 
 pub(crate) fn complete_viewforest (

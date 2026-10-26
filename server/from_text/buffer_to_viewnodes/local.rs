@@ -423,12 +423,12 @@ fn validate_acquired_folder (
     tree, treeid, "acquiredFolder",
     |node| matches!(&node . kind,
                     ViewnodeKind::Vognode (Vognode::Unrestricted (_))),
-    // An acquiree's phantom, or a note the user put there.
+    // An acquiree's ghost, or a note the user put there: the folder
+    // is write-protected, so whatever an occurrence there carries, it
+    // claims nothing.
     |node| matches!(&node . kind,
-                    ViewnodeKind::Vognode (Vognode::Ghost (_)))
-           || matches!(&node . kind,
-                       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                       if ! t . claimsMembership)) }
+                    ViewnodeKind::Vognode (
+                      Vognode::Ghost (_) | Vognode::Unrestricted (_)))) }
 
 /// The checks shared by the two derived acquisition folders: which
 /// parent, which children, one per parent.
@@ -690,6 +690,9 @@ pub fn nonignored_children_have_distinct_skgids (
 ) -> bool {
   let Some (node_ref) = tree . get (treeid)
     else { return true; };
+  if ! parent_reads_claims (tree, treeid) {
+    // No child claims, so no list is written: duplicates are notes.
+    return true; }
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
     let content_skgid : Option<ID> =
@@ -715,13 +718,17 @@ pub fn nonignored_children_have_distinct_skgids (
 /// Whether a folder's members have distinct IDs. As for a content
 /// list ('nonignored_children_have_distinct_skgids'), only members
 /// count, so that a write-protected non-member copy of a member (what
-/// 'convert_unwarranted_child' makes of a duplicate) may stand beside it.
+/// 'convert_unwarranted_child' makes of a duplicate) may stand beside it,
+/// and only where the folder's claims are read.
 fn partnerFolder_children_have_distinct_skgids (
   tree    : &Tree<Viewnode>,
   treeid  : NodeId,
 ) -> bool {
   let Some (node_ref) = tree . get (treeid)
     else { return true; };
+  if ! parent_reads_claims (tree, treeid) {
+    // No member claims, so no list is written: duplicates are notes.
+    return true; }
   let mut seen : HashSet<ID> = HashSet::new();
   for child in node_ref . children() {
     let Some (skgid) =

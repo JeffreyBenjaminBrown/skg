@@ -8,8 +8,7 @@
 // 1. collateral folder-membership update: a view of N shows a
 //    subscriberFolder with member S; a save of a second view that drops
 //    S's subscription to N must re-render N's view (collaterally) with
-//    S gone from its subscriberFolder. This exercises the
-//    reconcile_partnerFolder_children path shared by all eight folders.
+//    S unwarranted in its subscriberFolder.
 //
 // 2. saved-view-only warning scoping: a repair that happens in the
 //    collateral view (a stale intruder under its subscriberFolder) while
@@ -134,18 +133,19 @@ fn collateral_partner_folder_update_and_warning_scoping
           &mut views_state ) . await ?;
 
       // CELL 1 -- collateral folder-membership update: N's view is
-      // re-rendered with S gone from its subscriberFolder (the now-empty
-      // folder is dropped entirely).
+      // re-rendered with S, no longer a subscriber, kept in N's
+      // subscriberFolder, unwarranted (the refresh keeps what the
+      // truth no longer relates, and marks it).
       assert_eq! ( collateral_views . len (), 1,
         "exactly N's view should be collateral: {:?}", collateral_views );
       let n_collateral : &str = &collateral_views[0];
       assert! ( n_collateral . contains ("(gnid N)"),
         "the collateral view should be N's:\n{}", n_collateral );
-      assert! ( ! n_collateral . contains ("(gnid S)"),
-        "S must be gone from N's subscriberFolder collaterally:\n{}",
-        n_collateral );
-      assert! ( ! n_collateral . contains ("subscriberFolder"),
-        "N's now-empty subscriberFolder should be dropped:\n{}",
+      let s_line : &str = n_collateral . lines ()
+        . find ( |line| line . contains ("(gnid S)") )
+        . unwrap_or_else ( || panic! ( "S is kept:\n{}", n_collateral ));
+      assert! ( s_line . starts_with ("*** ") && s_line . contains ("noWarrant"),
+        "S must be unwarranted in N's subscriberFolder collaterally:\n{}",
         n_collateral );
 
       // CELL 2 -- saved-view-only warning scoping: N's subscriberFolder
@@ -217,7 +217,7 @@ fn a_member_added_at_a_later_visit_gets_its_chain
           "T should be a member of N's subscriberFolder:\n{}", n_collateral ));
       let chain_node : &str = lines . get (t_index + 1) . copied () . unwrap_or ("");
       assert! ( chain_node . starts_with ("**** ") && chain_node . contains ("(gnid C)")
-                && chain_node . contains ("noClaim")
+                && ! chain_node . contains ("noClaim") // under a write-protected parent
                 && chain_node . contains ("writeProtected"),
         "T should hold its chain, C:\n{}", n_collateral );
       Ok (( )) } )) }

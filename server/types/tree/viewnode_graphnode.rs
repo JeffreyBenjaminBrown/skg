@@ -10,6 +10,7 @@ use crate::types::viewnode::{Vognode, Folder};
 use crate::types::nodes::complete::Graphnode;
 use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
+use crate::refresh::ancestry::parent_reads_claims;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -243,6 +244,10 @@ fn collect_generation (
         vec![];
       for skgid in current_gen {
         if let Some (n) = tree . get (skgid) {
+          // Under a parent that does not read its children's claims
+          // ('parent_reads_claims') no occurrence claims, whatever it
+          // carries.
+          let claims_are_read : bool = parent_reads_claims (tree, skgid);
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
@@ -250,7 +255,7 @@ fn collect_generation (
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-                                    if ! t . claimsMembership ))
+                                    if ! t . claimsMembership || ! claims_are_read ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }

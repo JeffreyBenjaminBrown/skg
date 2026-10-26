@@ -254,8 +254,8 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
     assert! ( ! moved . contains ("viewRequests"), "{}", moved );
     for child in ["a", "b", "c"] {
       let lines : Vec<String> = at_depth (&moved, "***", child);
-      assert! ( lines . len () == 2
-                && lines [0] . contains ("noClaim")
+      assert! ( lines . len () == 2 // under a write-protected n, no claim atom
+                && ! lines [0] . contains ("noClaim")
                 && lines [0] . contains ("writeProtected")
                 && ! lines [1] . contains ("noClaim"),
                 "{} must be shown once under each n:\n{}", child, moved ); }
@@ -278,9 +278,10 @@ fn a_writeProtect_request_and_an_editable_request_move_editability_and_back (
 
 /// In the 'kinds' fixture the worktree removed sub's subscription to
 /// s1, so the buffer shows s1's subscriber folder holding sub as a
-/// removed member, a non-member marked '(diff (rel removed))'. Write-protected,
-/// s1 saves unchanged: the check of a write-protected occurrence's
-/// partner folders counts only members.
+/// removed member marked '(diff (rel removed))', with no claim atom,
+/// since the folder does not read claims. Write-protected, s1 saves
+/// unchanged: the save does not check a write-protected occurrence's
+/// partner folders.
 #[test]
 fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
 ) -> Result<(), Box<dyn Error>> {
@@ -299,7 +300,7 @@ fn a_writeProtected_occurrence_showing_a_removed_partner_saves_unchanged (
               && s1_and_folder [1] == "** (skg subscriberFolder)"
               && without_viewnode_ids (s1_and_folder [2]) . starts_with ("*** (skg node (gnid sub) ")
               && s1_and_folder [2] . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all))) sub")
-              && s1_and_folder [2] . contains ("noClaim"),
+              && ! s1_and_folder [2] . contains ("noClaim"),
               "s1 must be write-protected, showing sub as a removed member:\n{}",
               text );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;

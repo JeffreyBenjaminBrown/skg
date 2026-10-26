@@ -1,11 +1,7 @@
-// A buffer holding every one of the diff view's viewnodes,
-// rendered from the graph straddle of a git fixture, saves back unchanged:
-// no graph change, no validation error, and every one of them kept.
-// The buffer the save returns is a fixed point: saved again, it comes
-// back the same. (The first save's view completion adds the display
-// facts the builders leave out, and moves a historical phantom ahead
-// of the live content it stood among; positioning removed members is
-// the diff view's reconciler's job.)
+// A buffer holding every one of the diff view's viewnodes, rendered
+// from the graph straddle of a git fixture, crosses the wire: it
+// parses, and prints back, keeping every one of them; saved as a
+// content view, it changes no file.
 // The fixture's HEAD and worktree differ so: a is retitled and its
 // body edited; gone, which held gc, kept and the dangling ghost, is
 // deleted with gc, and p no longer contains it; acq acquired
@@ -19,7 +15,9 @@ use crate::git_fixture::{
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
 use skg::graph_straddle::types::{GraphStraddle, Partner};
-use skg::org_to_text::viewforest_tree_to_string;
+use skg::dbs::in_rust_graph::InRustGraph;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use skg::org_to_text::{viewforest_to_string, viewforest_tree_to_string};
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::diff_view::change_viewnodes::{
@@ -37,6 +35,7 @@ use ego_tree::{NodeId, Tree};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::error::Error;
 use std::path::Path;
+use std::sync::Arc;
 
 const FIXTURES : &str = "tests/diff_view/roundtrip/fixtures";
 
@@ -133,8 +132,14 @@ fn buffer_with_every_new_viewnode (
       . expect ("'acquired' is in the before-graph only"); }
   Ok ( viewforest_tree_to_string (&tree, &f . config) ? ) }
 
+/// The diff view's viewnodes cross the wire: the buffer parses
+/// without errors, and printing what was parsed gives a text that
+/// parses and prints back the same, holding every one of them. The
+/// parser skips the change facts the diff view derives, so only the
+/// buffer as drawn holds those. Saved as a content view, which keeps
+/// no ghost, the buffer changes no file.
 #[test]
-fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
+fn the_new_viewnodes_cross_the_wire (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?;
@@ -150,9 +155,6 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
       "(changesetMarker orderOnly)",
       "acquiredFolder", "acquiredByFolder",
       "ghost (gnid acquired) (skgRepos (nodeRepo main))" ];
-    // The change facts the diff view derives. Saved as a content
-    // view, the buffer derives none, and the parser skips them, so
-    // only the buffer as drawn holds them.
     let change_facts : [&str; 4] = [
       "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
       "ghost (gnid gc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))",
@@ -161,23 +163,25 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
     for facts in change_facts {
       assert! ( without_viewnode_ids (&buffer) . contains (facts),
                 "the buffer should hold {}:\n{}", facts, buffer ); }
+    let graph : Arc<InRustGraph> = f . graph . load_full ();
+    let across_the_wire = |text : &str| -> String {
+      let (forest, errors, _warnings, _provenance) =
+        org_to_viewforest (text, &graph) . unwrap ();
+      assert! ( errors . is_empty (), "{:?}\n\nbuffer:\n{}", errors, text );
+      viewforest_to_string (&forest, &f . config) . unwrap () };
+    let printed : String = across_the_wire (&buffer);
+    for atom in atoms {
+      assert! ( without_viewnode_ids (&printed) . contains (atom),
+                "the printed buffer should hold {}:\n{}", atom, printed ); }
+    assert_eq! ( across_the_wire (&printed), printed,
+                 "a printed buffer crosses the wire unchanged" );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
-    let mut saved : String = buffer;
-    for _ in 0 .. 2 {
-      for atom in atoms {
-        assert! ( without_viewnode_ids (&saved) . contains (atom),
-                  "the buffer should hold {}:\n{}", atom, saved ); }
-      let response : SaveResponse = save (f, &saved) ?;
-      assert! ( response . errors . is_empty (),
-                "the buffer must save without errors, got {:?}\n\nbuffer:\n{}",
-                response . errors, saved );
-      assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
-      assert_eq! ( skg_files (f) ?, files_before,
-                   "saving the buffer unchanged must not change the graph" );
-      saved = response . saved_view; }
-    let response : SaveResponse = save (f, &saved) ?;
-    assert_eq! ( response . saved_view, saved,
-                 "a saved buffer, saved again, comes back the same" );
+    let response : SaveResponse = save (f, &buffer) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    assert_eq! ( skg_files (f) ?, files_before,
+                 "saving the buffer unchanged must not change the graph" );
+    assert! ( ! response . saved_view . contains ("ghost (gnid "),
+              "a content view keeps no ghost:\n{}", response . saved_view );
     Ok (( )) }) }
 
 /// A readiness request on the old text names the node's text leaf;
@@ -195,7 +199,6 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
                   "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest (ready node)) (diff (node removed) (rel removed))" );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
-    assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     let p_contains_gone : LeafKey = LeafKey::Relationship {
       relationship : RelationshipKey {
         relation : NodeRelation::Contains,
@@ -209,11 +212,13 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
       . into_iter () . collect () );
     assert! ( ! without_viewnode_ids (&response . saved_view) . contains ("Request"),
               "the save consumes its requests:\n{}", response . saved_view );
+    // A content view keeps no change viewnode, so the request is made
+    // on the buffer as drawn.
     let response : SaveResponse = save ( f,
-      &response . saved_view . replacen (
+      &buffer_with_every_new_viewnode (f) ? . replacen (
         "(changesetMarker content))",
         "(changesetMarker content) (editRequest (ready all)))", 1 )) ?;
-    assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( ReadinessStore::load (&f . config . data_root) . marks
               . contains_key (&p_contains_gone) );
     Ok (( )) }) }

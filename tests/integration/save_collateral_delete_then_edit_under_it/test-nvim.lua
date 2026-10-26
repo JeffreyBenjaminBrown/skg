@@ -232,24 +232,29 @@ assert_headline_types_and_titles(buf2,
   'phase 5: buffer 2 after delete')
 -- Buffer 1 (collateral): the delete of 11 propagates to node 1
 -- (which contained it). 1.skg's contains has had 11 stripped, so on
--- rerender the 11-subtree is gone entirely from buffer 1 -- no
--- tombstone, nor anything under one.
+-- rerender 11's occurrence is a tombstone, which keeps what stood
+-- under it: its two folders, entombstoned in turn, holding the subee
+-- and also-hidden drawn there.
 T.check(vim.api.nvim_buf_is_valid(buf1), 'Buffer 1 still exists')
 print('Buffer 1 after collateral delete:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
   { { 1, 'node', '1' },
+    { 2, 'tombstone', '' },
+    { 3, 'tombstone', '' },
+    { 4, 'node', 'subee' },
+    { 4, 'tombstone', '' },
+    { 5, 'node', 'also-hidden' },
     { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' } },
   'phase 5: buffer 1 after collateral delete')
 
 print('=== PHASE 6: Add subee-2 in buffer 1 ===')
 -- Add subee-2 as a child of the standalone subee root in buffer 1
--- and save. The first "subee" match is now what used to be the
--- second match, because the earlier first match was a child of a
--- now-deleted non-vognode.
+-- and save: the second "subee" match, the first being the one under
+-- the tombstone where 11 stood.
 vim.api.nvim_set_current_buf(buf1)
 do
-  local subee_row = nth_line_with_title(buf1, 'subee', 1)
+  local subee_row = nth_line_with_title(buf1, 'subee', 2)
   T.check(subee_row, 'phase 6: found the standalone subee root')
   local subee_depth = headline_depth_at(buf1, subee_row)
   local insertion_row = end_of_subtree_row(buf1, subee_row)
@@ -266,6 +271,11 @@ T.check(vim.api.nvim_buf_is_valid(buf1), 'Buffer 1 still exists')
 print('Buffer 1 after adding subee-2:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
   { { 1, 'node', '1' },
+    { 2, 'tombstone', '' },
+    { 3, 'tombstone', '' },
+    { 4, 'node', 'subee' },
+    { 4, 'tombstone', '' },
+    { 5, 'node', 'also-hidden' },
     { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' },
     { 2, 'node', 'subee-2' } },
@@ -289,7 +299,7 @@ print('=== PHASE 8: Add new-root under tombstone in buffer 1 ===')
 -- to inherit, so explicit (skgRepos (nodeRepo main)) is still required).
 vim.api.nvim_set_current_buf(buf1)
 do
-  local subee_row = nth_line_with_title(buf1, 'subee', 1)
+  local subee_row = nth_line_with_title(buf1, 'subee', 2)
   T.check(subee_row, 'phase 8: found the standalone subee root')
   local subee_depth = headline_depth_at(buf1, subee_row)
   local insertion_row = end_of_subtree_row(buf1, subee_row)
@@ -308,6 +318,11 @@ T.check(vim.api.nvim_buf_is_valid(buf1), 'Buffer 1 still exists')
 print('Buffer 1 after new-root save:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
   { { 1, 'node', '1' },
+    { 2, 'tombstone', '' },
+    { 3, 'tombstone', '' },
+    { 4, 'node', 'subee' },
+    { 4, 'tombstone', '' },
+    { 5, 'node', 'also-hidden' },
     { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' },
     { 2, 'node', 'subee-2' },

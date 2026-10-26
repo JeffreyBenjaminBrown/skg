@@ -57,12 +57,9 @@ async fn test_multi_root_view_logic (
   let expected = indoc! {"* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1
                           1 has a body
                           * (skg node (gnid 2) (skgRepos (nodeRepo main))) 2
-                          * (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view omittedBody)) 1
                           "};
-                          // 'omittedBody': node 1 has a body, and this
-                          // (repeated, hence write-protected) occurrence of it
-                          // hides that body -- herald B ('docs/heralds.org',
-                          // "Other heralds").
+                          // The two roots standing for 1 are siblings,
+                          // which the refresh merges into the first.
   assert_metadata_eq!(result, expected,
              "Multi-root view should produce exact expected output");
 

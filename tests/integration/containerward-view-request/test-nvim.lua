@@ -100,7 +100,7 @@ local expected =
   .. '*** (skg containerFolder)\n'
   .. '**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected'
      .. ' (view (rels (contains (in 1) (out 3 (ancestors 2)))) (birth (contains out 2)) cycle)) 1\n'
-  .. '***** (skg node (gnid 0) (skgRepos (nodeRepo main)) noClaim writeProtected'
+  .. '***** (skg node (gnid 0) (skgRepos (nodeRepo main)) writeProtected'
      .. ' (view (rels (contains (out 1 (ancestors 1)))))) 0\n'
   .. '*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121\n'
   .. '** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13\n'

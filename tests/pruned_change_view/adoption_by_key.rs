@@ -203,7 +203,7 @@ fn copies_of_a_write_protected_graft_merge (
   with_fixture ("users_notes", &["main"], |f| {
     let member_a : &str = "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected";
     let graft_p  : &str =
-      "***** (skg node (gnid p) (skgRepos (nodeRepo main)) noClaim writeProtected";
+      "***** (skg node (gnid p) (skgRepos (nodeRepo main)) writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     let graft_line : String = buffer . lines ()
       . find ( |line| without_viewnode_ids (line) . starts_with (graft_p) )

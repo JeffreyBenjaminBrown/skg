@@ -98,7 +98,7 @@ fn set_skgrepo_restriction (
     prepare_rerender_views_with_runtime (
       env, runtime, views_state,
       Some (&target), Some (&prepass),
-      RerenderOptions::for_skgrepo_switch ) };
+      RerenderOptions::ordinary ) };
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (&restriction),
     "repo-set-switch-rerender",

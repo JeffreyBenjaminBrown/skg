@@ -318,13 +318,13 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_moving_foreign_subscribee_content_elsewhere_still_hides (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_foreign_subscribee_is_deleted",
+      s . reset ("test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
-      test_extra_view_child_under_foreign_subscribee_is_deleted (
+      test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_extra_view_child_under_owned_subscribee_is_deleted",
+      s . reset ("test_extra_view_child_under_owned_subscribee_is_kept_unwarranted",
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
-      test_extra_view_child_under_owned_subscribee_is_deleted (
+      test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_subscribee_and_compoundPartnerFolders",
         "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
@@ -662,7 +662,7 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
       rerendered );
     Ok (( )) }
 
-async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
+async fn test_extra_view_child_under_foreign_subscribee_is_kept_unwarranted (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -695,12 +695,13 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    // §6.0: the extra viewchild 'a' is a stale leaf (not in e's contains,
-    // claiming membership, no children), so it is deleted -- not preserved as
-    // a non-member child.
+    // The extra viewchild 'a' (not in e's contains, claiming
+    // membership) is kept, claiming nothing and unwarranted.
     assert!(
-      ! rerendered . lines() . any ( |line| line . contains ("(gnid a)") ),
-      "Extra stale-leaf view-child 'a' should be deleted, not preserved:\n{}",
+      rerendered . lines() . any ( |line| line . contains ("(gnid a)")
+                                         && line . contains ("noClaim")
+                                         && line . contains ("noWarrant") ),
+      "Extra view-child 'a' should be kept, unwarranted:\n{}",
       rerendered );
     assert_line_order (&rerendered, "(gnid e1)", "(gnid e2)");
     assert_does_not_hide_e1 (&rerendered);
@@ -713,7 +714,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
 
     Ok (( )) }
 
-async fn test_extra_view_child_under_owned_subscribee_is_deleted (
+async fn test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -737,12 +738,13 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    // §6.0: the extra viewchild 'e' is a stale leaf (not in r's contains,
-    // claiming membership, no children), so it is deleted -- not preserved as
-    // a non-member child.
+    // The extra viewchild 'e' (not in r's contains, claiming
+    // membership) is kept, claiming nothing and unwarranted.
     assert!(
-      ! rerendered . lines() . any ( |line| line . contains ("(gnid e)") ),
-      "Extra stale-leaf view-child 'e' should be deleted, not preserved:\n{}",
+      rerendered . lines() . any ( |line| line . contains ("(gnid e)")
+                                         && line . contains ("noClaim")
+                                         && line . contains ("noWarrant") ),
+      "Extra view-child 'e' should be kept, unwarranted:\n{}",
       rerendered );
     assert_line_order (&rerendered, "(gnid r1)", "(gnid r2)");
     assert!(
@@ -822,12 +824,12 @@ async fn test_subscribee_and_compoundPartnerFolders (
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid hidden-in-E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) hidden-in-E1
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 2 (unintegrated 1))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid hidden-in-E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) hidden-in-E2
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-2
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 2 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-2
        **** (skg node (gnid E21) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E21
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded node (gnid hidden-for-no-reason) (skgRepos (nodeRepo main)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)))) hidden-for-no-reason
@@ -898,7 +900,7 @@ async fn test_hidden_within_but_none_without (
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 3 (unintegrated 2))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 3 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 3 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
        **** (skg node (gnid E11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E11
        **** (skg node (gnid E12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) E12
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
@@ -1013,8 +1015,10 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     assert!(
-      ! collateral_views[0] . contains ("hiddenInSubscribeeFolder"),
-      "Expected collateral view to remove HiddenInSubscribeeFolder:\n{}",
+      collateral_views[0] . lines () . any ( |line|
+        without_viewnode_ids (line) . starts_with ("***** (skg folded node (gnid H)")
+        && line . contains ("noWarrant") ),
+      "Expected the collateral view's HiddenInSubscribeeFolder to keep H, unwarranted:\n{}",
       collateral_views[0]);
     assert! (
       collateral_views[0] . lines() . any ( |line|
@@ -1165,10 +1169,10 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       "Expected original hidden-outside viewnode H to remain:\n{}",
       rerendered );
     assert! (
-      ! rerendered . lines () . any ( |line|
-        line . contains ("(gnid E11)") ),
-      "A newly hidden child inside a collapsed subscribee should not also \
-       appear through an unrequested hiddenFolder:\n{}",
+      rerendered . lines () . filter ( |line| line . contains ("(gnid E11)") )
+        . all ( |line| line . contains ("noClaim") && line . contains ("noWarrant") ),
+      "E11, now hidden inside a collapsed subscribee, stays where it was \
+       typed only as an unwarranted child claiming nothing:\n{}",
       rerendered );
     let subscriber : Graphnode = node_from_disk (config, "R") ?;
     assert! (
@@ -1260,13 +1264,13 @@ async fn test_overlapping_hidden_within (
        *** (skg node (gnid E1) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-2
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-1
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-2
        *** (skg node (gnid E2) (skgRepos (nodeRepo main)) (view (rels (contains (out 1 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded node (gnid H) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 2 (ancestors 2))) (hidesFromSubs (in 1 (ancestors 4)))) (birth (contains in 2) (hidesFromSubs in 4)))) H
-       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-1
-       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-2
+       ****** (skg node (gnid E1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))))) subscribee-1
+       ****** (skg node (gnid E2) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 1))) (subscribesTo (in 1))) cycle)) subscribee-2
        ** (skg node (gnid R1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) R1
        "};
     assert_metadata_eq!(extended, expected_extended,

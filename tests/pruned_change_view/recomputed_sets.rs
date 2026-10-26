@@ -321,12 +321,12 @@ fn an_editable_view_request_moves_editability_back (
                          . iter () . fold ( line . to_string (),
                                             |line, atom| line . replace (atom, "") ))
         . collect () };
-    let b_under_x : &str = "(skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected ";
+    let b_under_x : &str = "(skg node (gnid b) (skgRepos (nodeRepo main)) writeProtected ";
     assert! ( without_viewnode_ids (&moved) . contains (n_under_x) && without_viewnode_ids (&moved) . contains (b_under_x),
               "n and b must be write-protected under x:\n{}", moved );
     let requested : String = requesting_editable_at (
-      &moved . replacen ( "node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected ",
-                          "folded node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected ",
+      &moved . replacen ( "node (gnid b) (skgRepos (nodeRepo main)) writeProtected ",
+                          "folded node (gnid b) (skgRepos (nodeRepo main)) writeProtected ",
                           1 ),
       n_under_x );
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
@@ -538,7 +538,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";
+    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (m_line), "{}", buffer );
     let requested : String = buffer . replacen (

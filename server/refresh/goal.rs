@@ -216,7 +216,7 @@ fn content_goal (
 /// When the occurrence at 'treeid' is a subscribee as such (a member
 /// of a subscribee folder that the folder's relation warrants), its
 /// subscriber.
-fn subscriber_of_subscribee_as_such (
+pub(crate) fn subscriber_of_subscribee_as_such (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<ID> {
@@ -246,28 +246,13 @@ fn folder_goal (
     Folder::AcquiredBy | Folder::Acquired =>
       Some ( diff_view::acquisition_goal (tree, folder, kind, walk)
              . unwrap_or_else ( || Goal::new (Vec::new (), false) )),
-    Folder::HiddenInSubscribee => {
-      let (subscribee, subscriber) : (ID, ID) =
-        ( ancestor_pid (0) ?, ancestor_pid (2) ? );
-      let goal : Vec<ID> = goal_list_for_hiddenInSubscribee_folder (
-        graph,
-        &graph . outbound_skgids_for_relation_gated (
-          &subscribee, NodeRelation::Contains, walk . truth . restriction ),
-        &graph . outbound_skgids_for_relation_gated (
-          &subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
-      Some ( gnid_goal ( resolve_all ( omit_hidden (goal, walk), graph ),
-                         &HashMap::new (), false )) },
-    Folder::HiddenOutsideOfSubscribee => {
-      let subscriber : ID = ancestor_pid (1) ?;
-      let goal : Vec<ID> = goal_list_for_hiddenOutsideOfSubscribee_folder (
-        graph,
-        &graph . outbound_skgids_for_relation_gated (
-          &subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
-        &graph . outbound_skgids_for_relation_gated (
-          &subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
-        walk . truth . config );
-      Some ( gnid_goal ( resolve_all ( omit_hidden (goal, walk), graph ),
-                         &HashMap::new (), true )) },
+    Folder::HiddenInSubscribee =>
+      Some ( gnid_goal ( hidden_in_subscribee (
+                           &ancestor_pid (0) ?, &ancestor_pid (2) ?, walk ),
+                         &HashMap::new (), false )),
+    Folder::HiddenOutsideOfSubscribee =>
+      Some ( gnid_goal ( hidden_outside_of_subscribees (&ancestor_pid (1) ?, walk),
+                         &HashMap::new (), true )),
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
@@ -288,6 +273,40 @@ fn folder_goal (
               &anchor, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
       Some ( gnid_goal (members, &relRepos, folder_goal_is_ordered (kind)) ) }, } }
+
+/// What 'subscriber' hides in the content of 'subscribee', less what
+/// the restriction hides: the goal of the compound folder
+/// 'HiddenInSubscribee' under the subscribee as such.
+pub(crate) fn hidden_in_subscribee (
+  subscribee : &ID,
+  subscriber : &ID,
+  walk       : &Walk,
+) -> Vec<ID> {
+  let graph : &InRustGraph = walk . truth . graph;
+  let goal : Vec<ID> = goal_list_for_hiddenInSubscribee_folder (
+    graph,
+    &graph . outbound_skgids_for_relation_gated (
+      subscribee, NodeRelation::Contains, walk . truth . restriction ),
+    &graph . outbound_skgids_for_relation_gated (
+      subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
+  resolve_all ( omit_hidden (goal, walk), graph ) }
+
+/// What 'subscriber' hides outside the content of its subscribees,
+/// less what the restriction hides: the goal of its compound folder
+/// 'HiddenOutsideOfSubscribee', in the order of its hides list.
+pub(crate) fn hidden_outside_of_subscribees (
+  subscriber : &ID,
+  walk       : &Walk,
+) -> Vec<ID> {
+  let graph : &InRustGraph = walk . truth . graph;
+  let goal : Vec<ID> = goal_list_for_hiddenOutsideOfSubscribee_folder (
+    graph,
+    &graph . outbound_skgids_for_relation_gated (
+      subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
+    &graph . outbound_skgids_for_relation_gated (
+      subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
+    walk . truth . config );
+  resolve_all ( omit_hidden (goal, walk), graph ) }
 
 /// Whether the members a folder's relation warrants take the goal's
 /// order: where the anchor's own file records them in order (content,

@@ -77,7 +77,7 @@ fn a_note_under_an_entombstoned_ghost_stays () -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
     let ghost : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
-      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed)";
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let with_note : String =
       insert_after_line_starting (&buffer, ghost, &note (3, "a note under h"));

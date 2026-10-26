@@ -161,8 +161,9 @@ which takes priority over subee.skg on disk."
 
   ;; Verify buffer 1 (collateral): the delete of 11 propagates to
   ;; node 1 (which contained it). 1.skg's contains has had 11
-  ;; stripped, so on rerender the 11-subtree is gone entirely from
-  ;; buffer 1 -- no tombstone, nor anything under one.
+  ;; stripped, so on rerender 11's occurrence is a tombstone, which
+  ;; keeps what stood under it: its two folders, entombstoned in
+  ;; turn, holding the subee and also-hidden drawn there.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
@@ -173,6 +174,11 @@ which takes priority over subee.skg on disk."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
+       (2 tombstone "")
+       (3 tombstone "")
+       (4 node "subee")
+       (4 tombstone "")
+       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1"))
      "phase 5: buffer 1 after collateral delete")))
@@ -182,8 +188,9 @@ which takes priority over subee.skg on disk."
   (message "=== PHASE 6: Add subee-2 in buffer 1 ===")
   (setq integration-test-phase "phase-6-add-subee-2")
   (with-current-buffer "*1*"
-    ;; Find subee. The first match here is what used to be the second match, because the earlier first match was a child of a now-deleted non-vognode.
-    (when (goto-nth-headline-with-title "subee" 1)
+    ;; Find the standalone subee root: the second match, the first
+    ;; being the one under the tombstone where 11 stood.
+    (when (goto-nth-headline-with-title "subee" 2)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
                            (line-beginning-position) (line-end-position)))
@@ -223,6 +230,11 @@ which takes priority over subee.skg on disk."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
+       (2 tombstone "")
+       (3 tombstone "")
+       (4 node "subee")
+       (4 tombstone "")
+       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2"))
@@ -255,7 +267,7 @@ to inherit, so explicit (skgRepos (nodeRepo main)) is still required)."
   (message "=== PHASE 8: Add new-root under tombstone in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
-    (when (goto-nth-headline-with-title "subee" 1)
+    (when (goto-nth-headline-with-title "subee" 2)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
                            (line-beginning-position) (line-end-position)))
@@ -297,6 +309,11 @@ to inherit, so explicit (skgRepos (nodeRepo main)) is still required)."
     (assert-headline-types-and-titles
      buf1
      '((1 node "1")
+       (2 tombstone "")
+       (3 tombstone "")
+       (4 node "subee")
+       (4 tombstone "")
+       (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1")
        (2 node "subee-2")

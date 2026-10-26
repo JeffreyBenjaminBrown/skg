@@ -94,12 +94,10 @@ pub fn handle_single_root_view_request (
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
-            let mut render_warnings : Vec<String> = Vec::new ();
             match multi_root_view_via_runtime (
               &runtime,
               &[skgid . clone ()],
-              Some (skgrepo_restriction),
-              &mut render_warnings )
+              Some (skgrepo_restriction) )
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 let release = decide_text_release (
                   "single-root-view",
@@ -117,8 +115,7 @@ pub fn handle_single_root_view_request (
                     viewforest,
                     &pids ); }
                 let warnings : Vec<String> =
-                  { let mut warnings : Vec<String> =
-                      render_warnings;
+                  { let mut warnings : Vec<String> = Vec::new ();
                     if let TextReleaseDecision::AllowWithWarning {
                       warning,
                     } = release {
