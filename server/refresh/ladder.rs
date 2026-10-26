@@ -5,7 +5,8 @@
 //!     rule says, where it stands; each descriptor (folder, property
 //!     member, change viewnode) whose position the ancestry table
 //!     forbids, or whose change is gone, is entombstoned;
-//!  2. merge: siblings standing for one gnid are unified;
+//!  2. viewnode merge: duplicate viewnode siblings, standing for one
+//!     gnid, are merged into one;
 //!  3. the goal and the warrant: each child's warrant is set from P's
 //!     goal;
 //!  4. claims: under an editable parent, every child that claims and
@@ -50,7 +51,7 @@ use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  Editability, Folder, FolderRelation, Ghost, PropertyMember, Unknown, Occurrence,
+  Editability, FoldAndFocus, Folder, FolderRelation, Ghost, PropertyMember, Unknown, Occurrence,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
 use crate::update_buffer::completion_mode::CompletionMode;
 
@@ -186,27 +187,47 @@ fn rekind_children (
   Ok (( )) }
 
 //
-// 2. merge
+// 2. viewnode merge
 //
 
-/// Unify siblings that stand for one gnid. The first in position
-/// survives, keeping its vnid and fold state; it is editable if any
-/// of them was; the others' children are appended to it, each marked
-/// 'noClaim' unless the truth warrants it under the survivor.
+/// Merge each set of duplicate viewnode siblings (siblings standing
+/// for one gnid) into one viewnode, the result, which stands where
+/// the first of them stood ('merge_into' says how the result is
+/// made). The result's vnid is cleared, so that the tail mints a
+/// fresh one, and the "merged" buffer correction names it.
 fn merge_siblings (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let mut survivors : HashMap<ID, NodeId> = HashMap::new ();
+  for duplicates in duplicate_viewnode_siblings (tree, parent) {
+    let result : NodeId = duplicates [0];
+    for merged_sibling in &duplicates [1..] {
+      merge_into (tree, result, *merged_sibling, walk) ?; }
+    tree . get_mut (result) . unwrap () . value () . viewnode_id = None;
+    walk . corrections . record (tree, result, CorrectionKind::SiblingsMerged); }
+  Ok (( )) }
+
+/// The children of 'parent' grouped by the gnid they stand for, each
+/// group in sibling order, the groups in order of their first member;
+/// only the groups of more than one.
+fn duplicate_viewnode_siblings (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+) -> Vec<Vec<NodeId>> {
+  let mut groups : Vec<Vec<NodeId>> = Vec::new ();
+  let mut group_of_gnid : HashMap<ID, usize> = HashMap::new ();
   for child in children_of (tree, parent) {
     let Some (GoalMember::Gnid (gnid)) =
       vognode_member (tree . get (child) . unwrap () . value ())
       else { continue; };
-    match survivors . get (&gnid) {
-      None => { survivors . insert (gnid, child); },
-      Some (survivor) => merge_into (tree, *survivor, child, walk) ?, }}
-  Ok (( )) }
+    match group_of_gnid . get (&gnid) {
+      Some (group) => groups [*group] . push (child),
+      None => { group_of_gnid . insert (gnid, groups . len ());
+                groups . push ( vec! [child] ); }, }}
+  groups . into_iter ()
+    . filter ( |group| group . len () > 1 )
+    . collect () }
 
 /// What a vognode stands for; None for any other kind.
 fn vognode_member (
@@ -216,46 +237,111 @@ fn vognode_member (
     ViewnodeKind::Vognode (_) => member_of_child (viewnode),
     _ => None, } }
 
+/// Merge 'merged_sibling' into 'result', a duplicate earlier among
+/// its siblings, and detach it. The result is folded only if both
+/// were, and so is its body; it is focused if either was, claims
+/// membership if either did, carries the requests of both
+/// ('merge_requests'), and is editable if either was
+/// ('merge_editability'). It takes the merged
+/// sibling's children after its own, each marked 'noClaim' unless
+/// the truth warrants it under the result.
 fn merge_into (
-  tree     : &mut Tree<Viewnode>,
-  survivor : NodeId,
-  other    : NodeId,
-  walk     : &mut Walk,
+  tree           : &mut Tree<Viewnode>,
+  result         : NodeId,
+  merged_sibling : NodeId,
+  walk           : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let other_viewnode : Viewnode = tree . get (other) . unwrap () . value () . clone ();
-  { let mut survivor_mut : NodeMut<Viewnode> = tree . get_mut (survivor) . unwrap ();
-    let survivor_viewnode : &mut Viewnode = survivor_mut . value ();
-    if other_viewnode . foldAndFocus . focused {
-      survivor_viewnode . foldAndFocus . focused = true; }
-    if let ( ViewnodeKind::Vognode (Vognode::Occurrence (kept)),
-             ViewnodeKind::Vognode (Vognode::Occurrence (merged)) )
-      = ( &mut survivor_viewnode . kind, &other_viewnode . kind )
-    { kept . view_requests . extend ( merged . view_requests . iter () . copied () );
-      if ! merged . is_writeProtected () {
-        // The merged copy's editability passes to the survivor, unless
-        // the survivor stands for another node (a node and its shown
-        // overrider stand for one gnid) whose editable occurrence is
-        // elsewhere.
-        walk . editable_gnids . remove (&merged . gnid);
-        let takes_it : bool = kept . is_writeProtected ()
-          && ! walk . editable_gnids . contains (&kept . gnid);
-        if takes_it {
-          kept . editability = merged . editability . clone (); }
-        if ! kept . is_writeProtected () {
-          walk . editable_gnids . insert ( kept . gnid . clone () ); }
-        if walk . drawn_editable . remove (&other) && takes_it {
-          walk . drawn_editable . insert (survivor); }}}}
-  let goal : Option<Goal> = goal_of_parent (tree, survivor, walk);
-  for grandchild in children_of (tree, other) {
-    move_to_last_child (tree, survivor, grandchild) ?;
+  let sibling_viewnode : Viewnode =
+    tree . get (merged_sibling) . unwrap () . value () . clone ();
+  { let mut result_mut : NodeMut<Viewnode> = tree . get_mut (result) . unwrap ();
+    let result_viewnode : &mut Viewnode = result_mut . value ();
+    merge_fold_and_focus ( &mut result_viewnode . foldAndFocus,
+                           &sibling_viewnode . foldAndFocus );
+    if result_viewnode . readiness_request . is_none () {
+      result_viewnode . readiness_request =
+        sibling_viewnode . readiness_request . clone (); }
+    merge_requests ( &mut result_viewnode . kind,
+                     &sibling_viewnode . kind ); }
+  if claims_membership (&sibling_viewnode) == Some (true) {
+    // Validation lets at most one claiming child of a parent stand
+    // for a gnid ('nonignored_children_have_distinct_gnids'), so no
+    // claim is lost.
+    set_claim (tree, result, true); }
+  merge_editability (tree, result, merged_sibling, &sibling_viewnode, walk);
+  let goal : Option<Goal> = goal_of_parent (tree, result, walk);
+  for grandchild in children_of (tree, merged_sibling) {
+    move_to_last_child (tree, result, grandchild) ?;
     let viewnode : &Viewnode = tree . get (grandchild) . unwrap () . value ();
     if claims_membership (viewnode) == Some (true)
        && warrant_of_child (goal . as_ref (), viewnode) != Some (Warrant::ByGraph) {
       set_claim (tree, grandchild, false);
       walk . corrections . record (tree, grandchild, CorrectionKind::MarkedNoClaim); }}
-  walk . corrections . record (tree, survivor, CorrectionKind::Merged);
-  tree . get_mut (other) . unwrap () . detach ();
+  tree . get_mut (merged_sibling) . unwrap () . detach ();
   Ok (( )) }
+
+/// Folded, and body-folded, only if both were; focused if either was.
+fn merge_fold_and_focus (
+  result         : &mut FoldAndFocus,
+  merged_sibling : &FoldAndFocus,
+) {
+  result . folded     = result . folded     && merged_sibling . folded;
+  result . bodyFolded = result . bodyFolded && merged_sibling . bodyFolded;
+  result . focused    = result . focused    || merged_sibling . focused; }
+
+/// The result carries the union of the view requests, and the
+/// relationship request of whichever carried one; on a ghost, the
+/// tombstone and restoreNode requests, if either carried them. The
+/// node edit request rides with the editability
+/// ('merge_editability').
+fn merge_requests (
+  result         : &mut ViewnodeKind,
+  merged_sibling : &ViewnodeKind,
+) {
+  match ( result, merged_sibling ) {
+    ( ViewnodeKind::Vognode (Vognode::Occurrence (result)),
+      ViewnodeKind::Vognode (Vognode::Occurrence (merged)) ) => {
+      result . view_requests . extend ( merged . view_requests . iter () . copied () );
+      if result . relationshipEditRequest . is_none () {
+        result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
+    ( ViewnodeKind::Vognode (Vognode::Ghost (result)),
+      ViewnodeKind::Vognode (Vognode::Ghost (merged)) ) => {
+      result . tombstone_request   |= merged . tombstone_request;
+      result . restoreNode_request |= merged . restoreNode_request; },
+    ( ViewnodeKind::Vognode (Vognode::Unknown (result)),
+      ViewnodeKind::Vognode (Vognode::Unknown (merged)) ) => {
+      if result . relationshipEditRequest . is_none () {
+        result . relationshipEditRequest = merged . relationshipEditRequest . clone (); }},
+    _ => {}, }}
+
+/// The merged sibling's editability, and its edit request with it,
+/// passes to the result, unless the result stands for another node (a
+/// node and its shown overrider stand for one gnid) whose editable
+/// occurrence is elsewhere in the buffer.
+fn merge_editability (
+  tree             : &mut Tree<Viewnode>,
+  result           : NodeId,
+  merged_sibling   : NodeId,
+  sibling_viewnode : &Viewnode,
+  walk             : &mut Walk,
+) {
+  let ViewnodeKind::Vognode (Vognode::Occurrence (merged)) = &sibling_viewnode . kind
+    else { return; };
+  if merged . is_writeProtected () { return; }
+  let mut result_mut : NodeMut<Viewnode> = tree . get_mut (result) . unwrap ();
+  let ViewnodeKind::Vognode (Vognode::Occurrence (result_occurrence)) =
+    &mut result_mut . value () . kind
+    else { return; };
+  walk . editable_gnids . remove (&merged . gnid);
+  let takes_it : bool = result_occurrence . is_writeProtected ()
+    && ! walk . editable_gnids . contains (&result_occurrence . gnid);
+  if takes_it {
+    result_occurrence . editability = merged . editability . clone (); }
+  if ! result_occurrence . is_writeProtected () {
+    walk . editable_gnids . insert ( result_occurrence . gnid . clone () ); }
+  if walk . drawn_editable . remove (&merged_sibling) && takes_it {
+    walk . drawn_editable . insert (result); }
+  if walk . had_editableView_request . remove (&merged_sibling) && takes_it {
+    walk . had_editableView_request . insert (result); }}
 
 //
 // 3. the goal and the warrant

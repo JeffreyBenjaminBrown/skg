@@ -26,7 +26,7 @@ mod ancestry;
 mod claims;
 mod corrections;
 mod diff_view;
-mod merge;
+mod merge_of_siblings;
 mod re_kind;
 mod reinstate;
 mod reorder;

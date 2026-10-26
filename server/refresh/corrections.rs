@@ -25,8 +25,9 @@ pub enum CorrectionKind {
   Entombstoned,
   /// An unwarranted child that claimed membership was marked 'noClaim'.
   MarkedNoClaim,
-  /// Siblings standing for one gnid were unified into this one.
-  Merged,
+  /// Duplicate viewnode siblings were merged into this one, the
+  /// viewnode merge's result, which has a fresh vnid.
+  SiblingsMerged,
   /// By the ID rule the headline became this kind of vognode, where
   /// it stands: "node", "ghost" or "unknown".
   Rekinded (&'static str),
@@ -59,8 +60,8 @@ impl Correction {
         "Entombstoned a headline that can stand here for nothing." . to_string (),
       CorrectionKind::MarkedNoClaim =>
         "Marked noClaim a child the graph does not relate to its parent." . to_string (),
-      CorrectionKind::Merged =>
-        "Merged siblings standing for one node into this one." . to_string (),
+      CorrectionKind::SiblingsMerged =>
+        "Merged duplicate viewnode siblings into this one." . to_string (),
       CorrectionKind::Rekinded (kind) =>
         format! ("Made a headline a {}, as the graph has it.", kind),
       CorrectionKind::EditRequestDropped =>
@@ -130,18 +131,20 @@ impl CorrectionLog {
                    title : viewnode . title () . to_string () },
       treeid )); }
 
-  /// The corrections, each headline that lacked a vnid given the one
-  /// it holds now. Call after the tail has assigned the vnids.
+  /// The corrections, each headline named by the vnid it holds now,
+  /// or, if it holds none (the tail pruned it), by the one it held
+  /// when the correction was made: a headline drawn by the walk gets
+  /// its vnid from the tail, and the result of a viewnode merge a
+  /// fresh one. Call after the tail has assigned the vnids.
   pub(crate) fn into_corrections (
     self,
     tree : &Tree<Viewnode>,
   ) -> Vec<Correction> {
     self . entries . into_iter ()
-      . map ( |(correction, treeid)| match correction . vnid {
-        Some (_) => correction,
-        None => Correction {
-          vnid : tree . get (treeid)
-                 . and_then ( |node| node . value () . viewnode_id . clone () ),
-          .. correction }, } )
+      . map ( |(correction, treeid)| {
+        let vnid_now : Option<ViewnodeId> = tree . get (treeid)
+          . and_then ( |node| node . value () . viewnode_id . clone () );
+        Correction { vnid : vnid_now . or (correction . vnid),
+                     .. correction } } )
       . collect () }
 }

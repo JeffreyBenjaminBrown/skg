@@ -7,7 +7,7 @@
 //! The walk is level order from the roots. A parent's own kind is
 //! settled before its children are visited: at each parent, the
 //! ladder ('ladder.rs') re-kinds its children by the ID rule
-//! ('id_rule.rs'), merges siblings standing for one gnid, sets each
+//! ('id_rule.rs'), merges duplicate viewnode siblings, sets each
 //! child's warrant against the parent's goal ('goal.rs'), marks the
 //! claims, reinstates what the goal names and no child stands for
 //! (as far as the extent allows, 'extent.rs'), reorders, substitutes

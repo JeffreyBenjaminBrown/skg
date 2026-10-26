@@ -395,7 +395,7 @@ async fn duplicate_members_merge (
 
 /// The rerender of a stored view whose d holds two copies of e, the
 /// first editable, the second write-protected, each holding ec, merges
-/// them, and then the two ec under the survivor: one e remains,
+/// them, and then the two ec under the result: one e remains,
 /// editable, holding one ec; that buffer saves. (A buffer holds at
 /// most one editable occurrence of a node: validation refuses a saved
 /// one with two, and every other is the server's own output.)
