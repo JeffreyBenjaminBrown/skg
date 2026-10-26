@@ -5,6 +5,9 @@
 # Results are written here:
 # - tests/results/ALL.org: a plain-text org-mode summary
 # - tests/results/*.log: individual test results
+# It clears tests/results/ at its start, except the subdirectories
+# named for a plan number (tests/results/06/), which hold the logs of
+# that plan's run and belong to its agents.
 #
 # Integration tests are run sequentially.  This script is intended to
 # keep an interactive machine usable, not to minimize wall-clock time.
@@ -67,8 +70,11 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-rm -rf "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR"
+find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 \
+  ! \( -type d -regextype posix-extended \
+       -regex '.*/[0-9]+([._][0-9]+)*' \) \
+  -exec rm -rf {} +
 
 T_START=$SECONDS
 BUILD_JOBS="$(skg_positive_int_or_default "${SKG_CARGO_BUILD_JOBS:-}" 2)"

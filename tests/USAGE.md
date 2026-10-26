@@ -19,4 +19,4 @@ The Docker container includes Emacs and Neovim (see `coding-advice/docker.org`),
 
 ## Where a plan run keeps its logs
 
-Agents executing a plan write their logs and one-time scripts under `tests/results/<plan>/sliceN/`. `bash/all-tests.sh` currently wipes all of `tests/results/` at its start; it is to leave those subdirectories alone (Decide 13 of `TODO/simplify-refresh/05_review.org`), and until it does, copy what `progress.org` cites before a full run.
+Agents executing a plan write their logs and one-time scripts under `tests/results/<plan>/sliceN/`, where `<plan>` is the plan's number (`tests/results/06/`). `bash/all-tests.sh` clears `tests/results/` at its start but for the subdirectories whose name is a plan number: those belong to the plan run's agents, and only they delete them.
