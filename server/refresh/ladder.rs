@@ -70,8 +70,6 @@ pub(crate) fn visit_parent (
   extend_requested_content (tree, parent, walk);
   add_default_folders (tree, parent, walk);
   let goal : Option<Goal> = goal_of_parent (tree, parent, walk);
-  if goal . as_ref () . is_some_and ( |goal| goal . emptied_by_the_restriction ) {
-    walk . emptied_folders . insert (parent); }
   rekind_children (tree, parent, goal . as_ref (), walk) ?;
   merge_siblings (tree, parent, walk) ?;
   set_warrants (tree, parent, goal . as_ref ());
@@ -138,7 +136,7 @@ fn add_default_folders (
      && partnerFolder_members_in_graph (
           walk . truth . graph, walk . truth . config, &pid, &Folder::Subscribee,
           walk . truth . restriction )
-        . is_some_and ( |list| ! list . members . is_empty () )
+        . is_some_and ( |members| ! members . is_empty () )
   { let had_one : bool = child_folder (tree, parent, &Folder::Subscribee) . is_some ();
     add_folders (tree, parent, &[ Folder::Subscribee ], walk);
     // A new one goes after any folder the occurrence was asked for.
@@ -155,7 +153,7 @@ fn add_default_folders (
           . expect ("add_default_folders: both are children"); }}}
   if let Some (subscriber) = subscriber_of_subscribee_as_such (tree, parent) {
     if child_folder (tree, parent, &Folder::HiddenInSubscribee) . is_none ()
-       && ! hidden_in_subscribee (&pid, &subscriber, walk) . members . is_empty ()
+       && ! hidden_in_subscribee (&pid, &subscriber, walk) . is_empty ()
     { let folder : NodeId = tree . get_mut (parent) . unwrap ()
         . append ( viewnode_of ( ViewnodeKind::Folder (Folder::HiddenInSubscribee) ))
         . id ();
@@ -891,7 +889,7 @@ fn add_folders (
     let hides_outside_its_subscribees = || -> bool {
       occurrence_pid ( tree . get (treeid) . unwrap () )
         . is_some_and ( |subscriber|
-          ! hidden_outside_of_subscribees (&subscriber, walk) . members . is_empty () ) };
+          ! hidden_outside_of_subscribees (&subscriber, walk) . is_empty () ) };
     if matches! ( folder, Folder::Subscribee )
        && child_folder (tree, folder_treeid, &Folder::HiddenOutsideOfSubscribee) . is_none ()
        && hides_outside_its_subscribees ()

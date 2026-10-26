@@ -171,9 +171,10 @@ fn a_tightened_restriction_leaves_a_tombstone_over_the_hidden_nodes_children (
       Ok (( )) } ) }
 
 /// The exact buffers of a view of r switched to "public" and back to
-/// "all": narrowed, the subscribee folder the restriction empties is
-/// pruned and h's occurrence is a tombstone holding s1; widened, h is
-/// drawn again beside the tombstone, and the pruned folder is not.
+/// "all": narrowed, the subscribee folder the restriction empties
+/// stays, empty, and h's occurrence is a tombstone holding s1;
+/// widened, the folder holds hs again and h is drawn again beside the
+/// tombstone.
 #[test]
 fn a_switch_and_its_reverse_draw_these_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -192,10 +193,10 @@ fn a_switch_and_its_reverse_draw_these_buffers (
       Ok (( )) } ) }
 
 /// As above, where r also hides hh, private, from its subscribers:
-/// the hidden-outside folder the restriction empties is pruned, and
-/// then the subscribee folder it leaves empty.
+/// narrowed, the subscribee folder and the hidden-outside folder in it
+/// stay, both emptied; widened, they hold hs and hh again.
 #[test]
-fn a_switch_prunes_the_folders_the_restriction_empties (
+fn a_switch_keeps_the_folders_the_restriction_empties (
 ) -> Result<(), Box<dyn Error>> {
   let case : tempfile::TempDir = tempfile::TempDir::new () ?;
   write_fixture_where_r_hides (case . path (), &["hh"]) ?;
@@ -211,6 +212,8 @@ fn a_switch_prunes_the_folders_the_restriction_empties (
                 "under all r's subscribee folder holds hs and hh:\n{}", opened );
       assert_eq! ( narrowed, "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 2))) repoBoundary)) r
+** (skg (vnid 0b) subscribeeFolder)
+*** (skg (vnid 0d) hiddenOutsideOfSubscribeeFolder)
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0g) tombstone)
 *** (skg (vnid 0h) node (gnid s1) (skgRepos (nodeRepo public))) s1
@@ -218,17 +221,22 @@ fn a_switch_prunes_the_folders_the_restriction_empties (
 " );
       assert_eq! ( widened, "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (subscribesTo (out 1)) (hidesFromSubs (out 1))) repoBoundary)) r
+** (skg (vnid 0b) subscribeeFolder)
+*** (skg (vnid 0j) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)) repoBoundary)) hs secret
+*** (skg (vnid 0d) hiddenOutsideOfSubscribeeFolder)
+**** (skg (vnid 0k) node (gnid hh) (skgRepos (nodeRepo private)) writeProtected (view (rels (hidesFromSubs (in 1 (ancestors 3)))) (birth (hidesFromSubs in 3)) repoBoundary)) hh secret
 ** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0g) tombstone)
 *** (skg (vnid 0h) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1))))) s1
-** (skg (vnid 0j) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
-*** (skg (vnid 0k) node (gnid s1) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+** (skg (vnid 0l) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
+*** (skg (vnid 0m) node (gnid s1) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ** (skg (vnid 0i) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
 " );
       Ok (( )) } ) }
 
 const SWITCHED_TO_PUBLIC : &str = "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 2))) repoBoundary)) r
+** (skg (vnid 0b) subscribeeFolder)
 ** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0e) tombstone)
 *** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public))) s1
@@ -237,11 +245,13 @@ const SWITCHED_TO_PUBLIC : &str = "\
 
 const SWITCHED_BACK_TO_ALL : &str = "\
 * (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (subscribesTo (out 1))) repoBoundary)) r
+** (skg (vnid 0b) subscribeeFolder)
+*** (skg (vnid 0h) node (gnid hs) (skgRepos (nodeRepo private) (relRepo public)) writeProtected (view (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2)))) (birth (subscribesTo in 2)) repoBoundary)) hs secret
 ** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
 ** (skg (vnid 0e) tombstone)
 *** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1))))) s1
-** (skg (vnid 0h) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
-*** (skg (vnid 0i) node (gnid s1) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+** (skg (vnid 0i) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
+*** (skg (vnid 0j) node (gnid s1) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
 ** (skg (vnid 0g) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
 ";
 

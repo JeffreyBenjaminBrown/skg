@@ -114,11 +114,6 @@ pub(crate) struct Walk<'a> {
   /// drew as change viewnodes. Their members are extent
   /// ('Walk::record_drawn').
   pub added_folders  : HashSet<NodeId>,
-  /// The folders whose goal the skgrepo restriction emptied
-  /// ('Goal::emptied_by_the_restriction'). The tail prunes each one
-  /// left empty, unless this refresh added it: a folder the user just
-  /// asked for shows, empty, once.
-  pub emptied_folders : HashSet<NodeId>,
   pub corrections    : CorrectionLog,
   pub correction_policy : &'a BufferCorrectionPolicy,
   /// The headlines entombstoned without a buffer correction
@@ -140,7 +135,6 @@ impl<'a> Walk<'a> {
            had_editableView_request : HashSet::new (),
            newborn_folders          : HashSet::new (),
            added_folders            : HashSet::new (),
-           emptied_folders          : HashSet::new (),
            corrections              : CorrectionLog::default (),
            quiet_tombstones         : HashSet::new (), } }
 

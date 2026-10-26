@@ -818,11 +818,11 @@ one automatically.
        tombstone, which keeps its viewchildren; so does an unknown,
        since under a set other than =all= no goal names one; a
        tombstone is pruned unless it holds something; an editable
-       folder the new set empties (its goal had members and the set
-       hides them all) is pruned when empty; and the refresh fills
-       every folder per the new set, so widening the set reveals
-       members and folders. When the set changed, none of this is
-       reported as a buffer correction.
+       folder the new set empties stays, empty, as any empty editable
+       folder does; and the refresh fills every folder per the new
+       set, so widening the set reveals members and folders, and
+       fills an emptied folder again. When the set changed, none of
+       this is reported as a buffer correction.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
@@ -1799,8 +1799,8 @@ its visible descendants are not orphaned:
 A tombstone says nothing of what stood there: no id, skgrepo or
 title, so nothing the user hid by restricting the skgrepo-set leaks.
 A childless one is pruned, as are the property members and change
-viewnodes of the node it replaced and the folders that prune empties;
-so is an editable folder whose members the new set hides.
+viewnodes of the node it replaced and the folders that prune empties.
+An editable folder whose members the new set hides stays, empty.
 It is save-inert: it emits no fieldIntent (a hidden node's membership
 in its parent's list is owned entirely by disk supplementation, not
 the buffer), and it is not a collateral re-render target. Its

@@ -3,23 +3,22 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::disk_home::home_from_disk;
-use crate::update_buffer::reconcile::{RestrictedGoalList, omit_restricted_members};
+use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::types::viewnode::Folder;
 
 /// The members a folder of this kind under the viewparent should hold,
 /// from 'graph': its partners in the folder's relation, each extra ID
 /// resolved to its node's pid (an unresolved ID kept as it is), less
-/// the members the skgrepo restriction hides, and whether it hid any.
-/// In graph order. None if the kind has no relation member role. The
-/// refresh's goal of such a folder in a content view
-/// ('server/refresh/goal.rs').
+/// the members the skgrepo restriction hides. In graph order. None if
+/// the kind has no relation member role. The refresh's goal of such a
+/// folder in a content view ('server/refresh/goal.rs').
 pub fn partnerFolder_members_in_graph (
   graph               : &InRustGraph,
   config              : &SkgConfig,
   viewparent_pid      : &ID,
   kind                : &Folder,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Option<RestrictedGoalList> {
+) -> Option<Vec<ID>> {
   let member_role : RelationRole = kind . relation_member_role () ?;
   let recorder_role : RelationRole =
     member_role . opposite_role ();

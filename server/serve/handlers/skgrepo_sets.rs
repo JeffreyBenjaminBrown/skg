@@ -58,8 +58,9 @@ pub fn handle_skgrepo_set_request (
 /// re-renders open views in place rather than closing them. The
 /// refresh brings each view under the new restriction: it entombstones
 /// the occurrences the restriction keeps out, draws no restricted
-/// member, prunes childless tombstones and the folders the restriction
-/// empties, and draws what a widening reveals; the rest keeps its
+/// member, prunes childless tombstones, and draws what a widening
+/// reveals; a folder the restriction empties stays, empty, as any
+/// empty editable folder does. The rest keeps its
 /// viewnode IDs. When the restriction changed, none of that is a
 /// buffer correction ('BufferCorrectionPolicy'). Results stream via
 /// the rerender-all message flow (lock, per-view, done).

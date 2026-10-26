@@ -6,24 +6,6 @@ pub mod partner_folder;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoName};
 
-/// A goal list as the skgrepo restriction lets it be seen: the members
-/// it keeps, and whether it omitted any. A folder whose list the
-/// restriction emptied (it omitted some and kept none) is pruned
-/// ('server/refresh/tail.rs').
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct RestrictedGoalList {
-  pub members      : Vec<ID>,
-  pub omitted_some : bool,
-}
-
-impl RestrictedGoalList {
-  /// Whether the restriction emptied the list.
-  pub fn emptied (
-    &self,
-  ) -> bool {
-    self . omitted_some && self . members . is_empty () }
-}
-
 /// Under a skgrepo restriction (the API doc's "Restricted-skgrepo nodes"): rendering omits every
 /// restricted member from goal lists (no placeholders are created).  A
 /// member whose skgrepo cannot be resolved is omitted too: it might be
@@ -37,17 +19,13 @@ pub fn omit_restricted_members (
   goal     : Vec<ID>,
   restriction : Option<&SkgrepoRestriction>,
   resolve  : impl Fn (&ID) -> Option<SkgrepoName>,
-) -> RestrictedGoalList {
+) -> Vec<ID> {
   match restriction . filter ( |a| ! a . is_all () ) {
-    None => RestrictedGoalList { members : goal, omitted_some : false },
-    Some (a) => {
-      let listed : usize = goal . len ();
-      let members : Vec<ID> =
-        goal . into_iter ()
-        . filter ( |gnid|
-            resolve (gnid)
-            . map ( |src| a . contains_skgrepo (&src) )
-            . unwrap_or (false) )
-        . collect ();
-      RestrictedGoalList { omitted_some : members . len () < listed,
-                           members } }, }}
+    None => goal,
+    Some (a) =>
+      goal . into_iter ()
+      . filter ( |gnid|
+          resolve (gnid)
+          . map ( |src| a . contains_skgrepo (&src) )
+          . unwrap_or (false) )
+      . collect (), }}
