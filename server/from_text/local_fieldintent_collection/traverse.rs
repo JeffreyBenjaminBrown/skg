@@ -19,9 +19,9 @@
 /// - folder shapes are valid: each folder holds only the child kinds it
 ///   permits, each folder is unique among its siblings, content members
 ///   have distinct IDs per
-///   'nonignored_children_have_distinct_ids', and write-protected-folder
+///   'claiming_children_have_distinct_gnids', and write-protected-folder
 ///   members have distinct IDs per
-///   'partnerFolder_children_have_distinct_ids'. The defining folders
+///   'partnerFolder_children_have_distinct_gnids'. The defining folders
 ///   (aliasFolder, subscribeeFolder, overriddenFolder) may contain
 ///   duplicates; emission dedups them silently.
 /// Collection performs no ancestry re-verification. On shapes that
@@ -473,7 +473,7 @@ fn subscribeeFolder_members (
 
 /// This returns the content of an editable vognode: its occurrence
 /// children that pass the contains predicate. It does not dedup,
-/// because validation ('nonignored_children_have_distinct_ids')
+/// because validation ('claiming_children_have_distinct_gnids')
 /// already guarantees distinctness. Each member is paired with its
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'FieldIntent').

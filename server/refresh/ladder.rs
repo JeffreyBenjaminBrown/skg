@@ -264,7 +264,7 @@ fn merge_into (
                      &sibling_viewnode . kind ); }
   if claims_membership (&sibling_viewnode) == Some (true) {
     // Validation lets at most one claiming child of a parent stand
-    // for a gnid ('nonignored_children_have_distinct_gnids'), so no
+    // for a gnid ('claiming_children_have_distinct_gnids'), so no
     // claim is lost.
     set_claim (tree, result, true); }
   merge_editability (tree, result, merged_sibling, &sibling_viewnode, walk);

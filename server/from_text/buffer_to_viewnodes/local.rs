@@ -124,7 +124,7 @@ fn validate_alias (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, treeid, 1, true) {
-    errors . push("Alias must have no (non-ignored) children." . to_string()); }
+    errors . push("An alias may have no claiming children." . to_string()); }
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| matches!(&node . kind,
@@ -142,7 +142,7 @@ fn validate_aliasfolder (
     tombstone_or (|node| matches!(&node . kind,
                     ViewnodeKind::PropertyMember (
                       PropertyMember::Alias { .. } ))))
-    { errors . push("AliasFolder's (non-ignored) children must include only Aliases."
+    { errors . push("An alias folder's claiming children may only be aliases."
                     . to_string()); }
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
@@ -164,7 +164,7 @@ fn validate_flag (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new ();
   if ! generation_does_not_exist (tree, treeid, 1, true) {
-    errors . push ("Flag must have no (non-ignored) children."
+    errors . push ("A flag may have no claiming children."
                    . to_string ()); }
   if ! generation_exists_and_includes (
     tree, treeid, -1, false,
@@ -545,7 +545,7 @@ fn validate_idFolder (
     tombstone_or (|node| matches!(&node . kind,
                     ViewnodeKind::PropertyMember (
                       PropertyMember::ID { .. } ))) )
-    { errors . push("IDFolder's (non-ignored) children can only be ID properties."
+    { errors . push("An ID folder's claiming children may only be ID properties."
                     . to_string() ); }
   if !siblings_cannot_include(
     tree, treeid,
@@ -560,7 +560,7 @@ fn validate_id_property (
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, treeid, 1, true) {
-    errors . push("ID property must have no (non-ignored) children." . to_string()); }
+    errors . push("An ID property may have no claiming children." . to_string()); }
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| matches!(&node . kind,
@@ -601,8 +601,8 @@ fn validate_vognode_identity_and_structure (
     tree, treeid, 1, true,
     |node| !cannot_be_child_of_vognode (node, is_subscribee_as_such))
     { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeFolder (outside a subscribee-as-such), or HiddenOutsideOfSubscribeeFolder.", label) ); }
-  if !nonignored_children_have_distinct_gnids(tree, treeid) {
-    errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
+  if !claiming_children_have_distinct_gnids(tree, treeid) {
+    errors . push( format!("Two claiming children of this {} stand for one node; only one may claim.", label . to_lowercase ()) ); }
   errors }
 
 fn validate_occurrence (
@@ -679,12 +679,11 @@ fn has_empty_title ( t : &Occurrence ) -> bool {
                Some (&NodeEditRequest::Delete) );
   is_editable && !is_delete && t . title . trim () . is_empty () }
 
-/// Check that all non-ignored content children
+/// Check that all claiming content children
 /// have distinct IDs.
-/// "Non-ignored" means one that claims membership.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
-pub fn nonignored_children_have_distinct_gnids (
+pub fn claiming_children_have_distinct_gnids (
   tree    : &Tree<Viewnode>,
   treeid  : NodeId,
 ) -> bool {
@@ -716,7 +715,7 @@ pub fn nonignored_children_have_distinct_gnids (
   true }
 
 /// Whether a folder's members have distinct IDs. As for a content
-/// list ('nonignored_children_have_distinct_gnids'), only members
+/// list ('claiming_children_have_distinct_gnids'), only members
 /// count, so that a copy of a member claiming nothing may stand beside it,
 /// and only where the folder's claims are read.
 fn partnerFolder_children_have_distinct_gnids (

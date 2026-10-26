@@ -218,7 +218,7 @@ async fn test_find_buffer_errors_for_saving (
       // child of AliasFolder; an occurrence typed there the parse makes
       // an alias)
       { let aliasfolder_children_re =
-          Regex::new(r"(?i)aliasFolder.*children.*must.*alias") . unwrap();
+          Regex::new(r"(?i)alias folder.s claiming children may only be aliases") . unwrap();
         let aliasfolder_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(
@@ -226,12 +226,12 @@ async fn test_find_buffer_errors_for_saving (
             if aliasfolder_children_re . is_match (msg)))
           . collect();
         assert_eq!(aliasfolder_children_errors . len(), 1,
-                   "Should find 1 'AliasFolder children must be Aliases' error"); }
+                   "Should find 1 error saying an alias folder holds only aliases"); }
 
       // An occurrence under an alias ("Alias with body problem" has
       // alias_child) claims nothing there, as under any parent that
       // reads no claims: it is a note, not an error.
-      { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children") . unwrap();
+      { let alias_children_re = Regex::new(r"(?i)an alias may have no claiming children") . unwrap();
         let alias_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
@@ -416,7 +416,7 @@ async fn test_duplicated_content_error (
         find_buffer_errors_for_saving(&viewforest, config)?;
 
       let dup_children_re =
-        Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
+        Regex::new(r"(?i)two claiming children.*stand for one node") . unwrap();
       let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                              if dup_children_re . is_match (msg)))
@@ -478,7 +478,7 @@ async fn test_no_duplicated_content_error_for_ghost_siblings (
         find_buffer_errors_for_saving(&viewforest, config)?;
 
       let dup_children_re =
-        Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
+        Regex::new(r"(?i)two claiming children.*stand for one node") . unwrap();
       let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                              if dup_children_re . is_match (msg)))

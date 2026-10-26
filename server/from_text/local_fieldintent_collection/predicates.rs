@@ -6,7 +6,7 @@
 /// represents.
 /// .
 /// None of them dedups: duplicate content members are a validation
-/// error ('nonignored_children_have_distinct_ids'), and duplicate
+/// error ('claiming_children_have_distinct_gnids'), and duplicate
 /// defining-folder members are silently deduplicated at emission.
 
 use crate::types::viewnode::{NodeEditRequest, Occurrence};
