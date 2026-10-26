@@ -120,9 +120,8 @@ pub fn detach_viewnode_transferring_focus (
 /// orderkeys it created, those of the stale or duplicate children it
 /// retained as non-members or entombstoned holding something, and
 /// those of the stale and duplicate children it made childless
-/// tombstones, which the prune that ends the completion removes. Callers that warn about repairs to
-/// write-protected folders consume this ('CompletionWarning'); other
-/// callers ignore it.
+/// tombstones, which the prune that ends the completion removes. No
+/// caller reads it: the diff view's completion repairs silently.
 #[derive(Debug)]
 pub struct RepairSummary<Orderkey> {
   pub created            : Vec<Orderkey>,

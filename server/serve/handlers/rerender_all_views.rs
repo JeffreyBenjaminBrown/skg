@@ -8,7 +8,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::rerender_stream::{
   PreparedRerenders, authorize_prepared_rerenders,
   prepare_rerender_views, stream_prepared_rerenders};
-use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::SkgEnv;
 use crate::types::views_state::ViewforestId;
@@ -33,7 +33,7 @@ pub fn handle_rerender_all_views_request (
             &format_lock_views_sexp (&[])));
         send_response_with_length_prefix (
           stream, &tag_sexp_response (TcpToClient::RerenderDone,
-            &format_errors_warnings_sexp (&[error], &[])));
+            &format_rerender_done_sexp (&[error], &[], &[])));
         return; } };
   stream_rerender_views_excluding (
     stream, env, views_state, skgrepo_restriction,

@@ -14,7 +14,6 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, entombstone_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
-use crate::update_buffer::warnings::CompletionWarning;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::views_state::DiffViewBufferKind;
 use crate::diff_view::visit::{
@@ -49,12 +48,6 @@ pub(crate) struct CompletionContext<'a> {
   /// a content list is extended whole); when it reaches 0 no later
   /// vognode other than a root extends (and the cascade stops).
   pub(super) node_budget                    : usize,
-  /// Some only when this completion serves the view the user just
-  /// saved: write-protected PartnerFolder reconcilers report their repairs
-  /// here, and the save response surfaces them as warnings. None for
-  /// de-novo renders, collateral rerenders and rerender-all, whose
-  /// repairs do not correspond to edits the user just made.
-  pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
   /// The completion mode: a content view, or a buffer of the diff view
   /// over a straddle ('docs/diff-view.org', "Completion over the
   /// straddle"). Read at the calls of 'diffView_visit_before_extension'
@@ -82,7 +75,7 @@ impl<'a> CompletionContext<'a> {
   /// 'diffView_buffer_kind' over 'straddle'. It
   /// is never restricted by skgrepo (the diff view requires the set
   /// 'all'), creates no default partner folders, substitutes no
-  /// overrider, and reports no repair. Every viewnode of a first
+  /// overrider. Every viewnode of a first
   /// rendering is created by it.
   pub(crate) fn for_diffView (
     runtime      : &'a RuntimeGeneration,
@@ -96,7 +89,6 @@ impl<'a> CompletionContext<'a> {
       editable_map, runtime, graph_snap, errors,
       skgrepo_restriction            : None,
       node_budget                    : runtime . config . initial_node_limit,
-      warning_sink                   : None,
       mode                           : CompletionMode::DiffView {
         straddle, buffer_kind : diffView_buffer_kind },
       nodes_before_completion        : &NO_NODES,
@@ -105,13 +97,12 @@ impl<'a> CompletionContext<'a> {
   /// A rerender of a buffer of the diff view ('rerender_view'):
   /// after a save, for rerender-all, or after a commit, over the
   /// straddle of 'mode'. It has the settings of 'for_diffView', and
-  /// carries the repairs' sink and what the view held before.
+  /// carries what the view held before.
   pub(super) fn for_rerender (
     runtime                        : &'a RuntimeGeneration,
     graph_snap                     : &'a Arc<InRustGraph>,
     editable_map                   : &'a mut EditableMap,
     errors                         : &'a mut Vec<String>,
-    warning_sink                   : Option<&'a mut Vec<CompletionWarning>>,
     mode                           : CompletionMode<'a>,
     nodes_before_completion        : &'a HashSet<NodeId>,
     editable_before_completion     : &'a HashSet<NodeId>,
@@ -119,7 +110,6 @@ impl<'a> CompletionContext<'a> {
     let CompletionMode::DiffView { straddle, buffer_kind } = mode
       else { panic! ("for_rerender: a content view is refreshed, not completed") };
     CompletionContext {
-      warning_sink,
       nodes_before_completion,
       editable_before_completion,
       .. CompletionContext::for_diffView (
@@ -217,13 +207,11 @@ fn dispatch_node_update (
     ViewnodeKind::Folder (Folder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
         treeid, tree, context . runtime,
-        context . skgrepo_restriction,
-        context . warning_sink . as_deref_mut () ) ?,
+        context . skgrepo_restriction ) ?,
     ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutsideSubscribeeFolder_children (
         treeid, tree, context . runtime,
-        context . skgrepo_restriction,
-        context . warning_sink . as_deref_mut () ) ?,
+        context . skgrepo_restriction ) ?,
     ViewnodeKind::Folder (role)
       // This arm serves every folder that reads one relation role: the
       // editable one (Overridden; Subscribee has its own completer
@@ -236,8 +224,7 @@ fn dispatch_node_update (
       reconcile_partnerFolder_children (
         treeid, tree, role,
         context . mode,
-        context . runtime,
-        context . warning_sink . as_deref_mut () ) ?,
+        context . runtime ) ?,
     // In a diff view, 'diffView_visit_before_extension' has finished
     // a changed property folder's visit: the node's visit filled it
     // from the graph straddle. Any other is refreshed here.

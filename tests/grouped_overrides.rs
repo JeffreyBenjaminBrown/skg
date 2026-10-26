@@ -11,6 +11,9 @@ mod git_fixture_helpers;
 #[path = "collateral_partner_folder.rs"]
 mod collateral_partner_folder;
 
+#[path = "corrections_channel.rs"]
+mod corrections_channel;
+
 #[path = "collateral_subscribee_staleness.rs"]
 mod collateral_subscribee_staleness;
 

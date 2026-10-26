@@ -29,7 +29,6 @@ fn straddle () -> GraphStraddle {
 struct Settings {
   skgrepo_restriction            : Option<SkgrepoRestriction>,
   node_budget                    : usize,
-  has_warning_sink               : bool,
   diffView_mode                  : Option<(*const GraphStraddle, DiffViewBufferKind)>, // None for a content view
   nodes_before_completion        : HashSet<NodeId>,
   editable_before_completion     : HashSet<NodeId>,
@@ -41,7 +40,6 @@ fn settings_of (
   Settings {
     skgrepo_restriction            : context . skgrepo_restriction . cloned (),
     node_budget                    : context . node_budget,
-    has_warning_sink               : context . warning_sink . is_some (),
     diffView_mode                  : match context . mode {
       CompletionMode::ContentView => None,
       CompletionMode::DiffView { straddle, buffer_kind } =>
@@ -62,15 +60,13 @@ fn for_diffView_gives_the_first_renderings_settings () {
   assert_eq! ( settings_of (&context), Settings {
     skgrepo_restriction            : None,
     node_budget                    : runtime . config . initial_node_limit,
-    has_warning_sink               : false,
     diffView_mode                  :
       Some (( &straddle as *const GraphStraddle, DiffViewBufferKind::Merges )),
     nodes_before_completion        : HashSet::new (),
     editable_before_completion     : HashSet::new (), } ); }
 
 /// A rerender of a buffer of the diff view takes the first
-/// rendering's settings, and keeps the sink and what the view held
-/// before.
+/// rendering's settings, and keeps what the view held before.
 #[test]
 fn for_rerender_gives_the_first_renderings_settings_and_keeps_the_rest () {
   let runtime : RuntimeGeneration = runtime ();
@@ -82,17 +78,15 @@ fn for_rerender_gives_the_first_renderings_settings_and_keeps_the_rest () {
   let nodes_before : HashSet<NodeId> = HashSet::from ([ some_node ]);
   let mut editable_map : EditableMap = EditableMap::new ();
   let mut errors : Vec<String> = Vec::new ();
-  let mut sink : Vec<CompletionWarning> = Vec::new ();
   let mode : CompletionMode =
     CompletionMode::DiffView { straddle    : &straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges };
   let context : CompletionContext = CompletionContext::for_rerender (
     &runtime, &graph_snap, &mut editable_map, &mut errors,
-    Some (&mut sink), mode, &nodes_before, &nodes_before );
+    mode, &nodes_before, &nodes_before );
   assert_eq! ( settings_of (&context), Settings {
     skgrepo_restriction            : None,
     node_budget                    : runtime . config . initial_node_limit,
-    has_warning_sink               : true,
     diffView_mode                  : Some ((
       &straddle as *const GraphStraddle, DiffViewBufferKind::AllChanges )),
     nodes_before_completion        : nodes_before . clone (),

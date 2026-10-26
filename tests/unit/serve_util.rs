@@ -1,12 +1,15 @@
 use super::{
   format_buffer_response_sexp,
-  format_errors_warnings_sexp,
+  format_rerender_done_sexp,
   format_single_view_sexp,
   sexp_to_client_string,
   tag_sexp_response,
   TcpToClient,
   ViewforestId,
 };
+
+use crate::refresh::corrections::{Correction, CorrectionKind, ViewCorrections};
+use crate::types::viewnode::ViewnodeId;
 
 use sexp::{Atom, Sexp};
 
@@ -35,15 +38,21 @@ fn format_buffer_response_separates_errors_and_warnings () {
 }
 
 #[test]
-fn format_errors_warnings_response_supports_warnings_only () {
+fn rerender_done_carries_each_views_corrections_under_its_view_id () {
   let warnings : Vec<String> =
     vec! [ "rerender note" . to_string () ];
-  let response : String =
-    format_errors_warnings_sexp (&[], &warnings);
-
+  let corrections : Vec<ViewCorrections> = vec! [ ViewCorrections {
+    viewforest_id : ViewforestId::ContentView ("content-view:5" . to_string ()),
+    corrections   : vec! [ Correction {
+      kind  : CorrectionKind::Reinstated,
+      vnid  : Some ( ViewnodeId ("0c" . to_string ()) ),
+      title : "new child" . to_string () } ] } ];
   assert_eq!(
-    response,
-    "((errors ()) (warnings (\"rerender note\")))" );
+    format_rerender_done_sexp (&[], &warnings, &[]),
+    "((errors ()) (warnings (\"rerender note\")) (corrections ()))" );
+  assert_eq!(
+    format_rerender_done_sexp (&[], &[], &corrections),
+    "((errors ()) (warnings ()) (corrections ((content-view:5 \"Drew what the graph says belongs here.\n*** new child\n- viewnode ID: 0c. To find it: C-c g v 0c\n\"))))" );
 }
 
 #[test]

@@ -7,9 +7,7 @@ use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
-use crate::update_buffer::reconcile::partner_folder::{folder_viewnode_id_of, push_repair_warnings};
 use crate::update_buffer::util::fold_members_of_newborn_folder;
-use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::viewnode::{Viewnode, Folder};
 
 use ego_tree::{NodeId, Tree};
@@ -17,7 +15,6 @@ use std::collections::HashMap;
 use std::error::Error;
 
 struct HiddenInContext {
-  subscribee_pid      : ID,
   subscribee_contains : Vec<ID>,
   subscriber_hides    : Vec<ID>,
   relRepos            : HashMap<ID, SkgrepoName>,
@@ -40,7 +37,6 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   tree                           : &mut Tree<Viewnode>,
   runtime                        : &RuntimeGeneration,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
-  warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   let kind : &Folder =
     &Folder::HiddenInSubscribee;
@@ -66,8 +62,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &goal_items, &context . relRepos, runtime ) ?;
-  let summary =
-    reconcile_partnerFolder_children_against_goal_list (
+  reconcile_partnerFolder_children_against_goal_list (
       // Retain as non-member or tombstone, then prune
       // ('docs/glossary.org'): a HiddenInSubscribeeFolder child
       // that becomes stale (e.g. the user moved it into the subscribee-as-such,
@@ -76,10 +71,6 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       // retained as non-member.
       tree, node, kind,
       &goal_items, &child_data, &runtime . graph ) ?;
-  if let Some (sink) = warning_sink {
-    push_repair_warnings (
-      sink, kind, &context . subscribee_pid,
-      folder_viewnode_id_of (tree, node) . as_ref (), summary ); }
   fold_members_of_newborn_folder (tree, node)
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   // An emptied HiddenInSubscribeeFolder is removed by the single postorder
@@ -136,7 +127,6 @@ fn read_hiddenin_context (
         . map ( |m| (m . member . clone (), m . relRepo . clone ()) )
         . collect () ) };
   Ok (HiddenInContext {
-    subscribee_pid,
     subscribee_contains,
     subscriber_hides,
     relRepos }) }

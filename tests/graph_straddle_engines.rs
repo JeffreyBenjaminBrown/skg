@@ -100,7 +100,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     // The folder reconciler reads no buffer kind.
     CompletionMode::DiffView { straddle    : &f . straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges },
-    &f . runtime, None ) ?;
+    &f . runtime ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (tree . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),

@@ -31,9 +31,10 @@ use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
   multi_root_view, multi_root_view_with_skgrepo_set};
+use skg::refresh::corrections::CorrectionKind;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode};
@@ -124,7 +125,9 @@ async fn save (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
     &mut stream, buf, config, tantivy, graph,
-    &Err ( String::new () ), &mut views_state ) . await }
+    // A view ID, which the save's corrections are tagged with.
+    &Ok ( ViewforestId::ContentView ("matrix view" . to_string ()) ),
+    &mut views_state ) . await }
 
 async fn render_with_requested_relation_folders (
   root    : &str,
@@ -247,11 +250,10 @@ async fn write_protected_reorder (
       &scenario, &resp . saved_view,
       &format! ("(gnid {})", spec . member_b),
       &format! ("(gnid {})", spec . member_a) ); }
-  // Reordering is not a repair.
-  if resp . warnings . iter () . any (
-    |w| w . contains (&format! ("Repaired {}", spec . atom)) ) {
+  // Reordering is not a correction.
+  if ! resp . corrections . is_empty () {
     fails . record (&scenario, format! (
-      "reorder should not warn of a repair: {:?}", resp . warnings)); }
+      "reorder should not be corrected: {:?}", resp . corrections)); }
   Ok (( )) }
 
 async fn write_protected_insert (
@@ -316,12 +318,13 @@ async fn write_protected_delete (
     &scenario, &resp . saved_view,
     &format! ("(gnid {})", spec . member_a) );
   // ... reported as a correction.
-  if ! resp . warnings . iter () . any ( |w|
-      w . contains ("Drew what the graph says belongs here.")
-      && w . contains (spec . member_a) ) {
+  if ! resp . corrections . iter ()
+       . flat_map ( |view| view . corrections . iter () )
+       . any ( |correction| correction . kind == CorrectionKind::Reinstated
+                            && correction . title . contains (spec . member_a) ) {
     fails . record (&scenario, format! (
-      "expected a reinstated-member warning naming {}: {:?}",
-      spec . member_a, resp . warnings )); }
+      "expected a correction reinstating {}: {:?}",
+      spec . member_a, resp . corrections )); }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////

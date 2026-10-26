@@ -24,10 +24,7 @@ use crate::types::viewnode::{
   DiffChange, Existence, Folder, Viewnode,
   ViewnodeKind, Vognode};
 use crate::update_buffer::reconcile::partner_folder::{
-  folder_viewnode_id_of, push_repair_warnings,
   reconcile_containerward_chain_under_member, view_order_preserving_goal_list};
-use crate::update_buffer::util::RepairSummary;
-use crate::update_buffer::warnings::CompletionWarning;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -46,7 +43,6 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
   viewparent_pid : &ID,
   member_role  : RelationRole,
   runtime      : &RuntimeGeneration,
-  warning_sink : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   let partners : Vec<Partner> =
     straddle . partners (viewparent_pid, member_role);
@@ -71,16 +67,10 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node, &goal_items, &HashMap::new (), runtime ) ?;
-  let summary : RepairSummary<ID> =
-    reconcile_partnerFolder_children_against_goal_list (
-      tree, node, kind, &goal_items, &child_data, &straddle . after ) ?;
+  reconcile_partnerFolder_children_against_goal_list (
+    tree, node, kind, &goal_items, &child_data, &straddle . after ) ?;
   attach_chains_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
-  if ! kind . is_editable () {
-    if let Some (sink) = warning_sink {
-      push_repair_warnings (
-        sink, kind, viewparent_pid,
-        folder_viewnode_id_of (tree, node) . as_ref (), summary ); }}
   Ok (( )) }
 
 /// The goal item of a partner of a folder over the straddle: a node only

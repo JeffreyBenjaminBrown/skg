@@ -1,0 +1,103 @@
+// cargo nextest run --test grouped_overrides -E 'test(corrections_channel::)'
+//
+// The save response carries the corrections of every view the save
+// refreshed, each tagged with its view ('SaveResponse.corrections'):
+// - a plain save, of a buffer as the server drew it, reports nothing;
+// - a save that adds a child to 'two' in the view of 'one' corrects
+//   the view of 'five', where 'two' is editable too and its list,
+//   already drawn, now lacks the child. That correction is tagged
+//   with the view of 'five'; the saved view reports nothing.
+//
+// Fixture: one contains two and three; two contains four; five
+// contains two.
+
+use std::error::Error;
+use std::net::{TcpListener, TcpStream};
+
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::refresh::corrections::{CorrectionKind, ViewCorrections};
+use skg::serve::ViewsState;
+use skg::serve::handlers::save_buffer::SaveResponse;
+use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
+use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+use skg::to_org::render::content_view::single_root_view;
+use skg::types::misc::{ID, SkgConfig, TantivyIndex};
+use skg::types::views_state::{OpenViews, ViewforestId};
+
+#[test]
+fn corrections_reach_the_save_response_tagged_with_their_view
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-corrections-channel",
+    "tests/corrections_channel/fixtures",
+    "/tmp/tantivy-test-corrections-channel",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None, };
+      let view_of_one : ViewforestId = ViewforestId::ContentView ("view of one" . into ());
+      let view_of_five : ViewforestId = ViewforestId::ContentView ("view of five" . into ());
+      let one : String = open_view (
+        "one", &view_of_one, config, tantivy, &graph, &mut views_state ) ?;
+      open_view ( "five", &view_of_five, config, tantivy, &graph, &mut views_state ) ?;
+      { // a plain save
+        let response : SaveResponse = save (
+          &one, &view_of_one, config, tantivy, &graph, &mut views_state ) . await ?;
+        assert! ( response . errors . is_empty (), "{:?}", response . errors );
+        assert! ( response . corrections . is_empty (),
+                  "a plain save corrects nothing: {:?}", response . corrections ); }
+      { // a child added to two, which the view of five also shows
+        let with_child : String = one . lines ()
+          . flat_map ( |line| {
+            let mut lines : Vec<String> = vec! [ line . to_string () ];
+            if line . contains ("(gnid two)") {
+              lines . push ( "*** new child" . to_string () ); }
+            lines } )
+          . collect::<Vec<String>> () . join ("\n") + "\n";
+        let response : SaveResponse = save (
+          &with_child, &view_of_one, config, tantivy, &graph,
+          &mut views_state ) . await ?;
+        assert! ( response . errors . is_empty (), "{:?}", response . errors );
+        assert_eq! ( response . corrections . len (), 1,
+                     "only the view of five is corrected: {:?}", response . corrections );
+        let five : &ViewCorrections = &response . corrections [0];
+        assert_eq! ( five . viewforest_id, view_of_five );
+        assert_eq! ( five . corrections . len (), 1, "{:?}", five . corrections );
+        assert_eq! ( five . corrections [0] . kind, CorrectionKind::Reinstated );
+        assert_eq! ( five . corrections [0] . title, "new child" );
+        assert! ( five . corrections [0] . vnid . is_some (),
+                  "the drawn child has a vnid by the time it is reported" );
+        assert! ( response . warnings . is_empty (),
+                  "a correction is not a warning: {:?}", response . warnings ); }
+      Ok (( )) } )) }
+
+/// Render the view of 'root' and register it as 'viewforest_id'.
+fn open_view (
+  root          : &str,
+  viewforest_id : &ViewforestId,
+  config        : &SkgConfig,
+  tantivy       : &mut TantivyIndex,
+  graph         : &InRustGraphHandle,
+  views_state   : &mut ViewsState,
+) -> Result<String, Box<dyn Error>> {
+  let (text, pids, viewforest) =
+    single_root_view ( config, Some (tantivy), &ID::from (root) ) ?;
+  views_state . open_views . register_view (
+    &graph . load_full (), viewforest_id . clone (), viewforest, &pids );
+  Ok (text) }
+
+async fn save (
+  buffer        : &str,
+  viewforest_id : &ViewforestId,
+  config        : &SkgConfig,
+  tantivy       : &mut TantivyIndex,
+  graph         : &InRustGraphHandle,
+  views_state   : &mut ViewsState,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0") . unwrap ();
+  let mut stream : TcpStream =
+    TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
+  update_from_and_rerender_buffer (
+    &mut stream, buffer, config, tantivy, graph,
+    &Ok (viewforest_id . clone ()), views_state ) . await }

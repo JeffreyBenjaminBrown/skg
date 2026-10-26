@@ -10,11 +10,9 @@
 //    S's subscription to N must re-render N's view (collaterally) with
 //    S unwarranted in its subscriberFolder.
 //
-// 2. saved-view-only warning scoping: a repair that happens in the
-//    collateral view (a stale intruder under its subscriberFolder) while
-//    the saved buffer is clean must not add a repair warning to the
-//    save response -- collateral rerenders pass no warning sink,
-//    so warnings stay scoped to the saved view.
+// 2. corrections are tagged with their view: whatever the refresh of
+//    the collateral view corrects is reported under that view, never
+//    under the saved one, and never as a warning.
 
 use std::error::Error;
 use std::io::BufReader;
@@ -148,18 +146,16 @@ fn collateral_partner_folder_update_and_warning_scoping
         "S must be unwarranted in N's subscriberFolder collaterally:\n{}",
         n_collateral );
 
-      // CELL 2 -- saved-view-only warning scoping: N's subscriberFolder
-      // changed in the collateral stream, but the change is not blamed on
-      // the saver -- the save response carries no folder-repair warning.
-      // (Collateral rerenders get no warning sink; this pins the observable
-      // consequence. The stronger form -- a collateral view holding an
-      // unrepaired stale member -- is not reachable through register_view,
-      // whose viewforests are always post-reconciliation; that form stays
-      // enforced by construction.)
+      // CELL 2 -- corrections are tagged with their view: N's
+      // subscriberFolder changed in the collateral stream, and nothing
+      // of that is reported under the saved view, or as a warning.
       assert! (
-        ! response . warnings . iter () . any (
-          |w| w . contains ("Repaired") ),
-        "a collateral folder change must not warn the saver: {:?}",
+        response . corrections . iter ()
+        . all ( |view| view . viewforest_id != s_viewforest_id ),
+        "the saved view corrected nothing: {:?}", response . corrections );
+      assert! (
+        response . warnings . is_empty (),
+        "a collateral change must not warn the saver: {:?}",
         response . warnings );
       Ok (( )) } )) }
 

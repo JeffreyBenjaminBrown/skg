@@ -12,9 +12,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::phantom::home_from_disk;
 use crate::update_buffer::ancestry::pid_and_skgrepo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_restricted_members;
-use crate::update_buffer::util::RepairSummary;
-use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{Folder, ChangeViewnode, ViewnodeId, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{Folder, ChangeViewnode, Viewnode, ViewnodeKind};
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -31,7 +29,6 @@ pub fn reconcile_partnerFolder_children (
   kind         : &Folder,
   mode         : CompletionMode,
   runtime      : &RuntimeGeneration,
-  warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
   // Read the viewparent Unrestricted vognode *through* the required-ancestry table of 'update_buffer/ancestry.rs'
@@ -48,8 +45,7 @@ pub fn reconcile_partnerFolder_children (
     return Err ( "reconcile_partnerFolder_children: a content view is refreshed, not completed"
                  . into () ); };
   reconcile_partnerFolder_children_from_graph_straddle (
-    node, tree, kind, straddle, &viewparent_pid, member_role, runtime,
-    warning_sink ) }
+    node, tree, kind, straddle, &viewparent_pid, member_role, runtime ) }
 
 /// Under 'member', an unrestricted vognode in a partner folder, make
 /// what the folder's reconciler hangs there match a shallow model
@@ -147,36 +143,6 @@ fn raw_outbound_members (
     graph . outbound_member_keys_for_relation_gated (
       viewparent_pid, member_role . relation, skgrepo_restriction )
   } else { Vec::new () }}
-
-/// Translate a RepairSummary into per-repair-kind CompletionWarnings.
-/// Empty categories contribute nothing.
-pub fn push_repair_warnings (
-  sink    : &mut Vec<CompletionWarning>,
-  folder     : &Folder,
-  recorder   : &ID,
-  folder_viewnode_id : Option<&ViewnodeId>,
-  summary : RepairSummary<ID>,
-) {
-  let categories : [ (RepairKind, Vec<ID>); 4 ] = [
-    (RepairKind::ReinstatedMember,   summary . created),
-    (RepairKind::Retained,    summary . retained),
-    (RepairKind::EntombstonedStaleLeaf, summary . entombstoned_stale),
-    (RepairKind::EntombstonedDuplicate, summary . entombstoned_duplicates) ];
-  for (repair, children) in categories {
-    if ! children . is_empty () {
-      sink . push ( CompletionWarning::FolderRepair {
-        folder   : folder . clone (),
-        recorder : recorder . clone (),
-        folder_viewnode_id : folder_viewnode_id . cloned (),
-        repair,
-        children } ); }}}
-
-/// The viewnode ID of the folder at 'node', for its repair warnings.
-pub fn folder_viewnode_id_of (
-  tree : &Tree<Viewnode>,
-  node : NodeId,
-) -> Option<ViewnodeId> {
-  tree . get (node) . and_then ( |folder| folder . value () . viewnode_id . clone () ) }
 
 /// The effective goal list for a folder whose goal is not ordered:
 /// the folder's existing members (the children for which

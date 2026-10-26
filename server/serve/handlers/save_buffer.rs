@@ -10,6 +10,7 @@ use crate::from_text::strandeds::{
   raised_relationship_warning, reset_to_default_relationships,
   stranded_relationships};
 use crate::git_ops::diff::compute_diff_for_skgrepo;
+use crate::refresh::corrections::{ViewCorrections, corrections_entry_sexp};
 use crate::save::{
   apply_delete_propagation_cleanup,
   PreparedSave, prepare_save_under_mutation_gate,
@@ -96,6 +97,9 @@ pub struct SaveResponse {
   /// Some when the saved buffer is one of the diff view's: the
   /// readiness summary the client shows after the save.
   pub readiness_summary   : Option<BufferReadinessSummary>,
+  /// What the refresh corrected in each view the save refreshed, the
+  /// saved view and the collateral ones.
+  pub corrections         : Vec<ViewCorrections>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -119,12 +123,14 @@ pub struct SavePointPosition {
 }
 
 impl SaveResponse {
-  /// Format: ((content "...") (errors (...)) (warnings (...)) POINT...
-  /// (readiness-summary ...)), where the point entries and the
-  /// readiness summary are there when the save has them.
+  /// Format: ((content "...") (errors (...)) (warnings (...))
+  /// (corrections (...)) POINT... (readiness-summary ...)), where the
+  /// point entries and the readiness summary are there when the save
+  /// has them.
   fn to_sexp_string (&self) -> String {
     let mut items : Vec<Sexp> = buffer_response_entries (
       & self . saved_view, & self . errors, & self . warnings );
+    items . push ( corrections_entry_sexp (& self . corrections) );
     if let Some (point_position) = &self . save_point_position {
       push_save_point_position_to_sexp_items (&mut items, point_position); }
     if let Some (readiness_summary) = &self . readiness_summary {
@@ -762,7 +768,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
           text_release_confirmation : None,
           strandeds_confirmation : Some (
             asked . into_iter () . cloned () . collect () ),
-          readiness_summary   : None, } ),
+          readiness_summary   : None,
+          corrections         : Vec::new (), } ),
       StrandedsReview::NotReviewed => {},
       StrandedsReview::Reviewed (chosen) => {
         let chosen : Vec<&StrandedRelationship> = asked . into_iter ()
@@ -788,6 +795,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       text_release_confirmation : None,
       strandeds_confirmation : None,
       readiness_summary   : None,
+      corrections         : Vec::new (),
     } ); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
@@ -812,7 +820,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       hoist_confirmation  : None,
       text_release_confirmation : None,
       strandeds_confirmation : None,
-      readiness_summary   : None, } ); }
+      readiness_summary   : None,
+      corrections         : Vec::new (), } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C is skgsave-committed with the rest of the
   // save -- its 'overrides = [N]' relationship rides in the same
@@ -933,7 +942,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         text_approved_pids,
         &fork_specs ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
-      // precede the completion-repair warnings.
+      // precede the rerender's warnings.
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
       warnings . extend ( strandeds_warnings );

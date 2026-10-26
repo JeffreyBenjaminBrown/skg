@@ -1,9 +1,18 @@
 //! What a refresh changed ('refresh_viewforest'): one correction per
 //! change, each naming its headline as a subtree is named, by vnid
 //! and title. The refresh reports corrections; it does not warn.
-//! Whoever calls it tags them with the view they belong to.
+//! Whoever calls it tags them with the view they belong to
+//! ('ViewCorrections'), and the save and rerender responses carry
+//! them to the client, which shows each view's under a headline of
+//! its own in its warnings buffer ('docs/api-and-formats.org', "Save
+//! buffer").
 
+use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::viewnode::{Viewnode, ViewnodeId};
+use crate::types::views_state::ViewforestId;
+
+use sexp::{Atom, Sexp};
+use std::iter::once;
 
 use ego_tree::{NodeId, Tree};
 
@@ -36,6 +45,67 @@ pub struct Correction {
   /// Its title when the correction was made.
   pub title : String,
 }
+
+impl Correction {
+  /// The correction as a message: what was done, then the headline
+  /// it was done to, named as a subtree ('HeadlineName').
+  pub fn message (
+    &self,
+  ) -> String {
+    let what : String = match self . kind {
+      CorrectionKind::Reinstated =>
+        "Drew what the graph says belongs here." . to_string (),
+      CorrectionKind::Entombstoned =>
+        "Entombstoned a headline that can stand here for nothing." . to_string (),
+      CorrectionKind::MarkedNoClaim =>
+        "Marked noClaim a child the graph does not relate to its parent." . to_string (),
+      CorrectionKind::Merged =>
+        "Merged siblings standing for one node into this one." . to_string (),
+      CorrectionKind::Rekinded (kind) =>
+        format! ("Made a headline a {}, as the graph has it.", kind),
+      CorrectionKind::EditRequestDropped =>
+        "Dropped an edit request its headline has no slot for." . to_string (), };
+    with_org_subheadlines (
+      &what,
+      &[ HeadlineName::of ( self . vnid . as_ref (), None, &self . title ) ] ) }
+}
+
+/// The corrections of one refreshed view, tagged with the view.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ViewCorrections {
+  pub viewforest_id : ViewforestId,
+  pub corrections   : Vec<Correction>,
+}
+
+impl ViewCorrections {
+  /// The view's corrections, if it has any.
+  pub fn of (
+    viewforest_id : &ViewforestId,
+    corrections   : Vec<Correction>,
+  ) -> Option<ViewCorrections> {
+    if corrections . is_empty () { return None; }
+    Some ( ViewCorrections { viewforest_id : viewforest_id . clone (),
+                             corrections } ) }
+}
+
+/// The 'corrections' entry of a save or rerender-done response:
+/// '(corrections (("VIEW_ID" "MESSAGE" ...) ...))', one list per view
+/// with corrections, the view's ID first, then one message per
+/// correction ('Correction::message').
+pub fn corrections_entry_sexp (
+  views : &[ViewCorrections],
+) -> Sexp {
+  Sexp::List ( vec! [
+    Sexp::Atom ( Atom::S ( "corrections" . to_string () )),
+    Sexp::List (
+      views . iter ()
+      . map ( |view| Sexp::List (
+        once (
+          Sexp::Atom ( Atom::S ( view . viewforest_id . repr_in_client () )))
+        . chain ( view . corrections . iter ()
+                  . map ( |correction| Sexp::Atom ( Atom::S ( correction . message () )) ))
+        . collect () ))
+      . collect () ) ] ) }
 
 /// The corrections of one refresh, recorded during the walk. A
 /// headline drawn by the walk has no vnid until the tail assigns one,

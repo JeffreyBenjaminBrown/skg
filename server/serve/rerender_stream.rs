@@ -3,19 +3,22 @@
 //! prepared in memory first ('prepare_rerender_views_where'), so that
 //! a text-release decision ('authorize_prepared_rerenders') can
 //! precede any visible change, and then streamed: "rerender-lock",
-//! one "rerender-view" per view, "rerender-done"
+//! one "rerender-view" per view, "rerender-done", which carries the
+//! errors, the warnings and each view's corrections
 //! ('stream_prepared_rerenders'). The graph straddle the rerenders
 //! brought up to date is written back to the connection
 //! ('write_graph_straddle_back'), as a save does with its own.
 
 use crate::graph_straddle::types::GraphStraddle;
+use crate::refresh::Refreshed;
+use crate::refresh::corrections::{Correction, ViewCorrections};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
   challenge_response,
   decide as decide_text_release};
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::serve::util::{ format_lock_views_sexp, format_rerender_done_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::tree::forest::ViewForest;
@@ -32,6 +35,7 @@ use std::sync::Arc;
 pub(crate) struct PreparedView {
   pub(crate) viewforest_id : ViewforestId,
   text                     : String,
+  corrections              : Vec<Correction>,
   pub(crate) viewforest    : ViewForest,
   viewnode_id_record       : ViewnodeIdRecord,
 }
@@ -125,13 +129,12 @@ pub(crate) fn prepare_rerender_views_where (
         &mut viewforest,
         &mut viewnode_id_record,
         &mut context,
-        None, // streamed rerenders repair silently.
         rerender_options (
           views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) )) } )
-    { Ok (text) => {
+    { Ok (Refreshed { text, corrections }) => {
         rendered_views . push ( PreparedView {
-          viewforest_id : viewforest_id . clone (), text, viewforest,
-          viewnode_id_record } ); },
+          viewforest_id : viewforest_id . clone (), text, corrections,
+          viewforest, viewnode_id_record } ); },
       Err (e) => {
         context . errors . push ( format! (
           "View {}: {}",
@@ -186,7 +189,10 @@ pub(crate) fn stream_prepared_rerenders (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
+  let mut corrections : Vec<ViewCorrections> = Vec::new ();
   for view in prepared . views {
+    corrections . extend ( ViewCorrections::of (
+      &view . viewforest_id, view . corrections ));
     views_state . open_views . update_view (
       &prepared . runtime . graph,
       &view . viewforest_id, view . viewforest, view . viewnode_id_record );
@@ -200,9 +206,10 @@ pub(crate) fn stream_prepared_rerenders (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
-      & format_errors_warnings_sexp (
+      & format_rerender_done_sexp (
         &prepared . errors,
-        &prepared . warnings) )); }
+        &prepared . warnings,
+        &corrections ) )); }
 
 /// Keep the graph straddle a rerender brought up to date as the
 /// connection's. A rerender that rendered no buffer of the diff view
@@ -215,7 +222,7 @@ pub(crate) fn write_graph_straddle_back (
     views_state . graph_straddle = graph_straddle; }}
 
 /// Send an empty rerender stream: a "rerender-lock" naming no views,
-/// then "rerender-done" with no errors or warnings.  Used after a
+/// then "rerender-done" with no errors, warnings or corrections.  Used after a
 /// refusal: Emacs locks every Skg buffer and sets its stream guard
 /// before sending a skgrepo-set switch, and only
 /// the rerender stream unwinds them.  The empty lock list makes
@@ -232,4 +239,4 @@ pub fn stream_empty_rerender (
     stream,
     & tag_sexp_response (
       TcpToClient::RerenderDone,
-      & format_errors_warnings_sexp ( &[], &[] ) )); }
+      & format_rerender_done_sexp ( &[], &[], &[] ) )); }

@@ -17,7 +17,6 @@
 
 pub mod ancestry;
 pub mod skgrepo_switch;
-pub mod warnings;
 pub mod complete;
 pub mod completion_mode;
 pub mod reconcile;
@@ -35,6 +34,7 @@ use complete::{complete_viewforest, CompletionContext};
 use completion_mode::CompletionMode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
+use crate::refresh::corrections::{Correction, ViewCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::completion::{
   DiffViewRerender, finish_diffView_rerender, prepare_diffView_rerender};
@@ -57,7 +57,6 @@ use crate::types::misc::{ID, SkgrepoName, SkgConfig};
 use crate::types::save::ForkSpec;
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_as_members, validate_membership_claims, mark_orphans_under_dead_parents_false};
-use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{
   Editability, Viewnode, ViewnodeKind, mk_editable_viewnode, mk_unknown_viewnode};
 use crate::types::viewnode::{FolderRelation, Vognode, ViewRequest};
@@ -117,6 +116,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
 struct RenderedCollateralView {
   viewforest_id  : ViewforestId,
   text           : String,
+  corrections    : Vec<Correction>,
   viewforest     : ViewForest,
   viewnode_id_record : ViewnodeIdRecord,
 }
@@ -198,25 +198,20 @@ pub fn update_views_after_save (
         strandeds_confirmation : None,
         text_release_confirmation : challenge_response (&release),
         readiness_summary   : None,
+        corrections         : Vec::new (),
       } ); }}
-  let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
-  let saved_text : String =
+  let saved : Refreshed =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "rerender_view (saved)" ). entered();
       rerender_view ( // saved view first; collateral ones later
         &mut saved_view_mut,
         &mut saved_viewnode_id_record,
         &mut context,
-        Some (&mut repair_warnings),
         RerenderOptions::ordinary (saved_diffView_buffer_kind) ) } ?;
   let readiness_summary : Option<BufferReadinessSummary> =
     saved_diffView_buffer_kind . and ( context . graph_straddle . as_ref () )
     . map ( |straddle| buffer_readiness_summary_for (
       env, straddle, &saved_view_mut ) );
-  context . warnings . extend (
-    // Repairs the completion pass made to write-protected PartnerFolders in
-    // the saved view, batched per (folder, recorder).
-    render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
   for curi in &collateral_viewforest_ids {
     match rerender_collateral_view (
@@ -246,15 +241,20 @@ pub fn update_views_after_save (
           strandeds_confirmation : None,
           text_release_confirmation : challenge_response (&decision),
           readiness_summary   : None,
+          corrections         : Vec::new (),
         } ); }
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
   write_graph_straddle_back (views_state, context . graph_straddle . take ());
+  let mut corrections : Vec<ViewCorrections> = Vec::new ();
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
+    corrections . extend ( ViewCorrections::of (viewforest_id, saved . corrections) );
     views_state . open_views . update_view (
       &context . graph_snap, viewforest_id, saved_view_mut, saved_viewnode_id_record );
     for rendered in collateral_views {
+      corrections . extend ( ViewCorrections::of (
+        &rendered . viewforest_id, rendered . corrections ));
       views_state . open_views . update_view (
         &context . graph_snap,
         &rendered . viewforest_id, rendered . viewforest,
@@ -266,7 +266,7 @@ pub fn update_views_after_save (
           & format_single_view_sexp (
             &rendered . viewforest_id, &rendered . text) )); }}
   Ok ( SaveResponse {
-    saved_view          : saved_text,
+    saved_view          : saved . text,
     errors              : context . errors,
     warnings            : context . warnings,
     save_point_position : None,
@@ -274,7 +274,8 @@ pub fn update_views_after_save (
     hoist_confirmation  : None,
     strandeds_confirmation : None,
     text_release_confirmation : None,
-    readiness_summary, } ) }
+    readiness_summary,
+    corrections, } ) }
 
 fn unrestricted_skgids_in_viewforest (
   viewforest : &ViewForest,
@@ -347,21 +348,21 @@ fn rerender_collateral_view (
   { return Err ( format! (
       "Collateral view {}: preprocessing failed: {}",
       viewforest_id . repr_in_client (), e )); }
-  let text : String =
+  let refreshed : Refreshed =
     { let _span : tracing::span::EnteredSpan =
         tracing::info_span!( "rerender_view (collateral)" ). entered();
       rerender_view (
         &mut viewforest,
         &mut viewnode_id_record,
         context,
-        None, // Collateral views repair silently.
         RerenderOptions::ordinary (diffView_buffer_kind)
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
                       viewforest_id . repr_in_client (), e)) ? };
   Ok (RenderedCollateralView {
     viewforest_id,
-    text,
+    text        : refreshed . text,
+    corrections : refreshed . corrections,
     viewforest,
     viewnode_id_record,
   }) }
@@ -455,12 +456,12 @@ impl RerenderOptions {
       integrate_unshown_changes             : true, } }
 }
 
-/// Bring an open view up to date with the graph and render it.
+/// Bring an open view up to date with the graph and render it,
+/// returning its text and its corrections.
 /// .
 /// A content view ('options . diffView_buffer' None) is refreshed
 /// ('refresh_viewforest' in content-view mode), from what it holds and
-/// the graph as they are now. When 'warning_sink' is Some (the view
-/// the user just saved), it receives the refresh's corrections.
+/// the graph as they are now.
 /// .
 /// A buffer of the diff view ('options . diffView_buffer' Some) is
 /// reconciled over the graph straddle, brought up to date in
@@ -480,20 +481,21 @@ impl RerenderOptions {
 /// recomputed D that the buffer does not show are appended as roots
 /// and completed. Its standing roots stay. The diff view does its
 /// part before completion in 'prepare_diffView_rerender' and after it
-/// in 'finish_diffView_rerender'.
+/// in 'finish_diffView_rerender'. It reports no corrections.
 pub fn rerender_view (
   viewforest    : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord, // the view's, which assigns the viewnode IDs its new viewnodes get
   context       : &mut RerenderAfterSaveContext<'_>,
-  warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
   options       : RerenderOptions,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Refreshed, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
-  let result : String = match options . diffView_buffer {
+  let result : Refreshed = match options . diffView_buffer {
     None => refresh_content_view (
-      viewforest, viewnode_id_record, context, warning_sink ) ?,
-    Some (_) => rerender_diffView_buffer (
-      viewforest, viewnode_id_record, context, warning_sink, options ) ?, };
+      viewforest, viewnode_id_record, context ) ?,
+    Some (_) => Refreshed {
+      text : rerender_diffView_buffer (
+        viewforest, viewnode_id_record, context, options ) ?,
+      corrections : Vec::new (), }, };
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -503,27 +505,21 @@ fn refresh_content_view (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   context            : &mut RerenderAfterSaveContext<'_>,
-  warning_sink       : Option<&mut Vec<CompletionWarning>>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Refreshed, Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "refresh_viewforest" ). entered();
   let truth : Truth = Truth { graph       : &context . runtime . graph,
                               config      : &context . runtime . config,
                               restriction : context . skgrepo_restriction, };
-  let refreshed : Refreshed = refresh_viewforest (
+  refresh_viewforest (
     viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
-    context . runtime . config . initial_node_limit, None ) ?;
-  if let Some (sink) = warning_sink {
-    sink . extend ( refreshed . corrections . into_iter ()
-                    . map (CompletionWarning::Correction) ); }
-  Ok (refreshed . text) }
+    context . runtime . config . initial_node_limit, None ) }
 
 /// The rerender of a buffer of the diff view; see 'rerender_view'.
 fn rerender_diffView_buffer (
   viewforest         : &mut ViewForest,
   viewnode_id_record : &mut ViewnodeIdRecord,
   context            : &mut RerenderAfterSaveContext<'_>,
-  warning_sink       : Option<&mut Vec<CompletionWarning>>,
   options            : RerenderOptions,
 ) -> Result<String, Box<dyn Error>> {
   claims_as_the_old_walk_reads_them (viewforest);
@@ -545,7 +541,6 @@ fn rerender_diffView_buffer (
       &context . graph_snap,
       &mut editable_map,
       &mut context . errors,
-      warning_sink,
       diffView_rerender . completion_mode (),
       &nodes_before_completion,
       &editable_before_completion );
