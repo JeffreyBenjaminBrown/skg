@@ -21,6 +21,9 @@ mod write_protected_should_not_count_as_donotdelete;
 #[path = "merge.rs"]
 mod merge;
 
+#[path = "orphan_warning.rs"]
+mod orphan_warning;
+
 #[path = "mutation_gate.rs"]
 mod mutation_gate;
 

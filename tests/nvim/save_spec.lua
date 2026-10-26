@@ -350,6 +350,39 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[other].modifiable)
   end)
 
+  it('shows the orphan warning, naming its headline, on save-result',
+     function ()
+    local orphan = 'Created an orphan, a node that nothing contains,'
+      .. ' from a headline whose parent takes no members:\n'
+      .. '*** typed under two\n- graphnode ID: n1\n- not yet saved\n'
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+        respond(helpers.framed(
+          '((response-type save-result)'
+          .. ' (content "* (skg node (gnid a)) a")'
+          .. ' (errors ()) (warnings ("' .. orphan .. '")))'))
+      end
+    end)
+    open_view('* (skg node (gnid a)) a', 'skg://orphan', 'view_id-orphan')
+    save.request_save_buffer()
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10)
+    local found = nil
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_get_name(buf)
+         == 'skg://messages/save-warnings' then found = buf end
+    end
+    assert.is_truthy(found)
+    local text = table.concat(
+      vim.api.nvim_buf_get_lines(found, 0, -1, false), '\n')
+    assert.is_truthy(text:find(
+      '** Created an orphan, a node that nothing contains,', 1, true))
+    assert.is_truthy(text:find('\n*** typed under two\n', 1, true))
+    vim.api.nvim_buf_delete(found, { force = true })
+  end)
+
   it('shows the warning channel on save-result', function ()
     -- Mirrors test-skg-save-response-folded-root's warning cases.
     server = helpers.connect_to_fake_server(function (line, respond)

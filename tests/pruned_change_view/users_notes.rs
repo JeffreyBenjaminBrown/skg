@@ -11,9 +11,10 @@
 use skg::metadata_canon::without_viewnode_ids;
 use crate::pruned_change_view::common::{
   assert_lines_in_order, insert_after_line_starting, note, open_all_changes_buffer,
-  parent_line_of, rerendered_view_content, saved_and_rerendered,
+  parent_line_of, rerendered_view_content, save, saved_and_rerendered,
   send_stage_and_commit_request, with_fixture};
 
+use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::skg_env_from_parts;
 use skg::types::env::SkgEnv;
 
@@ -61,6 +62,24 @@ fn a_note_under_a_ghost_survives (
     assert_eq! ( parent_line_of (&committed, "a note under h"), "** (skg tombstone)",
                  "{}", committed );
     assert! ( ! without_viewnode_ids (&committed) . contains (old_member), "{}", committed );
+    Ok (( )) }) }
+
+/// A note typed under a ghost, whose claims the save does not read,
+/// is saved as an orphan, and the save warns of it.
+#[test]
+fn a_note_under_a_ghost_is_warned_of_as_an_orphan (
+) -> Result<(), Box<dyn Error>> {
+  with_fixture ("users_notes", &["main"], |f| {
+    let ghost : &str = "** (skg ghost (gnid h)";
+    let buffer : String = open_all_changes_buffer (f) ?;
+    let response : SaveResponse = save ( f,
+      &insert_after_line_starting ( &buffer, ghost, &note (3, "a note under h") )) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    let orphans : Vec<&String> = response . warnings . iter ()
+      . filter ( |warning| warning . starts_with ("Created an orphan") )
+      . collect ();
+    assert_eq! ( orphans . len (), 1, "{:?}", response . warnings );
+    assert! ( orphans [0] . contains ("*** a note under h\n"), "{}", orphans [0] );
     Ok (( )) }) }
 
 /// A note placed in the "it acquired" folder survives beside the

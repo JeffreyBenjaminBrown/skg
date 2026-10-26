@@ -231,6 +231,40 @@ headline and not back on the focused headline."
                                     (nth 2 shown)))))
       (kill-buffer buf))))
 
+(ert-deftest test-save-response-shows-the-orphan-warning-naming-its-headline ()
+  "The warning of a node created as an orphan shows in the save
+warnings, the headline it names a subheadline of it."
+  (let ((buf (generate-new-buffer "*test-save-response-orphan*"))
+        (shown nil))
+    (unwind-protect
+        (with-current-buffer buf
+          (org-mode)
+          (cl-letf (((symbol-function 'skg-replace-buffer-with-new-content)
+                     (lambda (_tcp-proc new-content &optional _position)
+                       (erase-buffer)
+                       (insert new-content)))
+                    ((symbol-function 'skg-big-nonfatal-message)
+                     (lambda (buffer-name message-text content)
+                       (setq shown
+                             (list buffer-name message-text content)))))
+            (skg-handle-save-sexp
+             (prin1-to-string
+              `((content "* root\n")
+                (errors ())
+                (warnings (,(concat
+                             "Created an orphan, a node that nothing contains, "
+                             "from a headline whose parent takes no members:\n"
+                             "*** typed under two\n- graphnode ID: n1\n"
+                             "- not yet saved\n"))))))
+            (should (equal (car shown) "*SKG Save Warnings*"))
+            (should (string-match-p
+                     (concat "^\\* warnings\n\\*\\* Created an orphan, "
+                             "a node that nothing contains, from a headline "
+                             "whose parent takes no members:\n"
+                             "\\*\\*\\* typed under two$")
+                     (nth 2 shown)))))
+      (kill-buffer buf))))
+
 (ert-deftest test-save-response-failure-with-errors-and-warnings-shows_both ()
   (let ((buf (generate-new-buffer "*test-save-response-errors-warnings*"))
         (shown nil)

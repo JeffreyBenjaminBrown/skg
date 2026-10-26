@@ -27,17 +27,22 @@ use crate::from_text::supplement_from_disk::{
   NodeInstructions_with_Repomoves };
 use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_restricted_nodes};
 use crate::from_text::weave::member_is_visible;
+use crate::refresh::ancestry::parent_reads_claims;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{
   NodeInstruction, PostSkgsaveCommitNoticeCandidate, SaveNode, SkgrepoMove };
+use crate::types::errors::with_org_subheadlines;
 use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::{
+  Folder, NodeEditRequest, Viewnode, ViewnodeKind, Vognode};
 use lower::{lower_collected_fieldIntents, nodeMerge_pairs, LoweringOutput};
 use resolve_visibility::resolve_visibility;
 use traverse::collect_instructions_locally;
 use types::CollectedFieldIntents;
 use validate_text_claims::validate_text_claims;
 
+use ego_tree::NodeRef;
 use std::error::Error;
 use std::collections::HashSet;
 
@@ -107,11 +112,12 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
             . collect ();
           let suppressed : bool = kept . len () < before;
           (kept, suppressed) }};
-  let warnings : Vec<String> =
+  let mut warnings : Vec<String> =
     if suppressed_writes || suppressed_merges {
       vec! [ "Restricted nodes present in saved buffer remain unchanged in graph."
              . to_string () ] }
     else { Vec::new () };
+  warnings . extend ( orphan_warnings (viewforest, graph) );
   Ok (( NonmergeSavePlan {
           node_instructions,
           skgrepo_moves,
@@ -119,6 +125,44 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
           warnings,
           post_skgsave_commit_notice_candidates },
         nodeMerge_acquisitions )) }
+
+/// One warning per node the save creates from a headline typed under
+/// a parent whose claims the save does not read ('parent_reads_claims':
+/// a write-protected occurrence, a ghost, an unknown, a tombstone, a
+/// write-protected folder): the node is saved, and nothing contains
+/// it. A root is not one: the user typed it where no list is.
+fn orphan_warnings (
+  viewforest : &ViewForest,
+  graph      : &InRustGraph,
+) -> Vec<String> {
+  viewforest . nodes ()
+    . filter ( |node| is_created_as_an_orphan (viewforest, *node, graph) )
+    . map ( |node| with_org_subheadlines (
+      "Created an orphan, a node that nothing contains, from a headline whose parent takes no members:",
+      &[ node . value () . headline_name () ] ))
+    . collect () }
+
+/// Whether the save creates a node from 'node', an editable occurrence
+/// without a delete request whose gnid the graph lacks, and its parent
+/// reads no claims. (A claiming child of a subscribee folder is a
+/// subscribee as such, which the save does not create.)
+fn is_created_as_an_orphan (
+  viewforest : &ViewForest,
+  node       : NodeRef<Viewnode>,
+  graph      : &InRustGraph,
+) -> bool {
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &node . value () . kind
+    else { return false; };
+  let Some (parent) = node . parent () else { return false; };
+  let created : bool =
+    ! occurrence . is_writeProtected ()
+    && ! matches! ( occurrence . edit_request (), Some (NodeEditRequest::Delete) )
+    && graph . pid_of (&occurrence . gnid) . is_none ();
+  created
+  && match &parent . value () . kind {
+    ViewnodeKind::BufferRoot => false,
+    ViewnodeKind::Folder (Folder::Subscribee) if occurrence . claimsMembership => false,
+    _ => ! parent_reads_claims (viewforest, parent . id ()), } }
 
 /// Transitional compatibility for direct extraction tests.
 pub fn extract_nonmergeSavePlan_locally (
