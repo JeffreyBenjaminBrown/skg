@@ -840,8 +840,8 @@ async fn test_editable_view_request_moves_editability_back (
 // pins the same neutrality for the auto-rendered SubscribeeFolder). An AliasFolder,
 // unlike a SubscribeeFolder, is not auto-rendered de-novo -- it appears only on an
 // explicit `aliases` view request -- so this exercises the request path through
-// the rerender (build_and_integrate_aliases / reconcile_aliasFolder_children),
-// neither of which takes node_budget.
+// the refresh (the folder request, and the alias folder's goal), neither of
+// which is charged to the node budget.
 //
 // Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
 // counts vognode extensions (cost 1), so the whole content here is exactly 3

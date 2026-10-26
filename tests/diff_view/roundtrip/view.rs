@@ -13,7 +13,7 @@ use crate::git_fixture::{
   Fixture, OwnedSkgrepos, save_view, skg_files, with_git_fixture};
 
 use skg::diff_view::change_leaves::{LeafKey, NodeAspect, RelationshipAspect};
-use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationshipKey};
+use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole, RelationshipKey};
 use skg::graph_straddle::types::{GraphStraddle, Partner};
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -21,18 +21,18 @@ use skg::org_to_text::{viewforest_to_string, viewforest_tree_to_string};
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::diff_view::change_viewnodes::{
-  append_acquired_folder, append_historical_phantom_content, append_old_text,
+  append_acquired_folder, append_old_text,
   mk_changeset_marker_viewnode, mk_historical_viewnode, mk_relRepo_move_viewnode};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
-  ChangesetMarkerKind, Existence, ChangeViewnode, Viewnode, ViewnodeKind,
-  Vognode, viewnode_of};
+  ChangesetMarkerKind, Existence, ChangeViewnode, Folder, Viewnode, ViewnodeKind,
+  Vognode, mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
 use skg::types::views_state::ViewforestId;
 
 use ego_tree::{NodeId, Tree};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
@@ -64,9 +64,7 @@ fn treeid_of (
     . id () }
 
 /// Under 'parent', the historical phantom of 'pid' with its old
-/// content, a deleted member of which with its own. The view is a
-/// content view, which has no U, so its removed members are
-/// write-protected.
+/// content, a deleted member of which with its own.
 fn append_historical_phantom (
   tree     : &mut Tree<Viewnode>,
   parent   : NodeId,
@@ -76,8 +74,7 @@ fn append_historical_phantom (
 ) -> Option<NodeId> {
   let phantom : NodeId = tree . get_mut (parent) ? . append (
     mk_historical_viewnode (straddle, pid, rel) ? ) . id ();
-  let no_u : BTreeSet<ID> = BTreeSet::new ();
-  append_historical_phantom_content (tree, phantom, straddle, pid, &no_u) ?;
+  append_old_content (tree, phantom, straddle, pid) ?;
   let deleted_members : Vec<(NodeId, ID)> =
     tree . get (phantom) ? . children ()
     . filter_map ( |child| match &child . value () . kind {
@@ -86,8 +83,41 @@ fn append_historical_phantom (
       _ => None, } )
     . collect ();
   for (member, skgid) in deleted_members {
-    append_historical_phantom_content (tree, member, straddle, &skgid, &no_u) ?; }
+    append_old_content (tree, member, straddle, &skgid) ?; }
   Some (phantom) }
+
+/// Under the ghost 'phantom' of 'pid', what the diff view shows there:
+/// if a nodeMerge acquired it, an "it was acquired by" folder holding
+/// its acquirer; then its content at HEAD, a deleted member as its
+/// ghost, a surviving one as a write-protected occurrence whose
+/// relationship HEAD alone has, and a dangling one as an unknown.
+fn append_old_content (
+  tree     : &mut Tree<Viewnode>,
+  phantom  : NodeId,
+  straddle : &GraphStraddle,
+  pid      : &ID,
+) -> Option<()> {
+  if let Some (acquirer) = straddle . acquirer_of (pid) {
+    let node = straddle . after . get (&acquirer) ?;
+    let folder : NodeId = tree . get_mut (phantom) ? . append (
+      viewnode_of ( ViewnodeKind::Folder (Folder::AcquiredBy) )) . id ();
+    tree . get_mut (folder) ? . append ( mk_writeProtected_viewnode (
+      acquirer . clone (), node . home_skgrepo . clone (), node . title . clone (), true )); }
+  for partner in straddle . partners (pid, RelationRole::CONTENT) {
+    let member : Viewnode =
+      if straddle . node_existence (&partner . id) == Some (Existence::Removed) {
+        mk_historical_viewnode (straddle, &partner . id, Some (Existence::Removed)) ?
+      } else {
+        let mut member : Viewnode = match straddle . after . get (&partner . id) {
+          Some (node) => mk_writeProtected_viewnode (
+            partner . id . clone (), node . home_skgrepo . clone (),
+            node . title . clone (), false ),
+          None => mk_unknown_viewnode ( partner . id . clone () ), };
+        member . change_facts . change =
+          straddle . node_change (&partner . id, Some (Existence::Removed));
+        member };
+    tree . get_mut (phantom) ? . append (member); }
+  Some (( )) }
 
 /// The view of p, with every one of the diff view's viewnodes
 /// added where the diff view shows it.

@@ -132,78 +132,85 @@ membership never adds a second root for it.
 * Rendering a buffer
 ** Stub roots
 The buffer starts as one stub per root, in D's order: an editable
-vognode, or, when the after-graph lacks the node, its historical
-phantom. In a pruned change view, a root with several containers gets a folded
-container folder, which completion fills with its containers in
-either graph and their containerward forest.
-** Completion over the straddle
-The stub is completed by the one view completion every view uses
-(the level-order BFS of 'complete_viewforest'), in diff-view mode:
-the completion context's mode is 'CompletionMode::DiffView', which
-carries the straddle and the buffer kind
-('server/update_buffer/completion_mode.rs'). The completion mode
-changes completion so:
-- at an editable node's visit, before the content reconciler runs,
-  its children are aligned with the straddle, so that the reconciler
-  keeps each viewnode instead of creating another;
-- content is shown without override substitution: the view shows raw
-  graph facts;
-- no default partner folders and no hidden-in-subscribee folder are
-  created; folders appear only where something changed;
-- a property folder (alias, ID, flags) whose list changed is
-  reconciled by the per-visit step from the straddle; any other is
-  refreshed from the live graph at its own visit, as in every view;
-- a partner folder shows the union of the straddle;
-- an occurrence whose node the live graph lacks becomes its ghost
-  when the before-graph has the node, and a tombstone when it does
-  not; a ghost in content position adds its old content, and a ghost
-  carrying '(viewRequests tombstone)' becomes a tombstone ("Dismissing
-  a ghost");
-- the node budget is charged only as "Editability in the diff view"
-  says;
-- each editable node's visit ends in the per-visit step;
-- after completion, the '(ready ...)' change facts are set from the store.
+occurrence, its body folded unless its node is in C (it is
+context), or, when the after-graph lacks the node, its ghost. In a
+pruned change view, a root with several containers gets a folded
+container folder, which the refresh fills with its containers in
+either graph and their containerward chains
+('stub_viewforest_of_roots' in 'server/diff_view/pruned_change_view.rs').
+** The refresh over the straddle
+A buffer of the diff view is drawn, and redrawn after every save,
+rerender and commit, by the one refresh every view uses
+('refresh_viewforest', 'server/refresh/'), in diff-view mode: the
+mode is 'CompletionMode::DiffView', which carries the straddle and
+the buffer kind ('server/update_buffer/completion_mode.rs'), and the
+refresh reads the readiness store for its readiness facts
+('complete_viewforest_with_graph_straddle' and
+'rerender_diffView_buffer' in 'server/diff_view/completion.rs').
+The diff-view mode ('server/refresh/diff_view.rs') changes the
+refresh so:
+- a parent's goal is the union of its lists in the two graphs
+  ('GraphStraddle::partners', in the order of their interleaved
+  diff), so an item only HEAD's list holds is drawn too, warranted
+  by HEAD ('Warrant::ByHead', written 'ghostWarrant');
+- the ID rule asks, after the truth, whether HEAD has the node: an
+  occurrence whose node the worktree lacks becomes its ghost where
+  it stands, and a ghost becomes an occurrence again, in place,
+  when its node is back;
+- a ghost where content stands holds its old content, its content
+  at HEAD, drawn as any content is;
+- the change viewnodes of each editable occurrence are recomputed in
+  place (below), and each child is tagged with its change;
+- content is shown without override substitution: the view shows
+  raw graph facts;
+- no default folder is drawn; a folder appears where something
+  changed, or where the buffer holds one;
+- what is editable, and what an extension charges to the node
+  budget, the buffer's sets decide ("Editability in the diff view");
+- in the tail, the '(ready ...)' change facts are set from the
+  store, and in the skgrepo-changes buffer the home skgrepo moves.
 The skgrepo restriction plays no part, since the diff view requires
 'all'.
-** The per-visit step
-At each editable occurrence's visit, after the content reconciler,
-'process_unrestrictedVognode_changes' adds the node's change
-viewnodes:
-- it tags each content member with the three kinds of change: its
-  node's existence ('(node added)', '(node removed)'), its node's
-  other properties ('(properties changed)') and its relationship's
-  existence ('(rel added)', '(rel removed)'), and shows a
-  new member outside U as a write-protected member shown without its
-  content (one that was editable when the rerender began stays
-  editable);
-- it adds the removed content members (below);
-- for a node in C, ahead of its content: its old text, its home
-  skgrepo move, its "it acquired" folder, the alias, ID and flags
-  folders whose list changed, the partner folders whose membership
-  changed, and its changeset markers;
-- in the order-only buffer, its order-only changeset marker.
-What it adds for a node in C, it reads from the leaves that mention
-the node (those it records and the relationship leaves naming it as
-member), grouped by aspect ('ChangedAspects' in
-'server/diff_view/changes.rs'); the graphs supply only what each
-viewnode shows, such as the old title. A new aspect of a leaf is
-added in one place, and C, the extension and readiness follow. The
-mentioner folder alone reads the nodes whose set of mentioners
-changed, since a mention is no leaf.
-A node in U but not in C is context: when completion creates it, its
-body starts folded. A write-protected occurrence gets none of this;
-what an earlier visit added under it while it was editable goes, and
-its viewparent tags it. A root has no viewparent to tag it, so its
-own visit, editable or not, tags its node.
+** Change viewnodes and tags
+At each editable occurrence of a node in C, the refresh holds, ahead
+of its content, what 'model_of_front_change_viewnodes'
+('server/diff_view/changes.rs') says: its old text, its home skgrepo
+move, its "it acquired" folder, its alias, ID and flags folders whose
+list changed; then its partner folders whose membership changed;
+then its changeset markers; and in the order-only buffer, its
+order-only marker. Each is kept while its change exists, drawn when
+missing (after the one before it, or first), and entombstoned when
+its change is gone; the tombstone holds whatever stood under it.
+A change viewnode describes the straddle, so drawing one or
+entombstoning one whose change is gone is no correction. A
+write-protected occurrence holds none: an earlier one's change
+viewnodes are entombstoned.
+
+What a node in C shows, the refresh reads from the leaves that
+mention the node (those it records and the relationship leaves naming
+it as member), grouped by aspect ('ChangedAspects'); the graphs supply
+only what each viewnode shows, such as the old title. A new aspect of
+a leaf is added in one place, and C, the extension and readiness
+follow. The mentioner folder alone reads the nodes whose set of
+mentioners changed, since a mention is no leaf.
+
+Each child is tagged with its change ('tag_children'): an occurrence
+with its node's existence ('(node added)', '(node removed)'), its
+node's other properties ('(properties changed)') and its
+relationship's existence ('(rel added)', '(rel removed)'), the last
+from the goal item it is; a ghost with its node's removal and its
+relationship's; an unknown or a property member with its
+relationship's. A root, and an occurrence the goal does not name, are
+tagged as a node only; a node of the containerward chain carries no
+change. Under a member whose relationship moved to another skgrepo
+stands its relRepo move, first.
 
 A node was added when only the after-graph has it, and removed when
 only the before-graph does ('GraphStraddle::node_existence'); its
 other properties changed ("modified", herald M) when both graphs have
 it and it records at least one leaf
-('GraphStraddle::node_properties_changed'). Every site that tags a
-member, a removed member, a folder member or a root asks both
-('GraphStraddle::node_change'). A phantom never carries '(properties
-changed)'.
+('GraphStraddle::node_properties_changed'). A ghost never carries
+'(properties changed)'.
 ** What each kind of change looks like
 Every label is a herald rule on a metadata atom; 'docs/heralds.org'
 lists them, and the API doc's "Metadata of the diff view" the atoms.
@@ -217,7 +224,7 @@ leaf, marked on the old-text headline.
 Content has no folder. The members are the node's children, each
 tagged ∃+ / ∃- for its node's existence, M for its other properties
 and ~+ / ~- for its relationship's existence; a removed member stands
-where it stood (below). The
+where the interleaved diff of the two lists puts it (below). The
 content changeset marker, "its content changed", gathers the
 relationship leaves of the content list.
 *** the in-folders and out-folders
@@ -235,32 +242,29 @@ folders ("It contains these, but the subscribing ancestor hides them" and
 contains them") show no change and carry no '(rel ...)'. Under each
 member of a changed folder hangs its containerward chain, as in every
 view, so that the user sees where the member sits: the member's
-containers as write-protected non-members, theirs under them, up to
+containers as write-protected occurrences, theirs under them, up to
 the roots or to 'max_roleTree_depth', walked over the union of the
-two graphs. A phantom member holds no chain. A chain node
+two graphs ('ContainerwardChainPartners::GraphStraddle'). The refresh
+draws a chain under a member it draws, and never reinstates a chain
+node. A ghost member holds no chain. A chain node
 carries no change facts and takes no commit-readiness marker; only
 the folder's members show change. Before the chain, where the
-member's relationship moved to another skgrepo, hangs that move
-('attach_chains_under_straddle_folder_members' in
-'server/diff_view/partner_folders.rs').
+member's relationship moved to another skgrepo, hangs that move.
 *** aliases, IDs and flags
 The alias, ID and flags folders, drawn when their list changed,
 hold the union of the two lists in the order of their interleaved
 diff, each entry tagged '(rel added)' (+) or '(rel removed)' (-),
 its existence in the list. A lost alias or ID is an alias or ID
-member with a ghost warrant, written '(rel removed)'
-('Viewnode::is_ghostWarranted'), which the save never reads. Each
-entry is one leaf.
+member with a ghost warrant ('Warrant::ByHead', written
+'ghostWarrant'), claiming nothing ('noClaim'), so the save never
+reads it. Each entry is one leaf.
 
 A property folder is matched by its kind among all the children of
 its node, so a folder the user requested becomes the changed one
-when its list changes. It stays until the user deletes it: marked
-changed while its list differs between the graphs, and unmarked
-after ('unmark_property_folders_except' in
-'server/diff_view/changes.rs' converts its lost entries and clears
-the rest's change facts), when its own visit refreshes it from the
-live graph, as in every view. The diff view never converts a
-property folder as stale.
+when its list changes. It stays until the user deletes it, filled
+from its goal, the union of the two lists: its entries tagged while
+the lists differ, and untagged after. An entry a commit made lost
+for good stays, unwarranted and claiming nothing.
 *** home skgrepo and relRepo moves
 A home skgrepo move is one property under the node, "⌂ -OLD +NEW",
 one leaf. A relRepo move is a property under the member whose
@@ -274,225 +278,105 @@ A deleted node is shown as its ghost, written 'ghost (gnid ID)
 (skgRepos (nodeRepo REPO)) ...': write-protected,
 with HEAD's title and body, under each former container. Its old
 content stands beneath it, recursing into deleted members. Its
-existence is one leaf. An acquiree's phantom holds a derived,
+existence is one leaf. An acquiree's ghost holds a derived,
 save-inert folder "it was acquired by" with its acquirer, and the
-acquirer holds "it acquired" with the phantoms of its acquirees. A new
+acquirer holds "it acquired" with the ghosts of its acquirees. A new
 node is an ordinary editable node with ∃+; its existence is one leaf.
-** The shallow model subtree, and what it keeps
-Nothing that exists is created again. Each step builds a shallow model
-subtree of what a viewnode should hold, in a scratch tree, and
-'reconcile_children_with_shallowModelSubtree' matches what the viewnode holds
-to it. A child that stands for a graphnode is matched by the ID it
-stands for: a member or removed member by the pid the live graph
-resolves its ID to (so one shown by an extra ID matches its node), an
-unknown phantom by its raw ID, a historical phantom by its ID at HEAD
-('skgid_a_folder_child_stands_for', which the partner-folder
-reconciler and the save's check of a write-protected occurrence read
-too); any other child by its kind (a folder entry by its entry). A
-key is matched among all the children of the viewnode, whoever drew
-them. A matched child is adopted: kept, with its fold state, and its
-kind and change facts are updated in place: a member that loses its
-relationship becomes a removed member and back, an occurrence whose
-node was deleted becomes its ghost and back, a graft or a copy the user
-pasted becomes the removed member of its node. A second child of a
-matched key is a duplicate: of the copies the editable one is
-adopted, else the first in buffer order, and each other is retained
-write-protected or entombstoned, its subtree staying under it. A child the shallow
-model subtree lacks is converted, never detached (next section);
-what only the shallow model subtree has is created.
-"Produced by the shallow model subtree" is defined over the union of the two
-graphs, so a viewnode is converted only when what it stands for is in
-neither graph. The chains under a changed folder's members are
-reconciled the same way.
 
-So folding survives saves, rerenders and commits: the server sets a
-fold state only on a viewnode it creates (a context node's body and a
+A ghost claims membership only where its parent's worktree list
+still names its gnid (a dangling reference to a node HEAD has): it
+carries no 'noClaim' there, and the save keeps its gnid in the list
+as it keeps an unknown's ('traverse.rs'). Anywhere else under an
+editable parent it is marked 'noClaim', and contributes nothing to
+the save.
+** What the refresh keeps
+Nothing that exists is drawn again: the refresh decides everything
+from the buffer and the truth as they are now ('server/refresh/mod.rs'),
+and every buffer it draws refreshes to itself
+('every_diff_view_fixture_is_a_fixpoint_of_the_refresh' in
+'tests/idempotence.rs'). A child keeps its vnid, its fold state and
+its place; it is re-kinded where it stands, by the ID rule (a member
+whose node was deleted becomes its ghost and back); siblings standing
+for one gnid are merged, so a copy the user pasted beside a member
+merges into it. A child the goal does not name is kept, unwarranted
+and, under an editable parent, claiming nothing; the refresh never
+detaches. A tombstone keeps its children, and is pruned when it holds
+nothing; so is a folder the prune leaves empty. The server sets a fold
+state only on a viewnode it draws (a context node's body and a
 container folder start folded, the rest open).
 
 A root stays until the buffer is closed, whatever becomes of the
 changes under it, or until the user entombstones its ghost
-("Dismissing a ghost"). A commit is an ordinary rerender: the roots stand
-as plain context with their change viewnodes gone, and a ghost root
-whose node the commit deleted, now in neither graph, becomes a
-tombstone, pruned when it holds nothing of the user's. A removed
-member that held content, or any change viewnode that held
-something of the user's, stays as a non-member, keeping its
-editability, or a tombstone holding it.
-** What a reconciler keeps
-Two reconcilers run at an editable node's visit. The older one,
-'complete_managed_children' ('server/update_buffer/util.rs'),
-reconciles the content list first, as in every view, and each folder's
-members at the folder's own visit; then the per-visit step runs the
-diff view's, 'reconcile_children_with_shallowModelSubtree', over the change
-viewnodes, the removed members and what the diff view adds below
-them. What the user added survives both. Both obey the glossary's
-"retain as non-member or tombstone, then prune": neither
-detaches, and each converts a child the graph no longer warrants into
-a non-member retained with its editability or a tombstone, which
-the prune removes once childless.
+("Dismissing a ghost"). A commit is an ordinary rerender: the roots
+stand as plain context with their change viewnodes entombstoned; a
+ghost root whose node the commit deleted, now in neither graph,
+becomes a tombstone, which keeps what stood under it, and one whose
+gnid the commit left an extra ID of its acquirer becomes an
+occurrence of the acquirer, in place.
 
-Neither moves a child it keeps. A child it creates goes right after
-the kept or created child that precedes it in its model, or first
-when none does ('place_created_children_after_their_model_predecessors'
-in 'server/types/tree/moves.rs'; 'KeptChildOrder::Unmoved' in
-'complete_managed_children'). So a buffer saves back to itself, and an
-order the user gives a chain or a write-protected folder stands.
-There are two exceptions. A list whose order is a graph fact the save
-writes -- the content of a node, the alias folder and the editable
-partner folders -- follows the graph's order
-('KeptChildOrder::FollowsGoal'), so that a view other than the one
-saved follows a reorder saved elsewhere; in the view saved the two
-orders agree. And a removed member of a content list is moved to its
-slot at every visit ("Removed members and the LCS placement"), since
-the content reconciler puts non-members ahead of members. The
-containerward walk visits a node's containers in ID order, so a first
-render is the same every time.
-
-The diff view's reconciler matches a key among all the children of
-a node, whoever drew them. It converts a stale child only when the
-child is its own, which it knows by the child's kind and change facts
-at the completion that finds it stale
-('is_diffView_change_viewnode'): a change viewnode (an old text, a
-move, a changeset marker, a folder or a folder entry), a historical
-phantom, a removed member, which still carries '(rel removed)' then,
-or a member under a phantom, which has no content list. So a
-viewnode the user typed or pasted that no model wants stays where it
-stands, and so does a content member, tagged or not. Under an
-editable node the content members are the content reconciler's, and
-the change viewnodes and removed members the diff view's
-reconciler's; a member whose relationship only the before-graph
-has becomes a removed member, as does any non-member whose relationship to the
-node is only in the before-graph (a graft, or a copy the user
-pasted), and a historical phantom's old content adopts the former
-members under it. Before the content reconciler runs, the first
-non-member of a node in the after-graph's content list becomes its
-member when no member of that node stands there
-('align_content_members_with_straddle'). The chains under a changed
-folder's members are the folder reconciler's
-('reconcile_containerward_chain_under_member', as in every view); it
-matches every child of the member but its members, and converts only a
-chain node as it draws one (write-protected, carrying no change
-facts: 'is_drawn_chain_node') and a relRepo move, so it leaves the
-member's own visit's viewnodes, which carry change facts, and a note
-the user typed there alone. A chain
-node is known by where it stands ('is_in_containerward_chain'): its
-metadata says nothing of it, so nothing about it can be lost in a
-save.
-
-Both convert a stale child by one function
-('convert_unwarranted_child'), as the glossary's "retain as
-non-member or tombstone, then prune" says. The older reconciler looks
-below the children it manages only for a folder's member, whose chain
-goes with it ('convert_unwarranted_member_with_its_chain'); the diff
-view's converts, with the stale
-child, what was made below it for the same model
-('convert_unwarranted_subtree'): the diff view's own viewnodes, a
-folder's members and the chains, but not the content reconciler's
-members or what the user typed or pasted. The prune removes what holds
-nothing of the user's (a deleted node's phantom, once the
-deletion is committed, is entombstoned holding the user's note but
-not its old content).
-
-So a note the user adds under a member of a changed folder, under a
-historical phantom, in the "it acquired" folder or under a removed
-member survives every rerender; when the removed member goes stale
-(a commit makes the removal part of HEAD, or the relationship
-returns), the note stands under a non-member occurrence of it,
-which keeps the editability the removed member had.
-A new note there that names no skgrepo ('(skgRepos (nodeRepo NAME))') inherits that
-of its nearest ancestor that is an unrestricted vognode, through the
-phantoms and folders between them
-('inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'), as
-a note directly under a vognode inherits its parent's; in a folder it
-is a non-member.
-** Removed members and the LCS placement
+The goal orders what it warrants where the graph records an order
+(content, aliases, the subscribee, overridden and hidden folders);
+every other child stays right after the sibling it followed. So a
+buffer saves back to itself, and a view other than the one saved
+follows a reorder saved elsewhere.
+** Removed members
 A removed member is a member of the before-graph's list that the
-after-graph's lacks. Membership is decided by set difference, so a
-reorder shows nothing; the longest common subsequence of the two
-lists only places a removed entry: immediately before the next
+after-graph's lacks: an occurrence whose relationship to its
+viewparent HEAD alone has, warranted by HEAD ('ghostWarrant'),
+claiming nothing ('noClaim') where claims are read, with the change
+fact '(rel removed)'. That is the one encoding of a removed
+relationship, wherever it stands: in content, in a partner folder, in
+a ghost's old content, and as a node of the containerward chain whose
+container relationship only HEAD had. Membership is decided by set
+difference, so a reorder shows nothing; the goal's order, the
+interleaved diff of the two lists, places it: before the next
 surviving member of the old order, or last
-('phantom_insertion_plan', 'compute_interleaved_diff'). Content and
-the alias, ID and flags folders are placed this way. In content each
-removed member is moved, not recreated, to its slot at every visit,
-after the content reconciler has reordered the children; in a folder
-a removed entry is placed in its slot when it is created, and then
-stays where it stands, as every kept child does.
+('interleaved_diff_without_reorders'). The partner folders place
+their removed members the same way; recorders, which no list orders,
+come sorted by ID.
 
-The partner folders over the straddle place their removed
-members the same way, since 'GraphStraddle::partners' gives the
-partners a node records in the order of the interleaved diff of the
-two lists ('interleaved_diff_without_reorders'); recorders, which no
-list orders, come sorted by ID. So every rendering of the union of the
-two graphs places a removed entry by the LCS.
-** One encoding of a removed relationship
-A removed member whose node survives is an unrestricted vognode, a
-non-member, with the change fact '(rel removed)': its relationship to its
-viewparent exists in the before-graph only. That is the one encoding
-of a removed relationship, wherever it stands: in content, in a
-partner folder, and in a historical phantom's old content
-('mk_removed_member_viewnode', 'FolderGoalShape::Removed').
-'is_unrestricted_removed_member' reads it, and tests nothing
-about editability or position (a node of the containerward chain,
-the one other non-member the diff view draws, carries no change
-facts); the parser's check of a restore request reads it too
-('check_where_the_edit_request_sits'), and the save then checks
-where the request stands ('restoreRel_stands_where_it_may'). Since a removed member is never a member, the
-save's check of a write-protected occurrence's folders counts only
-members.
+A removed dangling ID is not shown in a folder whose membership the
+save reads, nor in content when neither graph has the node: its leaf
+in content is under the content changeset marker. Elsewhere it is an
+unknown, with '(rel removed)'.
 
-Its editability is a member's. In content position (under an
-unrestricted vognode or a historical phantom) a removed member is
-created editable, its body from the after-graph, when its node is in
-U, which it always is (its node is in C), and write-protected
-otherwise; the editability rule at its own visit keeps it editable
-when its node is unclaimed and write-protects it when another
-occurrence claimed the node first. An editable removed member's visit
-extends it as any editable occurrence's does, with its content list
-and its change viewnodes, among them its container folder listing the
-container that dropped it; a write-protected one holds nothing of its
-node. A removed member that was editable when a rerender began stays
-editable ('give_model_facts_to' only ever write-protects). In a partner
-folder a removed member stays as the folder's other members are.
-
-A removed dangling ID is not shown in content or in a folder whose
-membership the save reads (an unknown phantom there would read back
-as a member); its leaf in content is under the content changeset
-marker. In a write-protected-set folder and in a historical phantom's
-old content, where nothing reads back, it is an unknown phantom with
-'(rel removed)'; the save's check of a write-protected occurrence's
-folder skips an unknown phantom with that part, as it skips a removed
-member by its non-membership ('partnerFolder_members_in_view'). A
-former member is any viewnode standing for a
-before-only relationship, historical phantoms included.
+The restore requests read where it stands: 'restoreRel' is accepted
+on an occurrence with a ghost warrant in content position or in a
+partner folder ('restoreRel_stands_where_it_may'), and a save that
+fulfils one leaves the headline claiming the relationship it
+restored.
 
 * Editability in the diff view
 The diff view follows the rule that decides which occurrence is
-editable in any view -- the editable map, the editability rule, the cascade
-and the node budget, described in the module comment of
-'server/to_org/extend/editable.rs' -- with these deviations.
+editable in any view -- one editable occurrence per node, the first
+the refresh draws where its parent is editable content, the
+editable-view request and the node budget, described in the module
+comment of 'server/refresh/extent.rs' -- with these deviations.
 ** A node of U is editable, with its whole content list
-When a buffer is first rendered, a node of U is editable at its first
-occurrence and its whole content list is shown; a member outside U is
-a write-protected member shown without its content. No size cap
-applies: the node budget is not charged for any of this. A removed
-member in content position counts as an occurrence here: a node
-whose first occurrence is a removed member (one its only container
-dropped, say, or one first reached through a container that dropped
-it) is editable there ("One encoding of a removed relationship").
-Where the editability walk prefers a member to a non-member, a
-removed member counts as a member: it keeps the claim from a member
-met later, and takes it from a plain non-member met earlier.
+An occurrence the refresh draws in editable content is editable when
+its node is in U and has no editable occurrence yet, and its whole
+content list is drawn; a member outside U is a write-protected member
+shown without its content. No size cap applies: the node budget is
+not charged for any of this. A removed member in content position is
+an occurrence like any other here: a node whose first drawn
+occurrence is a removed member (one its only container dropped, say,
+or one first reached through a container that dropped it) is
+editable there ("Removed members"). An occurrence the buffer holds
+keeps its editability.
 ** The budget bounds only requests outside U
 An editable-view request (C-c s d) behaves as in any view: it makes
-its occurrence the editable one, write-protecting the other with its
-content subtree, and cascades to its content children. Only the
-extension of a node outside U that a request asked for is charged to
-'initial_node_limit'; a node of U is never charged, whether the rule
-above or a request made it editable. A request adds no default
-folders, since the diff view creates none.
+its occurrence the editable one, write-protecting the other (whose
+content keeps its own editability), and passes on to its content:
+each member it shows or draws whose node has no editable occurrence
+is editable while the budget allows, and passes it on in turn. Only
+the extension of a node outside U that a request reached is charged
+to 'initial_node_limit' ('CompletionMode::charges_node_budget'); a
+node of U is never charged, whether the rule above or a request made
+it editable. A request adds no default folders, since the diff view
+draws none.
 ** A save makes nothing editable and appends no root
-After a save, a buffer's sets are recomputed, and completion extends by
-the recomputed U wherever it adds something new. Nothing the buffer
+After a save, a buffer's sets are recomputed, and the refresh extends
+by the recomputed U wherever it draws something new. Nothing the buffer
 holds editable is write-protected again by the server. But the server
 makes no occurrence editable and appends no root on its own: a change
 recorded by a node the buffer holds no editable occurrence of is not
@@ -502,27 +386,28 @@ C-c r u ('skg-diffView-integrate-unshown-changes'; Neovim
 '<localleader>ru'), on a buffer with no unsaved changes, sends
 "integrate unshown changes". The server brings the straddle up to
 date and recomputes the buffer's sets. Every node of U without an
-editable occurrence becomes editable (its body read from the live
-graph) at its first content occurrence in level order
+editable occurrence becomes editable at its first content occurrence
+in level order, its children claiming as a buffer read back would
 ('ensure_editableOccurrences_exist'); a node shown only as a
 write-protected folder member counts as shown nowhere, since a
 folder's members stay write-protected.
 The walk for content occurrences counts a removed member under an
-unrestricted vognode or a historical phantom as a content occurrence,
-and passes through a historical phantom in content position into its
-old content.
-The buffer is then rerendered as after a save, which extends the
-content list of each node made editable, and last, each content
-origin of D that the buffer shows nowhere is appended as a root, in ID
-order, with the standing roots pinned, and completed. The answer is
-the readiness summary, and the rerender stream carries the buffer. It
-does not matter who write-protected an occurrence: the user asked for
-every change.
+occurrence or a ghost as a content occurrence, and passes through a
+ghost in content position into its old content.
+The buffer is then refreshed as after a save, which gives each node
+made editable its body and draws its content list; then each content
+origin of D that the buffer shows nowhere is appended as a stub root,
+in ID order, with the standing roots pinned, and the buffer is
+refreshed again ('rerender_diffView_buffer'). What the request draws
+is what the user asked for, so it reports no correction. The answer
+is the readiness summary, and the rerender stream carries the buffer.
+It does not matter who write-protected an occurrence: the user asked
+for every change.
 ** What counts as editable here
 A buffer makes a node's changes editable when it holds an editable
-occurrence of the node, wherever that sits, or the node's historical
-phantom in content position (under the buffer root, an unrestricted
-vognode, or a historical phantom that is itself in content position),
+occurrence of the node, wherever that sits, or the node's ghost in
+content position (under the buffer root, an occurrence, or a ghost
+that is itself in content position),
 since a deleted node's old content is editable nowhere and shown
 there ('nodes_editable_in_diffView'). The change-forest leaves those
 nodes record are the changes editable in the buffer.
@@ -581,7 +466,7 @@ folder's '(diff ...)' holds only its readiness, the objectless
 '(ready)', which is the folder's aggregate.
 
 The part '(ready OBJECT...)' is a display fact the server writes after
-completion ('set_ready_facts_in_viewforest'): the diff objects
+the refresh ('set_ready_facts_in_viewforest'): the diff objects
 ('node', 'rel', and on a headline that lists it 'all') whose leaves
 are all marked, so a ready changeset marker carries '(ready all)'; a
 bare '(ready)' on a headline that names one leaf, which lists no
@@ -665,7 +550,8 @@ headline that accepts it (herald "restore node"). The save writes the
 node's file from the before-graph's copy of it (title, body, aliases,
 extra IDs, flags, home skgrepo, and its four relationship lists with
 their relRepos), as it writes any node. An out-link to a node still
-deleted is kept as HEAD recorded it, and shows as an unknown phantom.
+deleted is kept as HEAD recorded it, and shows as that node's ghost,
+claiming membership, so a later save keeps it.
 Then it re-adds the node's in-links, from the before-graph's inbound
 indexes: each node that recorded it at HEAD (as content, a
 subscription, an override or a hide) gains it in that list, at the
@@ -700,10 +586,10 @@ file.
 ** The rerender
 The save's rerender shows the result as any save's does: the
 ghost of a restored node becomes the node again, and a
-removed member whose relationship returned becomes a member again. A
-change that no longer differs from HEAD leaves the change view; what
-the buffer still holds of it is kept or converted as "What a
-reconciler keeps" describes.
+removed member whose relationship returned is warranted again,
+claiming it. A change that no longer differs from HEAD leaves the
+change view; what the buffer still holds of it is kept as "What the
+refresh keeps" describes.
 
 * Dismissing a ghost
 A ghost stays where it stands until the user dismisses it. C-c r t
@@ -713,13 +599,13 @@ the ghost at point and saves; C-c r T
 ('skg-request-buffer-ghosts-tombstone'; Neovim '<localleader>rT',
 ':SkgRequestBufferGhostsTombstone') does it to every ghost in the
 buffer, in one save. The request is a view request: the save changes
-no file, and its rerender makes the ghost a tombstone, which keeps
-what the user put under it and drops what the diff view drew there
-(its old content, its acquisition folder); left childless, it is
-pruned. The parser refuses the request on anything but a ghost. A
-ghost root, once gone, is not drawn again; a ghost under a node that
-contained it at HEAD is, at that node's next rerender, since the node's
-removed members are recomputed from the straddle at every visit.
+no file, and its refresh makes the ghost a tombstone, which, as every
+tombstone does, keeps its children: what the user put under it and
+what the diff view drew there (its old content, its acquisition
+folder); left childless, it is pruned. The parser refuses the request
+on anything but a ghost. A ghost root, once gone, is not drawn again;
+a ghost under a node that contained it at HEAD is, at that node's next
+refresh, since the node's goal holds what HEAD alone warrants.
 * Stage and commit
 C-c r c ('skg-stage-and-commit') prompts once for a message and sends
 "stage and commit". The server stages the changed '.skg' files of
@@ -748,7 +634,7 @@ records the whole index.
 ** After the commit
 The straddle is rebuilt over the new HEAD, the store keeps only the
 marks whose leaves still exist, and each open buffer of the diff view
-is rerendered as any rerender is: its roots and what it made editable
+is refreshed as any rerender is: its roots and what it made editable
 stay, and what was committed loses its change viewnodes.
 
 * Strandeds

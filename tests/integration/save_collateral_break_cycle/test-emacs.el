@@ -1,9 +1,9 @@
 ;;; Integration test for collateral buffer updates via save pipeline
 ;;;
 ;;; Opens two buffers over a containment cycle (a contains b, b contains a),
-;;; removes 'a' from b's children and saves. The collateral a-view should
-;;; lose the now-stale write-protected 'a' underneath 'b', because
-;;; complete_managed_children discards children not in the parent's goal_list.
+;;; removes 'a' from b's children and saves. The collateral a-view keeps
+;;; the now-unwarranted 'a' underneath 'b', claiming nothing: the refresh
+;;; never detaches.
 ;;;
 ;;; This test does not exercise DeletedNode — no nodes are deleted from disk,
 ;;; only a containment relationship is modified.

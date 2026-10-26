@@ -10,7 +10,7 @@
 //! implies no relationship (the buffer root, a tombstone, an unknown)
 //! has no goal.
 //!
-//! The goal computers are the old walk's: 'partnerFolder_members_in_graph',
+//! The goal computers it reuses: 'partnerFolder_members_in_graph',
 //! the two compound folders' goal lists, 'unintegrated_content_skgids'
 //! and 'omit_restricted_members'.
 
@@ -272,7 +272,7 @@ fn folder_goal (
             &graph . outbound_member_keys_for_relation_gated (
               &anchor, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
-      Some ( gnid_goal (members, &relRepos, folder_goal_is_ordered (kind)) ) }, } }
+      Some ( gnid_goal (members, &relRepos, kind . goal_is_ordered ()) ) }, } }
 
 /// What 'subscriber' hides in the content of 'subscribee', less what
 /// the restriction hides: the goal of the compound folder
@@ -307,18 +307,6 @@ pub(crate) fn hidden_outside_of_subscribees (
       subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
     walk . truth . config );
   resolve_all ( omit_hidden (goal, walk), graph ) }
-
-/// Whether the members a folder's relation warrants take the goal's
-/// order: where the anchor's own file records them in order (content,
-/// aliases, and the outbound folders subscribee, overridden and
-/// hidden), and the compound folder of what the subscriber hides
-/// outside its subscribees, whose order is the subscriber's hides
-/// list. Unlike 'Folder::goal_is_ordered', which the old walk reads,
-/// this counts the hidden folder.
-pub(crate) fn folder_goal_is_ordered (
-  folder : &Folder,
-) -> bool {
-  folder . goal_is_ordered () || matches! ( folder, Folder::Hidden ) }
 
 /// A property folder's goal: the node's aliases (in order, each with
 /// its relRepo when that differs from the node's home), its IDs (pid

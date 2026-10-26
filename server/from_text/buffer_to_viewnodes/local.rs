@@ -108,8 +108,8 @@ pub fn validate_local_structure (
     } ) }}
 
 /// 'predicate', or a tombstone. Every folder accepts a
-/// tombstone among its children: it is what a stale entry or member
-/// holding something becomes ('convert_unwarranted_child').
+/// tombstone among its children: it is what the refresh makes of a
+/// member that can stand there for nothing, keeping what it holds.
 fn tombstone_or<Predicate> (
   predicate : Predicate,
 ) -> impl Fn (&Viewnode) -> bool
@@ -717,8 +717,7 @@ pub fn nonignored_children_have_distinct_skgids (
 
 /// Whether a folder's members have distinct IDs. As for a content
 /// list ('nonignored_children_have_distinct_skgids'), only members
-/// count, so that a write-protected non-member copy of a member (what
-/// 'convert_unwarranted_child' makes of a duplicate) may stand beside it,
+/// count, so that a non-member copy of a member may stand beside it,
 /// and only where the folder's claims are read.
 fn partnerFolder_children_have_distinct_skgids (
   tree    : &Tree<Viewnode>,

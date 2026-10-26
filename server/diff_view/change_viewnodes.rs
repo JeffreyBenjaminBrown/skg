@@ -6,19 +6,16 @@
 //! Each is save-inert. The kinds of change they show are set here;
 //! readiness is read from the store where they are placed.
 
-use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, Folder, Ghost, ChangeViewnode,
-  Viewnode, ViewnodeKind, Vognode, Warrant, mk_unknown_viewnode, mk_viewnode,
-  mk_writeProtected_viewnode, viewnode_of};
+  Folder, Ghost, ChangeViewnode,
+  Viewnode, ViewnodeKind, Vognode, Warrant, viewnode_of};
 
 use ego_tree::{NodeId, Tree};
 use similar::{ChangeTag, TextDiff};
-use std::collections::{BTreeSet, HashSet};
 
 /// Under 'parent', the old text of the node 'pid', with a body diff
 /// under it when the body changed. None (and nothing appended) when
@@ -124,39 +121,6 @@ pub fn mk_historical_viewnode (
         claimsMembership    : false,
         isWarranted         : Warrant::ByHead } ))) } ) }
 
-/// Under 'phantom', the historical phantom of 'pid' standing where
-/// content stands, what it holds: if a nodeMerge acquired it, an "it
-/// was acquired by" folder, and then its old content as removed
-/// members: a deleted member as a historical phantom (whose own visit
-/// adds its old content), a surviving one as a removed member
-/// ('mk_removed_member_viewnode', editable when its node is in 'u'),
-/// and a dangling one as an unknown phantom.
-pub fn append_historical_phantom_content (
-  tree     : &mut Tree<Viewnode>,
-  phantom  : NodeId,
-  straddle : &GraphStraddle,
-  pid      : &ID,
-  u        : &BTreeSet<ID>,
-) -> Option<()> {
-  if let Some (acquirer) = straddle . acquirer_of (pid) {
-    let acquirer_viewnode : Viewnode =
-      mk_member_viewnode (straddle, &acquirer, None);
-    let folder : NodeId = tree . get_mut (phantom) ? . append (
-      viewnode_of ( ViewnodeKind::Folder (
-        Folder::AcquiredBy ))) . id ();
-    tree . get_mut (folder) ? . append (acquirer_viewnode); }
-  for partner in straddle . partners (pid, RelationRole::CONTENT) {
-    let member : Option<Viewnode> =
-      if straddle . node_existence (&partner . id) == Some (Existence::Removed) {
-        mk_historical_viewnode (straddle, &partner . id, Some (Existence::Removed))
-      } else if straddle . node_in_either_graph (&partner . id) {
-        mk_removed_member_viewnode (straddle, &partner . id, u)
-      } else { Some ( mk_member_viewnode (
-                 straddle, &partner . id, Some (Existence::Removed) )) };
-    if let Some (member) = member {
-      tree . get_mut (phantom) ? . append (member); }}
-  Some (( )) }
-
 /// Under 'parent' (the acquirer 'pid'), an "it acquired" folder of
 /// the historical phantoms of the nodes it acquired since HEAD. None
 /// (and nothing appended) when it acquired none.
@@ -176,45 +140,3 @@ pub fn append_acquired_folder (
       tree . get_mut (folder) ? . append (phantom); }}
   Some (folder) }
 
-/// A removed member: the image of a node of the after-graph whose
-/// relationship to its viewparent is only in the before-graph, a
-/// non-member with '(rel removed)', the one encoding of a removed
-/// relationship ('is_unrestricted_removed_member' reads it). It is
-/// created editable, with its body from the after-graph, when its
-/// node is in 'u' (U of the buffer being completed), and
-/// write-protected otherwise; the editability rule at its own visit
-/// then write-protects an editable one whose node another occurrence
-/// claimed first, as for a member. None if the after-graph lacks the
-/// node.
-pub fn mk_removed_member_viewnode (
-  straddle : &GraphStraddle,
-  pid      : &ID,
-  u        : &BTreeSet<ID>,
-) -> Option<Viewnode> {
-  let node : &GraphnodeInRust = straddle . after . get (pid) ?;
-  let mut member : Viewnode = mk_viewnode (
-    pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
-    false,
-    if u . contains (pid) {
-      Editability::Editable { body : node . body . clone (), edit_request : None } }
-    else { Editability::WriteProtected },
-    HashSet::new () ); // view_requests
-  member . change_facts . change =
-    straddle . node_change (pid, Some (Existence::Removed));
-  Some (member) }
-
-/// A write-protected image of a node of the after-graph, whose
-/// relationship to its viewparent changed by 'rel'; an unknown
-/// phantom if the after-graph lacks it.
-fn mk_member_viewnode (
-  straddle : &GraphStraddle,
-  pid      : &ID,
-  rel      : Option<Existence>,
-) -> Viewnode {
-  let mut viewnode : Viewnode = match straddle . after . get (pid) {
-    Some (node) => mk_writeProtected_viewnode (
-      pid . clone (), node . home_skgrepo . clone (), node . title . clone (),
-      true ),
-    None => mk_unknown_viewnode ( pid . clone () ), };
-  viewnode . change_facts . change = DiffChange { rel, .. DiffChange::default () };
-  viewnode }

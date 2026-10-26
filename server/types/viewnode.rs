@@ -214,9 +214,8 @@ pub struct Unknown {
   /// restoreRel here), consumed only by save.
   pub relationshipEditRequest : Option<RelationshipEditRequest>,
   /// Whether the save reads its raw ID into its viewparent's list.
-  /// False, written 'noClaim', only on one whose relationship HEAD
-  /// alone warrants (the stats pass sets it from
-  /// 'Viewnode::is_ghostWarranted'): a dangling partner the worktree
+  /// The refresh marks it false, written 'noClaim', on one whose
+  /// relationship HEAD alone warrants: a dangling partner the worktree
   /// lost.
   pub claimsMembership : bool,
 }
@@ -430,17 +429,15 @@ pub struct ViewnodeStats {
 /// A member of a property folder: one alias, extra ID or true flag
 /// of the folder's viewparent.
 ///
-/// 'isWarranted' is set by the stats pass ('warrant_of_viewnode') and
-/// written '(view noWarrant)' when 'Warrant::No'.
+/// 'isWarranted' is set by the refresh's ladder and written
+/// '(view noWarrant)' when 'Warrant::No'.
 ///
 /// In the diff view an alias, ID or flag the worktree lost since HEAD
-/// is a member with a ghost warrant: HEAD alone warrants it. 'Warrant'
-/// has no word for that yet, so the server knows it by the change
-/// fact '(rel removed)' ('Viewnode::is_ghostWarranted') and writes it
-/// '(view ghostWarrant)'. An alias or ID with a ghost warrant claims no
-/// membership ('claimsMembership', set by the stats pass, written
-/// 'noClaim'): the alias reader and the ID check skip it, and its
-/// change-forest leaf is that alias or ID.
+/// is a member with a ghost warrant ('Warrant::ByHead'): HEAD alone
+/// warrants it, written '(view ghostWarrant)'. An alias or ID with a
+/// ghost warrant claims no membership ('claimsMembership', which the
+/// refresh marks, written 'noClaim'): the alias reader and the ID
+/// check skip it, and its change-forest leaf is that alias or ID.
 #[derive( Debug, Clone, PartialEq )]
 pub enum PropertyMember {
   Alias { text: String, // an alias for the node's grandparent
@@ -685,20 +682,20 @@ impl Folder {
   pub fn members_are_properties (&self) -> bool {
     matches! ( self, Folder::Alias | Folder::ID | Folder::Flags { .. } ) }
 
-  /// Whether the folder's goal has an order the view follows. True
-  /// when the viewparent's own file records the members, in an order
-  /// the save writes, so that the save reads the folder's membership:
-  /// the subscribee, overridden and alias folders, and the compound
-  /// partner folder of what the subscriber hides outside its
-  /// subscribees. False when other nodes' files record the members,
-  /// or they are derived or write-protected: the view then keeps the
-  /// order its members already have.
+  /// Whether the folder's goal has an order the view follows: the
+  /// viewparent's own file records the members in order (the
+  /// subscribee, overridden, hidden and alias folders), or the folder
+  /// is the compound partner folder of what the subscriber hides
+  /// outside its subscribees, in the order of the subscriber's hides
+  /// list. False when other nodes' files record the members, or they
+  /// are derived or unordered: the view then keeps the order its
+  /// members already have.
   pub fn goal_is_ordered (&self) -> bool {
     match self {
-      Folder::Subscribee | Folder::Overridden
+      Folder::Subscribee | Folder::Overridden | Folder::Hidden
         | Folder::HiddenOutsideOfSubscribee | Folder::Alias => true,
       Folder::Subscriber | Folder::Overrider | Folder::Hider
-        | Folder::Hidden | Folder::HiddenInSubscribee
+        | Folder::HiddenInSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Flags { .. } => false, } }
@@ -1153,24 +1150,10 @@ impl Viewnode {
         | ViewnodeKind::Tombstone => None,
     }}
 
-  /// Whether HEAD alone warrants this viewnode where it stands: for
-  /// now, whether it carries the change fact '(rel removed)', since
-  /// 'Warrant' has no word for that yet ('PropertyMember'). Only the
-  /// server's own trees carry change facts: the parser skips them.
-  pub fn is_ghostWarranted (&self) -> bool {
-    self . change_facts . change . rel == Some (Existence::Removed) }
-
   /// Whether this viewnode is an occurrence.
   pub fn is_occurrence (&self) -> bool {
     matches! ( &self . kind,
                ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ) }
-
-  pub fn is_unrestrictedVognode_and_member (&self) -> bool {
-    match &self . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        t . claimsMembership,
-      _ => false,
-    }}
 
   /// The id of a vognode that represents a current graphnode: None
   /// for ghosts, unknowns and non-vognodes.

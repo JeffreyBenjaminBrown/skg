@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_repos -E 'test(graph_straddle_engines::)'
 //
-// The partner-folder reconciler and the containerward chain, run over the
-// union of a graph straddle instead of the live graph. The straddle is built
+// A partner folder refreshed in diff-view mode, and the containerward
+// chain, over the union of a graph straddle instead of the live graph. The straddle is built
 // in memory: before, c1 and c2 contain r; after, c1 and c3 do, and c2
 // is gone.
 
@@ -17,8 +17,11 @@ use skg::types::viewnode::{
   DiffChange, Existence, Folder, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
 use skg::types::views_state::DiffViewBufferKind;
+use skg::diff_view::readiness_store::ReadinessStore;
+use skg::refresh::{Truth, refresh_viewforest};
+use skg::types::tree::forest::ViewForest;
+use skg::types::views_state::ViewnodeIdRecord;
 use skg::update_buffer::completion_mode::CompletionMode;
-use skg::update_buffer::reconcile::partner_folder::reconcile_partnerFolder_children;
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::HashMap;
@@ -89,20 +92,24 @@ fn children_with_change (
 fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
 ) -> Result<(), Box<dyn Error>> {
   let f : Fixture = fixture () ?;
-  let (mut tree, r) : (Tree<Viewnode>, NodeId) = tree_with_r ();
+  let mut forest : ViewForest = ViewForest::new ();
+  let r : NodeId = forest . append_root ( mk_editable_viewnode (
+    ID::from ("r"), SkgrepoName::from ("main"), "r" . into (), None ));
   let folder : NodeId =
-    tree . get_mut (r) . unwrap ()
+    forest . as_internal_tree_mut () . get_mut (r) . unwrap ()
     . append ( viewnode_of (
       ViewnodeKind::Folder (Folder::Container) ))
     . id ();
-  reconcile_partnerFolder_children (
-    folder, &mut tree, &Folder::Container,
-    // The folder reconciler reads no buffer kind.
+  refresh_viewforest (
+    &mut forest, &mut ViewnodeIdRecord::default (),
+    &Truth { graph       : &f . runtime . graph,
+             config      : &f . runtime . config,
+             restriction : None },
     CompletionMode::DiffView { straddle    : &f . straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges },
-    &f . runtime ) ?;
+    100, Some (&ReadinessStore::default ()) ) ?;
   let both : DiffChange = DiffChange::default ();
-  assert_eq! ( children_with_change (tree . get (folder) . unwrap ()), vec! [
+  assert_eq! ( children_with_change (forest . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),
     ( "c2" . to_string (), DiffChange { node : Some (Existence::Removed),
                                         rel  : Some (Existence::Removed),

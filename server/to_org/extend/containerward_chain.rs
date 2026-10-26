@@ -5,9 +5,9 @@
 /// 'max_roleTree_depth', up to the roots.
 /// A node the walk met before (a cycle or a diamond) is shown once
 /// more, as a leaf ('ContainerwardRoleTree::Repeated').
-/// The folder's reconciler reconciles each member's chain at every
-/// visit of the folder ('reconcile_containerward_chain_under_member'),
-/// so a member it adds gets its chain; no request extends a chain,
+/// The refresh draws the chain under a member it draws into such a
+/// folder ('after_drawing' in 'server/refresh/ladder.rs'), and never
+/// reinstates a chain node once drawn; no request extends a chain,
 /// and a request on a chain node for its containers draws a
 /// containers folder under it like any other. A chain node carries no
 /// change facts and takes no commit-readiness marker
@@ -21,10 +21,9 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
-use crate::types::tree::forest::stands_in_containerward_chain;
-use crate::types::viewnode::{ DiffChange, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
@@ -159,18 +158,3 @@ fn prepend_containerward_chain_node (
               . prepend (viewnode)
               . id () )) }
 
-/// Whether 'node' is a chain node as the walk draws it: write-protected
-/// (or a phantom, for a container it cannot show), carrying no change
-/// facts. So a non-member the user typed
-/// under a folder's member, which is editable, is not one,
-/// and neither is what that member's own visit adds there (a removed
-/// member, a historical phantom), which carries change facts.
-pub fn is_drawn_chain_node (
-  node : NodeRef<Viewnode>,
-) -> bool {
-  let viewnode : &Viewnode = node . value ();
-  stands_in_containerward_chain (node)
-    && viewnode . editable_skgid () . is_none ()
-    && viewnode . change_facts . change == DiffChange::default ()
-    && ! matches! ( viewnode . kind,
-                    ViewnodeKind::Vognode (Vognode::Ghost (_)) ) }

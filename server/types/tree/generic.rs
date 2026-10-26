@@ -1,77 +1,4 @@
-use crate::types::misc::{ID, SkgrepoName};
-use crate::types::viewnode::{Viewnode, ViewnodeKind};
-
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
-use std::error::Error;
-
-/// Errors if the ancestor is not found or cannot provide both PID and skgrepo.
-pub fn pid_and_skgrepo_from_ancestor (
-  tree       : &Tree<Viewnode>,
-  node       : NodeId,
-  generation : usize,
-  caller     : &str,
-) -> Result<(ID, SkgrepoName), Box<dyn Error>> {
-  read_at_ancestor_in_tree(
-    tree, node, generation,
-    |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (v) =>
-        v . pid_and_skgrepo ()
-        . map ( |(pid, skgrepo)| (pid . clone (), skgrepo . clone ()) )
-        . ok_or_else (|| format!(
-          "{}: ancestor {} has no repo",
-          caller, generation )),
-      _ => Err( format!(
-        "{}: ancestor {} cannot provide PID and repo",
-        caller, generation )) } )
-  . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-  . map_err( |e| -> Box<dyn Error> { e . into() } ) }
-
-/// Read a value from an ancestor of a node in a tree, applying a function to it.
-/// The `generation` parameter specifies how many generations to climb up:
-/// 0 = the node itself, 1 = parent, 2 = grandparent, etc.
-/// Returns an error if the node is not found or if we can't climb that high.
-pub fn read_at_ancestor_in_tree<T, F, R>(
-  tree: &Tree<T>,
-  treeid: NodeId,
-  generation: usize,
-  f: F
-) -> Result<R, String>
-where F: FnOnce (&T) -> R, {
-  let mut node_ref : NodeRef<T> = tree . get (treeid)
-    . ok_or ("node not found")?;
-  for _ in 0..generation {
-    node_ref = node_ref . parent()
-      . ok_or ("cannot climb that many generations")?; }
-  Ok(f(node_ref . value() )) }
-
-/// Find the unique child that matches `target_kind`.
-pub fn unique_non_vognode_child<T, F> (
-  tree          : &Tree<T>,
-  treeid    : NodeId,
-  target_kind   : &ViewnodeKind,
-  kind_from_node : F,
-) -> Result<Option<NodeId>, String>
-where
-  F : for<'a> Fn (&'a T) -> Option<&'a ViewnodeKind>,
-{
-  let node_ref : NodeRef<T> =
-    tree . get (treeid) . ok_or (
-      "unique_non_vognode_child: node not found")?;
-  let matches : Vec<NodeId> =
-    node_ref . children()
-    . filter (|child|
-      kind_from_node (child . value())
-      . map (|kind| kind == target_kind)
-      . unwrap_or (false))
-    . map (|child| child . id())
-    . collect();
-  match matches . len() {
-    0 => Ok (None),
-    1 => Ok (Some (matches[0])),
-    n => Err (format!(
-      "Expected at most one {:?} child, found {}",
-      target_kind, n)),
-  }}
 
 /// Write to an ancestor of a node in a tree, applying a mutating function to it.
 /// The `generation` parameter specifies how many generations to climb up:
@@ -95,31 +22,6 @@ where F: FnOnce (&mut T) -> R, {
   let mut node_mut : NodeMut<T> = tree . get_mut (target_skgid)
     . ok_or ("target node not found")?;
   Ok(f(node_mut . value() )) }
-
-/// Error if the node does not satisfy the predicate.
-pub fn error_unless_node_satisfies<T, F>(
-  tree      : &Tree<T>,
-  treeid    : NodeId,
-  predicate : F,
-  message   : &str,
-) -> Result<(), String>
-where F: FnOnce (&T) -> bool {
-  let satisfied : bool =
-    read_at_node_in_tree( tree, treeid, predicate ) ?;
-  if !satisfied {
-    return Err( message . to_string() ); }
-  Ok(( )) }
-
-/// Read a node's value from a tree, applying a function to it.
-/// Returns an error if the node is not found.
-pub fn read_at_node_in_tree<T, F, R>(
-    tree: &Tree<T>,
-    treeid: NodeId,
-    f: F
-) -> Result<R, String>
-where F: FnOnce (&T) -> R, {
-  read_at_ancestor_in_tree(
-    tree, treeid, 0, f) }
 
 /// Write to a node's value in a tree, applying a mutating function to it.
 /// Returns an error if the node is not found.

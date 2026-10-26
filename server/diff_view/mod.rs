@@ -3,15 +3,11 @@
 //! describes it; this module implements it:
 //! - 'pruned_change_view.rs': C, R, U and D, each buffer's sets, and
 //!   its stub roots;
-//! - 'completion.rs': rendering and rerendering a whole buffer;
-//! - 'visit.rs': where view completion reads the diff-view switch,
-//!   before a node's visit extends and after;
-//! - 'changes.rs': the per-visit step that view completion runs at
-//!   each unrestricted vognode and historical phantom;
+//! - 'completion.rs': rendering and rerendering a whole buffer, each a
+//!   refresh in diff-view mode ('server/refresh/diff_view.rs');
+//! - 'changes.rs': what changed about a node, and the change viewnodes
+//!   that say it;
 //! - 'change_viewnodes.rs': the diff view's own viewnodes;
-//! - 'shallow_model_subtree.rs': reconciling what a viewnode holds with a
-//!   shallow model subtree of it;
-//! - 'partner_folders.rs': the partner folders over the straddle;
 //! - 'change_leaves.rs': the change-forest leaves and their readiness;
 //! - 'readiness_store.rs': the marks the user set;
 //! - 'readiness_requests.rs': where the store meets a viewforest;
@@ -22,10 +18,7 @@ pub mod change_leaves;
 pub mod change_viewnodes;
 pub mod changes;
 pub mod completion;
-pub mod shallow_model_subtree;
-pub mod partner_folders;
 pub mod pruned_change_view;
 pub mod readiness_requests;
 pub mod readiness_store;
 pub mod restore_requests;
-pub mod visit;

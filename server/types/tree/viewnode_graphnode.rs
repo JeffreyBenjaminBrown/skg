@@ -1,55 +1,12 @@
 /// Node access utilities for ego_tree::Tree<Viewnode>
 
-use crate::types::misc::{ID, SkgrepoName};
-use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, UnrestrictedVognode, viewnode_of };
+use crate::types::misc::ID;
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::Vognode;
-use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
 use crate::refresh::ancestry::parent_reads_claims;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
-
-/// Apply a mutating function to the UnrestrictedVognode at the given tree position.
-/// Errors if the node is not found or is not an UnrestrictedVognode.
-pub fn write_at_unrestrictedVognode_in_tree<F, R> (
-  tree   : &mut Tree<Viewnode>,
-  treeid : NodeId,
-  f      : F,
-) -> Result<R, String>
-where F: FnOnce (&mut UnrestrictedVognode) -> R {
-  write_at_node_in_tree (
-    tree, treeid,
-    |viewnode| { match &mut viewnode . kind {
-      // A phantom is not an UnrestrictedVognode (it carries a slim PhantomDiff), so
-      // this Unrestricted-only mutator cannot apply to one (a phantom has no
-      // view_requests/editability/etc).
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        => Ok ( f (t) ),
-      _ => Err ( "write_at_unrestrictedVognode_in_tree: expected UnrestrictedVognode"
-                   . to_string () ) }} ) ? }
-
-/// Extract (ID, skgrepo) from a non-phantom vognode that carries both.
-/// Returns an error if the node is not found or cannot provide both fields.
-pub fn pid_and_skgrepo_from_viewnode_at (
-  tree        : &Tree<Viewnode>,
-  treeid      : NodeId,
-  caller_name : &str,
-) -> Result<(ID, SkgrepoName), Box<dyn Error>> {
-  let node_ref : NodeRef<Viewnode> =
-    tree . get (treeid) . ok_or_else ( ||
-      format! ( "{}: node not found", caller_name ) ) ?;
-  match &node_ref . value() . kind {
-    ViewnodeKind::Vognode (v) if v . is_current_graphnode () =>
-      v . pid_and_skgrepo ()
-      . map ( |(pid, skgrepo)| (pid . clone (), skgrepo . clone ()) )
-      . ok_or_else (|| format!(
-        "{}: vognode has no repo", caller_name ) . into () ),
-    _ => Err ( format! (
-      "{}: expected a non-phantom vognode with PID and repo",
-      caller_name ) . into() ),
-  }}
 
 /// The ID of this node if it is an occurrence,
 /// else that of its nearest occurrence ancestor.
@@ -68,37 +25,6 @@ pub fn skgid_from_self_or_nearest_ancestor (
       _ => {} }
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
-
-/// Find the unique child of a node with a given non-vognode kind.
-/// Returns None if no child has the kind,
-/// Some(child_id) if exactly one does,
-/// or an error if multiple children have it.
-pub fn unique_non_vognode_child_of_viewnode (
-  tree          : &Tree<Viewnode>,
-  treeid : NodeId,
-  non_vognode_kind : &ViewnodeKind,
-) -> Result<Option<NodeId>, Box<dyn Error>> {
-  unique_non_vognode_child (
-    tree,
-    treeid,
-    non_vognode_kind,
-    |child : &Viewnode| Some (&child . kind))
-  . map_err (|e| -> Box<dyn Error> { e . into() }) }
-
-pub fn insert_non_vognode_as_child (
-  tree          : &mut Tree<Viewnode>,
-  parent_skgid  : NodeId,
-  non_vognode_kind : ViewnodeKind,
-  prepend       : bool, // otherwise, append
-) -> Result < NodeId, Box<dyn Error> > {
-  let viewnode : Viewnode = viewnode_of (non_vognode_kind);
-  let folder_skgid : NodeId = with_node_mut (
-    tree, parent_skgid,
-    |mut parent_mut| {
-      if prepend { parent_mut . prepend (viewnode) . id () }
-      else       { parent_mut . append  (viewnode) . id () } } )
-    . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (folder_skgid) }
 
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.

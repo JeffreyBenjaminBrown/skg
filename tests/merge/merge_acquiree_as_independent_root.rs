@@ -10,15 +10,6 @@
 // content-children of anything), and puts (editRequest (merge b))
 // on d. So d is the acquirer and b is the acquiree.
 //
-// Before this fix, the rerender of the saved buffer would show b
-// as a PhantomDeleted at the top level (b hit
-// deleted_by_this_save_pids in extend_true_content_at_unrestrictedVognode and
-// short-circuited to (deleted ...)). The goal-list-resolution fix
-// in reconcile_content_children only helped for acquirees that
-// were content-children of some other node in the view -- it did
-// nothing for top-level/non-member acquirees because reconcile
-// never runs on them.
-//
 // Correct behaviour: any viewnode with pid = acquiree stands for the
 // acquirer after the save: the refresh re-kinds it in place. The two
 // roots then stand for one node, siblings under the buffer root, and

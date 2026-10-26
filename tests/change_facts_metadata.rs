@@ -51,7 +51,7 @@ fn request (
   Some ( ReadinessRequest { ready, objects : objects (on) } ) }
 
 /// Render 'node', check its metadata against 'expected', parse it
-/// back, and check that the result is 'node' without its change
+/// back, and check that the result is 'node' without its derived
 /// facts, which the parser skips, and with its readiness request.
 fn assert_round_trip (
   node     : Viewnode,
@@ -68,7 +68,25 @@ fn assert_round_trip (
       &metadata, node . title () . to_string (), node . body () . cloned () );
   assert_eq! ( error, None );
   assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
-               Viewnode { change_facts : ChangeFacts::default (), .. node } ); }
+               without_derived_facts (node) ); }
+
+/// 'node' as the parser reads it back: without its derived facts, the
+/// change facts and the warrant, which the parser skips.
+fn without_derived_facts (
+  node : Viewnode,
+) -> Viewnode {
+  let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
+  match &mut node . kind {
+    ViewnodeKind::PropertyMember (
+      PropertyMember::Alias { isWarranted, .. }
+      | PropertyMember::ID { isWarranted, .. }
+      | PropertyMember::Flag { isWarranted, .. } ) =>
+      *isWarranted = skg::types::viewnode::Warrant::ByGraph,
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      ghost . isWarranted = skg::types::viewnode::Warrant::ByGraph,
+    _ => {}, }
+  node }
+
 
 #[test]
 fn a_vognode_renders_its_change_and_readiness_and_round_trips_its_request () {
@@ -163,7 +181,7 @@ fn a_ghost_warranted_property_member_claims_nothing () {
     viewnode_of ( ViewnodeKind::PropertyMember ( PropertyMember::ID {
       skgid : ID::from ("x"),
       claimsMembership : false,
-      isWarranted : skg::types::viewnode::Warrant::ByGraph } )),
+      isWarranted : skg::types::viewnode::Warrant::ByHead } )),
     facts ( None, Some (Existence::Removed), None ),
     request (true, &[]) );
   assert_round_trip (

@@ -31,7 +31,7 @@ fn request_all () -> Option<ReadinessRequest> {
 
 /// Render 'node', check its metadata against 'expected', parse it
 /// back with its headline and body, and check that the result is
-/// 'node' again, less its change facts.
+/// 'node' again, less its derived facts.
 fn assert_round_trip (
   node     : Viewnode,
   expected : &str,
@@ -48,7 +48,25 @@ fn assert_round_trip (
   assert_eq! ( error, None );
   assert_eq! ( warning, None );
   assert_eq! ( Viewnode::try_from (parsed) . unwrap (),
-               Viewnode { change_facts : ChangeFacts::default (), .. node } ); }
+               without_derived_facts (node) ); }
+
+/// 'node' as the parser reads it back: without its derived facts, the
+/// change facts and the warrant, which the parser skips.
+fn without_derived_facts (
+  node : Viewnode,
+) -> Viewnode {
+  let mut node : Viewnode = Viewnode { change_facts : ChangeFacts::default (), .. node };
+  match &mut node . kind {
+    ViewnodeKind::PropertyMember (
+      PropertyMember::Alias { isWarranted, .. }
+      | PropertyMember::ID { isWarranted, .. }
+      | PropertyMember::Flag { isWarranted, .. } ) =>
+      *isWarranted = Warrant::ByGraph,
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      ghost . isWarranted = Warrant::ByGraph,
+    _ => {}, }
+  node }
+
 
 fn change_viewnode (
   change            : ChangeViewnode,
@@ -128,13 +146,13 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
                                               relRepo : None,
                                               relationshipEditRequest : None,
                                               claimsMembership : false,
-                                              isWarranted : Warrant::ByGraph },
+                                              isWarranted : Warrant::ByHead },
                       removed . clone (), None ),
     "alias noClaim (view ghostWarrant) (diff (rel removed) (ready))" );
   assert_round_trip (
     property_member ( PropertyMember::ID { skgid : ID::from ("old-id"),
                                            claimsMembership : false,
-                                           isWarranted : Warrant::ByGraph },
+                                           isWarranted : Warrant::ByHead },
                       removed, request_all () ),
     "id noClaim (editRequest (ready all)) (view ghostWarrant) (diff (rel removed) (ready))" ); }
 

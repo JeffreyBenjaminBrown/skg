@@ -1,15 +1,7 @@
-// The per-kind reconcilers view completion (complete_nodes_in_level_order in
-// complete.rs) dispatches to. There is no preorder/postorder split: each is run
-// at its node's own BFS visit.
+// The goal computers the refresh ('server/refresh/goal.rs') reads.
 
-pub mod aliasfolder;
-pub mod flags_folder;
 pub mod content;
-pub mod hiddeninsubscribee_folder;
-pub mod hiddenoutsideof_subscribeefolder;
-pub mod id_folder;
 pub mod partner_folder;
-pub mod view_requests;
 
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::{ID, SkgrepoName};

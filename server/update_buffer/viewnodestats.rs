@@ -8,10 +8,9 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::refresh::ancestry::parent_reads_claims;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
-  GraphnodeStats, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode, Warrant };
-use crate::update_buffer::ancestry::required_ancestor;
+  GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
+use crate::refresh::ancestry::required_ancestor_of;
 use crate::update_buffer::reconcile::content::unintegrated_content_skgids;
-use crate::update_buffer::warrant::warrant_of_viewnode;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 
@@ -23,18 +22,10 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::SubscribesTo,
   NodeRelation::Overrides, ];
 
-/// Who sets the warrants, and the claims of the property members and
-/// unknowns, in a stats pass.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WarrantsAndMemberClaims {
-  /// The stats pass, from the graph alone ('set_warrant',
-  /// 'set_member_claim_and_warrant'), as the old walk needs.
-  SetByTheStatsPass,
-  /// The refresh's ladder ('server/refresh/'), which knows what HEAD
-  /// warrants; the stats pass leaves them as they are.
-  AlreadySet,
-}
-
+/// The stats of each occurrence (its rels, props, birth, 'cycle',
+/// 'repoBoundary', 'omittedBody', relRepo). The warrants and the
+/// claims are the refresh's ladder's ('server/refresh/'); this pass
+/// leaves them as they are.
 pub fn set_viewnodestats_in_viewforest (
   viewforest            : &mut Tree<Viewnode>,
   graph                 : &InRustGraph,
@@ -42,21 +33,6 @@ pub fn set_viewnodestats_in_viewforest (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
-) {
-  set_viewnodestats_in_viewforest_with (
-    viewforest, graph, container_to_contents, content_to_containers,
-    config, restriction, WarrantsAndMemberClaims::SetByTheStatsPass ); }
-
-/// 'set_viewnodestats_in_viewforest', with the warrants and member
-/// claims set as 'warrants' says.
-pub fn set_viewnodestats_in_viewforest_with (
-  viewforest            : &mut Tree<Viewnode>,
-  graph                 : &InRustGraph,
-  container_to_contents : &HashMap<ID, HashSet<ID>>,
-  content_to_containers : &HashMap<ID, HashSet<ID>>,
-  config                : &SkgConfig,
-  restriction           : Option<&SkgrepoRestriction>,
-  warrants              : WarrantsAndMemberClaims,
 ) {
   let multi_skgrepo : bool = config . skgrepos . len () > 1;
   let mut ancestor_skgids : HashSet<ID> = HashSet::new ();
@@ -68,7 +44,6 @@ pub fn set_viewnodestats_in_viewforest_with (
     Some (graph),
     config,
     restriction,
-    warrants,
     &mut ancestor_skgids,
     container_to_contents,
     content_to_containers ); }
@@ -80,13 +55,10 @@ fn set_viewnodestats_recursive (
   graph                 : Option<&InRustGraph>,
   config                : &SkgConfig,
   restriction           : Option<&SkgrepoRestriction>,
-  warrants              : WarrantsAndMemberClaims,
   ancestor_skgids       : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let sets_warrants : bool =
-    warrants == WarrantsAndMemberClaims::SetByTheStatsPass;
   let opt_pid : Option<ID> =
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
@@ -95,19 +67,14 @@ fn set_viewnodestats_recursive (
         tree, treeid, &node_pid, ancestor_skgids );
       if multi_skgrepo {
         set_skgrepo_at_boundary (tree, treeid); }
-      let is_member_here : bool = stands_as_member (tree, treeid, warrants);
+      let is_member_here : bool = stands_as_member (tree, treeid);
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, is_member_here, graph, restriction,
         container_to_contents, content_to_containers );
       set_omitted_body (tree, treeid, &node_pid, graph);
       set_relRepo (tree, treeid, is_member_here, graph, config);
-      if sets_warrants {
-        set_warrant (tree, treeid, graph, config, restriction); }
       Some (node_pid)
-    } else {
-      if sets_warrants {
-        set_member_claim_and_warrant (tree, treeid, graph, config, restriction); }
-      None };
+    } else { None };
   let was_new : bool =
     if let Some ( ref pid ) = opt_pid
     { ancestor_skgids . insert ( pid . clone() ) }
@@ -123,7 +90,6 @@ fn set_viewnodestats_recursive (
       graph,
       config,
       restriction,
-      warrants,
       ancestor_skgids,
       container_to_contents,
       content_to_containers ); }
@@ -134,22 +100,19 @@ fn set_viewnodestats_recursive (
 /// Whether the unrestricted vognode at 'treeid' stands as a member of
 /// its viewparent, for the facts its membership explains (its birth,
 /// its relRepo). Where the viewparent reads its children's claims
-/// ('parent_reads_claims'), and wherever the old walk set them
-/// ('SetByTheStatsPass'), that is its claim. Under any other parent a
-/// refreshed child claims nothing: a root stands as one, a folder's
-/// member does when the truth warrants it, and a write-protected
-/// occurrence's child does not.
+/// ('parent_reads_claims'), that is its claim. Under any other parent
+/// a child claims nothing: a root stands as one, a folder's member
+/// does when the truth warrants it, and a write-protected occurrence's
+/// child does not.
 fn stands_as_member (
   tree     : &Tree<Viewnode>,
   treeid   : NodeId,
-  warrants : WarrantsAndMemberClaims,
 ) -> bool {
   let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
   let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &node . value () . kind
     else { return false; };
   let Some (parent) = node . parent () else { return t . claimsMembership; };
-  if warrants == WarrantsAndMemberClaims::SetByTheStatsPass
-     || parent_reads_claims (tree, parent . id ()) {
+  if parent_reads_claims (tree, parent . id ()) {
     return t . claimsMembership; }
   match &parent . value () . kind {
     ViewnodeKind::BufferRoot => true,
@@ -288,8 +251,8 @@ fn tracked_ancestors (
       let mut out : Vec<(ID, usize)> = Vec::new ();
       let mut i : usize = 0;
       loop {
-        match required_ancestor (tree, *folder_treeid, i) {
-          Ok (Some (anc_skgid)) => {
+        match required_ancestor_of (tree, *folder_treeid, i) {
+          Some (anc_skgid) => {
             if let Some (pid) = unrestricted_vognode_pid (tree, anc_skgid) {
               out . push ( (pid, i + 2) ); }
             i += 1; }
@@ -431,58 +394,6 @@ fn birth_facts_for_folder (
               NodeRelation::HidesFromSubs, Side::In, Some (3) ) ],
     // 'ParentKind::Folder' holds partner folders only.
     Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (), } }
-
-/// Sets 'isWarranted' on the unrestricted vognode at treeid (see
-/// 'warrant_of_viewnode'). Warranted without a graph handle (some
-/// tests): better no herald than a wrong one.
-fn set_warrant (
-  tree        : &mut Tree<Viewnode>,
-  treeid      : NodeId,
-  graph       : Option<&InRustGraph>,
-  config      : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
-) {
-  let warrant : Warrant = match graph {
-    Some (graph) => warrant_of_viewnode (
-      tree . get (treeid) . unwrap (), graph, config, restriction ),
-    None => Warrant::ByGraph, };
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-    &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . isWarranted = warrant; }}
-
-/// On a property member, sets 'isWarranted' (as 'set_warrant' does on
-/// an occurrence); on an alias, an ID or an unknown, sets
-/// 'claimsMembership' to whether HEAD alone does not warrant it
-/// ('Viewnode::is_ghostWarranted'), since the save must not read one
-/// the worktree lost. Anything else is left alone.
-fn set_member_claim_and_warrant (
-  tree        : &mut Tree<Viewnode>,
-  treeid      : NodeId,
-  graph       : Option<&InRustGraph>,
-  config      : &SkgConfig,
-  restriction : Option<&SkgrepoRestriction>,
-) {
-  let (claims, warrant) : (bool, Warrant) = {
-    let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
-    if ! matches! ( &node . value () . kind,
-                    ViewnodeKind::PropertyMember (_)
-                    | ViewnodeKind::Vognode (Vognode::Unknown (_)) )
-    { return; }
-    ( ! node . value () . is_ghostWarranted (),
-      match graph {
-        Some (graph) => warrant_of_viewnode (node, graph, config, restriction),
-        None => Warrant::ByGraph, } ) };
-  match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::PropertyMember (
-      PropertyMember::Alias { claimsMembership, isWarranted, .. }
-      | PropertyMember::ID { claimsMembership, isWarranted, .. } ) => {
-      *claimsMembership = claims;
-      *isWarranted = warrant; },
-    ViewnodeKind::PropertyMember (PropertyMember::Flag { isWarranted, .. }) =>
-      *isWarranted = warrant,
-    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
-      unknown . claimsMembership = claims,
-    _ => {}, }}
 
 /// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one

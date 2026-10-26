@@ -939,7 +939,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [ "cycle", "repoBoundary", "noWarrant", "omittedBody",
          "overridesHere", "relRepo",
-         // A property member's ghost warrant ('Viewnode::is_ghostWarranted').
+         // A ghost warrant ('Warrant::ByHead').
          "ghostWarrant" ] }
 
 /// The claim atom the serializer can emit: 'noClaim' on an occurrence,

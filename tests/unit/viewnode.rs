@@ -12,15 +12,14 @@ use std::collections::HashMap;
 
 // 'Folder::goal_is_ordered', 'Folder::is_editable' and
 // 'Folder::members_are_properties' are the per-kind facts that the
-// save, the reconcilers, the refresh and the heralds consult; this
-// pins them.
+// save, the refresh and the heralds consult; this pins them.
 #[test]
 fn folder_kind_facts () {
   let ordered : Vec<Folder> = vec! [
-    Folder::Subscribee, Folder::Overridden,
+    Folder::Subscribee, Folder::Overridden, Folder::Hidden,
     Folder::HiddenOutsideOfSubscribee, Folder::Alias ];
   let unordered : Vec<Folder> = vec! [
-    Folder::Subscriber, Folder::Overrider, Folder::Hider, Folder::Hidden,
+    Folder::Subscriber, Folder::Overrider, Folder::Hider,
     Folder::HiddenInSubscribee, Folder::Container, Folder::Mentioner,
     Folder::AcquiredBy, Folder::Acquired, Folder::ID, Folder::flags () ];
   for folder in &ordered {

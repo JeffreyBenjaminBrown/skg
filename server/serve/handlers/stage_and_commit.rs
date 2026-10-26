@@ -86,9 +86,8 @@ pub fn handle_stage_and_commit_request (
 
 /// After a git-commit: rerender each open buffer of the diff view as
 /// any rerender does, over the graph straddle the commit rebuilt. Its
-/// roots stay ('docs/diff-view.org', "The shallow model subtree, and
-/// what it keeps"), and what the commit made unchanged loses its
-/// decorations. The commit requires the skgrepo-set all, so no text is
+/// roots stay ('docs/diff-view.org', "What the refresh keeps"), and
+/// what the commit made unchanged loses its decorations. The commit requires the skgrepo-set all, so no text is
 /// withheld and no release is asked for.
 fn stream_rerender_diffView_views (
   stream              : &mut TcpStream,

@@ -153,20 +153,6 @@ fn add_relationship_contributions (
     let key : ID = canonical_key (identity, second_member);
     add_to_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
-/// Narrow fixture helper for unit tests that construct `GraphnodeInRust` directly.
-#[cfg(test)]
-pub(crate) fn add_to_inverse_indexes (
-  graph : &mut InRustGraph,
-  node  : &GraphnodeInRust,
-) {
-  for extra in &node . extra_ids {
-    graph . extra_id_to_pid . insert (
-      extra . clone (), node . pid . clone ()); }
-  let mut identity : InRustGraph = graph . clone ();
-  identity . nodes . insert (node . pid . clone (), node . clone ());
-  add_relationship_contributions (graph, node, &identity);
-}
-
 /// Remove a node's contributions from every recorderward relmap. Used
 /// during update (before inserting the new GraphnodeInRust) and during
 /// delete.

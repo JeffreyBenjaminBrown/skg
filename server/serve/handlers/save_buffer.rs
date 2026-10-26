@@ -643,7 +643,7 @@ fn backfill_parse_warnings (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - NodeMerges must follow the execution of other nodeInstructions, because the user may have updated one of the nodes to be merged.
-/// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, folders, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
+/// - The rerender is a refresh of each view ('refresh_viewforest', 'server/refresh/'): one level-order walk that runs the ladder at each parent, then a tail that sets the derived facts and prunes the childless tombstones.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,

@@ -35,7 +35,7 @@ use crate::refresh::Walk;
 use crate::refresh::ancestry::required_ancestor_of;
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
-  Goal, GoalItem, GoalMember, folder_goal_is_ordered, member_of_child};
+  Goal, GoalItem, GoalMember, member_of_child};
 use crate::refresh::id_rule::entombstone_gone_change;
 use crate::refresh::ladder::children_of;
 use crate::types::misc::{ID, SkgrepoName};
@@ -155,7 +155,7 @@ pub(crate) fn folder_goal (
                          || straddle . node_in_either_graph (&partner . id) )
     . map (partner_item)
     . collect (),
-    folder_goal_is_ordered (kind) )) }
+    kind . goal_is_ordered () )) }
 
 /// A property folder's members over the straddle: the union of the
 /// node's aliases, IDs or true flags in the two graphs, each lost one

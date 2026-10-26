@@ -197,8 +197,7 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus, folder . repr_in_client () )),
     ViewnodeKind::PropertyMember (member) =>
       Ok ( propertyMember_metadata_to_string (
-        viewnode . foldAndFocus, member, claims_are_read,
-        viewnode . is_ghostWarranted (), facts, request )),
+        viewnode . foldAndFocus, member, claims_are_read, facts, request )),
     ViewnodeKind::ChangeViewnode (change) =>
       Ok ( changeViewnode_metadata_to_string (
         viewnode . foldAndFocus, change, facts, request )),
@@ -241,7 +240,6 @@ fn propertyMember_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   member          : &PropertyMember,
   claims_are_read : bool,
-  ghostWarranted  : bool,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
@@ -250,8 +248,8 @@ fn propertyMember_metadata_to_string (
     PropertyMember::Alias { isWarranted, .. }
       | PropertyMember::ID { isWarranted, .. }
       | PropertyMember::Flag { isWarranted, .. } => *isWarranted, };
-  let warrant_atom : Option<String> = // a ghost warrant first: HEAD warrants it
-    if ghostWarranted || isWarranted == Warrant::ByHead {
+  let warrant_atom : Option<String> =
+    if isWarranted == Warrant::ByHead {
       Some ( "ghostWarrant" . to_string () ) }
     else if isWarranted == Warrant::No { Some ( "noWarrant" . to_string () ) }
     else { None };

@@ -1227,3 +1227,174 @@ the model would have to allow. For the review: the enrichment
 thread now only writes a payload, kept for the protocol's
 timing; a candidate for removal if the timing does not need it.
 
+
+** Slice 11: the diff view on it
+*** What's done
+'complete_viewforest_with_graph_straddle'
+('server/diff_view/completion.rs') is a refresh in diff-view
+mode: the first rendering refreshes a stub of the buffer's roots
+('stub_viewforest_of_roots'), and every rerender goes through
+'rerender_diffView_buffer', which brings the straddle up to date.
+The goal's HEAD part, 'ByHead' warrants, ghosts drawn and kept in
+place, change viewnodes recomputed in place, the readiness facts
+from the store in the tail; C, R, U and D still choose the roots
+and 'charges_node_budget'. The diff view's corrections ride the
+save and rerender responses like a content view's (test
+'the_diff_views_corrections_ride_the_save_response'). A ghost
+claims membership where its parent's worktree list names its
+gnid; the save keeps that gnid as it keeps an unknown's
+('traverse.rs'; tests
+'a_ghost_that_claims_keeps_its_gnid_in_its_parents_list' and, end
+to end, 'restoring_a_deleted_node'). 'tests/idempotence' holds
+'every_diff_view_fixture_is_a_fixpoint_of_the_refresh': 36
+buffers over 27 git fixture cases. Verified at the TCP surface
+('tests/results/slice11/verify.sh'): a straddle with a deleted
+node, a removed relationship and a modified node; a plain save
+(no correction, no file change); a readiness request; restoreRel;
+restoreNode; a final save.
+*** What of the old walk went
+The walk ('update_buffer/complete.rs'), 'finish_viewforest', the
+adapter 'claims_as_the_old_walk_reads_them' (grep-confirmed
+gone), 'visit.rs', 'shallow_model_subtree.rs', the align, tagging
+and step of 'changes.rs', the straddle folder reconciler
+('diff_view/partner_folders.rs'), the content reconciler and its
+'normalize_relationship_backed_content_unknowns', the alias, ID,
+flags, compound and partner folder reconcilers, the view-request
+reconciler, 'complete_managed_children' and 'KeptChildOrder', the
+'convert_*' family, the editability helpers, the
+'build_and_integrate_*' fillers and 'append_plain_stub_root', the
+de novo partner-folder builders, 'EditableMap', the orphan-folder
+death check ('update_buffer/ancestry.rs'), the "newly-extra"
+rewrite, and the two 'CompletionMode' methods the refresh never
+asks. Their unit tests went with them (45 tests).
+*** What stays, and why
+- 'CompletionMode' with its two variants and
+  'charges_node_budget'.
+- The goal computers the refresh reads, where they were:
+  'reconcile/content.rs' ('unintegrated_content_skgids'),
+  'reconcile/partner_folder.rs'
+  ('partnerFolder_members_in_graph'),
+  'to_org/complete/partner_folder/goal_list.rs', and 'kind.rs'
+  ('Folder::relation_member_role').
+- 'to_org/extend/containerward_chain.rs': the refresh draws
+  chains with it. 'to_org/render/content_view.rs': the fresh
+  views. 'to_org/util.rs' keeps two fetch and stats helpers.
+- 'update_buffer/util.rs' keeps
+  'detach_viewnode_transferring_focus' and 'subtree_satisfies'
+  (the tail's prune, the skgrepo switch).
+- 'changes.rs' keeps what the refresh reads ('ChangedAspects',
+  'model_of_front_change_viewnodes',
+  'changed_partner_folder_kinds', 'union_with_existence');
+  'change_viewnodes.rs' its builders.
+*** Deviations from the plan's "how"
+**** the old walk's residue beyond the list went too
+The stats pass's own warrant mode ('SetByTheStatsPass', "as the
+old walk needs") and 'update_buffer/warrant.rs' with its unit
+tests: only two tests reached them.
+'Viewnode::is_ghostWarranted': a lost alias or ID is 'ByHead'
+now, set by the ladder, so the printer reads the warrant alone.
+'Folder::goal_is_ordered' counts the hidden folder and the
+refresh's 'folder_goal_is_ordered' is gone (slices 8 and 9
+deferred the merge to here). Tree helpers only the old walk used.
+The old step's ghost-content builder lives on in the wire test
+that hand-builds such a buffer.
+**** the ghost's claim and warrant are on the wire
+'Ghost' gained 'claimsMembership' and 'isWarranted'. The printer
+writes 'noClaim' on a ghost that claims nothing where claims are
+read, and '(view noWarrant)' on one nothing warrants, never
+'ghostWarrant' (the kind is its own herald); the parser accepts
+both; 'shared/metadata-fields.json' offers 'noClaim' on a ghost.
+So both clients' pending-detachment herald stays right without a
+client change: a ghost the list dropped carries '(rel removed)'.
+A ghost re-kinded from an occurrence keeps its claim only where
+the list still names it.
+**** change viewnodes are no corrections in the diff view
+Drawing a change viewnode, or entombstoning one whose change is
+gone, is not reported: they describe the straddle and are
+recomputed at every refresh, as tags are; otherwise every save
+that makes a change reported one. A request dropped with one is.
+In a content view a change viewnode is reported, as before.
+**** the integrate request
+'ensure_editableOccurrences_exist' makes an occurrence editable
+directly (not by an editable-view request, which would cascade
+through members outside U), and lets its children claim, as the
+buffer read back would; when roots are appended the buffer is
+refreshed twice. What the request draws is the user's asking, so
+it reports no corrections. The stub roots are plain editable
+occurrences for the same reason.
+**** the editable-view request cascades in the diff view
+As the diff view always did and its tests pin: a drawn occurrence
+is editable in U, or, under an occurrence the request extends,
+while the budget allows; 'after_drawing' passes the request on in
+both modes, and the budget write-protects at the visit wherever
+'charges_node_budget' would charge.
+**** a fulfilled restoreRel leaves its headline claiming
+'consume_edit_request_after_save' sets the claim of a headline
+whose restoreRel the save fulfilled; else the refresh, which
+never sets a claim, would leave a pending detachment and the next
+save would undo the restore.
+**** smaller choices
+- An occurrence the goal does not name is tagged as a root is,
+  with its node's change only.
+- The fixpoint test finds its cases by their 'head' folders; a
+  skgrepo folder named 'foreign' is foreign. 'git_fixture.rs' is
+  declared in 'tests/grouped_overrides.rs' too.
+- 'docs/diff-view.org' cites no 'TODO/' file; its intro paragraph
+  and 'docs/glossary.org' still use the reconcilers' words, left
+  for slice 13.
+*** Regressions in the module, found and fixed
+Each a failure no rule of the plan explains:
+- an occurrence the goal does not name kept stale change facts
+  ('tag_children'), so a commit's rerender still showed '(rel
+  removed)';
+- a folder whose last member the prune removed stayed, empty; the
+  tail now prunes it too (unit test
+  'a_folder_the_prune_leaves_childless_goes_too');
+- the diff view's editable-view request did not cascade (above);
+- after restoreRel the restored member stayed 'noClaim' (above);
+- the integrate request left the children of an occurrence it
+  made editable claiming nothing, so a save detached them
+  (above).
+*** Fixtures adapted, by the rule that changed them
+- 'ByHead' written 'ghostWarrant' on removed members, a ghost's
+  old content and chain nodes HEAD alone relates (script
+  'ghost_warrant_on_removed_members.py', then by hand): 15 tests;
+- a ghost that claims nothing carries 'noClaim'; a ghost takes
+  '(view ...)': 12 tests (buffers, round trips, refusals, the
+  save unit tests' inputs);
+- the warrant is a derived fact the parser skips: the round-trip
+  helpers compare without it, 2 tests;
+- a tombstone keeps its children (an entombstoned ghost, a ghost
+  root after a commit): 4 tests;
+- unwarranted children kept, claiming nothing: 2 tests;
+- the merge rung (a pasted copy merges into the member): 1 test;
+- input editability kept when an editable-view request moves a
+  node's editability: 2 tests;
+- a claim is the user's to make (typed noClaim stays): 1 test;
+- the ID rule: a ghost before an unknown (1 test); a ghost root
+  whose gnid became an extra ID is an occurrence (1 test).
+*** What's imperfect about what's done
+- A folder the diff view drew as changed stays after a commit, a
+  plain folder filled from its goal, since the buffer holds it; a
+  change viewnode or ghost entombstoned by a commit keeps what
+  was drawn under it, as open question 2 says of tombstones.
+- Deleting a node in the diff view is reported as "Made a
+  headline a ghost", as a content view reports its entombstoning.
+- The integrate request refreshes twice when it appends roots.
+*** Suite failures and their classification
+**** first failure: 33 pruned_change_view tests after the wiring
+Seven were the regressions above (three by the stale change
+facts, three by the missing cascade, one each by the restoreRel
+claim and the integrate request's claims; the emptied folder
+showed in an adapted one); the other 26 were expected fixture
+adaptations by the rules listed above. Then 23 after the ghost's
+claim: 12 fixture adaptations, and 11 the same as before. All
+1001 passed before the deletion.
+**** after the deletion: 3 tests
+'the_new_viewnodes_cross_the_wire': an overlapping edit of mine
+(the test's own copy of the ghost-content builder lacked the
+acquired-by folder), fixed. Two round trips: the warrant is a
+derived fact (above). 'bash/nextest.sh' at the end: 956 of 956.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 10, with either
+client; the other 34 pass with each.

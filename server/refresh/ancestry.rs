@@ -7,9 +7,8 @@
 //! the tombstone. A vognode has no row: an occurrence is never
 //! unsayable.
 //!
-//! The old walk reads the folder rows too
-//! ('server/update_buffer/ancestry.rs'), to entombstone an orphaned
-//! folder and to read a folder's ancestors.
+//! The stats pass reads a folder's ancestors through the table too
+//! ('required_ancestor_of').
 
 use crate::types::viewnode::{
   ChangeViewnode, Folder, PropertyMember, Viewnode, ViewnodeKind, Vognode};

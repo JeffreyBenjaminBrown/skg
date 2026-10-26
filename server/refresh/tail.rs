@@ -20,8 +20,7 @@ use crate::update_buffer::completion_mode::CompletionMode;
 use crate::update_buffer::graphnodestats::{
   set_graphnodestats_in_viewforest, set_graphnodestats_in_viewforest_with_skgrepo_set};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
-use crate::update_buffer::viewnodestats::{
-  WarrantsAndMemberClaims, set_viewnodestats_in_viewforest_with};
+use crate::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -52,11 +51,10 @@ fn set_derived_facts (
         viewforest . as_internal_tree_mut (), truth . graph, truth . config, restriction ) ?,
       None => set_graphnodestats_in_viewforest (
         viewforest . as_internal_tree_mut (), truth . graph, truth . config ) ?, };
-  set_viewnodestats_in_viewforest_with (
+  set_viewnodestats_in_viewforest (
     viewforest . as_internal_tree_mut (), truth . graph,
     &container_to_contents, &content_to_containers,
-    truth . config, truth . restriction,
-    WarrantsAndMemberClaims::AlreadySet );
+    truth . config, truth . restriction );
   if let CompletionMode::DiffView { straddle, buffer_kind } = walk . mode {
     let store : &ReadinessStore = readiness_store
       . ok_or ("refresh_viewforest: the diff view needs the readiness store") ?;

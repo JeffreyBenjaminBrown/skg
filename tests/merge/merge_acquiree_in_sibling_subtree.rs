@@ -141,7 +141,7 @@ async fn merge_acquiree_in_sibling_subtree_impl (
   // 4. The MERGED: b preserver should appear somewhere in the view.
   //    Exactly one of the two d occurrences (a's and c's) is
   //    editable; the other is write-protected and won't extend its
-  //    contents. EditableMap picks the first in document order.
+  //    contents. The refresh keeps the first in level order editable.
   if ! view . contains ("MERGED: b") {
     failures . push (
       "text preserver 'MERGED: b' not found anywhere in rendered \

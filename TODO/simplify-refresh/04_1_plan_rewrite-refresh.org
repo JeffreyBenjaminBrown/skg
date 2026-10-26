@@ -1082,7 +1082,7 @@ is extent, not correction. This slice makes the corrections
 list exclude those, so that a reinstatement is reported only
 where a list already drawn was missing a member, and tests
 that a fresh view and a plain save report nothing.
-** TODO Slice 11: the diff view on it
+** DONE Slice 11: the diff view on it
 'complete_viewforest_with_graph_straddle' calls
 'refresh_viewforest' in diff-view mode: the goal's HEAD part,
 'ByHead' warrants, ghosts drawn and retained, change viewnodes
