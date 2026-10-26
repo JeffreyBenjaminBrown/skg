@@ -2,7 +2,7 @@
 /// Nodes of the graph are represented via the 'Graphnode' type.
 /// Nodes of the tree are represented via the 'Viewnode' type.
 /// Some 'Viewnode's represent graphnodes, which need not exist; these are
-/// 'Vognode's (unrestricted or phantom).
+/// 'Vognode's (an occurrence, a ghost or an unknown).
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
@@ -45,7 +45,7 @@ pub struct ChangeFacts {
 /// '(leaves N OBJECT...)': the change-forest leaves a readiness
 /// request on a viewnode may name ('docs/diff-view.org', "Change
 /// facts on the wire"). The OBJECTs are 'node' and/or 'rel' on a vognode or
-/// historical phantom, each worth one leaf; 'all' on a modified node
+/// ghost, each worth one leaf; 'all' on a modified node
 /// (beside 'rel' when that names a leaf) and on a commit readiness
 /// aggregate; none where a bare request names them all.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -164,71 +164,30 @@ impl ViewnodeKind {
                      if ! folder . members_are_properties () ) }
 }
 
-/// A viewnode that represents a graphnode, which need not exist: an
-/// Unrestricted vognode represents a current graphnode; a Phantom
-/// represents a missing or historical one. A node the skgrepo
-/// restriction hides has no vognode: its occurrence is entombstoned
-/// ('entombstone_hidden_occurrences').
+/// A viewnode that stands for a gnid: an Unrestricted vognode (an
+/// occurrence) for a node the gated graph has; a ghost, only in the
+/// diff view, for a node HEAD has and the worktree lacks; an unknown
+/// for a gnid its parent's list names and no node answers to. A node
+/// the skgrepo restriction hides has no vognode: its occurrence is
+/// entombstoned ('entombstone_hidden_occurrences'), and so is the
+/// occurrence of a node that vanished, unless the diff view can show
+/// it as a ghost.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
-  Unrestricted   (UnrestrictedVognode),
-  Phantom  (Phantom),
+  Unrestricted (UnrestrictedVognode),
+  Ghost        (Ghost),
+  Unknown      (Unknown),
 }
 
-/// The three display-only phantom kinds. None of them is a current
-/// graphnode: all are save-inert on save and excluded from the view's collateral pids
-/// (`pids_from_viewforest`). They differ in *why* the node is absent and thus
-/// in how much they can still say about it.
-#[derive( Debug, Clone, PartialEq )]
-pub enum Phantom {
-  Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
-  // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
-  Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
-  Historical (PhantomHistorical), // The diff view's image of a node that HEAD has and the worktree lacks.
-}
-
-/// A phantom for a node whose .skg file a save just
-/// removed -- one of the three phantom kinds, alongside PhantomHistorical and
-/// PhantomUnknown. All three stand in for something that is not a current
-/// graphnode (so all three are save-inert on save and excluded from the view's
-/// collateral pids, `pids_from_viewforest`); they differ in *why* the node is
-/// absent and thus in how much they can still say about it.
-///
-/// ARISES: during post-save / collateral re-render, when
-/// a node already materialized in the view turns up in
-/// `deleted_by_this_save_pids`. An Unrestricted content child flips here via
-/// `mutate_unrestrictedVognode_to_deletednode`. So it marks a node that
-/// genuinely no longer exists in the graph, killed
-/// by a completed save (this buffer's or a shared one's) -- not a git artifact.
-///
-/// USED: save-inert -- it generates no fieldIntents and is excluded from its
-/// parent's contains list. It is never "completed", yet it retains its children
-/// (which `mark_orphans_under_dead_parents_false` makes non-members)
-/// so the user's subtree under a vanished node survives. A childless Deleted is
-/// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
-/// may stand as a view root (validate_tree) so a deleted root still shows.
-///
-/// DISTINCT INFO: unlike PhantomUnknown it knows its `repo`, and unlike either
-/// other phantom it keeps the `title`/`body` it last displayed -- because it was
-/// a fully materialized node right up until the save deleted it, so that text is
-/// still worth showing.
-#[derive( Debug, Clone, PartialEq )]
-pub struct PhantomDeleted {
-  pub skgid        : ID,
-  pub home_skgrepo : SkgrepoName,
-  pub title        : String,
-  pub body         : Option < String >,
-}
-
-/// A phantom for a reference that resolves to nothing --
-/// one of the three phantom kinds, alongside PhantomHistorical and PhantomDeleted
-/// (see PhantomDeleted for the shared framing).
+/// A reference that resolves to nothing: a gnid that its parent's
+/// list names and no node answers to.
 ///
 /// ARISES: when some node's `contains` (or similar list) names an ID that has no
 /// record anywhere -- not a primary pid or extra_id in the graph, not on disk,
-/// and not recoverable through any phantom/diff procedure. Built by
+/// and not recoverable through any diff procedure. Built by
 /// `mk_unknown_viewnode`, e.g. when `graphnode_and_viewnode_from_id` returns
-/// None. A genuine dangling pointer.
+/// None. A genuine dangling pointer. Can result from bad data, or from a
+/// reference to another user's node that has since been deleted.
 ///
 /// USED: it lets the view degrade gracefully -- carrying the bad reference as
 /// its own kind, rather than erroring, is what keeps a single bad reference deep
@@ -239,12 +198,12 @@ pub struct PhantomDeleted {
 /// converts to a tombstone (`convert_nonmember_unknown_children_to_tombstones`) and
 /// is pruned.
 ///
-/// DISTINCT INFO: it carries only the `id`. Unlike PhantomDeleted it has no skgrepo
-/// (it is the one Phantom kind for which `pid_and_repo` returns None) and no
-/// last-seen text; unlike PhantomHistorical it has no old text. That emptiness is
-/// the information: a reference exists, but we have no record of its target.
+/// DISTINCT INFO: it carries only the `id`: no skgrepo (it is the one
+/// vognode for which `pid_and_skgrepo` returns None) and no text.
+/// That emptiness is the information: a reference exists, but we have
+/// no record of its target.
 #[derive( Debug, Clone, PartialEq )]
-pub struct PhantomUnknown {
+pub struct Unknown {
   pub skgid                 : ID,
   /// Display-only fact about this occurrence's binding relationship.
   pub relRepo         : Option<SkgrepoName>,
@@ -254,34 +213,42 @@ pub struct PhantomUnknown {
   pub relationshipEditRequest : Option<RelationshipEditRequest>,
 }
 
-/// A phantom for a node that the before-graph of the diff
-/// view's graph straddle has and the after-graph lacks: a node deleted
-/// (or acquired by a nodeMerge) since HEAD.
+/// A ghost: a node that the before-graph of the diff view's graph
+/// straddle has and the after-graph lacks -- a node deleted (or
+/// acquired by a nodeMerge) since HEAD. Drawn and retained only in
+/// the diff view.
 ///
 /// ARISES: only in a diff view, built from the graph straddle
 /// ('server/diff_view/change_viewnodes.rs'): under each former
-/// container as a former member, or as a view root. Its own old
-/// content hangs beneath it, recursing into deleted members.
+/// container as a former member, or as a view root; or, in place, from
+/// an occurrence whose node a save deleted. Its own old content hangs
+/// beneath it, recursing into deleted members. It stays until the
+/// user entombstones it ('(viewRequests tombstone)'), and becomes an
+/// occurrence again, in place, when its node is back.
 ///
-/// USED: write-protected and save-inert, like every phantom: it emits
-/// no fieldIntents, is excluded from its parent's contains, and the
-/// vognodes under it are not its members. The diff view's
-/// reconciler draws it, and knows it by its kind.
+/// USED: write-protected and save-inert: it emits no fieldIntents, is
+/// excluded from its parent's contains, and the vognodes under it are
+/// not its members. The diff view's reconciler draws it, and knows it
+/// by its kind.
 ///
 /// DISTINCT INFO: the before-graph's title, body and home skgrepo.
 /// Its viewnode's change facts are those of its existence ('(node
 /// removed)') and of its relationship to its viewparent ('(rel
 /// removed)'), each a change-forest leaf.
 #[derive( Debug, Clone, PartialEq )]
-pub struct PhantomHistorical {
+pub struct Ghost {
   pub skgid             : ID,
   pub home_skgrepo      : SkgrepoName,
   pub title             : String,
   pub body              : Option<String>,
   /// True when the user asked, by '(editRequest restoreNode)', that
   /// the save write the node back as HEAD recorded it. The only edit
-  /// request a phantom carries; consumed after the save.
+  /// request a ghost carries; consumed after the save.
   pub restoreNode_request : bool,
+  /// True when the user asked, by '(viewRequests tombstone)', that the
+  /// next refresh entombstone this ghost. The only view request a
+  /// ghost carries; the refresh fulfills it.
+  pub tombstone_request : bool,
 }
 
 pub type UnrestrictedVognode   = UnrestrictedVognode_Generic < ID, SkgrepoName >;
@@ -520,8 +487,8 @@ pub enum Folder {
   Container, // Collects nodes that contain its parent. Write-protected (editable from the other side of the relationship).
   Mentioner, // Collects nodes that link to its parent. Write-protected (a link lives in the linking node's text).
   // The diff view's two derived folders. Their membership comes from the extra IDs of the graph straddle's after-graph; both are save-inert.
-  AcquiredBy, // Child of a historical phantom: the node that acquired it by a nodeMerge.
-  Acquired, // Child of an acquirer: the historical phantoms of the nodes it acquired.
+  AcquiredBy, // Child of a ghost: the node that acquired it by a nodeMerge.
+  Acquired, // Child of an acquirer: the ghosts of the nodes it acquired.
   // The three property folders.
   Alias,
   ID,
@@ -540,7 +507,7 @@ pub enum NodeEditRequest {
   // The diff view's two restore requests ('docs/diff-view.org',
   // "Restoring what a change removed"). Neither lives in
   // 'Editability': a parsed RestoreNode becomes
-  // 'PhantomHistorical::restoreNode_request', a parsed RestoreRel
+  // 'Ghost::restoreNode_request', a parsed RestoreRel
   // 'RelationshipEditRequest::RestoreRel'.
   RestoreNode, // write back a node deleted since HEAD
   RestoreRel,  // re-add a relationship removed since HEAD
@@ -631,6 +598,9 @@ pub enum ViewRequest {
   WriteProtected,
   WriteProtectedSubtree,
   Fork,
+  /// Entombstone this ghost, keeping what stands under it. Valid
+  /// only on a ghost, where it becomes 'Ghost::tombstone_request'.
+  Tombstone,
 }
 
 //
@@ -846,44 +816,29 @@ impl ChangesetMarkerKind {
 }
 
 impl Vognode {
-  /// The id the vognode stands for; a phantom's is that of the node
-  /// it stands for.
+  /// The id the vognode stands for.
   pub fn skgid (&self) -> &ID {
     match self {
-      Vognode::Unrestricted   (t) => &t . skgid,
-      Vognode::Phantom  (p) => p . skgid (),
+      Vognode::Unrestricted (t) => &t . skgid,
+      Vognode::Ghost        (g) => &g . skgid,
+      Vognode::Unknown      (u) => &u . skgid,
     } }
 
+  /// The id and home skgrepo of the node it stands for; None for an
+  /// unknown, which knows no skgrepo.
   pub fn pid_and_skgrepo (
     &self,
   ) -> Option<(&ID, &SkgrepoName)> {
     match self {
-      Vognode::Unrestricted   (t) => Some ((&t . skgid, &t . home_skgrepo)),
-      Vognode::Phantom  (p) => p . pid_and_skgrepo (),
+      Vognode::Unrestricted (t) => Some ((&t . skgid, &t . home_skgrepo)),
+      Vognode::Ghost        (g) => Some ((&g . skgid, &g . home_skgrepo)),
+      Vognode::Unknown      (_) => None,
     } }
 
   /// Whether this vognode represents a current graphnode
-  /// (an Unrestricted one), as opposed to a phantom.
+  /// (an Unrestricted one), as opposed to a ghost or an unknown.
   pub fn is_current_graphnode (&self) -> bool {
-    ! matches! (self, Vognode::Phantom (_)) }
-}
-
-impl Phantom {
-  pub fn skgid (&self) -> &ID {
-    match self {
-      Phantom::Deleted (d) => &d . skgid,
-      Phantom::Unknown (u) => &u . skgid,
-      Phantom::Historical (h) => &h . skgid,
-    } }
-
-  pub fn pid_and_skgrepo (
-    &self,
-  ) -> Option<(&ID, &SkgrepoName)> {
-    match self {
-      Phantom::Deleted (d) => Some ((&d . skgid, &d . home_skgrepo)),
-      Phantom::Unknown (_) => None, // preserves Unknown's lone-None invariant
-      Phantom::Historical (h) => Some ((&h . skgid, &h . home_skgrepo)),
-    } }
+    matches! (self, Vognode::Unrestricted (_)) }
 }
 
 impl DiffChange {
@@ -1052,10 +1007,10 @@ impl Viewnode {
         if let Editability::Editable { edit_request, .. } =
           &mut restriction . editability
         { *edit_request = None; }},
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
         unknown . relationshipEditRequest = None,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
-        historical . restoreNode_request = false,
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+        ghost . restoreNode_request = false,
       ViewnodeKind::PropertyMember (PropertyMember::Alias { relationshipEditRequest, .. }) =>
         *relationshipEditRequest = None,
       _ => {}, }}
@@ -1063,16 +1018,14 @@ impl Viewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . title,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
-        &d . title,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-        &h . title,
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+        &ghost . title,
       ViewnodeKind::PropertyMember (member) => member . title (),
       ViewnodeKind::ChangeViewnode (change) => change . title (),
       ViewnodeKind::Folder (folder) => folder . title (),
       ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone
-        | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) =>
+        | ViewnodeKind::Vognode (Vognode::Unknown (_)) =>
         "",
     }}
 
@@ -1088,12 +1041,11 @@ impl Viewnode {
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t . body (),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => h . body . as_ref (),
+      ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => ghost . body . as_ref (),
       ViewnodeKind::Folder (folder) => folder . body (),
       ViewnodeKind::PropertyMember (member) => member . body (),
       ViewnodeKind::ChangeViewnode (change) => change . body (),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
+      ViewnodeKind::Vognode (Vognode::Unknown (_))
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::Tombstone => None,
     }}
@@ -1113,7 +1065,7 @@ impl Viewnode {
     }}
 
   /// The id of a vognode that represents a current graphnode: None
-  /// for phantoms and non-vognodes.
+  /// for ghosts, unknowns and non-vognodes.
   pub fn skgid_if_current_graphnode (&self) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (v) if v . is_current_graphnode () => Some (v . skgid ()),
@@ -1121,7 +1073,7 @@ impl Viewnode {
     }}
 
   /// The id of an Unrestricted vognode. None for everything else
-  /// (phantoms, folders, non-vognodes, BufferRoot).
+  /// (ghosts, unknowns, folders, non-vognodes, BufferRoot).
   pub fn unrestricted_skgid (&self) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (&t . skgid),
@@ -1172,7 +1124,8 @@ impl fmt::Display for ViewRequest {
       ViewRequest::Editable    => write! (f, "editableView"),
       ViewRequest::WriteProtected        => write! (f, "writeProtectedView"),
       ViewRequest::WriteProtectedSubtree => write! (f, "writeProtectedSubtreeView"),
-      ViewRequest::Fork        => write! (f, "fork"), } } }
+      ViewRequest::Fork        => write! (f, "fork"),
+      ViewRequest::Tombstone   => write! (f, "tombstone"), } } }
 
 //
 // Defaults
@@ -1238,18 +1191,17 @@ pub fn mk_editable_viewnode (
                               edit_request : None },
                             HashSet::new () ) } // view_requests
 
-/// Build a PhantomUnknown wrapper. Use when a referenced ID resolves
-/// to nothing in in_rust_graph, on disk, or via any phantom/diff procedure
-/// -- the phantom lets the view render the line as a herald
+/// Build an unknown. Use when a referenced ID resolves
+/// to nothing in in_rust_graph, on disk, or via any diff procedure
+/// -- the unknown lets the view render the line as a herald
 /// rather than aborting the whole BFS extension.
 pub fn mk_unknown_viewnode (
   skgid : ID,
 ) -> Viewnode {
-  viewnode_of ( ViewnodeKind::Vognode (Vognode::Phantom (
-    Phantom::Unknown ( PhantomUnknown {
+  viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown ( Unknown {
       skgid,
       relRepo         : None,
-      relationshipEditRequest : None, } ) )) ) }
+      relationshipEditRequest : None, } )) ) }
 
 /// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.

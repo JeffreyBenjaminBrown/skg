@@ -295,15 +295,15 @@ async fn test_find_buffer_errors_for_saving (
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_NonVognode error for alias"); }
 
-      // View roots must be UnrestrictedVognodes or deleted nodes.
-      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*unrestrictedVognode.*deleted") . unwrap();
+      // View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*unrestrictedVognode.*ghost") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(|e| matches!(e, BufferValidationError::Other (msg)
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be UnrestrictedVognodes or deleted nodes' error"); }
+                   "Should find 1 'View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts' error"); }
 
       // UnrestrictedVognode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
       { let unrestrictedVognode_children_re =
@@ -464,7 +464,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
         indoc! {"
                 * (skg (node (id root) (repo main))) parent
                 ** (skg (node (id 1) (repo main))) real child
-                ** (skg (historical (id 1) (repo main) (diff (node removed) (rel removed)))) phantom child
+                ** (skg (ghost (gnid 1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))) phantom child
             "};
 
       let viewforest: MpViewForest =

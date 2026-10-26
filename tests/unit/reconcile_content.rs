@@ -20,7 +20,7 @@ fn is_tombstone (tree : &Tree<Viewnode>, treeid : NodeId) -> bool {
 
 fn is_unknown (tree : &Tree<Viewnode>, treeid : NodeId) -> bool {
   matches! ( & tree . get (treeid) . unwrap () . value () . kind,
-             ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) ) }
+             ViewnodeKind::Vognode (Vognode::Unknown (_)) ) }
 
 #[test]
 fn nonmember_unknown_child_becomes_tombstone () {
@@ -60,53 +60,18 @@ fn same_session_surviving_content_membership_becomes_unknown () {
 
   normalize_relationship_backed_content_unknowns (
     &mut tree, parent, &[ghost . clone ()], &relRepos,
-    &skgrepo_name ("main"), &graph_snap, &HashMap::new () ) . unwrap ();
+    &skgrepo_name ("main"), &graph_snap ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
   assert! (rendered . foldAndFocus . focused && rendered . foldAndFocus . folded,
     "same-session normalization preserves view wrapper state");
   match &rendered . kind {
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
+    ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
       assert_eq! (unknown . skgid, ghost);
       assert_eq! (unknown . relRepo,
                   Some (skgrepo_name ("private")));
       assert_eq! (unknown . relationshipEditRequest, None); },
     other => panic! ("surviving relationship must render Unknown, got {other:?}"), }
-}
-
-#[test]
-fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
-  use crate::types::viewnode::mk_editable_viewnode;
-  let primary : ID = skgid ("deleted-primary");
-  let raw_extra : ID = skgid ("surviving-extra-id");
-  let mut tree : Tree<Viewnode> = Tree::new (mk_editable_viewnode (
-    skgid ("parent"), skgrepo_name ("main"), "parent" . to_string (), None ));
-  let parent : NodeId = tree . root () . id ();
-  let mut restriction : Viewnode = mk_editable_viewnode (
-    primary . clone (), skgrepo_name ("main"), "last seen" . to_string (), None );
-  restriction . foldAndFocus . focused = true;
-  let child : NodeId = tree . root_mut () . append (restriction) . id ();
-  let mut relRepos : HashMap<ID, SkgrepoName> = HashMap::new ();
-  relRepos . insert (raw_extra . clone (), skgrepo_name ("foreign"));
-  let graph_snap : std::sync::Arc<InRustGraph> =
-    std::sync::Arc::new (InRustGraph::new ());
-  let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
-  deleted_extra_ids . insert (
-    primary, [raw_extra . clone ()] . into_iter () . collect ());
-
-  normalize_relationship_backed_content_unknowns (
-    &mut tree, parent, &[raw_extra . clone ()], &relRepos,
-    &skgrepo_name ("main"), &graph_snap, &deleted_extra_ids ) . unwrap ();
-
-  let rendered = tree . get (child) . unwrap () . value ();
-  assert! (rendered . foldAndFocus . focused,
-    "extra-id normalization preserves the unrestricted child wrapper state");
-  match &rendered . kind {
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
-      assert_eq! (unknown . skgid, raw_extra,
-        "the retained on-disk spelling, not the deleted primary, is rendered");
-      assert_eq! (unknown . relRepo, Some (skgrepo_name ("foreign"))); },
-    other => panic! ("surviving extra-id relationship must be Unknown, got {other:?}"), }
 }
 
 // Regression: a content goal id present only as a

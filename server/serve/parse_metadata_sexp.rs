@@ -23,7 +23,7 @@
 ///                                [(ready OBJECT...)]
 ///                                [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]))
 ///   where OBJECT is node, rel or all. The '(diff ...)' form may also
-///   appear in (deleted ...), (unknown ...) and (historical ...), and
+///   appear in (unknown ...) and (ghost ...), and
 ///   at top level on an alias, id or flag property and on the
 ///   diff view's properties other than bodyDiff. A changed folder,
 ///   '(KIND changed)', may carry '(diff (ready))' at top level, and
@@ -35,8 +35,9 @@
 ///   ('validate_restoreRel_position', local.rs). It may sit beside
 ///   'writeProtected'.
 ///   The diff view's own viewnodes:
-///     (historical (id ID) (repo REPO) [(editRequest restoreNode)] ...)
-///                                            a historical phantom
+///     (ghost (gnid ID) (skgRepos (nodeRepo REPO))
+///            [(editRequest restoreNode)] [(viewRequests tombstone)] ...)
+///                                            a ghost
 ///     (oldText titleAndBody | title | body)  the text at HEAD
 ///     bodyDiff
 ///     (homeSkgrepoMove (old REPO) (new REPO))
@@ -53,13 +54,13 @@ use crate::types::nodes::complete::Flag;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, Existence, FoldAndFocus, ReadinessRequest,
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder, PhantomDeleted,
-  PhantomHistorical, PhantomUnknown,
+  ChangesetMarkerKind, PropertyMember, ChangeViewnode, Folder,
+  Ghost, Unknown,
   Editability, RelationshipEditRequest, ViewnodeId,
 };
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
-    MpVognode, MpPhantom,
+    MpVognode,
 };
 
 use sexp::Sexp;
@@ -88,19 +89,17 @@ pub struct ViewnodeMetadata {
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
   // The parts of the diff view's '(diff ...)' form, its facts and
-  // readiness request, on whichever vognode, phantom or property
+  // readiness request, on whichever vognode or property
   // leaf carries it.
   pub change_facts: ChangeFacts,
   pub readiness_request: Option<ReadinessRequest>,
   pub property_relRepo : Option<SkgrepoName>,
   pub property_relRepo_request : Option<SkgrepoName>,
-  // When true, this is a PhantomDeleted (id and skgrepo are used).
-  pub is_deleted_node: bool,
-  // When true, this is a PhantomHistorical (id and skgrepo are used).
-  pub is_historical_node: bool,
+  // When true, this is a ghost (id and skgrepo are used).
+  pub is_ghost: bool,
   // When true, this is a tombstone.
   pub is_tombstone: bool,
-  // When Some, this is a PhantomUnknown (a phantom for a missing
+  // When Some, this is a Unknown (a phantom for a missing
   // referent). Carries only the id; no skgrepo/title/body apply.
   pub unknown_node_skgid: Option<ID>,
   pub unknown_relRepo : Option<SkgrepoName>,
@@ -126,8 +125,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     readiness_request: None,
     property_relRepo : None,
     property_relRepo_request : None,
-    is_deleted_node: false,
-    is_historical_node: false,
+    is_ghost: false,
     is_tombstone: false,
     unknown_node_skgid: None,
     unknown_relRepo: None,
@@ -156,14 +154,13 @@ pub fn viewnode_from_metadata (
   let (kind, error, warning)
     : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_skgid {
-        ( MpViewnodeKind::Vognode (MpVognode::Phantom (
-            MpPhantom::Unknown (
-              PhantomUnknown {
-                skgid           : uid . clone (),
-                relRepo         : metadata . unknown_relRepo . clone (),
-                relationshipEditRequest : metadata . unknown_relRepo_request . clone ()
-                  . map (RelationshipEditRequest::RelRepo),
-              } ) )),
+        ( MpViewnodeKind::Vognode (MpVognode::Unknown (
+            Unknown {
+              skgid           : uid . clone (),
+              relRepo         : metadata . unknown_relRepo . clone (),
+              relationshipEditRequest : metadata . unknown_relRepo_request . clone ()
+                . map (RelationshipEditRequest::RelRepo),
+            } )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
               "Unknown phantom content cannot be edited.",
@@ -172,29 +169,20 @@ pub fn viewnode_from_metadata (
           None )
       } else if metadata . is_tombstone {
         ( MpViewnodeKind::Tombstone, None, None )
-      } else if metadata . is_historical_node {
-        ( MpViewnodeKind::Vognode (MpVognode::Phantom (
-            MpPhantom::Historical ( PhantomHistorical {
-              skgid : metadata . skgid . clone ()
-                      . unwrap_or_else ( || ID::from ("")),
-              home_skgrepo : metadata . home_skgrepo . clone ()
-                             . unwrap_or_else ( || SkgrepoName::from ("")),
-              title,
-              body,
-              restoreNode_request : matches! (
-                metadata . edit_request,
-                Some (NodeEditRequest::RestoreNode) ),
-            } ) )), None, None )
-      } else if metadata . is_deleted_node {
-        ( MpViewnodeKind::Vognode (MpVognode::Phantom (
-            MpPhantom::Deleted ( PhantomDeleted {
-            skgid     : metadata . skgid . clone ()
-                       . unwrap_or_else ( || ID::from ("")),
+      } else if metadata . is_ghost {
+        ( MpViewnodeKind::Vognode (MpVognode::Ghost ( Ghost {
+            skgid : metadata . skgid . clone ()
+                    . unwrap_or_else ( || ID::from ("")),
             home_skgrepo : metadata . home_skgrepo . clone ()
-                       . unwrap_or_else ( || SkgrepoName::from ("")),
+                           . unwrap_or_else ( || SkgrepoName::from ("")),
             title,
             body,
-          } ) )), None, None )
+            restoreNode_request : matches! (
+              metadata . edit_request,
+              Some (NodeEditRequest::RestoreNode) ),
+            tombstone_request : metadata . view_requests
+              . contains (&ViewRequest::Tombstone),
+          } )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
           MpViewnodeKind::Folder (Folder::Flags { .. }));
@@ -392,13 +380,9 @@ pub fn parse_metadata_to_viewnodemd (
         match first . as_str () {
           "node" => {
             parse_node_sexp ( &items[1..], &mut result ) ?; },
-          "deleted" => {
-            result . is_deleted_node = true;
-            parse_deleted_sexp ( &items[1..], &mut result ) ?; },
-          "historical" => {
-            // Same grammar as (deleted ...).
-            result . is_historical_node = true;
-            parse_deleted_sexp ( &items[1..], &mut result ) ?; },
+          "ghost" => {
+            result . is_ghost = true;
+            parse_ghost_sexp ( &items[1..], &mut result ) ?; },
           "oldText" => {
             let aspect : String = single_argument (&first, &items[1..]) ?;
             let (title_changed, body_changed) : (bool, bool) =
@@ -549,50 +533,59 @@ pub fn parse_metadata_to_viewnodemd (
   check_where_the_edit_request_sits (&result) ?;
   Ok (result) }
 
-/// What the parser says to a restoreRel on a historical phantom.
+/// What the parser says to a restoreRel on a ghost.
 pub const RESTORE_REL_ON_A_DELETED_NODE : &str =
   "This node is deleted; restore it first (skg-restore-deleted-node)";
-/// What the parser says to a restoreNode anywhere but on a historical
-/// phantom.
+/// What the parser says to a restoreNode anywhere but on a ghost.
 pub const RESTORE_NODE_ON_A_NODE_NOT_DELETED : &str =
-  "Only a node deleted since HEAD can be restored; restoreNode belongs on a historical phantom (skg-restore-deleted-node)";
+  "Only a node deleted since HEAD can be restored; restoreNode belongs on a ghost (skg-restore-deleted-node)";
+/// What the parser says to a tombstone request anywhere but on a ghost.
+pub const TOMBSTONE_REQUEST_ON_A_NON_GHOST : &str =
+  "Only a ghost can be entombstoned; the tombstone view request belongs on a ghost (skg-request-ghost-tombstone)";
 /// What the parser says to a restoreRel anywhere but on a removed
 /// membership.
 pub const RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP : &str =
   "Only a removed membership can be restored; restoreRel belongs on a removed member, or on a folder member carrying (rel removed) (skg-restore-removed-membership)";
 
 /// The refusal of a restore request on a headline that cannot carry
-/// it, given whether the headline is a historical phantom; None for
+/// it, given whether the headline is a ghost; None for
 /// any other request.
 fn misplaced_restore_request_message (
   request       : &Option<NodeEditRequest>,
-  is_historical : bool,
+  is_ghost : bool,
 ) -> Option<String> {
   match request {
     Some (NodeEditRequest::RestoreNode) =>
       Some ( RESTORE_NODE_ON_A_NODE_NOT_DELETED . to_string () ),
-    Some (NodeEditRequest::RestoreRel) if is_historical =>
+    Some (NodeEditRequest::RestoreRel) if is_ghost =>
       Some ( RESTORE_REL_ON_A_DELETED_NODE . to_string () ),
     Some (NodeEditRequest::RestoreRel) =>
       Some ( RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP . to_string () ),
     _ => None, } }
 
-/// A phantom carries no edit request but a historical phantom's
-/// restoreNode; restoreRel sits only on an unrestricted vognode that
-/// carries '(rel removed)', and the save checks its position. The other requests
-/// keep the places their own checks give them.
+/// A ghost carries no edit request but restoreNode, and no view
+/// request but tombstone, which nothing else carries; restoreRel sits
+/// only on an unrestricted vognode that carries '(rel removed)', and
+/// the save checks its position. The other requests keep the places
+/// their own checks give them.
 fn check_where_the_edit_request_sits (
   metadata : &ViewnodeMetadata,
 ) -> Result<(), String> {
-  let is_phantom : bool =
-    metadata . is_deleted_node || metadata . is_historical_node;
   let is_unrestricted_vognode : bool =
     metadata . non_vognode . is_none ()
-    && ! is_phantom
+    && ! metadata . is_ghost
     && ! metadata . is_tombstone
     && metadata . unknown_node_skgid . is_none ();
+  if metadata . view_requests . contains (&ViewRequest::Tombstone)
+     && ! metadata . is_ghost
+  { return Err ( TOMBSTONE_REQUEST_ON_A_NON_GHOST . to_string () ); }
+  if metadata . is_ghost
+     && metadata . view_requests . iter ()
+        . any ( |request| *request != ViewRequest::Tombstone )
+  { return Err ( "A ghost accepts no view request but tombstone"
+                 . to_string () ); }
   match &metadata . edit_request {
-    Some (NodeEditRequest::RestoreNode) if metadata . is_historical_node =>
+    Some (NodeEditRequest::RestoreNode) if metadata . is_ghost =>
       Ok (( )),
     Some (NodeEditRequest::RestoreRel)
       if is_unrestricted_vognode
@@ -600,10 +593,10 @@ fn check_where_the_edit_request_sits (
       Ok (( )),
     request @ Some (NodeEditRequest::RestoreNode | NodeEditRequest::RestoreRel) =>
       Err ( misplaced_restore_request_message (
-        request, metadata . is_historical_node )
+        request, metadata . is_ghost )
             . expect ("a restore request") ),
-    Some (_) if is_phantom =>
-      Err ( "A deleted node accepts no edit request but restoreNode, on a historical phantom"
+    Some (_) if metadata . is_ghost =>
+      Err ( "A ghost accepts no edit request but restoreNode"
             . to_string () ),
     _ => Ok (( )), } }
 
@@ -769,8 +762,9 @@ fn parse_old_and_new_skgrepos (
     (Some (old), Some (new)) => Ok ( SkgrepoChange { old, new } ),
     _ => Err ( format! ( "{} requires both (old REPO) and (new REPO)", head )), } }
 
-/// Parse the (deleted (id X) (repo S)) s-expression contents.
-fn parse_deleted_sexp (
+/// Parse the contents of '(ghost (gnid X) (skgRepos (nodeRepo R))
+/// ...)'.
+fn parse_ghost_sexp (
   items    : &[Sexp],
   metadata : &mut ViewnodeMetadata,
 ) -> Result<(), String> {
@@ -780,36 +774,50 @@ fn parse_deleted_sexp (
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         match key . as_str () {
-          "id" => {
-            if subitems . len () != 2 {
-              return Err ( "deleted id requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . skgid = Some ( ID::from (value)); },
-          "repo" => {
-            if subitems . len () != 2 {
-              return Err ( "deleted repo requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . home_skgrepo = Some ( SkgrepoName::from (value)); },
+          "gnid" => {
+            if metadata . skgid . is_some () {
+              return Err ( "ghost gnid may appear only once" . to_string () ); }
+            metadata . skgid = Some ( ID::from (
+              single_argument ("ghost gnid", &subitems[1..]) ? )); },
+          "skgRepos" => {
+            if metadata . home_skgrepo . is_some () {
+              return Err ( "ghost skgRepos may appear only once" . to_string () ); }
+            metadata . home_skgrepo = Some (
+              parse_ghost_skgRepos (&subitems[1..]) ? ); },
           "editRequest" => {
-            // Where a phantom's request may sit is checked once the
+            // Where a ghost's request may sit is checked once the
             // whole metadata is read ('check_where_the_edit_request_sits').
             if metadata . edit_request . is_some () {
-              return Err ( "node editRequest may appear only once"
+              return Err ( "ghost editRequest may appear only once"
                            . to_string () ); }
             parse_editrequest_sexp ( &subitems[1..], metadata ) ?;
             if metadata . relRepo_request . is_some () {
-              return Err ( "A deleted node accepts no edit request but restoreNode, on a historical phantom"
+              return Err ( "A ghost accepts no edit request but restoreNode"
                            . to_string () ); }},
+          "viewRequests" =>
+            parse_viewrequests_sexp (
+              &subitems[1..], &mut metadata . view_requests ) ?,
           "diff" =>
             parse_diff_form ( &subitems[1..], metadata ) ?,
-          _ => { return Err ( format! ( "Unknown deleted key: {}",
+          _ => { return Err ( format! ( "Unknown ghost key: {}",
                                          key )); }} },
-      _ => { return Err ( "Unexpected element in deleted sexp"
+      _ => { return Err ( "Unexpected element in ghost sexp"
                            . to_string () ); }} }
   Ok (( )) }
 
+/// A ghost's '(skgRepos (nodeRepo R))': its home skgrepo. A ghost has
+/// no relRepo.
+fn parse_ghost_skgRepos (
+  parts : &[Sexp],
+) -> Result<SkgrepoName, String> {
+  match parts {
+    [ Sexp::List (pair) ] => match pair . as_slice () {
+      [ head, value ] if atom_to_string (head) ? == "nodeRepo" =>
+        Ok ( SkgrepoName::from ( atom_to_string (value) ? )),
+      _ => Err ( "A ghost's skgRepos holds only (nodeRepo R)"
+                 . to_string () ), },
+    _ => Err ( "A ghost's skgRepos holds only (nodeRepo R)"
+               . to_string () ), } }
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
 /// 'cycle' stat, the discarded bare atom 'noWarrant', and the keyed 'overridesHere' / 'homeRepoHerald' /
@@ -942,6 +950,7 @@ fn parse_viewrequests_sexp (
         else if atom == "writeProtectedSubtreeView" { ViewRequest::WriteProtectedSubtree }
         else if atom == "fork" { ViewRequest::Fork }
         else if atom == "flags" { ViewRequest::Flags }
+        else if atom == "tombstone" { ViewRequest::Tombstone }
         else { return Err ( format! (
           "Invalid view request atom: {}", atom )); } },
       Sexp::List (sub) if sub . len () == 2 => {

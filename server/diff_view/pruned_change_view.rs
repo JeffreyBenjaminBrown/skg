@@ -34,7 +34,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  ChangeFacts, Editability, FoldAndFocus, Folder, Phantom, Viewnode, ViewnodeKind,
+  ChangeFacts, Editability, FoldAndFocus, Folder, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
@@ -314,7 +314,7 @@ pub fn nodes_editable_in_diffView (
 ) -> HashSet<ID> {
   let historical_in_content_position : HashSet<ID> =
     viewforest . nodes () . filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+      ViewnodeKind::Vognode (Vognode::Ghost (h))
         if in_content_position (node) =>
         Some ( h . skgid . clone () ),
       _ => None, } )
@@ -482,12 +482,12 @@ fn content_occurrences_in_level_order (
                ViewnodeKind::BufferRoot => true,
                ViewnodeKind::Vognode (
                  Vognode::Unrestricted (_)
-                 | Vognode::Phantom (Phantom::Historical (_)) ) =>
+                 | Vognode::Ghost (_) ) =>
                  is_unrestricted_removed_member ( node . value () ),
                _ => false, } );
         if ! is_root_or_member { continue; }
         occurrences . push ( node . id () ); },
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {},
+      ViewnodeKind::Vognode (Vognode::Ghost (_)) => {},
       _ => continue, }
     queue . extend ( node . children () ); }
   occurrences }

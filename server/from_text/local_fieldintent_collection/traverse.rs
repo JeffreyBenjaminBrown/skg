@@ -52,7 +52,7 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, 
   NodeEditRequest, PropertyMember, Folder, UnrestrictedVognode, Viewnode,
-  ViewnodeKind, Vognode, Phantom };
+  ViewnodeKind, Vognode };
 
 use ego_tree::NodeRef;
 use std::collections::HashSet;
@@ -74,16 +74,16 @@ fn visit (
   match &node_ref . value() . kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       visit_unrestricted_vognode (node_ref, t, context, collected),
-    ViewnodeKind::Vognode (Vognode::Phantom (p)) =>
+    ViewnodeKind::Vognode (vognode @ ( Vognode::Ghost (_) | Vognode::Unknown (_) )) =>
       recurse_under_vognode (
         node_ref,
         Some ( DefiningFolderRecorder {
-          // Carrying the phantom's identity (write-protected, not
-          // save-eligible) keeps a SubscribeeFolder found under a diff
-          // phantom meaningful: its children stay in
+          // Carrying the ghost's or unknown's identity (write-protected,
+          // not save-eligible) keeps a SubscribeeFolder found under a
+          // ghost meaningful: its children stay in
           // subscribee-as-such position, so their title edits bounce
           // via text claims instead of silently becoming real edits.
-          skgid               : p . skgid() . clone(),
+          skgid               : vognode . skgid() . clone(),
           headline            : node_ref . value () . headline_name (),
           is_editable    : false,
           is_saveEligible : false } ),
@@ -360,7 +360,7 @@ fn visit_hiddenOutside_folder (
               if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
               members . push (t . skgid . clone ()); },
-          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
+          ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
             if RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . skgid . clone ()); },
@@ -426,7 +426,7 @@ fn partnerFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
           members . push ((unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       _ => {}, }}
@@ -451,7 +451,7 @@ fn subscribeeFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
           members . push ((unknown . skgid . clone(),
                            RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       _ => {}, }}
@@ -485,7 +485,7 @@ fn content_members (
             // the original member it is shown in place of.
             t . collected_skgid (),
             RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
         // An Unknown is save-inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination skgrepo sticky.
@@ -511,7 +511,7 @@ fn visible_content_members (
           // collected_id: a shown overrider presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_skgid ()); },
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
         visible . push (unknown . skgid . clone ()),
       _ => {}, }}
   visible }

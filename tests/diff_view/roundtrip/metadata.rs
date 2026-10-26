@@ -10,8 +10,7 @@ use skg::serve::parse_metadata_sexp::{
 use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Phantom,
-  PhantomHistorical, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
+  ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -134,14 +133,14 @@ fn ghost_warranted_aliases_and_ids_round_trip () {
     "id (diff (rel removed) (ready) (readyRequest all))" ); }
 
 #[test]
-fn a_historical_phantom_round_trips () {
+fn a_ghost_round_trips () {
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
-        Phantom::Historical ( PhantomHistorical {
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
           skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : Some ("its body\n" . into ()),
-          restoreNode_request : false } )))),
+          restoreNode_request : false,
+          tombstone_request : false } ))),
       ChangeFacts {
         change   : DiffChange { node : Some (Existence::Removed),
                                 rel  : Some (Existence::Removed),
@@ -150,7 +149,7 @@ fn a_historical_phantom_round_trips () {
         leaves   : None,
         .. ChangeFacts::default () },
       request_all () ),
-    "(historical (id gone) (repo main) (diff (node removed) (rel removed) (ready node) (readyRequest all)))" ); }
+    "(ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node) (readyRequest all)))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {
@@ -185,14 +184,14 @@ fn malformed_diff_view_metadata_is_refused () {
               "should refuse {}", metadata ); }}
 
 #[test]
-fn a_historical_phantom_round_trips_with_its_restore_request () {
+fn a_ghost_round_trips_with_its_restore_request () {
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
-        Phantom::Historical ( PhantomHistorical {
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
           skgid : ID::from ("gone"), home_skgrepo : SkgrepoName::from ("main"),
           title : "gone" . into (), body : None,
-          restoreNode_request : true } )))),
+          restoreNode_request : true,
+          tombstone_request : false } ))),
       ChangeFacts {
         change : DiffChange { node : Some (Existence::Removed),
                               rel  : None,
@@ -201,7 +200,7 @@ fn a_historical_phantom_round_trips_with_its_restore_request () {
         leaves : None,
         .. ChangeFacts::default () },
       None ),
-    "(historical (id gone) (repo main) (editRequest restoreNode) (diff (node removed)))" ); }
+    "(ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed)))" ); }
 
 /// A restoreRel request lives outside the editability, so an
 /// editable and a write-protected removed member both carry it.
@@ -235,11 +234,9 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
 #[test]
 fn restore_requests_on_the_wrong_kind_are_refused () {
   for (metadata, message) in [
-    ( "(skg (historical (id g) (repo main) (editRequest restoreRel) (diff (node removed))))",
+    ( "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (node removed))))",
       RESTORE_REL_ON_A_DELETED_NODE ),
     ( "(skg (node (id x) (repo main) (editRequest restoreNode) (diff (rel removed))))",
-      RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
-    ( "(skg (deleted (id x) (repo main) (editRequest restoreNode)))",
       RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
     ( "(skg (unknown (id x) (editRequest restoreNode)))",
       RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
@@ -253,14 +250,13 @@ fn restore_requests_on_the_wrong_kind_are_refused () {
                  Err ( message . to_string () ),
                  "{}", metadata ); }}
 
-/// One edit request per node, and a phantom takes no other.
+/// One edit request per node, and a ghost takes no other.
 #[test]
-fn a_phantom_takes_no_other_edit_request () {
+fn a_ghost_takes_no_other_edit_request () {
   for metadata in [
-    "(skg (historical (id g) (repo main) (editRequest delete)))",
-    "(skg (deleted (id g) (repo main) (editRequest delete)))",
-    "(skg (historical (id g) (repo main) (editRequest (relRepo private))))",
-    "(skg (historical (id g) (repo main) (editRequest restoreNode) (editRequest restoreNode)))",
+    "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest delete)))",
+    "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (relRepo private))))",
+    "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (editRequest restoreNode)))",
     "(skg (node (id x) (editRequest restoreRel) (editRequest delete) (diff (rel removed))))", ] {
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
               "should refuse {}", metadata ); }}

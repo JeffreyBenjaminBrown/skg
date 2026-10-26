@@ -3,7 +3,7 @@
 use indoc::indoc;
 use std::error::Error;
 
-use skg::update_buffer::complete::prune_self_deletable_when_empty;
+use skg::update_buffer::complete::prune_childless_tombstones;
 use skg::update_buffer::reconcile::aliasfolder::reconcile_aliasFolder_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
@@ -86,7 +86,7 @@ async fn test_reconcile_alias_folder_children_logic (
     &mut viewforest, aliasfolder_1_skgid, &graph, config )?;
   // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
-  prune_self_deletable_when_empty (&mut viewforest) ?;
+  prune_childless_tombstones (&mut viewforest) ?;
 
   {
     let aliasfolder_1_ref =
@@ -118,7 +118,7 @@ async fn test_reconcile_alias_folder_children_logic (
     &mut viewforest, aliasfolder_2_skgid, &graph, config )?;
   // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
-  prune_self_deletable_when_empty (&mut viewforest) ?;
+  prune_childless_tombstones (&mut viewforest) ?;
 
   {
     let aliasfolder_2_ref =
@@ -227,7 +227,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   )?;
   // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
-  prune_self_deletable_when_empty (&mut viewforest) ?;
+  prune_childless_tombstones (&mut viewforest) ?;
 
   {
     let aliasfolder_ref =
@@ -276,7 +276,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   )?;
   // A stale or duplicate alias is converted to a tombstone; the
   // prune that ends every completion removes it.
-  prune_self_deletable_when_empty (&mut viewforest) ?;
+  prune_childless_tombstones (&mut viewforest) ?;
 
   {
     let aliasfolder_ref =

@@ -14,15 +14,12 @@
 //
 // Fixture 'main': k contains l and m, m contains mc; a, b and c contain
 // x, x contains xc, p contains b; al has the aliases one and two; d
-// contains e and f, e contains ec. Fixture 'restricted': skgrepos public
-// (u, qc) and private.
+// contains e and f, e contains ec.
 
 use ego_tree::Tree;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
 
 use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, without_lines_containing};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -31,8 +28,6 @@ use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
-use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName};
 use skg::test_utils::{
   extract_string_field_from_sexp, graph_handle_from_config,
@@ -49,7 +44,6 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let main : &str = "tests/retain_or_entombstone_then_prune/fixtures/main";
-  let restricted : &str = "tests/retain_or_entombstone_then_prune/fixtures/restricted";
   run_with_shared_test_stores (
     "skg-test-retain-or-entombstone-then-prune",
     |s| Box::pin ( async move {
@@ -73,9 +67,6 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("a_stale_alias_goes", main) ?;
       a_stale_alias_goes (
-        &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("a_deleted_phantom_of_a_restricted_node_loses_its_text", restricted) ?;
-      a_deleted_phantom_of_a_restricted_node_loses_its_text (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -497,54 +488,4 @@ async fn a_stale_alias_goes (
     "the stale alias is gone:\n{}", first_view );
   assert_eq! ( lines_containing (first_view, "alias) two") . len (), 1,
     "the other alias stays:\n{}", first_view );
-  Ok (( )) }
-
-/// A view of u shows two deleted phantoms of private nodes, q as a
-/// leaf and q2 holding qc. After the switch to the public skgrepo-set,
-/// q is gone and q2 is a tombstone without its title, still
-/// holding qc; nothing of either's text remains.
-async fn a_deleted_phantom_of_a_restricted_node_loses_its_text (
-  config  : &SkgConfig,
-  tantivy : &mut TantivyIndex,
-) -> Result<(), Box<dyn Error>> {
-  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut views_state : ViewsState = empty_views_state ();
-  let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-u" . into ());
-  let stored : Tree<Viewnode> = maybePlaced_to_placed_tree (
-    org_to_uninterpreted_nodes (
-      "* (skg (node (id u) (repo public))) u\n\
-       ** (skg (deleted (id q) (repo private))) q secret title\n\
-       q secret body\n\
-       ** (skg (deleted (id q2) (repo private))) q2 secret title\n\
-       *** (skg (node (id qc) (repo public) noClaim)) qc\n" ) ? . 0 ) ?;
-  views_state . open_views . register_view (
-    &graph . load_full (), viewforest_id . clone (), stored, &[ID::from ("u")] );
-  let env : SkgEnv = skg_env_from_parts (config, tantivy, &graph);
-  let mut restriction : SkgrepoRestriction =
-    SkgrepoRestriction::named (config, SkgrepoSetName::from ("all")) ?;
-  let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
-    Arc::new (Mutex::new (None));
-  let search_cancelled : Arc<AtomicBool> = Arc::new (AtomicBool::new (false));
-  let (mut stream, read_end) : (TcpStream, TcpStream) = mk_test_tcp_stream_pair ();
-  std::thread::scope ( |scope| {
-    // The handler blocks on futures itself, so it cannot run inside
-    // this test's executor.
-    scope . spawn ( || handle_skgrepo_set_request (
-      &mut stream,
-      "((request . \"set skgrepo restriction\") (name . \"public\"))",
-      &env, &mut views_state, &mut restriction,
-      &enrichment_slot, &search_cancelled )); } );
-  drop (stream);
-  let rerendered : Vec<String> = contents_of_messages (read_end, "rerender-view");
-  assert_eq! ( rerendered . len (), 1, "{:?}", rerendered );
-  let view : &str = &rerendered [0];
-  assert! ( ! view . contains ("secret"),
-    "no private text remains:\n{}", view );
-  assert! ( lines_containing (view, "(id q)") . is_empty ()
-            && lines_containing (view, "(id q2)") . is_empty (),
-    "no private ID remains:\n{}", view );
-  assert_eq! ( the_line (view, "** ", "tombstone"), "** (skg tombstone)",
-    "the phantom holding qc is a tombstone, untitled:\n{}", view );
-  assert! ( the_line_after (view, "** ", "tombstone") . contains ("(id qc)"),
-    "it still holds qc:\n{}", view );
   Ok (( )) }

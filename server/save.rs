@@ -178,7 +178,7 @@ pub async fn update_graph_including_nodeMerges (
   graph              : &InRustGraphHandle,
   mutation_gate      : &MutationGate,
   approved_hoist_pids : &HashSet<ID>,
-) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_including_nodeMerges_under_mutation_gate (
     nodeInstructions, nodeMerge_instructions, skgrepo_moves, config,
@@ -196,7 +196,7 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
   approved_hoist_pids : &HashSet<ID>,
-) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
   let prepared : PreparedSave = prepare_save_under_mutation_gate (
     nodeInstructions, nodeMerge_instructions, skgrepo_moves, &config,
     graph, approved_hoist_pids) ?;
@@ -211,7 +211,6 @@ pub(crate) struct PreparedSave {
   prepared_save_filesystem      : Option<PreparedFilesystemUpdate>,
   prepared_nodeMerge_filesystem : Option<PreparedFilesystemUpdate>,
   final_write_identities        : HashSet<ID>,
-  deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   telescope_warnings            : Vec<(ID, TelescopeViolation)>,
 }
 
@@ -239,7 +238,7 @@ impl PreparedSave {
     config        : SkgConfig,
     tantivy_index : &mut TantivyIndex,
     graph         : &InRustGraphHandle,
-  ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
+  ) -> Result<(), Box<dyn Error>> {
     if let Some ((prepared, prepared_filesystem)) =
       self . prepared_save . zip (self . prepared_save_filesystem)
     {
@@ -261,7 +260,7 @@ impl PreparedSave {
     if let Some (new_index) = nodeMerge_replacement {
       *tantivy_index = new_index; }
     emit_telescope_warnings (&self . telescope_warnings);
-    Ok (self . deleted_by_this_save_extra_ids)
+    Ok (( ))
   }
 }
 
@@ -329,14 +328,6 @@ pub(crate) fn prepare_save_under_mutation_gate (
     affected_telescope_warnings (
       config, &graph_before_save, &final_candidate,
       &saved_pids_for_telescope, &affected_ids_for_telescope);
-  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
-    all_filesystem_outputs . iter ()
-    . filter_map ( |instruction| match instruction {
-      NodeInstruction::Delete (delete) => graph_before_save . nodes . get (&delete . skgid)
-        . map (|node| (delete . skgid . clone (),
-                       node . extra_ids . iter () . cloned () . collect ())),
-      _ => None })
-    . collect ();
   let final_write_identities : HashSet<ID> = all_filesystem_outputs . iter ()
     .chain (prepared_save . iter ()
       .flat_map (|prepared| prepared . nodeInstructions () . iter ()))
@@ -355,7 +346,6 @@ pub(crate) fn prepare_save_under_mutation_gate (
     prepared_save_filesystem,
     prepared_nodeMerge_filesystem,
     final_write_identities,
-    deleted_by_this_save_extra_ids,
     telescope_warnings,
   })
 }
@@ -411,7 +401,7 @@ pub(crate) fn emit_telescope_warnings (
 ///   be an extra_id of one node, so a referencer cannot legitimately
 ///   carry a deleted node's id in its extra_ids.
 /// - linksTo: lives in body text; stripping requires body
-///   rewriting. Dangling link targets render as PhantomUnknown
+///   rewriting. Dangling link targets render as Unknown
 ///   placeholders when followed, so this is non-fatal.
 pub(crate) fn apply_delete_propagation_cleanup (
   node_defs  : &mut Vec<NodeInstruction>,

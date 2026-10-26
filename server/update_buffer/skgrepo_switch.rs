@@ -1,9 +1,8 @@
 /// Applying a repo-set switch to an already-rendered view
 /// (the API doc's "Restricted-skgrepo nodes").  Two passes:
 /// entombstone every occurrence of a node the new restriction hides,
-/// and every deleted or unknown phantom whose relationship or node a
-/// now-restricted skgrepo records (a deleted phantom's home skgrepo;
-/// an unknown phantom's relRepo, or, when it has none, its recorder's
+/// and every unknown whose relationship a now-restricted skgrepo
+/// records (its relRepo, or, when it has none, its recorder's
 /// home), then prune (DFS postorder, so emptied parents prune in the
 /// same sweep) the leaves the restriction hides, and only those:
 /// - Tombstone leaf;
@@ -20,7 +19,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::skgrepo_sets::{SkgrepoRestriction, entombstone_hidden_occurrences};
 use crate::types::misc::SkgrepoName;
 use crate::types::viewnode::{
-  Folder, Phantom, Viewnode, ViewnodeKind, Vognode };
+  Folder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -38,8 +37,8 @@ pub fn convert_and_prune_for_skgrepo_switch (
   prune_children_postorder (tree, root) ?;
   Ok (( )) }
 
-/// A phantom shows its node's ID, and a deleted one its last title and
-/// body, so one that a now-restricted skgrepo records becomes a tombstone:
+/// An unknown shows its node's ID, so one that a now-restricted
+/// skgrepo records becomes a tombstone:
 /// the prune below removes it if it is a leaf, and otherwise
 /// it stays, titleless, holding what is under it.
 fn convert_now_restricted_phantoms (
@@ -50,9 +49,7 @@ fn convert_now_restricted_phantoms (
   let phantoms : Vec<NodeId> =
     tree . root () . descendants ()
     . filter ( |node| match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
-          ! restriction . contains_skgrepo (&d . home_skgrepo),
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+        ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
           u . relRepo . clone ()
           . or_else ( || recorder_home_skgrepo (*node) )
           . is_some_and ( |skgrepo| ! restriction . contains_skgrepo (&skgrepo) ),
@@ -141,8 +138,7 @@ fn should_prune (
       is_leaf && had_children, // emptied: its children were pruned first
     ViewnodeKind::Tombstone =>
       is_leaf,
-    ViewnodeKind::Vognode (Vognode::Unrestricted (_))
-      | ViewnodeKind::Vognode (Vognode::Phantom (_))
+    ViewnodeKind::Vognode (_)
       | ViewnodeKind::BufferRoot =>
       false, } ) }
 

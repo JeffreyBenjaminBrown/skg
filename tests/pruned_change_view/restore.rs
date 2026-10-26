@@ -41,7 +41,7 @@ const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
 const D_IN_THE_CHAIN_UNDER_C : &str =
   "***** (skg (node (id d) (repo main) noClaim writeProtected (viewStats noWarrant))";
 const G_UNDER_Q : &str =
-  "** (skg (historical (id g)";
+  "** (skg (ghost (gnid g)";
 const GC_UNDER_G : &str =
   "*** (skg (node (id gc) (repo main) noClaim writeProtected";
 const GC_REMOVED_FROM_R : &str =
@@ -149,7 +149,7 @@ fn restoring_a_deleted_node () -> Result<(), Box<dyn Error>> {
     assert! ( ! files . contains_key ("main/gd.skg") );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     let rerendered : &str = &response . saved_view;
-    assert! ( ! rerendered . contains ("(historical (id g)"),
+    assert! ( ! rerendered . contains ("(ghost (gnid g)"),
               "g is no longer deleted:\n{}", rerendered );
     assert! ( ! rerendered . contains ("restoreNode"), "{}", rerendered );
     assert! ( rerendered . contains ("*** (skg (unknown (id gd))"),

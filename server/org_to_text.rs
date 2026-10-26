@@ -3,8 +3,8 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
-  Viewnode, ViewnodeKind, Vognode, Phantom, PropertyMember, ChangeViewnode, UnrestrictedVognode,
-  PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
+  Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, UnrestrictedVognode,
+  Ghost, Unknown, NodeEditRequest,
   RelationshipEditRequest,
   Warrant,
 };
@@ -252,17 +252,13 @@ fn viewnode_to_string_without_viewnode_id (
       Ok ( unrestrictedVognode_metadata_to_string (
         viewnode . foldAndFocus, unrestrictedVognode,
         &viewnode . change_facts, &viewnode . readiness_request, config )),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted_node))) =>
-      Ok ( phantomDeleted_metadata_to_string (
-        viewnode . foldAndFocus, deleted_node,
-        &viewnode . change_facts, &viewnode . readiness_request )),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown_node))) =>
+    ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . foldAndFocus, unknown_node,
         &viewnode . change_facts, &viewnode . readiness_request )),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
-      Ok ( phantomHistorical_metadata_to_string (
-        viewnode . foldAndFocus, historical,
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      Ok ( ghost_metadata_to_string (
+        viewnode . foldAndFocus, ghost,
         &viewnode . change_facts, &viewnode . readiness_request )), } }
 
 /// The position atoms a headline carries, in their order on the wire.
@@ -508,53 +504,38 @@ fn unrestrictedVognode_metadata_to_string (
   parts . push ( node_sexp (unrestrictedVognode, facts, request, config));
   parts . join (" ") }
 
-/// Render metadata for a PhantomDeleted:
-///   (skg [focused] [folded] (deleted (id X) (repo S)))
-fn phantomDeleted_metadata_to_string (
+/// Render metadata for a ghost:
+///   (skg [focused] [folded] (ghost (gnid X) (skgRepos (nodeRepo R))
+///                                  [(editRequest restoreNode)] ...))
+/// The 'gnid' and 'skgRepos' parts are the grammar's for every kind
+/// that stands for a gnid; the ghost writes them first.
+fn ghost_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
-  deleted_node    : &PhantomDeleted,
+  ghost           : &Ghost,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  let deleted_parts : Vec<String> =
-    [ format! ("(id {})", deleted_node . skgid . 0),
-      format! ("(repo {})",
-               metadata_value_atom (&deleted_node . home_skgrepo)) ]
+  let ghost_parts : Vec<String> =
+    [ format! ("(gnid {})", ghost . skgid . 0),
+      format! ("(skgRepos (nodeRepo {}))",
+               metadata_value_atom (&ghost . home_skgrepo)) ]
     . into_iter ()
-    . chain ( change_fact_forms (facts, request) )
-    . collect ();
-  parts . push ( format! ( "(deleted {})", deleted_parts . join (" ") ));
-  parts . join (" ") }
-
-/// Render metadata for a PhantomHistorical:
-///   (skg [focused] [folded] (historical (id X) (repo S)
-///                                       [(editRequest restoreNode)] ...))
-fn phantomHistorical_metadata_to_string (
-  foldAndFocus    : FoldAndFocus,
-  historical      : &PhantomHistorical,
-  facts           : &ChangeFacts,
-  request         : &Option<ReadinessRequest>,
-) -> String {
-  let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  let historical_parts : Vec<String> =
-    [ format! ("(id {})", historical . skgid . 0),
-      format! ("(repo {})",
-               metadata_value_atom (&historical . home_skgrepo)) ]
-    . into_iter ()
-    . chain ( historical . restoreNode_request . then (
+    . chain ( ghost . restoreNode_request . then (
       || "(editRequest restoreNode)" . to_string () ))
+    . chain ( ghost . tombstone_request . then (
+      || "(viewRequests tombstone)" . to_string () ))
     . chain ( change_fact_forms (facts, request) )
     . collect ();
-  parts . push ( format! ( "(historical {})", historical_parts . join (" ") ));
+  parts . push ( format! ( "(ghost {})", ghost_parts . join (" ") ));
   parts . join (" ") }
 
-/// Render metadata for a PhantomUnknown:
+/// Render metadata for an unknown:
 ///   (skg [focused] [folded] (unknown (id X)))
 /// Triggered when a referenced ID resolved to nothing in any db.
 fn phantomUnknown_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
-  unknown_node    : &PhantomUnknown,
+  unknown_node    : &Unknown,
   facts           : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {

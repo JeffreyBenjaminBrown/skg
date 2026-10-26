@@ -10,7 +10,7 @@
 // arise in real use).
 //
 // Expected: rendering the view of `parent` succeeds, with `ghost`
-// represented as a PhantomUnknown (skg metadata `(unknown (id ghost))`)
+// represented as a Unknown (skg metadata `(unknown (id ghost))`)
 // rather than killing the view.
 
 use indoc::indoc;
@@ -52,7 +52,7 @@ async fn test_dangling_reference_renders_unknown_node (
           &ID ( "parent" . to_string () ) ) ?;
       println!("Rendered:\n{}", rendered);
       // graphStats is empty because contents/containers counters
-      // count only resolvable nodes (PhantomUnknown is a placeholder,
+      // count only resolvable nodes (Unknown is a placeholder,
       // not an actual contained node), and the per-membership filter
       // hides (containers 0) for a member.
       // The unknown line has no headline title -- the id already
@@ -62,13 +62,13 @@ async fn test_dangling_reference_renders_unknown_node (
                               "};
       assert_metadata_eq! (rendered, expected,
                   "view should render the dangling child as an \
-                   PhantomUnknown rather than aborting");
+                   Unknown rather than aborting");
       Ok (( ))
     }
 
-// A view that the server rendered with a PhantomUnknown line in it
+// A view that the server rendered with a Unknown line in it
 // must round-trip through save without tripping the local-structure
-// validator. Previously, UnrestrictedVognode parent + PhantomUnknown child
+// validator. Previously, UnrestrictedVognode parent + Unknown child
 // triggered LocalStructureViolation.
 async fn test_buffer_with_unknownnode_child_saves_cleanly (
   config : &SkgConfig,

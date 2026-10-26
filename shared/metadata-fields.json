@@ -31,12 +31,12 @@
               "arguments": [ { "one_of": [ "aliases", "overrides",
                                            "hidesFromSubs", "subscribesTo",
                                            "containers", "mentioners" ] } ] } ] } ] },
-    { "kind": "historical phantom", "atoms": [ "historical" ], "fields_at": "form",
+    { "kind": "ghost", "atoms": [ "ghost" ], "fields_at": "form",
       "fields": [
         { "name": "editRequest", "shape": "one", "default": "none",
-          "values": [ { "value": "restoreNode" } ] } ] },
-    { "kind": "deleted phantom", "atoms": [ "deleted" ], "fields_at": "form",
-      "fields": [] },
+          "values": [ { "value": "restoreNode" } ] },
+        { "name": "viewRequests", "shape": "some", "default": "none",
+          "values": [ { "value": "tombstone" } ] } ] },
     { "kind": "unknown phantom", "atoms": [ "unknown" ], "fields_at": "form",
       "fields": [
         { "name": "editRequest", "shape": "one", "default": "none",

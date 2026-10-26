@@ -61,7 +61,6 @@
     "editRequest_flag":                "nonstandard",
     "viewRequests":                    "nonstandard",
     "tombstone":                       "message",
-    "deleted":                         "message",
     "unknown":                         "message",
     "aliasFolder":                     "message",
     "alias":                           "message",

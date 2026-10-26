@@ -1,6 +1,6 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::to_org::complete::partner_folder::child_data::{ChildData, FolderGoalItem, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, FolderGoalItem, build_child_data, reconcile_partnerFolder_children_against_goal_list};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenOutsideOfSubscribee_folder;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -13,7 +13,7 @@ use crate::update_buffer::warnings::CompletionWarning;
 use crate::types::viewnode::{Viewnode, Folder};
 
 use ego_tree::{NodeId, Tree};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 
 struct HiddenOutsideContext {
@@ -39,7 +39,6 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
   runtime                        : &RuntimeGeneration,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
@@ -73,14 +72,13 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
     build_child_data (
       tree, node, &goal_items, &context . relRepos, runtime ) ?;
   let summary =
-    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
+    reconcile_partnerFolder_children_against_goal_list (
       // Retain as non-member or tombstone, then prune
       // ('docs/glossary.org'): a stale member of this folder
       // is converted, a leaf (the common case) to a tombstone the prune
       // removes, one holding a subtree retained as non-member.
       tree, node, kind,
-      &goal_items, &child_data, &runtime . graph,
-      deleted_by_this_save_extra_ids ) ?;
+      &goal_items, &child_data, &runtime . graph ) ?;
   if let Some (sink) = warning_sink {
     push_repair_warnings (
       sink, kind, &context . subscriber_pid,
@@ -88,7 +86,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   fold_members_of_newborn_folder (tree, node)
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   // An emptied HiddenOutsideOfSubscribeeFolder is removed by the single
-  // postorder prune sweep (prune_self_deletable_when_empty), not here.
+  // postorder prune sweep (prune_childless_tombstones), not here.
   Ok(( )) }
 
 fn read_hiddenoutside_context (

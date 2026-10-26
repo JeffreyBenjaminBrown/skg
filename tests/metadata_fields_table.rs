@@ -89,7 +89,7 @@ fn every_kind_atom (
         | Folder::HiddenOutsideOfSubscribee
         | Folder::Container | Folder::Mentioner
         | Folder::AcquiredBy | Folder::Acquired => (), } }
-  [ "node", "historical", "deleted", "unknown",
+  [ "node", "ghost", "unknown",
     "tombstone", "forestRoot" ]
     . iter () . map ( |atom| atom . to_string () )
     . chain ( members . iter ()
@@ -132,14 +132,15 @@ fn view_request_wire_name (
     ViewRequest::Editable               => "editableView",
     ViewRequest::WriteProtected         => "writeProtectedView",
     ViewRequest::WriteProtectedSubtree  => "writeProtectedSubtreeView",
-    ViewRequest::Fork                   => "fork", } }
+    ViewRequest::Fork                   => "fork",
+    ViewRequest::Tombstone              => "tombstone", } }
 
 fn every_view_request (
 ) -> Vec<ViewRequest> {
   vec! [ ViewRequest::Folder (FolderRelation::Aliases),
          ViewRequest::Flags, ViewRequest::Editable,
          ViewRequest::WriteProtected, ViewRequest::WriteProtectedSubtree,
-         ViewRequest::Fork ] }
+         ViewRequest::Fork, ViewRequest::Tombstone ] }
 
 /// A minimal headline metadata of the kind whose head atom is 'atom'.
 fn example_of_kind (
@@ -147,8 +148,7 @@ fn example_of_kind (
 ) -> String {
   match atom {
     "node"                 => "(skg (node (id a) (repo r)))" . to_string (),
-    "historical" | "deleted" =>
-      format! ( "(skg ({} (id a) (repo r)))", atom ),
+    "ghost"                => "(skg (ghost (gnid a) (skgRepos (nodeRepo r))))" . to_string (),
     "unknown"              => "(skg (unknown (id a)))" . to_string (),
     "flag"                 => "(skg (flag noSearchMatching))" . to_string (),
     "oldText"              => "(skg (oldText title))" . to_string (),

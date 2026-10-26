@@ -21,7 +21,7 @@ use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName,
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
-use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
+use crate::types::maybe_placed_viewnode::{MpVognode};
 
 use ego_tree::{Tree, NodeRef};
 use futures::FutureExt;
@@ -661,9 +661,6 @@ fn compare_two_viewnode_branches_recursively_modulo_skgid (
       | MpViewnodeKind::PropertyMember (_)
       | MpViewnodeKind::ChangeViewnode (_)
       | MpViewnodeKind::BufferRoot) =>
-    { if n1 != n2 { return false; }}
-    ( MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_))),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))) =>
     { if n1 != n2 { return false; }}
     ( MpViewnodeKind::Tombstone,
       MpViewnodeKind::Tombstone) =>

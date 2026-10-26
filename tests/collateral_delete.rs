@@ -25,6 +25,10 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::ID;
+use skg::types::viewnode::Viewnode;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
+use ego_tree::Tree;
 
 fn mk_pair () -> (TcpStream, TcpStream) {
   let listener : TcpListener =
@@ -79,7 +83,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       { // A write-protected image is not search-specific. A normal
         // multi-root content view can contain the same PID more than
         // once; the later occurrence is write-protected. Every image
-        // of a node deleted by this save must become Deleted before
+        // of a node deleted by this save must become a tombstone before
         // completion tries to refresh it from the post-delete graph.
         let (view, pids, vf) =
           multi_root_view (
@@ -118,10 +122,73 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         . find ( |msg| msg . contains ("response-type collateral-view")
                        && msg . contains ("collat-del-write-protected-L") )
         . expect ("write-protected collateral view should be rerendered");
-      assert_eq! (
-        write_protected_update . matches ("(deleted (id L)") . count (), 2,
-        "both the editable and write-protected images must become DeletedNode: {}",
+      assert! (
+        write_protected_update . contains ("(content \"\")"),
+        "both the editable and write-protected images become childless tombstones, which the prune removes: {}",
         write_protected_update );
+      Ok (( )) } )) }
+
+/// A root whose node a save deleted becomes a tombstone, which the prune
+/// removes when it holds nothing, so a buffer may end with no roots: the
+/// saved view of L alone ends empty. A collateral view of L and P keeps
+/// P, which no longer contains L, and the tombstone where L stood holds
+/// what was drawn under L (X, shown there as L's note).
+#[test]
+fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-collateral-delete-root",
+    "tests/collateral_delete/fixtures",
+    "/tmp/tantivy-test-collateral-delete-root",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle =
+        graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views        : OpenViews::new (),
+        graph_straddle    : None, };
+      let both_viewforest_id : ViewforestId =
+        ViewforestId::ContentView ("collat-del-root-both" . into ());
+      let l_viewforest_id : ViewforestId =
+        ViewforestId::ContentView ("collat-del-root-L" . into ());
+      { // A view whose roots are L, holding X as a note, and P.
+        let stored : Tree<Viewnode> = maybePlaced_to_placed_tree (
+          org_to_uninterpreted_nodes (
+            "* (skg (node (id L) (repo main))) [[id:X][to X]]\n\
+             ** (skg (node (id X) (repo main) noClaim)) X\n\
+             * (skg (node (id P) (repo main))) P\n\
+             ** (skg (node (id L) (repo main) writeProtected)) [[id:X][to X]]\n" ) ? . 0 ) ?;
+        views_state . open_views . register_view (
+          &graph . load_full (), both_viewforest_id . clone (), stored,
+          &[ID::from ("L"), ID::from ("P")] ); }
+      let (_l_view, l_pids, l_vf) =
+        single_root_view (
+          config, Some (tantivy), &ID::from ("L") ) ?;
+      views_state . open_views . register_view (
+        &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids );
+      let delete_buffer : String =
+        "* (skg (node (id L) (repo main) (editRequest delete))) [[id:X][to X]]\n"
+        . to_string ();
+      let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
+      let response : SaveResponse =
+        update_from_and_rerender_buffer (
+          &mut stream, &delete_buffer, config, tantivy, &graph,
+          &Ok (l_viewforest_id . clone ()), &mut views_state ) . await ?;
+      drop (stream);
+      let msgs : Vec<String> = {
+        let mut reader : BufReader<TcpStream> = BufReader::new (read_end);
+        read_all_lp_messages (&mut reader) };
+      assert! ( response . errors . is_empty (), "{:?}", response . errors );
+      assert_eq! ( response . saved_view, "",
+        "the saved view of L alone has no roots left" );
+      let both : &String = msgs . iter ()
+        . find ( |msg| msg . contains ("response-type collateral-view")
+                       && msg . contains ("collat-del-root-both") )
+        . expect ("the view of L and P should be rerendered");
+      assert! ( ! both . contains ("(id L)"), "L is gone:\n{}", both );
+      assert! ( both . contains ("* (skg tombstone")
+                && both . contains ("** (skg (node (id X)"),
+        "the tombstone where L stood holds X:\n{}", both );
+      assert! ( both . contains ("(id P)"), "P stays:\n{}", both );
       Ok (( )) } )) }
 
 /// A saved

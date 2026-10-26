@@ -202,10 +202,6 @@
 (skg (unknown (id gone)))
 ---- text: Reference to unknown node.
 ---- styles: message*26
-==== placeholders: deleted node
-(skg (deleted (id gone) (repo main)))
----- text: DELETED
----- styles: message*7
 ==== placeholders: tombstone
 (skg tombstone)
 ---- text: DELETED
@@ -227,7 +223,7 @@
 ---- text: ☮ ⊥ restore membership ~-
 ---- styles: crucial*1 -*1 crucial*1 -*1 nonstandard*18 -*1 nonstandard*2
 ==== diff view: a request to restore a deleted node
-(skg (historical (id g) (repo main) (editRequest restoreNode) (diff (node removed) (rel removed))))
+(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed) (rel removed))))
 ---- text: ☮ restore node ∃- ~-
 ---- styles: crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
 ==== diff view: a new member whose node object is ready
@@ -254,10 +250,10 @@
 (skg alias (diff (rel added) (ready)))
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
-==== diff view: a deleted node with a request to unmark it
-(skg (deleted (id x) (diff (node removed) (unreadyRequest))))
----- text: DELETED ∃- request:unready
----- styles: message*7 -*1 nonstandard*2 -*1 nonstandard*15
+==== diff view: a ghost with a request to unmark its existence
+(skg (ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (unreadyRequest node))))
+---- text: ☮ ∃- ~- request:unready:node
+---- styles: crucial*1 -*1 nonstandard*2 -*1 nonstandard*2 -*1 nonstandard*20
 ==== diff view: a request to mark both objects of a member
 (skg (node (id x) (diff (readyRequest node rel))))
 ---- text: request:ready:node request:ready:rel
@@ -298,8 +294,8 @@
 (skg (changesetMarker orderOnly) (diff (ready all)))
 ---- text: order-only change✓
 ---- styles: message*17 go*1
-==== diff view: a historical phantom, its existence ready
-(skg (historical (id x) (repo main) (diff (node removed) (rel removed) (ready node))))
+==== diff view: a ghost, its existence ready
+(skg (ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node))))
 ---- text: ☮ ∃-✓ ~-
 ---- styles: crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: the acquired-by folder

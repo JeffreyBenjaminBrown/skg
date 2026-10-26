@@ -9,7 +9,7 @@ use super::errors::{HeadlineName, with_org_subheadlines};
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Phantom, Folder, PropertyMember, ChangeViewnode, PhantomDeleted, PhantomHistorical, PhantomUnknown, GraphnodeStats, ViewnodeStats, Editability, };
+use super::viewnode::{ ChangeFacts, Existence, FoldAndFocus, ReadinessRequest, ViewnodeId, Viewnode, ViewnodeKind, UnrestrictedVognode, Vognode, Folder, PropertyMember, ChangeViewnode, Ghost, Unknown, GraphnodeStats, ViewnodeStats, Editability, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -51,15 +51,9 @@ impl MpViewnodeKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
-  Unrestricted   (MpUnrestrictedVognode),
-  Phantom  (MpPhantom),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum MpPhantom {
-  Deleted (PhantomDeleted),
-  Unknown (PhantomUnknown),
-  Historical (PhantomHistorical),
+  Unrestricted (MpUnrestrictedVognode),
+  Ghost        (Ghost),
+  Unknown      (Unknown),
 }
 
 //
@@ -97,12 +91,10 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         Ok (ViewnodeKind::Vognode (
           Vognode::Unrestricted (UnrestrictedVognode::try_from (t)?))),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d)))),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
-        Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
-        Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))),
+      MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
+        Ok (ViewnodeKind::Vognode (Vognode::Unknown (u))),
+      MpViewnodeKind::Vognode (MpVognode::Ghost (h)) =>
+        Ok (ViewnodeKind::Vognode (Vognode::Ghost (h))),
       MpViewnodeKind::Folder (folder) =>
         Ok (ViewnodeKind::Folder (folder)),
       MpViewnodeKind::PropertyMember (member) =>
@@ -159,12 +151,10 @@ impl From<ViewnodeKind> for MpViewnodeKind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         MpViewnodeKind::Vognode (
           MpVognode::Unrestricted (MpUnrestrictedVognode::from (t))),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))),
+      ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
+        MpViewnodeKind::Vognode (MpVognode::Unknown (u)),
+      ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
+        MpViewnodeKind::Vognode (MpVognode::Ghost (h)),
       ViewnodeKind::Folder (folder) =>
         MpViewnodeKind::Folder (folder),
       ViewnodeKind::PropertyMember (member) =>
@@ -286,16 +276,14 @@ impl MpViewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => &t . title,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        &d . title,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
+      MpViewnodeKind::Vognode (MpVognode::Ghost (h)) =>
         &h . title,
       MpViewnodeKind::PropertyMember (member) => member . title (),
       MpViewnodeKind::ChangeViewnode (change) => change . title (),
       MpViewnodeKind::Folder (folder) => folder . title (),
       MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
+        | MpViewnodeKind::Vognode (MpVognode::Unknown (_)) =>
         "", }}
 
   /// What a message says of this headline.
@@ -322,13 +310,11 @@ impl MpViewnode {
         format!("partnerFolder:{}", folder . repr_in_client ()),
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        format!("deleted:{}", d . skgid . 0),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
-        format!("historical:{}", h . skgid . 0),
+      MpViewnodeKind::Vognode (MpVognode::Ghost (h)) =>
+        format!("ghost:{}", h . skgid . 0),
       MpViewnodeKind::Tombstone =>
         "tombstone" . to_string (),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
+      MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
         format!("unknown:{}", u . skgid . 0), }}
 
   /// The body text to render for this node, when it has one.
@@ -336,16 +322,14 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . body (),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        d . body . as_ref(),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
+      MpViewnodeKind::Vognode (MpVognode::Ghost (h)) =>
         h . body . as_ref(),
       MpViewnodeKind::Folder (folder) => folder . body (),
       MpViewnodeKind::PropertyMember (member) => member . body (),
       MpViewnodeKind::ChangeViewnode (change) => change . body (),
       MpViewnodeKind::BufferRoot
         | MpViewnodeKind::Tombstone
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
+        | MpViewnodeKind::Vognode (MpVognode::Unknown (_)) =>
         None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
@@ -353,11 +337,9 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . skgid . as_ref(),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
-        Some (&d . skgid),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (h))) =>
+      MpViewnodeKind::Vognode (MpVognode::Ghost (h)) =>
         Some (&h . skgid),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
+      MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
         Some (&u . skgid),
       MpViewnodeKind::Folder (_)
         | MpViewnodeKind::PropertyMember (_)

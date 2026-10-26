@@ -30,7 +30,7 @@ use crate::diff_view::shallow_model_subtree::{
   convert_unwarranted_subtree_taking_along, give_model_facts_to,
   is_unrestricted_removed_member};
 use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
-use crate::types::viewnode::{DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, Folder, mk_writeProtected_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{DiffChange, Unknown, Viewnode, ViewnodeKind, Vognode, Folder, mk_writeProtected_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{
   Conversion, KeptChildOrder, RepairSummary, Unwarranted, complete_managed_children};
 use crate::update_buffer::util::treat_certain_children;
@@ -110,9 +110,9 @@ pub fn skgid_a_folder_child_stands_for (
       if t . claimsMembership
          || is_unrestricted_removed_member (viewnode) =>
       Some ( graph . relationship_member_key (&t . skgid) . into_id () ),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+    ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
       Some ( u . skgid . clone () ),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+    ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
       Some ( h . skgid . clone () ),
     _ => None, }}
 
@@ -209,30 +209,13 @@ pub fn reconcile_partnerFolder_children_against_goal_list (
   child_data    : &HashMap<ID, ChildData>,
   graph         : &InRustGraph,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
-  reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-    tree, folder_node, kind, goal_list, child_data, graph, &HashMap::new () )
-}
-
-/// As above, with the raw aliases captured for nodes deleted by the current
-/// save.  Only the immediate post-save rerender has this information.
-/// Children match goal items by 'skgid_a_folder_child_stands_for'
-/// over 'graph', the live graph.
-pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-  tree          : &mut Tree<Viewnode>,
-  folder_node      : NodeId,
-  kind          : &Folder,
-  goal_list     : &[FolderGoalItem],
-  child_data    : &HashMap<ID, ChildData>,
-  graph         : &InRustGraph,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
   let goal_skgids : Vec<ID> =
     goal_list . iter () . map ( |item| item . skgid . clone () ) . collect ();
   let items_by_skgid : HashMap<&ID, &FolderGoalItem> =
     goal_list . iter () . map ( |item| (&item . skgid, item) ) . collect ();
   normalize_relationship_backed_partner_unknowns (
-    tree, folder_node, child_data, deleted_by_this_save_extra_ids ) ?;
+    tree, folder_node, child_data ) ?;
   mark_goal_children_as_folder_members (
     tree, folder_node, goal_list, graph ) ?;
   let summary : RepairSummary<ID> =
@@ -291,8 +274,7 @@ fn viewnode_of_goal_item (
                        label, item . skgid . 0 )) ?;
       if d . unknown {
         let mut unknown : Viewnode = mk_unknown_viewnode (item . skgid . clone ());
-        if let ViewnodeKind::Vognode (Vognode::Phantom (
-          Phantom::Unknown (u))) = &mut unknown . kind
+        if let ViewnodeKind::Vognode (Vognode::Unknown (u)) = &mut unknown . kind
         { u . relRepo = d . relRepo . clone (); }
         unknown
       } else { mk_writeProtected_viewnode (
@@ -331,7 +313,7 @@ fn apply_goal_shapes (
     let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
     let viewnode : &mut Viewnode = child_mut . value ();
     let historical : bool = matches! ( &viewnode . kind,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) );
+      ViewnodeKind::Vognode (Vognode::Ghost (_)) );
     let unrestricted : bool = matches! ( &viewnode . kind,
       ViewnodeKind::Vognode (Vognode::Unrestricted (_)) );
     match &item . shape {
@@ -356,38 +338,23 @@ fn normalize_relationship_backed_partner_unknowns (
   tree       : &mut Tree<Viewnode>,
   folder_node   : NodeId,
   child_data : &HashMap<ID, ChildData>,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<(), Box<dyn Error>> {
   treat_certain_children (
     tree, folder_node,
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
         restriction . claimsMembership
-        && (child_data . get (&restriction . skgid)
-            . is_some_and (|data| data . unknown)
-            || deleted_by_this_save_extra_ids . get (&restriction . skgid)
-               . is_some_and (|extra_ids| extra_ids . iter () . any (
-                 |raw_skgid| child_data . get (raw_skgid)
-                   . is_some_and (|data| data . unknown)))),
+        && child_data . get (&restriction . skgid)
+           . is_some_and (|data| data . unknown),
       _ => false },
     |vn : &mut Viewnode| {
-      let unrestricted_skgid : ID = match &vn . kind {
+      let skgid : ID = match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => restriction . skgid . clone (),
         _ => unreachable! (), };
-      let skgid : ID = if child_data . get (&unrestricted_skgid)
-        . is_some_and (|data| data . unknown) { unrestricted_skgid . clone () }
-      else { deleted_by_this_save_extra_ids . get (&unrestricted_skgid)
-        . and_then (|extra_ids| extra_ids . iter () . find (
-          |raw_skgid| child_data . get (*raw_skgid)
-            . is_some_and (|data| data . unknown)))
-        . expect ("normalization predicate found an unknown raw member")
-        . clone () };
       let relRepo : Option<SkgrepoName> = child_data . get (&skgid)
         . and_then (|data| data . relRepo . clone ());
-      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (
-        crate::types::viewnode::Phantom::Unknown (
-          crate::types::viewnode::PhantomUnknown {
-            skgid, relRepo, relationshipEditRequest: None })))); })
+      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Unknown (
+        Unknown { skgid, relRepo, relationshipEditRequest: None }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
@@ -432,41 +399,6 @@ mod tests {
         . collect::<Vec<NodeId>> (),
       vec! [member_treeid] ); }
 
-  #[test]
-  fn deleted_primary_with_surviving_extra_member_becomes_unknown () {
-    let primary : ID = skgid ("deleted-primary");
-    let raw_extra : ID = skgid ("surviving-extra");
-    let mut tree : Tree<Viewnode> = Tree::new (
-      viewnode_of (ViewnodeKind::Folder (Folder::Subscribee)));
-    let folder : NodeId = tree . root () . id ();
-    let mut child : Viewnode = mk_writeProtected_viewnode (
-      primary . clone (), skgrepo ("main"), "last seen" . to_string (),
-      true );
-    child . foldAndFocus . focused = true;
-    let child_treeid   : NodeId = tree . root_mut () . append (child) . id ();
-    let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
-    child_data . insert ( raw_extra . clone (), ChildData {
-      home_skgrepo: SkgrepoName::not_found (), title: String::new (),
-      unknown: true, relRepo: Some (skgrepo ("foreign")) } );
-    let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
-    deleted_extra_ids . insert (
-      primary, [raw_extra . clone ()] . into_iter () . collect ());
-
-    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      &mut tree, folder, &Folder::Subscribee,
-      &FolderGoalItem::live_members (&[raw_extra . clone ()]),
-      &child_data, &InRustGraph::from_graphnodes (&[]),
-      &deleted_extra_ids ) . unwrap ();
-
-    let rendered = tree . get (child_treeid) . unwrap () . value ();
-    assert! (rendered . foldAndFocus . focused,
-      "normalization must preserve the existing view wrapper state");
-    match &rendered . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
-        assert_eq! (unknown . skgid, raw_extra);
-        assert_eq! (unknown . relRepo, Some (skgrepo ("foreign"))); },
-      other => panic! ("expected raw extra member as Unknown, got {other:?}"), }
-  }
 }
 
 /// See this module's header for definition of "goal child".

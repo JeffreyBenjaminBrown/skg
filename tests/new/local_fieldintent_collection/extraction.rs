@@ -651,7 +651,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             **** (skg (node (id keep) (repo main))) keep
             **** (skg (node (id independent) (repo main) noClaim)) independent
             **** (skg (node (id delete-me) (repo main) (editRequest delete))) delete me
-            **** (skg (historical (id phantom) (repo main))) phantom
+            **** (skg (ghost (gnid phantom) (skgRepos (nodeRepo main)))) phantom
             "};
   let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);

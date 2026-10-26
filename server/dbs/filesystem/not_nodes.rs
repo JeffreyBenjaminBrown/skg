@@ -211,7 +211,7 @@ pub fn load_config (
     // Canonicalized so that downstream joins (make_paths_absolute,
     // path_from_pid_and_repo, strip_prefix in get_file_path) yield
     // absolute paths uniformly -- matters for paths whose files do
-    // not exist on disk (e.g. Deleted phantoms), where the
+    // not exist on disk (e.g. ghosts), where the
     // canonicalize-in-handler fallback would otherwise leave the
     // raw path relative while data_root is absolute, and
     // strip_prefix would silently fail.

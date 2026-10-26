@@ -121,8 +121,8 @@ fn view_can_display_absent_reference_change (
     .any (|pid| affected_recorder_pids . contains (pid))
   || viewforest . nodes () . any (|node| matches! (
        &node . value () . kind,
-       crate::types::viewnode::ViewnodeKind::Vognode (crate::types::viewnode::Vognode::Phantom (
-         crate::types::viewnode::Phantom::Unknown (unknown)))
+       crate::types::viewnode::ViewnodeKind::Vognode (
+         crate::types::viewnode::Vognode::Unknown (unknown))
        if unknown . skgid == *raw_skgid ))
 }
 

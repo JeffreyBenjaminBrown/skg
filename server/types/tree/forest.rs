@@ -3,7 +3,7 @@ use crate::types::maybe_placed_viewnode::{
   maybePlaced_viewforest_root_viewnode};
 use crate::types::misc::ID;
 use crate::types::viewnode::{
-  Phantom, Viewnode, ViewnodeKind, Vognode, viewforest_root_viewnode};
+  Viewnode, ViewnodeKind, Vognode, viewforest_root_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::collections::HashSet;
@@ -55,7 +55,7 @@ pub fn in_content_position (
     Some (parent) => match &parent . value () . kind {
       ViewnodeKind::BufferRoot
         | ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => true,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) =>
+      ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
         in_content_position (parent),
       _ => false, },
     None => false, }}

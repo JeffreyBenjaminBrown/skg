@@ -4,7 +4,7 @@
 /// PartnerFolder generators. The editable folder of the relation is created
 /// even when empty (its editable "add here" surface); the write-protected
 /// folders are built only when populated (an empty write-protected
-/// folder is pruned by 'is_self_deletable_when_empty').
+/// folder is pruned, as 'folder_is_entombstoned_when_empty' says).
 ///
 /// The folder's reconciler, at the folder's visit, hangs the
 /// containerward chain under each of its members

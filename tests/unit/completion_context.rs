@@ -9,7 +9,7 @@ use crate::graph_straddle::types::GraphStraddle;
 use crate::types::misc::{SkgConfig, SkgrepoSetName};
 use crate::types::views_state::DiffViewBufferKind;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 fn runtime () -> RuntimeGeneration {
   RuntimeGeneration {
@@ -32,8 +32,6 @@ fn restriction () -> SkgrepoRestriction {
 /// The settings of a context that do not borrow mutable state.
 #[derive(Debug, PartialEq)]
 struct Settings {
-  deleted_by_this_save_pids      : HashSet<ID>,
-  deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<SkgrepoRestriction>,
   node_budget                    : usize,
   create_partnerFolders_for_fresh_nodes : bool,
@@ -48,8 +46,6 @@ fn settings_of (
   context : &CompletionContext,
 ) -> Settings {
   Settings {
-    deleted_by_this_save_pids      : context . deleted_by_this_save_pids . clone (),
-    deleted_by_this_save_extra_ids : context . deleted_by_this_save_extra_ids . clone (),
     skgrepo_restriction            : context . skgrepo_restriction . cloned (),
     node_budget                    : context . node_budget,
     create_partnerFolders_for_fresh_nodes :
@@ -76,8 +72,6 @@ fn for_content_view_gives_render_initial_views_settings () {
     &runtime, &graph_snap, &mut editable_map, &mut errors,
     Some (&restriction), &mut sink );
   assert_eq! ( settings_of (&context), Settings {
-    deleted_by_this_save_pids      : HashSet::new (),
-    deleted_by_this_save_extra_ids : HashMap::new (),
     skgrepo_restriction            : Some (restriction . clone ()),
     node_budget                    : runtime . config . initial_node_limit,
     create_partnerFolders_for_fresh_nodes : true,
@@ -98,8 +92,6 @@ fn for_diffView_gives_the_first_renderings_settings () {
     &runtime, &graph_snap, &mut editable_map, &mut errors,
     &straddle, DiffViewBufferKind::Merges );
   assert_eq! ( settings_of (&context), Settings {
-    deleted_by_this_save_pids      : HashSet::new (),
-    deleted_by_this_save_extra_ids : HashMap::new (),
     skgrepo_restriction            : None,
     node_budget                    : runtime . config . initial_node_limit,
     create_partnerFolders_for_fresh_nodes : false,
@@ -112,18 +104,14 @@ fn for_diffView_gives_the_first_renderings_settings () {
 
 /// Outside the diff view a rerender takes the restriction and the two
 /// flags it is given; in a buffer of the diff view it takes the first
-/// rendering's instead. Either way it keeps what the save deleted, the
-/// sink, and what the view held before.
+/// rendering's instead. Either way it keeps the sink and what the view
+/// held before.
 #[test]
 fn for_rerender_gives_rerender_views_settings_in_and_out_of_the_diff_view () {
   let runtime : RuntimeGeneration = runtime ();
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
   let straddle : GraphStraddle = straddle ();
   let restriction : SkgrepoRestriction = restriction ();
-  let deleted_pids : HashSet<ID> = HashSet::from ([ ID::from ("gone") ]);
-  let deleted_extra_ids : HashMap<ID, HashSet<ID>> =
-    HashMap::from ([ ( ID::from ("gone"),
-                       HashSet::from ([ ID::from ("gone2") ]) ) ]);
   let tree : Tree<Viewnode> =
     Tree::new ( crate::types::viewnode::viewforest_root_viewnode () );
   let some_node : NodeId = tree . root () . id ();
@@ -139,12 +127,10 @@ fn for_rerender_gives_rerender_views_settings_in_and_out_of_the_diff_view () {
       } else { CompletionMode::ContentView };
     let context : CompletionContext = CompletionContext::for_rerender (
       &runtime, &graph_snap, &mut editable_map, &mut errors,
-      &deleted_pids, &deleted_extra_ids, Some (&restriction),
+      Some (&restriction),
       true, true, Some (&mut sink), mode,
       &nodes_before, &nodes_before );
     assert_eq! ( settings_of (&context), Settings {
-      deleted_by_this_save_pids      : deleted_pids . clone (),
-      deleted_by_this_save_extra_ids : deleted_extra_ids . clone (),
       skgrepo_restriction            :
         ( ! in_diffView ) . then ( || restriction . clone () ),
       node_budget                    : runtime . config . initial_node_limit,

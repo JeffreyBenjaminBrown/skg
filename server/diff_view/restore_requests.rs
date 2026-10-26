@@ -29,7 +29,7 @@ use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{RelationshipEditRequest, Phantom, ViewnodeKind, Vognode};
+use crate::types::viewnode::{RelationshipEditRequest, ViewnodeKind, Vognode};
 
 use ego_tree::NodeRef;
 use std::collections::HashSet;
@@ -41,7 +41,7 @@ pub fn viewforest_has_restore_requests (
 ) -> bool {
   viewforest . root () . descendants () . any (
     |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
         h . restoreNode_request,
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel),
@@ -134,7 +134,7 @@ fn restore_nodes (
 ) -> HashSet<ID> {
   let mut restored : HashSet<ID> = HashSet::new ();
   for node in viewforest . root () . descendants () {
-    let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+    let ViewnodeKind::Vognode (Vognode::Ghost (h))
       : &ViewnodeKind = &node . value () . kind else { continue; };
     if ! h . restoreNode_request || restored . contains (&h . skgid)
     { continue; }

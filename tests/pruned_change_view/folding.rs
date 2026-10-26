@@ -119,8 +119,8 @@ fn a_folded_historical_phantom_stays_folded (
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let folded : String = with_atom (
-      &with_atom ( &buffer, "*** (skg (historical (id delc)", "folded" ),
-      "** (skg (historical (id del)", "bodyFolded" );
+      &with_atom ( &buffer, "*** (skg (ghost (gnid delc)", "folded" ),
+      "** (skg (ghost (gnid del)", "bodyFolded" );
     let saved : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert_eq! ( saved, folded, "saved unchanged, the buffer comes back as it was" );
     let contained : String = insert_after (
@@ -129,9 +129,9 @@ fn a_folded_historical_phantom_stays_folded (
         "*** (skg (node (id r) (repo main) writeProtected)) r" ] );
     let saved : String = save_cleanly (f, &all_changes_view (), &contained) ? . saved_view;
     assert! ( saved . contains ("a new container"), "{}", saved );
-    assert! ( line_starting (&saved, "** (skg bodyFolded (historical (id del)")
+    assert! ( line_starting (&saved, "** (skg bodyFolded (ghost (gnid del)")
               . ends_with (" del"), "{}", saved );
-    assert! ( line_starting (&saved, "*** (skg folded (historical (id delc)")
+    assert! ( line_starting (&saved, "*** (skg folded (ghost (gnid delc)")
               . ends_with (" delc"), "{}", saved );
     Ok (( )) }) }
 
@@ -193,7 +193,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
       "*** (skg (node (id cy2)", "folded" );
     let deleted : String = save_cleanly (f, &all_changes_view (), &folded) ? . saved_view;
     assert! ( without_viewnode_ids (&deleted) . contains (
-      "** (skg bodyFolded (historical (id cy1) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel)))) cy1\n\
+      "** (skg bodyFolded (ghost (gnid cy1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) cy1\n\
        *** (skg folded (node (id cy2)" ),
       "cy1 is historical where it stood, its subtree folded as it was:\n{}", deleted );
     assert_eq! ( deleted . lines ()
@@ -201,7 +201,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
                  . count (), 1,
       "the former member is the phantom's old content, not beside it:\n{}", deleted );
     let restoring : String = edit_line (
-      &deleted, "** (skg bodyFolded (historical (id cy1)",
+      &deleted, "** (skg bodyFolded (ghost (gnid cy1)",
       |_| "** (skg bodyFolded (node (id cy1) (repo main))) cy1" . to_string () );
     let restoring : String = edit_line (
       &restoring, "*** (skg folded (node (id cy2)",
@@ -210,7 +210,7 @@ fn a_deleted_then_restored_node_keeps_the_folding_of_its_subtree (
     let restored : String = save_cleanly (f, &all_changes_view (), &restoring) ? . saved_view;
     assert! ( without_viewnode_ids (&restored) . contains ("** (skg bodyFolded (node (id cy1)")
               && without_viewnode_ids (&restored) . contains ("*** (skg folded (node (id cy2)")
-              && ! without_viewnode_ids (&restored) . contains ("historical (id cy1)"),
+              && ! without_viewnode_ids (&restored) . contains ("ghost (gnid cy1)"),
               "cy1 is a live member again, its subtree folded as it was:\n{}",
               restored );
     Ok (( )) }) }

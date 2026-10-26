@@ -117,7 +117,7 @@ fn deleted_images_of_removed_members_respawn (
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String = without_lines_containing (
       &without_subtree_starting (&buffer, "** (skg (node (id k1)"),
-      "*** (skg (historical (id gone)" );
+      "*** (skg (ghost (gnid gone)" );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &edited) ?;
     assert! ( response . errors . is_empty (),

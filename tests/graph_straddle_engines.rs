@@ -14,7 +14,7 @@ use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::{ID, RelPartner, SkgConfig, Skgrepo, SkgrepoName};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::types::viewnode::{
-  DiffChange, Existence, Folder, Phantom, Viewnode, ViewnodeKind,
+  DiffChange, Existence, Folder, Viewnode, ViewnodeKind,
   Vognode, mk_editable_viewnode, viewforest_root_viewnode, viewnode_of};
 use skg::types::views_state::DiffViewBufferKind;
 use skg::update_buffer::completion_mode::CompletionMode;
@@ -79,8 +79,8 @@ fn children_with_change (
     . filter_map ( |child| {
       let skgid : &ID = match &child . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . skgid,
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) => &u . skgid,
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) => &h . skgid,
+        ViewnodeKind::Vognode (Vognode::Unknown (u)) => &u . skgid,
+        ViewnodeKind::Vognode (Vognode::Ghost (h)) => &h . skgid,
         _ => return None, };
       Some (( skgid . 0 . clone (), child . value () . change_facts . change )) } )
     . collect () }
@@ -101,7 +101,7 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
     CompletionMode::DiffView { straddle    : &f . straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges },
     &f . runtime, &f . runtime . graph,
-    &HashMap::new (), None, None ) ?;
+    None, None ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (tree . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),

@@ -222,7 +222,8 @@ fn a_request_without_changes_commits_nothing (
 
 /// At the handler: the confirmed resend commits, and the open "all
 /// changes" buffer is rerendered in the rerender stream that follows:
-/// its roots remain, and carry no change facts.
+/// its roots remain but its ghosts, whose nodes the commit removed
+/// from HEAD too, and carry no change facts.
 #[test]
 fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
 ) -> Result<(), Box<dyn Error>> {
@@ -236,8 +237,9 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
               && first . contains ("(lock-views ())")
               && ! first . contains ("rerender-view"),
               "{}", first );
-    let roots : Vec<String> =
-      buffer . lines () . filter ( |line| line . starts_with ("* ") )
+    let roots : Vec<String> = // but the ghosts
+      buffer . lines ()
+      . filter ( |line| line . starts_with ("* ") && ! line . contains ("(ghost ") )
       . map ( |line| root_id (line) ) . collect ();
     let second : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"one message\") (confirmed . t))\n" ) ?;
@@ -252,7 +254,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
       . map ( |line| root_id (line) ) . collect ();
     assert_eq! ( roots_after, roots, "the roots remain:\n{}", content );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  "historical", "homeSkgrepoMove", "(ready" ] {
+                  "(ghost ", "homeSkgrepoMove", "(ready" ] {
       assert! ( ! content . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views

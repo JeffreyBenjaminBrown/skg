@@ -3,7 +3,7 @@
 /// without requiring global context.
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode};
-use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
+use crate::types::maybe_placed_viewnode::{MpVognode};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Editability, Folder, PropertyMember, ChangeViewnode};
 use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
@@ -74,13 +74,11 @@ pub fn validate_local_structure (
           validate_flags_folder (tree, treeid),
       MpViewnodeKind::PropertyMember (PropertyMember::Flag { .. }) =>
           validate_flag (tree, treeid),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
-        => Vec::new(),
       MpViewnodeKind::Tombstone => Vec::new(),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
+      MpViewnodeKind::Vognode (MpVognode::Unknown (_))
         => Vec::new(),
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))
-        => validate_historical_phantom (tree, treeid),
+      MpViewnodeKind::Vognode (MpVognode::Ghost (_))
+        => validate_ghost (tree, treeid),
       MpViewnodeKind::Folder (Folder::AcquiredBy) =>
         validate_acquiredBy_folder (tree, treeid),
       MpViewnodeKind::Folder (Folder::Acquired) =>
@@ -218,7 +216,7 @@ fn validate_hiddenInSubscribee_folder (
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_unrestricted ()
            || matches! ( &node . kind,
-                         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) )))
+                         MpViewnodeKind::Vognode (MpVognode::Unknown (_)) )))
     { errors . push(
         "HiddenInSubscribeeFolder's children can only be UnrestrictedVognodes or Unknown phantoms (to hide)."
         . to_string()); }
@@ -227,7 +225,7 @@ fn validate_hiddenInSubscribee_folder (
     tombstone_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . claimsMembership,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
+      MpViewnodeKind::Vognode (MpVognode::Unknown (_))
         => true,
       _ => false, }) )
     { errors . push(
@@ -263,14 +261,14 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_unrestricted ()
            || matches! ( &node . kind,
-                         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) )))
+                         MpViewnodeKind::Vognode (MpVognode::Unknown (_)) )))
     { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only UnrestrictedVognodes or Unknown phantoms." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . claimsMembership,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
+      MpViewnodeKind::Vognode (MpVognode::Unknown (_))
         => true,
       _ => false, }) )
     { errors . push(
@@ -303,8 +301,8 @@ fn validate_subscribeefolder (
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_unrestricted ()
            || matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
-                      | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) // a former member, in the diff view; save-inert
+                    MpViewnodeKind::Vognode (MpVognode::Unknown (_))
+                      | MpViewnodeKind::Vognode (MpVognode::Ghost (_)) // a former member, in the diff view; save-inert
                       | MpViewnodeKind::Folder (
                           Folder::HiddenOutsideOfSubscribee) )))
     { errors . push( "SubscribeeFolder's children must include only UnrestrictedVognodes, tombstones, Unknown or historical vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
@@ -313,9 +311,9 @@ fn validate_subscribeefolder (
     tombstone_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
         t . claimsMembership,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
+      MpViewnodeKind::Vognode (MpVognode::Unknown (_)) =>
         true,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))) =>
+      MpViewnodeKind::Vognode (MpVognode::Ghost (_)) =>
         true,
       MpViewnodeKind::Folder (
         Folder::HiddenOutsideOfSubscribee)
@@ -347,18 +345,18 @@ fn validate_relation_folder (
     tombstone_or (|node| node . is_unrestricted ()
            || ( *partnerFolder == Folder::Overridden
                 && matches! ( &node . kind,
-                              MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
+                              MpViewnodeKind::Vognode (MpVognode::Unknown (_)) ))
            || matches!(&node . kind, // a former member, in the diff view; save-inert
-                       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))))
+                       MpViewnodeKind::Vognode (MpVognode::Ghost (_)))))
     { errors . push(format!("{}'s children must include only UnrestrictedVognodes, tombstones, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
         => t . claimsMembership,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
+      MpViewnodeKind::Vognode (MpVognode::Unknown (_))
         if *partnerFolder == Folder::Overridden => true,
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))
+      MpViewnodeKind::Vognode (MpVognode::Ghost (_))
         => true,
       _ => false, }) )
     { errors . push(format!(
@@ -381,7 +379,7 @@ fn validate_relation_folder (
 // The diff view's viewnodes are save-inert: these checks only
 // keep each where the diff view shows it.
 
-fn validate_historical_phantom (
+fn validate_ghost (
   tree    : &Tree<MpViewnode>,
   treeid  : NodeId,
 ) -> Vec<String> {
@@ -390,13 +388,13 @@ fn validate_historical_phantom (
       tree, treeid,
       tree . get (treeid) . and_then ( |n| n . value () . skgid_opt () )
         . is_some_and ( |skgid| ! skgid . 0 . is_empty () ),
-      "Historical phantom" );
+      "Ghost" );
   if !generation_includes_only(
     tree, treeid, 1, false,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (_)
                     | MpViewnodeKind::Folder (Folder::AcquiredBy)))
-    { errors . push("A historical phantom's children can only be vognodes (its old content) and an acquiredByFolder."
+    { errors . push("A ghost's children can only be vognodes (its old content) and an acquiredByFolder."
                     . to_string()); }
   errors }
 
@@ -407,11 +405,11 @@ fn validate_acquiredBy_folder (
   validate_acquisition_folder (
     tree, treeid, "acquiredByFolder",
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_)))),
+                    MpViewnodeKind::Vognode (MpVognode::Ghost (_))),
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Unrestricted (_)
-                      | MpVognode::Phantom (MpPhantom::Unknown (_))))) }
+                      | MpVognode::Unknown (_)))) }
 
 fn validate_acquired_folder (
   tree    : &Tree<MpViewnode>,
@@ -423,7 +421,7 @@ fn validate_acquired_folder (
                     MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))),
     // An acquiree's phantom, or a note the user put there.
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
+                    MpViewnodeKind::Vognode (MpVognode::Ghost (_)))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
                        if ! t . claimsMembership)) }
@@ -736,7 +734,7 @@ pub fn nonignored_children_have_distinct_skgids (
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
           if t . claimsMembership
           => t . collected_skgid (),
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
+        MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
           Some (u . skgid . clone()),
         // A tombstone is not a content member (where it stands for a
         // hidden node, disk supplementation owns that membership), so
@@ -764,7 +762,7 @@ fn partnerFolder_children_have_distinct_skgids (
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
           if t . claimsMembership =>
           t . skgid . clone(),
-        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
+        MpViewnodeKind::Vognode (MpVognode::Unknown (u)) =>
           Some (u . skgid . clone()),
         _ => None,
       })

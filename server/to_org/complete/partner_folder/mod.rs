@@ -53,7 +53,7 @@ fn build_initial_render_child_data (
           nc . title . clone (), false ),
       None => // No record anywhere; 'reconcile' will still need an
               // entry, but downstream rendering would treat this as
-              // an PhantomUnknown case. We pass the raw id through with
+              // an Unknown case. We pass the raw id through with
               // a sentinel skgrepo/title so the reconcile call can
               // still run.
         ( skgid . clone (), SkgrepoName::from (""), String::new (), true ), };

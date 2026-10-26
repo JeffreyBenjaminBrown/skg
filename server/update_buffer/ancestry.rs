@@ -29,7 +29,7 @@
 
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::viewnode::{ Folder, Phantom, Viewnode, ViewnodeKind, Vognode };
+use crate::types::viewnode::{ Folder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::{Unwarranted, convert_unwarranted_child};
 
 use ego_tree::{ NodeId, NodeRef, Tree };
@@ -44,7 +44,7 @@ enum ExpectedAncestor {
   /// Must be exactly this folder kind (a folder is a collecting non-vognode; see 'is_folder_kind'). The
   /// only intermediate-chain folder the table uses is the SubscribeeFolder.
   Folder (Folder),
-  /// Must be a `Phantom::Historical` (the parent of an AcquiredBy folder).
+  /// Must be a `Vognode::Ghost` (the parent of an AcquiredBy folder).
   HistoricalPhantom,
 }
 
@@ -104,7 +104,7 @@ fn matches_expected (
       matches! ( actual, ViewnodeKind::Folder (r) if r == rc ),
     ExpectedAncestor::HistoricalPhantom =>
       matches! ( actual,
-                 ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) ),
+                 ViewnodeKind::Vognode (Vognode::Ghost (_)) ),
   } }
 
 /// Whether `kind` is a folder -- a folder is a

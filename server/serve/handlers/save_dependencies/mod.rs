@@ -4,13 +4,13 @@ use crate::save::PreparedSave;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::ClientViewSnapshot;
 use crate::types::maybe_placed_viewnode::{
-  MpPhantom, MpViewnodeKind, MpVognode,
+  MpViewnodeKind, MpVognode,
 };
 use crate::types::misc::ID;
 use crate::types::links::links_from_text;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 use crate::types::viewnode::{
-  Editability, NodeEditRequest, Phantom, PropertyMember, ViewnodeKind, Vognode,
+  Editability, NodeEditRequest, PropertyMember, ViewnodeKind, Vognode,
 };
 use crate::types::views_state::ViewforestId;
 
@@ -146,11 +146,9 @@ fn dependencies_from_uninterpreted (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (phantom))) => {
+      MpViewnodeKind::Vognode (MpVognode::Unknown (phantom)) => {
         result . insert (phantom . skgid . clone ()); }
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (phantom))) => {
-        result . insert (phantom . skgid . clone ()); }
-      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (phantom))) => {
+      MpViewnodeKind::Vognode (MpVognode::Ghost (phantom)) => {
         result . insert (phantom . skgid . clone ()); }
       MpViewnodeKind::PropertyMember (
         PropertyMember::ID { skgid, .. }) => {
@@ -172,11 +170,9 @@ fn dependencies_from_registered (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) => {
+      ViewnodeKind::Vognode (Vognode::Unknown (phantom)) => {
         result . insert (phantom . skgid . clone ()); }
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) => {
-        result . insert (phantom . skgid . clone ()); }
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (phantom))) => {
+      ViewnodeKind::Vognode (Vognode::Ghost (phantom)) => {
         result . insert (phantom . skgid . clone ()); }
       ViewnodeKind::PropertyMember (
         PropertyMember::ID { skgid, .. }) => {

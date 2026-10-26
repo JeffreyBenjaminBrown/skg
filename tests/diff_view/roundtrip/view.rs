@@ -29,7 +29,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::tree::moves::{move_before, move_to_first_child};
 use skg::types::viewnode::{
-  ChangesetMarkerKind, Existence, Phantom, ChangeViewnode, Viewnode, ViewnodeKind,
+  ChangesetMarkerKind, Existence, ChangeViewnode, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use skg::types::views_state::ViewforestId;
 
@@ -82,7 +82,7 @@ fn append_historical_phantom (
   let deleted_members : Vec<(NodeId, ID)> =
     tree . get (phantom) ? . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+      ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
         Some (( child . id (), h . skgid . clone () )),
       _ => None, } )
     . collect ();
@@ -139,8 +139,8 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
   with_fixture ( |f| {
     let buffer : String = buffer_with_every_new_viewnode (f) ?;
     let atoms : [&str; 14] = [
-      "(historical (id gone) (repo main) (diff (node removed) (rel removed)))",
-      "(historical (id gc) (repo main) (diff (node removed) (rel removed)))",
+      "(ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))",
+      "(ghost (gnid gc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))",
       "(diff (rel removed)))) kept", // a surviving member under gone
       "(unknown (id ghost) (diff (rel removed)))",
       "(oldText titleAndBody)", "bodyDiff",
@@ -149,7 +149,7 @@ fn a_buffer_of_the_new_viewnodes_saves_back_unchanged (
       "(changesetMarker content)", "(changesetMarker relRepo)",
       "(changesetMarker orderOnly)",
       "acquiredFolder", "acquiredByFolder",
-      "(historical (id acquired) (repo main) (diff (node removed)))" ];
+      "(ghost (gnid acquired) (skgRepos (nodeRepo main)) (diff (node removed)))" ];
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let mut saved : String = buffer;
     for _ in 0 .. 2 {
@@ -180,8 +180,8 @@ fn readiness_requests_on_the_new_viewnodes_name_their_leaves (
     let buffer : String = buffer_with_every_new_viewnode (f) ?
       . replace ( "(skg (oldText titleAndBody))",
                   "(skg (oldText titleAndBody) (diff (readyRequest)))" )
-      . replace ( "(historical (id gone) (repo main) (diff (node removed) (rel removed)))",
-                  "(historical (id gone) (repo main) (diff (node removed) (rel removed) (readyRequest node)))" );
+      . replace ( "(ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))",
+                  "(ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (readyRequest node)))" );
     let response : SaveResponse = save (f, &buffer) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );

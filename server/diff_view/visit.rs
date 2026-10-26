@@ -12,9 +12,11 @@
 //!   per-visit step reconciled it with the union of the straddle; any
 //!   other property folder is refreshed from the after-graph there, as
 //!   in every view;
-//! - a deleted phantom whose node the before-graph has becomes its
-//!   historical phantom, and each historical phantom's visit adds
-//!   its old content ('process_historical_phantom_visit');
+//! - an occurrence whose node vanished becomes its ghost when the
+//!   before-graph has the node ('vanished_occurrence_becomes_ghost'),
+//!   and each ghost's visit adds its old content
+//!   ('process_historical_phantom_visit'), unless the user asked to
+//!   entombstone it ('(viewRequests tombstone)');
 //! - no default partner folders and no hidden-in-subscribee folder
 //!   are created;
 //! - the node budget bounds only the extensions an editable-view
@@ -27,9 +29,9 @@
 //! ('set_diffView_facts_in_viewforest').
 
 use crate::diff_view::changes::{
-  HistoricalPhantomVisit, deleted_phantom_becomes_historical,
+  HistoricalPhantomVisit, entombstone_ghost,
   process_historical_phantom_visit, process_unrestrictedVognode_changes};
-use crate::types::viewnode::{Phantom, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, Tree};
@@ -42,7 +44,7 @@ pub enum DiffViewVisit {
   /// The diff view did the whole visit.
   Done,
   /// Completion visits the node. With 'visit_as_unrestrictedVognode',
-  /// the node was a historical phantom whose node is back, and is now
+  /// the node was a ghost whose node is back, and is now
   /// an editable vognode: completion visits it as one.
   Complete { visit_as_unrestrictedVognode : bool },
 }
@@ -51,8 +53,8 @@ pub enum DiffViewVisit {
 /// 'diffView_visit_after_extension'.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NormalNodeUpdate {
-  /// This save deleted its node: it is now a deleted phantom.
-  DeletedBySave,
+  /// The graph lacks its node: it is now a ghost, or a tombstone.
+  NodeVanished,
   /// Its update made it something other than an unrestricted vognode.
   NoLongerUnrestricted,
   /// It is still an unrestricted vognode.
@@ -63,7 +65,8 @@ pub enum NormalNodeUpdate {
 /// diff-view mode, an ordinary visit. In it, a changed property
 /// folder's visit is done (the per-visit step reconciled it), and any
 /// other property folder is visited as in every view, so that one the
-/// user requested stays fresh; a historical phantom adds its old
+/// user requested stays fresh; a ghost the user asked to entombstone
+/// becomes a tombstone; any other ghost adds its old
 /// content, and is then visited as an editable vognode only if its
 /// node is back.
 pub fn diffView_visit_before_extension (
@@ -80,8 +83,12 @@ pub fn diffView_visit_before_extension (
       if folder . members_are_properties ()
       && property_folder_is_changed (tree, treeid) =>
       return Ok (DiffViewVisit::Done),
-    // A historical phantom where content stands adds its old content.
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => {
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost))
+      if ghost . tombstone_request => {
+      entombstone_ghost (tree, treeid, straddle) ?;
+      return Ok (DiffViewVisit::Done); },
+    // A ghost where content stands adds its old content.
+    ViewnodeKind::Vognode (Vognode::Ghost (_)) => {
       if process_historical_phantom_visit (
            tree, treeid, straddle, buffer_kind ) ?
         == HistoricalPhantomVisit::Done {
@@ -91,9 +98,9 @@ pub fn diffView_visit_before_extension (
   Ok ( DiffViewVisit::Complete { visit_as_unrestrictedVognode } ) }
 
 /// The diff view's part at the end of an unrestricted vognode's visit:
-/// a node this save deleted that HEAD has is shown as history; one
-/// still unrestricted gets the per-visit step. Nothing outside
-/// diff-view mode.
+/// the ghost that replaced an occurrence whose node vanished is
+/// visited as a ghost; one still unrestricted gets the per-visit step.
+/// Nothing outside diff-view mode.
 pub fn diffView_visit_after_extension (
   tree                       : &mut Tree<Viewnode>,
   treeid                     : NodeId,
@@ -105,10 +112,10 @@ pub fn diffView_visit_after_extension (
   let CompletionMode::DiffView { straddle, buffer_kind } = mode
     else { return Ok (( )); };
   match update {
-    NormalNodeUpdate::DeletedBySave =>
-      if deleted_phantom_becomes_historical (tree, treeid, straddle) ? {
-        process_historical_phantom_visit (
-          tree, treeid, straddle, buffer_kind ) ?; },
+    NormalNodeUpdate::NodeVanished => {
+      // A no-op on a tombstone.
+      process_historical_phantom_visit (
+        tree, treeid, straddle, buffer_kind ) ?; },
     NormalNodeUpdate::NoLongerUnrestricted => {},
     NormalNodeUpdate::Updated =>
       // Tag the content, show what was removed, and add the change

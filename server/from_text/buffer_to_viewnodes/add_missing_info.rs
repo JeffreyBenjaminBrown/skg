@@ -214,7 +214,7 @@ fn skgrepo_of_nearest_unrestricted_ancestor (
                                . get (skgid) . cloned () )
           . or_else ( || at . home_skgrepo . clone () )
         } else { at . home_skgrepo . clone () },
-      MpViewnodeKind::Vognode (MpVognode::Phantom (_))
+      MpViewnodeKind::Vognode (MpVognode::Ghost (_) | MpVognode::Unknown (_))
         | MpViewnodeKind::Folder (_) => continue,
       MpViewnodeKind::PropertyMember (_)
         | MpViewnodeKind::ChangeViewnode (_)

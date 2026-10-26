@@ -6,7 +6,7 @@ use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
   FolderGoalItem,
-  reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
+  reconcile_partnerFolder_children_against_goal_list,
   skgid_a_folder_child_stands_for,
 };
 use crate::to_org::extend::containerward_chain::{
@@ -43,7 +43,6 @@ pub fn reconcile_partnerFolder_children (
   mode         : CompletionMode,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
@@ -61,7 +60,7 @@ pub fn reconcile_partnerFolder_children (
   if let CompletionMode::DiffView { straddle, .. } = mode {
     return reconcile_partnerFolder_children_from_graph_straddle (
       node, tree, kind, straddle, &viewparent_pid, member_role, runtime,
-      deleted_by_this_save_extra_ids, warning_sink ); }
+      warning_sink ); }
   let goal_list : Vec<ID> = {
     let graph_members : Vec<ID> =
       partnerFolder_members_in_graph (
@@ -100,9 +99,8 @@ pub fn reconcile_partnerFolder_children (
   // retained as non-member, so a write-protected PartnerFolder drops a
   // stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
-    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      tree, node, kind, &goal_items, &child_data, graph_snap,
-      deleted_by_this_save_extra_ids ) ?;
+    reconcile_partnerFolder_children_against_goal_list (
+      tree, node, kind, &goal_items, &child_data, graph_snap ) ?;
   if ! kind . goal_is_ordered () {
     // Repairs to an editable folder are not repairs: its membership is
     // whatever the user saved. Write-protected folders warn (when there is a

@@ -52,7 +52,7 @@ use crate::skgrepo_sets::{SkgrepoRestriction, entombstone_hidden_occurrences};
 use crate::to_org::util::EditableMap;
 use crate::types::views_state::{DiffViewBufferKind, ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{ID, SkgrepoName, SkgConfig};
-use crate::types::save::{NodeInstruction, ForkSpec};
+use crate::types::save::ForkSpec;
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_as_members, validate_membership_claims, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
@@ -61,7 +61,7 @@ use crate::types::viewnode::{FolderRelation, PropertyMember, Vognode, Folder, Vi
 use crate::update_buffer::ancestry::entombstone_generalized_orphan_folder;
 
 use ego_tree::{Tree, NodeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Instant;
@@ -72,12 +72,6 @@ pub struct RerenderAfterSaveContext<'a> {
   pub graph_snap    : Arc<InRustGraph>,
   pub errors        : Vec<String>,
   pub warnings      : Vec<String>,
-  /// Pids deleted by this save; not necessarily a subset of git deletes.
-  pub deleted_by_this_save_pids      : HashSet<ID>,
-  /// Raw extra IDs that belonged to each pid deleted by this save, captured
-  /// before graph mutation.  A still-stored relationship can name one of
-  /// these IDs after the pid itself has disappeared.
-  pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   pub skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
   /// The graph straddle a buffer of the diff view is completed
   /// over, brought up to date by 'current_graph_straddle_in_slot' when
@@ -87,40 +81,17 @@ pub struct RerenderAfterSaveContext<'a> {
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
-  fn for_save (
-    env               : &'a SkgEnv,
-    node_instructions      : &[NodeInstruction],
-    deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-    skgrepo_restriction : Option<&'a SkgrepoRestriction>,
-  ) -> RerenderAfterSaveContext<'a> {
-    let runtime = env . runtime_snapshot ();
-    Self::for_save_with_runtime (
-      env, runtime, node_instructions,
-      deleted_by_this_save_extra_ids, skgrepo_restriction)
-  }
-
-  fn for_save_with_runtime (
+  fn with_runtime (
     env : &'a SkgEnv,
     runtime : Arc<RuntimeGeneration>,
-    node_instructions : &[NodeInstruction],
-    deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
     skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
-    let deleted_by_this_save_pids : HashSet<ID> =
-      // PITFALL: Looks dangerous but isn't: Each nodeMerge includes an acquiree deletion. This would make Viewnodes with that ID invalid (since Viewnodes by this point should have PIDs). It doesn't, though, because rewriteInPlace_viewnodes_whose_id_is_newly_extra will rewrite those Viewnodes to instead use the acquirer's PID (i.e. to depict the acquirer now, instead of the acquiree as before) before using this set.
-      node_instructions . iter()
-      . filter_map( |instr| match instr {
-        NodeInstruction::Delete (d) => Some( d . skgid . clone() ),
-        _ => None })
-      . collect();
     RerenderAfterSaveContext {
       env,
       graph_snap : runtime . graph . clone (),
       runtime,
       errors : Vec::new (),
       warnings : Vec::new (),
-      deleted_by_this_save_pids,
-      deleted_by_this_save_extra_ids,
       skgrepo_restriction,
       graph_straddle : None,
     }}
@@ -129,16 +100,16 @@ impl<'a> RerenderAfterSaveContext<'a> {
     env                : &'a SkgEnv,
     skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
-    RerenderAfterSaveContext::for_save (
-      env, &[], HashMap::new (), skgrepo_restriction ) }
+    RerenderAfterSaveContext::with_runtime (
+      env, env . runtime_snapshot (), skgrepo_restriction ) }
 
   pub fn without_save_with_runtime (
     env : &'a SkgEnv,
     runtime : Arc<RuntimeGeneration>,
     skgrepo_restriction : Option<&'a SkgrepoRestriction>,
   ) -> RerenderAfterSaveContext<'a> {
-    RerenderAfterSaveContext::for_save_with_runtime (
-      env, runtime, &[], HashMap::new (), skgrepo_restriction ) }
+    RerenderAfterSaveContext::with_runtime (
+      env, runtime, skgrepo_restriction ) }
 }
 
 struct RenderedCollateralView {
@@ -159,14 +130,12 @@ struct RenderedCollateralView {
 pub fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
   saved_view                  : ViewForest,
-  node_instructions           : Vec<NodeInstruction>,
   collateral_viewforest_ids   : Vec<ViewforestId>,
   env                         : &SkgEnv,
   runtime                     : Arc<RuntimeGeneration>,
   viewforest_id_from_request_result : &Result<ViewforestId, String>,
   views_state                 : &mut ViewsState,
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
-  deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -176,11 +145,8 @@ pub fn update_views_after_save (
     // to acquirer pids before rerender) and by content_goal_list
     // resolution during reconcile (neighbors' on-disk contains still
     // point at the acquiree id).
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "RerenderAfterSaveContext::for_save" ). entered();
-      RerenderAfterSaveContext::for_save_with_runtime (
-        env, runtime, &node_instructions,
-        deleted_by_this_save_extra_ids, skgrepo_restriction ) };
+    RerenderAfterSaveContext::with_runtime (
+      env, runtime, skgrepo_restriction );
   context . graph_straddle = views_state . graph_straddle . clone ();
   let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
     viewforest_id_from_request_result . as_ref () . ok ()
@@ -564,8 +530,6 @@ pub fn rerender_view (
       &context . graph_snap,
       &mut editable_map,
       &mut context . errors,
-      &context . deleted_by_this_save_pids,
-      &context . deleted_by_this_save_extra_ids,
       context . skgrepo_restriction,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
       // and pass false. The repo-switch rerender passes true: its prune

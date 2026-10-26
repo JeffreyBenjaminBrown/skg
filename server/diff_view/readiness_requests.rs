@@ -37,7 +37,7 @@ use crate::types::errors::{HeadlineName, with_org_subheadlines};
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ChangeFacts, ChangesetMarkerKind, LeavesFact, Phantom, PropertyMember, ChangeViewnode, DiffObject,
+  ChangeFacts, ChangesetMarkerKind, LeavesFact, PropertyMember, ChangeViewnode, DiffObject,
   ReadinessRequest, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef};
@@ -134,7 +134,7 @@ fn leaves_named_at (
     ViewnodeKind::Vognode (vognode) => {
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
       let is_unknown : bool =
-        matches! (vognode, Vognode::Phantom (Phantom::Unknown (_)));
+        matches! (vognode, Vognode::Unknown (_));
       let objects : Vec<DiffObject> =
         if ! objects . is_empty () {
           objects . iter () . copied () . collect ()
@@ -248,7 +248,7 @@ pub fn set_ready_facts_in_viewforest (
         match &node . value () . kind {
           ViewnodeKind::Vognode (
             vognode @ ( Vognode::Unrestricted (_)
-                        | Vognode::Phantom (Phantom::Historical (_)) )) => {
+                        | Vognode::Ghost (_) )) => {
             let all_is_listed : bool =
               matches! ( vognode, Vognode::Unrestricted (_) )
               && leaves . as_ref () . is_some_and ( |leaves|
@@ -262,7 +262,7 @@ pub fn set_ready_facts_in_viewforest (
               . collect ();
             ( ! objects . is_empty () ) . then_some (objects) },
           ViewnodeKind::Vognode (
-            Vognode::Phantom (Phantom::Deleted (_) | Phantom::Unknown (_)) ) =>
+            Vognode::Unknown (_) ) =>
             object_is_ready (node, &[]) . then (BTreeSet::new),
           ViewnodeKind::ChangeViewnode ( ChangeViewnode::ChangesetMarker { kind } ) =>
             ( *kind == ChangesetMarkerKind::OrderOnly
@@ -307,7 +307,7 @@ fn leaves_fact_at (
       . collect (),
     ViewnodeKind::Vognode (
       Vognode::Unrestricted (_)
-      | Vognode::Phantom (Phantom::Historical (_)) ) => {
+      | Vognode::Ghost (_) ) => {
       let one_leaf_each : BTreeSet<DiffObject> =
         [ DiffObject::Node, DiffObject::Rel ] . into_iter ()
         . filter ( |object| names_some_leaf (&[ *object ]) )
@@ -347,7 +347,7 @@ pub(crate) fn vognode_leaf_pid (
   pid_of   : &dyn Fn (&ID) -> ID,
 ) -> Option<ID> {
   match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =>
+    ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
       Some ( h . skgid . clone () ),
     ViewnodeKind::Vognode (vognode) =>
       Some ( pid_of ( vognode . skgid () )),

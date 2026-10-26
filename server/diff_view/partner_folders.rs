@@ -15,7 +15,7 @@ use crate::to_org::complete::partner_folder::child_data::{
   ChildData,
   FolderGoalItem,
   FolderGoalShape,
-  reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
+  reconcile_partnerFolder_children_against_goal_list,
 };
 use crate::to_org::extend::containerward_chain::ContainerwardChainPartners;
 use crate::types::env::RuntimeGeneration;
@@ -30,7 +30,7 @@ use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::CompletionWarning;
 
 use ego_tree::{NodeId, Tree};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 
 /// 'reconcile_partnerFolder_children' with its goal list from the union
@@ -46,7 +46,6 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
   viewparent_pid : &ID,
   member_role  : RelationRole,
   runtime      : &RuntimeGeneration,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   warning_sink : Option<&mut Vec<CompletionWarning>>,
 ) -> Result<(), Box<dyn Error>> {
   let partners : Vec<Partner> =
@@ -73,9 +72,8 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
     build_child_data (
       tree, node, &goal_items, &HashMap::new (), runtime ) ?;
   let summary : RepairSummary<ID> =
-    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      tree, node, kind, &goal_items, &child_data, &straddle . after,
-      deleted_by_this_save_extra_ids ) ?;
+    reconcile_partnerFolder_children_against_goal_list (
+      tree, node, kind, &goal_items, &child_data, &straddle . after ) ?;
   attach_chains_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
   if ! kind . goal_is_ordered () {

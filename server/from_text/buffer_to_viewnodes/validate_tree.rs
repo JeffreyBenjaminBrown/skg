@@ -8,7 +8,7 @@ use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
-use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
+use crate::types::maybe_placed_viewnode::{MpVognode, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
@@ -261,12 +261,11 @@ fn validate_view_roots (
       &root . value () . kind,
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
         | MpViewnodeKind::Tombstone // e.g. a root the skgrepo restriction hides, kept for its children (the API doc's "Restricted-skgrepo nodes")
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
-        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Historical (_))))
+        | MpViewnodeKind::Vognode (MpVognode::Unknown (_))
+        | MpViewnodeKind::Vognode (MpVognode::Ghost (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be UnrestrictedVognodes, tombstones, deleted nodes, Unknown phantoms or historical phantoms."
+          "View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts."
           . to_string () )); }}}
 
 /// No two nodes with the same ID may carry editable view requests,

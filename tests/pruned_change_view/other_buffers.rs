@@ -138,7 +138,7 @@ fn the_merges_buffer_shows_only_the_merge (
   let text : String = buffer (DiffViewBufferKind::Merges) ?;
   let roots : Vec<&str> = roots (&text);
   assert_eq! ( roots . len (), 2, "{}", text );
-  assert! ( roots [0] . contains ("(historical (id acqd)"), "{}", text );
+  assert! ( roots [0] . contains ("(ghost (gnid acqd)"), "{}", text );
   assert! ( roots [1] . contains ("(node (id top)"), "{}", text );
   assert! ( child_headlines_of_editable (&text, "acq") . iter ()
             . any ( |line| line . contains ("(node (id pres)") ),

@@ -220,7 +220,7 @@ fn editable_node_inside_historical_phantom_subtree_emits () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) root
-      ** (skg (historical (id fading) (repo main))) fading
+      ** (skg (ghost (gnid fading) (skgRepos (nodeRepo main)))) fading
       *** (skg (node (id survivor) (repo main))) survivor
       "};
   let forest : ViewForest = forest_from_org (input);

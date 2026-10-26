@@ -24,7 +24,7 @@ use crate::to_org::extend::containerward_chain::is_drawn_chain_node;
 use crate::types::misc::ID;
 use crate::types::tree::moves::place_created_children_after_their_model_predecessors;
 use crate::types::viewnode::{
-  ChangeFacts, Existence, Phantom, PropertyMember, ChangeViewnode, Folder,
+  ChangeFacts, Existence, PropertyMember, ChangeViewnode, Folder,
   Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::util::{Conversion, Unwarranted, convert_unwarranted_child};
 
@@ -256,13 +256,13 @@ pub fn is_diffView_change_viewnode (
     ViewnodeKind::PropertyMember (_)
       | ViewnodeKind::ChangeViewnode (_)
       | ViewnodeKind::Folder (_)
-      | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => true,
+      | ViewnodeKind::Vognode (Vognode::Ghost (_)) => true,
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
       is_unrestricted_removed_member (viewnode)
       || ( t . claimsMembership
            && node . parent () . is_some_and ( |parent| matches! (
                 parent . value () . kind,
-                ViewnodeKind::Vognode (Vognode::Phantom (_)) ))),
+                ViewnodeKind::Vognode (Vognode::Ghost (_) | Vognode::Unknown (_)) ))),
     _ => false, }}
 
 /// Whether 'node', under a viewnode being converted, goes with it
@@ -290,7 +290,8 @@ fn goes_with_a_stale_viewparent (
 /// '(ready ...)' and '(leaves ...)' are cleared, for the pass after
 /// completion to set. An unrestricted vognode keeps what the view
 /// decides about it (its view requests, its stats, its readiness
-/// request), and becomes write-protected when the model one is.
+/// request), and becomes write-protected when the model one is. A
+/// ghost keeps its tombstone request.
 pub fn give_model_facts_to (
   existing : &mut Viewnode,
   model    : &Viewnode,
@@ -308,6 +309,14 @@ pub fn give_model_facts_to (
       e . claimsMembership = f . claimsMembership;
       if f . is_writeProtected () {
         e . write_protect (); }},
+    ( ViewnodeKind::Vognode (Vognode::Ghost (e)),
+      ViewnodeKind::Vognode (Vognode::Ghost (f)) ) => {
+      // The user's request to entombstone it outlives the model's
+      // facts, for its own visit to fulfill.
+      let tombstone_request : bool = e . tombstone_request;
+      *e = f . clone ();
+      e . tombstone_request = tombstone_request;
+      existing . readiness_request = model . readiness_request . clone (); },
     (kind, model_kind) => {
       *kind = model_kind . clone ();
       existing . readiness_request = model . readiness_request . clone (); }, }}

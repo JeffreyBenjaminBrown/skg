@@ -79,7 +79,7 @@ async fn test_new_headline_inherits_through_phantoms_and_folders (
     ( // Under a historical phantom under an editable node.
       indoc! {"
         * (skg (node (id editable) (repo alt))) editable
-        ** (skg (historical (id gone) (repo main) (diff (node removed) (rel removed)))) gone
+        ** (skg (ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))) gone
         *** new note
       "}, "alt", true ),
     ( // In a partner folder of an editable node, as a non-member.

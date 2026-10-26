@@ -36,7 +36,7 @@ fn a_headline_carries_the_leaves_it_names (
       save_cleanly (f, &all_changes_view (), &without_ctx) ? . saved_view;
     for line in [
       "** (skg (changesetMarker content) (diff (leaves 3 all)))",
-      "*** (skg (historical (id gone) (repo public) (diff (node removed) (rel removed) (leaves 2 node rel)))) gone",
+      "*** (skg (ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel)))) gone",
       "** (skg (oldText titleAndBody) (diff (leaves 1))) txt" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
                 "{:?} in:\n{}", line, saved ); }
@@ -303,7 +303,7 @@ fn a_member_deleted_in_the_buffer_is_rerendered_as_removed (
       f, &buffer, "** (skg bodyFolded (node (id cy1)", "cy1" ) ?;
     assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (id cy1)"), "{}", saved );
     let historical : &str =
-      "(historical (id cy1) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel)))) cy1";
+      "(ghost (gnid cy1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) cy1";
     assert_eq! ( without_viewnode_ids (&saved) . matches (historical) . count (), 2,
                  "in cy2's content and in its container folder:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . contains ( &format! ("** (skg bodyFolded {}", historical) ),
@@ -318,7 +318,7 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
     let saved : String = save_deleting (
       f, &buffer, "* (skg (node (id flg)", "flg" ) ?;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "* (skg (historical (id flg) (repo public) (diff (node removed) (leaves 1 node)))) flg" ),
+      "* (skg (ghost (gnid flg) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node)))) flg" ),
       "{}", saved );
     assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (id flg)"), "{}", saved );
     Ok (( )) }) }

@@ -288,9 +288,10 @@ pub fn headline_to_triple (
   }}
 
 /// The graphnode ID a headline's '(skg ...)' sexp carries in its
-/// '(node ...)', '(historical ...)', '(deleted ...)' or '(unknown ...)'
-/// form, read without parsing the rest of it, so that an error in the
-/// rest can name the headline. None if it carries none.
+/// '(node ...)' or '(unknown ...)' form as '(id X)', or in its
+/// '(ghost ...)' form as '(gnid X)', read without parsing the rest of
+/// it, so that an error in the rest can name the headline. None if it
+/// carries none.
 fn graphnode_id_written_in_metadata (
   metadata_sexp : &Sexp,
 ) -> Option<ID> {
@@ -299,13 +300,14 @@ fn graphnode_id_written_in_metadata (
     let Sexp::List (form) = element else { return None; };
     let [ Sexp::Atom (Atom::S (head)), fields @ .. ] = form . as_slice ()
       else { return None; };
-    if ! matches! ( head . as_str (),
-                    "node" | "historical" | "deleted" | "unknown" )
-    { return None; }
+    let id_key : &str = match head . as_str () {
+      "node" | "unknown" => "id",
+      "ghost"            => "gnid",
+      _                  => return None, };
     fields . iter () . find_map ( |field| match field {
       Sexp::List (pair) => match pair . as_slice () {
         [ Sexp::Atom (Atom::S (key)), Sexp::Atom (Atom::S (value)) ]
-          if key == "id" => Some ( ID::from ( value . as_str () )),
+          if key == id_key => Some ( ID::from ( value . as_str () )),
         _ => None },
       _ => None } ) } ) }
 

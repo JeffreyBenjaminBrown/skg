@@ -11,7 +11,7 @@ use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree
 use crate::types::tree::viewnode_graphnode::write_at_unrestrictedVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, Editability, UnrestrictedVognode, mk_editable_viewnode, mk_unknown_viewnode };
-use crate::types::viewnode::{Vognode, Phantom};
+use crate::types::viewnode::{Vognode};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_skgids};
 
 use ego_tree::{Tree, NodeId, NodeRef, NodeMut};
@@ -66,7 +66,7 @@ pub type EditableMap =
 /// validated title. Returns both.
 /// Returns Ok(None) when SKGID has no record anywhere -- not as a
 /// primary pid or extra_id in the captured graph.
-/// Callers should substitute a PhantomUnknown. A real
+/// Callers should substitute a Unknown. A real
 /// query error still surfaces as Err.
 pub fn graphnode_and_viewnode_from_skgid (
   graph  : &InRustGraph,
@@ -345,15 +345,15 @@ pub fn validate_membership_claims (
 
 /// An invariant: a *non-dead generalized orphan*
 /// must not claim membership. An Unrestricted node whose parent is a
-/// non-container -- a Deleted phantom or a tombstone -- is exactly
+/// non-container -- a tombstone -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// member claim (that it is part of that parent's membership) cannot hold.
 /// Make it a non-member so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - parent is a Deleted phantom / Tombstone -> make a member child a non-member.
-/// - parent is a historical phantom (the diff view): left alone.
+/// - parent is a Tombstone -> make a member child a non-member.
+/// - parent is a ghost (the diff view): left alone.
 /// - parent is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   member; membership is correct -> leave. (A folder whose own ancestry broke is
 ///   entombstoned first, and then this pass catches its members.)
@@ -379,8 +379,7 @@ pub fn mark_orphans_under_dead_parents_false (
       let parent_is_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
-            ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-              | ViewnodeKind::Tombstone ) );
+            ViewnodeKind::Tombstone ) );
       if parent_is_non_container { targets . push ( child_ref . id () ); }}}
   for skgid in targets {
     let mut node_mut : NodeMut<Viewnode> =
@@ -509,7 +508,7 @@ pub fn build_node_branch_minus_content (
               &mut tree, root_treeid, visited,
               graph, config, skgrepo_restriction ) ?;
             Ok (root_treeid) },
-          None => { // A singleton tree with a PhantomUnknown.
+          None => { // A singleton tree with a Unknown.
             let viewnode : Viewnode =
               mk_unknown_viewnode (skgid . clone ());
             let tree : Tree<Viewnode> = Tree::new (viewnode);
@@ -535,9 +534,8 @@ pub fn unrestrictedVognode_in_tree_is_writeProtected (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Ok (t . is_writeProtected ()),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_))) => Ok (true),
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-      | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) => Ok (false),
+    ViewnodeKind::Vognode (Vognode::Ghost (_)) => Ok (true),
+    ViewnodeKind::Vognode (Vognode::Unknown (_)) => Ok (false),
     _                                                => Err (
       "is_writeProtected: caller must pass a vognode" . into( )),
   }}

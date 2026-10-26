@@ -111,7 +111,12 @@ pub fn execute_view_requests (
         // pass; reaching here means that stripping was bypassed.
         return Err ( "execute_view_requests: a ViewRequest::Fork survived \
           to the view-request pass; it should have been consumed on the \
-          save path and stripped before rendering" . into () ), }}
+          save path and stripped before rendering" . into () ),
+      ViewRequest::Tombstone =>
+        // Only a ghost carries it ('Ghost::tombstone_request'); the
+        // parser refuses it on an occurrence.
+        return Err ( "execute_view_requests: an occurrence carries a \
+          tombstone request, which belongs only on a ghost" . into () ), }}
   Ok (( )) }
 
 /// The result of applying the Tentative/Final editability rule (see the module

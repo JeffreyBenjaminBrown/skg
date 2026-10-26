@@ -61,8 +61,9 @@ fn line_starting<'a> (
 /// After the commit: the editable removed member with content is
 /// retained as non-member, still editable, holding it as its content,
 /// without facts; the
-/// childless removed member is gone; the deleted root stays as a
-/// deleted phantom holding nothing; the changed folders are gone; no
+/// childless removed member is gone; the deleted root, in neither
+/// graph now, is gone too, entombstoned and pruned as a childless
+/// tombstone; the changed folders are gone; no
 /// change fact remains; and the buffer saves back to itself.
 #[test]
 fn a_commit_converts_what_the_diff_view_showed (
@@ -72,7 +73,7 @@ fn a_commit_converts_what_the_diff_view_showed (
     assert_lines_in_order (&buffer, &[
       "* (skg (node (id e)", REMOVED_X_UNDER_E, "(containerFolder changed)",
       "*** (skg (node (id xc) ",
-      "* (skg (historical (id h)", "** (skg (node (id hm)",
+      "* (skg (ghost (gnid h)", "** (skg (node (id hm)",
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b)", REMOVED_X_UNDER_B ]);
     let x_under_e_before : &str = line_starting (&buffer, REMOVED_X_UNDER_E);
     let committed : String = committed (f) ?;
@@ -86,14 +87,16 @@ fn a_commit_converts_what_the_diff_view_showed (
       "*** (skg (node (id xc) (repo main) writeProtected " ]);
     assert_lines_in_order (&committed, &[ // b, under p, holds nothing
       "* (skg bodyFolded (node (id p)", "** (skg (node (id b) ", ") b\n* (skg (node (id s)" ]);
-    assert_lines_in_order (&committed, &[
-      "\n* (skg (deleted (id h) (repo main))) h\n* (skg bodyFolded (node (id p)" ]);
+    assert! ( ! committed . contains ("(gnid h)")
+              && ! committed . contains ("(id h)")
+              && ! committed . contains ("tombstone"),
+              "h's root is gone:\n{}", committed );
     assert! ( ! committed . contains ("(id hm)"), "{}", committed );
     assert! ( ! committed . contains ("containerFolder")
               && ! committed . contains ("subscriberFolder"),
               "the changed folders are gone:\n{}", committed );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  "historical", "homeSkgrepoMove", "(ready" ] {
+                  "(ghost ", "homeSkgrepoMove", "(ready" ] {
       assert! ( ! committed . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, committed ); }
     let saved : String =

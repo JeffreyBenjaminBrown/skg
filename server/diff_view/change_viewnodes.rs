@@ -12,7 +12,7 @@ use crate::types::misc::{ID, SkgrepoChange};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, Folder, Phantom, PhantomHistorical, ChangeViewnode,
+  Editability, Folder, Ghost, ChangeViewnode,
   Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -97,7 +97,7 @@ pub fn mk_changeset_marker_viewnode (
   viewnode_of ( ViewnodeKind::ChangeViewnode (
     ChangeViewnode::ChangesetMarker { kind } )) }
 
-/// The historical phantom of 'pid', a node of the before-graph that
+/// The ghost of 'pid', a node of the before-graph that
 /// the after-graph lacks. 'rel' is the existence change of its
 /// relationship to its viewparent: removed under a former container,
 /// None at a root or in a folder. None if the before-graph lacks it.
@@ -114,13 +114,13 @@ pub fn mk_historical_viewnode (
       ready    : None,
       leaves   : None,
       .. ChangeFacts::default () },
-    .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
-      Phantom::Historical ( PhantomHistorical {
+    .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
         skgid        : pid . clone (),
         home_skgrepo : before . home_skgrepo . clone (),
         title        : before . title . clone (),
         body         : before . body . clone (),
-        restoreNode_request : false } )))) } ) }
+        restoreNode_request : false,
+        tombstone_request   : false } ))) } ) }
 
 /// Under 'phantom', the historical phantom of 'pid' standing where
 /// content stands, what it holds: if a nodeMerge acquired it, an "it

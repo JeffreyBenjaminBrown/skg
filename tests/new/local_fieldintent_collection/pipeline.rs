@@ -256,7 +256,7 @@ async fn pipeline_phantom_subtree (
       let input : &str =
         indoc! {"
             * (skg (node (id root) (repo main))) root
-            ** (skg (historical (id fading) (repo main))) fading
+            ** (skg (ghost (gnid fading) (skgRepos (nodeRepo main)))) fading
             *** (skg (node (id survivor) (repo main))) survivor
             "};
       let forest : ViewForest = placed_forest_from_org (input);

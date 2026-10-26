@@ -4,7 +4,8 @@
 //! completion; what it changes at a visit is listed in the module
 //! comment of 'server/diff_view/visit.rs'.
 
-use crate::diff_view::changes::align_content_members_with_straddle;
+use crate::diff_view::changes::{
+  align_content_members_with_straddle, vanished_occurrence_becomes_ghost};
 use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::types::misc::ID;
@@ -79,4 +80,18 @@ impl<'a> CompletionMode<'a> {
       CompletionMode::ContentView => Ok (( )),
       CompletionMode::DiffView { straddle, .. } =>
         align_content_members_with_straddle (tree, treeid, straddle), } }
+
+  /// Whether the occurrence at 'treeid', whose node the graph lacks,
+  /// became its node's ghost, in place: in diff-view mode, when HEAD
+  /// has the node ('vanished_occurrence_becomes_ghost'). Never in a
+  /// content view, which draws no ghost.
+  pub fn vanished_occurrence_becomes_ghost (
+    &self,
+    tree   : &mut Tree<Viewnode>,
+    treeid : NodeId,
+  ) -> Result<bool, Box<dyn Error>> {
+    match self {
+      CompletionMode::ContentView => Ok (false),
+      CompletionMode::DiffView { straddle, .. } =>
+        vanished_occurrence_becomes_ghost (tree, treeid, straddle), } }
 }

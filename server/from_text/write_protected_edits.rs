@@ -7,7 +7,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{RelationshipEditRequest, Existence, Folder, Phantom, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{RelationshipEditRequest, Existence, Folder, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
@@ -139,7 +139,7 @@ fn partnerFolder_members_in_view (
       ViewnodeKind::Vognode (Vognode::Unrestricted (member))
         if member . claimsMembership =>
         RelationshipEditRequest::relRepo_of (&member . relationshipEditRequest) . cloned (),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown)))
+      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
         if child . value () . change_facts . change . rel
            != Some (Existence::Removed) =>
         RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned (),

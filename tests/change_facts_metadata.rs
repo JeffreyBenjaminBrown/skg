@@ -15,8 +15,7 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
-  ChangeFacts, DiffChange, Existence, LeavesFact, Phantom,
-  PhantomDeleted, PhantomUnknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
+  ChangeFacts, DiffChange, Existence, Ghost, LeavesFact, Unknown, PropertyMember, DiffObject, ReadinessRequest, Viewnode,
   Folder, ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_unknown_viewnode, mk_writeProtected_viewnode, viewnode_of};
 
@@ -103,21 +102,20 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
     "(node (id m) (repo main) writeProtected (diff (rel added) (properties changed) (ready rel all) (unreadyRequest rel all)))" ); }
 
 #[test]
-fn phantoms_round_trip_their_change_facts () {
+fn ghosts_and_unknowns_round_trip_their_change_facts () {
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
-        Phantom::Deleted ( PhantomDeleted {
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Ghost ( Ghost {
           skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
-          title : "D" . into (), body : None, } )))),
-      facts ( Some (Existence::Removed), None, Some (&[]) ),
-      request (false, &[]) ),
-    "(deleted (id d) (repo main) (diff (node removed) (ready) (unreadyRequest)))" );
+          title : "D" . into (), body : None,
+          restoreNode_request : false, tombstone_request : false, } ))),
+      facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
+      request (false, &[DiffObject::Node]) ),
+    "(ghost (gnid d) (skgRepos (nodeRepo main)) (diff (node removed) (ready node) (unreadyRequest node)))" );
   assert_round_trip (
     with_facts (
-      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
-        Phantom::Unknown ( PhantomUnknown {
-          skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None, } )))),
+      viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
+          skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None, } ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
     "(unknown (id u) (diff (rel added) (readyRequest)))" ); }

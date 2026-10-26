@@ -5,6 +5,7 @@
 // `FnMut` closure which cannot ``.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::extend::editable::{ apply_editability_rule, apply_writeProtect_request, EditabilityOutcome};
 use crate::to_org::util::{EditableMap, make_member_children_nonMembers};
@@ -24,18 +25,17 @@ use super::completion_mode::CompletionMode;
 use crate::types::tree::viewnode_graphnode::{
   pid_and_skgrepo_from_viewnode_at, write_at_unrestrictedVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Folder, ViewRequest};
-use crate::types::viewnode::{Vognode, Phantom};
+use crate::types::viewnode::{Vognode};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
 use super::reconcile::partner_folder::{
   reconcile_containerward_chains_under_folder_members,
   reconcile_partnerFolder_children};
 use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
-use super::reconcile::content::{
-  extend_true_content_at_unrestrictedVognode, mutate_unrestrictedVognode_to_deletednode};
+use super::reconcile::content::extend_true_content_at_unrestrictedVognode;
 
 use ego_tree::{Tree, NodeId};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 use std::sync::{Arc, LazyLock};
 
@@ -44,8 +44,6 @@ pub(crate) struct CompletionContext<'a> {
   pub(super) runtime                        : &'a RuntimeGeneration,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
-  pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
-  pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
   pub(super) skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
   /// The node budget (see the module comment of 'to_org/extend/editable.rs'): how
   /// many more vognodes may extend their content. Initialized once per
@@ -89,16 +87,14 @@ pub(crate) struct CompletionContext<'a> {
   pub(super) editable_before_completion : &'a HashSet<NodeId>,
 }
 
-/// What a completion that follows no save, or shows nothing that was
-/// there before, is given for the sets it reads.
-static NOTHING_DELETED_PIDS      : LazyLock<HashSet<ID>> = LazyLock::new (HashSet::new);
-static NOTHING_DELETED_EXTRA_IDS : LazyLock<HashMap<ID, HashSet<ID>>> = LazyLock::new (HashMap::new);
+/// What a completion that shows nothing that was there before is
+/// given for the sets it reads.
 static NO_NODES                  : LazyLock<HashSet<NodeId>> = LazyLock::new (HashSet::new);
 
 impl<'a> CompletionContext<'a> {
   /// A de-novo content view ('render_initial_view'): each fresh
-  /// editable node gets its default partner folders, nothing was
-  /// deleted, and nothing was there before. Repairs go to
+  /// editable node gets its default partner folders, and nothing
+  /// was there before. Repairs go to
   /// 'warning_sink', which the caller drops.
   pub(super) fn for_content_view (
     runtime             : &'a RuntimeGeneration,
@@ -110,8 +106,6 @@ impl<'a> CompletionContext<'a> {
   ) -> CompletionContext<'a> {
     CompletionContext {
       editable_map, runtime, graph_snap, errors,
-      deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
-      deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
       skgrepo_restriction,
       node_budget                    : runtime . config . initial_node_limit,
       create_partnerFolders_for_fresh_nodes : true,
@@ -138,8 +132,6 @@ impl<'a> CompletionContext<'a> {
   ) -> CompletionContext<'a> {
     CompletionContext {
       editable_map, runtime, graph_snap, errors,
-      deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
-      deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
       skgrepo_restriction            : None,
       node_budget                    : runtime . config . initial_node_limit,
       create_partnerFolders_for_fresh_nodes : false,
@@ -151,8 +143,8 @@ impl<'a> CompletionContext<'a> {
       editable_before_completion     : &NO_NODES, } }
 
   /// A rerender of an open view ('rerender_view'): after a save, for
-  /// rerender-all, or after a skgrepo-set switch. It carries what the
-  /// save deleted, the repairs' sink, and what the view held before.
+  /// rerender-all, or after a skgrepo-set switch. It carries the
+  /// repairs' sink and what the view held before.
   /// In diff-view mode it completes that buffer of the diff view,
   /// with the settings of 'for_diffView' whatever
   /// 'skgrepo_restriction', 'create_partnerFolders_for_fresh_nodes'
@@ -162,8 +154,6 @@ impl<'a> CompletionContext<'a> {
     graph_snap                     : &'a Arc<InRustGraph>,
     editable_map                   : &'a mut EditableMap,
     errors                         : &'a mut Vec<String>,
-    deleted_by_this_save_pids      : &'a HashSet<ID>,
-    deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
     skgrepo_restriction            : Option<&'a SkgrepoRestriction>,
     create_partnerFolders_for_fresh_nodes : bool,
     substitute_existing_content_overrides : bool,
@@ -177,8 +167,6 @@ impl<'a> CompletionContext<'a> {
         runtime, graph_snap, editable_map, errors, straddle, buffer_kind ),
       CompletionMode::ContentView => CompletionContext {
         editable_map, runtime, graph_snap, errors,
-        deleted_by_this_save_pids      : &NOTHING_DELETED_PIDS,
-        deleted_by_this_save_extra_ids : &NOTHING_DELETED_EXTRA_IDS,
         skgrepo_restriction,
         node_budget                    : runtime . config . initial_node_limit,
         create_partnerFolders_for_fresh_nodes,
@@ -188,8 +176,6 @@ impl<'a> CompletionContext<'a> {
         nodes_before_completion        : &NO_NODES,
         editable_before_completion     : &NO_NODES, }, };
     CompletionContext {
-      deleted_by_this_save_pids,
-      deleted_by_this_save_extra_ids,
       warning_sink,
       nodes_before_completion,
       editable_before_completion,
@@ -210,7 +196,7 @@ pub(crate) fn complete_viewforest (
   // same BFS.
   complete_nodes_in_level_order (
     viewforest, &[root_treeid], context ) ?;
-  prune_self_deletable_when_empty (viewforest) ?;
+  prune_childless_tombstones (viewforest) ?;
   Ok(( )) }
 
 /// Complete the subtrees at 'roots', appended to a viewforest that
@@ -222,7 +208,7 @@ pub(crate) fn complete_appended_roots (
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   complete_nodes_in_level_order (viewforest, roots, context) ?;
-  prune_self_deletable_when_empty (viewforest) ?;
+  prune_childless_tombstones (viewforest) ?;
   Ok(( )) }
 
 /// Visit every node in *level order* (BFS), completing each at its own visit.
@@ -291,18 +277,15 @@ fn dispatch_node_update (
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribeeFolder_children (
         treeid, tree, context . runtime,
-        context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction ) ?,
     ViewnodeKind::Folder (Folder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
         treeid, tree, context . runtime,
-        context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
     ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutsideSubscribeeFolder_children (
         treeid, tree, context . runtime,
-        context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
     ViewnodeKind::Folder (role)
@@ -318,7 +301,6 @@ fn dispatch_node_update (
         treeid, tree, role,
         context . mode,
         context . runtime, context . graph_snap,
-        context . deleted_by_this_save_extra_ids,
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
     // In a diff view, 'diffView_visit_before_extension' has finished
@@ -336,16 +318,17 @@ fn dispatch_node_update (
       super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
-    // In a diff view, a historical phantom where content stands has
+    // In a diff view, a ghost where content stands has
     // extended its old content; a root whose node is back is now an
     // editable vognode.
-    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))
+    ViewnodeKind::Vognode (Vognode::Ghost (_))
       if visit_as_unrestrictedVognode =>
       visit_normal_node (tree, treeid, context) ?,
     _ => {
-      // No-op for: Unknown (unresolvable-id placeholder),
-      // Deleted, Historical, Tombstone, Property leaves and BufferRoot.
-      // The prune sweep handles empty/dead nodes.
+      // No-op for: Unknown (unresolvable-id placeholder), a ghost the
+      // diff view finished (or one outside a diff view), Tombstone,
+      // Property leaves and BufferRoot. The prune sweep handles
+      // empty/dead nodes.
     } }
   if let ViewnodeKind::Folder (folder_kind) = &kind {
     // In a content view, each member of the folder carries its
@@ -385,19 +368,21 @@ fn update_normal_node (
   treeid   : NodeId,
   context  : &mut CompletionContext<'_>,
 ) -> Result<NormalNodeUpdate, Box<dyn Error>> {
-  // Same-save deletion is an occurrence-wide state transition, not content
-  // reconciliation. Do it before editable arbitration, budget handling, or
-  // write-protected refresh: all of those paths may consult the post-save
-  // graph, where the node is necessarily absent. This also ensures every
-  // write-protected image becomes Deleted rather than Unknown.
-  let (pid, skgrepo) : (ID, SkgrepoName) =
+  // An occurrence whose node vanished (a save deleted it) is an
+  // occurrence-wide state transition, not content reconciliation. Do it
+  // before editable arbitration, budget handling, or write-protected
+  // refresh: all of those paths may consult the graph, where the node
+  // is absent. It becomes a tombstone, which keeps what stands under
+  // it; in a diff view, a node HEAD has becomes its ghost instead.
+  let (pid, _skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_viewnode_at (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
-  if context . deleted_by_this_save_pids . contains (&pid) {
-    mutate_unrestrictedVognode_to_deletednode (
-      tree, treeid, &pid, &skgrepo ) ?;
-    // In a diff view, a node HEAD has is then shown as history.
-    return Ok (NormalNodeUpdate::DeletedBySave); }
+  if context . graph_snap . gnid_presence_gated (&pid, None)
+     == GnidPresence::Absent {
+    if ! context . mode . vanished_occurrence_becomes_ghost (tree, treeid) ? {
+      tree . get_mut (treeid) . unwrap () . value ()
+        . replace_kind (ViewnodeKind::Tombstone); }
+    return Ok (NormalNodeUpdate::NodeVanished); }
   // A write-protect request is applied before anything else reads
   // the occurrence's editability, so that what follows -- the budget,
   // the editability rule, the extension -- sees it write-protected.
@@ -450,7 +435,6 @@ fn update_normal_node (
   extend_true_content_at_unrestrictedVognode (
     treeid, tree, context . editable_map,
     &context . runtime . config, context . graph_snap,
-    context . deleted_by_this_save_extra_ids,
     context . skgrepo_restriction,
     settled, cascade,
     if budgeted { Some (&mut context . node_budget) } else { None },
@@ -490,11 +474,9 @@ fn update_normal_node (
       context . skgrepo_restriction ) ?; }
   Ok (NormalNodeUpdate::Updated) }
 
-/// Whether a node of this kind is *self-deletable when empty*: the
-/// single postorder prune sweep removes it once it is childless. This is the
-/// one place self-deletion lives -- per-kind reconcilers no longer detach
-/// themselves when empty.
-/// - Tombstone and a childless Vognode::Deleted.
+/// Whether a folder of this kind, once childless, has nothing left to
+/// show, so that the prune sweep removes it as it removes a childless
+/// tombstone ('prune_childless_tombstones'):
 /// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden/
 ///   Container/Mentioner/AcquiredBy/Acquired (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
@@ -505,13 +487,11 @@ fn update_normal_node (
 /// Preserved when empty (so not here): PartnerFolder(Subscribee), PartnerFolder
 /// (Overridden), PropertyFolder(Alias) -- each an *editable interface onto the origin*
 /// that the user must be able to refill, removed only by hand.
-fn is_self_deletable_when_empty (
+fn folder_is_entombstoned_when_empty (
   kind : &ViewnodeKind,
 ) -> bool {
   matches! ( kind,
-    ViewnodeKind::Tombstone
-    | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
-    | ViewnodeKind::Folder (Folder::Subscriber)
+    ViewnodeKind::Folder (Folder::Subscriber)
     | ViewnodeKind::Folder (Folder::Overrider)
     | ViewnodeKind::Folder (Folder::Hider)
     | ViewnodeKind::Folder (Folder::Hidden)
@@ -524,34 +504,24 @@ fn is_self_deletable_when_empty (
     | ViewnodeKind::Folder (Folder::ID) ) }
 
 /// The postorder prune sweep -- the *one* place self-deletion happens.
-/// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
-/// entombstoned folders whose members all died, a childless Deleted, and empty
-/// write-protected relation / Hidden* / ID folders. Postorder so a chain (e.g.
-/// Tombstone -> Deleted, or a folder emptied by the removal of its last member)
-/// collapses completely in one pass. Focus is transferred to the surviving
-/// parent if the removed node held it. Never prunes a *view root* (child of the
-/// invisible BufferRoot): the user should still see a deleted root.
-pub fn prune_self_deletable_when_empty (
+/// It removes every childless tombstone, a view root included, so a
+/// buffer may end with no roots, and every childless folder that
+/// 'folder_is_entombstoned_when_empty' admits. Postorder, so that a chain (a tombstone under a
+/// tombstone, or a folder emptied by the removal of its last member)
+/// collapses completely in one pass. Focus is transferred to the
+/// surviving parent if the removed node held it.
+pub fn prune_childless_tombstones (
   tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
     collect_matching_treeids (
       tree,
-      |vn| is_self_deletable_when_empty (&vn . kind) ) ?;
+      |vn| matches! ( vn . kind, ViewnodeKind::Tombstone )
+           || folder_is_entombstoned_when_empty (&vn . kind) ) ?;
   for treeid in nodes {
-    let node = match tree . get (treeid) {
-      Some (node) => node,
-      None => continue };
-    let has_children : bool =
-      node . children () . next () . is_some ();
-    let parent_is_buffer_root : bool =
-      node . parent ()
-      . map ( |p| matches! ( &p . value () . kind,
-                             ViewnodeKind::BufferRoot ) )
-      . unwrap_or (false);
-    if ! has_children && ! parent_is_buffer_root {
-      detach_viewnode_transferring_focus (tree, treeid) ?; }
-  }
+    let Some (node) = tree . get (treeid) else { continue };
+    if node . children () . next () . is_some () { continue; }
+    detach_viewnode_transferring_focus (tree, treeid) ?; }
   Ok (( )) }
 
 fn collect_matching_treeids<Predicate> (
@@ -563,8 +533,8 @@ where Predicate : Fn (&Viewnode) -> bool {
   let mut result : Vec<NodeId> = Vec::new ();
   do_everywhere_in_tree_dfs_readonly (
     tree, root_treeid,
-    false, // postorder: a chain (Tombstone -> Deleted, or a folder emptied by the
-           // removal of its last child) collapses bottom-up in one sweep.
+    false, // postorder: a chain (a tombstone under a tombstone, or a folder emptied
+           // by the removal of its last child) collapses bottom-up in one sweep.
     &mut |node| {
       if predicate (node . value ()) {
         result . push (node . id ()); }

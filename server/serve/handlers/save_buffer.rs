@@ -891,14 +891,13 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       collateral_viewforest_ids . iter ()
         . map (ViewforestId::repr_in_client)
         . collect::<Vec<_>> ()); }
-  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
   { // Apply the already-checked preparation. Prominence sources are
     // computed from the post-save graph in the ordinary apply path.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "apply_prepared_save" ). entered();
     prepared_save . apply (
       (*runtime . config) . clone (), &mut working_tantivy, &working_graph )
-    .map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
+    .map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? }
   let swapped_in = env . runtime . swap_in (
     runtime . config . clone (), working_graph . load_full (), working_tantivy);
   // Rerender reads the newly swapped-in graph but performs no authoritative
@@ -925,14 +924,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       update_views_after_save (
         stream,
         viewforest,
-        node_instructions,
         collateral_viewforest_ids,
         env,
         swapped_in . clone (),
         viewforest_id_from_request_result,
         views_state,
         skgrepo_restriction,
-        deleted_by_this_save_extra_ids,
         text_approved_pids,
         &fork_specs ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)

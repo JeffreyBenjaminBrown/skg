@@ -28,7 +28,7 @@
 //   * d            <-- was b, rewritten to d (first in doc order -> editable)
 //   ** MERGED: b
 //   * d (write-protected)    <-- the original d root
-// (No (deleted ...) anywhere.)
+// (No tombstone anywhere.)
 
 use indoc::indoc;
 use std::error::Error;
@@ -87,12 +87,12 @@ async fn merge_acquiree_as_independent_root_impl (
   let view : &str = &response . saved_view;
   let lines : Vec<&str> = view . lines() . collect();
 
-  // 1. No (deleted ...) anywhere: acquiree b should have been
+  // 1. No tombstone anywhere: acquiree b should have been
   //    swapped to d by rewriteInPlace_viewnodes_whose_id_is_newly_extra.
-  if view . contains ("(deleted") {
+  if view . contains ("tombstone") {
     failures . push (
-      "saved view contains a (deleted ...) atom -- the top-level \
-       acquiree b was rendered as deleted instead of being swapped \
+      "saved view contains a tombstone -- the top-level \
+       acquiree b was entombstoned as deleted instead of being swapped \
        to its acquirer d by the preprocessing pass"
       . to_string() ); }
 

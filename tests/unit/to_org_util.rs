@@ -58,20 +58,11 @@ fn membership_if_normal (
 #[test]
 fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
   // §A (Jeff's invariant): a member Unrestricted node under a non-container
-  // parent (Deleted phantom / Tombstone) is made a non-member; a legitimate
+  // parent (a tombstone) is made a non-member; a legitimate
   // folder member (member Unrestricted under a PartnerFolder) is left untouched.
-  use crate::types::viewnode::{ Folder, Phantom, PhantomDeleted };
+  use crate::types::viewnode::{ Folder };
   let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
-  let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
-    viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
-                 PhantomDeleted {
-                   skgid : skgid ("PH"), home_skgrepo : src (),
-                   title : "PH" . to_string (), body : None }))))
-  ) . id ();
-  let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
-    mk_writeProtected_viewnode (skgid ("A"), src (), "A" . to_string (),
-                              true) ) . id ();
   let dead : NodeId = vf . get_mut (root) . unwrap () . append (
     viewnode_of (ViewnodeKind::Tombstone) ) . id ();
   let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
@@ -85,8 +76,6 @@ fn orphan_under_dead_parent_made_nonMember_but_folder_member_kept () {
 
   mark_orphans_under_dead_parents_false (&mut vf);
 
-  assert_eq! (membership_if_normal (&vf, under_phantom), false,
-    "A member child under a Deleted phantom must be made a non-member");
   assert_eq! (membership_if_normal (&vf, under_dead), false,
     "A member child under a tombstone must be made a non-member");
   assert_eq! (membership_if_normal (&vf, member), true,

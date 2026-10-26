@@ -26,7 +26,7 @@ use skg::types::env::{RuntimeGeneration, SkgEnv};
 use skg::types::misc::ID;
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::DiffViewBufferKind;
-use skg::types::viewnode::{Phantom, ViewnodeKind, Vognode};
+use skg::types::viewnode::{ViewnodeKind, Vognode};
 
 use ego_tree::NodeId;
 
@@ -511,7 +511,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
           if t . skgid == ID::from ("m")
           && node . parent () . is_some_and ( |parent| matches! (
                &parent . value () . kind,
-               ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+               ViewnodeKind::Vognode (Vognode::Ghost (h))
                  if h . skgid == ID::from ("h") )) =>
           Some ( node . id () ),
         _ => None, } ) };

@@ -192,7 +192,7 @@ pub enum KeptChildOrder {
 /// one node. Any other child -- a leaf, a non-vognode or a phantom
 /// -- is entombstoned, and the prune that ends the
 /// completion removes the tombstone once it is childless
-/// ('prune_self_deletable_when_empty'), so that whatever stands below
+/// ('prune_childless_tombstones'), so that whatever stands below
 /// it survives.
 pub fn convert_unwarranted_child (
   tree        : &mut Tree<Viewnode>,

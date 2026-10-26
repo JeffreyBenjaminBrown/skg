@@ -1,6 +1,6 @@
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::to_org::complete::partner_folder::child_data::{ChildData, FolderGoalItem, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, FolderGoalItem, build_child_data, reconcile_partnerFolder_children_against_goal_list};
 use crate::update_buffer::reconcile::omit_restricted_members;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::types::misc::{ID, RelPartner, SkgrepoName};
@@ -12,7 +12,7 @@ use crate::types::viewnode::{ Viewnode, ViewnodeKind, Folder};
 use crate::types::viewnode::{Vognode};
 
 use ego_tree::{NodeId, Tree};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 
 struct SubscribeeFolderContext {
@@ -34,7 +34,6 @@ pub fn reconcile_subscribeeFolder_children (
   node                           : NodeId,
   tree                           : &mut Tree<Viewnode>,
   runtime                        : &RuntimeGeneration,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : &Folder = &Folder::Subscribee;
@@ -52,7 +51,7 @@ pub fn reconcile_subscribeeFolder_children (
       context . worktree_subscribees . clone (), skgrepo_restriction,
       |skgid : &ID| SkgEnv::find_skgrepo_in_generation (runtime, skgid) );
 
-  // An exception to the prune sweep ('prune_self_deletable_when_empty'): an *empty* SubscribeeFolder is preserved, not
+  // An exception to the prune sweep ('prune_childless_tombstones'): an *empty* SubscribeeFolder is preserved, not
   // self-deleted. It is the editable interface onto the origin's outgoing
   // subscriptions; if it vanished when emptied, the user would lose the place
   // to add one back. (A SubscribeeFolder is only *created* when subscribesTo is
@@ -78,10 +77,9 @@ pub fn reconcile_subscribeeFolder_children (
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
         tree, node, &goal_items, &context . relRepos, runtime ) ?;
-    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
+    reconcile_partnerFolder_children_against_goal_list (
       tree, node, kind,
-      &goal_items, &child_data, &runtime . graph,
-      deleted_by_this_save_extra_ids ) ?; }
+      &goal_items, &child_data, &runtime . graph ) ?; }
 
   ensure_hiddenOutsideOfSubscribeeFolder_is_last (tree, node) ?;
   Ok(( )) }

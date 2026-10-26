@@ -13,11 +13,11 @@ use crate::types::nodes::complete::Graphnode;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, PhantomDeleted, Editability,
+    Viewnode, ViewnodeKind, Editability,
     ViewRequest, mk_editable_viewnode};
-use crate::types::viewnode::{Vognode, Phantom, Folder};
+use crate::types::viewnode::{Vognode, Folder, Unknown};
 use crate::types::tree::moves::move_to_last_child;
-use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
+use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_skgrepo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree};
 use crate::types::tree::viewnode_graphnode::{
     pid_and_skgrepo_from_viewnode_at,
     write_at_unrestrictedVognode_in_tree};
@@ -76,7 +76,6 @@ pub fn extend_true_content_at_unrestrictedVognode (
   editable_map                   : &mut EditableMap,
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   settled                        : bool,
   cascade                        : bool,
@@ -127,7 +126,6 @@ pub fn extend_true_content_at_unrestrictedVognode (
   sync_unrestrictedVognode_from_disk (tree, node, &graphnode) ?;
   reconcile_content_children (
     tree, node, &graphnode, config, graph_snap,
-    deleted_by_this_save_extra_ids,
     skgrepo_restriction,
     substitution_enabled,
     substitute_existing_content_overrides ) ?;
@@ -191,7 +189,6 @@ fn reconcile_content_children (
   graphnode                   : &Graphnode,
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
   substitution_enabled           : bool,
   substitute_existing_content_overrides : bool,
@@ -200,7 +197,7 @@ fn reconcile_content_children (
   // id appearing in a node's 'contains' after merging into another
   // node is redirected to the acquirer's pid. Without this, the
   // rerender would carry the raw (now deleted) acquiree through to
-  // the goal list and display it as (deleted ...) in its parent's
+  // the goal list and entombstone it in its parent's
   // subtree, even though the parent's containment logically points
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_repo_from_id'; this makes the rerender consistent.)
@@ -245,11 +242,12 @@ fn reconcile_content_children (
   // budget is spent once per extending vognode (in extend_true_content_at_unrestrictedVognode),
   // not per child, so a node either fully extends or is left write-protected; we
   // never create a silent partial sibling set.
-  // A content child this save deleted stays here; at its own BFS visit it
-  // becomes a PhantomDeleted whose folders generalized-orphan and entombstone -- so no folder
-  // reconciles against a missing Graphnode -- while any user subtree under it
-  // is preserved (made a non-member), and a now-childless PhantomDeleted is
-  // removed by the prune sweep ('prune_self_deletable_when_empty').
+  // A content child whose node vanished stays here; at its own BFS visit it
+  // becomes a tombstone (or, in a diff view, a ghost) whose folders
+  // generalized-orphan and entombstone -- so no folder reconciles against a
+  // missing Graphnode -- while any user subtree under it is preserved (made a
+  // non-member), and a now-childless tombstone is removed by the prune sweep
+  // ('prune_childless_tombstones').
   let substitution_for_children : bool =
     // The raw-shown-override rule (generalized 2026-06-12 from the
     // overridden-as-such case): when this node is itself
@@ -270,7 +268,6 @@ fn reconcile_content_children (
   complete_content_children(
     tree, node, &apparent_content_skgids, &unresolved_relRepos,
     &graphnode . home_skgrepo, config, graph_snap,
-    deleted_by_this_save_extra_ids,
     skgrepo_restriction,
     substitution_for_children ) ?;
   mark_erroneous_content_children_as_indep(
@@ -390,34 +387,11 @@ fn convert_nonmember_unknown_children_to_tombstones (
   treat_certain_children(
     tree, node,
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
         ! member_set . contains (&u . skgid),
       _ => false },
     |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::Tombstone); },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
-
-pub(in crate::update_buffer) fn mutate_unrestrictedVognode_to_deletednode (
-  tree    : &mut Tree<Viewnode>,
-  node    : NodeId,
-  pid     : &ID,
-  skgrepo : &SkgrepoName,
-) -> Result<(), Box<dyn Error>> {
-  let (title, body) : (String, Option<String>) =
-    read_at_node_in_tree ( tree, node,
-      |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => ( t . title . clone(),
-               t . body () . cloned() ),
-        _ => ( String::new(), None ) } ) ?;
-  write_at_node_in_tree ( tree, node,
-    |vn : &mut Viewnode| {
-      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (
-        Phantom::Deleted ( PhantomDeleted {
-        skgid           : pid . clone(),
-        home_skgrepo : skgrepo . clone(),
-        title,
-        body, } ) ))); }
-  ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Whether this node is overridden yet shown raw by its position, so
 /// that substitution must be disabled for its immediate children (one
@@ -582,7 +556,6 @@ fn complete_content_children (
   recorder_home      : &SkgrepoName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   substitution_enabled : bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -592,8 +565,7 @@ fn complete_content_children (
       skgrepo_restriction,
       substitution_enabled ) ?;
   normalize_relationship_backed_content_unknowns (
-    tree, node, goal_list, unresolved_relRepos, recorder_home, graph_snap,
-    deleted_by_this_save_extra_ids ) ?;
+    tree, node, goal_list, unresolved_relRepos, recorder_home, graph_snap ) ?;
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
   complete_managed_children_in_viewforest(
@@ -601,7 +573,7 @@ fn complete_content_children (
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => t . claimsMembership,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
+      ViewnodeKind::Vognode (Vognode::Unknown (_))
         // An Unknown is a real raw relationship member.  Match it by
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling relationship.
@@ -619,7 +591,7 @@ fn complete_content_children (
       // are created -- which keeps post-save rerendering stable.
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         => Ok ( t . collected_skgid () ),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))
+      ViewnodeKind::Vognode (Vognode::Unknown (u))
         => Ok ( u . skgid . clone() ),
       _ => Err(
         "complete_content_children: managed child had no content ID"
@@ -650,7 +622,7 @@ fn complete_content_children (
               vn }},
         ContentReality::Unknown => {
           let mut unknown : Viewnode = mk_unknown_viewnode ( skgid . clone() );
-          if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =
+          if let ViewnodeKind::Vognode (Vognode::Unknown (u)) =
             &mut unknown . kind
           { u . relRepo = d . relRepo . clone ()
               . filter ( |skgrepo| skgrepo != recorder_home ); }
@@ -659,11 +631,11 @@ fn complete_content_children (
   Ok (())
 }
 
-/// An open view can still hold an Unrestricted occurrence when this save deletes its
+/// An open view can still hold an Unrestricted occurrence when a save deletes its
 /// graphnode but leaves the parent's exact raw membership in place.  Replace
-/// that occurrence before its later BFS visit reaches generic deletion handling:
-/// the surviving relationship is the authoritative fact, so it is Unknown,
-/// not a last-seen Deleted node.  Assigning only `kind` deliberately preserves
+/// that occurrence before its later BFS visit entombstones it:
+/// the surviving relationship is the authoritative fact, so it is Unknown.
+/// Assigning only `kind` deliberately preserves
 /// the wrapper's focus and fold state.
 fn normalize_relationship_backed_content_unknowns (
   tree                 : &mut Tree<Viewnode>,
@@ -672,7 +644,6 @@ fn normalize_relationship_backed_content_unknowns (
   unresolved_relRepos  : &HashMap<ID, SkgrepoName>,
   recorder_home        : &SkgrepoName,
   graph_snap           : &Arc<InRustGraph>,
-  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<(), Box<dyn Error>> {
   treat_certain_children (
     tree, node,
@@ -680,28 +651,18 @@ fn normalize_relationship_backed_content_unknowns (
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
         restriction . claimsMembership
         && graph_snap . pid_of (&restriction . collected_skgid ()) . is_none ()
-        && goal_list . iter () . any (|raw_member|
-          raw_member == &restriction . collected_skgid ()
-          || deleted_by_this_save_extra_ids
-             . get (&restriction . collected_skgid ())
-             . is_some_and (|extra_ids| extra_ids . contains (raw_member))),
+        && goal_list . contains (&restriction . collected_skgid ()),
       _ => false },
     |vn : &mut Viewnode| {
-      let unrestricted_skgid : ID = match &vn . kind {
+      let skgid : ID = match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
           restriction . collected_skgid (),
         _ => unreachable! (), };
-      let skgid : ID = goal_list . iter () . find (|raw_member|
-        *raw_member == &unrestricted_skgid
-        || deleted_by_this_save_extra_ids . get (&unrestricted_skgid)
-           . is_some_and (|extra_ids| extra_ids . contains (*raw_member)))
-        . expect ("normalization predicate found a raw member") . clone ();
-      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
-        crate::types::viewnode::PhantomUnknown {
+      vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Unknown ( Unknown {
           relRepo: unresolved_relRepos . get (&skgid) . cloned ()
             . filter (|skgrepo| skgrepo != recorder_home),
           relationshipEditRequest: None,
-          skgid })))); })
+          skgid }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
@@ -753,13 +714,12 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if ! t . claimsMembership                  => 1,
         ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => 2,
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))  => 2,
-        // A historical phantom is a former member, standing where the member was.
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (_)))  => 2,
-        // PhantomUnknown is a content-position placeholder: order it
-        // alongside the Deleted/True content children rather than as
+        // A ghost is a former member, standing where the member was.
+        ViewnodeKind::Vognode (Vognode::Ghost (_))  => 2,
+        // Unknown is a content-position placeholder: order it
+        // alongside the true content children rather than as
         // a non-vognode.
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))  => 2,
+        ViewnodeKind::Vognode (Vognode::Unknown (_))  => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()

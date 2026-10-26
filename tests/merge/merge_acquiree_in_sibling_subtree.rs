@@ -91,12 +91,12 @@ async fn merge_acquiree_in_sibling_subtree_impl (
   let view : &str = &response . saved_view;
   let lines : Vec<&str> = view . lines() . collect();
 
-  // 1. No (deleted ...) anywhere: the acquiree b should have
+  // 1. No tombstone anywhere: the acquiree b should have
   //    been substituted by the acquirer d, not rendered as deleted.
-  if view . contains ("(deleted") {
+  if view . contains ("tombstone") {
     failures . push (
-      "saved view contains a (deleted ...) atom -- the acquiree \
-       b was rendered as deleted instead of being resolved to its \
+      "saved view contains a tombstone -- the acquiree \
+       b was entombstoned as deleted instead of being resolved to its \
        acquirer d via extra_id"
       . to_string() ); }
 

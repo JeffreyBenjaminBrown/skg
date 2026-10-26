@@ -58,14 +58,14 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut unknown : Viewnode = Viewnode {
     readiness_request : Some (ReadinessRequest {
       ready : true, objects : BTreeSet::new () }),
-    .. viewnode_of ( ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
-      PhantomUnknown {
+    .. viewnode_of ( ViewnodeKind::Vognode (Vognode::Unknown (
+      Unknown {
         skgid : ID::from ("unknown"),
         relRepo : None,
-        relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), })))) };
+        relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), }))) };
   unknown . consume_edit_request_after_save ();
   assert_eq! (unknown . readiness_request, None);
-  let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
+  let ViewnodeKind::Vognode (Vognode::Unknown (unknown)) = &unknown . kind
   else { panic! ("expected unknown node"); };
   assert_eq! (unknown . relationshipEditRequest, None);
 
@@ -173,9 +173,10 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     viewnode_of (ViewnodeKind::Folder (Folder::Alias)),
     viewnode_of (ViewnodeKind::PropertyMember (PropertyMember::Alias {
       text : "an alias" . into (), relRepo : None, relationshipEditRequest : None })),
-    viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
-      PhantomDeleted { skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
-                       title : "d" . into (), body : None } )))) ];
+    viewnode_of (ViewnodeKind::Vognode (Vognode::Ghost (
+      Ghost { skgid : ID::from ("g"), home_skgrepo : SkgrepoName::from ("main"),
+              title : "g" . into (), body : None,
+              restoreNode_request : false, tombstone_request : false } ))) ];
   for (counter, kind) in kinds . into_iter () . enumerate () {
     let viewnode_id : ViewnodeId = ViewnodeId::from_counter (10 + counter as u64);
     let viewnode : Viewnode = Viewnode { viewnode_id : Some (viewnode_id . clone ()), .. kind };

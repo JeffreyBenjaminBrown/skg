@@ -55,7 +55,7 @@ use crate::types::tree::moves::{
 use crate::types::views_state::DiffViewBufferKind;
 use crate::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence,
-  Editability, Folder, Phantom, PhantomDeleted, PropertyMember, ChangeViewnode, Viewnode, ViewnodeKind, Vognode,
+  Editability, Folder, PropertyMember, ChangeViewnode, Viewnode, ViewnodeKind, Vognode,
   mk_editable_viewnode, viewforest_root_viewnode,
   viewnode_of};
 use crate::update_buffer::util::{Unwarranted, convert_unwarranted_child};
@@ -291,7 +291,7 @@ pub(crate) fn align_content_members_with_straddle (
                 && nodes_with_a_member . insert ( t . skgid . clone () ) {
           t . claimsMembership = true; }
         None },
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+      ViewnodeKind::Vognode (Vognode::Ghost (h))
         if after_set . contains (&h . skgid) =>
         straddle . after . get (&h . skgid) . map ( |node|
           mk_editable_viewnode (
@@ -311,17 +311,17 @@ pub(crate) enum HistoricalPhantomVisit {
   RootIsLive,
 }
 
-/// The visit of a historical phantom in a diff view. Where
+/// The visit of a ghost in a diff view. Where
 /// content stands (under a vognode, or as a root), it holds what
 /// 'append_historical_phantom_content' adds, reconciled with what it
 /// holds already; a node standing above itself holds nothing. In a
 /// folder it holds nothing new. A root whose node is back becomes an
 /// editable vognode, and one whose node is in neither graph (a
-/// deletion since committed) a deleted phantom. A removed member of
+/// deletion since committed) a tombstone ('entombstone_ghost'). A removed member of
 /// its old content is created editable when its node is in U of the
 /// buffer being completed ('prunedChangeView_sets_of_buffer'); one that
 /// stands already keeps its editability ('give_model_facts_to'). A
-/// historical phantom has no content list, so its old content adopts
+/// ghost has no content list, so its old content adopts
 /// the content reconciler's former members under it, and converts the
 /// rest of them ('is_diffView_change_viewnode').
 pub(crate) fn process_historical_phantom_visit (
@@ -333,7 +333,7 @@ pub(crate) fn process_historical_phantom_visit (
   let (skgid, at_root, in_content_position) : (ID, bool, bool) = {
     let node : NodeRef<Viewnode> = tree . get (treeid)
       . ok_or ("process_historical_phantom_visit: node not found") ?;
-    let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =
+    let ViewnodeKind::Vognode (Vognode::Ghost (h)) =
       &node . value () . kind else {
         return Ok (HistoricalPhantomVisit::Done); };
     ( h . skgid . clone (),
@@ -350,20 +350,7 @@ pub(crate) fn process_historical_phantom_visit (
   let Some (model_phantom) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, None) else {
       // In neither graph.
-      let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid) . unwrap ();
-      if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h))) =
-        &node_mut . value () . kind {
-        let deleted : ViewnodeKind = ViewnodeKind::Vognode (Vognode::Phantom (
-          Phantom::Deleted ( PhantomDeleted {
-            skgid             : h . skgid . clone (),
-            home_skgrepo      : h . home_skgrepo . clone (),
-            title             : h . title . clone (),
-            body              : h . body . clone () } )));
-        node_mut . value () . replace_kind (deleted); }
-      let empty : Tree<Viewnode> = Tree::new (model_root ());
-      reconcile_children_with_shallowModelSubtree (
-        tree, treeid, &empty, empty . root () . id (), &straddle . after,
-        &is_diffView_change_viewnode, &|_| true, &|_| false ) ?;
+      entombstone_ghost (tree, treeid, straddle) ?;
       return Ok (HistoricalPhantomVisit::Done); };
   if at_root {
     give_model_facts_to (
@@ -372,7 +359,7 @@ pub(crate) fn process_historical_phantom_visit (
   let standing_above_itself : bool =
     tree . get (treeid) . unwrap () . ancestors ()
     . any ( |ancestor| matches! ( &ancestor . value () . kind,
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (h)))
+      ViewnodeKind::Vognode (Vognode::Ghost (h))
         if h . skgid == skgid ));
   let mut model : Tree<Viewnode> = Tree::new (model_root ());
   if ! standing_above_itself {
@@ -386,20 +373,20 @@ pub(crate) fn process_historical_phantom_visit (
     &|viewnode| ! matches! ( viewnode . kind, ViewnodeKind::Vognode (_) )) ?;
   Ok (HistoricalPhantomVisit::Done) }
 
-/// When a save deleted the node of the deleted phantom at 'treeid'
-/// and the straddle holds it as only-before, it becomes the node's
-/// historical phantom, in place. Returns whether it did.
-pub(crate) fn deleted_phantom_becomes_historical (
+/// When the graph lacks the node of the occurrence at 'treeid' and the
+/// straddle holds it as only-before, the occurrence becomes the node's
+/// ghost, in place. Returns whether it did.
+pub(crate) fn vanished_occurrence_becomes_ghost (
   tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   straddle : &GraphStraddle,
 ) -> Result<bool, Box<dyn Error>> {
   let (skgid, parent_pid) : (ID, Option<ID>) = {
     let node : NodeRef<Viewnode> = tree . get (treeid)
-      . ok_or ("deleted_phantom_becomes_historical: node not found") ?;
-    let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =
+      . ok_or ("vanished_occurrence_becomes_ghost: node not found") ?;
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       &node . value () . kind else { return Ok (false); };
-    ( d . skgid . clone (),
+    ( t . skgid . clone (),
       node . parent () . and_then ( |parent| match &parent . value () . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           Some ( t . skgid . clone () ),
@@ -411,13 +398,34 @@ pub(crate) fn deleted_phantom_becomes_historical (
       straddle . partners (&parent_pid, RelationRole::CONTENT) . into_iter ()
       . find ( |partner| partner . id == skgid )
       . and_then ( |partner| partner . existence ));
-  let Some (historical) : Option<Viewnode> =
+  let Some (ghost) : Option<Viewnode> =
     mk_historical_viewnode (straddle, &skgid, rel) else { return Ok (false); };
   let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid) . unwrap ();
   let viewnode : &mut Viewnode = node_mut . value ();
-  viewnode . replace_kind (historical . kind);
-  viewnode . change_facts = historical . change_facts;
+  viewnode . replace_kind (ghost . kind);
+  viewnode . change_facts = ghost . change_facts;
   Ok (true) }
+
+/// Make the ghost at 'treeid' a tombstone, which keeps what the user
+/// put under it; what the diff view drew there goes
+/// ('is_diffView_change_viewnode'). A tombstone left childless is
+/// pruned.
+pub(crate) fn entombstone_ghost (
+  tree     : &mut Tree<Viewnode>,
+  treeid   : NodeId,
+  straddle : &GraphStraddle,
+) -> Result<(), Box<dyn Error>> {
+  { let mut node_mut : NodeMut<Viewnode> = tree . get_mut (treeid)
+      . ok_or ("entombstone_ghost: node not found") ?;
+    let viewnode : &mut Viewnode = node_mut . value ();
+    viewnode . replace_kind (ViewnodeKind::Tombstone);
+    viewnode . change_facts = ChangeFacts::default ();
+    viewnode . readiness_request = None; }
+  let empty : Tree<Viewnode> = Tree::new (model_root ());
+  reconcile_children_with_shallowModelSubtree (
+    tree, treeid, &empty, empty . root () . id (), &straddle . after,
+    &is_diffView_change_viewnode, &|_| true, &|_| false ) ?;
+  Ok (( )) }
 
 /// The root of a scratch tree that holds a shallow model subtree.
 fn model_root (
@@ -454,7 +462,7 @@ fn convert_change_viewnodes (
                   && ! viewnode . kind . is_property_folder () )
       || matches! ( &viewnode . kind,
         ViewnodeKind::Vognode (
-          Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) )),
+          Vognode::Unrestricted (_) | Vognode::Ghost (_) )),
     &|_| false ) ?;
   Ok (( )) }
 
@@ -604,7 +612,7 @@ fn tag_content_members (
             // Not 'write_protect': the member keeps its view requests.
             t . editability = Editability::WriteProtected; }
           moved = partner . and_then ( |p| mk_relRepo_move_viewnode (p) ); },
-        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
+        ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
           viewnode . change_facts . change . rel =
             by_id . get (&unknown . skgid)
             . and_then ( |p| p . existence ); },
@@ -658,7 +666,7 @@ fn reconcile_removed_content_members (
     &is_diffView_change_viewnode,
     &|viewnode| matches! ( &viewnode . kind,
       ViewnodeKind::Vognode (
-        Vognode::Unrestricted (_) | Vognode::Phantom (Phantom::Historical (_)) ))
+        Vognode::Unrestricted (_) | Vognode::Ghost (_) ))
       && ! viewnode . is_unrestrictedVognode_and_member (),
     &|_| false ) ?;
   let member_treeids : HashMap<ID, NodeId> =
@@ -667,7 +675,7 @@ fn reconcile_removed_content_members (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if t . claimsMembership =>
         Some (( t . skgid . clone (), child . id () )),
-      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+      ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
         Some (( u . skgid . clone (), child . id () )),
       _ => None, } )
     . collect ();

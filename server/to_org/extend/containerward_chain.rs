@@ -21,7 +21,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
-use crate::types::viewnode::{ DiffChange, Phantom, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
+use crate::types::viewnode::{ DiffChange, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -199,5 +199,4 @@ pub fn is_drawn_chain_node (
     && viewnode . editable_skgid () . is_none ()
     && viewnode . change_facts . change == DiffChange::default ()
     && ! matches! ( viewnode . kind,
-                    ViewnodeKind::Vognode (Vognode::Phantom (
-                      Phantom::Historical (_) | Phantom::Deleted (_) ))) }
+                    ViewnodeKind::Vognode (Vognode::Ghost (_)) ) }

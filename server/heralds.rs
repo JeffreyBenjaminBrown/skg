@@ -296,8 +296,8 @@ fn change_fact_rules_for_two_objects (
       readiness_request_rule ("readyRequest",   "request:ready"),
       readiness_request_rule ("unreadyRequest", "request:unready") ]) ] }
 
-/// The same for a leaf with a single diff object (a property leaf, a
-/// deleted or unknown phantom), whose '(ready)' names no object, or
+/// The same for a leaf with a single diff object (a property leaf, an
+/// unknown), whose '(ready)' names no object, or
 /// 'all' on a changeset marker, and for a changed folder's '(diff
 /// (ready))'. 'added' and 'removed' render its existence, whichever
 /// object it names.
@@ -371,16 +371,12 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
 ///
-///   * 'vac' rules (focused, folded, node's repo, deleted's id...)
+///   * 'vac' rules (focused, folded, node's repo, ghost's gnid...)
 ///     match and emit nothing. The engine would ignore the atoms
 ///     anyway; the vacuous rules document that the atom is known, and
 ///     let the conformance test demand that every emittable atom
 ///     appear here.
 ///
-///   * tombstone vs deleted -- two shapes come in from the
-///     server depending on whether the deletion is on a non-vognode viewnode
-///     (like a deleted aliasFolder) or on a file-level node. Each gets
-///     its own matcher; both render as "DELETED".
 pub fn herald_rule_table () -> HeraldRule {
   HeraldRule {
     node_heralds_key : None, interc : None, label : Some ("skg"),
@@ -449,13 +445,6 @@ pub fn herald_rule_table () -> HeraldRule {
       change_fact_rules_for_one_object ("+", "-"),
       vec! [
       crule ("tombstone", vec! [ s ("DELETED") ]),
-      crule ("deleted", vec! [
-        s ("DELETED"),
-        vac ("id"),
-        vac ("repo") ]),
-      // A second rule over the same form, so its tokens do not take
-      // the prefix "DELETED".
-      rule ("deleted", change_fact_rules_for_one_object ("∃+", "∃-")),
       crule ("unknown", vec! [
         s ("Reference to unknown node."),
         vac ("id"),
@@ -466,13 +455,13 @@ pub fn herald_rule_table () -> HeraldRule {
           crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       rule ("unknown", change_fact_rules_for_one_object ("~+", "~-")),
-      // A historical phantom is write-protected; its two objects are
+      // A ghost is write-protected; its two objects are
       // its existence (∃-) and its relationship to its viewparent.
-      crule_styled_as ("writeProtected", "historical", vec! [
+      crule_styled_as ("writeProtected", "ghost", vec! [
         s ("☮"),
-        vac ("id"),
-        vac ("repo") ]),
-      rule ("historical", [
+        vac ("gnid"),
+        rule ("skgRepos", vec! [ vac ("nodeRepo") ]) ]),
+      rule ("ghost", [
         // Its one edit request, beside its change facts.
         vec! [ rule ("editRequest", vec! [
           leaf ("restoreNode", "restore node") ]) ],
@@ -688,10 +677,12 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // The viewnode ID that ends every wrapper; its value is value position.
     "vnid",
     // Form heads, from org_to_text.rs:
-    "node", "deleted", "unknown",
-    "tombstone", "historical",
-    // Keys inside node / deleted / unknown forms:
+    "node", "unknown",
+    "tombstone", "ghost",
+    // Keys inside node / unknown forms:
     "id", "repo",
+    // Keys inside a ghost's form:
+    "gnid", "skgRepos", "nodeRepo",
     "writeProtected", "omittedBody",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
@@ -702,7 +693,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // are matched literally so its herald can describe the complete state
     // change rather than echoing two context-free arguments.
     "delete", "merge", "flag", "true", "false",
-    // The diff view's restore requests, on a historical phantom and on
+    // The diff view's restore requests, on a ghost and on
     // a removed membership.
     "restoreNode", "restoreRel",
   ];

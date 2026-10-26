@@ -86,9 +86,9 @@ fn a_deleted_subtree_is_shown_where_it_stood (
   assert_lines_in_order ( &sets_buffer () ?, &[
     "* (skg (node (id r)",
     "** (skg (changesetMarker content) (diff (leaves 1 all)))",
-    "** (skg (historical (id del) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel)))) del",
+    "** (skg (ghost (gnid del) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) del",
     "the body del had",
-    "*** (skg (historical (id delc) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel)))) delc",
+    "*** (skg (ghost (gnid delc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) delc",
     "** (skg (node (id keep)" ] );
   Ok (( )) }
 
@@ -200,9 +200,9 @@ fn a_node_merge_shows_both_acquisition_folders (
   assert_lines_in_order ( &buffer, &[
     "* (skg (node (id acq)",
     "** (skg acquiredFolder)",
-    "*** (skg (historical (id acqd) (repo public) (diff (node removed) (leaves 1 node)))) acqd" ] );
+    "*** (skg (ghost (gnid acqd) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node)))) acqd" ] );
   assert_lines_in_order ( &buffer, &[
-    "* (skg (historical (id acqd) (repo public) (diff (node removed) (leaves 1 node)))) acqd",
+    "* (skg (ghost (gnid acqd) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node)))) acqd",
     "** (skg acquiredByFolder)",
     "*** (skg (node (id acq) (repo public) writeProtected" ] );
   Ok (( )) }
@@ -234,7 +234,7 @@ fn a_deleted_subscriber_is_shown_in_the_changed_subscriber_folder (
   assert_lines_in_order ( &kinds_buffer () ?, &[
     "* (skg (node (id orph)",
     "** (skg (subscriberFolder changed))",
-    "*** (skg (historical (id gone) (repo public) (diff (node removed) (rel removed) (leaves 2 node rel)))) gone" ] );
+    "*** (skg (ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel)))) gone" ] );
   Ok (( )) }
 
 #[test]
@@ -434,7 +434,7 @@ fn a_historical_phantoms_old_content_is_shown_as_removed_members (
     buffer = buffer_of (f) ?;
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
-    "** (skg (historical (id h) (repo main) (diff (node removed) (rel removed) (leaves 2 node rel)))) h",
+    "** (skg (ghost (gnid h) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) h",
     "*** (skg (node (id m) (repo main) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled",
     "**** (skg (oldText title) (diff (leaves 1))) m" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

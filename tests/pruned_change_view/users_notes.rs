@@ -46,7 +46,7 @@ fn a_note_under_a_changed_folders_member_survives (
 fn a_note_under_a_historical_phantom_survives (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let phantom : &str = "** (skg (historical (id h)";
+    let phantom : &str = "** (skg (ghost (gnid h)";
     let old_member : &str =
       "*** (skg (node (id m) (repo main) noClaim (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
@@ -75,7 +75,7 @@ fn a_note_in_the_acquired_folder_survives (
       &insert_after_line_starting ( &buffer, folder, &note (3, "a placed note") )) ?;
     assert! ( parent_line_of (&saved, "a placed note") . starts_with (folder), "{}", saved );
     assert_lines_in_order (&saved, &[
-      folder, " a placed note\n", "*** (skg (historical (id acqd)" ]);
+      folder, " a placed note\n", "*** (skg (ghost (gnid acqd)" ]);
     Ok (( )) }) }
 
 /// A note under a removed member survives the member going stale:

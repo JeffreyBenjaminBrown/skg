@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, viewnode_of };
-use crate::types::viewnode::{Vognode, Phantom, Folder};
+use crate::types::viewnode::{Vognode, Folder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::MpVognode;
@@ -164,9 +164,6 @@ pub fn find_children_by_skgids (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
         if target_skgids . contains (&t . skgid)
         { result . insert (t . skgid . clone (), child . id()); },
-      ViewnodeKind::Vognode (Vognode::Phantom (p @ Phantom::Deleted (_))) =>
-        if target_skgids . contains (p . skgid ())
-        { result . insert (p . skgid () . clone (), child . id()); },
       _ => {} } }
   result }
 
