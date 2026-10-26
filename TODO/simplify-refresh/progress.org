@@ -1398,3 +1398,9 @@ derived fact (above). 'bash/nextest.sh' at the end: 956 of 956.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 to 10, with either
 client; the other 34 pass with each.
+** Orchestrator's notes after slice 11 (2026-10-26)
+No correction inserted. For the review: the integrate request
+refreshes twice when it appends roots; a ghost's claim and
+warrant are now stored fields. The three open questions for
+Jeff stand.
+
