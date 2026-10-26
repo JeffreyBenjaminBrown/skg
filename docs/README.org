@@ -45,6 +45,10 @@ Tantivy search index from them. Clients exist for Emacs and Neovim, and the
 TCP protocol is editor-independent.
 
 The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.org][api-and-formats.org]].
+How the server draws every view -- the refresh, which corrects a
+buffer against the graph -- is the last section of [[./data-model_technical.org][the technical
+data model]]; its words are in [[./glossary.org][the glossary]], and the diff view's
+buffers in [[./diff-view.org][diff-view.org]].
 
 Some other reasonable jumping-off points include:
 - [[../server/types/][the types]] (in the server), especially

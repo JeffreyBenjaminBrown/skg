@@ -29,22 +29,34 @@ When the user saves, the client sends the whole buffer back. Saving
 updates the authoritative files, publishes a validated graph generation,
 queues the Tantivy update, and sends updated views to the client.
 
+Every buffer the server sends is drawn by one operation, the refresh
+(`refresh_viewforest` in `server/refresh/`): it takes a parsed,
+validated buffer and the graph, decides from the two as they are now
+what the buffer should say, corrects it, and reports its corrections.
+A fresh view, every rerender after a save or a request, the search
+enrichment and the diff view's buffers are all refreshes. Its model is
+in [the technical data model](../docs/data-model_technical.org),
+"The refresh: how a view follows the graph".
+
 Viewnodes are not all graphnodes:
 
 ```
-viewnode = vognode | propertyFolder | property | partnerFolder
+viewnode = vognode | folder | propertyMember | changeViewnode
          | bufferRoot | tombstone
-vognode  = unrestricted | ghost | unknown
+vognode  = occurrence | ghost | unknown
 ```
 
-A vognode represents a graphnode, which need not exist. An unrestricted
-vognode represents a current graphnode; a ghost, only in the diff view,
-a node HEAD has and the worktree lacks; an unknown, a reference that
-resolves to nothing. Property folders and partner folders carry aliases,
-IDs, flags, or relationships.
-New editable nodes may lack an ID until save preparation assigns one.
-Editability, viewnode kind, and relationship context determine how text is
-interpreted on save; not every displayed headline is an instruction to write
-a graphnode. See [the viewnode types](../server/types/viewnode.rs) and
+A vognode stands for a graphnode's ID, which need not name a current
+graphnode. An occurrence stands for a node the graph has; a ghost,
+only in the diff view, for a node HEAD has and the worktree lacks; an
+unknown, for a reference that resolves to nothing. Folders carry
+relationships or a node's aliases, IDs and flags, as their members;
+property members are those aliases, IDs and flags; change viewnodes
+describe a change the diff view shows.
+The parse gives every new headline an ID and a skgrepo before
+validation. Editability, viewnode kind, and whether a child claims
+membership of its viewparent's list determine how text is interpreted
+on save; not every displayed headline is an instruction to write a
+graphnode. See [the viewnode types](../server/types/viewnode.rs) and
 [the metadata parser](../server/serve/parse_metadata_sexp.rs) for the current
 representation, and the API document for its wire format.

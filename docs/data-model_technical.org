@@ -34,7 +34,7 @@ derived text links.
 =MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit
 has no opinion about the field; =Specified([])= explicitly supplies an empty
 value.  This distinction is load-bearing while telescope sections and partial
-nodeIntents are reconciled.  =RelPartner<T>= attaches the privacy
+nodeIntents are combined.  =RelPartner<T>= attaches the privacy
 skgrepo where an alias or relationship is recorded.  The order of list-valued fields is
 preserved.
 
@@ -149,3 +149,228 @@ validate the candidate graph, and build graph plus Tantivy from that same node
 vector.  A live rebuild swaps in only after the complete candidate succeeds;
 failure leaves the prior generation visible.  The operation never rewrites
 authoritative =.skg= files.
+
+** The refresh: how a view follows the graph
+
+Every buffer the server sends is drawn by one operation, the
+*refresh* (=refresh_viewforest= in =server/refresh/mod.rs=). It takes a
+viewforest the parse has read and validation accepted (every new
+headline already has a gnid and a skgrepo), the *truth* (=Truth=: the
+in-Rust graph as the skgrepo restriction lets it be seen, with the
+config), the mode (=CompletionMode= in
+=server/update_buffer/completion_mode.rs=: a content view, or a buffer of
+the diff view over the graph straddle), the node budget
+(=initial_node_limit=) and, in the diff view, the readiness store. It
+returns the buffer's text and the list of what it corrected
+(=Refreshed=). A fresh content view is the refresh of a stub
+(=stub_of_fresh_content_view= in =server/update_buffer.rs=: one
+editable occurrence per requested node, asking for its containers
+folder and to be the node's editable occurrence); a rerender, the
+saved view and every collateral view are refreshes of what the
+buffer holds (=rerender_view=); the search enrichment is the refresh
+of the search buffer as a stub (=enrich_search_viewforest=); the diff
+view's buffers are refreshes in diff-view mode (=docs/diff-view.org=,
+"Rendering a buffer").
+
+The refresh decides everything from the buffer and the truth as they
+are now, never from what either was at an earlier save. So it is a
+fixpoint: refreshing its own output changes nothing and corrects
+nothing, up to the viewnode IDs it assigns. =tests/idempotence.rs=
+asserts this over every content-view and diff-view fixture.
+
+*** The kinds a refresh sees
+A *vognode* stands for a gnid (=Vognode=): an *occurrence*, of a node
+the truth has, editable or write-protected; a *ghost*, in the diff
+view only, of a node HEAD has and the worktree lacks; an *unknown*,
+of a gnid its viewparent's list names and no node answers to. A
+*descriptor* describes its viewparent: a folder, a property member
+(an alias, an ID or a flag in its property folder) or a change
+viewnode. A *tombstone* says only that something stood there, and
+holds the children of what it replaced. The buffer root holds the
+roots.
+
+*** The ID rule
+What a headline standing for a gnid becomes is decided by four
+questions, the first yes winning (=id_rule= in
+=server/refresh/id_rule.rs=). Does the truth have the node? Then it is
+an occurrence of the node's pid. Otherwise, in the diff view, does
+HEAD have it? Then it is the node's ghost. Otherwise, does its
+viewparent's list name the gnid? Then it is an unknown. Otherwise it
+is a tombstone. A node the skgrepo restriction hides answers no to
+all four (the truth answers =Hidden=, =GnidPresence=, and the gated
+lists name no hidden member), so its headline becomes a tombstone,
+which reveals nothing of it. In the diff view, a gnid that HEAD had
+as a node and that a nodeMerge has since made an extra ID of another
+node stays that node's ghost. The headline is re-kinded where it
+stands, keeping its viewnode ID, its fold state, its children and,
+for an occurrence, its editability.
+
+*** Claim and warrant
+Each child of a vognode or a folder has two flags. It *claims
+membership* when the save will read it as a member of its
+viewparent's list. That is declared: the bare atom =noClaim= says no,
+its absence yes (=claimsMembership= on the occurrence, the ghost, the
+unknown, the alias and the ID). The save reads claims only under an
+editable occurrence, and under an editable folder (subscribee,
+overridden, hidden-outside-of-subscribee, alias) of one
+(=parent_reads_claims= in =server/refresh/ancestry.rs=); under any
+other viewparent no child claims, whatever it carries, and the
+server writes no =noClaim= there. A child *is warranted* when the
+truth relates it to its viewparent as its position implies: content
+its occurrence contains, a partner of the folder's relation, a
+container of the node above it in the containerward chain, a
+property of the node in a property folder. In the diff view HEAD
+alone may warrant it, a *ghost warrant*. The warrant is derived
+(=Warrant { ByGraph, ByHead, No }=), recomputed at every refresh and
+written in =(view ...)= as =noWarrant= or =ghostWarrant=, nothing
+meaning warranted by the truth; a root carries none.
+
+Under an editable parent at rest the two agree: the refresh marks
+=noClaim= on every child it keeps that the truth does not warrant, and
+the next save makes every claim warranted. They differ only for what
+the user typed since the last save: a new child claims and is not yet
+warranted, and a child the user marked =noClaim= to detach it is
+warranted and claims nothing (a *pending detachment*, herald
+"detach"). The refresh never detaches a child and sets no claim but a
+root's: the user's claims are the user's to make.
+
+*** The goal
+A parent's *goal* is what the truth says its children should be
+(=goal_of_parent= in =server/refresh/goal.rs=): for an occurrence's
+content, its =contains= list in file order (for a subscribee shown as
+such, less what its subscriber hides or already contains); for a node
+of the containerward chain, its containers; for a folder, its
+partners in the folder's relation, or the compound folders' derived
+lists; for a property folder, the node's aliases, IDs or true flags.
+Each item names a gnid, by the pid its list entry resolves to or the
+raw ID when nothing answers to it, or a property value. The goal is
+ordered where the viewparent's own file records the order (content,
+aliases, and the subscribee, overridden, hidden and
+hidden-outside-of-subscribee folders: =Folder::goal_is_ordered=), and
+unordered elsewhere. In the diff view the goal is the union
+of the parent's lists in the two graphs of the straddle, an item only
+HEAD's list holds being warranted by HEAD. A parent whose position
+implies no relationship (the buffer root, a tombstone, an unknown)
+has no goal.
+
+*** The walk and the ladder
+Before the walk, every editable-view request is fulfilled: its
+occurrence becomes the node's editable one and any other editable
+occurrence of the node is write-protected
+(=fulfill_editableView_requests=); and where a nodeMerge made two
+editable occurrences stand for one node, the first in level order
+stays editable (=keep_the_first_editable_occurrence_of_each_node=).
+The input holds at most one editable occurrence per gnid, which
+validation guarantees for a saved buffer
+(=Multiple_Defining_Viewnodes=); the refresh asserts it and does not
+re-check.
+
+The walk then visits every parent in level order from the buffer
+root, a parent's own kind settled before its children are visited.
+At each parent P (=visit_parent= in =server/refresh/ladder.rs=) it
+settles the node budget (below), lets an editable-view request extend
+the content P already shows, adds P's default folders, computes P's
+goal, and runs the *ladder*, its corrections in order, weakest first:
+1. re-kind: each vognode child becomes what the ID rule says; each
+   descriptor whose position the ancestry table forbids, or, for a
+   change viewnode, whose change is gone, is *unsayable* and becomes a
+   tombstone;
+2. merge: siblings standing for one gnid are unified, the first
+   surviving with its viewnode ID and fold state, editable if any was;
+   the others' children are appended to it, each marked =noClaim=
+   unless the truth warrants it there;
+3. warrant: each child's warrant is set from P's goal;
+4. claims: under a parent whose claims are read, each child that
+   claims and that the truth does not warrant is marked =noClaim=;
+   under any other, no child claims;
+5. reinstate: each goal item no child stands for is drawn, as far as
+   the extent allows (below); what it draws is what the ID rule makes
+   of the item, and a member of a folder whose members carry the
+   containerward chain gets its chain;
+6. reorder: where the goal is ordered, the children it names take its
+   order, and every other child rides right after the sibling it
+   followed; where it is not, nothing moves, and a drawn item follows
+   the last child the goal names;
+7. substitution: in a content view, under an editable occurrence, an
+   overridden member is shown as its overrider with =(overridesHere
+   N)=, except where P is itself overridden and shown raw (a root, or a
+   member of a folder other than the subscribee folder); when the
+   override is gone, the shown overrider loses the fact and the
+   original is reinstated beside it
+   (=docs/api-and-formats.org=, "Override substitution and the
+   overridesHere fact");
+8. requests: each child's view requests are fulfilled and dropped
+   (=writeProtectedView=, =writeProtectedSubtreeView=, =(folder
+   REL)=, =flags=, and on a ghost =tombstone=); =fork= stays for the
+   save. An edit request is carried through untouched unless the
+   child's new kind has no slot for it, in which case it is dropped
+   and reported.
+In the diff view, between rungs 5 and 6, the change viewnodes P
+should hold are drawn or kept, and each child is tagged with its
+change (=server/refresh/diff_view.rs=). After the ladder, a folder
+left with no child is entombstoned, unless the save reads its
+membership or it is the flags folder, where the user could add
+something.
+
+A content view draws some folders unasked, as it always has
+(=add_default_folders=): an occurrence that an editable-view request
+extends, a fresh view's roots among them, shows its subscribee folder
+when it subscribes to something the restriction shows, and the
+folder of what it hides outside its subscribees inside that, when it
+hides something there; an editable subscribee shown as such shows the
+folder of what its subscriber hides in it, when that holds anything.
+
+*** The ancestry table
+=required_ancestry= (=server/refresh/ancestry.rs=) gives each kind of
+descriptor the ancestors it may stand under, nearest first: a folder
+under an occurrence (the acquired-by folder under a ghost; the
+hidden-outside folder in a subscribee folder; the hidden-in folder
+under a subscribee in a subscribee folder); a property member in its
+property folder; a change viewnode under an occurrence or a ghost,
+and a body diff under an old text. A descriptor whose ancestors are
+not those is unsayable. A vognode has no row: an occurrence is never
+unsayable.
+
+*** The extent and the node budget
+The *extent* is how much of P's goal the refresh draws
+(=server/refresh/extent.rs=): all of it for a folder and for an
+editable occurrence's content, and in the diff view for a ghost's old
+content where content stands; none of it, beyond what the buffer
+already shows, for a write-protected occurrence's content and for the
+containerward chain. An occurrence the refresh draws is editable when
+its parent's children are editable content, no other occurrence of
+its node is editable, and the budget allows; otherwise
+write-protected. Each editable occurrence whose content is drawn
+charges the budget once (=CompletionMode::charges_node_budget=); one
+the refresh drew editable whose content the spent budget no longer
+allows is write-protected at its own visit. An editable-view request
+passes on to the content it extends, showing or drawing. The diff
+view's deviations are in =docs/diff-view.org=, "Editability in the
+diff view".
+
+*** The tail
+After the walk, once (=server/refresh/tail.rs=): the derived facts are
+computed, the stats of each occurrence (its relationship facts,
+property counts and birth, =cycle=, =repoBoundary=, =omittedBody=, its
+relRepo where it differs from the default), and in the diff view the
+readiness facts from the store and the home skgrepo moves; every
+childless tombstone is pruned, postorder and roots included, so a
+buffer may end with no roots, and so is a folder the pruning leaves
+empty that goes when empty; every viewnode that lacks a viewnode ID
+gets one; and the viewforest is rendered.
+
+*** Corrections
+The refresh reports what it changed because the buffer contradicted
+the truth; it does not warn (=server/refresh/corrections.rs=). A
+correction is a headline reinstated, entombstoned, marked =noClaim=,
+merged into, re-kinded, or stripped of an edit request its new kind
+has no slot for, named as a subtree is named, by viewnode ID and
+title. What the refresh draws as extent is no correction: the content
+of an occurrence it extends first, the members of a folder it added,
+a fresh view's content; nor, in the diff view, a change viewnode
+drawn or gone, since those describe the straddle. So a fresh view and
+a plain save report nothing. The callers tag each view's corrections
+with its view ID (=ViewCorrections=), the =save-result= and
+=rerender-done= responses carry them, and both clients append them to
+their warnings buffer, under one headline per view
+(=docs/api-and-formats.org=, "Save buffer").
