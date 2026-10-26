@@ -154,12 +154,6 @@ pub enum ViewnodeKind {
 }
 
 impl ViewnodeKind {
-  /// Whether this is a property folder: one whose members are the
-  /// viewparent's aliases, IDs or true flags.
-  pub fn is_property_folder (&self) -> bool {
-    matches! ( self, ViewnodeKind::Folder (folder)
-                     if folder . members_are_properties () ) }
-
   /// Whether this is a partner folder: one whose members are nodes.
   pub fn is_partner_folder (&self) -> bool {
     matches! ( self, ViewnodeKind::Folder (folder)

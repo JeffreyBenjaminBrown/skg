@@ -109,33 +109,6 @@ where
   result
 }
 
-/// Like run_with_test_stores, but loads config from a TOML file
-/// (supporting multi-repo setups) and skips Tantivy.
-pub fn run_with_test_stores_from_config<F>(
-  test_name: &str,
-  config_path: &str,
-  test_fn: F,
-) -> Result<(), Box<dyn Error>>
-where
-  F: for<'a>
-  FnOnce(&'a SkgConfig)
-         -> Pin<Box<dyn Future<Output = Result
-                               <(), Box<dyn Error>>> + 'a>>,
-{
-  let _groups_lock : std::sync::MutexGuard<()> =
-    // See the twin lock in run_with_test_stores.
-    TEST_STORE_GROUPS_MUTEX . lock ()
-    . unwrap_or_else ( |poisoned| poisoned . into_inner () );
-  block_on(async {
-    let config: SkgConfig =
-      load_config_with_overrides(config_path, Some (test_name), &[])?;
-    guarded_test_then_cleanup(
-      test_name, None,
-      test_fn(&config),
-    ) . await
-  } )
-}
-
 /// Serializes store-using tests (shared groups and the per-test
 /// run_with_test_stores family) within one process. Under nextest every
 /// test is its own process, so this is uncontended there; under
@@ -244,8 +217,7 @@ impl SharedStoreSession {
     self . wipe_then_repopulate () }
 
   /// Like 'reset', but loads a (possibly multi-repo) config from a
-  /// TOML file, reading fixtures in place -- the same convention as
-  /// 'run_with_test_stores_from_config'.
+  /// TOML file, reading fixtures in place.
   pub fn reset_from_config (
     &mut self,
     subtest_name : &str,
@@ -787,21 +759,6 @@ pub fn read_lp_message (
   let mut body_bytes : Vec<u8> = vec![0u8; content_length];
   reader . read_exact (&mut body_bytes) ?;
   Ok ( String::from_utf8 (body_bytes) ? ) }
-
-/// Read all LP messages from a stream until one contains the
-/// given terminal response type (e.g. "save-result").
-/// Returns (non_terminal_messages, terminal_message).
-pub fn read_lp_messages_until (
-  reader        : &mut std::io::BufReader<std::net::TcpStream>,
-  terminal_type : &str,
-) -> Result<(Vec<String>, String),
-            Box<dyn std::error::Error>> {
-  let mut collected : Vec<String> = Vec::new ();
-  loop {
-    let msg : String = read_lp_message (reader) ?;
-    if msg . contains (terminal_type) {
-      return Ok (( collected, msg )); }
-    collected . push (msg); } }
 
 /// Read all LP messages from a stream until EOF.
 /// Useful for tests that call pipeline functions directly

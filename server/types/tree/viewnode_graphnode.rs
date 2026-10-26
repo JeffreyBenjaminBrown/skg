@@ -26,19 +26,6 @@ pub fn gnid_from_self_or_nearest_ancestor (
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
 
-/// Find a child node by its ID.
-/// Returns the NodeId of the child if found, None otherwise.
-pub fn find_child_by_gnid (
-  tree          : & Tree<Viewnode>,
-  parent_treeid : NodeId,
-  target_gnid  : & ID,
-) -> Option < NodeId > {
-  let singleton : HashSet<ID> =
-    std::iter::once( target_gnid . clone() )
-    . collect();
-  find_children_by_gnids( tree, parent_treeid, &singleton)
-    . remove (target_gnid) }
-
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 pub fn find_children_by_gnids (
