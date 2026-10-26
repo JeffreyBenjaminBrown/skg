@@ -46,7 +46,7 @@ describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
         ['(skg ghost (gnid g) (skgRepos (nodeRepo r)))'] = 'ghost',
         ['(skg alias (skgRepos (relRepo r)))'] = 'alias',
         ['(skg (flag noSearchMatching))'] = 'flag',
-        ['(skg (subscribeeFolder changed))'] = 'folder',
+        ['(skg subscribeeFolder)'] = 'folder',
         ['(skg folded tombstone)'] = 'tombstone' }) do
       assert.are.equal(kind_name,
         fields.kind_of_sexp(sexpr.read(sexp_text)).kind, sexp_text)
@@ -267,7 +267,7 @@ describe('skg.sexpr.metadata_fields real-world metadata', function ()
   it('preserves an existing repo and appends non-canonical fields',
      function ()
     local headlines = filledIn_headlines(
-      '(skg node (gnid abc) (skgRepos (nodeRepo public)) (rels "C5"))')
+      '(skg node (gnid abc) (skgRepos (nodeRepo public)) (view (rels "C5")))')
     assert.is_not_nil(find_text(headlines, 'nodeRepo'))
     assert.is_not_nil(find_text(headlines, 'public'))
     assert.is_not_nil(find_text(headlines, 'gnid'))
@@ -284,7 +284,7 @@ describe('skg.sexpr.metadata_fields real-world metadata', function ()
   it('fills in real-world metadata with a herald field', function ()
     local headlines = filledIn_headlines(
       '(skg node (gnid 6972d099) (skgRepos (nodeRepo public))'
-      .. ' (rels "C5 4(1,1)L"))')
+      .. ' (view (rels "C5 4(1,1)L")))')
     assert.is_not_nil(find_text(headlines, 'nodeRepo'))
     assert.is_not_nil(find_text(headlines, 'public'))
     assert.is_not_nil(find_text(headlines, 'writeProtected'))
@@ -331,11 +331,43 @@ describe('skg.sexpr.metadata_fields other kinds, arguments, conditions', functio
       bijection.sexp_to_org(sexp), kind)
     assert.are.same(
       { { level = 1, text = 'skg' }, { level = 2, text = 'focused' },
-        { level = 2, text = 'alias' }, { level = 2, text = 'editRequest' },
+        { level = 2, text = 'alias' }, { level = 2, text = 'noClaim' },
+        { level = 3, text = 'false (default)' },
+        { level = 2, text = 'editRequest' },
         { level = 3, text = 'none (default)' } },
       bijection.extract_headlines(filledIn))
     assert.are.same(sexp, bijection.org_to_sexp(
       fields.strip_defaults_from_org(filledIn, kind)))
+  end)
+
+  it('keeps a readiness request beside the other edit request',
+     function ()
+    -- Alone, it is shown beside the other request at its default.
+    local sexp = sexpr.read('(skg unknown (gnid x) (editRequest (ready rel)))')
+    local kind = fields.kind_of_sexp(sexp)
+    local filledIn = fields.fillIn_defaults_in_org(
+      bijection.sexp_to_org(sexp), kind)
+    assert.are.same(
+      { { level = 1, text = 'skg' }, { level = 2, text = 'unknown' },
+        { level = 2, text = 'gnid' }, { level = 3, text = 'x' },
+        { level = 2, text = 'noClaim' },
+        { level = 3, text = 'false (default)' },
+        { level = 2, text = 'editRequest' },
+        { level = 3, text = 'none (default)' },
+        { level = 3, text = 'ready' }, { level = 4, text = 'rel' } },
+      bijection.extract_headlines(filledIn))
+    assert.are.same(sexp, bijection.org_to_sexp(
+      fields.strip_defaults_from_org(filledIn, kind)))
+    -- Beside another request, and when that request is chosen.
+    local both = sexpr.read('(skg node (editRequest delete (unready node)))')
+    assert.are.same(both, bijection.org_to_sexp(
+      fields.strip_defaults_from_org(fields.fillIn_defaults_in_org(
+        bijection.sexp_to_org(both), node_kind), node_kind)))
+    assert.are.same(
+      sexpr.read('(skg node (editRequest (relRepo r) (ready rel)))'),
+      strip_to_sexp(table.concat({
+        '* skg', '** node', '** editRequest', '*** relRepo r',
+        '*** ready', '**** rel' }, '\n')))
   end)
 
   it('leaves a kind without fields alone', function ()

@@ -86,10 +86,10 @@ describe('skg.heralds', function ()
 
   it('toggling adds and removes extmarks', function ()
     local buf = scratch_buffer_with({
-      'Test line with (skg node (gnid 123) (rels (contains (out 2)))'
-      .. ' (viewStats cycle)) herald',
-      'Another line (skg node (gnid 456) (rels (linksTo (in 3 (substantive 3))))'
-      .. ' (editRequest delete)) more text',
+      'Test line with (skg node (gnid 123) (view (rels (contains (out 2)))'
+      .. ' cycle)) herald',
+      'Another line (skg node (gnid 456) (editRequest delete)'
+      .. ' (view (rels (linksTo (in 3 (substantive 3)))))) more text',
       'Plain line without heralds' })
     assert.is_true(heralds.enable(buf))
     local marks = herald_extmarks(buf)
@@ -109,9 +109,9 @@ describe('skg.heralds', function ()
     -- renders as the C token 2aC: the in-side numeral "2" (medium), the
     -- ancestor "a" at its floor (low), and the birth letter "C" (low).
     local buf = scratch_buffer_with({
-      'Line with (skg node (gnid 123) noClaim'
-      .. ' (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))'
-      .. ' (viewStats noWarrant cycle) (editRequest delete)) text' })
+      'Line with (skg node (gnid 123) noClaim (editRequest delete)'
+      .. ' (view (rels (contains (in 2 (ancestors 1))))'
+      .. ' (birth (contains in 1)) noWarrant cycle)) text' })
     heralds.enable(buf)
     local marks = herald_extmarks(buf)
     assert.are.equal(1, #marks)
@@ -139,7 +139,7 @@ describe('skg.heralds', function ()
 
   it('dictates the view faces in a heralded window', function ()
     local buf = scratch_buffer_with({
-      '* (skg node (gnid 1) (rels (contains (out 2)))) a headline' })
+      '* (skg node (gnid 1) (view (rels (contains (out 2))))) a headline' })
     heralds.enable(buf)
     local winhighlight = vim.wo.winhighlight
     assert.is_truthy(winhighlight:find('Normal:SkgViewDefault', 1, true))
@@ -161,7 +161,7 @@ describe('skg.heralds', function ()
     local original = herald_rules.request_herald_rules
     herald_rules.request_herald_rules = install_fixture_rules
     local buf = scratch_buffer_with({
-      '(skg node (gnid 1) (skgRepos (nodeRepo s)) (rels (contains (out 2))))' })
+      '(skg node (gnid 1) (skgRepos (nodeRepo s)) (view (rels (contains (out 2)))))' })
     local enabled = heralds.enable(buf)
     herald_rules.request_herald_rules = original
     assert.is_true(enabled)
@@ -194,9 +194,61 @@ describe('skg.heralds', function ()
     heralds.enable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
     vim.api.nvim_buf_set_lines(buf, 0, 1, false, {
-      '* (skg node (gnid 9) (rels (contains (out 2)))) now a headline' })
+      '* (skg node (gnid 9) (view (rels (contains (out 2))))) now a headline' })
     vim.wait(200, function () return #herald_extmarks(buf) > 0 end, 10)
     assert.are.equal(1, #herald_extmarks(buf))
+  end)
+
+  it('renders a folder changed by its members, and keeps it current',
+     function ()
+    local buf = scratch_buffer_with({
+      '* (skg node (gnid p)) p',
+      '** (skg containerFolder) its containers',
+      '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (ready rel))) r',
+      '**** (skg node (gnid below)) below',
+      '* (skg node (gnid after)) after' })
+    heralds.enable(buf)
+    local function folder_herald ()
+      local marks = vim.api.nvim_buf_get_extmarks(
+        buf, heralds.namespace, { 1, 0 }, { 1, -1 }, { details = true })
+      return marks[1] and heralds.chunks_text(marks[1][4].virt_text)
+    end
+    assert.are.equal('☮ its containers changed (other files)✓',
+                     folder_herald())
+    -- Editing a member, or a line below it, rerenders the folder.
+    vim.api.nvim_buf_set_lines(buf, 2, 3, false, {
+      '*** (skg node (gnid r) (diff (rel added) (leaves 2 node rel) (ready node))) r' })
+    vim.wait(200, function ()
+      return folder_herald() == '☮ its containers changed (other files)' end, 10)
+    assert.are.equal('☮ its containers changed (other files)',
+                     folder_herald())
+    vim.api.nvim_buf_set_lines(buf, 2, 3, false, {
+      '*** (skg node (gnid r) (diff (node added) (ready node))) r' })
+    vim.wait(200, function ()
+      return folder_herald() == '☮ These contain it.' end, 10)
+    assert.are.equal('☮ These contain it.', folder_herald())
+    vim.api.nvim_buf_set_lines(buf, 3, 4, false, {
+      '**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (ready)))' })
+    vim.wait(200, function ()
+      return folder_herald() == '☮ its containers changed (other files)✓' end, 10)
+    assert.are.equal('☮ its containers changed (other files)✓',
+                     folder_herald())
+    heralds.disable(buf)
+    -- The lens reads the shape the server no longer writes.
+    assert.are.equal('its aliases changed (this file)✓',
+      heralds.chunks_text(heralds.chunks_from_metadata(
+        '(skg aliasFolder)', { ready = true })))
+    assert.are.equal('aliases',
+      heralds.chunks_text(heralds.chunks_from_metadata('(skg aliasFolder)')))
+  end)
+
+  it('renders relations and property counts once', function ()
+    local text = herald_text(
+      '(skg node (gnid x) (view (rels (contains (out 2))) (props (aliases 3))))')
+    local _, relations = text:gsub('C2', '')
+    local _, aliases = text:gsub('A3', '')
+    assert.are.same({ 1, 1 }, { relations, aliases })
+    assert.is_falsy(text:find('__RELS_SPANS__', 1, true))
   end)
 
   it('strips structural colons the way the elisp display does',

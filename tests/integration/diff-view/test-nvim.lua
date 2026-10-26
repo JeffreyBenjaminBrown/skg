@@ -138,7 +138,7 @@ T.check(T.wait_for(function ()
   for _, buf in ipairs(diffView_buffers()) do
     local text = T.buffer_text(buf)
     if not text:find('^%* ') then return nil end
-    for _, change in ipairs({ '(diff ', 'changed)', 'changesetMarker',
+    for _, change in ipairs({ '(diff ', 'changesetMarker',
                               'oldText', 'homeSkgrepoMove', 'acquiredFolder' }) do
       if text:find(change, 1, true) then return nil end
     end

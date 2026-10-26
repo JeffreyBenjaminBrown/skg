@@ -159,8 +159,8 @@ function M.format_headline (stars, metadata, title)
 end
 
 ---Parse METADATA_TEXT into { alist = {{key, value}...},
----bare_values = {...} }, all rendered as strings. graphStats and
----viewStats keep their whole sub-sexp as the value. Tolerant: parse
+---bare_values = {...} }, all rendered as strings. graphStats, view and
+---diff keep their whole sub-sexp as the value. Tolerant: parse
 ---failures give empty results, like the elisp condition-case.
 ---@param metadata_text string
 ---@return table
@@ -180,7 +180,8 @@ function M.parse_metadata_sexp (metadata_text)
                       or sexpr.atom_text(element[2]) })
         elseif sexpr.is_list(element) and #element > 1
                and (element[1] == sexpr.symbol('graphStats')
-                    or element[1] == sexpr.symbol('viewStats')) then
+                    or element[1] == sexpr.symbol('view')
+                    or element[1] == sexpr.symbol('diff')) then
           table.insert(alist,
             { key = sexpr.atom_text(element[1]),
               value = sexpr.to_string(element) })
@@ -198,14 +199,14 @@ function M.parse_metadata_sexp (metadata_text)
 end
 
 ---Reconstruct complete (skg ...) metadata text from PARSED (the
----shape parse_metadata_sexp returns). graphStats/viewStats values are
----already complete sexps and are spliced whole.
+---shape parse_metadata_sexp returns). graphStats, view and diff
+---values are already complete sexps and are spliced whole.
 ---@param parsed table
 ---@return string
 function M.reconstruct_metadata_sexp (parsed)
   local parts = {}
   for _, kv in ipairs(parsed.alist) do
-    if kv.key == 'graphStats' or kv.key == 'viewStats'
+    if kv.key == 'graphStats' or kv.key == 'view' or kv.key == 'diff'
        or kv.value:sub(1, 1) == '(' and kv.value:sub(1, 1) == '('
           and kv.value:match('^%(' .. kv.key) then
       table.insert(parts, kv.value)
@@ -584,16 +585,14 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
                         writeProtected_skgids)
 end
 
----Set the skgrepo at LINE_NUMBER to NEW_REPO (and refresh the
----homeRepoHerald so the display keeps pace).
+---Set the skgrepo at LINE_NUMBER to NEW_REPO. The save recomputes the
+---headline's '(view repoBoundary)'.
 ---@param line_number integer
 ---@param new_skgrepo string
 ---@return integer 1
 function M.change_repo_at_line (line_number, new_skgrepo)
   M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (skgRepos (ENSURE (nodeRepo %s))) (viewStats))', new_skgrepo)))
-  M.edit_metadata_at_line(line_number, sexpr.read(string.format(
-    '(skg (viewStats (ENSURE (homeRepoHerald ⌂:%s))))', new_skgrepo)))
+    '(skg (skgRepos (ENSURE (nodeRepo %s))))', new_skgrepo)))
   return 1
 end
 
@@ -661,14 +660,12 @@ M.partner_folder_atoms = {
 
 ---@param metadata_sexp any
 ---@return string|nil the partner folder's atom if METADATA_SEXP is a
----partner folder's, bare or as the diff view writes a changed one,
----'(ATOM changed)'
+---partner folder's
 function M.partner_folder_atom (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return nil end
   for i = 2, #metadata_sexp do
     local item = metadata_sexp[i]
-    if sexpr.is_list(item) then item = item[1] end
-    if item ~= nil and not sexpr.is_list(item) then
+    if not sexpr.is_list(item) then
       local atom = sexpr.atom_text(item)
       if M.partner_folder_atoms[atom] then return atom end
     end

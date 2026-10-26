@@ -52,12 +52,12 @@ T.check(not root_line:find('noClaim', 1, true),
     'contained view-root should be content, not false; line: %s',
     root_line))
 T.check(not root_line:find(
-    'noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
+    'noClaim writeProtected (view (rels (contains (out 1 (ancestors 1)))) (birth (contains out 1))', 1, true),
   string.format(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    'noClaim writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))', 1, true),
+    'noClaim writeProtected (view (rels (linksTo (out (ancestors 1)))) (birth (linksTo out 1))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 
@@ -77,7 +77,7 @@ T.check(parent_line, string.format(
   'no level-3 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(gnid parent) (skgRepos (nodeRepo main)) writeProtected (rels (contains (out 1 (ancestors 2))) (birth (contains out 2)))', 1, true) ~= nil,
+    '(gnid parent) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2))', 1, true) ~= nil,
   string.format(
     'parent is not a write-protected member of the folder; '
     .. 'line: %s', parent_line))

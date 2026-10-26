@@ -1,9 +1,9 @@
 -- PURPOSE: The commit-readiness gestures of the diff view
 -- ('docs/diff-view.org', "Readiness requests and gestures"). Each writes
--- readiness requests, '(readyRequest OBJECTS)' or '(unreadyRequest
--- OBJECTS)', into headline metadata, then saves. The save consumes
--- them, setting or clearing the marks, and answers with the buffer
--- rerendered and the readiness summary.
+-- readiness requests, '(ready OBJECTS)' or '(unready OBJECTS)', into
+-- the '(editRequest ...)' of headline metadata, then saves. The save
+-- consumes them, setting or clearing the marks, and answers with the
+-- buffer rerendered and the readiness summary.
 -- The Lua port of elisp/skg-readiness.el, which describes how the
 -- '(leaves N OBJECT...)' part of the server's '(diff ...)' form says
 -- which leaves a headline names. Neovim has no prefix argument, so each recursive form is its
@@ -118,28 +118,143 @@ function M.objects_ready_p (metadata_sexp, objects)
   return true
 end
 
+---The atom of METADATA_SEXP when it is a folder's, or nil.
 ---@param metadata_sexp any
----@return boolean is it a folder shown because of a change?
-function M.changed_folder_p (metadata_sexp)
+---@return string|nil
+function M.folder_atom (metadata_sexp)
+  if not sexpr.is_list(metadata_sexp) then return nil end
   for i = 2, #metadata_sexp do
-    local head = head_name(metadata_sexp[i])
-    if head and vim.endswith(head, 'Folder')
-       and vim.tbl_contains(arguments(metadata_sexp[i]), 'changed') then
-      return true end
+    local element = metadata_sexp[i]
+    if not sexpr.is_list(element) then
+      local atom = sexpr.atom_text(element)
+      if vim.endswith(atom, 'Folder') then return atom end
+    end
   end
-  return false
+  return nil
 end
 
----Whether the headline is ready: a headline that names leaves, on all
----the objects it lists, or a changed folder whose '(diff ...)'
----carries its aggregate, the objectless '(ready)'.
+---Whether a folder member carries a change of its relationship to
+---the folder's viewparent, and if so whether that change is ready.
+---MEMBER_SEXP is the member's metadata; CHILD_SEXPS that of its own
+---child headlines. The member carries such a change when its
+---'(diff ...)' has a '(rel ...)', or when one of its children is a
+---'(relRepoMove ...)'. The change is ready when both of these hold:
+---if the member has a '(rel ...)', its '(diff ...)' has a '(ready
+---...)' that, when its '(leaves ...)' lists 'rel', names 'rel'; if
+---it has a '(relRepoMove ...)' child, that child's '(diff ...)' has
+---a '(ready ...)'.
+---@param member_sexp any
+---@param child_sexps any[]
+---@return boolean|nil nil when the member carries no such change,
+---else whether it is ready
+function M.membership_change_ready (member_sexp, child_sexps)
+  local changed, ready = false, true
+  if M.form(member_sexp, 'rel') then
+    changed = true
+    local leaves = M.leaves(member_sexp)
+    local objects = {}
+    if leaves and vim.tbl_contains(leaves.objects, 'rel') then
+      objects = { 'rel' } end
+    ready = M.objects_ready_p(member_sexp, objects)
+  end
+  for _, child in ipairs(child_sexps) do
+    if child_with_head(child, 'relRepoMove') then
+      changed = true
+      ready = ready and M.form(child, 'ready') ~= nil end
+  end
+  if not changed then return nil end
+  return ready
+end
+
+---The level of the headline LINE (its star count), or nil when LINE
+---is no headline.
+---@param line string|nil
+---@return integer|nil
+local function headline_level (line)
+  local stars = line and line:match('^(%*+)%s')
+  return stars and #stars or nil
+end
+
+---The parsed metadata of the headline LINE, or nil.
+---@param line string
+---@return any|nil
+local function headline_sexp (line)
+  local split = metadata.split_as_stars_metadata_title(line)
+  if not split or split.metadata == '' then return nil end
+  local ok, sexp = pcall(sexpr.read, split.metadata)
+  return ok and sexp or nil
+end
+
+---Whether the folder whose headline is LINES[INDEX] is changed, and
+---if so whether it is ready. LINES are a buffer's lines, 1-based. The
+---folder is changed when one of its members (its direct child
+---headlines) carries a change of its relationship to the folder's
+---viewparent (M.membership_change_ready), and ready when every such
+---change is ready. Nil when the headline is no folder or no member
+---carries such a change; else { ready = BOOLEAN }.
+---@param lines string[]
+---@param index integer
+---@return table|nil
+function M.folder_change_in_lines (lines, index)
+  local level = headline_level(lines[index])
+  if not (level and M.folder_atom(headline_sexp(lines[index]))) then
+    return nil end
+  local members = {} -- each { sexp, child_sexps }
+  for i = index + 1, #lines do
+    local line_level = headline_level(lines[i])
+    if line_level then
+      if line_level <= level then break end
+      if line_level == level + 1 then
+        table.insert(members, { sexp = headline_sexp(lines[i]),
+                                child_sexps = {} })
+      elseif line_level == level + 2 and #members > 0 then
+        local child = headline_sexp(lines[i])
+        if child then
+          table.insert(members[#members].child_sexps, child) end
+      end
+    end
+  end
+  local changed, ready = false, true
+  for _, member in ipairs(members) do
+    local member_ready = member.sexp
+      and M.membership_change_ready(member.sexp, member.child_sexps)
+    if member_ready ~= nil then
+      changed = true
+      ready = ready and member_ready end
+  end
+  if not changed then return nil end
+  return { ready = ready }
+end
+
+---M.folder_change_in_lines for the headline at LINE_NUMBER of the
+---current buffer.
+---@param line_number integer
+---@return table|nil
+function M.folder_change_at_line (line_number)
+  return M.folder_change_in_lines(
+    vim.api.nvim_buf_get_lines(0, 0, -1, false), line_number)
+end
+
+---Whether the headline is ready: one that names leaves, on all the
+---objects it lists. (A changed folder's readiness depends on its
+---members: M.ready_at_line.)
 ---@param metadata_sexp any
 ---@return boolean
 function M.ready_p (metadata_sexp)
   local leaves = M.leaves(metadata_sexp)
-  if leaves then return M.objects_ready_p(metadata_sexp, leaves.objects) end
-  return M.changed_folder_p(metadata_sexp)
-         and M.form(metadata_sexp, 'ready') ~= nil
+  return leaves ~= nil and M.objects_ready_p(metadata_sexp, leaves.objects)
+end
+
+---Whether the headline at LINE_NUMBER is ready: a changed folder when
+---every change of its members' relationships is, any other headline
+---as M.ready_p says.
+---@param line_number integer
+---@return boolean
+function M.ready_at_line (line_number)
+  local folder_change = M.folder_change_at_line(line_number)
+  if folder_change then return folder_change.ready end
+  local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
+  return metadata_sexp ~= nil and M.ready_p(metadata_sexp)
 end
 
 -- ── moving between change headlines ─────────────────────────────
@@ -271,30 +386,67 @@ end
 
 -- ── the gestures ───────────────────────────────────────────────────
 
+---The heads of the top-level forms the server writes after
+---'(editRequest ...)'; a new one is placed before the first of them.
+local FORMS_AFTER_EDIT_REQUEST = { viewRequests = true, view = true,
+                                   diff = true }
+
+---METADATA_SEXP with READINESS_REQUEST, '(ready OBJECT...)' or
+---'(unready OBJECT...)', in its '(editRequest ...)' in place of any
+---readiness request there, after the headline's other request if it
+---has one. A headline without the form gets one, where the server
+---writes it: before its '(viewRequests ...)', '(view ...)' and '(diff
+---...)'.
+---@param metadata_sexp any
+---@param readiness_request any
+---@return any
+function M.with_readiness_request (metadata_sexp, readiness_request)
+  local result = { metadata_sexp[1] }
+  local placed = false
+  for i = 2, #metadata_sexp do
+    local element = metadata_sexp[i]
+    local head = head_name(element)
+    if head == 'editRequest' then
+      local edit_request = { element[1] }
+      for j = 2, #element do
+        local part = head_name(element[j])
+        if part ~= 'ready' and part ~= 'unready' then
+          table.insert(edit_request, element[j]) end
+      end
+      table.insert(edit_request, readiness_request)
+      element = edit_request
+      placed = true
+    elseif not placed and head and FORMS_AFTER_EDIT_REQUEST[head] then
+      table.insert(result, { sexpr.symbol('editRequest'), readiness_request })
+      placed = true end
+    table.insert(result, element)
+  end
+  if not placed then
+    table.insert(result, { sexpr.symbol('editRequest'), readiness_request })
+  end
+  return result
+end
+
 ---Replace the readiness request of the headline at LINE_NUMBER with
----one that marks (READY true) or unmarks the leaves on OBJECTS. The
----request is the last part of the headline's '(diff ...)' form, at
----the top level of its metadata. A headline without the form gets
----one.
+---one that marks (READY true) or unmarks the leaves on OBJECTS: '(ready
+---OBJECTS)' or '(unready OBJECTS)' in its '(editRequest ...)'
+---(M.with_readiness_request).
 ---@param line_number integer
 ---@param ready boolean
 ---@param objects string[]
 function M.write_request (line_number, ready, objects)
+  local split = metadata.split_as_stars_metadata_title(
+    metadata.line_text(line_number))
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
-  local request = { sexpr.symbol(ready and 'readyRequest'
-                                 or 'unreadyRequest') }
+  if not (split and metadata_sexp) then return end
+  local request = { sexpr.symbol(ready and 'ready' or 'unready') }
   for _, object in ipairs(objects) do
     table.insert(request, sexpr.symbol(object))
   end
-  local diff_edit = { sexpr.symbol('diff') }
-  if M.diff_form(metadata_sexp) then
-    table.insert(diff_edit, { sexpr.symbol('DELETE'),
-                              { sexpr.symbol('readyRequest') },
-                              { sexpr.symbol('unreadyRequest') } })
-  end -- else a missing form is appended whole, so it holds no DELETE
-  table.insert(diff_edit, request)
-  metadata.edit_metadata_at_line(line_number,
-                                 { sexpr.symbol('skg'), diff_edit })
+  metadata.replace_line(line_number, metadata.format_headline(
+    split.stars,
+    sexpr.to_string(M.with_readiness_request(metadata_sexp, request)),
+    split.title))
 end
 
 ---A request on the headline at LINE_NUMBER, with how many leaves it
@@ -320,7 +472,9 @@ end
 
 ---The requests of the one-level gesture on the headline at
 ---LINE_NUMBER: on a headline that names leaves, one naming every
----object it lists.
+---object it lists; on a changed folder, one on each headline one
+---level down that names leaves, naming the objects it lists but
+---'all', readying them unless the folder is ready.
 ---@param line_number integer
 ---@return table[]
 function M.requests_at_line (line_number)
@@ -332,8 +486,9 @@ function M.requests_at_line (line_number)
                line_number,
                not M.objects_ready_p(metadata_sexp, leaves.objects),
                leaves.objects) } end
-  if M.changed_folder_p(metadata_sexp) then
-    local ready = not M.ready_p(metadata_sexp)
+  local folder_change = M.folder_change_at_line(line_number)
+  if folder_change then
+    local ready = not folder_change.ready
     local requests = {}
     for _, line in ipairs(M.child_lines(line_number)) do
       local child = metadata.metadata_sexp_at_line_or_nil(line)
@@ -354,7 +509,7 @@ end
 function M.requests_for_subtree_at_line (line_number)
   local metadata_sexp = metadata.metadata_sexp_at_line_or_nil(line_number)
   if not metadata_sexp then return {} end
-  local ready = not M.ready_p(metadata_sexp)
+  local ready = not M.ready_at_line(line_number)
   local requests = {}
   for _, line in ipairs(M.subtree_lines(line_number)) do
     local headline = metadata.metadata_sexp_at_line_or_nil(line)

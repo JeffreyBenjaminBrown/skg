@@ -32,13 +32,14 @@ local M = {}
 
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
 
--- The placeholder token the server's `rels` rule emits
+-- The placeholder token the server's `rels` and `props` rules emit
 -- (RELS_SPANS_SENTINEL in server/heralds.rs). The relationship heralds
 -- are per-character styled spans -- more than the rule table's
 -- atom-level coloring can express -- so the rule only positions them by
 -- emitting this sentinel, which `chunks_from_metadata' replaces with the
--- spans it renders from semantic `(rels ...)' facts. The
--- analog of `heralds--rels-sentinel' in elisp.
+-- spans it renders from the semantic '(rels ...)', '(props ...)' and
+-- '(birth ...)' facts of '(view ...)'. The analog of
+-- `heralds--rels-sentinel' in elisp.
 M.RELS_SENTINEL = '__RELS_SPANS__'
 
 ---Define the highlight group SkgHeraldSTYLE for each style in
@@ -419,19 +420,25 @@ local function rel_chunks (rel, form, birth, write_protected, overrides_here)
   return chunks
 end
 
----Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
----or nil if there is none / it produces nothing. Tokens are the
----relations in display order (C L S O H), then the property counts
----A I F, space-separated.
+---Render the relationship facts of SEXP's '(view ...)' to
+---virtual-text chunks: the relation tokens from its '(rels ...)',
+---styled by its '(birth ...)', then the property counts from its
+---'(props ...)'. Nil if it has none or they produce nothing. Tokens
+---are the relations in display order (C L S O H), then the property
+---counts A I F, space-separated. 'writeProtected' and
+---'(overridesHere O)' stand at the top level of SEXP.
 ---@param sexp any
 ---@return table[]|nil
 function M.render_rel_facts (sexp)
-  local rels = assq(sexp, 'rels')
-  if not rels then return nil end
+  local view = assq(sexp, 'view')
+  if not view then return nil end
+  local rels = assq(view, 'rels')
+  local props = assq(view, 'props')
+  if not (rels or props) then return nil end
   local overrides_here = assq(sexp, 'overridesHere') ~= nil
   local write_protected = has_atom(sexp, 'writeProtected')
   local birth = {}
-  local birth_form = assq(rels, 'birth')
+  local birth_form = assq(view, 'birth')
   if birth_form then
     -- each birth fact is (RELATION SIDE [GEN])
     for i = 2, #birth_form do
@@ -448,14 +455,14 @@ function M.render_rel_facts (sexp)
     end
   end
   for _, rel in ipairs(REL_ORDER) do
-    local form = assq(rels, rel)
+    local form = rels and assq(rels, rel)
     if form or (rel == 'overrides' and overrides_here) then
       add_token(rel_chunks(rel, form, birth, write_protected, overrides_here))
     end
   end
   for _, count in ipairs({ { 'aliases', 'A' }, { 'extraIds', 'I' },
                            { 'flags', 'F' } }) do
-    local form = assq(rels, count[1])
+    local form = props and assq(props, count[1])
     if form then
       add_token({ styled(count[2] .. tostring(first_number(form)),
                          relationship_styles.property_counts) })
@@ -465,9 +472,12 @@ function M.render_rel_facts (sexp)
   return chunks
 end
 
----Like `tokens_to_chunks', but the sentinel token is replaced by
----REL_CHUNKS (the rendered relationship-herald spans). When REL_CHUNKS
----is nil the sentinel -- which should then be absent -- is dropped.
+---Like `tokens_to_chunks', but the first sentinel token is replaced
+---by REL_CHUNKS (the rendered relationship-herald spans), and any
+---later one is dropped: the rule table emits the sentinel from both
+---the 'rels' and the 'props' rule, so a headline with both carries
+---two. When REL_CHUNKS is nil every sentinel -- which should then be
+---absent -- is dropped.
 ---@param tokens table[]
 ---@param rel_chunks table[]|nil
 ---@return table[]|nil
@@ -475,17 +485,19 @@ function M.tokens_to_chunks_with_rels (tokens, rel_chunks)
   if #tokens == 0 then return nil end
   local chunks = {}
   local emitted = false
+  local rel_chunks_placed = false
   local function sep_if_needed (abut)
     if emitted and not abut then
       table.insert(chunks, { ' ', 'Normal' }) end
   end
   for _, token in ipairs(tokens) do
     if M.token_text(token) == M.RELS_SENTINEL then
-      if rel_chunks and #rel_chunks > 0 then
+      if rel_chunks and #rel_chunks > 0 and not rel_chunks_placed then
         sep_if_needed(token.abut)
         for _, c in ipairs(rel_chunks) do
           table.insert(chunks, c) end
         emitted = true
+        rel_chunks_placed = true
       end
     else
       local cells = M.strip_structural_colons(
@@ -515,19 +527,47 @@ function M.tokens_to_chunks_with_rels (tokens, rel_chunks)
   return chunks
 end
 
----Display chunks for METADATA_TEXT (a string beginning '(skg').
+---SEXP, a headline's metadata, as the lens reads it. When
+---FOLDER_CHANGE (as skg.readiness.folder_change_in_lines gives it)
+---says the folder is changed, its bare folder atom becomes '(FOLDER
+---changed)', followed by '(diff (ready))' when the folder is ready:
+---the rule table's changed-folder rules read that shape, which the
+---server does not write.
+---@param sexp any
+---@param folder_change table|nil
+---@return any
+function M.sexp_for_lens (sexp, folder_change)
+  if not folder_change then return sexp end
+  local folder_atom = require('skg.readiness').folder_atom(sexp)
+  local result = {}
+  for _, element in ipairs(sexp) do
+    if element == sexpr.symbol(folder_atom) then
+      table.insert(result, { element, sexpr.symbol('changed') })
+      if folder_change.ready then
+        table.insert(result, { sexpr.symbol('diff'),
+                               { sexpr.symbol('ready') } }) end
+    else
+      table.insert(result, element) end
+  end
+  return result
+end
+
+---Display chunks for METADATA_TEXT (a string beginning '(skg'), a
+---folder's changed when FOLDER_CHANGE says so (M.sexp_for_lens).
 ---Returns nil if it does not parse as an (skg ...) form or the rules
 ---produce no tokens. The analog of 'heralds-from-metadata'.
 ---@param metadata_text string
+---@param folder_change table|nil
 ---@return table[]|nil
-function M.chunks_from_metadata (metadata_text)
+function M.chunks_from_metadata (metadata_text, folder_change)
   local ok, sexp = pcall(sexpr.read, metadata_text)
   if not ok or not sexpr.is_list(sexp)
      or sexp[1] ~= sexpr.symbol('skg') then
     return nil end
   local rules = herald_rules.get_rules()
   if not rules then return nil end
-  local tokens = lens.transform_sexp_flat(sexp, rules)
+  local tokens = lens.transform_sexp_flat(
+    M.sexp_for_lens(sexp, folder_change), rules)
   return M.tokens_to_chunks_with_rels(tokens, M.render_rel_facts(sexp))
 end
 
@@ -586,23 +626,30 @@ end
 ---@param buf integer
 function M.apply_to_buffer (buf)
   vim.api.nvim_buf_clear_namespace(buf, M.namespace, 0, -1)
-  local line_count = vim.api.nvim_buf_line_count(buf)
-  for row = 0, line_count - 1 do M.apply_to_line(buf, row) end
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  for row = 0, #lines - 1 do M.apply_to_line(buf, row, lines) end
 end
 
 ---Lens the first (skg ...) occurrence on 0-based line ROW of BUF into
----one conceal+virtual-text extmark (at most).
+---one conceal+virtual-text extmark (at most). A folder's herald
+---depends on its members' metadata (skg.readiness.folder_change_in_lines),
+---read from LINES, BUF's lines, when given.
 ---@param buf integer
 ---@param row integer
-function M.apply_to_line (buf, row)
+---@param lines string[]|nil
+function M.apply_to_line (buf, row, lines)
   local line = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
   if not line then return end
   local start_index = line:find('(skg', 1, true)
   if not start_index then return end
   local end_index = sexpr.find_sexp_end(line, start_index)
   if not end_index then return end
-  local chunks =
-    M.chunks_from_metadata(line:sub(start_index, end_index))
+  local folder_change = nil
+  if line:find('Folder', 1, true) then
+    folder_change = require('skg.readiness').folder_change_in_lines(
+      lines or vim.api.nvim_buf_get_lines(buf, 0, -1, false), row + 1) end
+  local chunks = M.chunks_from_metadata(
+    line:sub(start_index, end_index), folder_change)
   if not chunks then return end
   vim.api.nvim_buf_set_extmark(buf, M.namespace, row, start_index - 1, {
     end_col = end_index,
@@ -612,9 +659,31 @@ function M.apply_to_line (buf, row)
     right_gravity = false })
 end
 
----Refresh heralds on the lines an edit touched, via nvim_buf_attach.
----Detaches (by returning true from the callback) once heralds are
----disabled or the buffer is gone.
+---Re-render the heralds of the folder headlines among the headline
+---at or above 0-based line ROW of LINES (BUF's lines) and its
+---ancestors: a folder's herald depends on the lines below it, so an
+---edit after ROW can change it.
+---@param buf integer
+---@param row integer
+---@param lines string[]
+function M.reapply_to_folder_ancestors (buf, row, lines)
+  local level = math.huge
+  for ancestor = math.min(row, #lines - 1), 0, -1 do -- none when ROW < 0
+    local stars = lines[ancestor + 1]:match('^(%*+)%s')
+    if stars and #stars < level then
+      level = #stars
+      if lines[ancestor + 1]:find('Folder', 1, true) then
+        vim.api.nvim_buf_clear_namespace(
+          buf, M.namespace, ancestor, ancestor + 1)
+        M.apply_to_line(buf, ancestor, lines) end
+      if level <= 1 then return end
+    end
+  end
+end
+
+---Refresh heralds on the lines an edit touched, and on the folders
+---above them, via nvim_buf_attach. Detaches (by returning true from
+---the callback) once heralds are disabled or the buffer is gone.
 ---@param buf integer
 function M.watch_buffer (buf)
   if vim.b[buf].skg_heralds_watched then return end
@@ -631,11 +700,12 @@ function M.watch_buffer (buf)
       vim.schedule(function ()
         if not vim.api.nvim_buf_is_valid(buf)
            or not M.enabled_p(buf) then return end
-        local line_count = vim.api.nvim_buf_line_count(buf)
-        local last = math.min(new_last, line_count)
+        local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+        local last = math.min(new_last, #lines)
         vim.api.nvim_buf_clear_namespace(
           buf, M.namespace, first, last)
-        for row = first, last - 1 do M.apply_to_line(buf, row) end
+        for row = first, last - 1 do M.apply_to_line(buf, row, lines) end
+        M.reapply_to_folder_ancestors(buf, first - 1, lines)
       end)
     end })
 end

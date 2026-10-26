@@ -128,8 +128,8 @@ describe('skg.sexpr.parse printing', function ()
     round_trips('(skg alias (diff (rel added)))')
     round_trips('(skg (oldText title))')
     round_trips('(skg node (gnid x) (overridesHere 4) '
-                .. '(viewStats (homeRepoHerald ⌂:public) cycle))')
-    round_trips('(skg node (gnid x) (rels "2(1,1)L 3S"))')
+                .. '(view cycle repoBoundary))')
+    round_trips('(skg node (gnid x) (view (rels "2(1,1)L 3S")))')
   end)
 
   it('escapes strings exactly as the server does', function ()
@@ -177,7 +177,7 @@ describe('skg.sexpr.parse.find_sexp_end', function ()
 
   it('handles herald characters that confuse Emacs forward-sexp',
      function ()
-    local line = '(skg node (gnid 7) (viewStats (homeRepoHerald ⌂:pub)))'
+    local line = '(skg node (gnid 7) (skgRepos (nodeRepo ⌂:pub)) (view repoBoundary))'
     assert.are.equal(#line, sexpr.find_sexp_end(line))
   end)
 
@@ -187,9 +187,9 @@ describe('skg.sexpr.parse.find_sexp_end', function ()
   end)
 
   it('ignores parens inside strings', function ()
-    local line = '(skg node (rels ")))(((")) tail'
+    local line = '(skg node (view (rels ")))((("))) tail'
     local ending = sexpr.find_sexp_end(line)
-    assert.are.equal('(skg node (rels ")))((("))',
+    assert.are.equal('(skg node (view (rels ")))(((")))',
                      line:sub(1, ending))
   end)
 

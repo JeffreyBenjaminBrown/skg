@@ -211,9 +211,9 @@ So far there are these endpoints:
        cascades as in any view, and only the extension of a node
        outside U spends =initial_node_limit=; nothing else in the
        buffer spends that budget.
-  - Readiness requests (=(readyRequest OBJECTS)= and
-    =(unreadyRequest OBJECTS)=, the last part of a headline's
-    =(diff ...)=; see "Metadata of the diff view") are
+  - Readiness requests (=(ready OBJECTS)= and =(unready OBJECTS)=
+    inside a headline's =(editRequest ...)=; see "Metadata of the
+    diff view") are
     consumed by a save of any buffer, not only one of the diff view's,
     after its graph edits succeed: each sets or clears the marks of the
     change-forest leaves its headline names, at their current
@@ -336,8 +336,9 @@ So far there are these endpoints:
     strings are always double-quoted and match atoms are bare symbols;
     the distinction is load-bearing for the lens engine.
   - The table in =server/heralds.rs= supplies non-relationship labels,
-    colors and placement. Both clients render the semantic =(rels ...)=
-    facts themselves, including fractions and per-character styles.
+    colors and placement. Both clients render the semantic =(rels ...)=,
+    =(props ...)= and =(birth ...)= facts of =(view ...)= themselves,
+    including fractions and per-character styles.
     Emacs fetches the table at connection setup and re-fetches on reconnect.
     If the fetch fails, its herald display disables after bounded retries;
     there is no client-side fallback table. The user-facing legend is
@@ -844,22 +845,20 @@ wrapped in "(skg ...)" -- something like
 Every headline has this one shape: its viewnode ID first, then the
 position atoms (=focused=, =folded=, =bodyFolded=), then its kind,
 and every part of the headline beside the kind at the top level, in
-any order. The kind is a bare atom (=node=, =ghost=, =unknown=,
-=alias=, =id=, =tombstone=, a folder atom, =bodyDiff=), or, for a kind
-with a parameter, a small form naming it (=(flag F)=, =(oldText
-ASPECT)=, the two moves, =(changesetMarker KIND)=, a changed folder's
-=(FOLDER changed)=). A headline naming no kind is a node. Each kind
+any order, the derived facts gathered in =(view ...)= and =(diff
+...)=, which the parser skips (see "The metadata headers"). The kind
+is a bare atom (=node=, =ghost=, =unknown=, =alias=, =id=,
+=tombstone=, a folder atom, =bodyDiff=), or, for a kind with a
+parameter, a small form naming it (=(flag F)=, =(oldText ASPECT)=,
+the two moves, =(changesetMarker KIND)=). A headline naming no kind
+is a node. Each kind
 takes only its own parts; =(gnid ID)= names the node a node, a
 ghost or an unknown stands for, and =(skgRepos (nodeRepo REPO)
 [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
 relationship to its viewparent, the relRepo written only when it
 differs from the default (a ghost has no relRepo; an unknown and an
 alias have only one). The parser refuses the retired spellings
-(=(node ...)=, =(ghost ...)= and =(unknown ...)= as forms, =(id
-ID)=, =(repo REPO)=, a top-level =(relRepo REPO)=, a relRepo or
-=overridesHere= inside =(viewStats ...)=, =nonMember=,
-=restrictedNode=, =(deleted ...)=, =(historical ...)=) with a message
-naming the grammar.
+listed in "The metadata headers" with a message naming the grammar.
 
 Any such string is valid metadata
 (although much of it might be ignored by Emacs),
@@ -880,22 +879,22 @@ takes no part in the membership represented by its viewparent: it is
 preserved and displayed but does not alter the parent's membership on
 save. A member carries nothing, and so does a view root.
 
-The bare atom =omittedBody= accompanies =writeProtected= on a write-protected
-node whose graphnode has a body — one the rendering hides. Herald
-"B", hugging the ☮. Display-only: the parser accepts and discards it;
-the view regenerates it.
+The atom =omittedBody= in =(view ...)= accompanies =writeProtected= on a
+write-protected node whose graphnode has a body — one the rendering
+hides. Herald "B", hugging the ☮. A derived fact: the parser skips
+it; the view regenerates it.
 
 A chain node -- a node of the containerward chain under a member of a
 partner folder, a container of its viewparent (see "View requests"
 below) -- carries =writeProtected= and =noClaim=, and, being a
-non-member, no birth fact in its =(rels ...)= (see "Stats metadata"
+non-member, no =(birth ...)= in its =(view ...)= (see "Stats metadata"
 below). It is known by where it stands, so it is still one after a
 save. A chain node carries no change facts.
 
 ** View requests: (viewRequests ...)
 
 =(viewRequests ...)= carries client→server requests for viewbranches
-(unlike =(rels ...)= and the stats below, which are server→client). On save
+(unlike =(view ...)= and the stats below, which are server→client). On save
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Request forms:
 
@@ -975,7 +974,9 @@ node's heralds.
 =(editRequest ...)= carries a client→server request that the save change
 the graph. A save that succeeds consumes every request in the buffer
 it saves, after its graph edits; a save that stops for a confirmation
-or fails leaves them in the buffer. A headline carries at most one. The
+or fails leaves them in the buffer. A headline carries at most one,
+beside at most one readiness request, =(ready ...)= or =(unready
+...)= (see "Metadata of the diff view"), written after it. The
 heralds are nonstandard. The five requests on a node, and the
 one on a ghost:
 
@@ -1015,12 +1016,13 @@ one on a ghost:
   viewparent. Herald "restore membership". Written by
   =skg-restore-removed-membership= (=C-c s l=). Like the relRepo request it
   concerns that relationship, so a write-protected occurrence carries it
-  too. On a headline not carrying =(rel removed)= it is a parse error
-  (on a ghost "This node is deleted; restore it first
-  (skg-restore-deleted-node)"); on one carrying it that stands
-  elsewhere, as a member under a vognode or a node of the
-  containerward chain, the save refuses it as a local structure
-  violation, "Only a removed membership can be restored".
+  too. On a ghost it is a parse error, "This node is deleted; restore
+  it first (skg-restore-deleted-node)". On a node that stands
+  elsewhere than a removed member may, as a member under a vognode, a
+  root or a node of the containerward chain, the save refuses it as a
+  local structure violation, "Only a removed membership can be
+  restored"; one that stands where a removed member may but names no
+  relationship HEAD records is dropped with a warning.
 - =(ghost ... (editRequest restoreNode))= — in the diff view, write
   back the node this ghost stands for, as HEAD had it.
   Herald "restore node". Written by =skg-restore-deleted-node=
@@ -1030,54 +1032,89 @@ one on a ghost:
 What the save does with the two restore requests is described in
 =docs/diff-view.org=, "Restoring what a change removed".
 
-** Stats metadata: graphStats and viewStats
+** Stats metadata: the view facts, =(view ...)=
 
-Generated display facts decorate a node and are never save input.
-=server/herald_tokens.rs= assembles graph counts and occurrence facts into
-one semantic =(rels ...)= form. Clients render it; the wire contains no
-assembled glyphs, omitted numerals or colors. For example:
+The derived facts of a headline's position stand in one form,
+=(view FACT...)=, after its declared parts and before its =(diff
+...)=. The server computes them at every rendering (the stats pass,
+=server/update_buffer/viewnodestats.rs=); nobody reads them back:
+the parser skips =(view ...)= whole, so editing them changes
+nothing. A headline with none carries no =(view ...)=, and =(view)=
+is never written. On a node, in the order written:
+
+- =omittedBody= — on a write-protected node whose graphnode has a
+  body, one the rendering hides. Herald "B", hugging the ☮.
+- =(rels ...)=, =(props ...)=, =(birth ...)= — the relationship
+  facts, below.
+- =noWarrant= — the graph does not relate the node to its viewparent
+  as its position implies: its parent does not contain it, the
+  folder's relation does not hold for it, or, on a chain node, it
+  does not contain the node above. A root is always warranted.
+  Herald "⊥". Independent of =noClaim=.
+- =cycle= — this position repeats an ancestor's ID. Herald "⟳".
+- =repoBoundary= — the node sits at a skgrepo boundary: a root, or a
+  node whose home skgrepo differs from its nearest occurrence
+  ancestor's. Written only when the config has more than one skgrepo.
+  Herald "⌂".
+
+On an alias, an ID or a flag member, =(view ...)= holds at most one
+atom: =noWarrant= when the node above its folder lacks it, or
+=ghostWarrant= when HEAD alone warrants it (in the diff view, one
+the worktree lost since HEAD, which also carries =(diff (rel
+removed))=).
+
+=server/herald_tokens.rs= assembles graph counts and occurrence facts
+into the three semantic forms. Clients render them; the wire contains
+no assembled glyphs, omitted numerals or colors. For example:
 
 #+begin_example
-(rels
-  (contains (in 2 (ancestors 1))
-            (out 8 (ancestors 2) (unintegrated 3 (ancestors 2))))
-  (linksTo (in 5 (ancestors 1 2)
+(view
+  (rels
+    (contains (in 2 (ancestors 1))
+              (out 8 (ancestors 2) (unintegrated 3 (ancestors 2))))
+    (linksTo (in 5 (ancestors 1 2)
                    (substantive 2 (ancestors 1)))
-               (out 3 (ancestors 2)))
-  (overrides (out 1 (ancestors 1)))
-  (aliases 2) (extraIds 1) (flags 3)
+             (out 3 (ancestors 2)))
+    (overrides (out 1 (ancestors 1))))
+  (props (aliases 2) (extraIds 1) (flags 3))
   (birth (contains in 1)))
 #+end_example
 
-Each relation side is =(in COUNT (ancestors GEN...))= or
-=(out COUNT (ancestors GEN...))=. Empty sides are generally omitted;
-=COUNT= is the complete distinct visible node count even when ancestor
-flags let the client omit its numeral. =GEN= is an ancestor generation:
-1 is the viewparent,
-2 the grandparent, counting non-vognode levels. Relation keys are =contains=,
-=linksTo=, =subscribesTo=, =overrides=, and
-=hidesFromSubs=. The =linksTo=
-incoming side adds =(substantive COUNT (ancestors GEN...))= for the subset
-whose skgrepo has a nonempty body, visible direct content, or more than one
-distinct visible resolved target. Its outgoing side counts distinct visible
-resolved targets. An applicable subscribee-as-such =contains= outgoing side
-adds =(unintegrated COUNT (ancestors GEN...))=, including when both counts
-are zero; absence of that subform means the role does not apply. The
-numerator counts members not already directly contained or hidden by that
-occurrence's subscriber. Subset counts cannot exceed their side's total.
-The ancestors counted are the viewparent, or, for a folder member, the
-vognodes of the folder's required ancestry. A non-member under a
-subscribee-as-such -- content its subscriber hides, which the
+Each relation side in =(rels ...)= is =(in COUNT (ancestors GEN...))=
+or =(out COUNT (ancestors GEN...))=. Empty sides are generally
+omitted, and =(rels ...)= is absent when no relation has anything to
+say; =COUNT= is the complete distinct visible node count even when
+ancestor flags let the client omit its numeral. =GEN= is an ancestor
+generation: 1 is the viewparent, 2 the grandparent, counting
+non-vognode levels. Relation keys are =contains=, =linksTo=,
+=subscribesTo=, =overrides=, and =hidesFromSubs=. The =linksTo=
+incoming side adds =(substantive COUNT (ancestors GEN...))= for the
+subset whose skgrepo has a nonempty body, visible direct content, or
+more than one distinct visible resolved target. Its outgoing side
+counts distinct visible resolved targets. An applicable
+subscribee-as-such =contains= outgoing side adds =(unintegrated COUNT
+(ancestors GEN...))=, including when both counts are zero; absence of
+that subform means the role does not apply. The numerator counts
+members not already directly contained or hidden by that
+occurrence's subscriber. Subset counts cannot exceed their side's
+total. The ancestors counted are the viewparent, or, for a folder
+member, the vognodes of the folder's required ancestry. A non-member
+under a subscribee-as-such -- content its subscriber hides, which the
 reconciler retains there as non-member when it holds a subtree --
-also counts the
-subscriber, three generations up, on its =hidesFromSubs= incoming side,
-as a =hiddenInSubscribeeFolder= member does.
-=(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind this
-occurrence, read from where it stands: for each, the side of this node
-it is on (=in= or =out=) and the ancestor generation it accounts for.
-=GEN= is omitted when no ancestor accounts for it, as for a node shown
-in place of a node it overrides, which carries =(overrides out)=. A
-non-member carries no other.
+also counts the subscriber, three generations up, on its
+=hidesFromSubs= incoming side, as a =hiddenInSubscribeeFolder= member
+does.
+
+=(props (aliases K) (extraIds K) (flags K))= holds the property
+counts, each present only when nonzero; =(props ...)= is absent when
+all are zero.
+
+=(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind
+this occurrence, read from where it stands: for each, the side of
+this node it is on (=in= or =out=) and the ancestor generation it
+accounts for. =GEN= is omitted when no ancestor accounts for it, as
+for a node shown in place of a node it overrides, which carries
+=(overrides out)=. A non-member carries no other.
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
@@ -1095,51 +1132,24 @@ non-member carries no other.
 | shown overrider (overrides-here) | =(overrides out)=                                    |
 A member of an acquisition folder carries none: a nodeMerge is no
 relation.
-Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
-There is no longer a
-=(graphStats ...)= sexp on an unrestricted node: its counts fold into the
-form above (=overriding= / =subscribing= / =hiding= become the =O= / =S= /
-=H= tokens; =aliasing= / =extraIDs=/true flags become the
-=Ak= / =Ik= / =Fk= property tokens),
-and the per-relation view-position flags (=containsParent=,
-=overridesParent= / =parentOverrides=, =subscribesParent= /
-=parentSubscribes=, =hidesParent= / =parentHides=, =grandparentOverrides= /
-=grandparentSubscribes=) are gone — those facts are the
-ancestor-lettered tokens now. (The bare =omittedBody= atom documented
-above still rides a write-protected node whose graphnode has an omitted
-body.)
+The graph counts fold into these forms (=overriding= / =subscribing= /
+=hiding= become the =O= / =S= / =H= tokens; =aliasing= / =extraIDs= /
+true flags become the =Ak= / =Ik= / =Fk= property tokens), and the
+per-relation view-position flags are the ancestor-lettered tokens.
 
-=(viewStats ...)= still carries the position facts that are not
-relationship tokens (the same graphnode can warrant different ones
-under different parents):
-
-- =noWarrant= — the graph does not relate the node to its viewparent
-  as its position implies: its parent does not contain it, the
-  folder's relation does not hold for it, or, on a chain node, it
-  does not contain the node above. A root is always warranted.
-  Herald "⊥". A display fact, discarded at save; independent of
-  =noClaim=;
-- =cycle= — this position repeats an ancestor's ID;
-- =(homeRepoHerald ⌂:LABEL)= — the node sits at a skgrepo boundary (a
-  root, or a skgrepo differing from its nearest unrestricted-vognode ancestor);
-- =(homeSkgrepoMove (old OLD) (new NEW))= — in the skgrepo-changes buffer of
-  the diff view, the node's home skgrepo moved from OLD to NEW
-  since HEAD; herald "-OLD +NEW". A display fact, discarded at save;
-- =(movedLikeAncestor LETTER)= — beside =homeSkgrepoMove=, when the nearest
-  vognode ancestor whose home moved moved the same way; LETTER names
-  that ancestor as the relationship tokens do (a = the viewparent).
-  Herald "Δ⌂=LETTER". A display fact, discarded at save;
-- =(relRepo NAME)= — ugly herald "~NAME", shown immediately before
-  the ⌂ skgrepo herald; the relRepo of the relationship this
-  headline represents (the =contains= relationship to a content child, or
-  the folder's relation for a PartnerFolder member), when its privacy was
-  deliberately raised above the relationship's default. This is an observed,
-  recomputed display fact: save never reads it as input.
-- =(overridesHere N)= — crucial =ĥ= immediately after the =O= token; the load-bearing
-  substitution fact, documented in "Override substitution and the
-  overridesHere fact" below.
+Two facts of a headline's relationship to its viewparent are not view
+facts. The skgrepo recording it, when its privacy was deliberately
+raised above the relationship's default, is the =(relRepo NAME)= of
+the headline's =(skgRepos ...)= (the =contains= relationship to a
+content child, or the folder's relation for a partner folder member);
+ugly herald "~NAME", shown immediately before the ⌂. It is recomputed
+at every rendering, and the save never reads it as a request, which
+is =(editRequest (relRepo NAME))=. And =(overridesHere N)=, crucial
+=ĥ= immediately after the =O= token, is a load-bearing declared part,
+documented in "Override substitution and the overridesHere fact"
+below.
 
 ** Node flags
 
@@ -1182,7 +1192,7 @@ level deep -- substitution resumes at the grandchildren -- and it is strict:
 a node whose only overrider is invisible under the skgrepo restriction is
 "overridden but shown raw" too, so its children are shown raw as well.
 
-A substituted viewnode carries the keyed viewStats form
+A substituted viewnode carries the keyed form
 =(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
 stands for. The fact is load-bearing at save: wherever it
 appears, extraction collects N rather than the carrying node's own
@@ -1409,6 +1419,49 @@ in-memory types those keys correspond to are in
 =Folder=, =PropertyMember=, the diff view's =ChangeViewnode=, and its
 =ChangeFacts= and =ReadinessRequest=, which every =Viewnode= carries).
 
+Every headline has one shape:
+#+begin_example
+(skg (vnid X) [focused] [folded] [bodyFolded]
+     KIND DECLARED...
+     [(view FACT...)] [(diff FACT...)])
+#+end_example
+The parts are of two classes. The declared parts are what the client
+is responsible for and the save reads: the kind, the viewnode ID, the
+position atoms, =(gnid ID)=, =(skgRepos ...)=, =noClaim=,
+=writeProtected=, =(overridesHere ID)=, =(viewRequests ...)= and
+=(editRequest ...)=. The derived facts are what the server computes
+at every rendering and nobody reads back: everything in =(view ...)=
+(see "Stats metadata: the view facts" above) and in =(diff ...)=
+(see "Metadata of the diff view" below). The parser skips both forms
+whole. Each kind takes only its own declared parts:
+#+begin_example
+node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
+     [noClaim] [writeProtected] [(overridesHere ID)]
+     [(editRequest [REQUEST] [READINESS])] [(viewRequests ...)]
+     [(view ...)] [(diff ...)]
+ghost (gnid ID) (skgRepos (nodeRepo R))
+      [(editRequest [restoreNode] [READINESS])]
+      [(viewRequests tombstone)] [(diff ...)]
+unknown (gnid ID) [(skgRepos (relRepo R))] [noClaim]
+        [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
+alias [(skgRepos (relRepo R))] [noClaim]
+      [(editRequest [(relRepo R)] [READINESS])] [(view ...)] [(diff ...)]
+id [noClaim] [(editRequest READINESS)] [(view ...)] [(diff ...)]
+(flag F) [(editRequest READINESS)] [(view ...)] [(diff ...)]
+(oldText ASPECT), (homeSkgrepoMove ...), (relRepoMove ...),
+(changesetMarker KIND): [(editRequest READINESS)] [(diff ...)]
+bodyDiff, tombstone, forestRoot, a folder atom
+#+end_example
+where READINESS is =(ready OBJECT...)= or =(unready OBJECT...)= (see
+"Metadata of the diff view"). =(gnid ID)= names the node a node, a
+ghost or an unknown stands for, and =(skgRepos (nodeRepo REPO)
+[(relRepo REPO)])= its home skgrepo and the skgrepo recording its
+relationship to its viewparent, the relRepo written only when it
+differs from the default (a ghost has no relRepo; an unknown and an
+alias have only one). =noClaim= on a node, an alias, an ID or an
+unknown says the save does not read it as an entry of its
+viewparent's list; a claimant carries nothing.
+
 Every viewnode's metadata starts with its viewnode ID, =(vnid X)=, where
 X is one or more lowercase letters and digits: =(skg (vnid 0a) node
 (gnid 1) (skgRepos (nodeRepo main)))=. It identifies the viewnode within its buffer for the
@@ -1427,6 +1480,14 @@ clients show nothing for it and save it back untouched. The view's
 record of its viewnode IDs, with the counter and the viewnode IDs of
 the forest as last rendered, is 'ViewnodeIdRecord' in
 =server/types/views_state.rs=.
+
+The parser refuses, with a message naming the grammar, the retired
+spellings: =(node ...)=, =(ghost ...)= and =(unknown ...)= as forms,
+=(deleted ...)=, =(historical ...)=, =(id ID)=, =(repo REPO)=, a
+top-level =(relRepo REPO)=, =(FOLDER changed)=, =(rels ...)=,
+=(viewStats ...)=, =omittedBody= or =(homeRepoHerald ...)= outside
+=(view ...)=, =(readyRequest ...)=, =(unreadyRequest ...)=,
+=nonMember= and =restrictedNode=.
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode.el=, whose rule table is
@@ -1454,28 +1515,28 @@ and "retain as non-member or tombstone, then prune"). Herald
 
 ** Metadata of the diff view
 
-The buffers of the diff view (see "Diff view") show
-changes with the forms below. All are display facts except the
-readiness requests and the restore edit requests, which the save
-consumes; saving a buffer reads none of the new viewnodes, which
-are save-inert, but for a historical phantom's restore request.
+The buffers of the diff view (see "Diff view") show changes with
+the forms below. The change facts are derived facts, which the
+parser skips; the readiness requests and the restore edit requests
+are declared parts, which the save consumes. Saving a buffer reads
+none of the new viewnodes, which are save-inert, but for a ghost's
+restore request.
 The glossary's "Terms a user meets in the diff view" and "Terms of
 the diff view's implementation" define the vocabulary.
 
-*** Change facts and requests: =(diff ...)=
-A headline's change facts and its readiness request form
-one list:
+*** The change facts: =(diff ...)=
+A headline's change facts form one list, the last part of its
+metadata:
 #+begin_example
-(diff (node added) (rel removed) (properties changed) (leaves N OBJECT...) (ready OBJECT...) (readyRequest OBJECT...))
+(diff (node added) (rel removed) (properties changed) (leaves N OBJECT...) (ready OBJECT...) (homeSkgrepoMove (old OLD) (new NEW)) (movedLikeAncestor LETTER))
 #+end_example
-the last part being =(unreadyRequest OBJECT...)= for an unmark. The
-first three parts are the three kinds of change, and say only what is
-true. The parts come in that order, and a part is absent when it has
-nothing to say; a headline with nothing to say carries no =(diff
-...)=, and =(diff)= is never written. The form sits inside =(node
-...)=, =(unknown ...)= and =(ghost ...)=, and at
-top level on alias, id and flag leaves, on the properties below other
-than =bodyDiff=, and on a changed folder (below).
+The first three parts are the three kinds of change, and say only
+what is true. The parts come in that order, and a part is absent when
+it has nothing to say; a headline with nothing to say carries no
+=(diff ...)=, and =(diff)= is never written. A node, a ghost, an
+unknown, an alias, id or flag member and the change viewnodes other
+than =bodyDiff= may carry it; a folder never does (see "Changed
+folders" below).
 **** =(node added)=, =(node removed)= -- the node's existence
 The node HEAD lacks (=added=) or the worktree lacks (=removed=). On a
 member, a removed member, a folder member, a root, and a ghost.
@@ -1484,54 +1545,62 @@ The relationship that HEAD lacks (=added=) or the worktree lacks
 (=removed=). Under a vognode it is the viewparent's content; in a partner
 folder it is the relationship, of the folder's kind, between the
 member and the folder's viewparent (the two compound partner folders
-carry none). On an alias, id or flag leaf, the single diff object is written
-=(rel added)= or =(rel removed)=: the entry's existence in its list. A
-lost alias or ID (below) is an alias or id leaf carrying =(rel
-removed)=, which marks it as one the save does not read.
+carry none). On an alias, id or flag member, the single diff object
+is written =(rel added)= or =(rel removed)=: the member's existence
+in its list. A lost alias or ID (below) carries =(rel removed)=.
 **** =(properties changed)= -- the node's other properties
 The node is in both graphs and its file records a change ("modified",
 herald =M=), on a member, a removed member, a folder member or a
-root. Never beside =(node added)= or =(node removed)=, and never on a phantom.
+root. Never beside =(node added)= or =(node removed)=, and never on a ghost.
 **** =(leaves N OBJECT...)= -- on every viewnode that names leaves
 It gives the OBJECTs a request there may name (=node= and/or =rel= on
-a vognode or historical phantom, each worth one leaf; =all= on a
+a vognode or ghost, each worth one leaf; =all= on a
 vognode whose properties changed, beside =rel= when that names a leaf;
 =all= on another changed vognode neither of whose objects names a
 leaf, or on a changeset marker; none where a bare request names them),
 and N, how many distinct leaves a request naming all of them touches.
 The clients read it to build their requests and to count the leaves
-an unmark touches; the server's parser accepts and ignores it.
+an unmark touches.
 **** =(ready OBJECT...)= -- the diff objects whose change-forest leaves are all marked commit-ready
 The objects are =node=, =rel=, and =all= on a headline whose =(leaves
 ...)= lists it, so a ready changeset marker carries =(ready all)=. A
 bare =(ready)= marks a headline that lists no object (one naming a
-single leaf), and, on a changed folder, the folder's aggregate. Absent
-when nothing is ready.
-**** =(readyRequest OBJECT...)= and =(unreadyRequest OBJECT...)= ask the save to set or clear the marks of those leaves
-The object =all= names every leaf a vognode's node records, or every
-leaf of a commit readiness aggregate, one level down. At most one, and
-absent when no request is pending.
+single leaf). Absent when nothing is ready.
+**** =(homeSkgrepoMove (old OLD) (new NEW))=, =(movedLikeAncestor LETTER)= -- a node's home skgrepo moved
+In the skgrepo-changes buffer, on a node whose home skgrepo moved
+from OLD to NEW since HEAD; herald "-OLD +NEW". Beside it, when the
+nearest vognode ancestor whose home moved moved the same way,
+=(movedLikeAncestor LETTER)=, LETTER naming that ancestor as the
+relationship tokens do (a = the viewparent); herald "Δ⌂=LETTER".
+
+*** The readiness requests: =(editRequest (ready ...))=
+=(ready OBJECT...)= and =(unready OBJECT...)= inside =(editRequest
+...)= ask the save to set or clear the commit-readiness marks of the
+leaves those objects name; the object =all= names every leaf a
+vognode's node records, or every leaf of a commit readiness
+aggregate, one level down. At most one per headline, written after
+the headline's other edit request if it has one: =(editRequest
+delete (ready node))=. Any headline that may carry =(diff ...)= may
+carry one.
 
 *** Who writes each part, and who acts on it
-**** The server writes the three kinds of change, =(leaves ...)= and =(ready ...)=
-The server writes the =(diff ...)= form (=change_fact_forms= in
-=server/org_to_text.rs=), and it writes =(ready ...)= after completion
-(=set_ready_facts_in_viewforest=); see =docs/diff-view.org=, "Change
-facts on the wire". A rerender of a buffer of the diff view updates each kept
-viewnode's change facts in place, and a save of such a buffer recomputes its
-change facts; see "Diff view" and "Save buffer" above. These parts
-are display facts: nothing reads =(ready ...)= at save, and the
-server's parser accepts and ignores =(leaves ...)=, as its headline
-above says. The glossary's "display fact vs save input" states the
-general rule: the parser ignores or discards display facts, so editing
-them changes nothing. The clients read =(leaves ...)= to build their
-requests and to count the leaves an unmark touches.
-**** The client's readiness gestures write =(readyRequest ...)= and =(unreadyRequest ...)=
-A gesture writes a readiness request as the last part of a headline's
-=(diff ...)=, creating the form if the headline lacks one, and saves;
-see =docs/diff-view.org=, "Readiness requests and gestures". In Emacs
-the gestures are =C-c r r= (=skg-cycle-commit-ready=), which toggles
-the commit-readiness of the change at point, and =C-c r h=
+**** The server writes the change facts
+The server writes the =(diff ...)= form (=diff_form= in
+=server/org_to_text.rs=), and it writes =(ready ...)= and =(leaves
+...)= after completion (=set_ready_facts_in_viewforest=); see
+=docs/diff-view.org=, "Change facts on the wire". A rerender of a
+buffer of the diff view recomputes each kept viewnode's change facts
+in place from the graph straddle, and so does a save of such a
+buffer; see "Diff view" and "Save buffer" above. The parser skips
+=(diff ...)= whole, so editing a change fact changes nothing. The
+clients read =(leaves ...)= to build their requests and to count the
+leaves an unmark touches.
+**** The client's readiness gestures write the readiness requests
+A gesture writes =(ready ...)= or =(unready ...)= into the headline's
+=(editRequest ...)=, creating the form if the headline lacks one, and
+saves; see =docs/diff-view.org=, "Readiness requests and gestures".
+In Emacs the gestures are =C-c r r= (=skg-cycle-commit-ready=), which
+toggles the commit-readiness of the change at point, and =C-c r h=
 (=skg-toggle-homeSkgrepo-move-commitReady=), which toggles the
 commit-readiness of the home-skgrepo move of the node at point. Their
 recursive forms take a prefix argument: =C-u C-c r r= marks every
@@ -1560,10 +1629,12 @@ that =all= names every leaf a modified node records, so one gesture on
 it marks its file.
 
 *** The diff view's viewnodes
-**** =alias=, =id= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
-Its headline is the alias or the ID, carrying
-=(diff (rel removed) ...)=: a member with a ghost warrant. Saving
-reads no alias from it and does not count it among the node's IDs.
+**** =alias noClaim (view ghostWarrant)=, =id noClaim (view ghostWarrant)= with =(rel removed)= -- in an alias or ID folder: an alias or extra ID that HEAD has and the worktree lacks
+Its headline is the alias or the ID: a member with a ghost warrant,
+which claims no membership. Saving reads no alias from it and does
+not count it among the node's IDs. A dangling partner the worktree
+lost, an unknown carrying =(rel removed)=, likewise carries
+=noClaim=.
 **** =ghost (gnid ID) (skgRepos (nodeRepo REPO)) ...= -- a ghost
 It is a node HEAD has and the worktree lacks, with HEAD's title and
 body, drawn only in the diff view. Its ID is written =(gnid ID)= and
@@ -1580,37 +1651,36 @@ Each line is prefixed by a space, =-= or =+=.
 **** =(relRepoMove (old REPO) (new REPO))= -- under a member: the skgrepo recording its relationship to its viewparent moved
 **** =(changesetMarker content)=, =(changesetMarker relRepo)=, =(changesetMarker orderOnly)= -- a changeset marker
 **** =acquiredByFolder=, =acquiredFolder= are write-protected and derived
-Under a historical phantom, an =acquiredByFolder= holds the node that
-acquired it by a nodeMerge; under an acquirer, an =acquiredFolder=
-holds the historical phantoms of the nodes it acquired. An
-=acquiredFolder= also accepts a non-member the user puts there.
+Under a ghost, an =acquiredByFolder= holds the node that acquired it
+by a nodeMerge; under an acquirer, an =acquiredFolder= holds the
+ghosts of the nodes it acquired. An =acquiredFolder= also accepts a
+non-member the user puts there.
 
 *** Changed folders
-A partner, alias, ID or flags folder shown because some relationship of
-it changed is written =(FOLDER changed)=, e.g. =(containerFolder changed)=,
-in place of the bare atom, and is followed by =(diff (ready))= when
-every changed membership is ready: the objectless =(ready)= is the
-folder's aggregate, and the folder's =(diff ...)= holds nothing else.
-Its herald reads "its X changed (this file)" or "(other files)" (see
-the glossary's "in, out").
-
-*** In view stats
-=(homeSkgrepoMove (old OLD) (new NEW))= and =(movedLikeAncestor LETTER)= may sit
-in a vognode's =(viewStats ...)= in the skgrepo-changes buffer; see
-"Stats metadata" above.
+A partner, alias, ID or flags folder is written as its bare atom,
+whether or not something in it changed. A folder is shown because of
+a change when some member of it carries a change of its relationship
+to the folder's viewparent: a =(rel ...)= part, or a =(relRepoMove
+...)= under it. The clients compute that from the members, and label
+such a folder "its X changed (this file)" or "(other files)" (see the
+glossary's "in, out"), with ✓ when every changed membership is ready:
+a member's =(rel ...)= is ready when it carries =(ready ...)= naming
+=rel= if its =(leaves ...)= lists =rel=, and any =(ready ...)=
+otherwise; a relRepo move is ready when it carries =(ready ...)=.
+A readiness gesture on such a folder acts on each changed membership.
 
 *** Examples
 #+begin_example
 (skg node (gnid 7) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (ready node)))
 (skg node (gnid 8) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (leaves 3 rel all) (ready all)))
-(skg node (gnid 9) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed) (leaves 1 rel)))
-(skg alias (diff (rel added) (leaves 1) (readyRequest)))
-(skg alias (diff (rel removed) (leaves 1) (ready)))
+(skg node (gnid 9) (skgRepos (nodeRepo main)) noClaim writeProtected (view noWarrant) (diff (rel removed) (leaves 1 rel)))
+(skg alias (editRequest (ready)) (diff (rel added) (leaves 1)))
+(skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready)))
 (skg ghost (gnid 4) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))
 (skg (oldText title) (diff (leaves 1) (ready)))
 (skg (changesetMarker content) (diff (leaves 3 all) (ready all)))
-(skg (changesetMarker content) (diff (leaves 3 all) (readyRequest all)))
-(skg (subscriberFolder changed) (diff (ready)))
+(skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 3 all)))
+(skg node (gnid 5) (skgRepos (nodeRepo pub)) (diff (homeSkgrepoMove (old priv) (new pub)) (movedLikeAncestor a)))
 #+end_example
 
 ** Restricted-skgrepo nodes: omission, retention, and save preservation

@@ -64,14 +64,13 @@ describe('skg.metadata parsing', function ()
     assert.are.same({ 'a', 'b' }, complex.bare_values)
   end)
 
-  it('keeps graphStats/viewStats sub-sexps whole', function ()
+  it('keeps graphStats/view/diff sub-sexps whole', function ()
     local parsed = metadata.parse_metadata_sexp(
-      '(skg node x (viewStats cycle (homeRepoHerald h)))')
-    local found = nil
-    for _, kv in ipairs(parsed.alist) do
-      if kv.key == 'viewStats' then found = kv.value end
-    end
-    assert.are.equal('(viewStats cycle (homeRepoHerald h))', found)
+      '(skg node x (view cycle repoBoundary) (diff (rel added) (ready)))')
+    local found = {}
+    for _, kv in ipairs(parsed.alist) do found[kv.key] = kv.value end
+    assert.are.equal('(view cycle repoBoundary)', found.view)
+    assert.are.equal('(diff (rel added) (ready))', found.diff)
   end)
 end)
 
@@ -127,7 +126,7 @@ describe('skg.metadata commands', function ()
     assert.are.equal('org', vim.bo.filetype)
   end)
 
-  it('set_repo replaces repo and refreshes the herald', function ()
+  it('set_repo replaces repo and writes nothing else', function ()
     -- Mirrors test-skg-set-repo.
     buffer_with('* (skg node (gnid 1) (skgRepos (nodeRepo public))) title')
     local original = picker.prompt_for_repo_change
@@ -140,8 +139,8 @@ describe('skg.metadata commands', function ()
     local result = first_metadata_sexp()
     assert.is_true(subtree_p(result,
       '(skg node (gnid 1) (skgRepos (nodeRepo private)))'))
-    assert.is_true(subtree_p(result,
-      '(skg node (viewStats (homeRepoHerald ⌂:private)))'))
+    -- The save recomputes '(view repoBoundary)'.
+    assert.is_nil(metadata.sexp_cdr_at_path(result, { 'skg', 'view' }))
     assert.is_false(subtree_p(result, '(skg node (skgRepos (nodeRepo public)))'))
   end)
 
@@ -170,8 +169,8 @@ describe('skg.metadata commands', function ()
                           'public-under-mismatch' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
         '(skg node (skgRepos (nodeRepo private)))'), skgid)
-      assert.is_true(subtree_p(metadata_sexp_by_id(skgid),
-        '(skg node (viewStats (homeRepoHerald ⌂:private)))'), skgid)
+      assert.is_nil(metadata.sexp_cdr_at_path(metadata_sexp_by_id(skgid),
+                                              { 'skg', 'view' }), skgid)
     end
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
       '(skg node (skgRepos (nodeRepo foreign)))'))

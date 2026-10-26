@@ -31,7 +31,7 @@ local function child_named (list, name)
 end
 
 ---A chain node's ROLENAME from its semantic relationship facts
----(RELS_BODY = the cdr of (rels ...)), or nil. A chain node relates outbound
+---(RELS_BODY = the cdr of (view (rels ...))), or nil. A chain node relates outbound
 ---to a tracked ancestor: a relation with an (out ... (ancestors ...))
 ---side, mapped to its role. Port of headline--role-of-chain-node-from-rels.
 local function role_of_chain_node_from_rels (rels_body)
@@ -59,7 +59,7 @@ local function relation_from_sexp (sexp)
   local chain_node_role = nil
   if non_member then
     chain_node_role = role_of_chain_node_from_rels(metadata.sexp_cdr_at_path(
-      sexp, { 'skg', 'rels' }))
+      sexp, { 'skg', 'view', 'rels' }))
   end
   if chain_node_role then return chain_node_role end
   if non_member then return 'noClaim' end

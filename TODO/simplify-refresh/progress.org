@@ -460,3 +460,114 @@ lens directive WHEN; under slice 13, document the default kind
 (a headline without a kind atom is a node) and the five kinds
 that keep their parameter in a small form.
 
+** Slice 5: the grammar's facts
+*** What's done
+The printer gathers the derived facts into '(view ...)'
+('omittedBody', '(rels ...)', '(props ...)', '(birth ...)',
+'noWarrant', 'cycle', 'repoBoundary'; 'noWarrant' or
+'ghostWarrant' on an alias, ID or flag member) and '(diff ...)'
+(the change facts, then '(homeSkgrepoMove ...)' and
+'(movedLikeAncestor X)'). The readiness requests are '(ready
+...)' and '(unready ...)' in '(editRequest ...)'. A folder is
+always its bare atom. The parser skips '(view ...)' and
+'(diff ...)' whole and refuses the retired spellings. The
+herald table, both clients, the fixtures (by
+'tests/results/slice5/convert_facts.py') and the three API doc
+sections follow.
+*** Deviations from the plan's "how"
+**** a lost alias, ID or unknown carries noClaim
+With '(diff ...)' skipped, the save no longer saw the
+'(rel removed)' by which it skipped a lost alias or ID, and a
+dangling partner the worktree lost (the census of a throwaway
+parser change: 41 failures, first 'IDFolder_Edited' on the
+diff view's own buffer;
+'tests/results/slice5/nextest-experiment-parser-skips-diff.log').
+So 'PropertyMember::Alias', '::ID' and 'Unknown' gained
+'claimsMembership', which the stats pass sets to "HEAD alone
+does not warrant it" and the printer writes 'noClaim'; the
+save reads the claim (alias reader, ID check, write-protected
+folder comparison, and traverse, which now passes over an
+unknown that claims nothing). 'shared/metadata-fields.json'
+offers 'noClaim' on those three kinds.
+**** where the property members' warrant lives
+'isWarranted : Warrant' on each 'PropertyMember' variant, set
+by the stats pass. 'ghostWarrant' is still derived from the
+change fact '(rel removed)' ('Viewnode::is_ghostWarranted'),
+until slice 11 gives 'Warrant' its 'ByHead'.
+**** restoreRel: the parser no longer checks (rel removed)
+The position check could not move to 'ghostWarrant' with
+'(view ...)' skipped, and the server writes no ghostWarrant on
+an occurrence before slice 11. The save checks the position by
+the declared parts ('restoreRel_stands_where_it_may', local.rs:
+a non-claimant under a vognode outside the chain, or a partner
+folder member), and drops with a warning a request naming no
+relationship HEAD records, as it did. A restoreRel on a
+claiming member or a root is now refused by the save, not the
+parser; the clients still check '(diff (rel removed))'.
+**** the ghost's old content is rederived before entombstoning
+'entombstone_ghost' knew what the diff view drew under a ghost
+by its parsed change facts. It now first matches the ghost's
+children with its content at HEAD, which gives them their facts
+again. Other readers of change facts in the diff view's step
+read facts the step has just recomputed (the suite is green).
+**** the changed folder is the clients' to compute
+The server writes neither '(FOLDER changed)' nor a folder's
+'(diff (ready))'; each client computes both from the folder's
+members (as 'folder_change_facts' did) and hands the lens the
+old spelling. So the changed-folder rules stay in the table,
+and the conformance test counts 'changed' among the atoms the
+clients compute; slice 6 drops the rules as it decides.
+**** smaller choices
+- '(view ...)' order: omittedBody, rels, props, birth,
+  noWarrant, cycle, repoBoundary, which keeps the old order of
+  those facts for the tests that match line prefixes.
+- 'repoBoundary' renders "⌂" with no label until slice 6
+  serves the label table; one rendering case changed so.
+- '(editRequest ...)' holds one edit request and one readiness
+  request; the readiness request rules render after the change
+  facts, where they did; their styles keep the keys
+  'readyRequest' and 'unreadyRequest'.
+- 'ViewnodeStats::homeSkgrepoAtBoundary' is 'repoBoundary';
+  'rel_heralds' is a 'RelationshipHeralds' of three forms.
+  The relationship sentinel comes from 'rels' and 'props'; the
+  clients splice the first and drop the others.
+- 'fork.rs' writes '(view repoBoundary)' on the clone-to-be.
+- 'viewnode_to_string' no longer reads its config ('_config').
+- Beyond the three sections: the API doc's "Content view",
+  "Edit requests" and save paragraphs, and the readiness
+  spellings in 'docs/glossary.org' and 'docs/diff-view.org'.
+*** What's imperfect about what's done
+**** diff-view viewnodes saved as a content view lose facts
+A content view derives no change facts and the parser skips
+them, so a buffer of the diff view's viewnodes saved outside
+the diff view comes back without '(diff ...)'
+('a_buffer_of_the_new_viewnodes_saves_back_unchanged' now
+checks the facts only on the buffer as drawn). Slice 9 makes
+that test a wire test or a diff-view save. Over TCP a lost
+alias saved back on the diff view's connection stays lost and
+takes a readiness request
+('tests/results/slice5/verify_diff.sh').
+**** a command that rewrites editRequest drops readiness
+Both clients' restore, merge and relRepo commands replace the
+whole '(editRequest ...)', so they would drop a readiness
+request typed there and not yet saved; the gestures save at
+once, so one rarely waits. The metadata editors keep one.
+*** Suite failures and their classification
+**** first failure: 28 Rust tests after the conversion
+Expected fixture adaptation: refusal cases, prefixes and
+round trips that expected parsed change facts, the folder
+'changed' spelling, and readiness requests in '(diff ...)';
+two were mine: a style key the table needed
+('repoBoundary', 'unready') and the ghost tombstone tests
+(regression, fixed as above).
+**** client unit suites: 21 ERT tests, 19 plenary specs
+Expected fixture adaptation: test logic that wrote readiness
+requests into '(diff ...)', changed folders by their old
+spelling, and set-repo's herald; fixed by the two client
+changes. Both suites pass in full (406 and 392).
+**** integration (Neovim): save_collateral_add_content...
+Expected fixture adaptation: its script read the relationship
+facts at '(skg rels)'; now '(skg view rels)'. It passes alone.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 4, with either
+client; the other 34 pass with each.

@@ -80,18 +80,18 @@ print('=== SKG Mentionerward View Request Integration Test ===')
 
 local expected_line0 =
   '* (skg node (gnid 1) (skgRepos (nodeRepo main))'
-  .. ' (rels (contains (out 2)))) 1\n'
-  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n'
-  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n'
+  .. ' (view (rels (contains (out 2))))) 1\n'
+  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0)))) (birth (contains in 1)))) 11\n'
+  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 12\n'
 local expected_line2 = expected_line0
 local expected_changed =
   '* (skg node (gnid 1) (skgRepos (nodeRepo main))'
-  .. ' (rels (contains (out 2)))) 1\n'
-  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0))) (birth (contains in 1)))) 11\n'
+  .. ' (view (rels (contains (out 2))))) 1\n'
+  .. '** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1))) (linksTo (in 1 (substantive 0)))) (birth (contains in 1)))) 11\n'
   .. '*** (skg mentionerFolder)\n'
   .. '**** (skg node (gnid l-11) (skgRepos (nodeRepo main)) writeProtected'
-  .. ' (rels (linksTo (out 1 (ancestors 2))) (birth (linksTo out 2)))) [[id:11][a link to 11]]\n'
-  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 12\n'
+  .. ' (view (rels (linksTo (out 1 (ancestors 2)))) (birth (linksTo out 2)))) [[id:11][a link to 11]]\n'
+  .. '** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'
 local expected_with_link =
   '* 1\n** 11\n*** \n**** [[id:11][a link to 11]]\n** 12\n' -- '*** ' the folder

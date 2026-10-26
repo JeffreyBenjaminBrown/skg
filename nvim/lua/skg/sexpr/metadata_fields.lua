@@ -297,12 +297,36 @@ function M.fillIn_one (name, group, child_level, kind, default_skgrepo)
   if field and group == nil then
     return { { level = child_level, text = name },
              { level = child_level + 1, text = M.shown_default(field) } } end
+  if field and name == 'editRequest'
+     and M.only_readiness_requests_p(group, child_level) then
+    return M.concatenated(
+      { group[1],
+        { level = child_level + 1, text = M.shown_default(field) } },
+      vim.list_slice(group, 2)) end
   if field and #group == 1 and field.shape == 'atom' then
     return { group[1], { level = child_level + 1, text = 'true' } } end
   if name == 'skgRepos' and default_skgrepo
      and vim.tbl_contains(kind.atoms, 'node') then
     return M.skgRepos_with_default(group, child_level, default_skgrepo) end
   return group or {}
+end
+
+---Whether GROUP, an editRequest at CHILD_LEVEL, holds nothing but a
+---readiness request, '(ready ...)' or '(unready ...)', which the
+---readiness commands set and the editor keeps. Its fill-in then shows
+---the other request at its default beside it.
+---@param group table[]
+---@param child_level integer
+---@return boolean
+function M.only_readiness_requests_p (group, child_level)
+  local value_groups =
+    M.group_children(vim.list_slice(group, 2), child_level + 1)
+  if #value_groups == 0 then return false end
+  for _, value_group in ipairs(value_groups) do
+    local text = vim.trim(value_group[1].text)
+    if text ~= 'ready' and text ~= 'unready' then return false end
+  end
+  return true
 end
 
 ---GROUP, a node's skgRepos (or nil when absent), with its nodeRepo

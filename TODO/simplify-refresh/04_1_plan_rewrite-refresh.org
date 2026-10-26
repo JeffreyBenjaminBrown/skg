@@ -889,7 +889,7 @@ clients' parsers and every fixture (script) follow. Tests: the
 parser's unit tests rewritten; the metadata-fields table test;
 the fixpoint harness; both client unit suites; the integration
 suite.
-** TODO Slice 5: the grammar's facts
+** DONE Slice 5: the grammar's facts
 '(view ...)' gathers every derived fact: 'cycle',
 'repoBoundary' in place of 'homeRepoHerald' (which closes
 'TODO/problems.org' line 388 once slice 6 renders it),

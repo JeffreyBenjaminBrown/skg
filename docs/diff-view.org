@@ -599,9 +599,9 @@ The server's 'leaves_named_at' is the single rule; the change fact
 is display-only, and the clients read it instead of keeping tables of
 headline kinds.
 ** Readiness requests and gestures
-A gesture writes readiness requests, '(readyRequest OBJECTS)' or
-'(unreadyRequest OBJECTS)', as the last part of a headline's '(diff
-...)' (creating the form if the headline lacks one) and saves; the save
+A gesture writes readiness requests, '(ready OBJECTS)' or '(unready
+OBJECTS)', into a headline's '(editRequest ...)' (creating the form if
+the headline lacks one) and saves; the save
 consumes them after its graph edits succeed (not when it stops for a
 confirmation), in any buffer, marking or unmarking the leaves each
 headline names at their current fingerprints. A request naming no

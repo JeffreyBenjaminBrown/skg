@@ -930,9 +930,9 @@ save never makes them editable; C-c r u integrates them.
 
 **** readiness request, readiness gesture
 
-A *readiness request* is a metadata form, '(readyRequest OBJECTS)' or
-'(unreadyRequest OBJECTS)', the last part of a headline's '(diff ...)'
-form, that the save consumes, after its graph
+A *readiness request* is a metadata form, '(ready OBJECTS)' or
+'(unready OBJECTS)' inside a headline's '(editRequest ...)', that the
+save consumes, after its graph
 edits succeed, to set or clear the marks of a headline's leaves. A
 *readiness gesture* is a gesture (C-c r r, C-c r h and their
 recursive forms) that writes readiness requests on one or many

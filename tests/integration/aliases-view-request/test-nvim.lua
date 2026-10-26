@@ -96,7 +96,7 @@ print('=== SKG Aliases View Request Integration Test ===')
 
 local expected_with_aliases =
   '* (skg node (gnid test-node) (skgRepos (nodeRepo main))'
-  .. ' (rels (aliases 2))) Test Node\n'
+  .. ' (view (props (aliases 2)))) Test Node\n'
   .. '** (skg aliasFolder)\n'
   .. '*** (skg alias) first alias\n'
   .. '*** (skg alias) second alias\n'
