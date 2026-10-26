@@ -3,7 +3,7 @@ pub use guard::TestStoreGuard;
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
-use crate::dbs::init::create_empty_tantivy_index;
+use crate::dbs::init::{create_empty_tantivy_index, empty_in_ram_tantivy_index};
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::types::env::SkgEnv;
@@ -26,6 +26,7 @@ use crate::types::viewnode::{Vognode};
 use ego_tree::{Tree, NodeRef};
 use futures::FutureExt;
 use futures::executor::block_on;
+use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -85,10 +86,8 @@ where
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let temp_fixtures : PathBuf =
     // Copy fixtures to temp so saves don't corrupt originals
-    PathBuf::from(format!("/tmp/{}-fixtures", test_name));
-  if temp_fixtures . exists() {
-    fs::remove_dir_all (&temp_fixtures)?;
-  }
+    temp_fixtures_folder (test_name);
+  remove_test_dir (&temp_fixtures) ?;
   copy_dir_all(
     &PathBuf::from (fixtures_folder),
     &temp_fixtures)?;
@@ -98,16 +97,62 @@ where
           test_name,
           temp_fixtures . to_str() . unwrap(),
           tantivy_folder )?;
-    guarded_test_then_cleanup(
-      test_name,
-      Some(config . tantivy_folder . clone()),
-      test_fn(&config, &mut tantivy),
-    ). await
-  } );
-  if temp_fixtures . exists() { // more cleanup
-    fs::remove_dir_all (&temp_fixtures)?; }
+    let mut guard : TestStoreGuard = TestStoreGuard::new (
+      test_name, Some ( config . tantivy_folder . clone () ));
+    let test_result : Result<Result<(), Box<dyn Error>>,
+                             Box<dyn Any + Send>> =
+      AssertUnwindSafe ( test_fn (&config, &mut tantivy) )
+      . catch_unwind () . await;
+    drop (tantivy); // before its folder goes
+    let cleanup_result : Result<(), Box<dyn Error>> =
+      cleanup_test_tantivy ( Some (&config . tantivy_folder) );
+    guard . disarm ();
+    test_result_after_cleanup (test_result, cleanup_result) } );
+  remove_test_dir (&temp_fixtures) ?;
   result
 }
+
+/// Where a test copies its fixtures, so that saves don't corrupt
+/// the originals. The process ID keeps two processes running a
+/// test of the same name (nextest beside a plain 'cargo test', say)
+/// out of each other's way.
+fn temp_fixtures_folder (
+  test_name : &str,
+) -> PathBuf {
+  PathBuf::from ( format! ( "/tmp/{}-fixtures-{}",
+                            test_name, std::process::id () )) }
+
+/// Remove a test's temporary directory, if it exists.
+/// PITFALL: Tantivy's meta-file watcher thread outlives the index
+/// it watches by up to one poll, and a reload it starts then
+/// creates a lock file in the index's folder. A removal racing it
+/// fails with "Directory not empty"; one retry after a short wait
+/// clears it.
+pub fn remove_test_dir (
+  dir : &Path,
+) -> Result<(), Box<dyn Error>> {
+  if ! dir . exists () { return Ok (( )); }
+  match fs::remove_dir_all (dir) {
+    Ok (()) => Ok (( )),
+    Err (e) if e . kind () == std::io::ErrorKind::DirectoryNotEmpty => {
+      std::thread::sleep ( std::time::Duration::from_millis (50) );
+      fs::remove_dir_all (dir) ?;
+      Ok (( )) },
+    Err (e) => Err ( Box::new (e) ), }}
+
+/// A test's result once its stores are cleaned up: a cleanup error
+/// fails a test that passed, and a panic resumes after cleanup.
+fn test_result_after_cleanup (
+  test_result    : Result<Result<(), Box<dyn Error>>,
+                          Box<dyn Any + Send>>,
+  cleanup_result : Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+  match test_result {
+    Ok (inner) => { cleanup_result ?; inner },
+    Err (panic_payload) => {
+      if let Err (e) = cleanup_result {
+        tracing::error! ("Cleanup error after test panic: {}", e); }
+      std::panic::resume_unwind (panic_payload) }, }}
 
 /// Serializes store-using tests (shared groups and the per-test
 /// run_with_test_stores family) within one process. Under nextest every
@@ -162,8 +207,7 @@ impl SharedStoreSession {
     P : FnOnce (&Path) -> Result<(), Box<dyn Error>>,
   {
     println! ("-- sub-test: {}", subtest_name);
-    if self . temp_fixtures . exists () {
-      fs::remove_dir_all ( &self . temp_fixtures ) ?; }
+    remove_test_dir (&self . temp_fixtures) ?;
     copy_dir_all (
       Path::new (fixtures_folder),
       &self . temp_fixtures ) ?;
@@ -234,6 +278,9 @@ impl SharedStoreSession {
     &mut self,
   ) -> Result<(), Box<dyn Error>> {
     crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
+    self . tantivy = // drops the old index before its folder goes
+      empty_in_ram_tantivy_index () ?;
+    remove_test_dir (&self . tantivy_folder) ?;
     self . tantivy = create_empty_tantivy_index (
       &self . tantivy_folder ) ?;
     Ok (( )) }
@@ -258,9 +305,10 @@ where
     TEST_STORE_GROUPS_MUTEX . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let temp_fixtures : PathBuf =
-    PathBuf::from ( format! ("/tmp/{}-fixtures", test_name) );
+    temp_fixtures_folder (test_name);
   let tantivy_folder : PathBuf =
-    PathBuf::from ( format! ("/tmp/tantivy-test-{}", test_name) );
+    PathBuf::from ( format! ( "/tmp/tantivy-test-{}-{}",
+                              test_name, std::process::id () ));
   let result : Result<(), Box<dyn Error>> = block_on ( async {
     let mut session : SharedStoreSession = SharedStoreSession {
       test_name        : test_name . to_string (),
@@ -270,53 +318,21 @@ where
         SkgConfig::fromSkgreposAndTantivyFolder (
           HashMap::new (),
           tantivy_folder . to_str () . unwrap () ),
-      tantivy        : create_empty_tantivy_index (&tantivy_folder) ?, };
+      tantivy        : // placeholder, in RAM, so no file watcher races the first reset
+        empty_in_ram_tantivy_index () ?, };
     let mut guard : TestStoreGuard = TestStoreGuard::new (
       test_name, Some ( tantivy_folder . clone () ));
-    let test_result : Result<Result<(), Box<dyn Error>>, _> =
+    let test_result : Result<Result<(), Box<dyn Error>>,
+                             Box<dyn Any + Send>> =
       AssertUnwindSafe ( test_fn (&mut session) )
       . catch_unwind () . await;
-    crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
+    drop (session); // and its index, before its folder goes
     let cleanup_result : Result<(), Box<dyn Error>> =
       cleanup_test_tantivy (Some (&tantivy_folder)) ;
     guard . disarm ();
-    match test_result {
-      Ok (inner) => { cleanup_result ?; inner },
-      Err (panic_payload) => {
-        if let Err (e) = cleanup_result {
-          tracing::error! ("Cleanup error after test panic: {}", e); }
-        std::panic::resume_unwind (panic_payload) }, }} );
-  if temp_fixtures . exists () { // more cleanup
-    fs::remove_dir_all (&temp_fixtures) ?; }
+    test_result_after_cleanup (test_result, cleanup_result) } );
+  remove_test_dir (&temp_fixtures) ?;
   result }
-
-/// Run a test future with a TestStoreGuard safety net, then clean up.
-/// Catches panics so cleanup runs even if the test fails.
-async fn guarded_test_then_cleanup(
-  test_name: &str,
-  tantivy_folder: Option<PathBuf>,
-  test_future: Pin<Box<dyn Future<Output = Result
-                                  <(), Box<dyn Error>>> + '_>>,
-) -> Result<(), Box<dyn Error>> {
-  let mut guard: TestStoreGuard = TestStoreGuard::new(
-    test_name, tantivy_folder.clone());
-  let test_result: Result<Result<(), Box<dyn Error>>, _> =
-    AssertUnwindSafe(test_future)
-    . catch_unwind() . await;
-  // A save's tantivy-commit now happens in the background and outlives
-  // update_from_and_rerender_buffer; drain it before deleting the test
-  // search index out from under the worker.
-  crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
-  let cleanup_result: Result<(), Box<dyn Error>> =
-    cleanup_test_tantivy(tantivy_folder . as_deref()) ;
-  guard . disarm();
-  match test_result {
-    Ok (inner) => { cleanup_result?; inner },
-    Err (panic_payload) => {
-      if let Err (e) = cleanup_result {
-        tracing::error!("Cleanup error after test panic: {}", e); }
-      std::panic::resume_unwind(panic_payload) }, }
-}
 
 /// Recursively copy a directory and its contents.
 pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
@@ -526,19 +542,9 @@ pub fn cleanup_test_tantivy (
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
-  if let Some (tantivy_path) = tantivy_folder {
-    if tantivy_path . exists() {
-      let max_attempts : usize = 20;
-      for attempt in 0 .. max_attempts {
-        match fs::remove_dir_all (tantivy_path) {
-          Ok (()) => break,
-          Err (e)
-            if e . raw_os_error() == Some (39)
-               && attempt + 1 < max_attempts => {
-            std::thread::sleep (
-              std::time::Duration::from_millis (50) ); }
-          Err (e) => return Err ( Box::new (e) ), } } } }
-  Ok (( )) }
+  match tantivy_folder {
+    Some (tantivy_path) => remove_test_dir (tantivy_path),
+    None => Ok (( )), }}
 
 /// Compare two org-mode headlines ignoring ID differences.
 /// Converts each headline to HeadlineInfo and strips ID from metadata.

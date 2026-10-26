@@ -7,12 +7,12 @@ use skg::skgrepo_sets::SkgrepoRestriction;
 use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SkgrepoName, SkgrepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{Graphnode, empty_graphnode};
 use skg::dbs::init::wipe_then_init_tantivy_db;
+use skg::test_utils::remove_test_dir;
 use skg::serve::handlers::text_search::{
   group_matches_by_gnid, build_search_viewforest};
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::fs;
 use skg::types::viewnode::PropertyMember;
 use skg::types::viewnode::ViewnodeKind;
 
@@ -156,9 +156,7 @@ fn test_text_search_org_format (
   match test_result {
     Ok ( () ) => {
       // Test passed, clean up
-      if Path::new (index_dir) . exists () {
-        fs::remove_dir_all (index_dir) ?;
-      }
+      remove_test_dir ( Path::new (index_dir) ) ?;
       Ok ( () )
     },
     Err (e) => {
@@ -230,8 +228,7 @@ fn test_search_results_preserve_links_in_title (
     }) ();
   match test_result {
     Ok (()) => {
-      if Path::new (index_dir) . exists () {
-        fs::remove_dir_all (index_dir) ?; }
+      remove_test_dir ( Path::new (index_dir) ) ?;
       Ok (())
     },
     Err (e) => {
@@ -339,8 +336,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
     }) ();
   match test_result {
     Ok (()) => {
-      if Path::new (index_dir) . exists () {
-        fs::remove_dir_all (index_dir) ?; }
+      remove_test_dir ( Path::new (index_dir) ) ?;
       Ok (())
     },
     Err (e) => {
@@ -406,6 +402,5 @@ fn private_alias_documents_are_filtered_before_grouping (
         assert! ( matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")) ); }
       Ok (( )) } ) ();
-  if Path::new (index_dir) . exists () {
-    fs::remove_dir_all (index_dir) ?; }
+  remove_test_dir ( Path::new (index_dir) ) ?;
   test_result }
