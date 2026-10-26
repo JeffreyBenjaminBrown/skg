@@ -75,6 +75,17 @@ use uuid::Uuid;
 // Parsing-internal types
 //
 
+/// The diff view's two restore requests ('docs/diff-view.org',
+/// "Restoring what a change removed"), as the parser reads them. Only
+/// the parse holds them so: a restoreNode becomes
+/// 'Ghost::restoreNode_request', a restoreRel
+/// 'RelationshipEditRequest::RestoreRel'.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RestoreRequest {
+  RestoreNode, // write back a node deleted since HEAD
+  RestoreRel,  // re-add a relationship removed since HEAD
+}
+
 /// Intermediate parsed metadata. Converted to Viewnode via viewnode_from_metadata().
 /// It holds what the headline says, so an occurrence's gnid and skgrepo
 /// may be absent; the parse completes them ('org_to_viewforest').
@@ -95,6 +106,7 @@ pub struct ViewnodeMetadata {
   pub viewStats: ViewnodeStats,
   pub overridesHere: Option<ID>,
   pub edit_request: Option<NodeEditRequest>,
+  pub restore_request: Option<RestoreRequest>,
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
   // The readiness request inside '(editRequest ...)', on whichever
@@ -146,6 +158,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     viewStats: ViewnodeStats::default(),
     overridesHere: None,
     edit_request: None,
+    restore_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
     readiness_request: None,
@@ -204,9 +217,8 @@ pub fn viewnode_from_metadata (
                            . unwrap_or_else ( || SkgrepoName::from ("")),
             title,
             body,
-            restoreNode_request : matches! (
-              metadata . edit_request,
-              Some (NodeEditRequest::RestoreNode) ),
+            restoreNode_request :
+              metadata . restore_request == Some (RestoreRequest::RestoreNode),
             claimsMembership : metadata . claimsMembership,
             isWarranted : Warrant::ByGraph, // a derived fact: the refresh sets it
           } )), None, None )
@@ -285,14 +297,12 @@ pub fn viewnode_from_metadata (
       // Occurrence
       { let relationshipEditRequest : Option<RelationshipEditRequest> =
           // lives outside 'Editability'
-          if matches! ( metadata . edit_request,
-                        Some (NodeEditRequest::RestoreRel) )
+          if metadata . restore_request == Some (RestoreRequest::RestoreRel)
           { Some (RelationshipEditRequest::RestoreRel) }
           else { metadata . relRepo_request . clone ()
                  . map (RelationshipEditRequest::RelRepo) };
         let edit_request : Option<NodeEditRequest> =
-          if relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) { None }
-          else { metadata . edit_request . clone () };
+          metadata . edit_request . clone ();
         let editability : Editability =
           if metadata . writeProtected
           { Editability::WriteProtected }
@@ -647,7 +657,7 @@ fn read_metadata_part (
         let mut request_metadata : ViewnodeMetadata = default_metadata ();
         parse_editrequest_sexp ( args, &mut request_metadata ) ?;
         if let Some (message) = misplaced_restore_request_message (
-             &request_metadata . edit_request, false ) {
+             &request_metadata . restore_request, false ) {
           return Err (message); }
         let takes_a_relRepo_request : bool =
           matches! ( kind,
@@ -687,17 +697,17 @@ pub const RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP : &str =
 /// it, given whether the headline is a ghost; None for
 /// any other request.
 fn misplaced_restore_request_message (
-  request       : &Option<NodeEditRequest>,
+  request  : &Option<RestoreRequest>,
   is_ghost : bool,
 ) -> Option<String> {
   match request {
-    Some (NodeEditRequest::RestoreNode) =>
+    Some (RestoreRequest::RestoreNode) =>
       Some ( RESTORE_NODE_ON_A_NODE_NOT_DELETED . to_string () ),
-    Some (NodeEditRequest::RestoreRel) if is_ghost =>
+    Some (RestoreRequest::RestoreRel) if is_ghost =>
       Some ( RESTORE_REL_ON_A_DELETED_NODE . to_string () ),
-    Some (NodeEditRequest::RestoreRel) =>
+    Some (RestoreRequest::RestoreRel) =>
       Some ( RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP . to_string () ),
-    _ => None, } }
+    None => None, } }
 
 /// A ghost carries no edit request but restoreNode, and no view
 /// request; restoreRel sits only on an occurrence, and the save checks
@@ -710,16 +720,17 @@ fn check_where_the_edit_request_sits (
     metadata . names_an_occurrence ();
   if metadata . is_ghost && ! metadata . view_requests . is_empty ()
   { return Err ( "A ghost accepts no view request" . to_string () ); }
-  match &metadata . edit_request {
-    Some (NodeEditRequest::RestoreNode) if metadata . is_ghost =>
+  // 'parse_editrequest_sexp' reads at most one of the two.
+  match ( &metadata . restore_request, &metadata . edit_request ) {
+    ( Some (RestoreRequest::RestoreNode), _ ) if metadata . is_ghost =>
       Ok (( )),
-    Some (NodeEditRequest::RestoreRel) if is_occurrence =>
+    ( Some (RestoreRequest::RestoreRel), _ ) if is_occurrence =>
       Ok (( )),
-    request @ Some (NodeEditRequest::RestoreNode | NodeEditRequest::RestoreRel) =>
+    ( request @ Some (_), _ ) =>
       Err ( misplaced_restore_request_message (
         request, metadata . is_ghost )
             . expect ("a restore request") ),
-    Some (_) if metadata . is_ghost =>
+    ( None, Some (_) ) if metadata . is_ghost =>
       Err ( "A ghost accepts no edit request but restoreNode"
             . to_string () ),
     _ => Ok (( )), } }
@@ -882,9 +893,9 @@ fn parse_one_edit_request (
       match bare_value . as_str () {
         "delete" => metadata . edit_request = Some (NodeEditRequest::Delete),
         "restoreNode" =>
-          metadata . edit_request = Some (NodeEditRequest::RestoreNode),
+          metadata . restore_request = Some (RestoreRequest::RestoreNode),
         "restoreRel" =>
-          metadata . edit_request = Some (NodeEditRequest::RestoreRel),
+          metadata . restore_request = Some (RestoreRequest::RestoreRel),
         _ => {
           return Err ( format! ( "Unknown editRequest value: {}",
                                   bare_value )); }} },

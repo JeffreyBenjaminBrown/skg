@@ -456,10 +456,7 @@ fn occurrence_metadata_to_string (
           NodeEditRequest::Delete => "delete" . to_string (),
           NodeEditRequest::SetFlag { flag, value } =>
             format! ( "(flag {} {})",
-              flag . wire_name (), value ),
-          // Parsed into fields outside 'Editability', never kept here.
-          NodeEditRequest::RestoreNode => "restoreNode" . to_string (),
-          NodeEditRequest::RestoreRel  => "restoreRel" . to_string () } } ) }
+              flag . wire_name (), value ) } } ) }
     fn view_requests ( occurrence : & Occurrence
                      ) -> Option < String > {
       if occurrence . view_requests . is_empty () { return None; }

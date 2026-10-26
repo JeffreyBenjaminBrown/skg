@@ -11,7 +11,7 @@
 // edit request and view request the parser knows.
 
 use skg::serve::parse_metadata_sexp::{
-  ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
+  RestoreRequest, ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use skg::types::misc::{ID, SkgrepoChange, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
@@ -107,18 +107,27 @@ fn edit_request_wire_name (
   match request {
     NodeEditRequest::NodeMerge (_)   => "merge",
     NodeEditRequest::Delete          => "delete",
-    NodeEditRequest::SetFlag { .. }  => "flag",
-    NodeEditRequest::RestoreNode     => "restoreNode",
-    NodeEditRequest::RestoreRel      => "restoreRel", } }
+    NodeEditRequest::SetFlag { .. }  => "flag", } }
+
+/// The wire name of each restore request. The match makes a new
+/// variant a compile error here until it is named.
+fn restore_request_wire_name (
+  request : &RestoreRequest,
+) -> &'static str {
+  match request {
+    RestoreRequest::RestoreNode => "restoreNode",
+    RestoreRequest::RestoreRel  => "restoreRel", } }
 
 fn every_edit_request (
 ) -> Vec<NodeEditRequest> {
   vec! [ NodeEditRequest::NodeMerge ( ID::from ("b") ),
          NodeEditRequest::Delete,
          NodeEditRequest::SetFlag { flag : Flag::NoSearchMatching,
-                                    value : true },
-         NodeEditRequest::RestoreNode,
-         NodeEditRequest::RestoreRel ] }
+                                    value : true } ] }
+
+fn every_restore_request (
+) -> Vec<RestoreRequest> {
+  vec! [ RestoreRequest::RestoreNode, RestoreRequest::RestoreRel ] }
 
 /// The wire name of each view request, as the parser reads it. The
 /// match makes a new variant a compile error here until it is named.
@@ -332,6 +341,8 @@ fn the_values_name_every_request_the_parser_knows () {
   let mut expected_edit_request_values : BTreeSet<String> =
     every_edit_request () . iter ()
     . map ( |request| edit_request_wire_name (request) . to_string () )
+    . chain ( every_restore_request () . iter ()
+              . map ( |request| restore_request_wire_name (request) . to_string () ))
     . collect ();
   expected_edit_request_values . insert ( "relRepo" . to_string () );
   assert_eq! ( edit_request_values, expected_edit_request_values );
@@ -382,7 +393,8 @@ fn each_node_value_parses_to_what_it_names () {
         "editRequest" if written . value == "relRepo" =>
           assert! ( parsed . relRepo_request . is_some () ),
         "editRequest" => assert_eq! (
-          parsed . edit_request . as_ref () . map (edit_request_wire_name),
+          parsed . edit_request . as_ref () . map (edit_request_wire_name)
+            . or ( parsed . restore_request . as_ref () . map (restore_request_wire_name) ),
           Some ( written . value . as_str () )),
         "viewRequests" => assert_eq! (
           parsed . view_requests . iter () . map (view_request_wire_name)

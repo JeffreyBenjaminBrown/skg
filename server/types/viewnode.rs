@@ -525,13 +525,6 @@ pub enum NodeEditRequest {
   NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
   SetFlag { flag : Flag, value : bool },
-  // The diff view's two restore requests ('docs/diff-view.org',
-  // "Restoring what a change removed"). Neither lives in
-  // 'Editability': a parsed RestoreNode becomes
-  // 'Ghost::restoreNode_request', a parsed RestoreRel
-  // 'RelationshipEditRequest::RestoreRel'.
-  RestoreNode, // write back a node deleted since HEAD
-  RestoreRel,  // re-add a relationship removed since HEAD
 }
 
 /// A request about the relationship that binds a viewnode to its
@@ -1159,8 +1152,6 @@ impl fmt::Display for NodeEditRequest {
       NodeEditRequest::Delete    => write!(f, "toDelete"),
       NodeEditRequest::SetFlag { flag, value } => write! (
         f, "(flag {} {})", flag . wire_name (), value),
-      NodeEditRequest::RestoreNode => write!(f, "restoreNode"),
-      NodeEditRequest::RestoreRel  => write!(f, "restoreRel"),
     }} }
 
 impl FromStr for NodeEditRequest {
@@ -1171,8 +1162,6 @@ impl FromStr for NodeEditRequest {
   ) -> Result<Self, Self::Err> {
     match s {
       "toDelete"    => Ok (NodeEditRequest::Delete),
-      "restoreNode" => Ok (NodeEditRequest::RestoreNode),
-      "restoreRel"  => Ok (NodeEditRequest::RestoreRel),
       _ => {
         // Try to parse as "merge <id>"
         if let Some (id_str) = s . strip_prefix ("merge ") {
