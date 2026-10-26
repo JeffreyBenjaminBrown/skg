@@ -33,7 +33,7 @@ use std::sync::{Arc, MutexGuard};
 /// viewnodes are recomputed in place, and the buffer's sets choose
 /// what is editable and what an extension charges to the node budget
 /// ('CompletionMode::charges_node_budget'). The diff view requires the
-/// skgrepo set 'all', so 'restriction' hides nothing there.
+/// skgrepo set 'all', so nothing is restricted there.
 /// 'correction_policy' says which changes are no buffer corrections.
 pub fn complete_viewforest_with_graph_straddle (
   runtime              : &RuntimeGeneration,

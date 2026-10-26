@@ -199,9 +199,10 @@ questions, the first yes winning (=id_rule= in
 an occurrence of the node's pid. Otherwise, in the diff view, does
 HEAD have it? Then it is the node's ghost. Otherwise, does its
 viewparent's list name the gnid? Then it is an unknown. Otherwise it
-is a tombstone. A node the skgrepo restriction hides answers no to
-all four (the truth answers =Hidden=, =GnidPresence=, and the gated
-lists name no hidden member), so its headline becomes a tombstone,
+is a tombstone. A restricted node (one the skgrepo restriction keeps
+out) answers no to all four (the truth answers =Restricted=,
+=GnidPresence=, and the gated lists name no restricted member), so
+its headline becomes a tombstone,
 which reveals nothing of it. In the diff view, a gnid that HEAD had
 as a node and that a nodeMerge has since made an extra ID of another
 node stays that node's ghost. The headline is re-kinded where it

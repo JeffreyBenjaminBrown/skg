@@ -71,7 +71,7 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
           break; }
         ViewnodeKind::Tombstone =>
           // A tombstone is a container boundary too (it may stand for
-          // a node the skgrepo restriction hides): infer nothing.
+          // a restricted node): infer nothing.
           break,
         _ =>
           // A non-vognode (folder, etc.): skip it and keep walking rootward.

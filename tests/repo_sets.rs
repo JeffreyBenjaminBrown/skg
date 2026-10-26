@@ -426,8 +426,8 @@ async fn tombstone_in_buffer_does_not_drive_contains (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // A tombstone where a hidden node stood emits no save intention for
-  // its container. The hidden node's presence and position in the
+  // A tombstone where a restricted node stood emits no save intention for
+  // its container. The restricted node's presence and position in the
   // container's contains are owned by the disk merge (weave), not the
   // buffer. So moving the tombstone cannot move its disk member.
   // (Disk root.contains = [active-a, private-a, active-b]; private-a's
@@ -457,7 +457,7 @@ async fn tombstone_in_buffer_does_not_drive_contains (
           "moving a tombstone must not move the hidden disk member" );
         assert! (
           ! save_gnids (&instructions) . contains (&ID::from ("private-a")),
-          "the hidden node must not produce a SaveNode" ); }
+          "the restricted node must not produce a SaveNode" ); }
       Ok (( )) }
 
 async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
@@ -560,7 +560,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
 /// private container above it, and nothing of the private container
 /// that contains the hit directly.
 #[test]
-fn search_enrichment_omits_the_containers_the_restriction_hides (
+fn search_enrichment_omits_the_restricted_containers (
 ) -> Result<(), Box<dyn Error>> {
   let config =
     load_config ("tests/repo_sets/fixtures/skgconfig.toml")? . 0;

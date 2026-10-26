@@ -32,7 +32,7 @@ use std::error::Error;
 /// graph either way.
 #[derive(Clone, Copy)]
 pub enum ContainerwardChainPartners<'a> {
-  /// The walk is ungated; what the skgrepo restriction hides is
+  /// The walk is ungated; what the skgrepo restriction keeps out is
   /// left out where it would be shown, and the chain stops there.
   LiveGraph,
   GraphStraddle (&'a GraphStraddle),
@@ -96,7 +96,7 @@ pub fn attach_containerward_chains_under_members (
 
 /// Prepend 'node' under 'parent' as a chain node, and under it, its
 /// own containers, each prepended in reverse so that they keep their
-/// order. Where a node is hidden, its branch of the chain stops.
+/// order. Where a node is restricted, its branch of the chain stops.
 fn insert_containerward_chain_recursive (
   node        : &ContainerwardRoleTree,
   parent      : NodeId,
@@ -117,8 +117,8 @@ fn insert_containerward_chain_recursive (
 
 /// Prepend 'container' under 'parent', which it contains, write-protected and
 /// claiming nothing, or an unknown if no graph
-/// knows it. None, and nothing prepended, when the skgrepo
-/// restriction hides the container or the relationship: the
+/// knows it. None, and nothing prepended, when the container or the
+/// relationship is restricted: the
 /// containment is recorded by the container, perhaps in a more
 /// private skgrepo than either node's home ('docs/telescopes.org',
 /// "What lives where").

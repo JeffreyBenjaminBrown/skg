@@ -586,10 +586,10 @@ the short form.) Code says 'skgrepo' and 'gitrepo' too ('SkgrepoName',
 The *skgrepo restriction* ('SkgrepoRestriction') is the skgrepo-set a
 connection currently shows; the skgrepo-set =all= means no
 restriction. A skgrepo inside it is *unrestricted*, one outside it
-*restricted*, and so are their nodes. A node in a restricted skgrepo
-is *hidden*: the gated graph answers 'hidden' for it, as distinct
-from 'present' and 'absent' ('GnidPresence'), and the view shows
-nothing of it. Where an occurrence of it stood when the restriction
+*restricted*, and so are their nodes and occurrences: the gated
+graph answers 'restricted' for such a node, as distinct from
+'present' and 'absent' ('GnidPresence'), and the view shows nothing
+of it. "Hidden" is reserved for hides-from-subscriptions. Where an occurrence of it stood when the restriction
 tightened, a tombstone stands, holding the occurrence's children.
 
 *** owned, foreign
@@ -1072,7 +1072,8 @@ A *vognode* is a viewnode standing for a gnid ('Vognode' in
 of a node the truth has; a *ghost*, in the diff view only, of a node
 HEAD has and the worktree lacks; an *unknown*, of a gnid its
 viewparent's list names and no node answers to. An occurrence of a
-node the skgrepo restriction hides becomes a tombstone.
+node the skgrepo restriction keeps out (a restricted node) becomes a
+tombstone.
 
 The other viewnodes are *non-vognodes*: the *descriptors* -- folders,
 property members and change viewnodes, which describe their
@@ -1183,7 +1184,7 @@ refresh: how a view follows the graph", states the whole model.
 What the refresh compares a buffer with ('Truth' in
 'server/refresh/mod.rs'): the in-Rust graph as the skgrepo
 restriction lets it be seen, with the config. For a gnid it answers
-'Present', 'Hidden' or 'Absent' ('GnidPresence',
+'Present', 'Restricted' or 'Absent' ('GnidPresence',
 'gnid_presence_gated'). In the diff view the mode adds HEAD, through
 the graph straddle.
 
@@ -1209,7 +1210,7 @@ What a headline standing for a gnid becomes, by four questions in
 order, the first yes winning ('id_rule' in 'server/refresh/id_rule.rs'):
 does the truth have the node (an occurrence); in the diff view, does
 HEAD (a ghost); does its viewparent's list name the gnid (an
-unknown); else a tombstone. A hidden node answers no to all four. The
+unknown); else a tombstone. A restricted node answers no to all four. The
 refresh *re-kinds* a headline by it where it stands, keeping its
 viewnode ID, fold state, children and, for an occurrence, its
 editability.

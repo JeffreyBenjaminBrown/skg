@@ -53,7 +53,7 @@ node p
   assert_eq! ( run . count (CorrectionKind::Entombstoned), 2 ); }
 
 #[test]
-fn a_hidden_node_becomes_a_tombstone_whatever_its_parent_lists () {
+fn a_restricted_node_becomes_a_tombstone_whatever_its_parent_lists () {
   let graph : InRustGraph = graph (&[
     p_lists (&["h", "c"]), node ("c"), node ("k"),
     Graphnode { home_skgrepo : SkgrepoName::from ("private"), .. node ("h") } ]);
@@ -72,7 +72,7 @@ node p
     node k noClaim
   node c" );
   assert! ( ! run . text . contains ("(gnid h)"),
-            "nothing of the hidden node shows: {}", run . text ); }
+            "nothing of the restricted node shows: {}", run . text ); }
 
 #[test]
 fn an_unknown_whose_node_appeared_becomes_an_occurrence () {

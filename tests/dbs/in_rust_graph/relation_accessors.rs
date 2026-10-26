@@ -243,7 +243,7 @@ fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
     gnid_set (&["known", "unknown", "points-at-unknown"]));
 }
 
-// A node the restriction excludes is hidden, by its pid or an extra
+// A node the restriction excludes is restricted, by its pid or an extra
 // ID; without a restriction, or under 'all', it is present; a gnid
 // no node answers to is absent, whatever the restriction.
 #[test]
@@ -261,8 +261,8 @@ fn gnid_presence_gated_tells_hidden_from_absent () {
   let presence = |gnid : &str, restriction : Option<&SkgrepoRestriction>|
     graph . gnid_presence_gated (&ID::from (gnid), restriction);
   assert_eq! ( presence ("public", Some (&only_main)), GnidPresence::Present );
-  assert_eq! ( presence ("private", Some (&only_main)), GnidPresence::Hidden );
-  assert_eq! ( presence ("private-extra", Some (&only_main)), GnidPresence::Hidden );
+  assert_eq! ( presence ("private", Some (&only_main)), GnidPresence::Restricted );
+  assert_eq! ( presence ("private-extra", Some (&only_main)), GnidPresence::Restricted );
   assert_eq! ( presence ("private", Some (&all)), GnidPresence::Present );
   assert_eq! ( presence ("private", None), GnidPresence::Present );
   assert_eq! ( presence ("nowhere", Some (&only_main)), GnidPresence::Absent );

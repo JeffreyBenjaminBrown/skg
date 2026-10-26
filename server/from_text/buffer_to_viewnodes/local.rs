@@ -707,7 +707,7 @@ pub fn nonignored_children_have_distinct_gnids (
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
           Some (u . gnid . clone()),
         // A tombstone is not a content member (where it stands for a
-        // hidden node, disk supplementation owns that membership), so
+        // restricted node, disk supplementation owns that membership), so
         // it does not participate in content-id distinctness.
         _ => None };
     if let Some (gnid) = content_gnid {

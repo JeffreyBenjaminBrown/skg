@@ -338,7 +338,7 @@ impl ViewnodeIdRecord {
 /// The pids a view "contains" for collateral detection (views_containing): the
 /// primary ids of its occurrences -- the only kind backed by a
 /// real, current graphnode that this view renders meaningfully. A tombstone
-/// standing for a hidden node shows nothing about the node, so a save
+/// standing for a restricted node shows nothing about the node, so a save
 /// touching that node need not re-render this view (its occurrence
 /// descendants register themselves). Ghosts and unknowns
 /// are excluded too: they are not graph members. The single source of

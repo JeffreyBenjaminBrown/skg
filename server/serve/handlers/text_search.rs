@@ -432,7 +432,7 @@ fn stub_root_of_hit (
 /// The IDs of the hit's override relatives that a folder of 'kind'
 /// shows: the nodes that override it (the overrider folder) or that it
 /// overrides (the overridden folder), less those whose override
-/// relationship or own skgrepo the restriction hides.
+/// relationship or own skgrepo is restricted.
 fn override_relatives (
   graph       : &InRustGraph,
   hit         : &ID,

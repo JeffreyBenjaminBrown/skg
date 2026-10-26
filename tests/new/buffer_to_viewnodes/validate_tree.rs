@@ -767,7 +767,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
 
 #[test]
 fn a_tombstone_holding_a_visible_child_passes_local_validation () {
-  // Where a switch of the skgrepo restriction hid a node, a tombstone
+  // Where a switch of the skgrepo restriction kept a node out, a tombstone
   // stands, holding the node's visible children ('docs/api-and-formats.org',
   // "Restricted-skgrepo nodes: omission, retention, and save
   // preservation"), under a node or as a view root.
@@ -802,7 +802,7 @@ fn a_tombstone_holding_a_visible_child_passes_local_validation () {
 
 #[test]
 fn a_tombstone_does_not_collide_with_content () {
-  // A tombstone is not a content member (where it stands for a hidden
+  // A tombstone is not a content member (where it stands for a restricted
   // node, the disk weave owns that membership), so it cannot
   // duplicate a real content child's id -- the buffer validates even
   // when a visible child is the very node the tombstone stood for.

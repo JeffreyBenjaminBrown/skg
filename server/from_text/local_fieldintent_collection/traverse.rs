@@ -89,8 +89,8 @@ fn visit (
           is_saveEligible : false } ),
         None, collected),
     ViewnodeKind::Tombstone =>
-      // A tombstone emits nothing. Where it stands for a node the
-      // skgrepo restriction hides, that node's membership is owned
+      // A tombstone emits nothing. Where it stands for a restricted
+      // node, that node's membership is owned
       // by disk supplementation, not extraction. With no identity it
       // owns no defining folder, so any folder found under it stays
       // silent.
@@ -478,7 +478,7 @@ fn subscribeeFolder_members (
 /// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'FieldIntent').
 ///
-/// Hidden nodes contribute nothing here: a hidden node has no
+/// Restricted nodes contribute nothing here: a restricted node has no
 /// occurrence in the buffer (at most a tombstone where one stood), so
 /// it emits no save intention for its container. Its membership in the
 /// container's contains is owned entirely by disk supplementation

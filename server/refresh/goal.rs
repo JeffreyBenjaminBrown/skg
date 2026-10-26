@@ -169,7 +169,7 @@ fn chain_goal (
   if let Some (goal) = diff_view::chain_goal (pid, walk) {
     return goal; }
   let graph : &InRustGraph = walk . truth . graph;
-  let containers : Vec<ID> = omit_hidden (
+  let containers : Vec<ID> = omit_restricted (
     graph . inbound_pids_for_relation_gated (
       pid, NodeRelation::Contains, walk . truth . restriction ),
     walk );
@@ -179,7 +179,7 @@ fn chain_goal (
               false ) }
 
 /// An occurrence's content: its 'contains' list, its unresolved
-/// members as raw IDs, less what the restriction hides; for a
+/// members as raw IDs, less the restricted members; for a
 /// subscribee as such, less what its subscriber hides or contains
 /// ('unintegrated_content_gnids').
 fn content_goal (
@@ -206,7 +206,7 @@ fn content_goal (
       pid, NodeRelation::Contains, walk . truth . restriction );
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_members_relRepos (graph, pid, &members);
-  let contents : Vec<ID> = omit_hidden (
+  let contents : Vec<ID> = omit_restricted (
     unintegrated ( members . into_iter ()
                    . map ( |member| member . member . into_id () )
                    . collect () ),
@@ -274,8 +274,8 @@ fn folder_goal (
         } else { HashMap::new () };
       Some ( gnid_goal (members, &relRepos, kind . goal_is_ordered ()) ) }, } }
 
-/// What 'subscriber' hides in the content of 'subscribee', less what
-/// the restriction hides: the goal of the compound folder
+/// What 'subscriber' hides in the content of 'subscribee', less the
+/// restricted members: the goal of the compound folder
 /// 'HiddenInSubscribee' under the subscribee as such.
 pub(crate) fn hidden_in_subscribee (
   subscribee : &ID,
@@ -289,10 +289,10 @@ pub(crate) fn hidden_in_subscribee (
       subscribee, NodeRelation::Contains, walk . truth . restriction ),
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ));
-  resolve_all ( omit_hidden (goal, walk), graph ) }
+  resolve_all ( omit_restricted (goal, walk), graph ) }
 
 /// What 'subscriber' hides outside the content of its subscribees,
-/// less what the restriction hides: the goal of its compound folder
+/// less the restricted members: the goal of its compound folder
 /// 'HiddenOutsideOfSubscribee', in the order of its hides list.
 pub(crate) fn hidden_outside_of_subscribees (
   subscriber : &ID,
@@ -306,7 +306,7 @@ pub(crate) fn hidden_outside_of_subscribees (
     &graph . outbound_gnids_for_relation_gated (
       subscriber, NodeRelation::SubscribesTo, walk . truth . restriction ),
     walk . truth . config );
-  resolve_all ( omit_hidden (goal, walk), graph ) }
+  resolve_all ( omit_restricted (goal, walk), graph ) }
 
 /// A property folder's goal: the node's aliases (in order, each with
 /// its relRepo when that differs from the node's home), its IDs (pid
@@ -380,8 +380,9 @@ fn resolve_all (
     . map ( |gnid| graph . relationship_member_key (&gnid) . into_id () )
     . collect () }
 
-/// 'gnids' less what the skgrepo restriction hides.
-fn omit_hidden (
+/// 'gnids' less the members the skgrepo restriction keeps out
+/// ('omit_restricted_members', given the truth's resolver).
+fn omit_restricted (
   gnids : Vec<ID>,
   walk  : &Walk,
 ) -> Vec<ID> {

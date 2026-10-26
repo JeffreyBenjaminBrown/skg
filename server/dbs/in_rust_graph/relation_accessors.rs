@@ -32,12 +32,12 @@ enum StoredRelPartners<'a> {
 }
 
 /// What the gated graph answers for a gnid ('gnid_presence_gated').
-/// A hidden node is one the graph has and the skgrepo restriction
+/// A restricted node is one the graph has and the skgrepo restriction
 /// keeps out of view; it is not an absent one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GnidPresence {
   Present,
-  Hidden,
+  Restricted,
   Absent,
 }
 
@@ -232,7 +232,7 @@ impl InRustGraph {
   /// Whether the gated graph has the node 'gnid' names (a pid or an
   /// extra ID): 'Present' when its home skgrepo is in the skgrepo
   /// restriction, or there is none ('restriction' None or 'all');
-  /// 'Hidden' when the graph has it and the restriction excludes its
+  /// 'Restricted' when the graph has it and the restriction excludes its
   /// home; 'Absent' when the graph has no such node.
   pub fn gnid_presence_gated (
     &self,
@@ -244,7 +244,7 @@ impl InRustGraph {
       Some ((_pid, home)) => match restriction {
         Some (set) if ! set . is_all ()
                       && ! set . contains_skgrepo (&home) =>
-          GnidPresence::Hidden,
+          GnidPresence::Restricted,
         _ => GnidPresence::Present, }, }}
 
   /// Stored outbound members for one relationship. Unlike the PID-oriented

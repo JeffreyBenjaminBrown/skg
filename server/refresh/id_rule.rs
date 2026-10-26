@@ -3,9 +3,9 @@
 //! the node? Then an occurrence. Otherwise, is the mode the diff view,
 //! and does HEAD have the node? Then a ghost. Otherwise, does the list
 //! of the headline's parent name this gnid? Then an unknown.
-//! Otherwise a tombstone. A hidden node answers no to every question:
-//! the truth answers 'Hidden', and the gated goal names no hidden
-//! member.
+//! Otherwise a tombstone. A restricted node answers no to every
+//! question: the truth answers 'Restricted', and the gated goal names
+//! no restricted member.
 //!
 //! The headline is re-kinded where it stands, keeping its vnid, its
 //! fold state, its children and, for an occurrence, its editability.

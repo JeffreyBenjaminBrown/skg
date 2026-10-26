@@ -253,7 +253,7 @@ fn validate_view_roots (
     if ! matches! (
       &root . value () . kind,
         ViewnodeKind::Vognode (Vognode::Occurrence (_))
-        | ViewnodeKind::Tombstone // e.g. a root the skgrepo restriction hides, kept for its children (the API doc's "Restricted-skgrepo nodes")
+        | ViewnodeKind::Tombstone // e.g. where a restricted root stood, kept for its children (the API doc's "Restricted-skgrepo nodes")
         | ViewnodeKind::Vognode (Vognode::Unknown (_))
         | ViewnodeKind::Vognode (Vognode::Ghost (_)))
     { errors . push (

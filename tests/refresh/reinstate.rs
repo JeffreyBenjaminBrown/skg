@@ -129,7 +129,7 @@ node s
      subscriber hides in it" ); }
 
 #[test]
-fn a_folder_omits_what_the_restriction_hides () {
+fn a_folder_omits_the_restricted_members () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["p"]), .. node ("q") },
     Graphnode { contains : ids (&["p"]),

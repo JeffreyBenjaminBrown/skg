@@ -9,7 +9,7 @@ use crate::types::viewnode::Folder;
 /// The members a folder of this kind under the viewparent should hold,
 /// from 'graph': its partners in the folder's relation, each extra ID
 /// resolved to its node's pid (an unresolved ID kept as it is), less
-/// the members the skgrepo restriction hides. In graph order. None if
+/// the restricted members. In graph order. None if
 /// the kind has no relation member role. The refresh's goal of such a
 /// folder in a content view ('server/refresh/goal.rs').
 pub fn partnerFolder_members_in_graph (

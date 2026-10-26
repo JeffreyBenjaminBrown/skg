@@ -166,14 +166,13 @@ impl ViewnodeKind {
                      if ! folder . members_are_properties () ) }
 }
 
-/// A viewnode that stands for a gnid: an occurrence (an
-/// occurrence) for a node the gated graph has; a ghost, only in the
-/// diff view, for a node HEAD has and the worktree lacks; an unknown
-/// for a gnid its parent's list names and no node answers to. A node
-/// the skgrepo restriction hides has no vognode: the refresh
-/// entombstones its occurrence (the ID rule, 'server/refresh/id_rule.rs'),
-/// and so the occurrence of a node that vanished, unless the diff view
-/// can show it as a ghost.
+/// A viewnode that stands for a gnid: an occurrence, for a node the
+/// gated graph has; a ghost, only in the diff view, for a node HEAD
+/// has and the worktree lacks; an unknown, for a gnid its parent's
+/// list names and no node answers to. A restricted node has no
+/// vognode: the refresh entombstones its occurrence (the ID rule,
+/// 'server/refresh/id_rule.rs'), as it does the occurrence of a node
+/// that vanished, unless the diff view can show it as a ghost.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Occurrence   (Occurrence),
