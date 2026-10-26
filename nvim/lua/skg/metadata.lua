@@ -348,6 +348,68 @@ function M.delete ()
     'This change will only be applied when you save the buffer.')
 end
 
+-- ── detach and attach ──────────────────────────────────────────────
+-- Under a parent that reads claims, to detach a child is to write
+-- 'noClaim' on it, so that the next save takes it out of the parent's
+-- list; to attach it is to remove the atom, so that the next save puts
+-- it in ('docs/glossary.org', "claims membership").
+
+---Write 'noClaim' on the headline at point, so that the next save
+---takes it out of its parent's list. Refuses a headline whose parent
+---does not read claims (skg.readiness.editable_parent_p), and one
+---that claims nothing already. Does not save. Mirrors skg-detach.
+function M.detach ()
+  vim.notify(M.set_claim(false))
+end
+
+---Remove 'noClaim' from the headline at point, so that the next save
+---puts it in its parent's list. Refuses a headline whose parent does
+---not read claims, and one that claims membership already. Does not
+---save. Mirrors skg-attach.
+function M.attach ()
+  vim.notify(M.set_claim(true))
+end
+
+---Make the headline at point claim membership of its parent's list
+---when CLAIMS, else claim nothing, by removing or writing 'noClaim'.
+---Errors off a headline, on a headline whose kind cannot carry
+---'noClaim', and under a parent that does not read claims.
+---@param claims boolean
+---@return string what the next save will do, or that nothing changed
+function M.set_claim (claims)
+  if not M.at_headline_p() then error('Not on a headline', 0) end
+  local readiness = require('skg.readiness')
+  local fields = require('skg.sexpr.metadata_fields')
+  local verb = claims and 'attach' or 'detach'
+  local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
+  local kind = fields.kind_of_sexp(metadata_sexp or { SKG })
+  if not vim.tbl_contains(fields.field_names(kind), 'noClaim') then
+    error(string.format(
+      'Cannot %s: a headline of kind %s claims no membership',
+      verb, kind.kind), 0) end
+  local ancestors = readiness.ancestor_sexps_in_lines(
+    vim.api.nvim_buf_get_lines(0, 0, -1, false),
+    M.current_line_number(), 2)
+  if not readiness.editable_parent_p(ancestors[1], ancestors[2]) then
+    error(string.format(
+      'Cannot %s: the parent does not read claims (it is write-protected,'
+      .. ' or no editable node), so no child claims membership of it',
+      verb), 0) end
+  if claims == M.node_member_p(metadata_sexp) then
+    if claims then
+      return 'This headline claims membership already; nothing to attach.'
+    end
+    return 'This headline claims nothing already; nothing to detach.'
+  end
+  if claims then
+    M.edit_metadata_at_point(sexpr.read('(skg (DELETE noClaim))'))
+    return "Attached: the next save puts this headline in its parent's list."
+  end
+  M.edit_metadata_at_point(sexpr.read(
+    metadata_sexp and '(skg noClaim)' or '(skg node noClaim)'))
+  return "Detached: the next save takes this headline out of its parent's list."
+end
+
 ---Mark the headline at point, and every occurrence viewdescendant,
 ---for deletion. Non-occurrence descendants (ghosts, folders, ...) are
 ---skipped. Does not save.

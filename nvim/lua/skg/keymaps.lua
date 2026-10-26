@@ -91,6 +91,10 @@ M.commands = {
                 desc = "Change the node's repo (in-buffer; save applies)" },
   SetRepoRecursive = { module = 'skg.metadata', fn = 'set_repo_recursive',
                          desc = 'Change repo here and in matching descendants' },
+  Detach = { module = 'skg.metadata', fn = 'detach',
+             desc = "Write noClaim: the save takes it out of its parent's list" },
+  Attach = { module = 'skg.metadata', fn = 'attach',
+             desc = "Remove noClaim: the save puts it in its parent's list" },
   SetFlagSearchMatching = { module = 'skg.flag', fn = 'set_search_matching',
                                 desc = 'Stage search matching for this node' },
   SetFlagSearchMatchingRecursive = { module = 'skg.flag',
@@ -266,6 +270,8 @@ M.content_view_bindings = {
   { 'sl', 'RestoreRemovedMembership' },  -- C-c s l
   { 'ss', 'SetRepo' },                 -- C-c s s
   { 'sS', 'SetRepoRecursive' },        -- C-c s S
+  { 'st', 'Detach' },                    -- C-c s t
+  { 'sa', 'Attach' },                    -- C-c s a
   { 'rr', 'CycleCommitReady' },          -- C-c r r
   { 'rR', 'CycleCommitReadyRecursive' }, -- C-u C-c r r
   { 'rh', 'ToggleHomeSkgrepoMoveCommitReady' }, -- C-c r h

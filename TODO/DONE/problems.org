@@ -1,3 +1,32 @@
+* Problems noticed while executing plan 04.1, slice 6 (2026-10-26; fixed 2026-10-26)
+** Emacs: a readiness request blocks skg-set-relRepo
+  Found by the same review ('05_1_review-reports/duplication.org',
+  finding 2; run in emacs --batch). 'skg--node-edit-request-at-point-p'
+  ('elisp/skg-metadata.el') treats anything in '(editRequest ...)'
+  but relRepo as a pending delete or merge, and since plan 04.1 the
+  readiness requests live in that form, so a node marked ready
+  refuses 'skg-set-relRepo'. Fix: skip the readiness parts there
+  ('skg--readiness-request-p' already knows them).
+  Fixed by slice 4 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org':
+  the readiness parts are skipped ('tests/elisp/test-skg-set-relRepo.el',
+  'test-apply-relRepo-under-a-readiness-request').
+** A relRepo request renders as "request~:NAME" in Emacs
+  The herald rule '(editRequest (relRepo (ANY "request:~" IT)))'
+  ('server/heralds.rs') makes the lens token "request:~:priv", and
+  Emacs's 'heralds--strip-structural-colons' consumes the colon
+  before "~" with the "~" itself, so the colon after it survives:
+  the herald reads "request~:priv" where 'docs/heralds.org' promises
+  "request:~NAME" (run in batch Emacs against the pinned table;
+  'tests/results/slice6/relrepo-request.el'). No rendering case
+  covers a relRepo request. The relRepo display fact "~NAME" renders
+  right. Found while slice 6 of
+  'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org' taught the
+  stripping to keep the colon of "⌂:LABEL"; left as it was.
+  Fixed by slice 4 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org':
+  both clients keep a colon before '~', as they keep one after '⌂';
+  Neovim rendered "request~:NAME" too. The rendering case "node: a
+  relRepo request" in 'tests/shared/herald-rendering-cases.txt'
+  covers it.
 * Problems found while planning plan 06 (2026-10-26; fixed 2026-10-26)
 ** A save under a restriction unhides a restricted member
   Found by the experiment 'TODO/simplify-refresh/

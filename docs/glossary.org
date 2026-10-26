@@ -218,7 +218,7 @@ or flags ('PropertyMember' in code).
 A *membership* is the relationship that causes a node to be drawn
 as a member of a list or folder; the member is the node.
 
-*** claims membership, 'noClaim', pending detachment
+*** claims membership, 'noClaim', pending detachment, detach, attach
 
 A child *claims membership* when the save will read it as a member
 of its viewparent's list. That is a declared part: the bare atom
@@ -251,6 +251,16 @@ detach it: a *pending detachment*, herald "detach", which the next
 save takes out of the list. 'docs/data-model_technical.org', "The
 refresh: how a view follows the graph", says how claims and warrants
 move.
+
+Under a viewparent that reads claims, to *detach* a child is to write
+=noClaim= on it, so that the next save takes it out of the
+viewparent's list, and to *attach* it is to remove the atom, so that
+the next save puts it in: two gestures on the declared part, no
+request ('skg-detach' and 'skg-attach', C-c s t and C-c s a;
+':SkgDetach' and ':SkgAttach' in Neovim). Both refuse under a
+viewparent that reads no claims. "Detach" says what the user does to
+a claim, never what the refresh does to the tree: the refresh never
+removes a child.
 
 *** warranted, 'noWarrant', 'ghostWarrant'
 

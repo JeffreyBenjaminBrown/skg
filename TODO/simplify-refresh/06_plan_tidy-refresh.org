@@ -954,7 +954,7 @@ path in the signature.
 'bash/integration-tests.sh'; the fixpoint sweeps
 ('tests/idempotence.rs') unchanged.
 
-** TODO Slice 4: the clients
+** DONE Slice 4: the clients
 Emacs and Neovim together; each item names both where both are
 concerned. Read the duplication report's items 2, 11, 12 and 15
 and the user-docs report's item 2 first.

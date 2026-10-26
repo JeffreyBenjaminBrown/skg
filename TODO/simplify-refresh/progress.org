@@ -2296,3 +2296,163 @@ Jeff's three files intact. Suites: nextest 969 of 969, Emacs
 411, Neovim 401, integration 34 of 35 with the pre-existing
 failure.
 
+
+** Slice 4
+*** The commits
+**** 94029bd7
+The alist parser goes: 'skg-parse-metadata-sexp',
+'skg-reconstruct-metadata-sexp', 'skg-parse-headline-metadata',
+the two delete-kv helpers, the Neovim twins, their tests; with
+them both clients' 'graphStats' special case. The forward-sexp
+pitfall rewritten.
+**** 1398c95e
+A readiness request no longer blocks 'skg-set-relRepo'.
+**** 2ca5429d
+The startup warnings append under "Startup warnings" in both
+clients, keeping the buffer corrections.
+**** 9c991b9d
+A relRepo request's herald reads "request:~NAME" in both clients;
+a rendering case for it.
+**** 793e9371
+One kind reader per client, defaulting to node.
+**** f9787a7e
+One folder-atom reader per client, from the shared kinds.
+**** f4b7b222
+One headline metadata reader per client.
+**** d5509826
+The folder-ancestor walkers call the ancestor readers.
+**** 72bccfee
+Emacs's change-facts reader uses the helpers and checks every
+relRepo move.
+**** e1a92936
+Emacs's 'skg--relationship-removed-p'.
+**** bda65c09
+One '(editRequest ...)' writer in Emacs, placing the form as the
+printer does.
+**** 305c03e9
+The fields module's DEFAULT-SKGREPO path goes.
+**** 362be208
+The clients' dead code.
+**** this record's commit
+'skg-detach', 'skg-attach', ':SkgDetach', ':SkgAttach', their
+tests and docs; it carries this record, the two problems entries
+moved to 'TODO/DONE/problems.org', and the slice's DONE.
+*** The suites
+**** cargo check --all-targets
+Not run: the slice touched no Rust.
+**** bash/nextest.sh
+969 of 969 passed (no Rust changed; run for the rendering cases,
+as the plan asks). The first run failed one test at cleanup with
+'DirectoryNotEmpty',
+'save::extra_id_revocation::rejected_revocation_does_not_mutate_any_store',
+which passed alone and in the full rerun: unrelated flake, the
+'TODO/problems.org' entries slice 5 fixes.
+**** bash/emacs-tests.sh
+412 of 412 passed (eleven tests went with what they tested: two
+of the alist parser, four of the delete-kv helpers, five of the
+DEFAULT-SKGREPO path; twelve came).
+**** bash/nvim-tests.sh
+399 passed, 0 failed, 0 errors, over 34 spec files (eleven went,
+as in Emacs; nine came, eight of them in the new
+'detach_attach_spec.lua').
+**** bash/integration-tests.sh
+34 of 35 passed. The one failure, 'import-md-and-org', is
+pre-existing, as the plan says; not investigated.
+**** failures met during the slice
+One: after the writer placed a new '(editRequest ...)' as the
+printer does, 'test-skg-write-readiness-request-places-it-in-the-
+editRequest' expected it after '(viewRequests ...)'. Expected
+fixture adaptation: the plan asks for the printer's place, before
+the view requests; the expectation was changed. Nothing else
+failed at any point.
+**** the forward-sexp check
+A throwaway batch-Emacs check
+('tests/results/06/slice4/forward-sexp-check.el', its log beside
+it) ran 'forward-sexp' in an org-mode buffer over every metadata
+line of 'tests/shared/herald-rendering-cases.txt' and five other
+forms the server writes: it agreed with 'skg-find-sexp-end' on all
+90. It failed ('scan-error') on metadata holding an unmatched '<',
+'"', '{' or '['. So the special cases were dead (both lived in the
+alist parser), and the pitfall holds only for what a user types
+into metadata; 'elisp/PITFALLs.org' now says so.
+*** Deviations from the plan's "how"
+**** docs rode with their parts
+As slices 1 to 3 did: each item's doc changes are in its own
+commit, not all in the last.
+**** Neovim had the relRepo herald bug too
+The problems entry named Emacs; the new rendering case failed in
+both clients, each rendering "request~:priv". Both keep a colon
+before '~' now, as they keep one after '⌂'.
+**** the startup handler appends; 'skg-big-nonfatal-message' stays
+The plan names 'skg-big-nonfatal-message' as what erased the
+buffer. The import, search and save-error buffers share it and
+should still be replaced, so the startup handler stopped calling
+it: it and the buffer corrections share
+'skg--append-to-server-warnings'. 'skg-messages-to-org-string' and
+its alias 'skg-errors-to-org-string', left without a caller, went
+with the dead code.
+**** the kind reader's default
+'skg-metadata-fields-kind-of-sexp' and 'kind_of_sexp' give the
+occurrence's kind to an '(skg ...)' naming none, and nil to what
+is no '(skg ...)'; their tests changed so. Neovim's
+skgrepo-inheritance walk now reads such metadata as a node's, as
+Emacs did.
+**** the property folders by name
+A partner folder is a folder of the shared kinds but for
+'aliasFolder', 'idFolder' and 'flagsFolder', which each client
+names in a three-atom list; the JSON does not tell them apart.
+**** the headline readers
+Emacs: 'skg--metadata-from' (the '(skg ...)' at a position: start,
+end, sexp), 'skg--metadata-on-line' (a headline's), and
+'skg--metadata-sexp-at-point-or-nil' (its sexp, in any buffer),
+which replaces 'skg--metadata-sexp-on-line'. Unreadable metadata
+is now no metadata to every caller rather than an error to some.
+The heralds keep lensing the first "(skg" on any line (their
+tests rely on it), through 'skg--metadata-from'. id-search's
+'skg--find-metadata-start-on-line' was a sixth reader and uses it
+too. Neovim: 'readiness.headline_sexp' reads a line's text, not a
+buffer line, so it became 'metadata.metadata_sexp_of_line', which
+'metadata_sexp_at_line_or_nil' calls, rather than calling it.
+**** the walkers keep their reach
+Emacs refreshes the two headlines enclosing the edited one,
+Neovim every headline enclosing the line above the edit; each
+starts from a different line, so each keeps its count, now through
+'skg--ancestor-headline-starts-on-line' and
+'readiness.ancestor_indices_in_lines'.
+**** the change-facts helpers moved
+'skg--readiness-form', '-diff-form', '-leaves' and
+'-objects-ready-p' moved from 'skg-readiness.el' to
+'skg-metadata.el', which 'skg-readiness.el' requires, so that the
+folder reader can use them without a require cycle.
+**** the one writer reaches delete and the flag request
+'skg-delete', 'skg-delete-recursive' and the search-matching flag
+request merged their own '(editRequest ...)' in; they now go
+through 'skg--write-edit-request' too, so the form lands where the
+printer puts it and a readiness request in it is kept.
+**** the four older dead functions
+Located at 098d61bf: 'skg--other-unsaved-skg-buffers'
+(skg-buffer.el), 'heralds.tokens_to_chunks',
+'messages.messages_to_org_string' and 'flag._recursive_targets'.
+**** the Neovim command names
+The plan's ':Skg Detach' is ':SkgDetach' (every command is
+'Skg' and its name); likewise ':SkgAttach'.
+**** what detach accepts
+Kinds whose fields include 'noClaim' (occurrence, ghost, unknown,
+alias, ID); a headline without metadata is a node, and detaching
+it writes '(skg node noClaim)'. The parent check is
+'skg--editable-parent-p' / 'readiness.editable_parent_p' over the
+two nearest ancestors; a root is refused.
+*** Fixtures changed
+'tests/shared/herald-rendering-cases.txt' gains "node: a relRepo
+request". Expectations changed: the fields module's ordering tests
+use '(view cycle)' where they used '(graphStats 42)'; the kind
+tests expect the occurrence's kind for '(skg (relRepo r))'; the
+startup-warnings test expects the "Startup warnings" headline; the
+readiness-request placement test expects the form before
+'(viewRequests ...)'.
+*** Left unfinished
+Nothing of slice 4. Noticed: stripping still drops a ' (default)'
+suffix from a nodeRepo value, and the repo cycling still handles
+one, though nothing writes it now; slice 7 aligns the editors.
+*** Headline
+DONE.

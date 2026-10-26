@@ -422,6 +422,23 @@ and the save is refused.
 The same, for the occurrence and its whole content subtree:
 every node in it becomes write-protected,
 and no child under them claims membership.
+*** <localleader>st : :SkgDetach
+Under a parent that reads claims -- an editable occurrence, or a
+folder under one that is not write-protected -- writes 'noClaim' on
+the headline at point, so that the next save takes it out of the
+parent's list. The headline stays in the buffer: a child the graph
+put there shows =detach= until the save, and =⊥= after it.
+Under a parent that reads no claims (a write-protected occurrence, a
+write-protected folder, or none at all) it refuses, since no child
+claims membership there. On a headline that claims nothing already,
+it says so and changes nothing. It does not save.
+*** <localleader>sa : :SkgAttach
+The reverse of <localleader>st: removes 'noClaim' from the headline at point,
+so that the next save puts it in the parent's list. The headline
+keeps its =⊥= until the save. It refuses where <localleader>st does, and on a
+headline that claims membership already it says so and changes
+nothing. It does not save. The metadata editor (<localleader>vm) offers
+'noClaim' as well.
 *** <localleader>ss : :SkgSetRepo
 Changes the skgrepo of the node at point.
 The prompt starts with the current skgrepo as editable command-line

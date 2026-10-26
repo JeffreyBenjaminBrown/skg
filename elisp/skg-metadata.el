@@ -5,6 +5,7 @@
 (require 'org)
 (require 'org-fold-core)
 (require 'skg-config)
+(require 'skg-metadata-fields)
 (require 'skg-sexpr-search)
 (require 'skg-shared)
 
@@ -43,6 +44,61 @@ call `skg-request-save-buffer' afterward."
             (skg--write-edit-request 'delete 'node))) ;; mark a descendent
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
+
+;;; Detach and attach
+;;; Under a parent that reads claims, to detach a child is to write
+;;; 'noClaim' on it, so that the next save takes it out of the
+;;; parent's list; to attach it is to remove the atom, so that the
+;;; next save puts it in ('docs/glossary.org', "claims membership").
+
+(defun skg-detach ()
+  "Write 'noClaim' on the headline at point, so that the next save
+takes it out of its parent's list. Refuses a headline whose parent
+does not read claims (`skg--editable-parent-p'), and one that claims
+nothing already. Does not save; call `skg-request-save-buffer'
+afterward."
+  (interactive)
+  (message "%s" (skg--set-claim nil)))
+
+(defun skg-attach ()
+  "Remove 'noClaim' from the headline at point, so that the next save
+puts it in its parent's list. Refuses a headline whose parent does
+not read claims (`skg--editable-parent-p'), and one that claims
+membership already. Does not save; call `skg-request-save-buffer'
+afterward."
+  (interactive)
+  (message "%s" (skg--set-claim t)))
+
+(defun skg--set-claim (claims)
+  "Make the headline at point claim membership of its parent's list
+when CLAIMS is non-nil, else claim nothing, by removing or writing
+'noClaim'. Returns the message saying what the next save will do, or
+that nothing changed. Signals `user-error' off a headline, on a
+headline whose kind cannot carry 'noClaim', and under a parent that
+does not read claims."
+  (unless (org-at-heading-p)
+    (user-error "Not on a headline"))
+  (let* ((verb (if claims "attach" "detach"))
+         (metadata-sexp (skg--metadata-sexp-at-point-or-nil))
+         (kind (skg-metadata-fields-kind-of-sexp (or metadata-sexp '(skg))))
+         (ancestors (skg--ancestor-metadata-sexps-on-line 2)))
+    (unless (member "noClaim" (skg-metadata-fields-field-names kind))
+      (user-error "Cannot %s: a headline of kind %s claims no membership"
+                  verb (alist-get 'kind kind)))
+    (unless (skg--editable-parent-p (nth 0 ancestors) (nth 1 ancestors))
+      (user-error "Cannot %s: the parent does not read claims (it is write-protected, or no editable node), so no child claims membership of it"
+                  verb))
+    (cond ((eq claims (skg--node-member-p metadata-sexp))
+           (if claims
+               "This headline claims membership already; nothing to attach."
+             "This headline claims nothing already; nothing to detach."))
+          (claims
+           (skg-edit-metadata-at-point '(skg (DELETE noClaim)))
+           "Attached: the next save puts this headline in its parent's list.")
+          (t
+           (skg-edit-metadata-at-point
+            (if metadata-sexp '(skg noClaim) '(skg node noClaim)))
+           "Detached: the next save takes this headline out of its parent's list."))))
 
 (defun skg-view-without-metadata ()
   "Copy the active region to a new org buffer, stripping skg metadata.

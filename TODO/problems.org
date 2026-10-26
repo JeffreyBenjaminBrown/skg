@@ -43,14 +43,6 @@
   'relationship_member_is_visible' ('server/from_text/weave.rs')
   already does. Left as it is.
 * Problems noticed while executing plan 04.1, slice 6 (2026-10-26)
-** FIX PLANNED: Emacs: a readiness request blocks skg-set-relRepo
-  Found by the same review ('05_1_review-reports/duplication.org',
-  finding 2; run in emacs --batch). 'skg--node-edit-request-at-point-p'
-  ('elisp/skg-metadata.el') treats anything in '(editRequest ...)'
-  but relRepo as a pending delete or merge, and since plan 04.1 the
-  readiness requests live in that form, so a node marked ready
-  refuses 'skg-set-relRepo'. Fix: skip the readiness parts there
-  ('skg--readiness-request-p' already knows them).
 ** FIX PLANNED: Flaky "Directory not empty" at a test's cleanup under the parallel run
   During plan 04.1 one Rust test per full run (a different one each
   time: 'rebuild::complete_aliasfolder', 'save::id_folder_outside_diff_view',
@@ -58,18 +50,6 @@
   "Directory not empty" and passed alone. Fixed per-test temp paths
   collide under nextest's parallelism. Fix: a per-test unique
   directory, or a serialized cleanup.
-** FIX PLANNED: A relRepo request renders as "request~:NAME" in Emacs
-  The herald rule '(editRequest (relRepo (ANY "request:~" IT)))'
-  ('server/heralds.rs') makes the lens token "request:~:priv", and
-  Emacs's 'heralds--strip-structural-colons' consumes the colon
-  before "~" with the "~" itself, so the colon after it survives:
-  the herald reads "request~:priv" where 'docs/heralds.org' promises
-  "request:~NAME" (run in batch Emacs against the pinned table;
-  'tests/results/slice6/relrepo-request.el'). No rendering case
-  covers a relRepo request. The relRepo display fact "~NAME" renders
-  right. Found while slice 6 of
-  'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org' taught the
-  stripping to keep the colon of "⌂:LABEL"; left as it was.
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Emacs's relRepo info request always sends a nil recorder
   'skg-set-relRepo' asks the server which skgrepos a relationship may
