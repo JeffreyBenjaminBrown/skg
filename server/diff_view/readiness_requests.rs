@@ -11,7 +11,10 @@
 //! clears the marks of the leaves it names, at their fingerprints in
 //! the graph straddle brought up to date with the save. A request that
 //! names no current change is dropped with a warning. A save that stops
-//! for a confirmation consumes nothing.
+//! for a confirmation consumes nothing. Validation has refused a save
+//! in which two headlines name one leaf, one ready and the other
+//! unready ('find_contradictory_readiness_requests', which reads
+//! 'NamedLeafSet').
 //!
 //! After view completion of a buffer of the diff view, the
 //! '(ready ...)' change facts are set from the store, and the
@@ -114,6 +117,99 @@ pub struct NamedLeaves {
   /// a changeset marker's request names.
   pub content_relationships_of : Vec<(ID, RelationshipAspect)>,
 }
+
+impl NamedLeaves {
+  /// What the request names, as sets of leaves that can be told apart
+  /// without the change forest ('NamedLeafSet').
+  pub fn leaf_sets (
+    &self,
+  ) -> Vec<NamedLeafSet> {
+    self . leaves . iter () . cloned () . map (NamedLeafSet::Leaf)
+      . chain ( self . all_of . iter () . cloned () . map (NamedLeafSet::AllOf) )
+      . chain ( self . content_relationships_of . iter ()
+                . map ( |(pid, aspect)|
+                  NamedLeafSet::ContentRelationshipsOf (pid . clone (), *aspect) ))
+      . collect () }
+}
+
+/// A set of change leaves a request names, told without the change
+/// forest: one leaf; every leaf a node records ('all'); or the
+/// content relationships a node records, of one aspect (a changeset
+/// marker's). Which leaves of the forest the last two hold, the
+/// forest says ('keys_in_forest').
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum NamedLeafSet {
+  Leaf                   (LeafKey),
+  AllOf                  (ID),
+  ContentRelationshipsOf (ID, RelationshipAspect),
+}
+
+impl NamedLeafSet {
+  /// The leaves both sets name, whatever the forest holds, as the
+  /// narrower of the two; None when they can name no leaf in common.
+  pub fn overlap (
+    &self,
+    other : &NamedLeafSet,
+  ) -> Option<NamedLeafSet> {
+    let narrower_within = |narrower : &NamedLeafSet,
+                           wider    : &NamedLeafSet| -> bool {
+      match (narrower, wider) {
+        (NamedLeafSet::Leaf (leaf), NamedLeafSet::AllOf (pid)) =>
+          recorder_of_leaf (leaf) == pid,
+        (NamedLeafSet::Leaf (LeafKey::Relationship { relationship, aspect }),
+         NamedLeafSet::ContentRelationshipsOf (pid, wider_aspect)) =>
+          relationship . relation == NodeRelation::Contains
+          && relationship . recorder == *pid && aspect == wider_aspect,
+        (NamedLeafSet::ContentRelationshipsOf (pid, _),
+         NamedLeafSet::AllOf (wider_pid)) =>
+          pid == wider_pid,
+        _ => narrower == wider, } };
+    if narrower_within (self, other) { Some ( self . clone () ) }
+    else if narrower_within (other, self) { Some ( other . clone () ) }
+    else { None } }
+
+  /// The set in words, for a message.
+  pub fn describe (
+    &self,
+  ) -> String {
+    match self {
+      NamedLeafSet::Leaf (LeafKey::Node { pid, aspect }) => {
+        let what : String = match aspect {
+          NodeAspect::Existence   => "existence" . to_string (),
+          NodeAspect::Text        => "text" . to_string (),
+          NodeAspect::HomeSkgrepo => "home skgrepo" . to_string (),
+          NodeAspect::Alias (alias) => format! ("alias {:?}", alias),
+          NodeAspect::ExtraId (id)  => format! ("extra ID {}", id),
+          NodeAspect::Flag (flag)   => format! ("flag {}", flag . wire_name ()), };
+        format! ("the {} of node {}", what, pid) },
+      NamedLeafSet::Leaf (LeafKey::Relationship { relationship, aspect }) =>
+        format! ("the {} of the relationship {} {} {}",
+                 relationship_aspect_name (*aspect),
+                 relationship . recorder,
+                 relationship . relation . relation_name (),
+                 relationship . member ),
+      NamedLeafSet::AllOf (pid) =>
+        format! ("every change node {} records", pid),
+      NamedLeafSet::ContentRelationshipsOf (pid, aspect) =>
+        format! ("the {} of every content relationship node {} records",
+                 relationship_aspect_name (*aspect), pid), } }
+}
+
+/// The node that records a leaf: a node's own aspect, its node; a
+/// relationship, its recorder.
+fn recorder_of_leaf (
+  leaf : &LeafKey,
+) -> &ID {
+  match leaf {
+    LeafKey::Node { pid, .. } => pid,
+    LeafKey::Relationship { relationship, .. } => &relationship . recorder, } }
+
+fn relationship_aspect_name (
+  aspect : RelationshipAspect,
+) -> &'static str {
+  match aspect {
+    RelationshipAspect::Existence => "existence",
+    RelationshipAspect::RelRepo   => "relRepo", } }
 
 /// The leaves that a request naming the diff objects 'objects' at
 /// 'node' names. No objects on a vognode means both of its objects

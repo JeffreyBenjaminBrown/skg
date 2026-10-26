@@ -7,7 +7,15 @@ use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
+use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::{
+  find_contradictory_readiness_requests, find_inconsistent_instructions};
+use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving_in_graph;
+use skg::dbs::in_rust_graph::InRustGraph;
+use skg::types::errors::HeadlineName;
+use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName};
+use skg::types::viewnode::ViewnodeId;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use skg::test_utils::run_with_test_stores;
 use std::error::Error;
 
@@ -106,3 +114,82 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
         assert_eq!(gnid . 0, "duplicate",
                    "Multiple_Defining_Viewnodes error should come from the duplicate ID"); }
       Ok(( )) } )) }
+
+/// The contradictions 'find_contradictory_readiness_requests' finds
+/// in 'buffer' over an empty graph (each ID resolves to itself): each
+/// leaf described, with the vnids of the headlines naming it.
+fn readiness_contradictions_in (
+  buffer : &str,
+) -> Vec<(String, Vec<String>)> {
+  let viewforest : ViewForest =
+    org_to_viewforest (buffer, IdResolution::AsWritten) . unwrap () . 0;
+  find_contradictory_readiness_requests (
+    &viewforest, &InRustGraph::from_graphnodes (&[]) )
+    . into_iter ()
+    . map ( |(leaf, headlines)| (
+      leaf,
+      headlines . iter ()
+        . map ( |headline : &HeadlineName|
+                headline . viewnode_id . as_ref () . unwrap () . 0 . clone () )
+        . collect () ) )
+    . collect () }
+
+#[test]
+fn two_headlines_naming_one_leaf_ready_and_unready_contradict () {
+  assert_eq! (
+    readiness_contradictions_in ( indoc! {"
+      * (skg (vnid p1) node (gnid p)) p
+      ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unready node))) x
+      "} ),
+    vec! [ ( "the existence of node x" . to_string (),
+             vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
+
+#[test]
+fn an_all_request_contradicts_an_opposite_request_on_a_leaf_its_node_records () {
+  assert_eq! (
+    readiness_contradictions_in ( indoc! {"
+      * (skg (vnid x1) node (gnid x) (editRequest (unready all))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (ready node))) x
+      "} ),
+    vec! [ ( "the existence of node x" . to_string (),
+             vec! [ "x1" . to_string (), "x2" . to_string () ] ) ] ); }
+
+#[test]
+fn readiness_requests_that_agree_or_name_different_leaves_pass () {
+  assert! ( readiness_contradictions_in ( indoc! {"
+      * (skg (vnid p1) node (gnid p)) p
+      ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (ready))) x
+      "} ) . is_empty (),
+    "two requests that agree" );
+  assert! ( readiness_contradictions_in ( indoc! {"
+      * (skg (vnid p1) node (gnid p)) p
+      ** (skg (vnid x1) node (gnid x) (editRequest (ready node))) x
+      * (skg (vnid x2) node (gnid x) writeProtected (editRequest (unready rel))) x
+      "} ) . is_empty (),
+    "a node's existence and its relationship to its viewparent are \
+     different leaves" ); }
+
+#[test]
+fn validation_refuses_contradictory_readiness_requests () -> Result<(), Box<dyn Error>> {
+  let viewforest : ViewForest = org_to_viewforest ( indoc! {"
+      * (skg (vnid x1) node (gnid x) (skgRepos (nodeRepo main)) (editRequest (ready node))) x
+      * (skg (vnid x2) node (gnid x) (skgRepos (nodeRepo main)) writeProtected (editRequest (unready node))) x
+      "}, IdResolution::AsWritten ) . unwrap () . 0;
+  let config : SkgConfig = SkgConfig::dummyFromSkgrepos ( HashMap::from ([
+    ( SkgrepoName::from ("main"),
+      Skgrepo { name : SkgrepoName::from ("main"), abbreviation : None,
+                path : PathBuf::from ("/tmp/main"), owned : true } ) ]));
+  let errors : Vec<BufferValidationError> = find_buffer_errors_for_saving_in_graph (
+    &viewforest, &InRustGraph::from_graphnodes (&[]), &config ) ?;
+  let refusals : Vec<&BufferValidationError> = errors . iter ()
+    . filter ( |e| matches! ( e, BufferValidationError::ContradictoryReadinessRequests (..) ))
+    . collect ();
+  assert_eq! ( refusals . len (), 1, "errors: {:?}", errors );
+  assert_eq! ( refusals [0] . named_headlines () . iter ()
+               . map ( |headline| headline . viewnode_id . clone () )
+               . collect::<Vec<Option<ViewnodeId>>> (),
+               vec! [ Some ( ViewnodeId ("x1" . into ()) ),
+                      Some ( ViewnodeId ("x2" . into ()) ) ] );
+  Ok (( )) }

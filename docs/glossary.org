@@ -240,7 +240,7 @@ Under an editable parent the refresh marks =noClaim= on every child
 it keeps that the graph does not relate to its viewparent (see
 "warranted, 'noWarrant', 'ghostWarrant'"): one whose relationship a
 save in another view removed, a removed member in the diff view, a
-child a merge of siblings moved there. A child the graph does relate
+child a viewnode merge moved there. A child the graph does relate
 there and that claims nothing is one the user marked =noClaim= to
 detach it: a *pending detachment*, herald "detach", which the next
 save takes out of the list. 'docs/data-model_technical.org', "The
@@ -1224,7 +1224,7 @@ children's order. A parent whose position implies no relationship
 *** the ladder, unsayable
 
 The fixed order of corrections the refresh applies at each parent to
-its children, weakest first: re-kind, merge of siblings, warrant,
+its children, weakest first: re-kind, viewnode merge, warrant,
 claims, reinstate, reorder, override substitution, view requests
 ('server/refresh/ladder.rs'; 'docs/data-model_technical.org', "The
 walk and the ladder"). A descriptor -- a folder, a property member, a
@@ -1235,15 +1235,26 @@ entombstoned, its children staying under the tombstone. An occurrence
 is never unsayable. (This ladder is not the privacy ladder, the
 skgrepos in privacy order.)
 
-*** merge of siblings
+*** viewnode merge, duplicate viewnode siblings
 
-The ladder's second rung ('merge_siblings'): siblings standing for
-one gnid are unified into the first, which keeps its viewnode ID and
-fold state, is editable if any of them was, and takes the others'
-children, each marked =noClaim= unless the graph warrants it there.
-So a copy pasted beside a member merges into it. It is neither a
-nodeMerge nor an instructionMerge, and is never called a bare
-"merge".
+*Duplicate viewnode siblings* are siblings standing for one gnid
+under one parent. The ladder's second rung ('merge_siblings') makes
+each set of them one viewnode, by a *viewnode merge*. The result
+stands where the first of them stood and has a fresh viewnode ID.
+It is folded only if every sibling was, and its body is folded only
+if every sibling's was; it is focused if any sibling was; it is
+editable if any sibling was, unless it stands for another node (a
+node and its shown overrider stand for one gnid) whose editable
+occurrence is elsewhere in the buffer; it claims membership if any
+sibling did. It carries the union of the siblings' view requests,
+and the edit request and relationship request of whichever sibling
+carried one. It holds every sibling's children in sibling order,
+each marked =noClaim= unless the graph warrants it there. So a copy
+pasted beside a member merges into it. The buffer correction
+"merged" names the result. A viewnode merge is neither a nodeMerge,
+which joins two graphnodes, nor an instructionMerge, and is never
+called a bare "merge". Both terms are coined by plan 06 ("tidy the
+refresh").
 
 *** extent, extension, node budget
 

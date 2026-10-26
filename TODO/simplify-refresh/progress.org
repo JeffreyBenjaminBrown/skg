@@ -1638,3 +1638,86 @@ Unrelated and pre-existing, as in slices 0 to 12, with either
 client, in the run and its retry. 'bash/all-tests.sh': build,
 ERT, plenary, nextest (956 of 956) and doctests pass;
 integration 68 of 70.
+* Tidy refresh
+** Slice 0
+*** The commits
+**** 2ed60ab2
+The viewnode merge: the result claims, folds, focuses and is
+editable by the "any" and "all" rules, carries the union of the
+requests, and gets a fresh vnid; 'SiblingsMerged'; the tests in
+'tests/refresh/merge_of_siblings.rs'.
+**** this record's commit
+Validation refuses contradictory readiness requests; the
+glossary, the technical data model and the diff-view doc; this
+slice DONE;
+the problems.org entry moved to 'TODO/DONE/problems.org'.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+965 of 965 passed.
+**** bash/integration-tests.sh
+34 of 35 passed. The one failure, 'import-md-and-org', is
+pre-existing, as the plan says; not investigated.
+**** the isolated instance (the verify skill)
+A scratch server on port 1750, scratch data, removed after.
+Saving p with two siblings c, the first 'writeProtected noClaim'
+and folded, the second editable and claiming, kept c in p's file,
+answered one correction "Merged duplicate viewnode siblings into
+this one.", and drew the result unfolded. Two headlines naming
+the existence of c, ready and unready, were refused, naming the
+change and both vnids; two that agreed saved.
+*** Deviations from the plan's "how"
+**** one correction per result
+'merge_siblings' groups the duplicates first and records one
+"merged" buffer correction per result, after the last sibling is
+merged into it, rather than one per pairwise merge: three
+siblings make one correction, which names the result.
+**** a correction names the vnid its headline holds at the end
+'CorrectionLog::into_corrections' now prefers the vnid the
+headline holds after the tail over the one it held when the
+correction was made. Without it, a correction recorded on the
+first sibling before the merge (a re-kind, say) would name the
+vnid the merge cleared, which is no longer in the buffer.
+**** the readiness request rides with the edit request
+The plan lists the edit and relationship requests; the readiness
+request, which rides in '(editRequest ...)' on the wire, is
+carried the same way: the result keeps its own, or else takes
+the merged sibling's.
+**** the editable-view request's extension passes too
+When the result takes the merged sibling's editability, it also
+takes the sibling's place in 'Walk::had_editableView_request', so
+that the content an editable-view request extends is still drawn.
+The request itself was fulfilled before the walk.
+**** ghosts and unknowns merge their requests too
+A ghost result takes the tombstone and restoreNode requests if
+either ghost carried them; an unknown takes the relationship
+request. The claim merges for every kind ('set_claim').
+**** the readiness check without the change forest
+Validation has no change forest, and 'leaves_named_at' names an
+'all' request, or a changeset marker's, as a set the forest fills
+in. 'NamedLeafSet' ('server/diff_view/readiness_requests.rs')
+holds one leaf, every leaf a node records, or a node's content
+relationships of one aspect; two opposite requests contradict
+where their sets can share a leaf, and the refusal names the
+shared part. A leaf named outright conflicts with an 'all' on its
+recorder even when the forest lacks that leaf; such a request
+would have been dropped with a warning anyway.
+**** the refusal is a variant of its own
+'BufferValidationError::ContradictoryReadinessRequests' (the leaf
+described, the headlines in buffer order), formatted as the
+deletion refusal is, beside it in 'validate_tree.rs'.
+**** a sentence in the docs beyond the plan's list
+'docs/diff-view.org', "Readiness requests and gestures", and the
+module comment of 'readiness_requests.rs' say that validation
+refuses contradictory requests.
+*** Fixtures changed
+None. The merge tests' first case now expects the result
+unfolded (its second sibling was not folded) and no longer checks
+that it keeps the first's vnid; a new case checks the fresh vnid.
+*** Left unfinished
+Nothing of slice 0. Noticed: 'coding-advice/names.org' lists the
+qualified merges as nodeMerge and instructionMerge; it does not
+yet name the viewnode merge. The plan does not ask for that edit.
+*** Headline
+DONE.

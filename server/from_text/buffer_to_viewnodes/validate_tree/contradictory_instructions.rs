@@ -1,3 +1,7 @@
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::diff_view::readiness_requests::{
+  NamedLeafSet, RequestedReadiness, readiness_requests_in_viewforest};
+use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
 use crate::types::viewnode::Vognode;
@@ -109,3 +113,46 @@ fn collect_instructions(
     &mut id_toDelete_instructions,
     &mut id_to_definers);
   (id_toDelete_instructions, id_to_definers) }
+
+/// PURPOSE:
+/// Find the change leaves that two headlines of a buffer the user
+/// asked to save name with contradictory readiness requests, one
+/// '(ready ...)' and one '(unready ...)'. Each is returned described
+/// ('NamedLeafSet::describe'), with the headlines that name it, in
+/// buffer order. Requests that agree contradict nothing.
+/// .
+/// STRATEGY:
+/// Which leaves a request names is 'leaves_named_at'
+/// ('server/diff_view/readiness_requests.rs'), resolving IDs through
+/// 'graph'. Without the change forest, an 'all' request, or a
+/// changeset marker's, names a set of leaves that the forest fills
+/// in; two requests contradict where their sets can share a leaf
+/// ('NamedLeafSet::overlap'), and the shared part is what is named.
+pub fn find_contradictory_readiness_requests (
+  viewforest : &ViewForest,
+  graph      : &InRustGraph,
+) -> Vec<(String, Vec<HeadlineName>)> {
+  let requests : Vec<RequestedReadiness> =
+    readiness_requests_in_viewforest (viewforest, graph);
+  let mut contradictions : Vec<(NamedLeafSet, Vec<HeadlineName>)> = Vec::new ();
+  for (position, ready) in requests . iter () . enumerate () {
+    for unready in &requests [position + 1 ..] {
+      if ready . ready == unready . ready { continue; }
+      for ready_set in ready . named . leaf_sets () {
+        for unready_set in unready . named . leaf_sets () {
+          let Some (shared) = ready_set . overlap (&unready_set)
+            else { continue; };
+          let headlines : &mut Vec<HeadlineName> =
+            match contradictions . iter () . position ( |(set, _)| *set == shared ) {
+              Some (index) => &mut contradictions [index] . 1,
+              None => { contradictions . push (( shared, Vec::new () ));
+                        &mut contradictions . last_mut () . unwrap () . 1 }, };
+          for headline in [ &ready . headline, &unready . headline ] {
+            if ! headlines . contains (headline) {
+              headlines . push ( headline . clone () ); }} }} }}
+  contradictions . into_iter ()
+    . map ( |(set, mut headlines)| {
+      headlines . sort_by_key ( |headline| requests . iter ()
+        . position ( |request| request . headline == *headline ) );
+      ( set . describe (), headlines ) } )
+    . collect () }

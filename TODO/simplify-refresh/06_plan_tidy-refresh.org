@@ -612,7 +612,7 @@ Each slice ends with the tests it names; "the suites" means
 plus 'bash/emacs-tests.sh', 'bash/nvim-tests.sh' and
 'bash/integration-tests.sh' green where the slice says so.
 
-** TODO Slice 0: the viewnode merge, and contradictory readiness
+** DONE Slice 0: the viewnode merge, and contradictory readiness
 *** the rule
 In 'merge_into' and 'merge_siblings' ('server/refresh/
 ladder.rs'), implement "The viewnode merge" of the agreed

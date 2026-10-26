@@ -29,17 +29,6 @@
   is drawn under "all" and gone under "public". Not explained.
   Plan 06, slice 1, finds the cause and records it.
 * Problems noticed while executing plan 04.1, slice 6 (2026-10-26)
-** FIX PLANNED: The refresh's merge drops the editable twin's claim
-  Found by the review of plan 04.1 ('TODO/simplify-refresh/05_review.org',
-  Decide 1; 'TODO/simplify-refresh/05_1_review-reports/probes.org',
-  probe b). 'merge_into' ('server/refresh/ladder.rs') passes the
-  merged sibling's editability to the surviving first sibling but
-  not its claim. Validation lets one sibling claim, so when the
-  claimant is not first the survivor keeps the first's 'noClaim',
-  is warranted, and is a pending detachment; saving the buffer back
-  unchanged removed the node from its parent's file. Every suite was
-  green over it. Fix: the survivor claims if any sibling did, and a
-  unit test in 'tests/refresh/merge.rs'.
 ** FIX PLANNED: Emacs: a readiness request blocks skg-set-relRepo
   Found by the same review ('05_1_review-reports/duplication.org',
   finding 2; run in emacs --batch). 'skg--node-edit-request-at-point-p'

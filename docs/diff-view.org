@@ -497,7 +497,11 @@ the headline lacks one) and saves; the save
 consumes them after its graph edits succeed (not when it stops for a
 confirmation), in any buffer, marking or unmarking the leaves each
 headline names at their current fingerprints. A request naming no
-current change is dropped with a warning. 'all' names every leaf a
+current change is dropped with a warning. Validation refuses a save
+in which two headlines name one leaf, one ready and the other
+unready, naming the leaf and both headlines
+('find_contradictory_readiness_requests'); requests that agree are
+consumed as usual. 'all' names every leaf a
 modified node records, or every leaf of a commit readiness aggregate
 one level down.
 

@@ -275,10 +275,14 @@ goal, and runs the *ladder*, its corrections in order, weakest first:
    descriptor whose position the ancestry table forbids, or, for a
    change viewnode, whose change is gone, is *unsayable* and becomes a
    tombstone;
-2. merge: siblings standing for one gnid are unified, the first
-   surviving with its viewnode ID and fold state, editable if any was;
-   the others' children are appended to it, each marked =noClaim=
-   unless the truth warrants it there;
+2. viewnode merge: duplicate viewnode siblings, standing for one
+   gnid, are merged into one viewnode, which stands where the first
+   stood and gets a fresh viewnode ID; it is folded (and body-folded)
+   only if every sibling was, and focused, editable and claiming if
+   any was; it carries the siblings' requests; every sibling's
+   children are appended to it in sibling order, each marked
+   =noClaim= unless the truth warrants it there (the glossary's
+   "viewnode merge");
 3. warrant: each child's warrant is set from P's goal;
 4. claims: under a parent whose claims are read, each child that
    claims and that the truth does not warrant is marked =noClaim=;

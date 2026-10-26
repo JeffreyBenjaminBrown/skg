@@ -202,6 +202,9 @@ fn buffer_validation_error_text (
     BufferValidationError::AmbiguousDeletion (gnid, _) => {
       format!("ID has ambiguous deletion instructions:\n- ID: {}\n",
               gnid . 0) },
+    BufferValidationError::ContradictoryReadinessRequests (leaf, _) => {
+      format!("Contradictory readiness requests: one headline asks that a change be marked ready, another that it be marked unready:\n- the change: {}\n- Remove one of the two requests.\n",
+              leaf) },
     BufferValidationError::DuplicatedContent (gnid) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
               gnid . 0) },

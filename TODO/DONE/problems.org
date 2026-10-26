@@ -1,3 +1,19 @@
+* Problems noticed while executing plan 04.1, slice 6 (2026-10-26; fixed 2026-10-26)
+** The refresh's merge drops the editable twin's claim
+  Found by the review of plan 04.1 ('TODO/simplify-refresh/05_review.org',
+  Decide 1; 'TODO/simplify-refresh/05_1_review-reports/probes.org',
+  probe b). 'merge_into' ('server/refresh/ladder.rs') passes the
+  merged sibling's editability to the surviving first sibling but
+  not its claim. Validation lets one sibling claim, so when the
+  claimant is not first the survivor keeps the first's 'noClaim',
+  is warranted, and is a pending detachment; saving the buffer back
+  unchanged removed the node from its parent's file. Every suite was
+  green over it. Fix: the survivor claims if any sibling did, and a
+  unit test in 'tests/refresh/merge.rs'.
+  Fixed by slice 0 of 'TODO/simplify-refresh/06_plan_tidy-refresh.org':
+  the result of a viewnode merge claims if any sibling did
+  ('tests/refresh/merge_of_siblings.rs',
+  'the_result_claims_when_the_claiming_sibling_is_second').
 * Problems noticed while executing plan 04.1, slice 2 (2026-10-26; fixed 2026-10-26)
 ** A tombstone over a hidden node's children reads DELETED
   Since slice 2 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
