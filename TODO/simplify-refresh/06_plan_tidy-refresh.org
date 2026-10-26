@@ -775,7 +775,7 @@ with 'initial_node_limit' raised) before and after, through
 'progress.org'. Then the suites, with 'bash/emacs-tests.sh',
 'bash/nvim-tests.sh' and 'bash/integration-tests.sh'.
 
-** TODO Slice 2: the server's words
+** DONE Slice 2: the server's words
 Every item cites the report that locates it; read the finding,
 then change every site it names and every other site a grep
 finds. Each rename is mechanical; none changes behavior, except

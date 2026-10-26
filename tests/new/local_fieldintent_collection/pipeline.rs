@@ -242,7 +242,7 @@ async fn pipeline_restricted_subtree (
         members_of (&saved_node_by_gnid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new(),
         "the tombstone emits no contains membership; under a \
-         restricted set the weave restores a hidden node's from disk \
+         restricted set the weave restores a restricted node's from disk \
          (see tests/repo_sets.rs)" );
       Ok (( )) }
 
@@ -254,7 +254,7 @@ async fn pipeline_ghost_subtree (
         indoc! {"
             * (skg node (gnid root) (skgRepos (nodeRepo main))) root
             ** (skg ghost (gnid fading) (skgRepos (nodeRepo main)) noClaim) fading
-            *** (skg node (gnid survivor) (skgRepos (nodeRepo main))) survivor
+            *** (skg node (gnid underneath) (skgRepos (nodeRepo main))) underneath
             "};
       let forest : ViewForest = placed_forest_from_org (input);
       let (plan, _) =
@@ -262,9 +262,9 @@ async fn pipeline_ghost_subtree (
           &forest, config, None)?;
       assert_eq!(
         save_gnids (&plan . node_instructions),
-        // survivor is on the new recursion surface; the ghost
+        // underneath is on the new recursion surface; the ghost
         // itself emits nothing and is not content of its parent.
-        vec![ ID::from ("root"), ID::from ("survivor") ]);
+        vec![ ID::from ("root"), ID::from ("underneath") ]);
       assert_eq!(
         members_of (&saved_node_by_gnid (&plan . node_instructions, "root") . contains),
         Vec::<ID>::new() );

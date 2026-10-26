@@ -213,7 +213,7 @@ fn editable_child_of_tombstone_emits () {
   assert_eq!( entry (&collected, "root") . contains,
               Some (vec![]),
               "the tombstone is not content of its parent; where it \
-               stands for a hidden node, the disk weave owns that \
+               stands for a restricted node, the disk weave owns that \
                membership" ); }
 
 #[test]
@@ -222,15 +222,15 @@ fn editable_node_inside_ghost_subtree_emits () {
     indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       ** (skg ghost (gnid fading) (skgRepos (nodeRepo main)) noClaim) fading
-      *** (skg node (gnid survivor) (skgRepos (nodeRepo main))) survivor
+      *** (skg node (gnid underneath) (skgRepos (nodeRepo main))) underneath
       "};
   let forest : ViewForest = forest_from_org (input);
   let collected : CollectedFieldIntents =
     collect_instructions_locally (&forest) . unwrap();
   assert!( collected . by_pid . get (&ID::from ("fading")) . is_none(),
            "the ghost itself emits nothing" );
-  { let survivor : &FieldIntentsForOneId = entry (&collected, "survivor");
-    assert!( survivor . title_and_body . is_some(),
+  { let underneath : &FieldIntentsForOneId = entry (&collected, "underneath");
+    assert!( underneath . title_and_body . is_some(),
              "an editable node beneath a ghost emits for itself" ); }
   assert_eq!( entry (&collected, "root") . contains, Some (vec![]),
               "the ghost is not content of its parent" ); }

@@ -1941,3 +1941,161 @@ launches with the context of slice 1's names:
 'orphan_warnings', 'relationship_member_is_visible', the
 'prepass' hook gone.
 
+
+** Slice 2
+*** The commits
+**** 25cbae67
+The correction carried from slice 1: a folder the restriction
+empties stays. 'RestrictedGoalList', 'Goal::emptied_by_the_
+restriction', 'Walk::emptied_folders', the tail's condition and
+its three tests go; the switch tests of 'tests/hidden_nodes.rs'
+assert the emptied folders stay, empty, and fill again.
+**** a50db1a3
+"Restricted" for the restriction's sense: 'GnidPresence::
+Restricted', 'omit_restricted', comments, test names, glossary.
+**** b095c973
+"Claiming": 'claiming_children_have_distinct_gnids',
+'skip_non_claimants', the six messages, the citing comments.
+**** aee346f6
+No bare "merge" or "marker": 'ChangeKey::ChangesetMarker', the
+docs and a test header say "viewnode merge".
+**** 98f63807
+The refresh "never removes a child", in docs and comments.
+**** 3f6ab8f9
+One accessor for an occurrence's gnid: 'occurrence_gnid'.
+**** 905ef3a6
+The restore requests are parse-only ('RestoreRequest').
+**** c35f628b
+'BufferCorrectionKind::Rekinded' takes a 'VognodeKind'.
+**** 8453f57c
+Truth, the overridesHere part, per-kind rules, 'change_facts',
+"headline with change facts", "property member",
+'described_node' and 'CompoundFolderParties'.
+**** 0cfab0d3
+'isWarranted' is 'warrant'; an unknown keeps one.
+**** e6cbc24b
+"Buffer corrections": the file, the types, the server's names,
+the docs and comments, and the clients' per-view headline.
+**** abce1d60
+No "pre-pass".
+**** e34a7daa
+Leftovers: 'added_compound_folders', occurrences no longer bound
+as 'restriction', 'Walk::hold_editability' and
+'release_editability', four corrected comments.
+**** 23cd3c70
+Comments say "the refresh"; the false ones corrected.
+**** this record's commit
+Two test fixtures' node "survivor" renamed, for the slice's
+grep; this record; the slice DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+967 of 967 passed (slice 1's 970 less the three tests of the
+withdrawn rule). Two earlier runs each failed one test at
+cleanup with 'DirectoryNotEmpty'
+('save::extra_id_revocation::rejected_revocation_does_not_
+mutate_any_store', then 'partner_folder_warnings::all_tests'),
+each passing alone or on the next run: unrelated flake, the
+'TODO/problems.org' entries slice 5 fixes.
+**** bash/emacs-tests.sh
+410 of 410 passed.
+**** bash/nvim-tests.sh
+400 passed, 0 failed, 0 errors, over 33 spec files. One run
+before had failed 'skg.server_warnings ... a second batch goes
+after the first': expected fixture adaptation, the per-view
+headline now reading "Buffer corrections in"; fixed.
+**** the integration test whose expectations changed
+'save_collateral_add_content_and_modify_text', alone, with both
+clients: passed. The full integration suite was not run; the
+plan does not ask it of this slice.
+**** the three greps
+Empty: 'non-ignored|nonignored', 'GnidPresence::Hidden|
+omit_hidden', 'survivor'.
+*** Deviations from the plan's "how"
+**** docs rode with their parts
+Each item's doc changes are in its own commit, as slice 1 did,
+none in a commit of its own.
+**** the unknown keeps a warrant the printer does not write
+The plan said to give the unknown a warrant field or document
+why it has none, whichever the docs say; the docs give every
+child a warrant, so 'Unknown::warrant' exists and 'set_warrant'
+stores it. The metadata grammar gives an unknown no '(view
+...)', so the printer writes none; nothing reads it yet. It is
+never 'No': the ID rule makes an unknown only where the goal
+names it.
+**** the vognode-kind enum
+'VognodeKind' ('server/types/viewnode.rs'), with
+'with_article'. The message reads "Made a headline an
+occurrence, as the graph has it."
+**** the parse-only enum
+'RestoreRequest' in 'parse_metadata_sexp.rs', carried in
+'ViewnodeMetadata::restore_request'; the parser reads at most
+one edit or restore request per headline, so the two fields
+never both hold one.
+**** the parties are indices
+'CompoundFolderParties' holds the subscriber's and subscribee's
+indices into the folder's required ancestry, so that the goal
+reads them through 'required_ancestor_of' and the birth facts
+derive their generations from them (index + 2) where the stats
+pass had the numbers 2, 3 and 4. 'described_node' is the
+subscribee as such for the hidden-in folder, the subscriber for
+the hidden-outside folder, else the viewparent; 'parent_reads_
+claims' asks it.
+**** buffer corrections, how far
+Beyond the four names the plan lists: 'BufferCorrectionLog',
+'into_buffer_corrections', the fields 'Walk::buffer_
+corrections', 'Refreshed::buffer_corrections',
+'SaveResponse::buffer_corrections', every
+'buffer_correction_policy', and 'tests/refresh/buffer_
+corrections.rs'. Kept, as named for the wire field:
+'corrections_entry_sexp', which builds '(corrections ...)', and
+'tests/corrections_channel.rs' with its fixture folder. Where
+the docs said the ladder applies "its corrections in order"
+they say "its rungs". The clients' per-view headline is
+"Buffer corrections in" and the view's buffer name.
+**** "headline with change facts" reached the clients
+The grep found "change headline" in both clients' docstrings,
+the Neovim keymap descriptions, the commands docs and two test
+identifiers; all say "headline with change facts" now.
+**** what the editability methods are called
+'hold_editability' (whether the occurrence may hold the gnid's
+one editability) and 'release_editability'. Reads of
+'editable_gnids' stay direct.
+**** the overridesHere part's sections
+The section titles in 'docs/api-and-formats.org' and
+'docs/override.org' say "part", their citations follow, and
+'overridesHere_fact_errors' is 'overridesHere_part_errors'.
+**** stale claims beyond the two lists
+The collateral integration test's "known limitation" (the
+collateral update failing for a new node) was false, the test
+checking that it succeeds; its headers say what it checks. The
+merge test's header narrated a fixed bug; it says what it
+asserts.
+*** Fixtures changed
+None of the fixture data. Expectations changed: the switched
+buffers of 'tests/hidden_nodes.rs' (the plan's correction;
+'a_switch_prunes_the_folders_the_restriction_empties' is
+'a_switch_keeps_the_folders_the_restriction_empties'); the
+message patterns of 'tests/new/buffer_to_viewnodes/
+validate_tree.rs'; the per-view headline in both clients'
+tests and the collateral integration test; the node "survivor"
+of two save tests is "underneath".
+*** Left unfinished
+Nothing of slice 2. Noticed:
+**** the forward-sexp pitfall
+'elisp/PITFALLs.org', "Can't use forward-sexp on skg metadata",
+argues from '(graphStats ... (containsHerald 0{9))', which the
+server no longer writes; whether the pitfall still holds was
+not checked. Both clients still special-case 'graphStats'
+('skg-metadata.el', 'metadata.lua'), likely dead.
+**** two identical dependency collectors
+'dependencies_from_uninterpreted' and
+'dependencies_from_registered'
+('server/serve/handlers/save_dependencies/mod.rs') have the same
+body.
+**** readability item 10's other renames
+'parent_is_editable' still holds 'parent_reads_claims' in
+'mark_claims'; the plan's slice 2 does not list it.
+*** Headline
+DONE.
