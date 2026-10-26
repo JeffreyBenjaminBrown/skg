@@ -11,7 +11,7 @@
 /// and a request on a chain node for its containers draws a
 /// containers folder under it like any other. A chain node carries no
 /// change facts and takes no commit-readiness marker
-/// ('is_in_containerward_chain').
+/// ('stands_in_containerward_chain').
 
 use crate::dbs::in_rust_graph::containerward_role_tree::{ ContainerwardRoleTree, containerward_role_trees_by_skgid_from_skgids, containers_in_inRustGraph};
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -21,6 +21,7 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::util::graphnode_and_viewnode_from_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::phantom::home_from_disk;
+use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::types::viewnode::{ DiffChange, Viewnode, ViewnodeKind, Vognode, mk_unknown_viewnode, mk_writeProtected_from_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
@@ -158,33 +159,6 @@ fn prepend_containerward_chain_node (
               . prepend (viewnode)
               . id () )) }
 
-/// Whether 'node' is a chain node: a non-member vognode under a
-/// member of a partner folder whose members carry the chain
-/// ('Folder::members_carry_containerward_chain'), or under
-/// another chain node.
-pub fn is_in_containerward_chain (
-  node : NodeRef<Viewnode>,
-) -> bool {
-  let mut current : NodeRef<Viewnode> = node;
-  loop {
-    let ViewnodeKind::Vognode (vognode) = &current . value () . kind
-      else { return false; };
-    let is_nonMember : bool = match vognode {
-      Vognode::Unrestricted (t) => ! t . claimsMembership,
-      _ => true, };
-    if ! is_nonMember { return false; }
-    let Some (parent) : Option<NodeRef<Viewnode>> = current . parent ()
-      else { return false; };
-    let ViewnodeKind::Vognode (_) = &parent . value () . kind
-      else { return false; };
-    let parent_is_a_chain_carrying_folder_member : bool =
-      parent . parent () . is_some_and ( |grandparent| matches! (
-        &grandparent . value () . kind,
-        ViewnodeKind::Folder (kind)
-          if kind . members_carry_containerward_chain () ));
-    if parent_is_a_chain_carrying_folder_member { return true; }
-    current = parent; }}
-
 /// Whether 'node' is a chain node as the walk draws it: write-protected
 /// (or a phantom, for a container it cannot show), carrying no change
 /// facts. So a non-member the user typed
@@ -195,7 +169,7 @@ pub fn is_drawn_chain_node (
   node : NodeRef<Viewnode>,
 ) -> bool {
   let viewnode : &Viewnode = node . value ();
-  is_in_containerward_chain (node)
+  stands_in_containerward_chain (node)
     && viewnode . editable_skgid () . is_none ()
     && viewnode . change_facts . change == DiffChange::default ()
     && ! matches! ( viewnode . kind,

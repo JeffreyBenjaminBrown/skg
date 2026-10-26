@@ -135,3 +135,23 @@ pub fn required_ancestor_of (
   if i >= required_ancestry (&node . value () . kind) . len () {
     return None; }
   node . ancestors () . nth (i) . map ( |ancestor| ancestor . id () ) }
+
+/// Whether the save reads the claims of the children of 'parent': an
+/// editable occurrence, or an editable folder whose node is an
+/// editable occurrence. Under any other parent no child claims
+/// membership, whatever it carries, and the printer writes no
+/// 'noClaim' there.
+pub fn parent_reads_claims (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+) -> bool {
+  match &tree . get (parent) . unwrap () . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+      ! occurrence . is_writeProtected (),
+    ViewnodeKind::Folder (folder) if folder . is_editable () => {
+      let anchor_depth : usize = // the node the folder describes
+        if matches! ( folder, Folder::HiddenOutsideOfSubscribee ) { 1 } else { 0 };
+      required_ancestor_of (tree, parent, anchor_depth)
+        . and_then ( |anchor| tree . get (anchor) )
+        . is_some_and ( |anchor| anchor . value () . editable_skgid () . is_some () ) },
+    _ => false, } }

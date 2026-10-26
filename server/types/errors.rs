@@ -73,11 +73,6 @@ pub enum BufferValidationError {
     changes  : Vec<String>,
     headline : HeadlineName,
   }, // This occurrence differs from the graph, but a write-protected occurrence emits no fieldIntent for the differing data.
-  MemberChildOfWriteProtectedOccurrence {
-    skgid    : ID,
-    title    : String,
-    headline : HeadlineName,
-  }, // A write-protected occurrence has a member child, but a write-protected occurrence cannot write its content.
   FlagsSurfaceEdited {
     recorder_skgid : ID,
     recorder_title : String,
@@ -265,10 +260,6 @@ impl std::fmt::Display for BufferValidationError {
         skgid, title, changes, headline } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}, {}) differs from the graph ({}). A write-protected occurrence saves nothing of its own; edit an editable occurrence instead, or request this one editable (C-c s d).",
                skgid, title, headline, changes . join ("; ")),
-      BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-        skgid, title, headline } =>
-        write!(f, "A child typed under the write-protected occurrence of {} ({}, {}) cannot become its content. Request an editable occurrence of it (C-c s d), or mark the child as not affecting its parent.",
-               title, skgid . 0, headline),
       BufferValidationError::FlagsSurfaceEdited {
         recorder_skgid, recorder_title, changes, headline } =>
         write!(f, "The flags surface under node {:?} ({:?}, {}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-flag-search-matching for noSearchMatching; provenance flags have no setter.",
@@ -295,7 +286,6 @@ impl BufferValidationError {
         | BufferValidationError::LocalStructureViolation (_, _, headline)
         | BufferValidationError::EditRequestOnWriteProtectedOccurrence (_, headline)
         | BufferValidationError::EditedWriteProtectedOccurrence { headline, .. }
-        | BufferValidationError::MemberChildOfWriteProtectedOccurrence { headline, .. }
         | BufferValidationError::FlagsSurfaceEdited { headline, .. }
         | BufferValidationError::IDFolder_Edited (_, _, _, headline)
         | BufferValidationError::OverridesHere_Mismatch (_, _, _, headline) =>

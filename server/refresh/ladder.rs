@@ -39,7 +39,7 @@ use crate::refresh::id_rule::{
   IdRuleAnswer, entombstone, ghost_from_head, id_rule, occurrence_from_truth,
   rekind_vognode};
 use crate::refresh::{Walk, write_protect_occurrence};
-use crate::refresh::ancestry::{is_unsayable, required_ancestor_of};
+use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
 use crate::refresh::diff_view;
 use crate::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
@@ -256,24 +256,6 @@ fn mark_claims (
         set_claim (tree, child, false);
         walk . corrections . record (tree, child, CorrectionKind::MarkedNoClaim); }}
     else if claims { set_claim (tree, child, false); }}}
-
-/// Whether the save reads the claims of the children of 'parent': an
-/// editable occurrence, or an editable folder whose node is an
-/// editable occurrence.
-pub(crate) fn parent_reads_claims (
-  tree   : &Tree<Viewnode>,
-  parent : NodeId,
-) -> bool {
-  match &tree . get (parent) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
-      ! occurrence . is_writeProtected (),
-    ViewnodeKind::Folder (folder) if folder . is_editable () => {
-      let anchor_depth : usize = // the node the folder describes
-        if matches! ( folder, Folder::HiddenOutsideOfSubscribee ) { 1 } else { 0 };
-      required_ancestor_of (tree, parent, anchor_depth)
-        . and_then ( |anchor| tree . get (anchor) )
-        . is_some_and ( |anchor| anchor . value () . editable_skgid () . is_some () ) },
-    _ => false, } }
 
 /// Whether the viewnode claims membership; None for a kind that
 /// carries no claim.

@@ -8,7 +8,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenOutsideOfSubscribee_folder;
-use crate::to_org::extend::containerward_chain::is_in_containerward_chain;
+use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::nodes::complete::{Graphnode, flag_is_true};
 use crate::types::viewnode::{
@@ -41,7 +41,7 @@ pub fn warrant_of_viewnode (
     Some (parent) => match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) => {
         let gnid : ID = pid_or_itself (graph, &occurrence . collected_skgid ());
-        if is_in_containerward_chain (node) {
+        if stands_in_containerward_chain (node) {
           match vognode_gnid (parent) {
             Some (gnid_above) => graph . relation_membership_is_visible (
               &gnid_above, &gnid,

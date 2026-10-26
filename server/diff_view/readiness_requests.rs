@@ -23,7 +23,7 @@
 //! changes" request, answer with the readiness summary of the buffer
 //! they rerendered ('buffer_readiness_summary_for').
 
-use crate::to_org::extend::containerward_chain::is_in_containerward_chain;
+use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ChangeLeaves, LeafKey, NodeAspect, RelationshipAspect};
 use crate::diff_view::pruned_change_view::nodes_editable_in_diffView;
@@ -130,7 +130,7 @@ fn leaves_named_at (
   let mut content_relationships_of : Vec<(ID, RelationshipAspect)> =
     Vec::new ();
   match &node . value () . kind {
-    ViewnodeKind::Vognode (_) if is_in_containerward_chain (node) =>
+    ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node) =>
       return None,
     ViewnodeKind::Vognode (vognode) => {
       let pid : ID = vognode_leaf_pid (node . value (), pid_of) ?;
@@ -382,7 +382,7 @@ pub fn apply_readiness_requests (
 /// it stands: under a vognode, its viewparent's content; under a
 /// partner folder, the relation of the folder, between it and the
 /// folder's viewparent. None for a node of the containerward chain
-/// ('is_in_containerward_chain'), which stands for no relationship
+/// ('stands_in_containerward_chain'), which stands for no relationship
 /// the diff view tracks, at a root, or under anything else.
 pub(crate) fn relationship_to_viewparent (
   node   : NodeRef<Viewnode>,
@@ -399,7 +399,7 @@ pub(crate) fn relationship_to_viewparent (
       relationship : RelationshipKey { relation : role . relation, recorder, member },
       aspect } };
   match &parent . value () . kind {
-    ViewnodeKind::Vognode (_) if is_in_containerward_chain (node) => None,
+    ViewnodeKind::Vognode (_) if stands_in_containerward_chain (node) => None,
     ViewnodeKind::Vognode (_) => {
       let viewparent : ID = vognode_leaf_pid (parent . value (), pid_of) ?;
       Some ( key_for_role (RelationRole::CONTENT, viewparent) ) },

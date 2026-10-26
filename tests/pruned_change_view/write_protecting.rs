@@ -10,16 +10,15 @@ use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, skg_files};
 use crate::pruned_change_view::common::{
   line_start_of, node_lines, open_all_changes_buffer, requesting_editable_at, save,
-  viewforest_id_of, with_fixture};
+  with_fixture};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::update_from_and_rerender_buffer_test;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::types::errors::{BufferValidationError, HeadlineName, SaveError};
+use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::ID;
-use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::{DiffViewBufferKind, ViewforestId};
+use skg::types::views_state::ViewforestId;
 use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
@@ -71,14 +70,6 @@ fn write_protecting_at (
       ! in_body } )
     . collect::<Vec<String>> () . concat () }
 
-fn the_registered_viewforest (
-  f : &Fixture,
-) -> ViewForest {
-  f . views_state . open_views
-    . viewforest_id_to_view ( &viewforest_id_of (DiffViewBufferKind::AllChanges) )
-    . expect ("the buffer is registered")
-    . clone () }
-
 /// The errors of a save that must be refused.
 fn refusal_errors (
   f    : &mut Fixture,
@@ -125,38 +116,28 @@ fn write_protecting_the_only_editable_occurrence_of_a_node_of_u_saves (
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     Ok (( )) }) }
 
-/// A child typed under n under y, a write-protected occurrence, is a
-/// member, so the save is refused, naming n, and the buffer's
-/// registered viewforest is as the last rendering left it. Marked as
-/// not affecting its parent, the child saves.
+/// A child typed under n under y, a write-protected occurrence,
+/// claims nothing there: the save takes it, as it takes one marked
+/// as not affecting its parent, and the buffer shows it under n
+/// again, unwarranted.
 #[test]
-fn a_member_child_typed_under_a_writeProtected_occurrence_is_refused (
+fn a_child_typed_under_a_writeProtected_occurrence_is_a_note (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("shared", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let registered : ViewForest = the_registered_viewforest (f);
     let n_under_y_line : &str = buffer . lines ()
       . find ( |line| without_viewnode_ids (line) . starts_with (N_UNDER_Y) )
       . expect ("n is shown write-protected under y");
-    let typing = |child : &str| -> String {
-      buffer . replacen ( n_under_y_line,
-                          &format! ("{}\n{}", n_under_y_line, child), 1 ) };
-    let errors : Vec<BufferValidationError> =
-      refusal_errors ( f, &typing ("*** typed child") );
-    assert! ( matches! (
-      &errors [..],
-      [ BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-          skgid, title, headline : HeadlineName { viewnode_id : Some (_), .. } } ]
-      if *skgid == ID::from ("n") && title == "n" ),
-      "{:?}", errors );
-    assert! ( errors [0] . to_string () . contains (
-                "cannot become its content" ),
-              "{}", errors [0] );
-    assert! ( the_registered_viewforest (f) == registered,
-              "a refused save leaves the registered viewforest alone" );
-    let response : SaveResponse = save (
-      f, &typing ("*** (skg node noClaim) typed child") ) ?;
+    let typed : String = buffer . replacen (
+      n_under_y_line, &format! ("{}\n*** typed child", n_under_y_line), 1 );
+    let response : SaveResponse = save (f, &typed) ?;
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    let saved : String = without_viewnode_ids (&response . saved_view);
+    let typed_line : &str = saved . lines ()
+      . find ( |line| line . ends_with (" typed child") )
+      . unwrap_or_else ( || panic! ("the typed child must stay:\n{}", saved) );
+    assert! ( typed_line . starts_with ("*** ") && typed_line . contains ("noWarrant"),
+              "{}", saved );
     Ok (( )) }) }
 
 /// Write-protecting n under x (its children becoming non-members)
@@ -205,9 +186,10 @@ fn write_protecting_a_node_outside_u_saves (
     Ok (( )) }) }
 
 /// In an ordinary content view, write-protecting n, its root, whose
-/// content a and b stay members, is refused, naming n.
+/// content a and b are shown, saves: under a write-protected
+/// occurrence no child claims membership, so nothing is refused.
 #[test]
-fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
+fn in_a_content_view_write_protecting_an_occurrence_with_content_saves (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("shared", &["main"], |f| {
     let viewforest_id : ViewforestId = ViewforestId::ContentView ("content-view-of-n" . to_string ());
@@ -223,23 +205,14 @@ fn in_a_content_view_write_protecting_an_occurrence_with_members_is_refused (
       mk_test_tcp_stream_pair ();
     let write_protected : String = text . replacen (
       "(skgRepos (nodeRepo main)) ", "(skgRepos (nodeRepo main)) writeProtected ", 1 );
-    let result : Result<SaveResponse, Box<dyn Error>> = block_on (
+    let response : SaveResponse = block_on (
       update_from_and_rerender_buffer_test (
         &mut stream, &write_protected,
         &f . config, &f . tantivy, &f . graph,
-        &Ok (viewforest_id), &mut f . views_state ));
-    let Err (error) = result else {
-      panic! ("the save must be refused") };
-    let Ok (save_error) = error . downcast::<SaveError> () else {
-      panic! ("expected a SaveError") };
-    let SaveError::BufferValidationErrors { errors, .. } = *save_error else {
-      panic! ("expected validation errors") };
-    assert! ( matches! (
-      &errors [..],
-      [ BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-          skgid, .. } ]
-      if *skgid == ID::from ("n") ),
-      "{:?}", errors );
+        &Ok (viewforest_id), &mut f . views_state )) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
+    assert! ( response . saved_view . lines () . next () . unwrap () . contains ("writeProtected"),
+              "{}", response . saved_view );
     Ok (( )) }) }
 
 /// c, typed under n under x and so created, carries change facts. A
@@ -371,7 +344,9 @@ fn a_writeProtected_occurrence_with_another_home_skgrepo_is_refused (
 
 /// An ID folder and a flags folder under the write-protected ctx
 /// (see the previous test) are checked as under any recorder: saying
-/// what the graph says, they save; saying more, they are refused.
+/// what the graph says, they save, and so does an ID folder holding
+/// an ID beyond ctx's, which claims nothing there; an ID folder
+/// lacking ctx's ID, and a flags folder saying more, are refused.
 #[test]
 fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
 ) -> Result<(), Box<dyn Error>> {
@@ -380,12 +355,13 @@ fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
     let with_folder = |folder : &str| -> String {
       editing_ctx ( &buffer, |line| format! ("{}\n{}", line, folder) ) };
     for agreeing in [ "*** (skg idFolder)\n**** (skg id) ctx",
+                      "*** (skg idFolder)\n**** (skg id) ctx\n**** (skg id) ctx-too",
                       "*** (skg flagsFolder)" ] {
       let response : SaveResponse = save ( f, &with_folder (agreeing) ) ?;
       assert! ( response . errors . is_empty (),
                 "{:?} must save, got {:?}", agreeing, response . errors ); }
     let errors : Vec<BufferValidationError> = refusal_errors (
-      f, &with_folder ("*** (skg idFolder)\n**** (skg id) ctx\n**** (skg id) ctx-too") );
+      f, &with_folder ("*** (skg idFolder)\n**** (skg id) ctx-too") );
     assert! ( matches! (
       &errors [..],
       [ BufferValidationError::IDFolder_Edited (recorder, _, _, _) ]

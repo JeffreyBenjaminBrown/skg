@@ -109,7 +109,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
         warnings : parsing_warnings, } ); }}
   { let errors : Vec<BufferValidationError> =
       write_protected_edits::errors_for_writeProtected_occurrences (
-        &viewforest, graph, config, skgrepo_restriction );
+        &viewforest, graph );
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors,

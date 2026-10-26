@@ -4,33 +4,29 @@
 //! judged by the graph alone: it must say what the graph says.
 
 use crate::types::errors::{BufferValidationError, HeadlineName};
-use crate::types::misc::{ID, SkgConfig, SkgrepoName, members_of};
+use crate::types::misc::{ID, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
-use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
-use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::nodes::complete::flag_is_true;
-use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 
 use ego_tree::NodeRef;
-use std::collections::HashSet;
 
 /// Every write-protected occurrence of the saved view must agree with
-/// the graph: its title and home skgrepo, and its alias folder and
-/// partner folders when present, equal the node's, and it has no
-/// member child, since a write-protected occurrence cannot write its
-/// content. Non-member children are the user's own and are not
-/// checked. (Its ID folder is checked for every recorder, by
+/// the graph: its title and home skgrepo equal the node's, and its
+/// alias folder, when present, shows the node's aliases in order and
+/// takes no relRepo request. Under a write-protected parent no child
+/// claims membership, so what else stands there (an alias the node
+/// lacks, a child, a folder's members) is the user's note or the diff
+/// view's, which the refresh shows unwarranted, and is not checked.
+/// (Its ID folder is checked for every recorder, by
 /// 'find_buffer_errors_for_saving'.) Every present flags folder, under
-/// any recorder, is server-owned and must equal the node's flags.
+/// any recorder, is server-owned and must show the node's flags.
 pub fn errors_for_writeProtected_occurrences (
-  viewforest          : &ViewForest,
-  graph               : &InRustGraph,
-  config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
+  viewforest : &ViewForest,
+  graph      : &InRustGraph,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
     flags_surface_errors_against_graph (viewforest, graph);
@@ -41,18 +37,13 @@ pub fn errors_for_writeProtected_occurrences (
     if let Some (graphnode) = graphnode_from_graph (graph, &occurrence . skgid) {
       let differences : Vec<String> =
         writeProtected_differences_from_graph (
-          node, occurrence, &graphnode, graph, config, skgrepo_restriction );
+          node, occurrence, &graphnode );
       if ! differences . is_empty () {
         errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
           skgid    : occurrence . skgid . clone (),
           title    : graphnode . title . clone (),
           changes  : differences,
-          headline : node . value () . headline_name (), }); }}
-    if node . children () . any ( |child| is_member (child . value ()) ) {
-      errors . push (BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-        skgid    : occurrence . skgid . clone (),
-        title    : occurrence . title . clone (),
-        headline : node . value () . headline_name (), }); }}
+          headline : node . value () . headline_name (), }); }}}
   errors }
 
 /// What the occurrence says that the graph does not.
@@ -60,9 +51,6 @@ fn writeProtected_differences_from_graph (
   node                : NodeRef<Viewnode>,
   occurrence          : &UnrestrictedVognode,
   graphnode           : &Graphnode,
-  graph               : &InRustGraph,
-  config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Vec<String> {
   let mut differences : Vec<String> = Vec::new ();
   if occurrence . title != graphnode . title {
@@ -74,101 +62,22 @@ fn writeProtected_differences_from_graph (
       "home skgrepo {} differs from the graph's {}",
       occurrence . home_skgrepo, graphnode . home_skgrepo )); }
   if let Some (aliases_in_view) = aliases_of_occurrence (node) {
-    let aliases_in_graph : Vec<(String, Option<SkgrepoName>)> =
-      members_of (graphnode . aliases . or_default ())
-      . into_iter () . map ( |alias| (alias, None) ) . collect ();
-    if aliases_in_view != aliases_in_graph {
+    let aliases_in_graph : Vec<String> =
+      members_of (graphnode . aliases . or_default ());
+    let differs : bool =
+      aliases_in_view . iter () . any ( |(_, request)| request . is_some () )
+      || aliases_in_view . into_iter ()
+         . map ( |(alias, _)| alias )
+         . filter ( |alias| aliases_in_graph . contains (alias) )
+         . collect::<Vec<String>> () != aliases_in_graph;
+    if differs {
       differences . push ("aliases differ from the graph's" . to_string ()); }}
-  differences . extend (
-    partnerFolder_differences_from_graph (
-      node, graphnode, graph, config, skgrepo_restriction ));
   differences }
 
-/// One change per partner folder under the occurrence whose members
-/// are not the node's partners in the folder's relation, as the folder
-/// reconciler would show them, or of which a member carries a relRepo
-/// request. An absent folder, and a folder with no relation member
-/// role, says nothing.
-fn partnerFolder_differences_from_graph (
-  node                : NodeRef<Viewnode>,
-  graphnode           : &Graphnode,
-  graph               : &InRustGraph,
-  config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Vec<String> {
-  node . children () . filter_map ( |folder| {
-    let ViewnodeKind::Folder (kind) = &folder . value () . kind
-      else { return None; };
-    if kind . members_are_properties () { return None; }
-    let members_in_graph : HashSet<ID> =
-      partnerFolder_members_in_graph (
-        graph, config, &graphnode . pid, kind, skgrepo_restriction ) ?
-      . into_iter () . collect ();
-    let members_in_view : Vec<(ID, Option<SkgrepoName>)> =
-      partnerFolder_members_in_view (folder, graph);
-    let differs : bool =
-      members_in_view . iter () . any ( |(_, request)| request . is_some () )
-      || members_in_view . into_iter () . map ( |(skgid, _)| skgid )
-         . collect::<HashSet<ID>> () != members_in_graph;
-    differs . then ( || changed_partners_phrase (kind) . to_string () ) } )
-    . collect () }
-
-/// The members of a partner folder, as the check of a write-protected
-/// occurrence's folder counts them, each with its relRepo request and
-/// by the ID the folder reconciler matches it by
-/// ('skgid_a_folder_child_stands_for'). A member is a child that
-/// claims the node has that partner now, which the check compares
-/// with the graph:
-/// - an unrestricted vognode that affects the folder;
-/// - an unknown phantom (a partner no node has) that claims
-///   membership.
-/// Every other child is the user's or the diff view's and is not
-/// counted. In particular a removed member, of either kind, is not:
-/// it stands for a relationship the before-graph had and the
-/// after-graph lacks, so counting it would refuse the folder the diff
-/// view rendered. The diff view shows a removed member as a non-member
-/// unrestricted vognode with '(rel removed)', or, when the partner
-/// is dangling, as an unknown phantom with that part; each carries
-/// 'noClaim', which excludes it.
-fn partnerFolder_members_in_view (
-  folder : NodeRef<Viewnode>,
-  graph  : &InRustGraph,
-) -> Vec<(ID, Option<SkgrepoName>)> {
-  folder . children () . filter_map ( |child| {
-    let relRepo_request : Option<SkgrepoName> = match &child . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (member))
-        if member . claimsMembership =>
-        RelationshipEditRequest::relRepo_of (&member . relationshipEditRequest) . cloned (),
-      ViewnodeKind::Vognode (Vognode::Unknown (unknown))
-        if unknown . claimsMembership =>
-        RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned (),
-      _ => return None, };
-    Some (( skgid_a_folder_child_stands_for (child . value (), graph) ?,
-            relRepo_request )) } )
-    . collect () }
-
-/// How an error names a change to a partner folder of this kind.
-fn changed_partners_phrase (
-  kind : &Folder,
-) -> &'static str {
-  match kind {
-    Folder::Subscribee                => "changed subscriptions",
-    Folder::Subscriber                => "changed subscribers",
-    Folder::Overridden                => "changed overrides",
-    Folder::Overrider                 => "changed overriders",
-    Folder::Hider                     => "changed hiders",
-    Folder::Hidden                    => "changed hidden nodes",
-    Folder::Container                 => "changed containers",
-    Folder::Mentioner                 => "changed mentioners",
-    Folder::HiddenInSubscribee // Not checked: these have no
-      | Folder::HiddenOutsideOfSubscribee // relation member role.
-      | Folder::AcquiredBy
-      | Folder::Acquired              => "changed memberships",
-    Folder::Alias | Folder::ID | Folder::Flags { .. } => // not partner folders
-      "changed properties", }}
-
 /// The aliases in the occurrence's alias folder, in order, each with
-/// its relRepo request; None if it has no alias folder.
+/// its relRepo request; None if it has no alias folder. Under a
+/// write-protected occurrence no alias claims membership, so an alias
+/// the worktree lost stands here as any other.
 fn aliases_of_occurrence (
   node : NodeRef<Viewnode>,
 ) -> Option<Vec<(String, Option<SkgrepoName>)>> {
@@ -176,20 +85,11 @@ fn aliases_of_occurrence (
     &child . value () . kind, ViewnodeKind::Folder (Folder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
       let ViewnodeKind::PropertyMember (PropertyMember::Alias {
-        text, relationshipEditRequest, claimsMembership, .. }) =
+        text, relationshipEditRequest, .. }) =
         &alias . value () . kind else { return None; };
-      if ! claimsMembership { // one the worktree lost
-        return None; }
       Some ((text . clone (),
              RelationshipEditRequest::relRepo_of (relationshipEditRequest) . cloned ()))
     }) . collect () ) }
-
-fn is_member (
-  viewnode : &Viewnode,
-) -> bool {
-  matches! ( &viewnode . kind,
-             ViewnodeKind::Vognode (Vognode::Unrestricted (child))
-             if child . claimsMembership ) }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FlagsFolderSurface {
@@ -231,10 +131,9 @@ fn collect_flags_surfaces (
               flag, title, body, .. }) =>
               viewnodes . push ((*flag, title . clone (), body . clone ())),
             // A tombstone (a stale flag holding something) and a
-            // non-member standing in the folder are no part of its surface.
-            ViewnodeKind::Tombstone => (),
-            ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-              if ! t . claimsMembership => (),
+            // vognode standing in the folder, which claims nothing
+            // there, are no part of its surface.
+            ViewnodeKind::Tombstone | ViewnodeKind::Vognode (_) => (),
             other => other_children . push (format! ("{:?}", other)), } }
         viewnodes . sort_by_key ( |(flag, _, _)| // The flags are a set.
           Flag::ALL . iter () . position ( |each| each == flag ) );
@@ -364,12 +263,8 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted
     ::org_to_viewforest;
   use crate::types::misc::{MSV, rel_partners_at_relRepo};
-  use crate::skgrepo_sets::SkgrepoSetName;
-  use crate::types::misc::Skgrepo;
   use crate::types::nodes::complete::empty_graphnode;
   use indoc::indoc;
-  use std::collections::{BTreeSet, HashMap};
-  use std::path::PathBuf;
 
   fn forest (text : &str) -> ViewForest {
     let (forest, errors, _warnings, _provenance) =
@@ -409,28 +304,8 @@ mod tests {
         home_skgrepo : SkgrepoName::from ("private"),
         .. node ("private_sub") } ]) }
 
-  fn config () -> SkgConfig {
-    SkgConfig::dummyFromSkgrepos ( ["main", "private"] . into_iter ()
-      . map ( |name| ( SkgrepoName::from (name), Skgrepo {
-        name         : SkgrepoName::from (name),
-        abbreviation : None,
-        path         : PathBuf::from (name),
-        owned        : true, } ))
-      . collect::<HashMap<SkgrepoName, Skgrepo>> () ) }
-
   fn errors_in (text : &str) -> Vec<BufferValidationError> {
-    errors_for_writeProtected_occurrences (
-      &forest (text), &graph (), &config (), None ) }
-
-  /// The changes the one refusal of 'errors' names.
-  fn refused_changes (
-    errors : &[BufferValidationError],
-  ) -> Vec<String> {
-    match errors {
-      [BufferValidationError::EditedWriteProtectedOccurrence {
-        skgid, changes, .. }] if skgid == &ID::from ("recorder") =>
-        changes . clone (),
-      _ => panic! ("expected one refusal of recorder, got {:?}", errors), }}
+    errors_for_writeProtected_occurrences ( &forest (text), &graph () ) }
 
   #[test]
   fn an_occurrence_that_agrees_with_the_graph_passes () {
@@ -444,31 +319,20 @@ mod tests {
     "}), vec! []);
   }
 
+  /// Under a write-protected occurrence no child claims membership:
+  /// a typed child, even one the editable-view request will extend,
+  /// is the user's note, which the refresh shows unwarranted.
   #[test]
-  fn a_member_child_under_a_writeProtected_occurrence_is_refused () {
-    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
+  fn a_child_typed_under_a_writeProtected_occurrence_passes () {
+    for text in [ indoc! {"
       * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       ** (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       *** (skg node (gnid typed) (skgRepos (nodeRepo main))) typed
-    "});
-    assert! (matches! (&errors[..],
-      [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-        skgid, title, .. }] if skgid == &ID::from ("recorder") && title == "recorder"),
-      "{:?}", errors);
-    assert! (errors [0] . to_string () . contains ("C-c s d"), "{}", errors [0]);
-  }
-
-  #[test]
-  fn a_member_child_under_a_requested_writeProtected_occurrence_is_refused () {
-    // The editable-view request does not license the typed child.
-    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
+    "}, indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) recorder
       ** (skg node (gnid typed) (skgRepos (nodeRepo main))) typed
-    "});
-    assert! (matches! (&errors[..],
-      [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-        skgid, .. }] if skgid == &ID::from ("recorder")),
-      "{:?}", errors);
+    "} ] {
+      assert_eq! (errors_in (text), vec! [], "{}", text); }
   }
 
   #[test]
@@ -496,11 +360,14 @@ mod tests {
              "{}", errors [0]);
   }
 
+  /// The alias folder must show the node's aliases, in order, and take
+  /// no relRepo request. An alias the node lacks claims nothing there
+  /// (as an alias the worktree lost, which the diff view shows), and
+  /// passes.
   #[test]
   fn an_alias_folder_that_differs_is_refused_and_an_absent_one_passes () {
     for differing in [
       "*** (skg alias) other name\n",
-      "*** (skg alias) another name\n*** (skg alias) one more\n",
       "*** (skg alias (editRequest (relRepo main))) another name\n", ]
     { let text : String = format! (
         "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder\n** (skg aliasFolder)\n{}",
@@ -513,222 +380,24 @@ mod tests {
     assert_eq! (errors_in (
       "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder\n"),
       vec! []);
+    assert_eq! (errors_in (
+      "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder\n** (skg aliasFolder)\n*** (skg alias) one more\n*** (skg alias) another name\n"),
+      vec! []);
   }
 
+  /// A partner folder under a write-protected occurrence is not
+  /// checked: its members claim nothing, so a missing, an extra or a
+  /// removed member is the refresh's to correct.
   #[test]
-  fn a_subscribee_folder_with_an_extra_member_is_refused () {
-    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg subscribeeFolder)
-      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
-      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
-      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected) c1
-    "});
-    assert_eq! (refused_changes (&errors),
-                vec! ["changed subscriptions" . to_string ()]);
-    assert! (errors [0] . to_string () . contains ("changed subscriptions"),
-             "{}", errors [0]);
-  }
-
-  /// As a buffer of the diff view shows the folder: each member
-  /// with the existence of its relationship.
-  #[test]
-  fn a_subscribee_folder_with_an_extra_member_is_refused_in_a_diffView_buffer () {
-    let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg subscribeeFolder)
-      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected (diff (rel added))) sub
-      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
-      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected (diff (rel added))) c1
-    "});
-    assert_eq! (refused_changes (&errors),
-                vec! ["changed subscriptions" . to_string ()]);
-  }
-
-  #[test]
-  fn a_partner_folder_that_matches_the_graph_passes_and_an_absent_one_passes () {
-    assert_eq! (errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg subscribeeFolder)
-      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
-      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
-      ** (skg containerFolder)
-      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
-      ** (skg node (gnid c2) (skgRepos (nodeRepo main)) noClaim) a non-member
-    "}), vec! []);
-    assert_eq! (errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg containerFolder)
-      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
-    "}), vec! []);
-  }
-
-  /// A container folder is a write-protected set the server
-  /// generates; a missing or an extra member is refused alike.
-  #[test]
-  fn a_container_folder_that_differs_is_refused () {
+  fn a_partner_folder_under_a_writeProtected_occurrence_is_not_checked () {
     for members in [
       "",
-      "*** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
-*** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected) c1
-", ]
+      "*** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root\n*** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected) c1\n",
+      "*** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root\n*** (skg unknown (gnid gone))\n", ]
     { let text : String = format! (
-        "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-** (skg containerFolder)
-{}",
+        "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder\n** (skg containerFolder)\n{}",
         members );
-      assert_eq! (refused_changes (&errors_in (&text)),
-                  vec! ["changed containers" . to_string ()], "{}", text); }
-  }
-
-  /// recorder subscribes to x by its extra ID x2, and to ghost, which
-  /// no node has. A member shown by the extra ID, or by x's pid, passes,
-  /// because the check reads each member as the folder reconciler
-  /// matches it ('skgid_a_folder_child_stands_for'): by the pid the
-  /// graph resolves its ID to.
-  #[test]
-  fn a_member_shown_by_an_extra_id_passes_when_the_graph_lists_the_extra_id () {
-    let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
-    for shown in ["x2", "x"] {
-      let text : String = format! (
-        "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-** (skg subscribeeFolder)
-*** (skg node (gnid {}) (skgRepos (nodeRepo main)) writeProtected) x
-*** (skg unknown (gnid ghost))
-", shown );
-      assert_eq! (
-        errors_for_writeProtected_occurrences (
-          &forest (&text), &graph, &config (), None ),
-        vec! [], "{}", text ); }
-  }
-
-  /// An unknown phantom member is compared by its raw ID: shown with
-  /// the ID the recorder lists it passes, shown with another it is
-  /// refused.
-  #[test]
-  fn an_unknown_member_is_compared_by_raw_id () {
-    let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
-    let text_with = |unknown : &str| -> String { format! (
-      "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-** (skg subscribeeFolder)
-*** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x
-*** (skg unknown (gnid {}))
-", unknown ) };
-    assert_eq! (
-      errors_for_writeProtected_occurrences (
-        &forest (&text_with ("ghost")), &graph, &config (), None ),
-      vec! [] );
-    assert_eq! (
-      refused_changes ( &errors_for_writeProtected_occurrences (
-        &forest (&text_with ("other_ghost")), &graph, &config (), None )),
-      vec! ["changed subscriptions" . to_string ()] );
-  }
-
-  /// A dangling removed member, as the diff view shows one (an
-  /// unknown phantom with 'noClaim' and '(rel removed)'), is not
-  /// counted: the folder beside it says what the graph says, and
-  /// passes. The same phantom claiming membership is a member,
-  /// compared by its raw ID as any unknown member is, and recorder
-  /// does not list it.
-  #[test]
-  fn an_unknown_phantom_whose_relationship_was_removed_is_not_counted () {
-    let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
-    let text_with = |gone : &str| -> String { format! (
-      "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-** (skg subscribeeFolder)
-*** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x
-*** (skg unknown (gnid ghost))
-*** {}
-", gone ) };
-    assert_eq! (
-      errors_for_writeProtected_occurrences (
-        &forest (&text_with ("(skg unknown (gnid gone) noClaim (diff (rel removed)))")),
-        &graph, &config (), None ),
-      vec! [] );
-    assert_eq! (
-      refused_changes ( &errors_for_writeProtected_occurrences (
-        &forest (&text_with ("(skg unknown (gnid gone))")),
-        &graph, &config (), None )),
-      vec! ["changed subscriptions" . to_string ()] );
-  }
-
-  /// recorder subscribes to x2, an extra ID of x, and to ghost, which
-  /// no node has.
-  fn graph_listing_an_extra_id_and_a_dangling_id () -> InRustGraph {
-    let main : SkgrepoName = SkgrepoName::from ("main");
-    let node = |pid : &str| -> Graphnode { Graphnode {
-      pid          : ID::from (pid),
-      title        : pid . to_string (),
-      home_skgrepo : main . clone (),
-      .. empty_graphnode () }};
-    InRustGraph::from_graphnodes (&[
-      Graphnode {
-        subscribesTo : MSV::Specified (rel_partners_at_relRepo (
-          &main, vec! [ID::from ("x2"), ID::from ("ghost")])),
-        .. node ("recorder") },
-      Graphnode {
-        extra_ids : vec! [ID::from ("x2")],
-        .. node ("x") } ]) }
-
-  /// A removed member, as the diff view shows one (a non-member with
-  /// '(rel removed)'), is not counted, nor is any other non-member.
-  #[test]
-  fn a_removed_member_is_not_counted () {
-    assert_eq! (errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg containerFolder)
-      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
-      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) c1
-      *** (skg node (gnid c2) (skgRepos (nodeRepo main)) writeProtected noClaim) c2
-    "}), vec! []);
-  }
-
-  /// A member is counted whatever its diff facts say: a removed
-  /// member is never a member.
-  #[test]
-  fn a_member_marked_removed_is_counted () {
-    assert_eq! (refused_changes (&errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg containerFolder)
-      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
-      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected (diff (rel removed))) c1
-    "})), vec! ["changed containers" . to_string ()]);
-  }
-
-  #[test]
-  fn a_partner_folder_member_with_a_relRepo_request_is_refused () {
-    assert_eq! (refused_changes (&errors_in (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg containerFolder)
-      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) root
-    "})), vec! ["changed containers" . to_string ()]);
-  }
-
-  /// Under a skgrepo restriction the folder is shown without the
-  /// members it hides, and so shown it passes; shown with them, it
-  /// differs.
-  #[test]
-  fn under_a_skgrepo_restriction_a_folder_without_the_hidden_members_passes () {
-    let restriction : SkgrepoRestriction = SkgrepoRestriction {
-      name     : SkgrepoSetName::from ("mainOnly"),
-      skgrepos : BTreeSet::from ([SkgrepoName::from ("main")]), };
-    let errors_under_restriction = |text : &str| -> Vec<BufferValidationError> {
-      errors_for_writeProtected_occurrences (
-        &forest (text), &graph (), &config (), Some (&restriction) ) };
-    let without_hidden : &str = indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg subscribeeFolder)
-      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
-    "};
-    assert_eq! (errors_under_restriction (without_hidden), vec! []);
-    assert_eq! (refused_changes (&errors_in (without_hidden)),
-                vec! ["changed subscriptions" . to_string ()]);
-    assert_eq! (refused_changes (&errors_under_restriction (indoc! {"
-      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
-      ** (skg subscribeeFolder)
-      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
-      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
-    "})), vec! ["changed subscriptions" . to_string ()]);
+      assert_eq! (errors_in (&text), vec! [], "{}", text); }
   }
 
   #[test]

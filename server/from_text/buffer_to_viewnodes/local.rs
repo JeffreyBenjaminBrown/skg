@@ -9,6 +9,8 @@ use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
 use crate::serve::parse_metadata_sexp::RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP;
 use crate::types::misc::{ID, SkgConfig};
+use crate::refresh::ancestry::parent_reads_claims;
+use crate::types::tree::forest::stands_in_containerward_chain;
 use crate::types::tree::viewnode_graphnode::{
   generation_includes_only,
   generation_exists_and_includes,
@@ -624,52 +626,26 @@ fn validate_unrestrictedVognode (
 
 /// Whether a restoreRel request stands where it may: on a member of a
 /// partner folder (whose removed members are non-members), or on a
-/// removed member, a non-member under a vognode that is no node of the
-/// containerward chain ('mp_is_in_containerward_chain'). A chain node
-/// stands for no relationship the diff view tracks.
+/// removed member, a child claiming no membership under a vognode
+/// that is no node of the containerward chain
+/// ('stands_in_containerward_chain'). Under a parent that does not
+/// read its children's claims no child claims, whatever it carries.
+/// A chain node stands for no relationship the diff view tracks.
 fn restoreRel_stands_where_it_may (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
   t      : &UnrestrictedVognode,
 ) -> bool {
-  let Some (parent) : Option<NodeRef<Viewnode>> =
-    tree . get (treeid) . and_then ( |node| node . parent () )
+  let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
+    else { return false; };
+  let Some (parent) : Option<NodeRef<Viewnode>> = node . parent ()
     else { return false; };
   match &parent . value () . kind {
     kind if kind . is_partner_folder () => true,
     ViewnodeKind::Vognode (_) =>
-      ! t . claimsMembership
-      && ! mp_is_in_containerward_chain (tree, treeid),
+      ( ! t . claimsMembership || ! parent_reads_claims (tree, parent . id ()) )
+      && ! stands_in_containerward_chain (node),
     _ => false, }}
-
-/// 'is_in_containerward_chain' ('to_org/extend/containerward_chain.rs')
-/// over the parsed tree: a non-member vognode under a member of a
-/// partner folder whose members carry the chain, or under another
-/// such node.
-fn mp_is_in_containerward_chain (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-) -> bool {
-  let Some (mut current) : Option<NodeRef<Viewnode>> = tree . get (treeid)
-    else { return false; };
-  loop {
-    let ViewnodeKind::Vognode (vognode) = &current . value () . kind
-      else { return false; };
-    let is_nonMember : bool = match vognode {
-      Vognode::Unrestricted (t) => ! t . claimsMembership,
-      _ => true, };
-    if ! is_nonMember { return false; }
-    let Some (parent) : Option<NodeRef<Viewnode>> = current . parent ()
-      else { return false; };
-    let ViewnodeKind::Vognode (_) = &parent . value () . kind
-      else { return false; };
-    let parent_is_a_chain_carrying_folder_member : bool =
-      parent . parent () . is_some_and ( |grandparent| matches! (
-        &grandparent . value () . kind,
-        ViewnodeKind::Folder (kind)
-          if kind . members_carry_containerward_chain () ));
-    if parent_is_a_chain_carrying_folder_member { return true; }
-    current = parent; }}
 
 fn cannot_be_child_of_vognode (
   node : &Viewnode,

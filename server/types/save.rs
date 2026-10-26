@@ -259,10 +259,6 @@ fn buffer_validation_error_text (
       skgid, title, changes, .. } => {
       format!("Write-protected occurrence differs from the graph:\n- ID: {}\n- Title: {}\n- Differences: {}\n- A write-protected occurrence saves nothing of its own; no changes were saved.\n- Edit an editable occurrence instead, or request this one editable (C-c s d).\n",
               skgid . 0, title, changes . join ("; ")) },
-    BufferValidationError::MemberChildOfWriteProtectedOccurrence {
-      skgid, title, .. } => {
-      format!("A child typed under the write-protected occurrence of {} ({}) cannot become its content.\n- Request an editable occurrence of it (C-c s d), or mark the child as not affecting its parent.\n",
-              title, skgid . 0) },
     BufferValidationError::FlagsSurfaceEdited {
       recorder_skgid, recorder_title, changes, .. } => {
       format!("Edited server-owned flags surface:\n- Recorder ID: {}\n- Recorder title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",

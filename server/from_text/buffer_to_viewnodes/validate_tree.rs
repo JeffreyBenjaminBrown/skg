@@ -106,18 +106,18 @@ pub fn find_buffer_errors_for_saving (
   find_buffer_errors_for_saving_in_graph (
     viewforest, &graph, config ) }
 
-/// Edits to an idFolder's membership abort the save (see the
-/// glossary's "write-protected set"): for each present
-/// idFolder whose parent is an UnrestrictedVognode with an ID, the multiset of ID
-/// non-vognodes beneath it must equal the recorder's real ID list (pid
-/// plus extra_ids). Reordering passes (the order is view-local:
-/// the rerender keeps it); adding, deleting or text-editing an ID property fails,
-/// with a message naming the escape hatch (edit the .skg file
-/// directly). In the diff view, an ID entry carrying 'noClaim' is a
-/// lost ID, not a membership claim, and is excluded before
-/// comparing. An absent idFolder means no opinion, as
-/// for other folders. Shapes that other validations reject (an idFolder
-/// without an UnrestrictedVognode parent, a parent without an ID) are skipped
+/// Removing an ID from an idFolder aborts the save (see the
+/// glossary's "write-protected set"): for each present idFolder whose
+/// parent is an UnrestrictedVognode with an ID, every ID of the
+/// recorder (its pid and extra_ids) must stand beneath it. The order
+/// is view-local (the rerender keeps it). The idFolder is
+/// write-protected, so no ID there claims membership: an ID beyond
+/// the recorder's (one the user typed, or, in the diff view, one the
+/// worktree lost) saves nothing and is not refused; the refresh shows
+/// it unwarranted. The message names the escape hatch (edit the .skg
+/// file directly). An absent idFolder means no opinion, as for other
+/// folders. Shapes that other validations reject (an idFolder without
+/// an UnrestrictedVognode parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
 fn idFolder_membership_errors (
@@ -142,9 +142,7 @@ fn idFolder_membership_errors (
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          // An ID that claims no membership is one the worktree lost.
-          ViewnodeKind::PropertyMember (PropertyMember::ID {
-            skgid, claimsMembership : true, .. })
+          ViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. })
             => Some ( skgid . clone () ),
           _ => None } )
       . collect ();
@@ -157,10 +155,8 @@ fn idFolder_membership_errors (
         errors . push ( BufferValidationError::IDFolder_Edited (
           recorder, buffer_skgids, Vec::new (), recorder_headline )),
       Some (real) => {
-        let mut real_sorted : Vec<ID> = real . clone ();
-        real_sorted . sort ();
         buffer_skgids . sort ();
-        if buffer_skgids != real_sorted {
+        if real . iter () . any ( |id| ! buffer_skgids . contains (id) ) {
           errors . push ( BufferValidationError::IDFolder_Edited (
             recorder, buffer_skgids, real, recorder_headline )); }}, }}
   Ok (( )) }

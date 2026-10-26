@@ -16,7 +16,7 @@
 use crate::diff_view::pruned_change_view::prunedChangeView_sets_of_buffer;
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::types::misc::ID;
-use crate::types::tree::forest::in_content_position;
+use crate::types::tree::forest::{holds_containerward_chain, in_content_position};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use crate::update_buffer::completion_mode::CompletionMode;
 
@@ -52,25 +52,12 @@ pub(crate) fn extent_of_parent (
   if all { Extent::All } else { Extent::None } }
 
 /// Whether the vognode children of the occurrence at 'treeid' are the
-/// containerward chain: it is write-protected, and a member of a
-/// folder whose members carry the chain, or itself a node of the
-/// chain. The refresh knows a chain node by where it stands.
+/// containerward chain ('holds_containerward_chain').
 pub(crate) fn is_chain_parent (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> bool {
-  let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
-    &node . value () . kind else { return false; };
-  if ! occurrence . is_writeProtected () { return false; }
-  match node . parent () {
-    Some (parent) => match &parent . value () . kind {
-      ViewnodeKind::Folder (folder) =>
-        folder . members_carry_containerward_chain (),
-      ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
-        is_chain_parent (tree, parent . id ()),
-      _ => false, },
-    None => false, } }
+  holds_containerward_chain ( tree . get (treeid) . unwrap () ) }
 
 /// Whether the children of 'parent' are editable content: those of
 /// an editable occurrence, and in the diff view the old content of a

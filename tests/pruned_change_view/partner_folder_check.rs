@@ -1,6 +1,6 @@
-// The save's check of a write-protected occurrence's partner folders
-// reads each member as the folder reconciler matches it
-// ('skgid_a_folder_child_stands_for'). The 'partner_ids' fixture (one
+// The save does not check a write-protected occurrence's partner
+// folders: under a write-protected parent no child claims
+// membership, so whatever stands there saves. The 'partner_ids' fixture (one
 // skgrepo, main): c1 and c2, whose bodies changed, each contain
 // recorder, unchanged, which subscribes to x by its extra ID x2 and
 // to ghost, which no node has. So recorder is shown write-protected
@@ -9,8 +9,6 @@
 use crate::pruned_change_view::common::{open_all_changes_buffer, save, with_fixture};
 
 use skg::serve::handlers::save_buffer::SaveResponse;
-use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::ID;
 
 use std::error::Error;
 use skg::metadata_canon::without_viewnode_ids;
@@ -62,29 +60,16 @@ fn a_dangling_removed_member_is_not_counted (
     assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }
 
-/// An unknown phantom is compared by its raw ID: shown with an ID
-/// recorder does not list, the folder is refused.
+/// An unknown phantom with an ID recorder does not list claims
+/// nothing in the folder of a write-protected occurrence: the buffer
+/// saves.
 #[test]
-fn an_unknown_member_with_another_raw_id_is_refused (
+fn an_unknown_member_with_another_raw_id_saves (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("partner_ids", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let refused = save ( f, &with_subscribee_folder_under_recorder (
+    let response : SaveResponse = save ( f, &with_subscribee_folder_under_recorder (
       &buffer, &[ "(skg node (gnid x2) (skgRepos (nodeRepo main)) writeProtected) x",
-                  "(skg unknown (gnid other_ghost))" ] ));
-    let errors : Vec<BufferValidationError> = match refused {
-      Err (error) => match error . downcast::<SaveError> () {
-        Ok (save_error) => match *save_error {
-          SaveError::BufferValidationErrors { errors, .. } => errors,
-          other => panic! ( "expected validation errors, got {:?}", other ), },
-        Err (other) => panic! ( "expected a SaveError, got {:?}", other ), },
-      Ok (response) => panic! (
-        "the save must be refused:\n{}", response . saved_view ), };
-    assert! ( matches! (
-      &errors [..],
-      [ BufferValidationError::EditedWriteProtectedOccurrence {
-          skgid, changes, .. } ]
-      if *skgid == ID::from ("recorder")
-         && *changes == vec! [ "changed subscriptions" . to_string () ] ),
-      "{:?}", errors );
+                  "(skg unknown (gnid other_ghost))" ] )) ?;
+    assert! ( response . errors . is_empty (), "{:?}", response . errors );
     Ok (( )) }) }

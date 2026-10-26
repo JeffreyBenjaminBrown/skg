@@ -56,6 +56,35 @@ pub fn in_content_position (
       _ => false, },
     None => false, }}
 
+/// Whether the vognode children of 'node' are nodes of the
+/// containerward chain: 'node' is a write-protected occurrence that is
+/// a member of a folder whose members carry the chain
+/// ('Folder::members_carry_containerward_chain'), or is itself a node
+/// of the chain. The chain is known by where it stands. An editable
+/// member's children are its content.
+pub fn holds_containerward_chain (
+  node : NodeRef<Viewnode>,
+) -> bool {
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    &node . value () . kind else { return false; };
+  if ! occurrence . is_writeProtected () { return false; }
+  match node . parent () {
+    Some (parent) => match &parent . value () . kind {
+      ViewnodeKind::Folder (folder) =>
+        folder . members_carry_containerward_chain (),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
+        holds_containerward_chain (parent),
+      _ => false, },
+    None => false, }}
+
+/// Whether 'node' is a node of the containerward chain: a vognode
+/// whose viewparent holds the chain ('holds_containerward_chain').
+pub fn stands_in_containerward_chain (
+  node : NodeRef<Viewnode>,
+) -> bool {
+  matches! ( node . value () . kind, ViewnodeKind::Vognode (_) )
+  && node . parent () . is_some_and (holds_containerward_chain) }
+
 /// The 'internal' functions expose the awkward internal representation
 /// that Forest is designed to hide when possible.
 impl<T> Forest<T> {
