@@ -52,8 +52,9 @@ Signals an error if:
 
 (defun skg--read-sexp-at-point-on-line (start line-end)
   "Parse the sexp starting at START, ensuring it ends before LINE-END.
-Uses skg-find-sexp-end for paren matching (immune to herald
-characters that confuse Emacs's forward-sexp), then strips
+Uses skg-find-sexp-end for paren matching (immune to an unmatched
+bracket or quote typed into the metadata, which stops Emacs's
+forward-sexp), then strips
 herald fields before returning the parsed sexp.
 Moves point to the end of the sexp."
   (let* ((line-text (buffer-substring-no-properties start line-end))

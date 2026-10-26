@@ -1,7 +1,7 @@
 -- Mirrors tests/elisp/test-skg-metadata.el (the parts belonging to
 -- this module; the replace-content<->link cases live with
 -- skg.modify_graph and the minibuffer linkstack cases with
--- skg.linkstack) and all of test-skg-metadata-editing.el.
+-- skg.linkstack).
 
 local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')
@@ -50,27 +50,6 @@ describe('skg.metadata parsing', function ()
       '** (skg node (gnid 1)) some title')
     assert.are.equal('(skg node (gnid 1))', with_meta.metadata)
     assert.are.equal('some title', with_meta.title)
-  end)
-
-  it('parses metadata into alist and bare values', function ()
-    -- Mirrors test-skg-parse-metadata-sexp.
-    local simple = metadata.parse_metadata_sexp('(skg (gnid 1) value)')
-    assert.are.same({ { key = 'gnid', value = '1' } }, simple.alist)
-    assert.are.same({ 'value' }, simple.bare_values)
-    local complex =
-      metadata.parse_metadata_sexp('(skg a b (c d) (e f))')
-    assert.are.same({ { key = 'c', value = 'd' },
-                      { key = 'e', value = 'f' } }, complex.alist)
-    assert.are.same({ 'a', 'b' }, complex.bare_values)
-  end)
-
-  it('keeps graphStats/view/diff sub-sexps whole', function ()
-    local parsed = metadata.parse_metadata_sexp(
-      '(skg node x (view cycle repoBoundary) (diff (rel added) (ready)))')
-    local found = {}
-    for _, kv in ipairs(parsed.alist) do found[kv.key] = kv.value end
-    assert.are.equal('(view cycle repoBoundary)', found.view)
-    assert.are.equal('(diff (rel added) (ready))', found.diff)
   end)
 end)
 
@@ -594,66 +573,5 @@ describe('skg.metadata keybinding surface', function ()
     save.request_save_buffer = original_save
     helpers.wipe_skg_buffers()
     if not ok then error(err, 0) end
-  end)
-end)
-
-describe('skg.metadata editing helpers', function ()
-  -- Mirrors tests/elisp/test-skg-metadata-editing.el.
-  local example_data = table.concat({
-    '* 1',
-    '1 body',
-    '* (skg) 2',
-    '* (skg (k v) value) 3',
-    '3 body',
-    '* (skg value (k v)) 4' }, '\n')
-
-  local function apply_to_all_lines (fn, argument)
-    for line = 1, vim.api.nvim_buf_line_count(0) do
-      vim.api.nvim_win_set_cursor(0, { line, 0 })
-      fn(argument)
-    end
-  end
-
-  after_each(function ()
-    pcall(vim.api.nvim_buf_delete,
-          vim.api.nvim_get_current_buf(), { force = true })
-  end)
-
-  it('deletes a kv-pair whose key exists', function ()
-    buffer_with(example_data)
-    apply_to_all_lines(metadata.delete_kv_pair_from_metadata_by_key,
-                       'k')
-    assert.are.equal(table.concat({
-      '* 1', '1 body', '* (skg) 2', '* (skg value) 3', '3 body',
-      '* (skg value) 4' }, '\n'), buffer_text())
-  end)
-
-  it('leaves metadata alone when the key is na', function ()
-    -- "Alone" up to normalization: reconstruction orders kv-pairs
-    -- before bare values, exactly as the elisp expectations show
-    -- (input '(skg value (k v))' comes back '(skg (k v) value)').
-    buffer_with(example_data)
-    apply_to_all_lines(metadata.delete_kv_pair_from_metadata_by_key,
-                       'h')
-    assert.are.equal(table.concat({
-      '* 1', '1 body', '* (skg) 2', '* (skg (k v) value) 3', '3 body',
-      '* (skg (k v) value) 4' }, '\n'), buffer_text())
-  end)
-
-  it('deletes a bare value that exists', function ()
-    buffer_with(example_data)
-    apply_to_all_lines(metadata.delete_value_from_metadata, 'value')
-    assert.are.equal(table.concat({
-      '* 1', '1 body', '* (skg) 2', '* (skg (k v)) 3', '3 body',
-      '* (skg (k v)) 4' }, '\n'), buffer_text())
-  end)
-
-  it('leaves metadata alone when the value is na', function ()
-    buffer_with(example_data)
-    apply_to_all_lines(metadata.delete_value_from_metadata,
-                       'nonexistent')
-    assert.are.equal(table.concat({
-      '* 1', '1 body', '* (skg) 2', '* (skg (k v) value) 3', '3 body',
-      '* (skg (k v) value) 4' }, '\n'), buffer_text())
   end)
 end)

@@ -211,7 +211,7 @@ member, 'true' on a child claiming nothing."
 
 (ert-deftest test-canonical-ordering ()
   "Fields appear in canonical order after filling in."
-  (let* ((sexp '(skg node (skgRepos (nodeRepo jeff)) (graphStats 42) (gnid abc) writeProtected))
+  (let* ((sexp '(skg node (skgRepos (nodeRepo jeff)) (view cycle) (gnid abc) writeProtected))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))
          (lines (split-string filledIn "\n"))
@@ -221,10 +221,10 @@ member, 'true' on a child claiming nothing."
                            (lambda (hl) (= (car hl) 2))
                            headlines))))
     ;; Order should be: node, skgRepos, gnid, write-protected,
-    ;; noClaim, editRequest, viewRequests, graphStats
+    ;; noClaim, editRequest, viewRequests, view
     (should (equal level-2
                    '("node" "skgRepos" "gnid" "writeProtected" "noClaim"
-                     "editRequest" "viewRequests" "graphStats")))))
+                     "editRequest" "viewRequests" "view")))))
 
 ;;
 ;; Strip: editRequest merge with org link

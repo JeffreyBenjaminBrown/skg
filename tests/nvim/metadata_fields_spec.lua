@@ -100,7 +100,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
 
   it('orders fields canonically', function ()
     local headlines = filledIn_headlines(
-      '(skg node (skgRepos (nodeRepo jeff)) (graphStats 42) (gnid abc) writeProtected)')
+      '(skg node (skgRepos (nodeRepo jeff)) (view cycle) (gnid abc) writeProtected)')
     local level_2 = {}
     for _, headline in ipairs(headlines) do
       if headline.level == 2 then
@@ -108,7 +108,7 @@ describe('skg.sexpr.metadata_fields filling in', function ()
     end
     assert.are.same(
       { 'node', 'gnid', 'skgRepos', 'writeProtected', 'noClaim',
-        'editRequest', 'viewRequests', 'graphStats' },
+        'editRequest', 'viewRequests', 'view' },
       level_2)
   end)
 end)

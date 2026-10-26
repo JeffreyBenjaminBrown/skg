@@ -40,48 +40,38 @@ surrounding fold state. Currently, every such call site in the
 skg client goes through =skg-replace-current-line=:
 
 - =skg-edit-metadata-at-point= — merge or create metadata
-- =skg-delete-kv-pair-from-metadata-by-key= — remove a kv-pair
-- =skg-delete-value-from-metadata= — remove a bare value
+- =skg-strip-fork-requests-in-buffer= — remove fork requests
+- =skg--around-org-todo= — lift the metadata off while =org-todo= runs
 
 If you add another metadata-editing function, route it through
 =skg-replace-current-line= for the same reason.
 
-* Can't use forward-sexp on skg metadata
+* Find the end of skg metadata by counting parentheses
 
-Emacs's =forward-sexp= (and by extension =backward-up-list=,
-=up-list=, etc.) chokes on skg metadata because herald fields
-contain characters that Emacs treats as unmatched delimiters.
-
-For example, =containsHerald= uses ={= without a closing =}=:
-
-: (graphStats (containers 0) (contents 9) (containsHerald 0{9))
-
-=forward-sexp= sees the ={= and either errors or jumps to the
-wrong position, because Emacs's syntax tables treat braces as
-paired delimiters.
-
-Similarly, the home-skgrepo herald uses =⌂= and =linksHerald= uses =→=,
-which can confuse sexp navigation depending on syntax table
-settings.
+Every form the server writes in a headline's metadata holds only
+symbols, numbers and parentheses, so =forward-sexp= finds its end.
+(A throwaway check confirmed it over every metadata line of
+=tests/shared/herald-rendering-cases.txt=.) Metadata the user types
+need not be so tame: org-mode's syntax table pairs =<= with =>=, and
+Emacs pairs =[= with =]= and ={= with =}= and reads ="= as a string
+delimiter, so one unmatched such character inside the metadata makes
+=forward-sexp= signal =scan-error= (checked too).
 
 ** What to use instead
 
 =skg-find-sexp-end= in =skg-sexpr/skg-sexpr-search.el= counts
-parentheses manually, ignoring all other characters. Use it (or
-=skg--read-sexp-at-point-on-line= which wraps it) instead of
-=forward-sexp= when navigating skg metadata.
-
-** Where this matters
-
-Any Emacs Lisp code that needs to find the extent of an =(skg ...)=
-sexp in a buffer or string. Currently:
+parentheses alone, ignoring every other character. Use it (or
+=skg--read-sexp-at-point-on-line=, which wraps it) instead of
+=forward-sexp= when finding the extent of an =(skg ...)= sexp in a
+buffer or string. Currently:
 
 - =skg-first-sexpr-on-line= — returns the first sexp on the line
 - =skg-sexp-at-or-after-point= — returns the sexp at/after point
-- =skg-metadata.el= — splits headline into stars, metadata, title
+- =skg-split-as-stars-metadata-title= — splits a headline into
+  stars, metadata and title
+- =skg--metadata-sexp-on-line= — reads a headline's metadata in any
+  buffer
 - =heralds-minor-mode.el= — finds metadata extent for overlays
-
-All of these use =skg-find-sexp-end= rather than =forward-sexp=.
 * Strip Emacs properties from text before sending them to the server.
 
 They are gibberish outside Emacs.
