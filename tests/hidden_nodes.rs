@@ -137,6 +137,105 @@ fn a_tightened_restriction_leaves_a_tombstone_over_the_hidden_nodes_children (
                   "the tombstone stays:\n{}", back ); }
       Ok (( )) } ) }
 
+/// The buffers a switch draws, compared with the text captured
+/// before the switch's own entombstone-and-prune phase was deleted
+/// (TODO/simplify-refresh/06_plan_tidy-refresh.org, slice 1): the
+/// refresh alone draws a switched view as that phase and the refresh
+/// together did, the subscribee folder the restriction empties
+/// pruned.
+#[test]
+fn a_switch_draws_the_view_as_the_switchs_own_phase_did (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture (case . path ()) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      open_view_of_r (f, None) ?;
+      let narrowed : String = switch (f, &mut restriction, "public") ?;
+      let widened : String = switch (f, &mut restriction, "all") ?;
+      assert_eq! ( narrowed, SWITCHED_TO_PUBLIC );
+      assert_eq! ( widened, SWITCHED_BACK_TO_ALL );
+      Ok (( )) } ) }
+
+/// As above, where r also hides hh, private, from its subscribers:
+/// the hidden-outside folder the restriction empties is pruned, and
+/// then the subscribee folder it leaves empty.
+#[test]
+fn a_switch_prunes_the_folders_the_restriction_empties (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture_where_r_hides (case . path (), &["hh"]) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      let opened : String = open_view_of_r (f, None) ?;
+      let narrowed : String = switch (f, &mut restriction, "public") ?;
+      let widened : String = switch (f, &mut restriction, "all") ?;
+      assert! ( opened . contains ("hiddenOutsideOfSubscribeeFolder"),
+                "under all r's subscribee folder holds hs and hh:\n{}", opened );
+      assert_eq! ( narrowed, "\
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 2))) repoBoundary)) r
+** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
+** (skg (vnid 0g) tombstone)
+*** (skg (vnid 0h) node (gnid s1) (skgRepos (nodeRepo public))) s1
+** (skg (vnid 0i) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
+" );
+      assert_eq! ( widened, "\
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (subscribesTo (out 1)) (hidesFromSubs (out 1))) repoBoundary)) r
+** (skg (vnid 0f) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
+** (skg (vnid 0g) tombstone)
+*** (skg (vnid 0h) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1))))) s1
+** (skg (vnid 0j) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
+*** (skg (vnid 0k) node (gnid s1) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+** (skg (vnid 0i) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
+" );
+      Ok (( )) } ) }
+
+const SWITCHED_TO_PUBLIC : &str = "\
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 2))) repoBoundary)) r
+** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
+** (skg (vnid 0e) tombstone)
+*** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public))) s1
+** (skg (vnid 0g) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
+";
+
+const SWITCHED_BACK_TO_ALL : &str = "\
+* (skg (vnid 0a) node (gnid r) (skgRepos (nodeRepo public)) (view (rels (contains (out 3)) (subscribesTo (out 1))) repoBoundary)) r
+** (skg (vnid 0d) node (gnid a) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) a
+** (skg (vnid 0e) tombstone)
+*** (skg (vnid 0f) node (gnid s1) (skgRepos (nodeRepo public)) (view (rels (contains (in 1))))) s1
+** (skg (vnid 0h) node (gnid h) (skgRepos (nodeRepo private) (relRepo public)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (props (aliases 1)) (birth (contains in 1)) repoBoundary)) h secret
+*** (skg (vnid 0i) node (gnid s1) (skgRepos (nodeRepo public)) writeProtected (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)) repoBoundary)) s1
+** (skg (vnid 0g) node (gnid b) (skgRepos (nodeRepo public)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) b
+";
+
+/// A switch's rerender reports no buffer corrections: narrowed, the
+/// tombstone over s1 is the restriction's doing, and widened, h drawn
+/// again is too ('BufferCorrectionPolicy').
+#[test]
+fn a_switch_reports_no_buffer_corrections (
+) -> Result<(), Box<dyn Error>> {
+  let case : tempfile::TempDir = tempfile::TempDir::new () ?;
+  write_fixture (case . path ()) ?;
+  with_git_fixture (
+    case . path (), OwnedSkgrepos::Named (&["public", "private"]), &[],
+    |f| {
+      let mut restriction : SkgrepoRestriction =
+        SkgrepoRestriction::named (&f . config, "all" . into ()) ?;
+      open_view_of_r (f, None) ?;
+      for name in ["public", "all"] {
+        let (view, done) : (String, String) =
+          switch_reporting (f, &mut restriction, name) ?;
+        assert! ( done . contains ("(corrections ())"),
+                  "the switch to {} reports no buffer corrections: {}\n\nview:\n{}",
+                  name, done, view ); }
+      Ok (( )) } ) }
+
 fn assert_no_trace_of_the_hidden_nodes (
   what   : &str,
   buffer : &str,
@@ -152,14 +251,32 @@ fn assert_no_trace_of_the_hidden_nodes (
 fn write_fixture (
   dir : &Path,
 ) -> Result<(), Box<dyn Error>> {
+  write_fixture_where_r_hides (dir, &[]) }
+
+/// The fixture, with r hiding 'hides' from its subscribers. Beside it
+/// stand hh ("hh secret", private) and hv (public), which r may hide.
+fn write_fixture_where_r_hides (
+  dir   : &Path,
+  hides : &[&str],
+) -> Result<(), Box<dyn Error>> {
+  let hidesFromSubs : String =
+    if hides . is_empty () { String::new () }
+    else { format! ( "hidesFromSubs:\n{}",
+                     hides . iter () . map ( |hide| format! ("- {}\n", hide) )
+                     . collect::<String> () ) };
+  let r : String = format! (
+    "pid: r\ntitle: r\ncontains:\n- a\n- h\n- b\nsubscribesTo:\n- hs\n{}",
+    hidesFromSubs );
   let public : &[(&str, &str)] = &[
-    ("r",  "pid: r\ntitle: r\ncontains:\n- a\n- h\n- b\nsubscribesTo:\n- hs\n"),
+    ("r",  &r),
     ("a",  "pid: a\ntitle: a\n"),
     ("b",  "pid: b\ntitle: b\n"),
-    ("s1", "pid: s1\ntitle: s1\n"), ];
+    ("s1", "pid: s1\ntitle: s1\n"),
+    ("hv", "pid: hv\ntitle: hv\n"), ];
   let private : &[(&str, &str)] = &[
     ("h",  "pid: h\ntitle: h secret\naliases:\n- h alias secret\ncontains:\n- s1\n"),
-    ("hs", "pid: hs\ntitle: hs secret\n"), ];
+    ("hs", "pid: hs\ntitle: hs secret\n"),
+    ("hh", "pid: hh\ntitle: hh secret\n"), ];
   for (skgrepo, files) in [("public", public), ("private", private)] {
     for side in ["head", "worktree"] {
       let folder = dir . join (skgrepo) . join (side);
@@ -219,6 +336,16 @@ fn switch (
   restriction : &mut SkgrepoRestriction,
   name        : &str,
 ) -> Result<String, Box<dyn Error>> {
+  Ok ( switch_reporting (f, restriction, name) ? . 0 ) }
+
+/// Switch to the skgrepo-set 'name'; return the view as rerendered,
+/// and the "rerender-done" message, which carries the buffer
+/// corrections.
+fn switch_reporting (
+  f           : &mut Fixture,
+  restriction : &mut SkgrepoRestriction,
+  name        : &str,
+) -> Result<(String, String), Box<dyn Error>> {
   let env : SkgEnv = skg_env_from_parts (&f . config, &f . tantivy, &f . graph);
   let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::new (Mutex::new (None));
@@ -236,5 +363,10 @@ fn switch (
                        && message . contains (&format! ("(view-id \"{}\")", VIEW)) )
     . and_then ( |message| extract_string_field_from_sexp (
       &message [ message . find ('(') ? .. ], "content" ));
-  Ok ( rerendered . unwrap_or_else (
-    || panic! ( "the switch to {} rerenders the view: {:?}", name, messages )) ) }
+  let done : String = messages . iter ()
+    . find ( |message| message . contains ("rerender-done") )
+    . cloned ()
+    . unwrap_or_else ( || panic! ( "the switch to {} ends: {:?}", name, messages ));
+  Ok (( rerendered . unwrap_or_else (
+          || panic! ( "the switch to {} rerenders the view: {:?}", name, messages )),
+        done )) }

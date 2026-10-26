@@ -1,3 +1,4 @@
+use crate::refresh::corrections::BufferCorrectionPolicy;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
@@ -98,6 +99,8 @@ fn set_skgrepo_restriction (
     prepare_rerender_views_with_runtime (
       env, runtime, views_state,
       Some (&target), Some (&prepass),
+      BufferCorrectionPolicy::after_a_switch (
+        restriction != *skgrepo_restriction ),
       RerenderOptions::ordinary ) };
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, Some (&restriction),

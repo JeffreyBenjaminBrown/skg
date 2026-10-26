@@ -1286,12 +1286,19 @@ in the diff view".
 
 *** corrections
 
-What a refresh reports it changed because the buffer contradicted
-the truth ('Correction', 'CorrectionKind' in
-'server/refresh/corrections.rs'): a headline reinstated,
-entombstoned, marked =noClaim=, merged into, re-kinded, or stripped
-of an edit request its new kind has no slot for. What it draws as
-extent is no correction. The save and rerender responses carry each
+A buffer correction is a change the refresh made to what a buffer
+said because the buffer was wrong about the graph ('Correction',
+'CorrectionKind' in 'server/refresh/corrections.rs'): a headline
+reinstated, entombstoned, marked =noClaim=, merged into, re-kinded,
+or stripped of an edit request its new kind has no slot for. What
+it draws as extent is no buffer correction. Nor are two changes
+the buffer was not wrong about, which the refresh learns of from
+its caller ('BufferCorrectionPolicy'): a tombstone it leaves where
+the saving user's own save deleted the node, and a member it draws
+because the skgrepo restriction was widened (after a change of the
+restriction it reports no tombstone either). The refresh reports
+buffer corrections; it does not warn. The save and rerender
+responses carry each
 view's corrections, tagged with its view ID ('ViewCorrections'), and
 the clients show them in their warnings buffer (see "startup warnings
 channel").

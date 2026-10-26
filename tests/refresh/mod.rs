@@ -136,11 +136,13 @@ pub(super) fn run_in (
   let mut forest : ViewForest = parse (text, IdResolution::ThroughGraph (graph));
   let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
   let first : Refreshed = refresh_viewforest (
-    &mut forest, &mut record, &truth, mode, budget, Some (&store) )
+    &mut forest, &mut record, &truth, mode, budget, Some (&store),
+    &BufferCorrectionPolicy::default () )
     . unwrap ();
   let mut again : ViewForest = parse (&first . text, IdResolution::ThroughGraph (graph));
   let second : Refreshed = refresh_viewforest (
-    &mut again, &mut record, &truth, mode, budget, Some (&store) )
+    &mut again, &mut record, &truth, mode, budget, Some (&store),
+    &BufferCorrectionPolicy::default () )
     . unwrap ();
   assert_eq! ( second . text, first . text,
                "the refresh of a refresh's output changed it" );

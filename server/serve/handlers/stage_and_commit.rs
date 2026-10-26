@@ -12,6 +12,7 @@
 //! ('stream_rerender_diffView_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
+use crate::refresh::corrections::BufferCorrectionPolicy;
 use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ReadinessSummary, readiness_response_sexp,
   readiness_response_trailing_entries};
@@ -97,7 +98,8 @@ fn stream_rerender_diffView_views (
 ) {
   let prepared : PreparedRerenders = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state,
-    Some (skgrepo_restriction), None, RerenderOptions::ordinary,
+    Some (skgrepo_restriction), None, BufferCorrectionPolicy::default (),
+    RerenderOptions::ordinary,
     |_, state| state . diffView_buffer_kind . is_some () );
   stream_prepared_rerenders (stream, views_state, prepared);
 }

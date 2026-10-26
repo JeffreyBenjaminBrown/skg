@@ -18,6 +18,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_viewforest};
+use crate::refresh::corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -389,7 +390,7 @@ pub fn enrich_search_viewforest (
   { let truth : Truth = Truth { graph, config, restriction : Some (restriction) };
     refresh_viewforest (
       viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
-      config . initial_node_limit, None ) ?; }
+      config . initial_node_limit, None, &BufferCorrectionPolicy::default () ) ?; }
   for hit in &hits {
     let drawn : Vec<NodeId> =
       viewforest . get (*hit) . unwrap () . children ()

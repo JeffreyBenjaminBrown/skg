@@ -101,7 +101,8 @@ fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-                       CompletionMode::ContentView, 100, None ) . unwrap ();
+                       CompletionMode::ContentView, 100, None,
+                       &BufferCorrectionPolicy::default () ) . unwrap ();
   assert_eq! ( outline (&forest), "\
 node p
   node a wp" ); }
@@ -124,7 +125,8 @@ fn of_two_editable_occurrences_a_nodeMerge_made_one_nodes_the_first_stays_editab
   let config : SkgConfig = config ();
   let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-                       CompletionMode::ContentView, 100, None ) . unwrap ();
+                       CompletionMode::ContentView, 100, None,
+                       &BufferCorrectionPolicy::default () ) . unwrap ();
   assert_eq! ( outline (&forest), "\
 node a
   node a wp

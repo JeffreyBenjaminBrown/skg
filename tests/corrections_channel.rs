@@ -8,6 +8,9 @@
 //   already drawn, now lacks the child. That correction is tagged
 //   with the view of 'five'; the saved view reports nothing.
 //
+// - a save that deletes a node reports no buffer correction for it,
+//   in any view.
+//
 // Fixture: one contains two and three; two contains four; five
 // contains two.
 
@@ -70,6 +73,47 @@ fn corrections_reach_the_save_response_tagged_with_their_view
                   "the drawn child has a vnid by the time it is reported" );
         assert! ( response . warnings . is_empty (),
                   "a correction is not a warning: {:?}", response . warnings ); }
+      Ok (( )) } )) }
+
+/// A save that deletes a node reports no buffer correction for it:
+/// four, deleted in the view of one, leaves no "Entombstoned" in that
+/// view or in the view of five, where it stood under two too. The
+/// tombstone is the saving user's own doing ('BufferCorrectionPolicy').
+#[test]
+fn a_saves_own_deletion_is_no_buffer_correction
+  () -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-corrections-channel-deletion",
+    "tests/corrections_channel/fixtures",
+    "/tmp/tantivy-test-corrections-channel-deletion",
+    |config, tantivy| Box::pin ( async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+      let mut views_state : ViewsState = ViewsState {
+        open_views     : OpenViews::new (),
+        graph_straddle : None, };
+      let view_of_one : ViewforestId = ViewforestId::ContentView ("view of one" . into ());
+      let view_of_five : ViewforestId = ViewforestId::ContentView ("view of five" . into ());
+      let one : String = open_view (
+        "one", &view_of_one, config, tantivy, &graph, &mut views_state ) ?;
+      let five : String = open_view (
+        "five", &view_of_five, config, tantivy, &graph, &mut views_state ) ?;
+      assert! ( one . contains ("(gnid four)") && five . contains ("(gnid four)"),
+                "both views show four:\n{}\n{}", one, five );
+      let deleting_four : String =
+        one . replacen ( "(gnid four)", "(gnid four) (editRequest delete)", 1 );
+      let response : SaveResponse = save (
+        &deleting_four, &view_of_one, config, tantivy, &graph,
+        &mut views_state ) . await ?;
+      assert! ( response . errors . is_empty (), "{:?}", response . errors );
+      assert! ( graph . load_full () . get (&ID::from ("four")) . is_none (),
+                "the save deleted four" );
+      let entombstoned : Vec<&ViewCorrections> = response . corrections . iter ()
+        . filter ( |view| view . corrections . iter ()
+                   . any ( |c| c . kind == CorrectionKind::Entombstoned ))
+        . collect ();
+      assert! ( entombstoned . is_empty (),
+                "the save's own deletion is no buffer correction: {:?}",
+                response . corrections );
       Ok (( )) } )) }
 
 /// Render the view of 'root' and register it as 'viewforest_id'.

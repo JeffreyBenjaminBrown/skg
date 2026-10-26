@@ -94,7 +94,8 @@ fn a_tombstone_request_entombstones_a_ghost () {
     &mut forest, &mut ViewnodeIdRecord::default (), &truth,
     CompletionMode::DiffView { straddle : &straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges },
-    100, Some (&ReadinessStore::default ()) ) . unwrap ();
+    100, Some (&ReadinessStore::default ()),
+    &BufferCorrectionPolicy::default () ) . unwrap ();
   assert_eq! ( outline (&forest), "\
 node p
   changesetMarker content

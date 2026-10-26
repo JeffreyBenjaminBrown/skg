@@ -27,7 +27,7 @@ use crate::types::viewnode::{
   default_occurrence};
 use crate::update_buffer::completion_mode::CompletionMode;
 
-use ego_tree::{NodeId, NodeMut, Tree};
+use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::error::Error;
 
 /// What the ID rule makes of a gnid.
@@ -190,13 +190,26 @@ pub(crate) fn rekind_vognode (
   Ok (( )) }
 
 /// Make the headline at 'treeid' a tombstone, keeping its children,
-/// and report it, and any edit request it carried.
+/// and report it, and any edit request it carried. Its entombstoning
+/// is no buffer correction when the policy says so of the gnid it
+/// stood for, or when its viewparent was entombstoned quietly
+/// ('Walk::quiet_tombstones').
 pub(crate) fn entombstone (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   walk   : &mut Walk,
 ) {
-  walk . corrections . record (tree, treeid, CorrectionKind::Entombstoned);
+  let reported : bool = {
+    let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
+    let gnid : Option<&ID> = match &node . value () . kind {
+      ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () ),
+      _ => None, };
+    walk . correction_policy . reports_entombstoning (gnid)
+    && ! node . parent () . is_some_and (
+         |parent| walk . quiet_tombstones . contains (&parent . id ()) ) };
+  if reported {
+    walk . corrections . record (tree, treeid, CorrectionKind::Entombstoned); }
+  else { walk . quiet_tombstones . insert (treeid); }
   entombstone_reporting_requests_only (tree, treeid, walk); }
 
 /// Make the change viewnode at 'treeid', whose change is gone, a

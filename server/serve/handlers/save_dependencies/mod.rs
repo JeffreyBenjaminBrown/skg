@@ -13,12 +13,31 @@ use crate::types::viewnode::{
 use crate::types::views_state::ViewforestId;
 
 use std::collections::{HashMap, HashSet};
+use std::iter::once;
 
 pub(crate) struct SaveAffectedIds {
   before      : HashSet<ID>,
   after       : HashSet<ID>,
   raw_touched : HashSet<ID>,
+  /// Every ID of each node the save deletes: one the graph before the
+  /// save resolves and the graph after it does not.
+  pub(crate) deleted : HashSet<ID>,
 }
+
+/// Every ID (pid and extra IDs) of each node among 'touched' that
+/// 'before' resolves and 'after' does not.
+fn ids_of_deleted_nodes (
+  touched : &HashSet<ID>,
+  before  : &InRustGraph,
+  after   : &InRustGraph,
+) -> HashSet<ID> {
+  touched . iter ()
+    . filter ( |gnid| after . pid_of (gnid) . is_none () )
+    . filter_map ( |gnid| before . pid_of (gnid) )
+    . filter_map ( |pid| before . get (&pid) )
+    . flat_map ( |node| once ( node . pid . clone () )
+                        . chain ( node . extra_ids . iter () . cloned () ))
+    . collect () }
 
 impl SaveAffectedIds {
   pub(crate) fn from_prepared (
@@ -30,7 +49,9 @@ impl SaveAffectedIds {
       . update_relevant_neighborhood (raw_touched . iter () . cloned ());
     let after : HashSet<ID> = prepared . final_candidate ()
       . update_relevant_neighborhood (raw_touched . iter () . cloned ());
-    SaveAffectedIds { before, after, raw_touched }
+    let deleted : HashSet<ID> = ids_of_deleted_nodes (
+      &raw_touched, prepared . graph_before_save (), prepared . final_candidate () );
+    SaveAffectedIds { before, after, raw_touched, deleted }
   }
 
   pub(crate) fn matching_identity (

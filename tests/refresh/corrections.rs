@@ -3,7 +3,10 @@
 // content of an occurrence first extended, the members of a folder
 // first requested, or what stands under the roots of a stub is
 // extent, which it does not report; a reinstatement is reported only
-// where a list already drawn was missing a member.
+// where a list already drawn was missing a member. Nor does it report
+// what its caller's policy says the buffer was not wrong about: a
+// tombstone the saving user's own save left, or a member drawn after
+// a change of the skgrepo restriction.
 
 use super::*;
 use crate::update_buffer::stub_of_fresh_content_view;
@@ -29,7 +32,8 @@ fn a_fresh_view_reports_nothing () {
     &[ ID::from ("p"), ID::from ("b") ], &graph );
   let refreshed : Refreshed = refresh_viewforest (
     &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100, None ) . unwrap ();
+    CompletionMode::ContentView, 100, None,
+    &BufferCorrectionPolicy::default () ) . unwrap ();
   assert! ( refreshed . text . contains ("(gnid a1)")
             && refreshed . text . contains ("containerFolder"),
             "the stub drew its roots' content and containers:\n{}",
@@ -96,3 +100,61 @@ node p
                "b was missing from p's content, q from its containers \
                 folder; b's own content is drawn as b is first \
                 extended" ); }
+
+/// Under a policy naming x as deleted by the save, x's tombstone is no
+/// buffer correction, nor is its folder, which the tombstone makes
+/// unsayable; y, gone too but not by the save, is reported.
+#[test]
+fn a_tombstone_the_save_left_is_not_reported () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["c"]), .. node ("p") },
+    node ("c"), node ("k") ]);
+  let config : SkgConfig = config ();
+  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} x
+    *** (skg containerFolder)
+    ** {} y
+    *** {} k
+    ", occ ("p", ""), occ ("c", ""), occ ("x", ""), occ ("y", ""), occ ("k", "") );
+  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
+  let policy : BufferCorrectionPolicy =
+    BufferCorrectionPolicy::after_a_save_deleting (
+      HashSet::from ([ ID::from ("x") ]) );
+  let refreshed : Refreshed = refresh_viewforest (
+    &mut forest, &mut ViewnodeIdRecord::default (), &truth,
+    CompletionMode::ContentView, 100, None, &policy ) . unwrap ();
+  assert_eq! ( outline (&forest), "\
+node p
+  node c
+  tombstone
+    node k noClaim",
+    "x's tombstone and its folder are pruned; y's keeps k" );
+  let reported : Vec<(CorrectionKind, &str)> =
+    refreshed . corrections . iter ()
+    . map ( |c| ( c . kind, c . title . as_str () ))
+    . collect ();
+  assert_eq! ( reported, vec! [ ( CorrectionKind::Entombstoned, "y" ) ] ); }
+
+/// After a change of the skgrepo restriction, what a list already
+/// drawn lacked and the refresh draws is the restriction's doing, not
+/// a buffer correction.
+#[test]
+fn a_member_drawn_after_a_restriction_change_is_not_reported () {
+  let graph : InRustGraph = family ();
+  let config : SkgConfig = config ();
+  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} a
+    *** {} a1
+    ", occ ("p", ""), occ ("a", ""), occ ("a1", "") );
+  let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
+  let refreshed : Refreshed = refresh_viewforest (
+    &mut forest, &mut ViewnodeIdRecord::default (), &truth,
+    CompletionMode::ContentView, 100, None,
+    &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
+  assert! ( refreshed . text . contains ("(gnid b)"), "b is drawn:\n{}", refreshed . text );
+  assert! ( refreshed . corrections . is_empty (), "{:?}", refreshed . corrections ); }

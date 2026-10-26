@@ -940,7 +940,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         views_state,
         skgrepo_restriction,
         text_approved_pids,
-        &fork_specs ) ?;
+        &fork_specs,
+        affected_gnids . deleted . clone () ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the rerender's warnings.
       let mut warnings : Vec<String> = parse_warnings;

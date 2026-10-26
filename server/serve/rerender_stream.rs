@@ -11,7 +11,7 @@
 
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::Refreshed;
-use crate::refresh::corrections::{Correction, ViewCorrections};
+use crate::refresh::corrections::{BufferCorrectionPolicy, Correction, ViewCorrections};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -57,12 +57,13 @@ pub(crate) fn prepare_rerender_views (
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
+  buffer_correction_policy : BufferCorrectionPolicy,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
 ) -> PreparedRerenders {
   let runtime = env . runtime_snapshot ();
   prepare_rerender_views_with_runtime (
     env, runtime, views_state, skgrepo_restriction, prepass,
-    rerender_options)
+    buffer_correction_policy, rerender_options)
 }
 
 pub(crate) fn prepare_rerender_views_with_runtime (
@@ -71,11 +72,12 @@ pub(crate) fn prepare_rerender_views_with_runtime (
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
+  buffer_correction_policy : BufferCorrectionPolicy,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
     env, runtime, views_state, skgrepo_restriction, prepass,
-    rerender_options, |_, _| true )
+    buffer_correction_policy, rerender_options, |_, _| true )
 }
 
 /// Prepare only open views selected from their already-held state.
@@ -83,12 +85,15 @@ pub(crate) fn prepare_rerender_views_with_runtime (
 /// command can leave unrelated clean *and dirty* buffers entirely untouched.
 /// 'rerender_options' gives the options of each view's 'rerender_view'
 /// from the view's buffer kind in the diff view, if any.
+/// 'buffer_correction_policy' says which changes the rerenders report
+/// as no buffer corrections.
 pub(crate) fn prepare_rerender_views_where (
   env                 : &SkgEnv,
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
+  buffer_correction_policy : BufferCorrectionPolicy,
   rerender_options    : fn (Option<DiffViewBufferKind>) -> RerenderOptions,
   include             : impl Fn (&ViewforestId, &ViewState) -> bool,
 ) -> PreparedRerenders {
@@ -102,6 +107,7 @@ pub(crate) fn prepare_rerender_views_where (
   // brought up to date from the connection's. Streaming the rerenders
   // writes it back, as a save does.
   context . graph_straddle = views_state . graph_straddle . clone ();
+  context . buffer_correction_policy = buffer_correction_policy;
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for viewforest_id in &viewforest_ids {
     let mut viewforest : ViewForest = match

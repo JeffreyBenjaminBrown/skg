@@ -2,6 +2,7 @@
 //! every one the request does not exclude, through the shared
 //! rerender pipeline ('server/serve/rerender_stream.rs').
 
+use crate::refresh::corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;
@@ -83,7 +84,7 @@ fn stream_rerender_views_excluding (
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, Some (skgrepo_restriction), None,
-    RerenderOptions::ordinary );
+    BufferCorrectionPolicy::default (), RerenderOptions::ordinary );
   prepared . viewforest_ids . retain (|viewforest_id| ! excluded . contains (viewforest_id));
   prepared . views . retain (|view| ! excluded . contains (&view . viewforest_id));
   if ! authorize_prepared_rerenders (

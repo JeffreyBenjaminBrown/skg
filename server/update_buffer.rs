@@ -28,7 +28,7 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use completion_mode::CompletionMode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
-use crate::refresh::corrections::{Correction, ViewCorrections};
+use crate::refresh::corrections::{BufferCorrectionPolicy, Correction, ViewCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::completion::rerender_diffView_buffer;
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
@@ -69,6 +69,11 @@ pub struct RerenderAfterSaveContext<'a> {
   /// the first such buffer is rerendered. A caller that holds the
   /// connection's straddle sets it, and keeps what it becomes.
   pub graph_straddle                 : Option<Arc<GraphStraddle>>,
+  /// Which changes the rerenders report as no buffer corrections: a
+  /// save's rerender sets the nodes it deleted, a skgrepo-set switch
+  /// whether the restriction changed; every other rerender reports
+  /// every change.
+  pub buffer_correction_policy       : BufferCorrectionPolicy,
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -85,6 +90,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       warnings : Vec::new (),
       skgrepo_restriction,
       graph_straddle : None,
+      buffer_correction_policy : BufferCorrectionPolicy::default (),
     }}
 
   pub fn without_save (
@@ -116,6 +122,8 @@ struct RenderedCollateralView {
 /// for each view affected by the save.
 /// Starts with the saved view itself, not the collateral ones,
 /// to minimize any freeze the user might experience.
+/// A headline standing for a node in 'deleted_by_the_save' that the
+/// rerender entombstones is no buffer correction.
 /// .
 /// ASSUMES:
 /// the graph was already updated. The reverse order would be bad.
@@ -130,11 +138,14 @@ pub fn update_views_after_save (
   skgrepo_restriction         : Option<&SkgrepoRestriction>,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
+  deleted_by_the_save         : HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
     RerenderAfterSaveContext::with_runtime (
       env, runtime, skgrepo_restriction );
+  context . buffer_correction_policy =
+    BufferCorrectionPolicy::after_a_save_deleting (deleted_by_the_save);
   context . graph_straddle = views_state . graph_straddle . clone ();
   let saved_diffView_buffer_kind : Option<DiffViewBufferKind> =
     viewforest_id_from_request_result . as_ref () . ok ()
@@ -360,7 +371,7 @@ pub fn render_initial_view (
   let refreshed : Refreshed = refresh_viewforest (
     &mut viewforest, &mut ViewnodeIdRecord::default (), &truth,
     CompletionMode::ContentView, runtime . config . initial_node_limit,
-    None ) ?;
+    None, &BufferCorrectionPolicy::default () ) ?;
   Ok (( viewforest, refreshed . text )) }
 
 /// One root per requested node: an editable occurrence of the node
@@ -454,6 +465,7 @@ pub fn rerender_view (
       &mut context . graph_straddle, &context . runtime, context . env,
       context . skgrepo_restriction, diffView_buffer_kind,
       options . integrate_unshown_changes,
+      &context . buffer_correction_policy,
       viewforest, viewnode_id_record ) ?, };
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
@@ -470,4 +482,5 @@ fn refresh_content_view (
                               restriction : context . skgrepo_restriction, };
   refresh_viewforest (
     viewforest, viewnode_id_record, &truth, CompletionMode::ContentView,
-    context . runtime . config . initial_node_limit, None ) }
+    context . runtime . config . initial_node_limit, None,
+    &context . buffer_correction_policy ) }

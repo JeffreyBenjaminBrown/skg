@@ -35,6 +35,7 @@ use crate::types::viewnode::{
   Vognode, mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
+use crate::refresh::corrections::BufferCorrectionPolicy;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -218,7 +219,8 @@ pub fn diffView_buffer_viewforest (
   let mut viewforest : ViewForest =
     stub_viewforest_of_roots (runtime, straddle, diffView_buffer_kind, roots) ?;
   let refreshed : Refreshed = complete_viewforest_with_graph_straddle (
-    runtime, straddle, diffView_buffer_kind, store, None, &mut viewforest,
+    runtime, straddle, diffView_buffer_kind, store, None,
+    &BufferCorrectionPolicy::default (), &mut viewforest,
     // A new buffer's first viewnode IDs; 'register_view' reads the record
     // back from the forest.
     &mut ViewnodeIdRecord::default () ) ?;

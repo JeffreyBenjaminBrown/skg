@@ -19,6 +19,7 @@ use skg::types::viewnode::{
 use skg::types::views_state::DiffViewBufferKind;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::refresh::{Truth, refresh_viewforest};
+use skg::refresh::corrections::BufferCorrectionPolicy;
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::ViewnodeIdRecord;
 use skg::update_buffer::completion_mode::CompletionMode;
@@ -107,7 +108,8 @@ fn a_container_folder_from_a_graph_straddle_holds_both_graphs_containers (
              restriction : None },
     CompletionMode::DiffView { straddle    : &f . straddle,
                                buffer_kind : DiffViewBufferKind::AllChanges },
-    100, Some (&ReadinessStore::default ()) ) ?;
+    100, Some (&ReadinessStore::default ()),
+    &BufferCorrectionPolicy::default () ) ?;
   let both : DiffChange = DiffChange::default ();
   assert_eq! ( children_with_change (forest . get (folder) . unwrap ()), vec! [
     ( "c1" . to_string (), both ),
