@@ -99,7 +99,7 @@ pub struct Viewnode {
   /// carries a change (a folder, a restricted vognode, the buffer
   /// root, a tombstone, 'BodyDiff'), and outside the diff view.
   pub change_facts      : ChangeFacts,
-  /// Save intent, like 'relRepo_request', but allowed on a
+  /// Save intent, like 'relationshipEditRequest', but allowed on a
   /// write-protected occurrence, and beside an edit request.
   /// None on a kind that never carries a change.
   pub readiness_request : Option<ReadinessRequest>,
@@ -223,8 +223,10 @@ pub struct PhantomUnknown {
   pub skgid                 : ID,
   /// Display-only fact about this occurrence's binding relationship.
   pub relRepo         : Option<SkgrepoName>,
-  /// A pending relRepo change, consumed only by save.
-  pub relRepo_request : Option<SkgrepoName>,
+  /// A pending request about this reference's relationship to its
+  /// viewparent (only a relRepo change: the parser refuses
+  /// restoreRel here), consumed only by save.
+  pub relationshipEditRequest : Option<RelationshipEditRequest>,
 }
 
 /// A phantom for a node that the before-graph of the diff
@@ -305,15 +307,13 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
   pub viewStats     : ViewnodeStats,
-  /// A requested skgrepo for this occurrence's binding relationship. Unlike
-  /// `viewStats.relRepo`, this is save intent.
-  pub relRepo_request : Option<SkgrepoName>,
-  /// True when the user asked, by '(editRequest restoreRel)', that the
-  /// save re-add the relationship to the viewparent that this removed
-  /// member stands for, as HEAD recorded it. Like 'relRepo_request', it
-  /// concerns that relationship rather than the node, so it lives
-  /// outside 'Editability': a write-protected occurrence carries it too.
-  pub restoreRel_request : bool,
+  /// A request about this occurrence's binding relationship to its
+  /// viewparent: a skgrepo for it (unlike 'viewStats.relRepo', this
+  /// is save intent), or, on a removed member, that the save re-add
+  /// it as HEAD recorded it. It concerns that relationship rather
+  /// than the node, so it lives outside 'Editability': a
+  /// write-protected occurrence carries it too.
+  pub relationshipEditRequest : Option<RelationshipEditRequest>,
 
   pub view_requests : HashSet < ViewRequest >,
   pub editability  : Editability,
@@ -430,7 +430,7 @@ pub struct ViewnodeStats {
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
   /// This is a display fact, unlike a requested replacement stored in
-  /// 'UnrestrictedVognode_Generic::relRepo_request'.  Save extraction never
+  /// 'UnrestrictedVognode_Generic::relationshipEditRequest'.  Save extraction never
   /// treats this value as a fieldIntent.
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
@@ -460,7 +460,7 @@ pub enum PropertyFolder {
 pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<SkgrepoName>,
-          relRepo_request: Option<SkgrepoName> },
+          relationshipEditRequest: Option<RelationshipEditRequest> },
   ID { skgid: ID }, // an ID of grandparent (the parent being an IDFolder)
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
@@ -567,9 +567,32 @@ pub enum NodeEditRequest {
   // "Restoring what a change removed"). Neither lives in
   // 'Editability': a parsed RestoreNode becomes
   // 'PhantomHistorical::restoreNode_request', a parsed RestoreRel
-  // 'UnrestrictedVognode_Generic::restoreRel_request'.
+  // 'RelationshipEditRequest::RestoreRel'.
   RestoreNode, // write back a node deleted since HEAD
   RestoreRel,  // re-add a relationship removed since HEAD
+}
+
+/// A request about the relationship that binds a viewnode to its
+/// viewparent, rather than about the viewnode's node, carried by an
+/// occurrence, an unknown or an alias. At most one per headline:
+/// the parser takes one '(editRequest ...)'.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RelationshipEditRequest {
+  /// '(editRequest (relRepo R))': record the relationship in R.
+  RelRepo (SkgrepoName),
+  /// '(editRequest restoreRel)': re-add the relationship to the
+  /// viewparent that a removed member stands for, as HEAD recorded it.
+  RestoreRel,
+}
+
+impl RelationshipEditRequest {
+  /// The skgrepo that 'request' asks for, if it is a relRepo request.
+  pub fn relRepo_of (
+    request : &Option<RelationshipEditRequest>,
+  ) -> Option<&SkgrepoName> {
+    match request {
+      Some (RelationshipEditRequest::RelRepo (skgrepo)) => Some (skgrepo),
+      Some (RelationshipEditRequest::RestoreRel) | None => None, } }
 }
 
 /// Which relation's folders a 'Folder' view-request builds. A Folder
@@ -1041,17 +1064,16 @@ impl Viewnode {
     self . readiness_request = None;
     match &mut self . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
-        restriction . relRepo_request = None;
-        restriction . restoreRel_request = false;
+        restriction . relationshipEditRequest = None;
         if let Editability::Editable { edit_request, .. } =
           &mut restriction . editability
         { *edit_request = None; }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
-        unknown . relRepo_request = None,
+        unknown . relationshipEditRequest = None,
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Historical (historical))) =>
         historical . restoreNode_request = false,
-      ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =>
-        *relRepo_request = None,
+      ViewnodeKind::Property (Property::Alias { relationshipEditRequest, .. }) =>
+        *relationshipEditRequest = None,
       _ => {}, }}
 
   pub fn title (&self) -> &str {
@@ -1209,8 +1231,7 @@ pub fn default_unrestrictedVognode (
     claimsMembership : true,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
-    relRepo_request : None,
-    restoreRel_request : false,
+    relationshipEditRequest : None,
     view_requests  : HashSet::new(),
     editability    : Editability::Editable {
       body         : None,
@@ -1242,7 +1263,7 @@ pub fn mk_unknown_viewnode (
     Phantom::Unknown ( PhantomUnknown {
       skgid,
       relRepo         : None,
-      relRepo_request : None, } ) )) ) }
+      relationshipEditRequest : None, } ) )) ) }
 
 pub fn mk_restricted_viewnode (
 ) -> Viewnode {

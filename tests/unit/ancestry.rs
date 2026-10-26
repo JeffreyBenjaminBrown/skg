@@ -24,7 +24,7 @@ fn alias_property (text : &str) -> Viewnode {
   viewnode_of (ViewnodeKind::Property (Property::Alias {
       text : text . to_string (),
       relRepo : None,
-      relRepo_request : None })) }
+      relationshipEditRequest : None })) }
 
 fn child (
   tree : &mut Tree<Viewnode>, parent : NodeId, vn : Viewnode

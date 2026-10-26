@@ -5,7 +5,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::viewnode::{Editability, PropertyFolder, Property};
+use crate::types::viewnode::{RelationshipEditRequest, Editability, PropertyFolder, Property};
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -158,7 +158,9 @@ fn make_alias_if_appropriate(
       org . kind = MpViewnodeKind::Property (
         Property::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
-                      relRepo_request: t . relRepo_request . clone () } ); }}
+                      relationshipEditRequest: // an alias takes no restoreRel
+                        t . relationshipEditRequest . clone () . filter ( |request|
+                          matches! (request, RelationshipEditRequest::RelRepo (_)) ) } ); }}
   Ok (( )) }
 
 /// Inherit a skgrepo if both:

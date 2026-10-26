@@ -50,7 +50,7 @@ use crate::from_text::local_fieldintent_collection::types::{
 use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{
+use crate::types::viewnode::{RelationshipEditRequest, 
   NodeEditRequest, Property, PropertyFolder, PartnerFolder, UnrestrictedVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
@@ -282,12 +282,13 @@ fn visit_aliasFolder (
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewnodeKind::Property (Property::Alias {
-            text, relRepo_request, .. })
+            text, relationshipEditRequest, .. })
             = &child . value() . kind
           { // A 'Property::RemovedAlias' is no alias, so it is not read.
             if seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
-                                relRepo_request . clone () )); }} }
+                                RelationshipEditRequest::relRepo_of (
+                                  relationshipEditRequest ) . cloned () )); }} }
         aliases };
       // The MSV semantics are: an absent folder emits no fieldIntent, which
       // lowers to Unspecified, while a present-but-empty folder emits
@@ -353,11 +354,11 @@ fn visit_hiddenOutside_folder (
         match &child . value() . kind {
           ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if member_counts_for_partnerFolder (t) => {
-              if t . relRepo_request . is_some () {
+              if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
               members . push (t . skgid . clone ()); },
           ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
-            if unknown . relRepo_request . is_some () {
+            if RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . skgid . clone ()); },
           _ => {}, }}
@@ -421,10 +422,10 @@ fn partnerFolder_members (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
-                           t . relRepo_request . clone())),
+                           RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           members . push ((unknown . skgid . clone(),
-                           unknown . relRepo_request . clone())),
+                           RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       _ => {}, }}
   dedup_members_by_skgid (members) }
 
@@ -447,10 +448,10 @@ fn subscribeeFolder_members (
       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . skgid . clone(),
-                           t . relRepo_request . clone())),
+                           RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           members . push ((unknown . skgid . clone(),
-                           unknown . relRepo_request . clone())),
+                           RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned ())),
       _ => {}, }}
   dedup_members_by_skgid (members) }
 
@@ -482,13 +483,13 @@ fn content_members (
             // collected_id, not id: a shown overrider stands for
             // the original member it is shown in place of.
             t . collected_skgid (),
-            t . relRepo_request . clone() )); }},
+            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned () )); }},
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         // An Unknown is save-inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination skgrepo sticky.
         contents . push (( unknown . skgid . clone(),
-                           unknown . relRepo_request . clone() )),
+                           RelationshipEditRequest::relRepo_of (&unknown . relationshipEditRequest) . cloned () )),
       _ => {}, }}
   contents }
 

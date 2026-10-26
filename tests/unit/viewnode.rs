@@ -39,14 +39,14 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Editable] . into_iter () . collect () );
   if let ViewnodeKind::Vognode (Vognode::Unrestricted (node)) = &mut restriction . kind {
-    node . relRepo_request = Some (SkgrepoName::from ("private")); }
+    node . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )); }
   restriction . readiness_request = Some (ReadinessRequest {
     ready : true, objects : [DiffObject::All] . into_iter () . collect () });
   restriction . consume_edit_request_after_save ();
   assert_eq! (restriction . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &restriction . kind
   else { panic! ("expected unrestricted node"); };
-  assert_eq! (restriction . relRepo_request, None);
+  assert_eq! (restriction . relationshipEditRequest, None);
   assert_eq! (restriction . edit_request (), None);
   assert! (restriction . view_requests . contains (&ViewRequest::Editable));
 
@@ -57,12 +57,12 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       PhantomUnknown {
         skgid : ID::from ("unknown"),
         relRepo : None,
-        relRepo_request : Some (SkgrepoName::from ("private")), })))) };
+        relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), })))) };
   unknown . consume_edit_request_after_save ();
   assert_eq! (unknown . readiness_request, None);
   let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
   else { panic! ("expected unknown node"); };
-  assert_eq! (unknown . relRepo_request, None);
+  assert_eq! (unknown . relationshipEditRequest, None);
 
   let mut alias : Viewnode = Viewnode {
     readiness_request : Some (ReadinessRequest {
@@ -70,13 +70,13 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
     .. viewnode_of ( ViewnodeKind::Property (Property::Alias {
       text : "alias" . into (),
       relRepo : None,
-      relRepo_request : Some (SkgrepoName::from ("private")), })) };
+      relationshipEditRequest : Some (RelationshipEditRequest::RelRepo (SkgrepoName::from ("private"))), })) };
   alias . consume_edit_request_after_save ();
   assert_eq! (alias . readiness_request, None);
-  let ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =
+  let ViewnodeKind::Property (Property::Alias { relationshipEditRequest, .. }) =
     &alias . kind
   else { panic! ("expected alias"); };
-  assert_eq! (*relRepo_request, None);
+  assert_eq! (*relationshipEditRequest, None);
 }
 
 // The write-protect requests render as their atoms, and parse back.
@@ -168,7 +168,7 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     viewnode_of (ViewnodeKind::PartnerFolder (PartnerFolder::Container)),
     viewnode_of (ViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
     viewnode_of (ViewnodeKind::Property (Property::Alias {
-      text : "an alias" . into (), relRepo : None, relRepo_request : None })),
+      text : "an alias" . into (), relRepo : None, relationshipEditRequest : None })),
     viewnode_of (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (
       PhantomDeleted { skgid : ID::from ("d"), home_skgrepo : SkgrepoName::from ("main"),
                        title : "d" . into (), body : None } )))) ];

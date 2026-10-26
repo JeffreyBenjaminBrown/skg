@@ -687,14 +687,14 @@ fn relrepo_fact_and_request_round_trip_separately (
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::viewnode::{
-    default_unrestrictedVognode, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode,
+    default_unrestrictedVognode, RelationshipEditRequest, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode,
     viewnode_of };
 
   let mut t : UnrestrictedVognode =
     default_unrestrictedVognode (
       ID::new ("n"), SkgrepoName::from ("public"), "N" . to_string () );
   t . viewStats . relRepo = Some ( SkgrepoName::from ("private") );
-  t . relRepo_request = Some ( SkgrepoName::from ("secret") );
+  t . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ));
   let viewnode : Viewnode =
     viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ));
   let config : SkgConfig =
@@ -796,12 +796,12 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
 ) {
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
-  use crate::types::viewnode::{mk_unknown_viewnode, Phantom, ViewnodeKind, Vognode};
+  use crate::types::viewnode::{mk_unknown_viewnode, Phantom, RelationshipEditRequest, ViewnodeKind, Vognode};
 
   let mut unknown = mk_unknown_viewnode ( ID::new ("absent-raw") );
   if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) = &mut unknown . kind {
     u . relRepo = Some ( SkgrepoName::from ("private") );
-    u . relRepo_request = Some ( SkgrepoName::from ("secret") );
+    u . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ));
   } else { unreachable! (); }
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
   let rendered : String = viewnode_to_string (&unknown, &config) . unwrap ();

@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{NodeEditRequest, Editability, PartnerFolder, Property, PropertyFolder};
+use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Editability, PartnerFolder, Property, PropertyFolder};
 use crate::types::viewnode::ChangesetMarkerKind;
 use crate::types::errors::HeadlineName;
 use crate::serve::parse_metadata_sexp::RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP;
@@ -658,7 +658,7 @@ fn validate_unrestrictedVognode (
       . to_string ()); }
   if has_empty_title (t) {
     errors . push("Editable node has an empty title." . to_string()); }
-  if t . restoreRel_request
+  if t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel)
     && ! restoreRel_stands_where_it_may (tree, treeid, t)
   { errors . push ( RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP . to_string () ); }
   errors }

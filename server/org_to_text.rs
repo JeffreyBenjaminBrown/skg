@@ -5,6 +5,7 @@ use crate::types::viewnode::{
   ChangeFacts, DiffObject, FoldAndFocus, ReadinessRequest,
   Viewnode, ViewnodeKind, Vognode, Phantom, Property, UnrestrictedVognode,
   PhantomDeleted, PhantomHistorical, PhantomUnknown, NodeEditRequest,
+  RelationshipEditRequest,
   Warrant,
 };
 
@@ -313,15 +314,13 @@ fn property_metadata_to_string (
 ) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
   match property {
-    Property::Alias { relRepo, relRepo_request, .. } => {
+    Property::Alias { relRepo, relationshipEditRequest, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (skgrepo) = relRepo {
         parts . push ( format! (
           "(relRepo {})", metadata_value_atom (skgrepo) ) ); }
-      if let Some (skgrepo) = relRepo_request {
-        parts . push ( format! (
-          "(editRequest (relRepo {}))",
-          metadata_value_atom (skgrepo) ) ); }
+      parts . extend ( relationshipEditRequest . as_ref ()
+                       . map (relationshipEditRequest_form) );
       parts . extend ( change_fact_forms (facts, request) ); }
     Property::ID { .. } => {
       parts . push ( "id" . to_string () );
@@ -354,6 +353,16 @@ fn property_metadata_to_string (
       parts . extend ( change_fact_forms (facts, request) ); }
   }
   Ok ( parts . join (" ")) }
+
+/// '(editRequest (relRepo R))' or '(editRequest restoreRel)'.
+fn relationshipEditRequest_form (
+  request : &RelationshipEditRequest,
+) -> String {
+  match request {
+    RelationshipEditRequest::RelRepo (skgrepo) => format! (
+      "(editRequest (relRepo {}))", metadata_value_atom (skgrepo) ),
+    RelationshipEditRequest::RestoreRel =>
+      "(editRequest restoreRel)" . to_string (), } }
 
 /// The diff view's one form for a viewnode, '(diff (node
 /// added|removed) (rel added|removed) (properties changed) (leaves N
@@ -444,12 +453,8 @@ fn unrestrictedVognode_metadata_to_string (
                "(viewStats {})", parts . join (" ") )) }}
     fn edit_request ( unrestrictedVognode : & UnrestrictedVognode
                     ) -> Option < String > {
-      if let Some (skgrepo) = &unrestrictedVognode . relRepo_request {
-        return Some ( format! (
-          "(editRequest (relRepo {}))",
-          metadata_value_atom (skgrepo) ) ); }
-      if unrestrictedVognode . restoreRel_request {
-        return Some ( "(editRequest restoreRel)" . to_string () ); }
+      if let Some (request) = &unrestrictedVognode . relationshipEditRequest {
+        return Some ( relationshipEditRequest_form (request) ); }
       unrestrictedVognode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (skgid) => format! ( "(merge {})", skgid . 0 ),
@@ -557,9 +562,8 @@ fn phantomUnknown_metadata_to_string (
   if let Some (skgrepo) = &unknown_node . relRepo {
     unknown_parts . push ( format! (
       "(viewStats (relRepo {}))", metadata_value_atom (skgrepo)) ); }
-  if let Some (skgrepo) = &unknown_node . relRepo_request {
-    unknown_parts . push ( format! (
-      "(editRequest (relRepo {}))", metadata_value_atom (skgrepo)) ); }
+  unknown_parts . extend ( unknown_node . relationshipEditRequest . as_ref ()
+                           . map (relationshipEditRequest_form) );
   unknown_parts . extend ( change_fact_forms (facts, request) );
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }

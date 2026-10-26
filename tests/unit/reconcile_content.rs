@@ -70,7 +70,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
       assert_eq! (unknown . skgid, ghost);
       assert_eq! (unknown . relRepo,
                   Some (skgrepo_name ("private")));
-      assert_eq! (unknown . relRepo_request, None); },
+      assert_eq! (unknown . relationshipEditRequest, None); },
     other => panic! ("surviving relationship must render Unknown, got {other:?}"), }
 }
 

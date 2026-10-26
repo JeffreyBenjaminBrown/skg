@@ -73,7 +73,7 @@ pub fn reconcile_aliasFolder_children (
                                                  . and_then ( |relRepo|
                                                    if relRepo == &parent_graphnode . home_skgrepo { None }
                                                    else { Some (relRepo . clone ()) } ),
-                                               relRepo_request : None } )))};
+                                               relationshipEditRequest : None } )))};
   complete_managed_children_in_viewforest(
     tree,
     aliasfolder_treeid,

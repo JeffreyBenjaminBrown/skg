@@ -11,7 +11,7 @@ use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, PartnerFolder, Phantom,
-  PhantomHistorical, Property, DiffObject, ReadinessRequest, Viewnode,
+  PhantomHistorical, Property, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
   ViewnodeKind, Vognode, mk_editable_viewnode,
   mk_writeProtected_viewnode, viewnode_of};
 
@@ -208,7 +208,7 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
     ( &mut write_protected,
       "(node (id x) (repo main) noClaim writeProtected (editRequest restoreRel) (diff (rel removed)))" ), ] {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut node . kind
-    { t . restoreRel_request = true; }
+    { t . relationshipEditRequest = Some (RelationshipEditRequest::RestoreRel); }
     assert_round_trip (
       with_facts (node . clone (), removed_rel . clone (), None ),
       expected ); }}

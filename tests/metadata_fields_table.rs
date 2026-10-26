@@ -50,7 +50,7 @@ fn every_kind_atom (
                     new : SkgrepoName::from ("b") };
   let properties : Vec<Property> = vec! [
     Property::Alias { text : String::new (), relRepo : None,
-                      relRepo_request : None },
+                      relationshipEditRequest : None },
     Property::ID { skgid : ID::default () },
     Property::Flag { flag : Flag::NoSearchMatching,
                      title : String::new (), body : None },

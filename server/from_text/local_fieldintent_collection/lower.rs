@@ -44,7 +44,7 @@ pub struct NodeSaveIntent {
   // contains / subscribesTo / overrides pair each member
   // with an Option<RepoName>: Some when the buffer's headline
   // carried an '(editRequest (relRepo NAME))' request (see
-  // 'UnrestrictedVognode_Generic::relRepo_request', 'FieldIntent'); None means
+  // 'RelationshipEditRequest::RelRepo', 'FieldIntent'); None means
   // "derive" (sticky-else-default). 'requested_relRepos' extracts the
   // Some entries into a side-channel before 'into_graphnode'
   // discards them, for 'apply_sticky_relRepos' to validate against

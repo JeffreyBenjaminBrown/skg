@@ -688,5 +688,5 @@ pub fn build_search_viewforest (
             ViewnodeKind::Property ( Property::Alias {
               text            : title . clone (),
               relRepo         : None,
-              relRepo_request : None } )) ); }} }
+              relationshipEditRequest : None } )) ); }} }
   (viewforest, search_results) }

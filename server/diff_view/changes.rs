@@ -753,7 +753,7 @@ fn append_changed_property_folders (
         Some (Existence::Removed) => entry_viewnode (
           Property::RemovedAlias { text }, existence ),
         _ => entry_viewnode (
-          Property::Alias { text, relRepo : None, relRepo_request : None },
+          Property::Alias { text, relRepo : None, relationshipEditRequest : None },
           existence ), } )
       . collect () ); }
   if aspects . extra_ids {

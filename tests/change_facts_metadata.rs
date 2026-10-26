@@ -116,7 +116,7 @@ fn phantoms_round_trip_their_change_facts () {
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
         Phantom::Unknown ( PhantomUnknown {
-          skgid : ID::from ("u"), relRepo : None, relRepo_request : None, } )))),
+          skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None, } )))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
     "(unknown (id u) (diff (rel added) (readyRequest)))" ); }
@@ -126,7 +126,7 @@ fn property_leaves_round_trip_their_change_facts () {
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Property ( Property::Alias {
-        text : "an alias" . into (), relRepo : None, relRepo_request : None, } )),
+        text : "an alias" . into (), relRepo : None, relationshipEditRequest : None, } )),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       None ),
     "alias (diff (rel added) (ready))" );
@@ -191,7 +191,7 @@ fn each_part_of_the_diff_form_round_trips_together_and_alone () {
                        Some (&[DiffObject::Node]) ));
   assert_eq! ( metadata . readiness_request, request (true, &[DiffObject::Rel]) );
   let alias = || viewnode_of ( ViewnodeKind::Property ( Property::Alias {
-    text : "an alias" . into (), relRepo : None, relRepo_request : None, } ));
+    text : "an alias" . into (), relRepo : None, relationshipEditRequest : None, } ));
   assert_round_trip (
     with_facts ( alias (), facts ( None, Some (Existence::Removed), None ), None ),
     "alias (diff (rel removed))" );
@@ -291,7 +291,7 @@ fn a_folder_is_ready_when_each_changed_membership_is () {
     with_facts ( mk_unknown_viewnode (ID::from ("unknown")), change_facts, None ) };
   let entry_unready : Viewnode = with_facts (
     viewnode_of ( ViewnodeKind::Property ( Property::Alias {
-      text : "an alias" . into (), relRepo : None, relRepo_request : None } )),
+      text : "an alias" . into (), relRepo : None, relationshipEditRequest : None } )),
     facts ( None, Some (Existence::Removed), None ),
     None );
   let unchanged : Viewnode = with_facts (

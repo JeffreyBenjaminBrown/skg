@@ -72,6 +72,6 @@ pub fn build_and_integrate_aliases (
                         .and_then ( |home|
                           if &alias . relRepo == home { None }
                           else { Some (alias . relRepo . clone ()) } ),
-                      relRepo_request: None } ),
+                      relationshipEditRequest: None } ),
       false ) ?; }
   Ok (( )) }

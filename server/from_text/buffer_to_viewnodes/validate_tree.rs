@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{NodeEditRequest, PartnerFolder, Property, PropertyFolder, ViewRequest};
+use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, PartnerFolder, Property, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom, MpUnrestrictedVognode};
 use crate::types::tree::forest::MpViewForest;
@@ -351,7 +351,7 @@ fn writeProtected_relRepo_request_errors (
     let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
       &node_ref . value () . kind else { continue; };
     if t . is_writeProtected ()
-       && t . relRepo_request . is_some ()
+       && RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some ()
        && ! relRepo_request_is_collected (node_ref, t)
     { let headline : HeadlineName = node_ref . value () . headline_name ();
       errors . push ( BufferValidationError::Other ( with_org_subheadlines (

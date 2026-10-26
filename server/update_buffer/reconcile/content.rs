@@ -704,7 +704,7 @@ fn normalize_relationship_backed_content_unknowns (
         crate::types::viewnode::PhantomUnknown {
           relRepo: unresolved_relRepos . get (&skgid) . cloned ()
             . filter (|skgrepo| skgrepo != recorder_home),
-          relRepo_request: None,
+          relationshipEditRequest: None,
           skgid })))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }

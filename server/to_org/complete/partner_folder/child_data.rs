@@ -390,7 +390,7 @@ fn normalize_relationship_backed_partner_unknowns (
       vn . replace_kind ( ViewnodeKind::Vognode (Vognode::Phantom (
         crate::types::viewnode::Phantom::Unknown (
           crate::types::viewnode::PhantomUnknown {
-            skgid, relRepo, relRepo_request: None })))); })
+            skgid, relRepo, relationshipEditRequest: None })))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 

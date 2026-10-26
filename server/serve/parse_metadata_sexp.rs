@@ -55,7 +55,7 @@ use crate::types::viewnode::{
   GraphnodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   ChangesetMarkerKind, Property, PropertyFolder, PartnerFolder, PhantomDeleted,
   PhantomHistorical, RestrictedVognode, PhantomUnknown,
-  Editability, ViewnodeId,
+  Editability, RelationshipEditRequest, ViewnodeId,
 };
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
@@ -163,7 +163,8 @@ pub fn viewnode_from_metadata (
               PhantomUnknown {
                 skgid           : uid . clone (),
                 relRepo         : metadata . unknown_relRepo . clone (),
-                relRepo_request : metadata . unknown_relRepo_request . clone (),
+                relationshipEditRequest : metadata . unknown_relRepo_request . clone ()
+                  . map (RelationshipEditRequest::RelRepo),
               } ) )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other ( with_org_subheadlines (
@@ -243,8 +244,9 @@ pub fn viewnode_from_metadata (
                               text: title . clone (),
                               relRepo:
                                 metadata . property_relRepo . clone (),
-                              relRepo_request:
-                                metadata . property_relRepo_request . clone () }),
+                              relationshipEditRequest:
+                                metadata . property_relRepo_request . clone ()
+                                . map (RelationshipEditRequest::RelRepo) }),
           MpViewnodeKind::Property (Property::ID { .. }) =>
             MpViewnodeKind::Property (Property::ID {
                               skgid: title . clone () . into () }),
@@ -286,11 +288,15 @@ pub fn viewnode_from_metadata (
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
       // MpUnrestrictedVognode
-      { let restoreRel_request : bool = // lives outside 'Editability'
-          matches! ( metadata . edit_request,
-                     Some (NodeEditRequest::RestoreRel) );
+      { let relationshipEditRequest : Option<RelationshipEditRequest> =
+          // lives outside 'Editability'
+          if matches! ( metadata . edit_request,
+                        Some (NodeEditRequest::RestoreRel) )
+          { Some (RelationshipEditRequest::RestoreRel) }
+          else { metadata . relRepo_request . clone ()
+                 . map (RelationshipEditRequest::RelRepo) };
         let edit_request : Option<NodeEditRequest> =
-          if restoreRel_request { None }
+          if relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) { None }
           else { metadata . edit_request . clone () };
         let editability : Editability =
           if metadata . writeProtected
@@ -325,8 +331,7 @@ pub fn viewnode_from_metadata (
             claimsMembership : metadata . claimsMembership,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
-            relRepo_request : metadata . relRepo_request . clone (),
-            restoreRel_request,
+            relationshipEditRequest,
             view_requests    : metadata . view_requests . clone (),
             editability, };
         let node_kind : MpViewnodeKind =
@@ -528,7 +533,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "restrictedNode" => result . is_restricted_node = true,
           // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relationshipEditRequest: None } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
             MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
