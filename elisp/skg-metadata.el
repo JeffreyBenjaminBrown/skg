@@ -788,6 +788,33 @@ aliases, IDs and flags. Every other folder is a partner folder.")
          (not (memq folder skg--property-folder-atoms))
          folder)))
 
+;;; A headline's change facts
+
+(defun skg--readiness-diff-form (metadata-sexp)
+  "The '(diff ...)' form of METADATA-SEXP, or nil. Every kind's
+'(diff ...)' stands at the top level of '(skg ...)', beside its kind
+atom."
+  (assq 'diff (cdr metadata-sexp)))
+
+(defun skg--readiness-form (metadata-sexp key)
+  "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
+  (assq key (cdr (skg--readiness-diff-form metadata-sexp))))
+
+(defun skg--readiness-leaves (metadata-sexp)
+  "The '(leaves N OBJECT...)' fact of the headline with METADATA-SEXP,
+as (N . OBJECTS), or nil when it names no leaf."
+  (cdr (skg--readiness-form metadata-sexp 'leaves)))
+
+(defun skg--readiness-objects-ready-p (metadata-sexp objects)
+  "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline:
+when it carries a '(ready ...)' that names each of them. A headline
+that lists no object (one naming a single leaf) is ready when it
+carries any '(ready ...)'."
+  (let ((ready (skg--readiness-form metadata-sexp 'ready)))
+    (and ready
+         (seq-every-p (lambda (object) (memq object (cdr ready)))
+                      objects))))
+
 ;;; A changed folder
 ;;; The server writes every folder as its bare atom. Whether the diff
 ;;; view shows it because of a change, and whether that change is
@@ -814,22 +841,22 @@ it carries none, else `ready' or `unready'. It carries one when its
 '(diff ...)' has a '(rel ...)', or when a child is a
 '(relRepoMove ...)'. The change is ready when both hold: a '(rel ...)'
 comes with a '(ready ...)' that names 'rel' if the member's
-'(leaves ...)' lists 'rel'; a '(relRepoMove ...)' child carries
+'(leaves ...)' lists 'rel'; every '(relRepoMove ...)' child carries
 '(diff (ready ...))'."
-  (let* ((diff (cdr (assq 'diff (cdr member-sexp))))
-         (rel-change (assq 'rel diff))
-         (relRepo-move
-          (seq-find (lambda (child-sexp)
-                      (assq 'relRepoMove (cdr child-sexp)))
-                    child-sexps)))
-    (when (or rel-change relRepo-move)
+  (let ((rel-change (skg--readiness-form member-sexp 'rel))
+        (relRepo-moves
+         (seq-filter (lambda (child-sexp)
+                       (assq 'relRepoMove (cdr child-sexp)))
+                     child-sexps)))
+    (when (or rel-change relRepo-moves)
       (if (and (or (not rel-change)
-                   (let ((ready (assq 'ready diff)))
-                     (and ready
-                          (or (not (memq 'rel (cdr (assq 'leaves diff))))
-                              (memq 'rel (cdr ready))))))
-               (or (not relRepo-move)
-                   (assq 'ready (cdr (assq 'diff (cdr relRepo-move))))))
+                   (skg--readiness-objects-ready-p
+                    member-sexp
+                    (and (memq 'rel (cdr (skg--readiness-leaves member-sexp)))
+                         '(rel))))
+               (seq-every-p (lambda (relRepo-move)
+                              (skg--readiness-form relRepo-move 'ready))
+                            relRepo-moves))
           'ready
         'unready))))
 

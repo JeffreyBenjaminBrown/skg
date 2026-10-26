@@ -405,3 +405,21 @@ buffer order and reports the end without wrapping."
                   ("C-c r p r" . skg-diffView-goto-previous-ready-change)))
     (should (eq (lookup-key skg-content-view-mode-map (kbd (car pair)))
                 (cdr pair)))))
+
+(ert-deftest test-skg-membership-change-readiness-checks-every-relRepo-move ()
+  "A folder member's change is ready only when every '(relRepoMove ...)'
+child is, not the first alone."
+  (let ((member '(skg node (gnid m)))
+        (ready-move '(skg (relRepoMove (old pub) (new priv)) (diff (ready))))
+        (unready-move '(skg (relRepoMove (old priv) (new pub)) (diff))))
+    (should (eq (skg--membership-change-readiness
+                 member (list ready-move unready-move))
+                'unready))
+    (should (eq (skg--membership-change-readiness
+                 member (list ready-move ready-move))
+                'ready))
+    (should (eq (skg--membership-change-readiness
+                 '(skg node (gnid m) (diff (rel added) (leaves 1 rel) (ready rel)))
+                 (list ready-move))
+                'ready))
+    (should-not (skg--membership-change-readiness member nil))))

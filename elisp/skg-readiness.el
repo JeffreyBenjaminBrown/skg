@@ -105,40 +105,16 @@ its move. Works on write-protected occurrences too."
 
 ;;; Reading a headline's change facts
 
-(defun skg--readiness-diff-form (metadata-sexp)
-  "The '(diff ...)' form of METADATA-SEXP, or nil. Every kind's
-'(diff ...)' stands at the top level of '(skg ...)', beside its kind
-atom."
-  (assq 'diff (cdr metadata-sexp)))
-
-(defun skg--readiness-form (metadata-sexp key)
-  "The (KEY ...) part of METADATA-SEXP's '(diff ...)' form, or nil."
-  (assq key (cdr (skg--readiness-diff-form metadata-sexp))))
-
-(defun skg--readiness-leaves (metadata-sexp)
-  "The '(leaves N OBJECT...)' fact of the headline with METADATA-SEXP,
-as (N . OBJECTS), or nil when it names no leaf."
-  (cdr (skg--readiness-form metadata-sexp 'leaves)))
-
 (defun skg--readiness-leaves-below (metadata-sexp)
-  "The same, for a headline below the one a gesture acts on, without
-`all': nil when `all' was its only object."
+  "`skg--readiness-leaves' of METADATA-SEXP, for a headline below the
+one a gesture acts on, without `all': nil when `all' was its only
+object."
   (let ((leaves (skg--readiness-leaves metadata-sexp)))
     (if (not (memq 'all (cdr leaves)))
         leaves
       (let ((objects (remq 'all (cdr leaves))))
         (when objects
           (cons (length objects) objects))))))
-
-(defun skg--readiness-objects-ready-p (metadata-sexp objects)
-  "Non-nil when every one of OBJECTS is ready on METADATA-SEXP's headline:
-when it carries a '(ready ...)' that names each of them. A headline
-that lists no object (one naming a single leaf) is ready when it
-carries any '(ready ...)'."
-  (let ((ready (skg--readiness-form metadata-sexp 'ready)))
-    (and ready
-         (seq-every-p (lambda (object) (memq object (cdr ready)))
-                      objects))))
 
 (defun skg--readiness-ready-p (metadata-sexp)
   "Non-nil when the headline with METADATA-SEXP, at point, is ready: a
