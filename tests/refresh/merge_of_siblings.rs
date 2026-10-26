@@ -34,9 +34,9 @@ fn duplicate_siblings_are_merged_into_one_where_the_first_stood () {
     ** (skg (vnid c2) node (gnid c) (skgRepos (nodeRepo main)) noClaim) c
     *** {} d
     *** {} e
-    ", occ ("p", ""), occ ("e", "writeProtected"), occ ("d", ""),
-       occ ("e", "writeProtected") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("e", "writeProtected"), occurrence_metadata ("d", ""),
+       occurrence_metadata ("e", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -54,7 +54,7 @@ fn the_result_has_a_fresh_vnid_which_the_buffer_correction_names () {
     ** (skg (vnid c1) node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
     ** (skg (vnid c2) node (gnid c) (skgRepos (nodeRepo main)) writeProtected noClaim) c
     " );
-  let run : Run = run (&input, &family ());
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   let result : NodeRef<Viewnode> = children_of_first_root (&run) [0];
   let vnid : ViewnodeId = result . value () . viewnode_id . clone ()
     . expect ("the tail gives the result a vnid");
@@ -74,8 +74,8 @@ fn the_result_claims_when_the_claiming_sibling_is_second () {
     * {} p
     ** {} c
     ** {} c
-    ", occ ("p", ""), occ ("c", "writeProtected noClaim"), occ ("c", "") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected noClaim"), occurrence_metadata ("c", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -88,8 +88,8 @@ fn the_result_is_unfolded_when_any_sibling_was () {
     ** (skg folded node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
     ** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected noClaim) c
     ** (skg folded node (gnid c) (skgRepos (nodeRepo main)) writeProtected noClaim) c
-    ", occ ("p", "") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
   node c wp" ); }
@@ -101,8 +101,8 @@ fn the_result_is_folded_when_every_sibling_was () {
     ** (skg folded bodyFolded node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
     ** (skg folded bodyFolded focused node (gnid c) (skgRepos (nodeRepo main)) writeProtected noClaim) c
     ** (skg folded node (gnid c) (skgRepos (nodeRepo main)) writeProtected noClaim) c
-    ", occ ("p", "") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
   node c wp folded" );
@@ -122,9 +122,9 @@ fn a_view_request_on_the_second_sibling_is_carried () {
     * {} p
     ** {} c
     ** {} c
-    ", occ ("p", ""), occ ("c", "writeProtected"),
-       occ ("c", "writeProtected noClaim (viewRequests (folder containers))") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected noClaim (viewRequests (folder containers))") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node c wp
@@ -140,9 +140,9 @@ fn an_appended_child_the_truth_does_not_warrant_under_the_result_is_marked_noCla
     *** {} d
     ** {} c
     *** {} e
-    ", occ ("p", ""), occ ("c", ""), occ ("d", ""),
-       occ ("c", "writeProtected noClaim"), occ ("e", "") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("d", ""),
+       occurrence_metadata ("c", "writeProtected noClaim"), occurrence_metadata ("e", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -161,8 +161,8 @@ fn copies_of_one_folder_member_are_merged () {
     ** (skg containerFolder)
     *** {} q
     *** {} q
-    ", occ ("p", ""), occ ("q", "writeProtected"), occ ("q", "writeProtected") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"), occurrence_metadata ("q", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   containerFolder
@@ -174,5 +174,5 @@ fn roots_standing_for_one_gnid_are_merged () {
   let input : String = formatdoc! ("
     * {} p
     * {} p
-    ", occ ("p", ""), occ ("p", "writeProtected") );
-  assert_eq! ( run (&input, &graph) . outline (), "node p" ); }
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("p", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "node p" ); }

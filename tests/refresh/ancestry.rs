@@ -39,7 +39,7 @@ fn a_property_member_outside_its_folder_is_unsayable () {
     *** (skg id) p
     ** (skg flagsFolder)
     *** (skg (flag noSearchMatching))
-    ", occ ("p", "") ), IdResolution::AsWritten );
+    ", occurrence_metadata ("p", "") ), IdResolution::AsWritten );
   let unsayable : Vec<String> = forest . nodes ()
     . filter ( |node| matches! ( node . value () . kind, ViewnodeKind::PropertyMember (_) ))
     . map ( |node| format! ( "{} {}", node . value () . kind_name (),
@@ -54,8 +54,8 @@ fn an_unsayable_property_member_is_entombstoned () {
     * {} p
     ** (skg aliasFolder)
     *** (skg id) p
-    ", occ ("p", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   aliasFolder" );
@@ -68,7 +68,7 @@ fn a_body_diff_stands_only_under_an_old_text () {
     ** (skg (oldText body))
     *** (skg bodyDiff)
     ** (skg bodyDiff)
-    ", occ ("p", "") ), IdResolution::AsWritten );
+    ", occurrence_metadata ("p", "") ), IdResolution::AsWritten );
   let unsayable : Vec<bool> = forest . nodes ()
     . filter ( |node| matches! ( node . value () . kind,
       ViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) ))

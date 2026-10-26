@@ -19,8 +19,8 @@ fn an_occurrence_its_parent_lists_and_no_node_answers_to_becomes_an_unknown () {
     ** {} c
     ** (skg (vnid zz) folded node (gnid x) (skgRepos (nodeRepo main))) x
     *** {} k
-    ", occ ("p", ""), occ ("c", ""), occ ("k", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("k", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -42,8 +42,8 @@ fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
     ** {} x
     *** {} k
     ** {} y
-    ", occ ("p", ""), occ ("c", ""), occ ("x", ""), occ ("k", ""), occ ("y", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("x", ""), occurrence_metadata ("k", ""), occurrence_metadata ("y", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -62,9 +62,9 @@ fn a_restricted_node_becomes_a_tombstone_whatever_its_parent_lists () {
     ** (skg node (gnid h) (skgRepos (nodeRepo private))) h
     *** {} k
     ** {} c
-    ", occ ("p", ""), occ ("k", ""), occ ("c", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("k", ""), occurrence_metadata ("c", "") );
   let restriction : SkgrepoRestriction = main_only ();
-  let run : Run = run_in ( &input, &graph, Some (&restriction),
+  let run : Run = run_asserting_fixpoint_in ( &input, &graph, Some (&restriction),
                            CompletionMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node p
@@ -80,8 +80,8 @@ fn an_unknown_whose_node_appeared_becomes_an_occurrence () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg unknown (gnid u))
-    ", occ ("p", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node u" );
@@ -96,13 +96,9 @@ fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
   let input : String = formatdoc! ("
     * {} p
     ** {} b
-    ", occ ("p", ""), occ ("b", "writeProtected") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected") );
   let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
-  let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
-  refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-                       CompletionMode::ContentView, 100,
-                       &BufferCorrectionPolicy::default () ) . unwrap ();
+  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
   assert_eq! ( outline (&forest), "\
 node p
   node a wp" ); }
@@ -120,13 +116,9 @@ fn of_two_editable_occurrences_a_nodeMerge_made_one_nodes_the_first_stays_editab
   let input : String = formatdoc! ("
     * {} b
     ** {} a
-    ", occ ("b", ""), occ ("a", "") );
+    ", occurrence_metadata ("b", ""), occurrence_metadata ("a", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::AsWritten);
-  let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
-  refresh_viewforest ( &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-                       CompletionMode::ContentView, 100,
-                       &BufferCorrectionPolicy::default () ) . unwrap ();
+  refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
   assert_eq! ( outline (&forest), "\
 node a
   node a wp
@@ -144,8 +136,8 @@ fn a_deleted_node_that_its_parent_listed_by_an_extra_id_leaves_a_tombstone_and_a
     * {} p
     ** {} c
     ** {} n
-    ", occ ("p", ""), occ ("c", ""), occ ("n", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("n", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -159,8 +151,8 @@ fn a_folder_its_position_forbids_is_entombstoned_keeping_its_children () {
     ** (skg tombstone)
     *** (skg containerFolder)
     **** {} k
-    ", occ ("p", ""), occ ("k", "writeProtected") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("k", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   tombstone
@@ -174,7 +166,7 @@ fn a_change_viewnode_in_a_content_view_is_entombstoned () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg (changesetMarker content))
-    ", occ ("p", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "node p" );
   assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }

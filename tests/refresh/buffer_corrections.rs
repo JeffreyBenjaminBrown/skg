@@ -26,14 +26,10 @@ fn family () -> InRustGraph {
 #[test]
 fn a_fresh_view_reports_nothing () {
   let graph : InRustGraph = family ();
-  let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   let mut forest : ViewForest = stub_of_fresh_content_view (
     &[ ID::from ("p"), ID::from ("b") ], &graph );
-  let refreshed : Refreshed = refresh_viewforest (
-    &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100,
-    &BufferCorrectionPolicy::default () ) . unwrap ();
+  let refreshed : Refreshed =
+    refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
   assert! ( refreshed . text . contains ("(gnid a1)")
             && refreshed . text . contains ("containerFolder"),
             "the stub drew its roots' content and containers:\n{}",
@@ -45,8 +41,8 @@ fn a_fresh_view_reports_nothing () {
 fn the_members_of_a_folder_first_requested_are_not_reported () {
   let input : String = formatdoc! ("
     * {} p
-    ", occ ("p", "writeProtected (viewRequests (folder containers))") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", "writeProtected (viewRequests (folder containers))") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p wp
   containerFolder
@@ -58,9 +54,9 @@ fn the_content_an_editable_view_request_extends_is_not_reported () {
   let input : String = formatdoc! ("
     * {} q
     ** {} p
-    ", occ ("q", "writeProtected"),
-       occ ("p", "writeProtected (viewRequests editableView)") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("p", "writeProtected (viewRequests editableView)") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node q wp
   node p noClaim
@@ -81,8 +77,8 @@ fn a_member_missing_from_a_list_already_drawn_is_reported () {
     ** {} a
     *** {} a1
     ** (skg containerFolder)
-    ", occ ("p", ""), occ ("a", ""), occ ("a1", "") );
-  let run : Run = run (&input, &family ());
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""), occurrence_metadata ("a1", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
   node a
@@ -109,8 +105,6 @@ fn a_tombstone_the_save_left_is_not_reported () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["c"]), .. node ("p") },
     node ("c"), node ("k") ]);
-  let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   let input : String = formatdoc! ("
     * {} p
     ** {} c
@@ -118,14 +112,12 @@ fn a_tombstone_the_save_left_is_not_reported () {
     *** (skg containerFolder)
     ** {} y
     *** {} k
-    ", occ ("p", ""), occ ("c", ""), occ ("x", ""), occ ("y", ""), occ ("k", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("x", ""), occurrence_metadata ("y", ""), occurrence_metadata ("k", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let policy : BufferCorrectionPolicy =
     BufferCorrectionPolicy::after_a_save_deleting (
       HashSet::from ([ ID::from ("x") ]) );
-  let refreshed : Refreshed = refresh_viewforest (
-    &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100, &policy ) . unwrap ();
+  let refreshed : Refreshed = refresh_once (&mut forest, &graph, &policy);
   assert_eq! ( outline (&forest), "\
 node p
   node c
@@ -144,17 +136,13 @@ node p
 #[test]
 fn a_member_drawn_after_a_restriction_change_is_not_reported () {
   let graph : InRustGraph = family ();
-  let config : SkgConfig = config ();
-  let truth : Truth = Truth { graph : &graph, config : &config, restriction : None };
   let input : String = formatdoc! ("
     * {} p
     ** {} a
     *** {} a1
-    ", occ ("p", ""), occ ("a", ""), occ ("a1", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""), occurrence_metadata ("a1", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
-  let refreshed : Refreshed = refresh_viewforest (
-    &mut forest, &mut ViewnodeIdRecord::default (), &truth,
-    CompletionMode::ContentView, 100,
-    &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
+  let refreshed : Refreshed = refresh_once (
+    &mut forest, &graph, &BufferCorrectionPolicy::after_a_switch (true) );
   assert! ( refreshed . text . contains ("(gnid b)"), "b is drawn:\n{}", refreshed . text );
   assert! ( refreshed . buffer_corrections . is_empty (), "{:?}", refreshed . buffer_corrections ); }

@@ -19,7 +19,7 @@ fn two_levels () -> InRustGraph {
 
 #[test]
 fn an_editable_occurrences_content_is_drawn_editable () {
-  let run : Run = run ( &format! ("* {} p\n", occ ("p", "")), &two_levels () );
+  let run : Run = run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels () );
   assert_eq! ( run . outline (), "\
 node p
   node a
@@ -35,8 +35,8 @@ fn a_write_protected_occurrences_content_is_not_drawn () {
   let input : String = formatdoc! ("
     * {} p
     ** {} a
-    ", occ ("p", ""), occ ("a", "writeProtected") );
-  assert_eq! ( run (&input, &two_levels ()) . outline (), "\
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &two_levels ()) . outline (), "\
 node p
   node a wp
   node b
@@ -44,7 +44,7 @@ node p
 
 #[test]
 fn once_the_budget_is_spent_what_is_drawn_is_write_protected () {
-  let run : Run = run_in ( &format! ("* {} p\n", occ ("p", "")), &two_levels (),
+  let run : Run = run_asserting_fixpoint_in ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels (),
                            None, CompletionMode::ContentView, 2 );
   assert_eq! ( run . outline (), "\
 node p
@@ -60,7 +60,7 @@ fn a_repeat_is_write_protected () {
     Graphnode { contains : ids (&["a", "c"]), .. node ("p") },
     Graphnode { contains : ids (&["a"]), .. node ("c") },
     node ("a"), ]);
-  assert_eq! ( run ( &format! ("* {} p\n", occ ("p", "")), &graph ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &graph ) . outline (), "\
 node p
   node a
   node c
@@ -70,7 +70,7 @@ node p
 fn a_member_its_parent_lists_and_no_node_answers_to_is_drawn_as_an_unknown () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["x"]), .. node ("p") } ]);
-  assert_eq! ( run ( &format! ("* {} p\n", occ ("p", "")), &graph ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &graph ) . outline (), "\
 node p
   unknown x" ); }
 
@@ -83,8 +83,8 @@ fn a_folders_reinstated_member_carries_its_chain () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg containerFolder)
-    ", occ ("p", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   containerFolder
@@ -98,8 +98,8 @@ fn an_empty_write_protected_folder_goes_and_an_empty_editable_one_stays () {
     * {} p
     ** (skg containerFolder)
     ** (skg overriddenFolder)
-    ", occ ("p", "") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("p", "") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   overriddenFolder" ); }
 
@@ -115,8 +115,8 @@ fn a_subscribee_as_such_shows_what_its_subscriber_neither_hides_nor_contains () 
     * {} s
     ** (skg subscribeeFolder)
     *** {} e
-    ", occ ("s", ""), occ ("e", "") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
   subscribeeFolder
     node e
@@ -138,9 +138,9 @@ fn a_folder_omits_the_restricted_members () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg containerFolder)
-    ", occ ("p", "") );
+    ", occurrence_metadata ("p", "") );
   let restriction : SkgrepoRestriction = main_only ();
-  let run : Run = run_in ( &input, &graph, Some (&restriction),
+  let run : Run = run_asserting_fixpoint_in ( &input, &graph, Some (&restriction),
                            CompletionMode::ContentView, 100 );
   assert_eq! ( run . outline (), "\
 node p
@@ -160,8 +160,8 @@ fn the_hidden_in_subscribee_folder_holds_what_the_subscriber_hides_of_the_subscr
     ** (skg subscribeeFolder)
     *** {} e
     **** (skg hiddenInSubscribeeFolder)
-    ", occ ("s", ""), occ ("e", "") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
   subscribeeFolder
     node e
@@ -196,9 +196,9 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
     ** {} s
     *** (skg subscribeeFolder)
     * {} c1
-    ", occ ("p", "(viewRequests (folder containers) flags (folder overrides))"),
-       occ ("c", "writeProtected"), occ ("q", "writeProtected"),
-       occ ("s", "(viewRequests (folder subscribesTo))"),
-       occ ("c1", "(viewRequests writeProtectedSubtreeView)") );
-  let run : Run = run_in ( &input, &graph, None, CompletionMode::ContentView, 3 );
+    ", occurrence_metadata ("p", "(viewRequests (folder containers) flags (folder overrides))"),
+       occurrence_metadata ("c", "writeProtected"), occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
+       occurrence_metadata ("c1", "(viewRequests writeProtectedSubtreeView)") );
+  let run : Run = run_asserting_fixpoint_in ( &input, &graph, None, CompletionMode::ContentView, 3 );
   assert! ( run . outline () . contains ("unknown x"), "{}", run . outline () ); }

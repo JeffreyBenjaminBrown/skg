@@ -49,8 +49,8 @@ fn all_tests
       s . reset ("de_novo_rendering_shows_the_overrider_marked", fixtures) ?;
       de_novo_rendering_shows_the_overrider_marked (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("save_roundtrips_to_original_and_is_idempotent", fixtures) ?;
-      save_roundtrips_to_original_and_is_idempotent (
+      s . reset ("save_roundtrips_to_original_and_is_a_fixpoint", fixtures) ?;
+      save_roundtrips_to_original_and_is_a_fixpoint (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("extraction_honors_overridesHere", fixtures) ?;
       extraction_honors_overridesHere (
@@ -157,7 +157,7 @@ async fn de_novo_rendering_shows_the_overrider_marked (
         "M, not overridden, is shown raw:\n{}", view );
       Ok (( )) }
 
-async fn save_roundtrips_to_original_and_is_idempotent (
+async fn save_roundtrips_to_original_and_is_a_fixpoint (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -186,7 +186,7 @@ async fn save_roundtrips_to_original_and_is_idempotent (
         save_and_rerender (&saved, config, tantivy)
         . await ?;
       assert_metadata_eq! ( saved, saved_again,
-        "a second save is a noop (idempotence through the \
+        "a second save is a noop (the fixpoint through the \
          collected-ID orderkey)" );
       Ok (( )) }
 

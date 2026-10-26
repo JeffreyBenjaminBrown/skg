@@ -8,7 +8,9 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::types::env::SkgEnv;
 use crate::from_text::strandeds::StrandedsReview;
-use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
+use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
+use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo, org_to_viewforest};
+use crate::refresh::Refreshed;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{
   ClientViewSnapshot, SaveResponse,
@@ -16,7 +18,8 @@ use crate::serve::handlers::save_buffer::{
   update_from_and_rerender_buffer_with_approvals,
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
-use crate::types::views_state::ViewforestId;
+use crate::types::tree::forest::ViewForest;
+use crate::types::views_state::{ViewforestId, ViewnodeIdRecord};
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
@@ -333,6 +336,35 @@ where
     test_result_after_cleanup (test_result, cleanup_result) } );
   remove_test_dir (&temp_fixtures) ?;
   result }
+
+/// Whether 'text', parsed over 'graph' and refreshed again by
+/// 'refresh', comes back as it was, correcting nothing: the fixpoint
+/// of the refresh. Err says how not. The refresh's unit tests
+/// ('tests/refresh/mod.rs') and the sweeps over the fixtures
+/// ('tests/idempotence.rs') each pass their own refresh.
+pub fn refresh_reaches_fixpoint<R> (
+  text    : &str,
+  graph   : &InRustGraph,
+  refresh : R,
+) -> Result<(), String>
+where
+  R : FnOnce (&mut ViewForest, &mut ViewnodeIdRecord)
+              -> Result<Refreshed, Box<dyn Error>>,
+{
+  let (mut forest, errors, _warnings, _provenance) =
+    org_to_viewforest (text, IdResolution::ThroughGraph (graph))
+    . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
+  if ! errors . is_empty () {
+    return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
+  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
+  let again : Refreshed = refresh (&mut forest, &mut record)
+    . map_err ( |e| format! ("the second refresh failed: {}", e) ) ?;
+  if again . text != text {
+    return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
+                           text, again . text )); }
+  if ! again . buffer_corrections . is_empty () {
+    return Err ( format! ( "corrected: {:?}", again . buffer_corrections )); }
+  Ok (( )) }
 
 /// Recursively copy a directory and its contents.
 pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {

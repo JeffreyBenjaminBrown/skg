@@ -16,8 +16,8 @@ fn content_is_warranted_when_its_parent_lists_it () {
     * {} p
     ** {} c
     ** {} z
-    ", occ ("p", ""), occ ("c", ""), occ ("z", "writeProtected noClaim") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("z", "writeProtected noClaim") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   node c
   node z wp noClaim ⊥" ); }
@@ -32,8 +32,8 @@ fn a_folder_member_is_warranted_when_the_folders_relation_holds () {
     ** (skg containerFolder)
     *** {} q
     *** {} z
-    ", occ ("p", ""), occ ("q", "writeProtected"), occ ("z", "writeProtected") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"), occurrence_metadata ("z", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   containerFolder
     node q wp noClaim
@@ -51,9 +51,9 @@ fn a_chain_node_is_warranted_when_it_contains_the_node_above () {
     *** {} q
     **** {} top
     **** {} z
-    ", occ ("p", ""), occ ("q", "writeProtected"),
-       occ ("top", "writeProtected noClaim"), occ ("z", "writeProtected noClaim") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("top", "writeProtected noClaim"), occurrence_metadata ("z", "writeProtected noClaim") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   containerFolder
     node q wp noClaim
@@ -73,8 +73,8 @@ fn a_property_member_is_warranted_when_its_node_has_the_property () {
     ** (skg aliasFolder)
     *** (skg alias) a
     *** (skg alias) b
-    ", occ ("p", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   aliasFolder
@@ -88,8 +88,8 @@ fn a_child_of_a_tombstone_and_a_root_carry_no_warrant_fact () {
     * {} p
     ** (skg tombstone)
     *** {} c
-    ", occ ("p", ""), occ ("c", "writeProtected") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   tombstone

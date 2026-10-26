@@ -9,12 +9,12 @@ use super::*;
 use crate::types::viewnode::Existence;
 use indoc::formatdoc;
 
-fn diff_run (
+fn diff_run_asserting_fixpoint (
   text     : &str,
   straddle : &GraphStraddle,
 ) -> Run {
   let readiness_store : ReadinessStore = ReadinessStore::default ();
-  run_in ( text, &straddle . after, None,
+  run_asserting_fixpoint_in ( text, &straddle . after, None,
            CompletionMode::DiffView { straddle,
                                       buffer_kind : DiffViewBufferKind::AllChanges,
                                       readiness_store : &readiness_store },
@@ -31,8 +31,8 @@ fn an_occurrence_whose_node_head_has_and_the_worktree_lacks_becomes_its_ghost ()
     * {} p
     ** {} c
     ** (skg (vnid dd) node (gnid d) (skgRepos (nodeRepo main))) d
-    ", occ ("p", ""), occ ("c", "writeProtected") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
@@ -49,7 +49,7 @@ fn a_relationship_head_alone_has_is_drawn_with_a_ghost_warrant_and_no_claim () {
   let straddle : GraphStraddle = straddle (
     &[ Graphnode { contains : ids (&["m"]), .. node ("p") }, node ("m") ],
     &[ node ("p"), node ("m") ] );
-  let run : Run = diff_run ( &format! ("* {} p\n", occ ("p", "")), &straddle );
+  let run : Run = diff_run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
@@ -66,8 +66,8 @@ fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg (vnid gg) ghost (gnid g) (skgRepos (nodeRepo main))) g
-    ", occ ("p", "") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
   node g wp" );
@@ -85,8 +85,8 @@ fn a_property_head_alone_has_is_a_member_with_a_ghost_warrant () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg aliasFolder)
-    ", occ ("p", "") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
   aliasFolder
@@ -104,8 +104,8 @@ fn change_viewnodes_are_kept_while_their_change_exists_and_entombstoned_when_gon
     ** (skg (vnid ot) (oldText title)) old
     ** (skg (changesetMarker content))
     ** {} c
-    ", occ ("p", ""), occ ("c", "writeProtected") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
   oldText
@@ -121,7 +121,7 @@ fn a_missing_change_viewnode_is_drawn () {
     &[ Graphnode { title : "old" . into (), body : Some ("was\n" . into ()),
                    .. node ("p") } ],
     &[ Graphnode { body : Some ("is\n" . into ()), .. node ("p") } ] );
-  let run : Run = diff_run ( &format! ("* {} p\n", occ ("p", "")), &straddle );
+  let run : Run = diff_run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert_eq! ( run . outline (), "\
 node p
   oldText
@@ -134,7 +134,7 @@ fn the_diff_view_substitutes_nothing () {
     node ("n"),
     Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ];
   let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
-  let run : Run = diff_run ( &format! ("* {} p\n", occ ("p", "")), &straddle );
+  let run : Run = diff_run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert_eq! ( run . outline (), "\
 node p
   node n wp" ); }
@@ -149,8 +149,8 @@ fn a_ghost_where_content_stands_holds_its_old_content () {
   let input : String = formatdoc! ("
     * {} p
     ** {} d
-    ", occ ("p", ""), occ ("d", "writeProtected") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("d", "writeProtected") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
@@ -172,8 +172,8 @@ fn a_deleted_node_that_its_parent_listed_by_an_extra_id_becomes_its_ghost () {
   let input : String = formatdoc! ("
     * {} p
     ** (skg (vnid nn) node (gnid n) (skgRepos (nodeRepo main))) n
-    ", occ ("p", "") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
@@ -214,7 +214,7 @@ fn a_buffer_of_many_changes_is_a_fixpoint () {
     ** {} d
     ** {} m
     ** {} q
-    ", occ ("p", "(viewRequests (folder containers) flags)"),
-       occ ("b", ""), occ ("d", ""), occ ("m", ""), occ ("q", "") );
-  let run : Run = diff_run (&input, &straddle);
+    ", occurrence_metadata ("p", "(viewRequests (folder containers) flags)"),
+       occurrence_metadata ("b", ""), occurrence_metadata ("d", ""), occurrence_metadata ("m", ""), occurrence_metadata ("q", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert! ( run . outline () . contains ("ghost d"), "{}", run . outline () ); }

@@ -1,9 +1,11 @@
 // The unit suite of the refresh ('server/refresh/'): a file per rung
-// of the ladder, and one each for the ancestry rows, the diff view and
-// the tail. Each test builds a small graph and an input buffer,
-// refreshes it, and asserts the output, as an outline
-// ('outline'). Every refresh is checked for the fixpoint: refreshing
-// its output again changes nothing ('run_in').
+// of the ladder, and one each for the ancestry rows, the diff view,
+// the tail and the buffer corrections ('buffer_corrections.rs'). Each
+// test builds a small graph and an input buffer, refreshes it, and
+// asserts the output, as an outline ('outline'). A refresh is checked
+// for the fixpoint, that refreshing its output again changes nothing
+// ('run_asserting_fixpoint_in'), unless the test needs a refresh the
+// check cannot repeat ('refresh_once').
 
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
@@ -11,6 +13,7 @@ use crate::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::skgrepo_sets::SkgrepoRestriction;
+use crate::test_utils::refresh_reaches_fixpoint;
 use crate::types::misc::{
   MSV, RelPartner, Skgrepo, SkgrepoName, SkgrepoSetName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Graphnode, empty_graphnode};
@@ -115,16 +118,18 @@ impl Run {
 }
 
 /// Refresh 'text' as a content view over 'graph', with no
-/// restriction and a large budget.
-pub(super) fn run (
+/// restriction and a large budget, asserting the fixpoint.
+pub(super) fn run_asserting_fixpoint (
   text  : &str,
   graph : &InRustGraph,
 ) -> Run {
-  run_in ( text, graph, None, CompletionMode::ContentView, 100 ) }
+  run_asserting_fixpoint_in (
+    text, graph, None, CompletionMode::ContentView, 100 ) }
 
-/// Refresh 'text' over 'graph' in 'mode' with 'budget', then refresh
-/// its output again and assert that nothing changes: the fixpoint.
-pub(super) fn run_in (
+/// Refresh 'text' over 'graph' in 'mode' with 'budget', then assert
+/// the fixpoint: its output, refreshed again, comes back as it was,
+/// correcting nothing.
+pub(super) fn run_asserting_fixpoint_in (
   text        : &str,
   graph       : &InRustGraph,
   restriction : Option<&SkgrepoRestriction>,
@@ -139,17 +144,29 @@ pub(super) fn run_in (
     &mut forest, &mut record, &truth, mode, budget,
     &BufferCorrectionPolicy::default () )
     . unwrap ();
-  let mut again : ViewForest = parse (&first . text, IdResolution::ThroughGraph (graph));
-  let second : Refreshed = refresh_viewforest (
-    &mut again, &mut record, &truth, mode, budget,
-    &BufferCorrectionPolicy::default () )
-    . unwrap ();
-  assert_eq! ( second . text, first . text,
-               "the refresh of a refresh's output changed it" );
-  assert! ( second . buffer_corrections . is_empty (),
-            "the refresh of a refresh's output corrected it: {:?}",
-            second . buffer_corrections );
+  if let Err (failure) = refresh_reaches_fixpoint (
+    &first . text, graph,
+    |again, again_record| refresh_viewforest (
+      again, again_record, &truth, mode, budget,
+      &BufferCorrectionPolicy::default () )) {
+    panic! ( "the refresh of a refresh's output is no fixpoint: {}", failure ); }
   Run { forest, text : first . text, buffer_corrections : first . buffer_corrections } }
+
+/// Refresh 'forest' once, as a content view over 'graph' with no
+/// restriction, a large budget and 'policy', asserting no fixpoint:
+/// for a forest parsed as written, a stub, or a policy that a second
+/// refresh would not share.
+pub(super) fn refresh_once (
+  forest : &mut ViewForest,
+  graph  : &InRustGraph,
+  policy : &BufferCorrectionPolicy,
+) -> Refreshed {
+  let config : SkgConfig = config ();
+  let truth : Truth = Truth { graph, config : &config, restriction : None };
+  refresh_viewforest (
+    forest, &mut ViewnodeIdRecord::default (), &truth,
+    CompletionMode::ContentView, 100, policy )
+    . unwrap () }
 
 pub(super) fn parse (
   text          : &str,
@@ -226,7 +243,7 @@ fn describe (
 
 /// The metadata of an occurrence of 'pid' in 'main', with 'more'
 /// parts.
-pub(super) fn occ (
+pub(super) fn occurrence_metadata (
   pid  : &str,
   more : &str,
 ) -> String {

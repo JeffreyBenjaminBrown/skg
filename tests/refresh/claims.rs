@@ -17,8 +17,8 @@ fn under_an_editable_occurrence_an_unwarranted_claimant_is_marked_noClaim () {
     ** {} c
     ** {} d
     ** {} z
-    ", occ ("p", ""), occ ("c", ""), occ ("d", "noClaim"), occ ("z", "") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("d", "noClaim"), occurrence_metadata ("z", "") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   node c
@@ -37,9 +37,9 @@ fn under_a_write_protected_occurrence_no_child_claims () {
     * {} p
     ** {} c
     ** {} z
-    ", occ ("p", "writeProtected"), occ ("c", "writeProtected"),
-       occ ("z", "writeProtected") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("p", "writeProtected"), occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("z", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p wp
   node c wp noClaim
@@ -50,8 +50,8 @@ node p wp
 #[test]
 fn a_root_claims () {
   let graph : InRustGraph = graph (&[ node ("p") ]);
-  let input : String = format! ("* {} p\n", occ ("p", "noClaim"));
-  assert_eq! ( run (&input, &graph) . outline (), "node p" ); }
+  let input : String = format! ("* {} p\n", occurrence_metadata ("p", "noClaim"));
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "node p" ); }
 
 #[test]
 fn in_an_editable_folder_an_unwarranted_member_is_marked_noClaim () {
@@ -63,8 +63,8 @@ fn in_an_editable_folder_an_unwarranted_member_is_marked_noClaim () {
     ** (skg subscribeeFolder)
     *** {} e
     *** {} z
-    ", occ ("s", ""), occ ("e", "writeProtected"), occ ("z", "writeProtected") );
-  let run : Run = run (&input, &graph);
+    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "writeProtected"), occurrence_metadata ("z", "writeProtected") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node s
   subscribeeFolder
@@ -80,8 +80,8 @@ fn in_an_editable_folder_of_a_write_protected_node_no_member_claims () {
     * {} s
     ** (skg subscribeeFolder)
     *** {} e
-    ", occ ("s", "writeProtected"), occ ("e", "writeProtected") );
-  assert_eq! ( run (&input, &graph) . outline (), "\
+    ", occurrence_metadata ("s", "writeProtected"), occurrence_metadata ("e", "writeProtected") );
+  assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s wp
   subscribeeFolder
     node e wp noClaim" ); }

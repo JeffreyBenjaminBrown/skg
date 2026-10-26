@@ -8,7 +8,7 @@
 // Method: render the view de-novo to get a complete buffer, then run it through
 // the save+rerender pipeline twice. The two rerenders must be identical. (We do
 // not assert de-novo == first-rerender -- those can legitimately differ in
-// metadata; idempotence is specifically that a second rerender changes nothing.)
+// metadata; the fixpoint is specifically that a second rerender changes nothing.)
 //
 // Fixture exercises several Viewnode kinds in one view: occurrences as content (a -> b,
 // c), an AliasFolder + Alias (b has alias "bee"), the IDFolders, a SubscribeeFolder +
@@ -31,15 +31,12 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
-use skg::refresh::{Refreshed, Truth, refresh_content_viewforest};
+use skg::refresh::{Truth, refresh_content_viewforest};
 use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
-use skg::test_utils::{graph_from_config, prefer_owned_subdir};
+use skg::test_utils::{graph_from_config, prefer_owned_subdir, refresh_reaches_fixpoint};
 use skg::types::env::RuntimeGeneration;
 use skg::types::misc::{Skgrepo, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::views_state::ViewnodeIdRecord;
 use skg::update_buffer::render_initial_view;
 
 use crate::git_fixture::{OwnedSkgrepos, git_fixture, graph_straddle};
@@ -56,14 +53,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[test]
-fn rerender_is_idempotent
+fn rerender_is_a_fixpoint
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-idempotence",
     "tests/idempotence/fixtures",
     "/tmp/tantivy-test-idempotence",
     |config, tantivy| Box::pin ( async move {
-      rerender_is_idempotent_impl (
+      rerender_is_a_fixpoint_impl (
         config, tantivy ) . await
     } )) }
 
@@ -92,7 +89,7 @@ async fn rerender_once (
     "rerender must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-async fn rerender_is_idempotent_impl (
+async fn rerender_is_a_fixpoint_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -160,22 +157,11 @@ fn refreshes_unchanged (
   let (_, text) : (ViewForest, String) =
     render_initial_view (runtime, &[ pid . clone () ], None)
     . map_err ( |e| format! ("the fresh view failed: {}", e) ) ?;
-  let (mut forest, errors, _warnings, _provenance) =
-    org_to_viewforest (&text, IdResolution::ThroughGraph (&runtime . graph))
-    . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
-  if ! errors . is_empty () {
-    return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let again : Refreshed = refresh_content_viewforest (
-    &mut forest, &mut record, &Truth::of_runtime (runtime, None),
-    &BufferCorrectionPolicy::default () )
-    . map_err ( |e| format! ("the second refresh failed: {}", e) ) ?;
-  if again . text != text {
-    return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
-                           text, again . text )); }
-  if ! again . buffer_corrections . is_empty () {
-    return Err ( format! ( "corrected: {:?}", again . buffer_corrections )); }
-  Ok (( )) }
+  refresh_reaches_fixpoint (
+    &text, &runtime . graph,
+    |forest, record| refresh_content_viewforest (
+      forest, record, &Truth::of_runtime (runtime, None),
+      &BufferCorrectionPolicy::default () )) }
 
 /// Every folder named 'fixtures' under 'root', but the test results.
 fn fixture_folders (
@@ -285,22 +271,11 @@ fn diff_view_buffer_refreshes_unchanged (
   buffer_kind : DiffViewBufferKind,
   text        : &str,
 ) -> Result<(), String> {
-  let (mut forest, errors, _warnings, _provenance) =
-    org_to_viewforest (text, IdResolution::ThroughGraph (&runtime . graph))
-    . map_err ( |e| format! ("the parse failed: {}", e) ) ?;
-  if ! errors . is_empty () {
-    return Err ( format! ( "the parse refused it: {:?}\n{}", errors, text )); }
-  let mut record : ViewnodeIdRecord = ViewnodeIdRecord::of_viewforest (&forest);
-  let again : Refreshed = complete_viewforest_with_graph_straddle (
-    runtime, straddle, buffer_kind, store, None,
-    &BufferCorrectionPolicy::default (), &mut forest, &mut record )
-    . map_err ( |e| format! ("the second refresh failed: {}", e) ) ?;
-  if again . text != text {
-    return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
-                           text, again . text )); }
-  if ! again . buffer_corrections . is_empty () {
-    return Err ( format! ( "corrected: {:?}", again . buffer_corrections )); }
-  Ok (( )) }
+  refresh_reaches_fixpoint (
+    text, &runtime . graph,
+    |forest, record| complete_viewforest_with_graph_straddle (
+      runtime, straddle, buffer_kind, store, None,
+      &BufferCorrectionPolicy::default (), forest, record )) }
 
 /// The git fixture cases under 'GIT_FIXTURE_CASES': each folder there
 /// that holds a 'head' folder, or whose subfolders do.
