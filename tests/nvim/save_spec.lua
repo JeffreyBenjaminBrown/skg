@@ -411,7 +411,7 @@ describe('skg.save pipeline', function ()
     vim.api.nvim_buf_delete(found, { force = true })
   end)
 
-  describe('corrections on save-result', function ()
+  describe('buffer corrections on save-result', function ()
     local server_warnings = require('skg.server_warnings')
 
     local function warnings_buffer ()
@@ -453,7 +453,7 @@ describe('skg.save pipeline', function ()
         return lock.stream_in_progress == nil end, 10)
     end
 
-    it("puts a collateral view's correction under that view's buffer"
+    it("puts a collateral view's buffer correction under that view's buffer"
        .. ' name', function ()
       save_with_corrections_tail(
         ' (corrections ((content-view:7'
@@ -462,19 +462,19 @@ describe('skg.save pipeline', function ()
       local buf = warnings_buffer()
       assert.is_truthy(buf)
       assert.are.same({
-        '* skg://collateral',
+        '* Buffer corrections in skg://collateral',
         '** Drew what the graph says belongs here.',
         '*** new child',
         '- viewnode ID: 0d. To find it: <localleader>gv 0d',
       }, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
     end)
 
-    it('shows nothing when the corrections field is absent', function ()
+    it('shows nothing when the (corrections ...) field is absent', function ()
       save_with_corrections_tail('')
       assert.is_nil(warnings_buffer())
     end)
 
-    it('shows nothing when the corrections list is empty', function ()
+    it('shows nothing when the (corrections ...) list is empty', function ()
       save_with_corrections_tail(' (corrections ())')
       assert.is_nil(warnings_buffer())
     end)

@@ -1,11 +1,11 @@
 // cargo nextest run --test grouped_overrides -E 'test(corrections_channel::)'
 //
-// The save response carries the corrections of every view the save
-// refreshed, each tagged with its view ('SaveResponse.corrections'):
+// The save response carries the buffer corrections of every view the save
+// refreshed, each tagged with its view ('SaveResponse.buffer_corrections'):
 // - a plain save, of a buffer as the server drew it, reports nothing;
 // - a save that adds a child to 'two' in the view of 'one' corrects
 //   the view of 'five', where 'two' is editable too and its list,
-//   already drawn, now lacks the child. That correction is tagged
+//   already drawn, now lacks the child. That buffer correction is tagged
 //   with the view of 'five'; the saved view reports nothing.
 //
 // - a save that deletes a node reports no buffer correction for it,
@@ -18,7 +18,7 @@ use std::error::Error;
 use std::net::{TcpListener, TcpStream};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::refresh::corrections::{CorrectionKind, ViewCorrections};
+use skg::refresh::buffer_corrections::{BufferCorrectionKind, ViewBufferCorrections};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
@@ -28,7 +28,7 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::views_state::{OpenViews, ViewforestId};
 
 #[test]
-fn corrections_reach_the_save_response_tagged_with_their_view
+fn buffer_corrections_reach_the_save_response_tagged_with_their_view
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-corrections-channel",
@@ -48,8 +48,8 @@ fn corrections_reach_the_save_response_tagged_with_their_view
         let response : SaveResponse = save (
           &one, &view_of_one, config, tantivy, &graph, &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (), "{:?}", response . errors );
-        assert! ( response . corrections . is_empty (),
-                  "a plain save corrects nothing: {:?}", response . corrections ); }
+        assert! ( response . buffer_corrections . is_empty (),
+                  "a plain save corrects nothing: {:?}", response . buffer_corrections ); }
       { // a child added to two, which the view of five also shows
         let with_child : String = one . lines ()
           . flat_map ( |line| {
@@ -62,17 +62,17 @@ fn corrections_reach_the_save_response_tagged_with_their_view
           &with_child, &view_of_one, config, tantivy, &graph,
           &mut views_state ) . await ?;
         assert! ( response . errors . is_empty (), "{:?}", response . errors );
-        assert_eq! ( response . corrections . len (), 1,
-                     "only the view of five is corrected: {:?}", response . corrections );
-        let five : &ViewCorrections = &response . corrections [0];
+        assert_eq! ( response . buffer_corrections . len (), 1,
+                     "only the view of five is corrected: {:?}", response . buffer_corrections );
+        let five : &ViewBufferCorrections = &response . buffer_corrections [0];
         assert_eq! ( five . viewforest_id, view_of_five );
-        assert_eq! ( five . corrections . len (), 1, "{:?}", five . corrections );
-        assert_eq! ( five . corrections [0] . kind, CorrectionKind::Reinstated );
-        assert_eq! ( five . corrections [0] . title, "new child" );
-        assert! ( five . corrections [0] . vnid . is_some (),
+        assert_eq! ( five . buffer_corrections . len (), 1, "{:?}", five . buffer_corrections );
+        assert_eq! ( five . buffer_corrections [0] . kind, BufferCorrectionKind::Reinstated );
+        assert_eq! ( five . buffer_corrections [0] . title, "new child" );
+        assert! ( five . buffer_corrections [0] . vnid . is_some (),
                   "the drawn child has a vnid by the time it is reported" );
         assert! ( response . warnings . is_empty (),
-                  "a correction is not a warning: {:?}", response . warnings ); }
+                  "a buffer correction is not a warning: {:?}", response . warnings ); }
       Ok (( )) } )) }
 
 /// A save that deletes a node reports no buffer correction for it:
@@ -107,13 +107,13 @@ fn a_saves_own_deletion_is_no_buffer_correction
       assert! ( response . errors . is_empty (), "{:?}", response . errors );
       assert! ( graph . load_full () . get (&ID::from ("four")) . is_none (),
                 "the save deleted four" );
-      let entombstoned : Vec<&ViewCorrections> = response . corrections . iter ()
-        . filter ( |view| view . corrections . iter ()
-                   . any ( |c| c . kind == CorrectionKind::Entombstoned ))
+      let entombstoned : Vec<&ViewBufferCorrections> = response . buffer_corrections . iter ()
+        . filter ( |view| view . buffer_corrections . iter ()
+                   . any ( |c| c . kind == BufferCorrectionKind::Entombstoned ))
         . collect ();
       assert! ( entombstoned . is_empty (),
                 "the save's own deletion is no buffer correction: {:?}",
-                response . corrections );
+                response . buffer_corrections );
       Ok (( )) } )) }
 
 /// Render the view of 'root' and register it as 'viewforest_id'.

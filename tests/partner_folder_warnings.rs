@@ -2,11 +2,11 @@
 //
 // When the refresh corrects a write-protected partner folder in the
 // view the user just saved, the save succeeds and
-// SaveResponse.corrections carries its corrections, tagged with the
+// SaveResponse.buffer_corrections carries its buffer corrections, tagged with the
 // view
 // ('docs/sharing-model.org', "The write-protected folders: who
 // subscribes to, overrides, or hides this node"):
-// - a deleted generated member is reinstated, a correction naming it;
+// - a deleted generated member is reinstated, a buffer correction naming it;
 // - a child placed in the folder, which claims nothing there, stays,
 //   unwarranted, with nothing to correct.
 //
@@ -20,7 +20,7 @@ use std::net::TcpStream;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::refresh::corrections::ViewCorrections;
+use skg::refresh::buffer_corrections::ViewBufferCorrections;
 use skg::serve::ViewsState;
 use skg::types::views_state::{OpenViews, ViewforestId};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -128,21 +128,21 @@ async fn write_protected_folder_repairs_warn_impl (
     save_buffer (&edited, config, tantivy, &graph, &mut views_state) . await ?;
   assert! ( response . errors . is_empty (),
     "save must succeed; got errors: {:?}", response . errors );
-  assert_eq! ( response . corrections . len (), 1,
-               "only the saved view is corrected: {:?}", response . corrections );
-  let view : &ViewCorrections = &response . corrections [0];
+  assert_eq! ( response . buffer_corrections . len (), 1,
+               "only the saved view is corrected: {:?}", response . buffer_corrections );
+  let view : &ViewBufferCorrections = &response . buffer_corrections [0];
   assert_eq! ( view . viewforest_id,
                ViewforestId::ContentView ("view of n" . to_string ()) );
-  assert_eq! ( view . corrections . len (), 1,
-               "the reinstatement is the only correction: {:?}", view . corrections );
-  let message : String = view . corrections [0] . message ();
+  assert_eq! ( view . buffer_corrections . len (), 1,
+               "the reinstatement is the only buffer correction: {:?}", view . buffer_corrections );
+  let message : String = view . buffer_corrections [0] . message ();
   assert! ( message . starts_with ("Drew what the graph says belongs here.")
             && message . contains ("\n*** r\n- viewnode ID: "),
-            "the correction reinstates r, named as a subtree: {}", message );
+            "the buffer correction reinstates r, named as a subtree: {}", message );
   assert_eq! ( response . warnings . iter ()
                . filter ( |w| ! w . contains ("Headline text on a subscriberFolder") )
                . count (), 0,
-               "a correction is not a warning: {:?}", response . warnings );
+               "a buffer correction is not a warning: {:?}", response . warnings );
   assert! ( response . warnings . iter ()
             . any ( |w| w . contains ("Headline text on a subscriberFolder") ),
     "discarded folder headline text must warn: {:?}",

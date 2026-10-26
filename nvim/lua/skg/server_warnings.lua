@@ -1,15 +1,15 @@
 -- PURPOSE: Show, in M.buffer_name, what the server warned about as it
--- started (unknown skgconfig.toml keys, say) and the corrections it
--- made to each view it refreshed. client.connect sends the startup
--- request once per connection, as soon as the connection is up and so
--- before any view is requested. A non-empty answer opens M.buffer_name;
--- an empty one opens nothing. The corrections arrive on a save's
+-- started (unknown skgconfig.toml keys, say) and the buffer
+-- corrections it made to each view it refreshed. client.connect sends
+-- the startup request once per connection, as soon as the connection
+-- is up and so before any view is requested. A non-empty answer opens M.buffer_name;
+-- an empty one opens nothing. The buffer corrections arrive on a save's
 -- save-result and on a rerender stream's rerender-done; show_corrections
 -- appends them to the buffer, erasing nothing. The Lua port of
 -- elisp/skg-request-server-warnings.el.
 --
 -- DATA USED/ASSUMED: See docs/api-and-formats.org, "Server warnings".
--- The corrections field is a list of (VIEW_ID MESSAGE ...) entries,
+-- The (corrections ...) field is a list of (VIEW_ID MESSAGE ...) entries,
 -- one per corrected view; each MESSAGE is a headline line followed by
 -- a level-3 subheadline naming the corrected headline, as in
 -- docs/api-and-formats.org, "How a message names a headline".
@@ -23,7 +23,7 @@ local state = require('skg.state')
 local M = {}
 
 ---The buffer that shows the server's startup warnings and each view's
----corrections, beside the save warnings' 'skg://messages/save-warnings'.
+---buffer corrections, beside the save warnings' 'skg://messages/save-warnings'.
 M.buffer_name = 'skg://messages/server-warnings'
 
 ---Ask the server on TCP for its startup warnings. A one-shot handler
@@ -54,9 +54,9 @@ function M.show_server_warnings (response)
 end
 
 ---Append CORRECTIONS, the parsed value of a response's 'corrections'
----field, to M.buffer_name, and show it. Each view gets a level-1
----headline naming it (its buffer's name, or its view ID when no
----buffer has it), and each of its messages a level-2 headline. Nil or
+---field (the buffer corrections), to M.buffer_name, and show it. Each
+---view gets a level-1 headline, 'Buffer corrections in' and its name
+---(its buffer's name, or its view ID when no buffer has it), and each of its messages a level-2 headline. Nil or
 ---an empty list does nothing.
 ---@param corrections any
 function M.show_corrections (corrections)
@@ -103,6 +103,7 @@ function M.corrected_views (corrections)
 end
 
 ---CORRECTED_VIEWS as org text: per view, a level-1 headline naming it
+---('Buffer corrections in' the view's name)
 ---and a level-2 headline per message. A message's own subheadline
 ---lines (level 3) stay as they are; its trailing newlines go, and the
 ---Emacs chords it names become Neovim bindings.
@@ -112,7 +113,8 @@ function M.corrected_views_to_org_string (corrected_views)
   local lines = {}
   for _, corrected_view in ipairs(corrected_views) do
     table.insert(lines,
-                 '* ' .. M.corrected_view_name(corrected_view.view_id))
+                 '* Buffer corrections in '
+                   .. M.corrected_view_name(corrected_view.view_id))
     for _, message in ipairs(corrected_view.messages) do
       table.insert(lines,
                    '** ' .. messages.with_neovim_bindings(

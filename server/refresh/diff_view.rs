@@ -358,7 +358,7 @@ fn expected_change_viewnodes (
 /// to date with the straddle. Folders are drawn empty: their own
 /// visits fill them from their goals. A change viewnode describes the
 /// straddle and is recomputed at every refresh, so drawing one is no
-/// correction ('entombstone_gone_change').
+/// buffer correction ('entombstone_gone_change').
 pub(crate) fn draw_change_viewnodes (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,

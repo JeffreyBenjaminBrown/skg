@@ -170,9 +170,9 @@ and the new child c."
 
 (defun phase-6-verify-correction-in-warnings-buffer ()
   "Buffer A's editable a lacked c, which the save drew there: a
-correction of buffer A, which the warnings buffer shows under a
-headline naming buffer A."
-  (message "=== PHASE 6: Verify the correction in the warnings buffer ===")
+buffer correction of buffer A, which the warnings buffer shows under
+a headline naming buffer A."
+  (message "=== PHASE 6: Verify the buffer correction in the warnings buffer ===")
   (setq integration-test-phase "phase-6-verify-correction-in-warnings-buffer")
   (let ((buf (get-buffer skg-server-warnings-buffer-name)))
     (unless buf
@@ -182,16 +182,16 @@ headline naming buffer A."
                   (buffer-substring-no-properties (point-min) (point-max)))))
       (message "Warnings buffer content: %S" text)
       (unless (string-match-p
-               (concat "^\\* \\*a\\*\n"
+               (concat "^\\* Buffer corrections in \\*a\\*\n"
                        "\\*\\* Drew what the graph says belongs here\\.\n"
                        "\\*\\*\\* c\n")
                text)
-        (message "✗ FAIL [phase 6]: the correction drawing c is not under buffer A's headline")
+        (message "✗ FAIL [phase 6]: the buffer correction drawing c is not under buffer A's headline")
         (kill-emacs 1))
-      (when (string-match-p "^\\* \\*b\\*$" text)
-        (message "✗ FAIL [phase 6]: the saved buffer B reported a correction")
+      (when (string-match-p "^\\* Buffer corrections in \\*b\\*$" text)
+        (message "✗ FAIL [phase 6]: the saved buffer B reported a buffer correction")
         (kill-emacs 1))
-      (message "✓ PASS [phase 6]: the correction is under buffer A's headline"))))
+      (message "✓ PASS [phase 6]: the buffer correction is under buffer A's headline"))))
 
 (defun run-all-tests ()
   "Main orchestrator function that runs all integration tests."

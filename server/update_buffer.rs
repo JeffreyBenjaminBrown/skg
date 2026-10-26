@@ -27,7 +27,7 @@ pub use viewnodestats::set_viewnodestats_in_viewforest;
 use completion_mode::CompletionMode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
-use crate::refresh::corrections::{BufferCorrectionPolicy, Correction, ViewCorrections};
+use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, ViewBufferCorrections};
 use crate::diff_view::change_leaves::BufferReadinessSummary;
 use crate::diff_view::completion::rerender_diffView_buffer;
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
@@ -111,7 +111,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
 struct RenderedCollateralView {
   viewforest_id  : ViewforestId,
   text           : String,
-  corrections    : Vec<Correction>,
+  buffer_corrections    : Vec<BufferCorrection>,
   viewforest     : ViewForest,
   viewnode_id_record : ViewnodeIdRecord,
 }
@@ -188,7 +188,7 @@ pub fn update_views_after_save (
         strandeds_confirmation : None,
         text_release_confirmation : challenge_response (&release),
         readiness_summary   : None,
-        corrections         : Vec::new (),
+        buffer_corrections         : Vec::new (),
       } ); }}
   let saved : Refreshed =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -231,20 +231,20 @@ pub fn update_views_after_save (
           strandeds_confirmation : None,
           text_release_confirmation : challenge_response (&decision),
           readiness_summary   : None,
-          corrections         : Vec::new (),
+          buffer_corrections         : Vec::new (),
         } ); }
       TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       TextReleaseDecision::Allow => {}, }}
   write_graph_straddle_back (views_state, context . graph_straddle . take ());
-  let mut corrections : Vec<ViewCorrections> = Vec::new ();
+  let mut buffer_corrections : Vec<ViewBufferCorrections> = Vec::new ();
   if let Ok (viewforest_id) = viewforest_id_from_request_result {
-    corrections . extend ( ViewCorrections::of (viewforest_id, saved . corrections) );
+    buffer_corrections . extend ( ViewBufferCorrections::of (viewforest_id, saved . buffer_corrections) );
     views_state . open_views . update_view (
       &context . graph_snap, viewforest_id, saved_view_mut, saved_viewnode_id_record );
     for rendered in collateral_views {
-      corrections . extend ( ViewCorrections::of (
-        &rendered . viewforest_id, rendered . corrections ));
+      buffer_corrections . extend ( ViewBufferCorrections::of (
+        &rendered . viewforest_id, rendered . buffer_corrections ));
       views_state . open_views . update_view (
         &context . graph_snap,
         &rendered . viewforest_id, rendered . viewforest,
@@ -265,7 +265,7 @@ pub fn update_views_after_save (
     strandeds_confirmation : None,
     text_release_confirmation : None,
     readiness_summary,
-    corrections, } ) }
+    buffer_corrections, } ) }
 
 fn occurrence_gnids_in_viewforest (
   viewforest : &ViewForest,
@@ -346,7 +346,7 @@ fn rerender_collateral_view (
   Ok (RenderedCollateralView {
     viewforest_id,
     text        : refreshed . text,
-    corrections : refreshed . corrections,
+    buffer_corrections : refreshed . buffer_corrections,
     viewforest,
     viewnode_id_record,
   }) }
@@ -356,7 +356,7 @@ fn rerender_collateral_view (
 /// each root's content within the node budget and fulfils the stub's
 /// folder requests. Returns the viewforest and its text, with every
 /// viewnode given a vnid from a new record. A fresh view reports no
-/// correction: there was nothing the user could have made otherwise.
+/// buffer correction: there was nothing the user could have made otherwise.
 pub fn render_initial_view (
   runtime     : &RuntimeGeneration,
   root_gnids : &[ID],
@@ -441,7 +441,7 @@ impl RerenderOptions {
 }
 
 /// Bring an open view up to date with the graph and render it,
-/// returning its text and its corrections. It is refreshed
+/// returning its text and its buffer corrections. It is refreshed
 /// ('refresh_viewforest'), from what it holds and the graph as they
 /// are now: a content view ('options . diffView_buffer' None) in
 /// content-view mode; a buffer of the diff view in diff-view mode,

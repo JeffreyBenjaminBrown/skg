@@ -16,10 +16,10 @@
 //! viewnodes are recomputed in place ('diff_view.rs'). After the
 //! walk, the tail ('tail.rs') computes the derived facts, prunes the
 //! childless tombstones, gives every viewnode a vnid and renders.
-//! The refresh returns what it changed ('corrections.rs').
+//! The refresh returns what it changed ('buffer_corrections.rs').
 
 pub mod ancestry;
-pub mod corrections;
+pub mod buffer_corrections;
 mod diff_view;
 mod extent;
 mod goal;
@@ -37,7 +37,7 @@ use crate::types::viewnode::{
   Editability, ViewRequest, Viewnode, ViewnodeKind, Vognode};
 use crate::types::views_state::ViewnodeIdRecord;
 use crate::update_buffer::completion_mode::CompletionMode;
-use corrections::{BufferCorrectionPolicy, Correction, CorrectionKind, CorrectionLog};
+use buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, BufferCorrectionKind, BufferCorrectionLog};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashSet, VecDeque};
@@ -57,7 +57,7 @@ pub struct Refreshed {
   /// The buffer's text.
   pub text        : String,
   /// What the refresh changed, in walk order.
-  pub corrections : Vec<Correction>,
+  pub buffer_corrections : Vec<BufferCorrection>,
 }
 
 /// Refresh 'viewforest' against 'truth', in 'mode', drawing at most
@@ -65,7 +65,7 @@ pub struct Refreshed {
 /// ('extent.rs'). In the diff view 'readiness_store' gives the
 /// readiness facts; a content view passes None. 'viewnode_id_record'
 /// assigns the vnids of the viewnodes the refresh draws.
-/// 'correction_policy' says which changes are no buffer corrections.
+/// 'buffer_correction_policy' says which changes are no buffer corrections.
 /// Edit requests pass through untouched; view requests are fulfilled
 /// and dropped.
 pub fn refresh_viewforest (
@@ -75,9 +75,9 @@ pub fn refresh_viewforest (
   mode               : CompletionMode,
   node_budget        : usize,
   readiness_store    : Option<&ReadinessStore>,
-  correction_policy  : &BufferCorrectionPolicy,
+  buffer_correction_policy  : &BufferCorrectionPolicy,
 ) -> Result<Refreshed, Box<dyn Error>> {
-  let mut walk : Walk = Walk::new (truth, mode, node_budget, correction_policy);
+  let mut walk : Walk = Walk::new (truth, mode, node_budget, buffer_correction_policy);
   { let tree : &mut Tree<Viewnode> = viewforest . as_internal_tree_mut ();
     debug_assert! ( at_most_one_editable_occurrence_per_gnid (tree),
                     "the input holds two editable occurrences of one gnid" );
@@ -87,9 +87,9 @@ pub fn refresh_viewforest (
     walk_in_level_order (tree, &mut walk) ?; }
   let text : String = tail::finish (
     viewforest, viewnode_id_record, &walk, readiness_store ) ?;
-  let corrections : Vec<Correction> =
-    walk . corrections . into_corrections (viewforest . as_internal_tree_mut ());
-  Ok ( Refreshed { text, corrections } ) }
+  let buffer_corrections : Vec<BufferCorrection> =
+    walk . buffer_corrections . into_buffer_corrections (viewforest . as_internal_tree_mut ());
+  Ok ( Refreshed { text, buffer_corrections } ) }
 
 /// What the walk carries from one parent to the next.
 pub(crate) struct Walk<'a> {
@@ -114,8 +114,8 @@ pub(crate) struct Walk<'a> {
   /// drew as change viewnodes. Their members are extent
   /// ('Walk::record_drawn').
   pub added_folders  : HashSet<NodeId>,
-  pub corrections    : CorrectionLog,
-  pub correction_policy : &'a BufferCorrectionPolicy,
+  pub buffer_corrections    : BufferCorrectionLog,
+  pub buffer_correction_policy : &'a BufferCorrectionPolicy,
   /// The headlines entombstoned without a buffer correction
   /// ('BufferCorrectionPolicy'). What their entombstoning makes
   /// unsayable beneath them goes unreported too.
@@ -127,15 +127,15 @@ impl<'a> Walk<'a> {
     truth             : &'a Truth<'a>,
     mode              : CompletionMode<'a>,
     node_budget       : usize,
-    correction_policy : &'a BufferCorrectionPolicy,
+    buffer_correction_policy : &'a BufferCorrectionPolicy,
   ) -> Walk<'a> {
-    Walk { truth, mode, node_budget, correction_policy,
+    Walk { truth, mode, node_budget, buffer_correction_policy,
            editable_gnids           : HashSet::new (),
            drawn_editable           : HashSet::new (),
            had_editableView_request : HashSet::new (),
            newborn_folders          : HashSet::new (),
            added_folders            : HashSet::new (),
-           corrections              : CorrectionLog::default (),
+           buffer_corrections              : BufferCorrectionLog::default (),
            quiet_tombstones         : HashSet::new (), } }
 
   pub fn is_diff_view (
@@ -147,7 +147,7 @@ impl<'a> Walk<'a> {
   /// first time: the content of an occurrence it extends first (one
   /// it drew editable, or one an editable-view request extends, the
   /// roots of a fresh view's stub among them) and the members of a
-  /// folder it added. Drawing those is extent, not correction.
+  /// folder it added. Drawing those is extent, not buffer correction.
   pub fn draws_first_under (
     &self,
     parent : NodeId,
@@ -158,7 +158,7 @@ impl<'a> Walk<'a> {
 
   /// Report the headline drawn at 'drawn', under 'parent', as
   /// reinstated, unless drawing it is extent ('draws_first_under'):
-  /// a reinstatement is a correction only where a list already drawn
+  /// a reinstatement is a buffer correction only where a list already drawn
   /// was missing a member, and the restriction did not just widen
   /// ('BufferCorrectionPolicy').
   pub(crate) fn record_drawn (
@@ -168,8 +168,8 @@ impl<'a> Walk<'a> {
     drawn  : NodeId,
   ) {
     if ! self . draws_first_under (parent)
-       && self . correction_policy . reports_reinstatement () {
-      self . corrections . record (tree, drawn, CorrectionKind::Reinstated); }}
+       && self . buffer_correction_policy . reports_reinstatement () {
+      self . buffer_corrections . record (tree, drawn, BufferCorrectionKind::Reinstated); }}
 }
 
 /// Visit every parent in level order, starting at the buffer root:
@@ -284,8 +284,8 @@ pub(crate) fn write_protect_occurrence (
         ( Some ( occurrence . gnid . clone () ), dropped ) },
       _ => (None, false), };
   if dropped {
-    walk . corrections . record (
-      tree, treeid, CorrectionKind::EditRequestDropped ); }
+    walk . buffer_corrections . record (
+      tree, treeid, BufferCorrectionKind::EditRequestDropped ); }
   if let Some (gnid) = gnid {
     walk . editable_gnids . remove (&gnid);
     walk . drawn_editable . remove (&treeid); }}

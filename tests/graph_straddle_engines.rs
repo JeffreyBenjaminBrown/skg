@@ -19,7 +19,7 @@ use skg::types::viewnode::{
 use skg::types::views_state::DiffViewBufferKind;
 use skg::diff_view::readiness_store::ReadinessStore;
 use skg::refresh::{Truth, refresh_viewforest};
-use skg::refresh::corrections::BufferCorrectionPolicy;
+use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::types::tree::forest::ViewForest;
 use skg::types::views_state::ViewnodeIdRecord;
 use skg::update_buffer::completion_mode::CompletionMode;

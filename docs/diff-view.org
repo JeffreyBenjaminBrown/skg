@@ -185,7 +185,7 @@ order-only marker. Each is kept while its change exists, drawn when
 missing (after the one before it, or first), and entombstoned when
 its change is gone; the tombstone holds whatever stood under it.
 A change viewnode describes the straddle, so drawing one or
-entombstoning one whose change is gone is no correction. A
+entombstoning one whose change is gone is no buffer correction. A
 write-protected occurrence holds none: an earlier one's change
 viewnodes are entombstoned.
 
@@ -403,7 +403,7 @@ made editable its body and draws its content list; then each content
 origin of D that the buffer shows nowhere is appended as a stub root,
 in ID order, with the standing roots pinned, and the buffer is
 refreshed again ('rerender_diffView_buffer'). What the request draws
-is what the user asked for, so it reports no correction. The answer
+is what the user asked for, so it reports no buffer correction. The answer
 is the readiness summary, and the rerender stream carries the buffer.
 It does not matter who write-protected an occurrence: the user asked
 for every change.

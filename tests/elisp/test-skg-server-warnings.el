@@ -58,19 +58,19 @@
    nil "((response-type server-warnings) (warnings ()))")
   (should-not (get-buffer skg-server-warnings-buffer-name)))
 
-;;; Corrections: the server's, per view, appended to the same buffer.
+;;; Buffer corrections: the server's, per view, appended to the same buffer.
 
 (defconst test-skg-server-warnings--correction-of-new-child
   (concat "Drew what the graph says belongs here.\n"
           "*** new child\n"
           "- viewnode ID: 0d. To find it: C-c g v 0d\n")
-  "A correction as the server writes it, naming one headline.")
+  "A buffer correction as the server writes it, naming one headline.")
 
 (defconst test-skg-server-warnings--correction-of-stray
   (concat "Removed what the graph says does not belong here.\n"
           "*** stray\n"
           "- viewnode ID: 0e. To find it: C-c g v 0e\n")
-  "Another correction, naming another headline.")
+  "Another buffer correction, naming another headline.")
 
 (defun test-skg-server-warnings--with-view-buffer (name view-id body)
   "Call BODY with a buffer NAME whose `skg-view-id' is VIEW-ID."
@@ -129,9 +129,9 @@ level-3 one. All of it after what the buffer held."
              (buffer-string)
              (concat
               "* an earlier startup warning\n"
-              "* *test corrected view*\n"
+              "* Buffer corrections in *test corrected view*\n"
               "** " test-skg-server-warnings--correction-of-new-child
-              "* search:two words\n"
+              "* Buffer corrections in search:two words\n"
               "** " test-skg-server-warnings--correction-of-stray
               "** Kept as it was.\n")))
            (goto-char (point-min))
@@ -139,7 +139,7 @@ level-3 one. All of it after what the buffer held."
            (should (org-up-heading-safe))
            (should (looking-at-p "\\*\\* Removed what the graph"))
            (should (org-up-heading-safe))
-           (should (looking-at-p "\\* search:two words$")))))
+           (should (looking-at-p "\\* Buffer corrections in search:two words$")))))
     (test-skg-server-warnings--kill-buffer)))
 
 (ert-deftest test-skg-empty-corrections-open-nothing ()
@@ -186,7 +186,7 @@ the stream, the locks, the buffer replacement and the display."
               (should
                (equal (buffer-string)
                       (concat
-                       "* *test collateral view*\n"
+                       "* Buffer corrections in *test collateral view*\n"
                        "** "
                        test-skg-server-warnings--correction-of-new-child))))))))
     (test-skg-server-warnings--kill-buffer)))
@@ -233,7 +233,7 @@ the stream, the locks, the buffer replacement and the display."
           (should
            (equal (buffer-string)
                   (concat "* an earlier correction\n"
-                          "* search:two words\n"
+                          "* Buffer corrections in search:two words\n"
                           "** "
                           test-skg-server-warnings--correction-of-stray)))))
     (test-skg-server-warnings--kill-buffer)))

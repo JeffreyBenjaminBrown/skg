@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
 ;;; PURPOSE: Show what the server warned about as it started (unknown
-;;; skgconfig.toml keys, say), and each view's corrections.
+;;; skgconfig.toml keys, say), and each view's buffer corrections.
 ;;;
 ;;; Startup warnings: `skg-tcp-connect-to-rust' sends the request once
 ;;; per connection, as soon as the connection is up and so before any
@@ -9,10 +9,11 @@
 ;;; `skg-server-warnings-buffer-name', replacing what it held; an empty
 ;;; one opens nothing.
 ;;;
-;;; Corrections: a save's save-result and a rerender stream's
+;;; Buffer corrections: a save's save-result and a rerender stream's
 ;;; rerender-done can name, per view the server refreshed, the
 ;;; headlines it corrected. `skg-show-corrections-in-server-warnings'
-;;; appends them to the same buffer, keeping what it held.
+;;; appends them to the same buffer, under a headline "Buffer
+;;; corrections in" the view's name, keeping what it held.
 ;;;
 ;;; DATA USED/ASSUMED: See docs/api-and-formats.org, "Server warnings".
 
@@ -23,7 +24,7 @@
 
 (defconst skg-server-warnings-buffer-name "*SKG Server Warnings*"
   "The buffer that shows the server's startup warnings, and the
-corrections the server made to each view's headlines.")
+buffer corrections the server made to each view's headlines.")
 
 (defun skg-request-server-warnings (tcp-proc)
   "Ask the server on TCP-PROC for its startup warnings.
@@ -56,10 +57,11 @@ caller's own request follows it at once."
 
 (defun skg-show-corrections-in-server-warnings (corrections)
   "Append CORRECTIONS to `skg-server-warnings-buffer-name' and show it.
-CORRECTIONS is the corrections field of a save-result or a
-rerender-done: one entry (VIEW-ID MESSAGE ...) per view the server
-corrected. Each view becomes a level-1 headline (see
-`skg--corrected-view-name') and each of its messages a level-2
+CORRECTIONS is the (corrections ...) field of a save-result or a
+rerender-done, the buffer corrections: one entry (VIEW-ID MESSAGE
+...) per view the server corrected. Each view becomes a level-1
+headline, \"Buffer corrections in\" and its name (see
+`skg--corrected-view-name'), and each of its messages a level-2
 headline under it. What the buffer already held stays.
 Does nothing when CORRECTIONS is empty."
   (when (skg--message-list-nonempty-p corrections)
@@ -90,12 +92,14 @@ Does nothing when CORRECTIONS is empty."
                skg-server-warnings-buffer-name))))
 
 (defun skg--corrections-to-org-string (corrections)
-  "Org text for CORRECTIONS: per view, a level-1 headline naming it,
+  "Org text for CORRECTIONS: per view, a level-1 headline naming it
+\"Buffer corrections in\" the view's name,
 and under it each message as a level-2 headline. A message's own
 subheadlines are already level 3, so the message is inserted as it is."
   (mapconcat
    (lambda (view-entry)
-     (concat "* " (skg--corrected-view-name (car view-entry)) "\n"
+     (concat "* Buffer corrections in "
+             (skg--corrected-view-name (car view-entry)) "\n"
              (mapconcat (lambda (correction)
                           (let ((headline (concat "** " correction)))
                             (if (string-suffix-p "\n" headline)

@@ -4,14 +4,14 @@
 //! a text-release decision ('authorize_prepared_rerenders') can
 //! precede any visible change, and then streamed: "rerender-lock",
 //! one "rerender-view" per view, "rerender-done", which carries the
-//! errors, the warnings and each view's corrections
+//! errors, the warnings and each view's buffer corrections
 //! ('stream_prepared_rerenders'). The graph straddle the rerenders
 //! brought up to date is written back to the connection
 //! ('write_graph_straddle_back'), as a save does with its own.
 
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::Refreshed;
-use crate::refresh::corrections::{BufferCorrectionPolicy, Correction, ViewCorrections};
+use crate::refresh::buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, ViewBufferCorrections};
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -35,7 +35,7 @@ use std::sync::Arc;
 pub(crate) struct PreparedView {
   pub(crate) viewforest_id : ViewforestId,
   text                     : String,
-  corrections              : Vec<Correction>,
+  buffer_corrections              : Vec<BufferCorrection>,
   pub(crate) viewforest    : ViewForest,
   viewnode_id_record       : ViewnodeIdRecord,
 }
@@ -128,9 +128,9 @@ pub(crate) fn prepare_rerender_views_where (
         &mut context,
         rerender_options (
           views_state . open_views . diffView_buffer_kind_of_view (viewforest_id) )) } )
-    { Ok (Refreshed { text, corrections }) => {
+    { Ok (Refreshed { text, buffer_corrections }) => {
         rendered_views . push ( PreparedView {
-          viewforest_id : viewforest_id . clone (), text, corrections,
+          viewforest_id : viewforest_id . clone (), text, buffer_corrections,
           viewforest, viewnode_id_record } ); },
       Err (e) => {
         context . errors . push ( format! (
@@ -186,10 +186,10 @@ pub(crate) fn stream_prepared_rerenders (
       TcpToClient::RerenderLock,
       & format_lock_views_sexp (&prepared . viewforest_ids) ));
   write_graph_straddle_back (views_state, prepared . graph_straddle);
-  let mut corrections : Vec<ViewCorrections> = Vec::new ();
+  let mut buffer_corrections : Vec<ViewBufferCorrections> = Vec::new ();
   for view in prepared . views {
-    corrections . extend ( ViewCorrections::of (
-      &view . viewforest_id, view . corrections ));
+    buffer_corrections . extend ( ViewBufferCorrections::of (
+      &view . viewforest_id, view . buffer_corrections ));
     views_state . open_views . update_view (
       &prepared . runtime . graph,
       &view . viewforest_id, view . viewforest, view . viewnode_id_record );
@@ -206,7 +206,7 @@ pub(crate) fn stream_prepared_rerenders (
       & format_rerender_done_sexp (
         &prepared . errors,
         &prepared . warnings,
-        &corrections ) )); }
+        &buffer_corrections ) )); }
 
 /// Keep the graph straddle a rerender brought up to date as the
 /// connection's. A rerender that rendered no buffer of the diff view
@@ -219,7 +219,7 @@ pub(crate) fn write_graph_straddle_back (
     views_state . graph_straddle = graph_straddle; }}
 
 /// Send an empty rerender stream: a "rerender-lock" naming no views,
-/// then "rerender-done" with no errors, warnings or corrections.  Used after a
+/// then "rerender-done" with no errors, warnings or buffer corrections.  Used after a
 /// refusal: Emacs locks every Skg buffer and sets its stream guard
 /// before sending a skgrepo-set switch, and only
 /// the rerender stream unwinds them.  The empty lock list makes

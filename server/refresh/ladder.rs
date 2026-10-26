@@ -1,4 +1,4 @@
-//! The ladder: the corrections the refresh applies at each parent P
+//! The ladder: the rungs the refresh applies at each parent P
 //! to its children, in order ('docs/data-model_technical.org', "The
 //! walk and the ladder"):
 //!  1. re-kind: each child that stands for a gnid becomes what the ID
@@ -30,7 +30,7 @@
 
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_owned_chain, resolve_override};
-use crate::refresh::corrections::CorrectionKind;
+use crate::refresh::buffer_corrections::BufferCorrectionKind;
 use crate::refresh::extent::{
   Extent, drawn_occurrence_is_editable, extent_of_parent, settle_budget_at_visit};
 use crate::refresh::goal::{
@@ -205,7 +205,7 @@ fn merge_siblings (
     for merged_sibling in &duplicates [1..] {
       merge_into (tree, result, *merged_sibling, walk) ?; }
     tree . get_mut (result) . unwrap () . value () . viewnode_id = None;
-    walk . corrections . record (tree, result, CorrectionKind::SiblingsMerged); }
+    walk . buffer_corrections . record (tree, result, BufferCorrectionKind::SiblingsMerged); }
   Ok (( )) }
 
 /// The children of 'parent' grouped by the gnid they stand for, each
@@ -275,7 +275,7 @@ fn merge_into (
     if claims_membership (viewnode) == Some (true)
        && warrant_of_child (goal . as_ref (), viewnode) != Some (Warrant::ByGraph) {
       set_claim (tree, grandchild, false);
-      walk . corrections . record (tree, grandchild, CorrectionKind::MarkedNoClaim); }}
+      walk . buffer_corrections . record (tree, grandchild, BufferCorrectionKind::MarkedNoClaim); }}
   tree . get_mut (merged_sibling) . unwrap () . detach ();
   Ok (( )) }
 
@@ -424,7 +424,7 @@ fn mark_claims (
     else if parent_is_editable {
       if claims && warrant_of_child (goal, viewnode) != Some (Warrant::ByGraph) {
         set_claim (tree, child, false);
-        walk . corrections . record (tree, child, CorrectionKind::MarkedNoClaim); }}
+        walk . buffer_corrections . record (tree, child, BufferCorrectionKind::MarkedNoClaim); }}
     else if claims { set_claim (tree, child, false); }}}
 
 /// Whether the viewnode claims membership; None for a kind that
@@ -757,7 +757,7 @@ fn stop_substituting (
   if warrant != Warrant::ByGraph
      && claims_membership (tree . get (child) . unwrap () . value ()) == Some (true) {
     set_claim (tree, child, false);
-    walk . corrections . record (tree, child, CorrectionKind::MarkedNoClaim); }
+    walk . buffer_corrections . record (tree, child, BufferCorrectionKind::MarkedNoClaim); }
   let member : GoalMember = GoalMember::Gnid ( original . clone () );
   let stands : bool = tree . get (parent) . unwrap () . children ()
     . any ( |sibling| member_of_child (sibling . value ()) . as_ref () == Some (&member) );

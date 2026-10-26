@@ -26,7 +26,7 @@ node p
   node z noClaim ⊥",
     "z is marked; d, detached by the user, stays detached, and is not \
      drawn again" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::MarkedNoClaim ] ); }
+  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::MarkedNoClaim ] ); }
 
 #[test]
 fn under_a_write_protected_occurrence_no_child_claims () {
@@ -44,8 +44,8 @@ fn under_a_write_protected_occurrence_no_child_claims () {
 node p wp
   node c wp noClaim
   node z wp noClaim ⊥" );
-  assert! ( run . corrections . is_empty (),
-            "no claim is read there, so none is corrected: {:?}", run . corrections ); }
+  assert! ( run . buffer_corrections . is_empty (),
+            "no claim is read there, so none is corrected: {:?}", run . buffer_corrections ); }
 
 #[test]
 fn a_root_claims () {

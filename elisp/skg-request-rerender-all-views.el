@@ -160,7 +160,7 @@ response a rerender stream follows."
      (skg--apply-streamed-view-update payload 'rerender "rerender-view"))
    nil) ;; non-one-shot: fires for each streamed view
   (skg-register-response-handler
-   ;; 3. Done message: clean up and show errors/warnings and corrections.
+   ;; 3. Done message: clean up and show errors/warnings and buffer corrections.
    'rerender-done
    (lambda (_tcp-proc payload)
      (setq skg-response-handler-map

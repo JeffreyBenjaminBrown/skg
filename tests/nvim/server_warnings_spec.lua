@@ -1,5 +1,5 @@
--- Coverage for the corrections half of skg.server_warnings: each
--- view's corrections appended to the server-warnings buffer, after
+-- Coverage for the buffer corrections half of skg.server_warnings:
+-- each view's buffer corrections appended to the server-warnings buffer, after
 -- whatever it held. Mirrors the Emacs client's
 -- skg-show-corrections-in-server-warnings.
 
@@ -24,7 +24,7 @@ local function wipe_warnings_buffer ()
   if buf then vim.api.nvim_buf_delete(buf, { force = true }) end
 end
 
-describe('skg.server_warnings corrections', function ()
+describe('skg.server_warnings buffer corrections', function ()
   local real_notify
   local notified
 
@@ -60,14 +60,14 @@ describe('skg.server_warnings corrections', function ()
     assert.is_truthy(buf)
     assert.are.same({
       '* an earlier startup warning',
-      '* skg://shown-view',
+      '* Buffer corrections in skg://shown-view',
       '** Drew what the graph says belongs here.',
       '*** new child',
       '- viewnode ID: 0d. To find it: <localleader>gv 0d',
       '** Dropped a duplicate.',
       '*** twin',
       '- viewnode ID: 0e.',
-      '* search:two words',
+      '* Buffer corrections in search:two words',
       '** Drew what the graph says belongs here.',
       '*** hit',
     }, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
@@ -82,15 +82,15 @@ describe('skg.server_warnings corrections', function ()
     server_warnings.show_corrections(sexpr.read(
       '((content-view:2 "Second.\\n*** two\\n"))'))
     assert.are.same({
-      '* content-view:1', '** First.', '*** one',
-      '* content-view:2', '** Second.', '*** two',
+      '* Buffer corrections in content-view:1', '** First.', '*** one',
+      '* Buffer corrections in content-view:2', '** Second.', '*** two',
     }, vim.api.nvim_buf_get_lines(warnings_buffer(), 0, -1, false))
     assert.are.equal(
       'skg: the server corrected 1 headline in 1 view - see '
       .. server_warnings.buffer_name, notified[2])
   end)
 
-  it('an absent or empty corrections list does nothing', function ()
+  it('an absent or empty (corrections ...) list does nothing', function ()
     server_warnings.show_corrections(nil)
     server_warnings.show_corrections(sexpr.read('()'))
     server_warnings.show_corrections(sexpr.read('nil'))

@@ -274,7 +274,7 @@ root, a parent's own kind settled before its children are visited.
 At each parent P (=visit_parent= in =server/refresh/ladder.rs=) it
 settles the node budget (below), lets an editable-view request extend
 the content P already shows, adds P's default folders, computes P's
-goal, and runs the *ladder*, its corrections in order, weakest first:
+goal, and runs the *ladder*, its rungs in order, weakest first:
 1. re-kind: each vognode child becomes what the ID rule says; each
    descriptor whose position the ancestry table forbids, or, for a
    change viewnode, whose change is gone, is *unsayable* and becomes a
@@ -369,13 +369,13 @@ empties stays and fills again when the restriction widens; every
 viewnode that lacks a viewnode ID gets one; and the viewforest is
 rendered.
 
-*** Corrections
+*** Buffer corrections
 The refresh reports what it changed because the buffer contradicted
-the truth; it does not warn (=server/refresh/corrections.rs=). A
-correction is a headline reinstated, entombstoned, marked =noClaim=,
+the truth; it does not warn (=server/refresh/buffer_corrections.rs=). A
+buffer correction is a headline reinstated, entombstoned, marked =noClaim=,
 the result of a viewnode merge, re-kinded, or stripped of an edit
 request its new kind has no slot for, named as a subtree is named,
-by viewnode ID and title. What the refresh draws as extent is no correction: the content
+by viewnode ID and title. What the refresh draws as extent is no buffer correction: the content
 of an occurrence it extends first, the members of a folder it added,
 a fresh view's content; nor, in the diff view, a change viewnode
 drawn or gone, since those describe the straddle. Nor is a change
@@ -383,7 +383,7 @@ the buffer was not wrong about, which the caller names
 (=BufferCorrectionPolicy=): a tombstone left where the saving user's
 own save deleted the node, and, after a change of the skgrepo
 restriction, a member drawn or a headline entombstoned. So a fresh
-view and a plain save report nothing. The callers tag each view's corrections
+view and a plain save report nothing. The callers tag each view's buffer corrections
 with its view ID (=ViewCorrections=), the =save-result= and
 =rerender-done= responses carry them, and both clients append them to
 their warnings buffer, under one headline per view

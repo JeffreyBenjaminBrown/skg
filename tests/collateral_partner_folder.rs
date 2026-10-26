@@ -10,7 +10,7 @@
 //    S's subscription to N must re-render N's view (collaterally) with
 //    S unwarranted in its subscriberFolder.
 //
-// 2. corrections are tagged with their view: whatever the refresh of
+// 2. buffer corrections are tagged with their view: whatever the refresh of
 //    the collateral view corrects is reported under that view, never
 //    under the saved one, and never as a warning.
 
@@ -146,13 +146,13 @@ fn collateral_partner_folder_update_and_warning_scoping
         "S must be unwarranted in N's subscriberFolder collaterally:\n{}",
         n_collateral );
 
-      // CELL 2 -- corrections are tagged with their view: N's
+      // CELL 2 -- buffer corrections are tagged with their view: N's
       // subscriberFolder changed in the collateral stream, and nothing
       // of that is reported under the saved view, or as a warning.
       assert! (
-        response . corrections . iter ()
+        response . buffer_corrections . iter ()
         . all ( |view| view . viewforest_id != s_viewforest_id ),
-        "the saved view corrected nothing: {:?}", response . corrections );
+        "the saved view corrected nothing: {:?}", response . buffer_corrections );
       assert! (
         response . warnings . is_empty (),
         "a collateral change must not warn the saver: {:?}",

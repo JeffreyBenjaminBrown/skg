@@ -192,11 +192,11 @@ So far there are these endpoints:
        =content= is the re-rendered saved buffer (nil on failure). =errors= is a list of failure-explaining strings. =warnings= is a list of nonfatal messages. Both lists are present and empty if none.
        =corrections= holds what the refresh corrected in each view the
        save refreshed, the saved view and the collateral ones: one
-       list per view with corrections, its view ID first, then one
-       message per correction (see "How a message names a headline"
+       list per view with buffer corrections, its view ID first, then one
+       message per buffer correction (see "How a message names a headline"
        below), such as =("content-view:5" "Drew what the graph says
        belongs here.\n*** new child\n- viewnode ID: 0d. ...")=. A
-       correction is a headline the refresh changed because the
+       buffer correction is a headline the refresh changed because the
        buffer contradicted the graph (reinstated, entombstoned, marked
        =noClaim=, joined by a viewnode merge, re-kinded, or an edit
        request dropped). What
@@ -206,7 +206,7 @@ So far there are these endpoints:
        reported only where a list already drawn lacked a member, and a
        plain save reports nothing. The list is present and empty if
        none; a failed save's response has no =corrections=. A buffer
-       of the diff view reports its corrections too, but for its change
+       of the diff view reports its buffer corrections too, but for its change
        viewnodes, which describe the straddle and are recomputed at
        every refresh. Each client appends them to its
        warnings buffer (see "Server warnings" below), under one level-1
@@ -432,9 +432,10 @@ since the command searches the current buffer.
     opens a buffer listing the warnings, one headline each:
     =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
     in Neovim. An empty answer opens nothing.
-  - The same buffer receives the corrections that a =save-result= or
+  - The same buffer receives the buffer corrections that a =save-result= or
     a =rerender-done= carries: each client appends them, keeping
-    what the buffer holds, under one level-1 headline per view, each
+    what the buffer holds, under one level-1 headline per view,
+    "Buffer corrections in" and the view's buffer name, each buffer
     correction a level-2 headline under it.
 
 ** Link statuses
@@ -557,7 +558,7 @@ since the command searches the current buffer.
     in ID order, and the buffer refreshed again; R is deduplicated with
     the buffer's roots pinned, so that a changed cycle that already has
     a root gains no second one. What the request draws is what the user
-    asked for, so it reports no correction.
+    asked for, so it reports no buffer correction.
     =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pruned_change_view.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in

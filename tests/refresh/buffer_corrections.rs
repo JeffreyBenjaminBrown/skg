@@ -1,4 +1,4 @@
-// What the refresh reports. A correction is a headline the refresh
+// What the refresh reports. A buffer correction is a headline the refresh
 // changed because the buffer contradicted the truth. Drawing the
 // content of an occurrence first extended, the members of a folder
 // first requested, or what stands under the roots of a stub is
@@ -38,8 +38,8 @@ fn a_fresh_view_reports_nothing () {
             && refreshed . text . contains ("containerFolder"),
             "the stub drew its roots' content and containers:\n{}",
             refreshed . text );
-  assert! ( refreshed . corrections . is_empty (),
-            "{:?}", refreshed . corrections ); }
+  assert! ( refreshed . buffer_corrections . is_empty (),
+            "{:?}", refreshed . buffer_corrections ); }
 
 #[test]
 fn the_members_of_a_folder_first_requested_are_not_reported () {
@@ -51,7 +51,7 @@ fn the_members_of_a_folder_first_requested_are_not_reported () {
 node p wp
   containerFolder
     node q wp noClaim" );
-  assert! ( run . corrections . is_empty (), "{:?}", run . corrections ); }
+  assert! ( run . buffer_corrections . is_empty (), "{:?}", run . buffer_corrections ); }
 
 #[test]
 fn the_content_an_editable_view_request_extends_is_not_reported () {
@@ -72,7 +72,7 @@ node q wp
           node p wp noClaim
             node q wp noClaim
       node s" );
-  assert! ( run . corrections . is_empty (), "{:?}", run . corrections ); }
+  assert! ( run . buffer_corrections . is_empty (), "{:?}", run . buffer_corrections ); }
 
 #[test]
 fn a_member_missing_from_a_list_already_drawn_is_reported () {
@@ -92,8 +92,8 @@ node p
   node b
     node s" );
   let reinstated : Vec<&str> =
-    run . corrections . iter ()
-    . filter ( |c| c . kind == CorrectionKind::Reinstated )
+    run . buffer_corrections . iter ()
+    . filter ( |c| c . kind == BufferCorrectionKind::Reinstated )
     . map ( |c| c . title . as_str () )
     . collect ();
   assert_eq! ( reinstated, vec! [ "b", "q" ],
@@ -132,11 +132,11 @@ node p
   tombstone
     node k noClaim",
     "x's tombstone and its folder are pruned; y's keeps k" );
-  let reported : Vec<(CorrectionKind, &str)> =
-    refreshed . corrections . iter ()
+  let reported : Vec<(BufferCorrectionKind, &str)> =
+    refreshed . buffer_corrections . iter ()
     . map ( |c| ( c . kind, c . title . as_str () ))
     . collect ();
-  assert_eq! ( reported, vec! [ ( CorrectionKind::Entombstoned, "y" ) ] ); }
+  assert_eq! ( reported, vec! [ ( BufferCorrectionKind::Entombstoned, "y" ) ] ); }
 
 /// After a change of the skgrepo restriction, what a list already
 /// drawn lacked and the refresh draws is the restriction's doing, not
@@ -157,4 +157,4 @@ fn a_member_drawn_after_a_restriction_change_is_not_reported () {
     CompletionMode::ContentView, 100, None,
     &BufferCorrectionPolicy::after_a_switch (true) ) . unwrap ();
   assert! ( refreshed . text . contains ("(gnid b)"), "b is drawn:\n{}", refreshed . text );
-  assert! ( refreshed . corrections . is_empty (), "{:?}", refreshed . corrections ); }
+  assert! ( refreshed . buffer_corrections . is_empty (), "{:?}", refreshed . buffer_corrections ); }

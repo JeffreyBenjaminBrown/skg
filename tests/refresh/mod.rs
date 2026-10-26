@@ -23,8 +23,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod ancestry;
+mod buffer_corrections;
 mod claims;
-mod corrections;
 mod diff_view;
 mod merge_of_siblings;
 mod re_kind;
@@ -90,7 +90,7 @@ pub(super) fn straddle (
 pub(super) struct Run {
   pub forest      : ViewForest,
   pub text        : String,
-  pub corrections : Vec<Correction>,
+  pub buffer_corrections : Vec<BufferCorrection>,
 }
 
 impl Run {
@@ -99,18 +99,18 @@ impl Run {
   ) -> String {
     outline (&self . forest) }
 
-  /// The kinds of correction made, in order.
-  pub fn correction_kinds (
+  /// The kinds of buffer correction made, in order.
+  pub fn buffer_correction_kinds (
     &self,
-  ) -> Vec<CorrectionKind> {
-    self . corrections . iter () . map ( |c| c . kind ) . collect () }
+  ) -> Vec<BufferCorrectionKind> {
+    self . buffer_corrections . iter () . map ( |c| c . kind ) . collect () }
 
-  /// How many corrections of 'kind' were made.
+  /// How many buffer corrections of 'kind' were made.
   pub fn count (
     &self,
-    kind : CorrectionKind,
+    kind : BufferCorrectionKind,
   ) -> usize {
-    self . corrections . iter () . filter ( |c| c . kind == kind ) . count () }
+    self . buffer_corrections . iter () . filter ( |c| c . kind == kind ) . count () }
 }
 
 /// Refresh 'text' as a content view over 'graph', with no
@@ -146,10 +146,10 @@ pub(super) fn run_in (
     . unwrap ();
   assert_eq! ( second . text, first . text,
                "the refresh of a refresh's output changed it" );
-  assert! ( second . corrections . is_empty (),
+  assert! ( second . buffer_corrections . is_empty (),
             "the refresh of a refresh's output corrected it: {:?}",
-            second . corrections );
-  Run { forest, text : first . text, corrections : first . corrections } }
+            second . buffer_corrections );
+  Run { forest, text : first . text, buffer_corrections : first . buffer_corrections } }
 
 pub(super) fn parse (
   text          : &str,

@@ -49,8 +49,8 @@ fn when_the_override_is_gone_the_overrider_is_unwarranted_and_the_original_retur
 node p
   node o noClaim ⊥
   node n" );
-  assert_eq! ( run . correction_kinds (),
-               vec! [ CorrectionKind::MarkedNoClaim, CorrectionKind::Reinstated ] ); }
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::MarkedNoClaim, BufferCorrectionKind::Reinstated ] ); }
 
 #[test]
 fn a_root_and_a_folder_member_are_shown_raw () {

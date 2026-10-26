@@ -178,7 +178,7 @@ fn an_edit_request_is_carried_through () {
     ", occ ("p", ""), occ ("d", "(editRequest delete)") );
   let run : Run = run (&input, &graph);
   assert! ( run . text . contains ("(editRequest delete)"), "{}", run . text );
-  assert! ( run . corrections . is_empty (), "{:?}", run . corrections ); }
+  assert! ( run . buffer_corrections . is_empty (), "{:?}", run . buffer_corrections ); }
 
 #[test]
 fn an_edit_request_the_new_kind_has_no_slot_for_is_dropped_and_reported () {
@@ -193,9 +193,9 @@ fn an_edit_request_the_new_kind_has_no_slot_for_is_dropped_and_reported () {
 node p
   unknown x" );
   assert! ( ! run . text . contains ("editRequest"), "{}", run . text );
-  assert_eq! ( run . correction_kinds (),
-               vec! [ CorrectionKind::EditRequestDropped,
-                      CorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::EditRequestDropped,
+                      BufferCorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
 
 #[test]
 fn a_search_stub_of_write_protected_hits_draws_each_hits_containers () {

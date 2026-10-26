@@ -9,7 +9,7 @@
 //! as a save's does, and is followed by a rerender stream: the one
 //! view, or nothing when the request was refused.
 
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::diff_view::change_leaves::{BufferReadinessSummary, readiness_response_sexp};
 use crate::diff_view::readiness_requests::buffer_readiness_summary_for;
 use crate::graph_straddle::types::GraphStraddle;

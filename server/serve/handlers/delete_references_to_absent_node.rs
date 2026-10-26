@@ -1,4 +1,4 @@
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::delete_references_to_absent_node::{
   preview, preview_warning_org, result_org, rewrite };
 use crate::dbs::in_rust_graph::new_handle;

@@ -34,7 +34,7 @@ use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::IdResolution;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::refresh::{Refreshed, Truth, refresh_viewforest};
-use skg::refresh::corrections::BufferCorrectionPolicy;
+use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
 use skg::test_utils::{graph_from_config, prefer_owned_subdir};
 use skg::types::env::RuntimeGeneration;
 use skg::types::misc::{Skgrepo, SkgrepoName};
@@ -178,8 +178,8 @@ fn refreshes_unchanged (
   if again . text != text {
     return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
                            text, again . text )); }
-  if ! again . corrections . is_empty () {
-    return Err ( format! ( "corrected: {:?}", again . corrections )); }
+  if ! again . buffer_corrections . is_empty () {
+    return Err ( format! ( "corrected: {:?}", again . buffer_corrections )); }
   Ok (( )) }
 
 /// Every folder named 'fixtures' under 'root', but the test results.
@@ -303,8 +303,8 @@ fn diff_view_buffer_refreshes_unchanged (
   if again . text != text {
     return Err ( format! ( "changed:\n--- first ---\n{}--- second ---\n{}",
                            text, again . text )); }
-  if ! again . corrections . is_empty () {
-    return Err ( format! ( "corrected: {:?}", again . corrections )); }
+  if ! again . buffer_corrections . is_empty () {
+    return Err ( format! ( "corrected: {:?}", again . buffer_corrections )); }
   Ok (( )) }
 
 /// The git fixture cases under 'GIT_FIXTURE_CASES': each folder there

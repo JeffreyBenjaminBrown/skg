@@ -217,7 +217,7 @@ describe('skg stream consumers', function ()
       :find('stale herald', 1, true))
   end)
 
-  it('appends the corrections on rerender-done to the server-warnings'
+  it('appends the buffer corrections on rerender-done to the server-warnings'
      .. ' buffer', function ()
     local server_warnings = require('skg.server_warnings')
     wipe_named(server_warnings.buffer_name)
@@ -248,10 +248,10 @@ describe('skg stream consumers', function ()
     assert.is_truthy(found)
     assert.are.same({
       '* an earlier startup warning',
-      '* skg://corrected',
+      '* Buffer corrections in skg://corrected',
       '** Drew what the graph says belongs here.',
       '*** new child',
-      '* search:two words',
+      '* Buffer corrections in search:two words',
       '** Dropped a duplicate.',
       '*** twin',
     }, vim.api.nvim_buf_get_lines(found, 0, -1, false))

@@ -11,7 +11,7 @@ fn a_root_whose_node_vanished_is_pruned_and_the_buffer_may_end_empty () {
   let run : Run = run ( &format! ("* {} gone\n", occ ("gone", "")), &graph );
   assert_eq! ( run . outline (), "" );
   assert_eq! ( run . text, "" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Entombstoned ] ); }
+  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }
 
 #[test]
 fn a_tombstone_root_that_holds_something_stays () {
@@ -33,8 +33,8 @@ fn every_viewnode_gets_a_vnid () {
                         &graph );
   assert! ( run . forest . nodes () . all ( |node| node . value () . viewnode_id . is_some () ),
             "{}", run . text );
-  assert! ( run . corrections . iter () . all ( |c| c . vnid . is_some () ),
-            "{:?}", run . corrections ); }
+  assert! ( run . buffer_corrections . iter () . all ( |c| c . vnid . is_some () ),
+            "{:?}", run . buffer_corrections ); }
 
 #[test]
 fn a_folder_the_prune_leaves_childless_goes_too () {

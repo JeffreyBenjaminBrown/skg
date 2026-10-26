@@ -381,7 +381,7 @@ fn switch (
 
 /// Switch to the skgrepo-set 'name'; return the view as rerendered,
 /// and the "rerender-done" message, which carries the buffer
-/// corrections.
+/// buffer corrections.
 fn switch_reporting (
   f           : &mut Fixture,
   restriction : &mut SkgrepoRestriction,

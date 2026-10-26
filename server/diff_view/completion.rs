@@ -15,7 +15,7 @@ use crate::diff_view::readiness_store::ReadinessStore;
 use crate::graph_straddle::build::current_graph_straddle_in_slot;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Refreshed, Truth, refresh_viewforest};
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::ID;
@@ -34,14 +34,14 @@ use std::sync::{Arc, MutexGuard};
 /// what is editable and what an extension charges to the node budget
 /// ('CompletionMode::charges_node_budget'). The diff view requires the
 /// skgrepo set 'all', so nothing is restricted there.
-/// 'correction_policy' says which changes are no buffer corrections.
+/// 'buffer_correction_policy' says which changes are no buffer corrections.
 pub fn complete_viewforest_with_graph_straddle (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,
   diffView_buffer_kind : DiffViewBufferKind,
   store                : &ReadinessStore,
   restriction          : Option<&SkgrepoRestriction>,
-  correction_policy    : &BufferCorrectionPolicy,
+  buffer_correction_policy    : &BufferCorrectionPolicy,
   viewforest           : &mut ViewForest,
   viewnode_id_record   : &mut ViewnodeIdRecord,
 ) -> Result<Refreshed, Box<dyn Error>> {
@@ -51,7 +51,7 @@ pub fn complete_viewforest_with_graph_straddle (
   refresh_viewforest (
     viewforest, viewnode_id_record, &truth,
     CompletionMode::DiffView { straddle, buffer_kind : diffView_buffer_kind },
-    runtime . config . initial_node_limit, Some (store), correction_policy ) }
+    runtime . config . initial_node_limit, Some (store), buffer_correction_policy ) }
 
 /// Rerender a buffer of the diff view: bring the straddle in
 /// 'graph_straddle_slot' up to date, and refresh the buffer over it.
@@ -63,7 +63,7 @@ pub fn complete_viewforest_with_graph_straddle (
 /// D that the buffer shows nowhere are appended as stub roots, and the
 /// buffer is refreshed again. Its standing roots stay. What that
 /// request draws is what the user asked for, as a fresh view's is, so
-/// it reports no corrections.
+/// it reports no buffer corrections.
 pub fn rerender_diffView_buffer (
   graph_straddle_slot       : &mut Option<Arc<GraphStraddle>>,
   runtime                   : &RuntimeGeneration,
@@ -71,7 +71,7 @@ pub fn rerender_diffView_buffer (
   restriction               : Option<&SkgrepoRestriction>,
   diffView_buffer_kind      : DiffViewBufferKind,
   integrate_unshown_changes : bool,
-  correction_policy         : &BufferCorrectionPolicy,
+  buffer_correction_policy         : &BufferCorrectionPolicy,
   viewforest                : &mut ViewForest,
   viewnode_id_record        : &mut ViewnodeIdRecord,
 ) -> Result<Refreshed, Box<dyn Error>> {
@@ -86,7 +86,7 @@ pub fn rerender_diffView_buffer (
   let store : MutexGuard<ReadinessStore> = env . runtime . lock_readiness_store ();
   let refreshed : Refreshed = complete_viewforest_with_graph_straddle (
     runtime, &straddle, diffView_buffer_kind, &store, restriction,
-    correction_policy, viewforest, viewnode_id_record ) ?;
+    buffer_correction_policy, viewforest, viewnode_id_record ) ?;
   if ! integrate_unshown_changes { return Ok (refreshed); }
   let new_roots : Vec<ID> = contentOrigins_missing_from_buffer (
     &straddle, diffView_buffer_kind, viewforest, &standing_roots );
@@ -97,5 +97,5 @@ pub fn rerender_diffView_buffer (
         runtime, &straddle, diffView_buffer_kind, viewforest, &new_roots ) ?;
       complete_viewforest_with_graph_straddle (
         runtime, &straddle, diffView_buffer_kind, &store, restriction,
-        correction_policy, viewforest, viewnode_id_record ) ? . text };
-  Ok ( Refreshed { text, corrections : Vec::new () } ) }
+        buffer_correction_policy, viewforest, viewnode_id_record ) ? . text };
+  Ok ( Refreshed { text, buffer_corrections : Vec::new () } ) }

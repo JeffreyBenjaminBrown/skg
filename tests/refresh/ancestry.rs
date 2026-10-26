@@ -59,7 +59,7 @@ fn an_unsayable_property_member_is_entombstoned () {
   assert_eq! ( run . outline (), "\
 node p
   aliasFolder" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Entombstoned ] ); }
+  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }
 
 #[test]
 fn a_body_diff_stands_only_under_an_old_text () {

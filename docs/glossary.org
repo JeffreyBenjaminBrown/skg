@@ -495,9 +495,9 @@ occurrence's content. So a member the user deleted from a
 write-protected folder comes back at the next save, since its
 membership is a fact of the graph, edited from the other side of the
 relationship; and a member that a save in another view added appears
-in this one. The correction "Drew what the graph says belongs here."
-reports it, naming the headline ('CorrectionKind::Reinstated' in
-'server/refresh/corrections.rs'), except where drawing it is extent
+in this one. The buffer correction "Drew what the graph says belongs here."
+reports it, naming the headline ('BufferCorrectionKind::Reinstated' in
+'server/refresh/buffer_corrections.rs'), except where drawing it is extent
 (see "extent, extension, node budget"). "Reinstate" names only this:
 a child the buffer already holds is never drawn again, but re-kinded
 and re-warranted where it stands.
@@ -1125,7 +1125,7 @@ acquire inconsistent treatment in different layers:
   =MSV::Unspecified=, filled from disk); a present-but-empty one, an
   explicit empty set (=MSV::Specified(vec![])=). Every other folder is
   write-protected: its membership follows from the graph, and the
-  refresh reports its corrections (see [[*write-protected set][write-protected set]]).
+  refresh reports its buffer corrections (see [[*write-protected set][write-protected set]]).
 - =goal_is_ordered=: the viewparent's own file records the members'
   order, which the warranted members take: the editable folders and
   =hiddenFolder=. In every other folder the refresh moves no child:
@@ -1233,8 +1233,8 @@ children's order. A parent whose position implies no relationship
 
 *** the ladder, unsayable
 
-The fixed order of corrections the refresh applies at each parent to
-its children, weakest first: re-kind, viewnode merge, warrant,
+The fixed order of rungs the refresh applies at each parent to its
+children, weakest first: re-kind, viewnode merge, warrant,
 claims, reinstate, reorder, override substitution, view requests
 ('server/refresh/ladder.rs'; 'docs/data-model_technical.org', "The
 walk and the ladder"). A descriptor -- a folder, a property member, a
@@ -1294,24 +1294,25 @@ of the node is, and the budget allows
 The diff view's deviations are in 'docs/diff-view.org', "Editability
 in the diff view".
 
-*** corrections
+*** buffer corrections
 
 A buffer correction is a change the refresh made to what a buffer
-said because the buffer was wrong about the graph ('Correction',
-'CorrectionKind' in 'server/refresh/corrections.rs'): a headline
-reinstated, entombstoned, marked =noClaim=, the result of a viewnode
-merge, re-kinded, or stripped of an edit request its new kind has no
-slot for. What
-it draws as extent is no buffer correction. Nor are two changes
+said because the buffer was wrong about the graph ('BufferCorrection',
+'BufferCorrectionKind' in 'server/refresh/buffer_corrections.rs'): a
+headline reinstated, entombstoned, marked =noClaim=, the result of a
+viewnode merge, re-kinded, or stripped of an edit request its new
+kind has no slot for. What it draws as extent is no buffer
+correction. Nor are two changes
 the buffer was not wrong about, which the refresh learns of from
 its caller ('BufferCorrectionPolicy'): a tombstone it leaves where
 the saving user's own save deleted the node, and a member it draws
 because the skgrepo restriction was widened (after a change of the
 restriction it reports no tombstone either). The refresh reports
 buffer corrections; it does not warn. The save and rerender
-responses carry each
-view's corrections, tagged with its view ID ('ViewCorrections'), and
-the clients show them in their warnings buffer (see "startup warnings
+responses carry each view's buffer corrections, tagged with its view
+ID ('ViewBufferCorrections'), in their field =(corrections ...)=, and
+the clients show them in their warnings buffer, under a headline
+"Buffer corrections in" the view's buffer name (see "startup warnings
 channel").
 
 *** IdResolution
@@ -1443,7 +1444,7 @@ returns warnings beside the config, 'main' records them once on the
 runtime ('record_startup_warnings' in 'server/types/env.rs'), the
 server serves them on request ("server warnings"), and each client
 shows them in its '*SKG Server Warnings*' buffer on connect. The
-same buffer receives the corrections a save or a rerender reports,
+same buffer receives the buffer corrections a save or a rerender reports,
 under a headline per view.
 
 *** "snapshot" is always qualified: graph, git or buffer snapshot
@@ -1561,7 +1562,7 @@ while the change exists, drawn when missing, entombstoned when the
 change is gone, the tombstone keeping what the user drew under it
 ('server/refresh/diff_view.rs'). The acquisition folders and the
 changed folders are drawn the same way. Drawing one, or entombstoning
-one whose change is gone, is no correction, since a change viewnode
+one whose change is gone, is no buffer correction, since a change viewnode
 describes the straddle.
 
 *** Terms of Tantivy, the search index

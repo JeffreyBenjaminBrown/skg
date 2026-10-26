@@ -18,7 +18,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::refresh::{Truth, refresh_viewforest};
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,

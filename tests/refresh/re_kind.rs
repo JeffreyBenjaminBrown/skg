@@ -30,8 +30,8 @@ node p
     . children () . nth (1) . unwrap ();
   assert_eq! ( x . value () . viewnode_id, Some ( ViewnodeId ("zz" . into ()) ),
                "the unknown keeps the occurrence's vnid" );
-  assert_eq! ( run . correction_kinds (),
-               vec! [ CorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
 
 #[test]
 fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
@@ -50,7 +50,7 @@ node p
   tombstone
     node k noClaim",
     "the tombstone keeps x's child; y, childless, is pruned" );
-  assert_eq! ( run . count (CorrectionKind::Entombstoned), 2 ); }
+  assert_eq! ( run . count (BufferCorrectionKind::Entombstoned), 2 ); }
 
 #[test]
 fn a_restricted_node_becomes_a_tombstone_whatever_its_parent_lists () {
@@ -85,7 +85,7 @@ fn an_unknown_whose_node_appeared_becomes_an_occurrence () {
   assert_eq! ( run . outline (), "\
 node p
   node u" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
+  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
 
 #[test]
 fn an_occurrence_whose_gnid_became_an_extra_id_stands_for_its_node () {
@@ -177,4 +177,4 @@ fn a_change_viewnode_in_a_content_view_is_entombstoned () {
     ", occ ("p", "") );
   let run : Run = run (&input, &graph);
   assert_eq! ( run . outline (), "node p" );
-  assert_eq! ( run . correction_kinds (), vec! [ CorrectionKind::Entombstoned ] ); }
+  assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }

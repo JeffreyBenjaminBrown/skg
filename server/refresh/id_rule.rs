@@ -16,7 +16,7 @@ use crate::dbs::in_rust_graph::relation_accessors::GnidPresence;
 use crate::diff_view::change_viewnodes::mk_historical_viewnode;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::refresh::{Walk, write_protect_occurrence};
-use crate::refresh::corrections::CorrectionKind;
+use crate::refresh::buffer_corrections::BufferCorrectionKind;
 use crate::refresh::extent::drawn_occurrence_is_editable;
 use crate::refresh::goal::{Goal, GoalMember};
 use crate::types::misc::{ID, SkgrepoName};
@@ -136,8 +136,8 @@ pub(crate) fn rekind_vognode (
         walk . editable_gnids . insert (pid . clone ());
         walk . drawn_editable . insert (child); }
       if requests . restore_node {
-        walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
-      walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Occurrence)); },
+        walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
+      walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Occurrence)); },
     ( IdRuleAnswer::Ghost (pid), Vognode::Ghost (ghost) ) =>
       refresh_ghost_in_place (tree, child, ghost, &pid, walk),
     ( IdRuleAnswer::Ghost (pid), other ) => {
@@ -158,8 +158,8 @@ pub(crate) fn rekind_vognode (
            . ok_or ("rekind_vognode: HEAD lacks the node it has") ? };
       set_vognode_keeping_readiness (tree, child, Vognode::Ghost (ghost));
       if requests . any () {
-        walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
-      walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Ghost)); },
+        walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
+      walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Ghost)); },
     ( IdRuleAnswer::Unknown, Vognode::Unknown (unknown) ) => {
       let relRepo : Option<SkgrepoName> = goal_relRepo (parent_goal, &gnid);
       if let ViewnodeKind::Vognode (Vognode::Unknown (unknown_mut)) =
@@ -183,8 +183,8 @@ pub(crate) fn rekind_vognode (
           claimsMembership        : true,
           warrant                 : Warrant::ByGraph, } )); // the warrant rung sets it
       if dropped {
-        walk . corrections . record (tree, child, CorrectionKind::EditRequestDropped); }
-      walk . corrections . record (tree, child, CorrectionKind::Rekinded (VognodeKind::Unknown)); },
+        walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
+      walk . buffer_corrections . record (tree, child, BufferCorrectionKind::Rekinded (VognodeKind::Unknown)); },
     ( IdRuleAnswer::Tombstone, other ) => {
       forget_editable_occurrence (&other, child, walk);
       entombstone (tree, child, walk); }, }
@@ -205,18 +205,18 @@ pub(crate) fn entombstone (
     let gnid : Option<&ID> = match &node . value () . kind {
       ViewnodeKind::Vognode (vognode) => Some ( vognode . gnid () ),
       _ => None, };
-    walk . correction_policy . reports_entombstoning (gnid)
+    walk . buffer_correction_policy . reports_entombstoning (gnid)
     && ! node . parent () . is_some_and (
          |parent| walk . quiet_tombstones . contains (&parent . id ()) ) };
   if reported {
-    walk . corrections . record (tree, treeid, CorrectionKind::Entombstoned); }
+    walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::Entombstoned); }
   else { walk . quiet_tombstones . insert (treeid); }
   entombstone_reporting_requests_only (tree, treeid, walk); }
 
 /// Make the change viewnode at 'treeid', whose change is gone, a
 /// tombstone, keeping its children. In the diff view a change viewnode
 /// describes the straddle and is recomputed at every refresh, so its
-/// going is no correction; only a request it carried, dropped, is
+/// going is no buffer correction; only a request it carried, dropped, is
 /// reported. In a content view, where it can describe nothing, it is
 /// reported as any entombstoned headline is.
 pub(crate) fn entombstone_gone_change (
@@ -242,7 +242,7 @@ fn entombstone_reporting_requests_only (
         relationshipEditRequest, .. }) => relationshipEditRequest . is_some (),
       _ => false, } };
   if carried_requests {
-    walk . corrections . record (tree, treeid, CorrectionKind::EditRequestDropped); }
+    walk . buffer_corrections . record (tree, treeid, BufferCorrectionKind::EditRequestDropped); }
   tree . get_mut (treeid) . unwrap () . value ()
     . replace_kind (ViewnodeKind::Tombstone); }
 

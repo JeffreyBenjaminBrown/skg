@@ -1,4 +1,4 @@
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::rerender_stream::{
   PreparedRerenders,

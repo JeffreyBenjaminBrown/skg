@@ -2,7 +2,7 @@
 //! every one the request does not exclude, through the shared
 //! rerender pipeline ('server/serve/rerender_stream.rs').
 
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::protocol::TcpToClient;

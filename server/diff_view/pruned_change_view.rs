@@ -35,7 +35,7 @@ use crate::types::viewnode::{
   Vognode, mk_editable_viewnode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -208,7 +208,7 @@ pub struct RenderedDiffViewBuffer {
 /// roots 'roots' (for a pruned change view, its D in order), and
 /// readiness from 'store': the refresh of a stub of its roots
 /// ('stub_viewforest_of_roots'). A first rendering reports no
-/// correction.
+/// buffer correction.
 pub fn diffView_buffer_viewforest (
   runtime              : &RuntimeGeneration,
   straddle             : &GraphStraddle,

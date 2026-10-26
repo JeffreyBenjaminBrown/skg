@@ -12,7 +12,7 @@
 //! ('stream_rerender_diffView_views'). Its roots stay, so a buffer whose
 //! changes were all committed comes back as plain context.
 
-use crate::refresh::corrections::BufferCorrectionPolicy;
+use crate::refresh::buffer_corrections::BufferCorrectionPolicy;
 use crate::diff_view::change_leaves::{
   BufferReadinessSummary, ReadinessSummary, readiness_response_sexp,
   readiness_response_trailing_entries};
