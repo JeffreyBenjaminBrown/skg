@@ -10,10 +10,13 @@ each one commit-ready, and commit everything at once. C-c v d
 The vocabulary (graph straddle, the three kinds of change, C, R, U,
 D, change-forest leaf, mark, changeset marker, ...) is the
 glossary's "Terms a user meets in the diff view" and "Terms of the
-diff view's implementation" ('docs/glossary.org'); the reconcilers'
-words (key, adopt, retain as non-member or tombstone, then prune)
-are among its "Terms of the implementation", and tombstone and
-non-member among its "Terms a user meets". The wire forms are the
+diff view's implementation" ('docs/glossary.org'); the refresh's
+words (the ID rule, goal, warrant, the ladder, extent) are among its
+"Terms of the implementation", and ghost, tombstone and claims
+membership among its "Terms a user meets". A buffer of the diff view
+is drawn by the refresh every view uses, whose model is
+'docs/data-model_technical.org', "The refresh: how a view follows the
+graph"; this document says what its diff-view mode adds. The wire forms are the
 API doc's "Diff view", "Stage and commit", "Integrate unshown changes" and
 "Metadata of the diff view" ('docs/api-and-formats.org'). The
 heralds are 'docs/heralds.org', "Diff heralds". The commands are
@@ -253,17 +256,17 @@ member's relationship moved to another skgrepo, hangs that move.
 *** aliases, IDs and flags
 The alias, ID and flags folders, drawn when their list changed,
 hold the union of the two lists in the order of their interleaved
-diff, each entry tagged '(rel added)' (+) or '(rel removed)' (-),
+diff, each member tagged '(rel added)' (+) or '(rel removed)' (-),
 its existence in the list. A lost alias or ID is an alias or ID
 member with a ghost warrant ('Warrant::ByHead', written
 'ghostWarrant'), claiming nothing ('noClaim'), so the save never
-reads it. Each entry is one leaf.
+reads it. Each is one leaf.
 
 A property folder is matched by its kind among all the children of
 its node, so a folder the user requested becomes the changed one
 when its list changes. It stays until the user deletes it, filled
-from its goal, the union of the two lists: its entries tagged while
-the lists differ, and untagged after. An entry a commit made lost
+from its goal, the union of the two lists: its members tagged while
+the lists differ, and untagged after. A member a commit made lost
 for good stays, unwarranted and claiming nothing.
 *** home skgrepo and relRepo moves
 A home skgrepo move is one property under the node, "⌂ -OLD +NEW",
@@ -455,34 +458,38 @@ records, nearly its file (a home skgrepo move and a relRepo move name
 a second file): it shows M✓ when each of those is marked, wherever it
 stands.
 ** Change facts on the wire
-A headline's change facts and its readiness request form one form, '(diff
-(node added|removed) (rel added|removed) (properties changed) (leaves
-N OBJECT...) (ready OBJECT...) REQUEST)', each part present only when
-it has something to say, the first three only when true
-('change_fact_forms' in 'server/org_to_text.rs'; the grammar is in
-'docs/api-and-formats.org', "Change facts and requests"). It sits inside the
-node's or phantom's form, or at top level on a property. A changed
-folder's '(diff ...)' holds only its readiness, the objectless
-'(ready)', which is the folder's aggregate.
+A headline's change facts form one form, '(diff (node added|removed)
+(rel added|removed) (properties changed) (leaves N OBJECT...) (ready
+OBJECT...))', and in the skgrepo-changes buffer its home skgrepo move
+after them, each part present only when it has something to say, the
+first three only when true ('diff_form' in 'server/org_to_text.rs';
+the grammar is in 'docs/api-and-formats.org', "Metadata of the diff
+view"). Like every part of a headline it stands at the top level of
+the metadata, last; the parser skips it whole. A folder carries none:
+each client computes a changed folder's label and readiness from its
+members ("changed folder" in 'docs/glossary.org'). A readiness
+request is no change fact; it rides in the headline's '(editRequest
+...)' (below).
 
-The part '(ready OBJECT...)' is a display fact the server writes after
-the refresh ('set_ready_facts_in_viewforest'): the diff objects
-('node', 'rel', and on a headline that lists it 'all') whose leaves
-are all marked, so a ready changeset marker carries '(ready all)'; a
-bare '(ready)' on a headline that names one leaf, which lists no
-object. Nothing reads it at save.
+The part '(ready OBJECT...)' is a derived fact the server sets in the
+tail of the refresh ('set_ready_facts_in_viewforest'): the diff
+objects ('node', 'rel', and on a headline that lists it 'all') whose
+leaves are all marked, so a ready changeset marker carries '(ready
+all)'; a bare '(ready)' on a headline that names one leaf, which
+lists no object. Nothing reads it at save.
 
 Before it, a headline that names leaves
 carries the part '(leaves N OBJECT...)': N is the number of distinct
 leaves a request naming every listed object would touch, and the
 OBJECTs are those a request on this headline may name ('node' and/or
-'rel' on a vognode or phantom, each worth one leaf; 'all' on a
+'rel' on a vognode, each worth one leaf; 'all' on a
 modified node, every leaf it records, beside 'rel' when its
 relationship changed; 'all' on a commit readiness aggregate, worth N; none on a
 headline that names exactly one leaf, which a bare request marks).
 The server's 'leaves_named_at' is the single rule; the change fact
 is display-only, and the clients read it instead of keeping tables of
 headline kinds.
+
 ** Readiness requests and gestures
 A gesture writes readiness requests, '(ready OBJECTS)' or '(unready
 OBJECTS)', into a headline's '(editRequest ...)' (creating the form if
@@ -561,10 +568,10 @@ skipped) or lists it already. A recorder the save already writes, as
 the buffer's editable occurrence of it, gains it there.
 ** '(editRequest restoreRel)': a removed membership
 C-c s l ('skg-restore-removed-membership'; Neovim '<localleader>sl',
-':SkgRestoreRemovedMembership') writes it into an unrestricted vognode
+':SkgRestoreRemovedMembership') writes it into an occurrence
 carrying '(rel removed)' that stands where it may: a removed member in
-content position (a non-member under a vognode that is no node of the
-containerward chain), or a member of a partner folder whose
+content position (a child claiming nothing under a vognode that is no
+node of the containerward chain), or a member of a partner folder whose
 relationship to the folder's viewparent was removed, editable or
 write-protected (herald "restore membership"). The command and the
 save both refuse it anywhere else, by where the headline stands, with

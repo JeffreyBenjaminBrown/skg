@@ -7,7 +7,7 @@ metadata, such as the label shown after a link or a title shown beside
 an ID in magit, are *annotations*, not heralds.) Toggle the compact display with
 'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
 (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
-need to inspect the exact display facts or requests.
+need to inspect the exact derived facts or requests.
 
 Relationship counts describe the latest rendered graph within the current
 skgrepo restriction. They count distinct visible nodes, including visible
@@ -220,7 +220,7 @@ where =∃= stands: a node is new, deleted or modified, never two of
 those. A folder member shows them as a content member does, so a
 modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
-flag entry, which has one diff object, the same change facts read =+= and
+flag member, which has one diff object, the same change facts read =+= and
 =-=, and an unknown's one object reads =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
@@ -230,13 +230,14 @@ folder or changeset marker) shows a =✓= when everything under it is ready. =re
 requests, consumed by the next save.
 
 These heralds render the headline's one =(diff ...)= form (see
-'docs/api-and-formats.org', "Change facts and requests"): =∃+= and =∃-=
+'docs/api-and-formats.org', "Metadata of the diff view"): =∃+= and =∃-=
 come from its =(node added)= and =(node removed)= parts, =M= from
 =(properties changed)=, =~+= and =~-= from =(rel added)= and =(rel
 removed)= (the style keys 'existence' and 'properties' in
 'shared/herald-styles.json'), each =✓= from its =(ready ...)= part
-(=M='s from =all= there), and the request from its last part; its
-=(leaves ...)= part shows nothing. The rules match the ready part once
+(=M='s from =all= there), and the pending readiness request from the
+=(ready ...)= or =(unready ...)= in the headline's =(editRequest ...)=;
+its =(leaves ...)= part shows nothing. The rules match the ready part once
 per diff object, so a =✓= follows its own object whatever the raw
 order of the parts.
 
@@ -270,6 +271,39 @@ one relationship (=~+=), and on a property or a change viewnode one
 object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
 'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust
 conformance test checks that each WHEN names only kind atoms.
+
+** What the server serves, and what the clients add
+The server serves two tables over the "herald rules" endpoint
+('docs/api-and-formats.org', "Herald rules"): the rule table, and,
+beside it, the skgrepo label table =(skgrepoLabels ("REPO" "LABEL")...)=,
+each configured skgrepo's =abbreviation=, or else its name. No
+rendered text rides in the metadata. Three heralds need what one
+headline's metadata cannot say, so each client supplies it, before
+the lens or in its place:
+- =(repoBoundary LABEL)=: the client replaces the atom =repoBoundary=
+  in =(view ...)= with this form, LABEL looked up in the label table by
+  the headline's =nodeRepo= (the =nodeRepo= itself when the table
+  lacks it), and the rule renders it "⌂:LABEL". A headline naming no
+  =nodeRepo= keeps the bare atom, which renders "⌂".
+- =pendingDetachment=: the client adds this atom to a headline that
+  carries =noClaim=, is warranted by the graph (no =noWarrant=, no
+  =ghostWarrant=, no =(rel removed)=), and stands under an editable
+  parent: a node that is not write-protected, or a folder that is not
+  write-protected whose node is such a node. The rule renders it
+  "detach", styled as a request.
+- a changed folder: the server writes a folder as its bare atom, with
+  no =(diff ...)=. The client sees from the folder's members whether
+  some member's relationship to the folder's viewparent changed, and
+  whether every such change is ready, and then draws the folder's
+  herald itself instead of the lens's: ☮ when the folder is
+  write-protected, its changed label ("its X changed (this file)" or
+  "(other files)"), and ✓ when ready, from 'folder_heralds' in
+  'shared/herald-styles.json'.
+The conformance test counts =pendingDetachment= among the atoms the
+metadata may hold ('client_computed_atoms' in 'server/heralds.rs'),
+so that the rule table may render it. The code is
+'heralds-from-metadata' in 'elisp/heralds-minor-mode.el' and
+'sexp_for_lens' in 'nvim/lua/skg/heralds.lua'.
 
 ** Link annotations
 The current buffer can display a suffix after each literal
