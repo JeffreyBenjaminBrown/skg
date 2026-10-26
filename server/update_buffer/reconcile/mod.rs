@@ -9,7 +9,6 @@ pub mod hiddeninsubscribee_folder;
 pub mod hiddenoutsideof_subscribeefolder;
 pub mod id_folder;
 pub mod partner_folder;
-pub mod subscribee_folder;
 pub mod view_requests;
 
 use crate::skgrepo_sets::SkgrepoRestriction;

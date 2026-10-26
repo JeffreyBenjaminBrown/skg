@@ -2,13 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::diff_view::partner_folders::reconcile_partnerFolder_children_from_graph_straddle;
 use crate::diff_view::shallow_model_subtree::reconcile_children_with_shallowModelSubtree;
-use crate::to_org::complete::partner_folder::child_data::{
-  build_child_data,
-  ChildData,
-  FolderGoalItem,
-  reconcile_partnerFolder_children_against_goal_list,
-  skgid_a_folder_child_stands_for,
-};
+use crate::to_org::complete::partner_folder::child_data::skgid_a_folder_child_stands_for;
 use crate::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members,
   is_drawn_chain_node};
@@ -24,120 +18,38 @@ use crate::types::viewnode::{Folder, ChangeViewnode, ViewnodeId, Viewnode, Viewn
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeRef, Tree};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
-use std::sync::Arc;
 
 /// Reconciles one PartnerFolder (a folder is a collecting non-vognode)
-/// from a node in the viewforest with the current in-Rust graph snapshot's data
-/// about that node in a content view, or, in diff-view mode, with the
-/// union of the mode's graph straddle ('mode';
-/// 'diff_view/partner_folders.rs').
-/// Makes the folder's UnrestrictedVognode children that are members match a goal list,
-/// preserving reusable children and creating missing ones,
-/// then makes stale member children non-members ('noClaim').
+/// of a buffer of the diff view with the union of the mode's graph
+/// straddle ('mode'; 'diff_view/partner_folders.rs'). (A content view
+/// is refreshed: 'server/refresh/'.)
 pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an UnrestrictedVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : &Folder,
   mode         : CompletionMode,
   runtime      : &RuntimeGeneration,
-  graph_snap   : &Arc<InRustGraph>,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
   // Read the viewparent Unrestricted vognode *through* the required-ancestry table of 'update_buffer/ancestry.rs'
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
-  let (viewparent_pid, viewparent_skgrepo) : (ID, SkgrepoName) =
+  let (viewparent_pid, _viewparent_skgrepo) : (ID, SkgrepoName) =
     pid_and_skgrepo_from_required_ancestor (
       tree, node, 0, kind . caller_label () ) ?;
   let Some (member_role) = kind . relation_member_role () else {
     return Err (format!(
       "{} called for PartnerFolder {:?}, which has no relation member role",
       kind . caller_label (), kind) . into ()); };
-  if let CompletionMode::DiffView { straddle, .. } = mode {
-    return reconcile_partnerFolder_children_from_graph_straddle (
-      node, tree, kind, straddle, &viewparent_pid, member_role, runtime,
-      warning_sink ); }
-  let goal_list : Vec<ID> = {
-    let graph_members : Vec<ID> =
-      partnerFolder_members_in_graph (
-        graph_snap, &runtime . config, &viewparent_pid, kind, skgrepo_restriction )
-      . ok_or ( "partnerFolder_members_in_graph: no relation member role" ) ?;
-    if kind . goal_is_ordered () {
-      // Graph (disk) order is meaningful here: the user's own
-      // save defines it.
-      graph_members
-    } else {
-      // The user may have reordered this generated folder; the
-      // order is view-local and respected ('docs/sharing-model.org',
-      // "The write-protected folders: who subscribes to, overrides, or
-      // hides this node").
-      view_order_preserving_goal_list (
-        tree, node, &graph_members, graph_snap ) ? }};
-  // The node budget: a folder fills its members whole and is budget-neutral -- the owning
-  // vognode already spent its budget unit when it extended, so adding all the
-  // relation members here costs nothing and never truncates the group. (The
-  // budget bounds how many vognodes extend, not how big one group is.)
-  let relRepos : HashMap<ID, SkgrepoName> = // of unknown members, for their heralds
-    raw_outbound_members (graph_snap, &viewparent_pid, member_role, skgrepo_restriction)
-      . into_iter ()
-      . filter (|member| member . member . is_unresolved ())
-      . filter (|member| member . relRepo != viewparent_skgrepo)
-      . map (|member| (member . member . into_id (), member . relRepo))
-      . collect ();
-  let goal_items : Vec<FolderGoalItem> =
-    FolderGoalItem::live_members (&goal_list);
-  let child_data : HashMap<ID, ChildData> =
-    build_child_data (
-      tree, node, &goal_items, &relRepos, runtime ) ?;
-  // Retain as non-member or tombstone, then prune
-  // ('docs/glossary.org'): the reconciler converts a stale
-  // member, a leaf to a tombstone the prune removes and a branch
-  // retained as non-member, so a write-protected PartnerFolder drops a
-  // stale leaf member instead of preserving it.
-  let summary : RepairSummary<ID> =
-    reconcile_partnerFolder_children_against_goal_list (
-      tree, node, kind, &goal_items, &child_data, graph_snap ) ?;
-  if ! kind . is_editable () {
-    // Repairs to an editable folder are not repairs: its membership is
-    // whatever the user saved. Write-protected folders warn (when there is a
-    // sink, i.e. when this completion serves the just-saved view).
-    if let Some (sink) = warning_sink {
-      push_repair_warnings (
-        sink, kind, &viewparent_pid,
-        folder_viewnode_id_of (tree, node) . as_ref (), summary ); }}
-  Ok (( )) }
-
-/// In a content view, under each member of 'folder', a partner folder
-/// whose members carry the containerward chain, reconcile the member's
-/// chain with the live graph ('reconcile_containerward_chain_under_member').
-/// Run at every visit of such a folder, after its reconciler, so that a
-/// member the reconciler added gets its chain, and a chain that stays
-/// keeps its viewnodes, where they stand, and their fold state. A
-/// non-member in the folder (one retained as non-member, a note) is
-/// left as it stands, and so is what stands under it.
-pub fn reconcile_containerward_chains_under_folder_members (
-  tree                : &mut Tree<Viewnode>,
-  folder              : NodeId,
-  graph               : &InRustGraph,
-  config              : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Result<(), Box<dyn Error>> {
-  let members : Vec<NodeId> =
-    tree . get (folder)
-    . ok_or ("reconcile_containerward_chains_under_folder_members: folder not found") ?
-    . children ()
-    . filter ( |child| child . value () . is_unrestrictedVognode_and_member () )
-    . map ( |child| child . id () )
-    . collect ();
-  for member in members {
-    reconcile_containerward_chain_under_member (
-      tree, member, Vec::new (), graph, graph, config, skgrepo_restriction,
-      ContainerwardChainPartners::LiveGraph ) ?; }
-  Ok (( )) }
+  let CompletionMode::DiffView { straddle, .. } = mode else {
+    return Err ( "reconcile_partnerFolder_children: a content view is refreshed, not completed"
+                 . into () ); };
+  reconcile_partnerFolder_children_from_graph_straddle (
+    node, tree, kind, straddle, &viewparent_pid, member_role, runtime,
+    warning_sink ) }
 
 /// Under 'member', an unrestricted vognode in a partner folder, make
 /// what the folder's reconciler hangs there match a shallow model

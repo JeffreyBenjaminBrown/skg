@@ -17,10 +17,9 @@ use crate::types::viewnode::{Vognode};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child,
-  pid_for_subscribee_and_its_subscriber_grandparent,
   unique_non_vognode_child_of_viewnode };
 
-use ego_tree::{NodeId, NodeRef, Tree};
+use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
@@ -65,28 +64,6 @@ fn build_initial_render_child_data (
                   relRepo : None } ); }
   Ok ((goal, resolved)) }
 
-/// Check if a node's type and parent type are consistent with being a Subscribee.
-/// A Subscribee is an UnrestrictedVognode whose parent is a SubscribeeFolder.
-/// (Checking that its grandparent (the subscriber) is an UnrestrictedVognode
-/// happens from the SubscribeeFolder, so needn't be repeated here.)
-pub fn type_and_parent_type_consistent_with_subscribee (
-  tree    : &Tree<Viewnode>,
-  treeid  : NodeId,
-) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < Viewnode > =
-    tree . get (treeid)
-    . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
-  let is_unrestrictedVognode_and_member : bool =
-    node_ref . value () . is_unrestrictedVognode_and_member ();
-  let parent_is_subscribeeFolder : bool =
-    node_ref . parent ()
-    . map ( |p| matches! (
-              & p . value () . kind,
-              ViewnodeKind::Folder (Folder::Subscribee)))
-    . unwrap_or (false);
-  Ok ( is_unrestrictedVognode_and_member
-       && parent_is_subscribeeFolder ) }
-
 /// If appropriate, prepend a SubscribeeFolder child containing:
 /// - for each subscribee, a write-protected Subscribee child
 /// - if any hidden nodes are outside subscribee content,
@@ -114,7 +91,7 @@ pub fn maybe_add_subscribeeFolder_branch (
                         if t . is_writeProtected () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_writeProtected { return Ok(( )); } }
-  { // Pre-existing SubscribeeFolder children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribeeFolder_children'.
+  { // Pre-existing SubscribeeFolder children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_partnerFolder_children'.
     if unique_non_vognode_child_of_viewnode (
       tree, treeid,
       &ViewnodeKind::Folder (Folder::Subscribee) )? . is_some ()
@@ -286,75 +263,3 @@ pub fn maybe_add_one_partnerFolder (
     tree, folder_treeid, kind, &FolderGoalItem::live_members (&goal), &data, graph ) ?;
   Ok (( )) }
 
-/// If this node is a Subscribee,
-/// and the corresponding subscriber hides any of its content,
-/// then prepend a HiddenInSubscribeeFolder to hold those hidden nodes.
-/// The subscriber is the Subscribee's grandparent:
-///   subscriber -> SubscribeeFolder -> Subscribee
-pub fn maybe_add_hiddenInSubscribeeFolder_branch (
-  tree               : &mut Tree<Viewnode>,
-  subscribee_treeid  : NodeId,
-  graph              : &InRustGraph,
-  config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Result < (), Box<dyn Error> > {
-  if ! type_and_parent_type_consistent_with_subscribee (
-    tree, subscribee_treeid )?
-  { return Err ( "maybe_add_hiddenInSubscribeeFolder_branch called on non-subscribee" . into ( )); }
-  if unique_non_vognode_child_of_viewnode (
-      // Pre-existing HiddenIn folders are instead reconciled by the rerender pipeline's 'reconcile_hiddenIn_folders', which dispatches to 'reconcile_hiddenInSubscribeeFolder_children'.
-       tree, subscribee_treeid,
-       &ViewnodeKind::Folder (Folder::HiddenInSubscribee)
-     )? . is_some ()
-  { return Ok (( )); }
-  let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
-    pid_for_subscribee_and_its_subscriber_grandparent (
-      tree, subscribee_treeid, graph, config ) ?;
-  let ( _visible, hidden_in_content )
-    : ( HashSet < ID >, HashSet < ID > )
-    = {
-      // relRepo-gated from the captured graph: hides and memberships
-      // outside the skgrepo restriction must not shape this derived folder.
-      {
-        let subscriber_hides : HashSet<ID> =
-          graph . outbound_pids_for_relation_gated (
-            & subscriber_pid,
-            NodeRelation::HidesFromSubs,
-            skgrepo_restriction )
-          . into_iter () . collect ();
-        let subscribee_content : HashSet<ID> =
-          graph . outbound_pids_for_relation_gated (
-            & subscribee_pid, NodeRelation::Contains,
-            skgrepo_restriction )
-          . into_iter () . collect ();
-        ( subscribee_content . iter ()
-            . filter ( |skgid| ! subscriber_hides . contains (skgid) )
-            . cloned () . collect (),
-          subscribee_content . iter ()
-            . filter ( |skgid| subscriber_hides . contains (skgid) )
-            . cloned () . collect () ) } };
-  if hidden_in_content . is_empty () {
-    // Skip because it would be empty.
-    return Ok (( )); }
-  let hidden_in_skgids : Vec<ID> =
-    hidden_in_content . into_iter () . collect ();
-  let hidden_folder_treeid : NodeId =
-    insert_non_vognode_as_child (
-      tree, subscribee_treeid,
-      ViewnodeKind::Folder (Folder::HiddenInSubscribee),
-      true ) ?;
-  with_node_mut ( tree, hidden_folder_treeid,
-    |mut n| {
-      // A new hidden folder begins folded. The
-      // stamp moves to the members at the folder's own BFS visit
-      // ('fold_members_of_newborn_folder').
-      n . value () . foldAndFocus . folded = true; } )
-    . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-  let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
-    build_initial_render_child_data (
-      &hidden_in_skgids, graph, config ) ?;
-  reconcile_partnerFolder_children_against_goal_list (
-    tree, hidden_folder_treeid,
-    &Folder::HiddenInSubscribee,
-    &FolderGoalItem::live_members (&goal), &data, graph ) ?;
-  Ok (( )) }

@@ -3,9 +3,7 @@
 // Regression for a collateral-rerender staleness. A editable subscriber
 // open in two views: changing its subscriptions in one view and saving must
 // refresh the other (collateral) view's subscribeeFolder from the graph,
-// not leave it showing the old subscription. Before the fix,
-// reconcile_subscribeeFolder_children skipped an editable subscriber, so
-// the collateral subscribeeFolder kept stale members.
+// not leave it claiming the old subscription.
 //
 // Installs the explicit graph handle (the subscribee lookups read
 // the captured graph), so it lives among the grouped_overrides installers.

@@ -1,4 +1,3 @@
-use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::extend::editable::execute_view_requests;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::misc::SkgConfig;
@@ -31,29 +30,6 @@ pub fn execute_unrestrictedVognode_view_requests (
       tree, requests, graph, config, errors,
       skgrepo_restriction ) ?; }
   Ok(( )) }
-
-pub fn ensure_hiddenInFolder_under_editable_subscribee (
-  tree               : &mut Tree<Viewnode>,
-  node               : NodeId,
-  graph              : &crate::dbs::in_rust_graph::InRustGraph,
-  config             : &SkgConfig,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Result<(), Box<dyn Error>> {
-  let is_subscribee : bool =
-    type_and_parent_type_consistent_with_subscribee (
-      tree, node ) ?;
-  if ! is_subscribee { return Ok (( )); }
-  let is_writeProtected : bool =
-    read_at_node_in_tree( tree, node,
-      |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => t . is_writeProtected (),
-        _ => false } )
-    . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-  if is_writeProtected { return Ok (( )); }
-  maybe_add_hiddenInSubscribeeFolder_branch (
-    tree, node, graph, config,
-    skgrepo_restriction ) }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles

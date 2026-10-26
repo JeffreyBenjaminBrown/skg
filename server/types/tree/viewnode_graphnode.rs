@@ -1,13 +1,9 @@
 /// Node access utilities for ego_tree::Tree<Viewnode>
 
-use crate::to_org::util::get_skgid_from_viewnode_at;
-use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
-use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SkgrepoName};
+use crate::types::misc::{ID, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, viewnode_of };
-use crate::types::viewnode::{Vognode, Folder};
-use crate::types::nodes::complete::Graphnode;
+use crate::types::viewnode::Vognode;
 use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
 use crate::refresh::ancestry::parent_reads_claims;
@@ -88,38 +84,6 @@ pub fn unique_non_vognode_child_of_viewnode (
     non_vognode_kind,
     |child : &Viewnode| Some (&child . kind))
   . map_err (|e| -> Box<dyn Error> { e . into() }) }
-
-/// Extract PIDs for a Subscribee and its grandparent (the subscriber).
-/// Expects: subscriber -> SubscribeeFolder -> Subscribee (this node)
-pub fn pid_for_subscribee_and_its_subscriber_grandparent (
-  tree    : &Tree<Viewnode>,
-  treeid : NodeId,
-  graph   : &InRustGraph,
-  config  : &SkgConfig,
-) -> Result < ( ID, ID ), Box<dyn Error> > {
-  let subscribee_pid : ID = get_skgid_from_viewnode_at ( tree, treeid ) ?;
-  let node_ref : NodeRef < Viewnode > =
-    tree . get (treeid) . ok_or (
-      "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
-  let parent_ref : NodeRef < Viewnode > =
-    node_ref . parent ()
-    . ok_or ("Subscribee has no parent (SubscribeeFolder)") ?;
-  if ! matches! ( &parent_ref . value () . kind,
-                  ViewnodeKind::Folder (Folder::Subscribee)) {
-    return Err ( "Subscribee's parent is not a SubscribeeFolder" .
-                 into () ); }
-  let grandparent_ref : NodeRef < Viewnode > =
-    parent_ref . parent ()
-    . ok_or ("SubscribeeFolder has no parent (subscriber)") ?;
-  let (subscriber_skgid, subscriber_skgrepo) : (ID, SkgrepoName) =
-    pid_and_skgrepo_from_viewnode_at (
-      tree, grandparent_ref . id (),
-      "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
-  let graphnode : Graphnode =
-    graphnode_graphFirst_by_pid_and_skgrepo (
-      graph, config, &subscriber_skgid, &subscriber_skgrepo ) ?;
-  Ok (( subscribee_pid,
-        graphnode . pid . clone() )) }
 
 pub fn insert_non_vognode_as_child (
   tree          : &mut Tree<Viewnode>,

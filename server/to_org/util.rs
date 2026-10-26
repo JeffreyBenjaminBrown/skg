@@ -21,7 +21,6 @@ use std::error::Error;
 use std::io;
 use std::time;
 
-
 /// Whether an ID's editable occurrence is Final (claimed by a
 /// editable view request, EVR) or merely Tentative (an ordinary
 /// saved/completed editable). A EVR clobbers a Tentative occurrence
@@ -55,7 +54,6 @@ impl Finalizable {
 ///   conflicts with a new editable view request
 pub type EditableMap =
   HashMap < ID, Finalizable >;
-
 
 // ======================================================
 // Fetching, building and modifying Graphnodes and Viewnodes
@@ -232,27 +230,9 @@ pub fn detect_and_mark_cycle_v1 (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }
 
-
 // ==============================================
 // Reading and manipulating trees, esp. via IDs
 // ==============================================
-
-/// Create a viewforest containing just view roots,
-/// and complete each via build_node_branch_minus_content.
-pub fn stub_viewforest_from_root_skgids (
-  root_skgids : &[ID],
-  graph    : &crate::dbs::in_rust_graph::InRustGraph,
-  config   : &SkgConfig,
-  visited  : &mut EditableMap,
-  skgrepo_restriction : Option<&SkgrepoRestriction>,
-) -> Result < ViewForest, Box<dyn Error> > {
-  let mut viewforest : ViewForest =
-    ViewForest::new ();
-  for root_skgid in root_skgids {
-    append_plain_stub_root (
-      &mut viewforest, root_skgid, graph, config, visited,
-      skgrepo_restriction ) ?; }
-  Ok (viewforest) }
 
 /// Append one view root to the viewforest, completed via
 /// build_node_branch_minus_content. Returns its treeid.
@@ -451,8 +431,6 @@ pub fn get_skgid_from_viewnode_at (
     _ => Err ( "get_skgid_from_viewnode_at: caller must pass a non-phantom vognode" . into() ),
   }}
 
-
-
 /// Builds a node from disk, place it in a tree,
 /// complete the branch it implies except for 'content' descendents,
 /// and return the NodeId of the branch root.
@@ -550,7 +528,6 @@ pub fn collect_child_treeids (
     tree . get (treeid)
     . ok_or ("collect_child_treeids: NodeId not in tree") ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
-
 
 // ==============================================
 // 'remove_completed_view_request'

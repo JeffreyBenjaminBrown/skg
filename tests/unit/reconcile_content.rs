@@ -104,7 +104,7 @@ fn independent_same_skgid_child_is_prefetched () {
   let data : HashMap<ID, ChildData> =
     build_child_creation_data (
       &tree, parent, &[ goal . clone () ], &no_relRepos,
-      &config, &graph_snap, None, false )
+      &config, &graph_snap, None )
       . unwrap ();
   assert! ( data . contains_key (&goal),
             "a non-member same-id child's goal id must be pre-fetched, not \

@@ -28,27 +28,6 @@ pub enum CompletionMode<'a> {
 }
 
 impl<'a> CompletionMode<'a> {
-  /// Whether the Subscribee folder has its own reconciler. In diff-view
-  /// mode the generic partner-folder reconciler fills it.
-  pub fn subscribeeFolder_has_own_reconciler (
-    &self,
-  ) -> bool {
-    matches! ( self, CompletionMode::ContentView ) }
-
-  /// Whether content is shown with override substitution. Not in
-  /// diff-view mode: it shows raw graph facts.
-  pub fn substitution_enabled (
-    &self,
-  ) -> bool {
-    matches! ( self, CompletionMode::ContentView ) }
-
-  /// Whether default partner folders and the hidden-in-subscribee
-  /// folder may be created. Not in diff-view mode.
-  pub fn default_folders_allowed (
-    &self,
-  ) -> bool {
-    matches! ( self, CompletionMode::ContentView ) }
-
   /// Whether this extension of 'pid' is charged to the node budget (see
   /// the module comment of 'to_org/extend/editable.rs'). In a content
   /// view, every extension is. The diff view deviates

@@ -5,8 +5,6 @@ use crate::to_org::util::{EditableMap, make_writeProtected_if_repeat_then_extend
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SkgConfig, SkgrepoName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::in_rust_graph::override_resolution::{
-    OverrideResolution, resolve_override};
 use crate::types::env::find_skgrepo_with_optional_tantivy;
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::Graphnode;
@@ -48,11 +46,6 @@ struct ChildData {
   /// an Unknown has no home, so only this retained relationship fact can show
   /// its optional relRepo herald.
   relRepo : Option<SkgrepoName>,
-  /// Some(R) = override substitution applies: show R, marked
-  /// '(overridesHere goal-id)', in place of the goal member. The
-  /// title/repo/body above are then R's. Only ContentReality::Real
-  /// children substitute.
-  shown_skgid : Option<ID>,
 }
 
 /// UnrestrictedVognode content reconcile + content-child creation, for one node, in the
@@ -80,8 +73,6 @@ pub fn extend_true_content_at_unrestrictedVognode (
   settled                        : bool,
   cascade                        : bool,
   node_budget                    : Option<&mut usize>,
-  substitution_enabled           : bool, // false in the diff view: it shows raw graph facts.
-  substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and extends
   // real content nodes.
@@ -126,9 +117,7 @@ pub fn extend_true_content_at_unrestrictedVognode (
   sync_unrestrictedVognode_from_disk (tree, node, &graphnode) ?;
   reconcile_content_children (
     tree, node, &graphnode, config, graph_snap,
-    skgrepo_restriction,
-    substitution_enabled,
-    substitute_existing_content_overrides ) ?;
+    skgrepo_restriction ) ?;
   if cascade {
     pass_editableViewRequest_to_content_children( tree, node ) ?; }
   order_children_as_non_vognodes_then_ignored_then_content(
@@ -190,8 +179,6 @@ fn reconcile_content_children (
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   skgrepo_restriction            : Option<&SkgrepoRestriction>,
-  substitution_enabled           : bool,
-  substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -248,28 +235,12 @@ fn reconcile_content_children (
   // missing Graphnode -- while any user subtree under it is preserved (made a
   // non-member), and a now-childless tombstone is removed by the prune sweep
   // ('prune_childless_tombstones').
-  let substitution_for_children : bool =
-    // The raw-shown-override rule (generalized 2026-06-12 from the
-    // overridden-as-such case): when this node is itself
-    // overridden but shown raw by its position -- a write-protected folder
-    // member, an overriddenFolder member, or a view root -- the user is
-    // looking at the original, so its immediate children are shown raw too.
-    // Depth one level: a content child is not a raw position, so
-    // substitution resumes there (matching the overridden-as-such
-    // precedent).
-    substitution_enabled
-    && ! is_overridden_shown_raw (tree, node, config, graph_snap) ?;
-  if substitute_existing_content_overrides {
-    replace_raw_content_children_with_visible_overriders (
-      tree, node, config, graph_snap, skgrepo_restriction,
-      substitution_for_children ) ?; }
   adopt_nonMember_children_that_are_content (
     tree, node, &apparent_content_skgids ) ?;
   complete_content_children(
     tree, node, &apparent_content_skgids, &unresolved_relRepos,
     &graphnode . home_skgrepo, config, graph_snap,
-    skgrepo_restriction,
-    substitution_for_children ) ?;
+    skgrepo_restriction ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_skgids ) ?;
   convert_nonmember_unknown_children_to_tombstones(
@@ -313,63 +284,6 @@ fn adopt_nonMember_children_that_are_content (
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok (( )) }
 
-/// Replace already-rendered raw content children whose newly skgsave-committed
-/// overrides now make another node their visible substitute.  Reconciliation
-/// otherwise recognizes the raw child by its member ID and retains it,
-/// which would leave an implicit fork editable as its foreign original until
-/// the view were reopened.
-///
-/// The replacement retains the tree position and wrapper state (focus and
-/// folds), while its `overridesHere` fact keeps the parent's membership
-/// attached to the original ID on the next save.
-fn replace_raw_content_children_with_visible_overriders (
-  tree                 : &mut Tree<Viewnode>,
-  node                 : NodeId,
-  config               : &SkgConfig,
-  graph_snap           : &Arc<InRustGraph>,
-  skgrepo_restriction  : Option<&SkgrepoRestriction>,
-  substitution_enabled : bool,
-) -> Result<(), Box<dyn Error>> {
-  if ! substitution_enabled { return Ok (()); }
-  let substitutions : Vec<(NodeId, ID, Graphnode)> = {
-    let node_ref = tree . get (node)
-      . ok_or ("replace_raw_content_children_with_visible_overriders: node not found") ?;
-    let mut result : Vec<(NodeId, ID, Graphnode)> = Vec::new ();
-    for child in node_ref . children () {
-      let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
-        &child . value () . kind else { continue; };
-      if ! restriction . claimsMembership
-         || restriction . overridesHere . is_some ()
-      { continue; }
-      let original : ID = restriction . skgid . clone ();
-      let effective : ID = resolve_override (
-        config, graph_snap, skgrepo_restriction, &original ) . effective;
-      if effective == original { continue; }
-      let skgrepo : SkgrepoName = graph_snap . pid_and_skgrepo (&effective)
-        . map (|(_pid, skgrepo)| skgrepo)
-        . ok_or_else (|| format! (
-          "replace_raw_content_children_with_visible_overriders: no repo for overrider {}",
-          effective . 0 )) ?;
-      let overrider : Graphnode = graphnode_graphFirst_by_pid_and_skgrepo (
-        graph_snap, config, &effective, &skgrepo ) ?;
-      result . push ((child . id (), original, overrider));
-    }
-    result };
-  for (child, original, overrider) in substitutions {
-    write_at_unrestrictedVognode_in_tree (
-      tree, child,
-      |restriction| {
-        restriction . skgid = overrider . pid . clone ();
-        restriction . home_skgrepo = overrider . home_skgrepo . clone ();
-        restriction . title = overrider . title . clone ();
-        if let Editability::Editable { body, .. } = &mut restriction . editability
-        { *body = overrider . body . clone (); }
-        restriction . overridesHere = Some (original);
-      }) . map_err (|e| -> Box<dyn Error> { e . into () }) ?;
-  }
-  Ok (())
-}
-
 /// An Unknown content placeholder (a dangling reference the parent kept
 /// rather than failing the whole view) that is *no longer a member* of the
 /// parent's contains converts to a tombstone; the postorder prune sweep
@@ -392,60 +306,6 @@ fn convert_nonmember_unknown_children_to_tombstones (
       _ => false },
     |vn : &mut Viewnode| { vn . replace_kind (ViewnodeKind::Tombstone); },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
-
-/// Whether this node is overridden yet shown raw by its position, so
-/// that substitution must be disabled for its immediate children (one
-/// level; a content child is a substituting position, so substitution
-/// resumes there). Generalizes the overridden-as-such rule (an
-/// overriddenFolder member; 'docs/override.org', "overriddenFolder: what
-/// this node overrides") to every raw-shown position. Decided
-/// 2026-06-12:
-/// - POSITION: a member of any PartnerFolder that shows its members raw -- every folder
-///   except the editable subscribeeFolder, whose subscribees-as-such do
-///   substitute (the subscriber's view of them) -- or a view root.
-/// - OVERRIDDEN: ownership-gated, visibility-ungated ('unrestricted' = None),
-///   so even a node whose only overrider is invisible counts as
-///   "overridden but shown raw".
-/// - A node carrying an 'overridesHere' fact is a substitute, not a
-///   raw original, so it is excluded (its children substitute as
-///   usual).
-fn is_overridden_shown_raw (
-  tree       : &Tree<Viewnode>,
-  node       : NodeId,
-  config     : &SkgConfig,
-  graph_snap : &Arc<InRustGraph>,
-) -> Result<bool, Box<dyn Error>> {
-  let in_raw_position : bool = {
-    let parent_is_raw_showing_folder : bool =
-      read_at_ancestor_in_tree( tree, node, 1,
-        |vn : &Viewnode| match &vn . kind {
-          ViewnodeKind::Folder (pc) if ! pc . members_are_properties ()
-            => ! matches!( pc, Folder::Subscribee ),
-          _ => false } )
-      . unwrap_or (false);
-    let is_view_root : bool =
-      // During completion a view root is a child of the BufferRoot
-      // sentinel; its membership is stamped only later, at
-      // render.
-      read_at_ancestor_in_tree( tree, node, 1,
-        |vn : &Viewnode| matches!( &vn . kind,
-          ViewnodeKind::BufferRoot ))
-      . unwrap_or (false);
-    parent_is_raw_showing_folder || is_view_root };
-  if ! in_raw_position { return Ok (false); }
-  let (skgid, has_overridesHere) : (Option<ID>, bool) =
-    read_at_node_in_tree( tree, node,
-      |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-          => ( Some (t . skgid . clone ()),
-               t . overridesHere . is_some () ),
-        _ => ( None, false ) } ) ?;
-  let skgid : ID = match skgid { Some (skgid) => skgid, None => return Ok (false) };
-  if has_overridesHere { return Ok (false); }
-  let overridden : bool =
-    resolve_override (config, graph_snap, None, &skgid) . effective != skgid;
-  Ok (overridden) }
-
 /// Whether this node claims membership
 /// and is a child of SubscribeeFolder (and not a phantom).
 fn is_subscribee (
@@ -557,13 +417,11 @@ fn complete_content_children (
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  substitution_enabled : bool,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
       tree, node, goal_list, unresolved_relRepos, config, graph_snap,
-      skgrepo_restriction,
-      substitution_enabled ) ?;
+      skgrepo_restriction ) ?;
   normalize_relationship_backed_content_unknowns (
     tree, node, goal_list, unresolved_relRepos, recorder_home, graph_snap ) ?;
   // The RepairSummary is dropped: content is not a generated
@@ -603,23 +461,9 @@ fn complete_content_children (
         skgid . 0 )) ?;
       Ok ( match d . kind {
         ContentReality::Real =>
-          match &d . shown_skgid {
-            None =>
-              mk_editable_viewnode(
-                skgid . clone(), d . home_skgrepo . clone(),
-                d . title . clone(), d . body . clone() ),
-            Some (shown) => {
-              // Override substitution: show the overrider, marked
-              // with the original it stands for.
-              let mut vn : Viewnode =
-                mk_editable_viewnode(
-                  shown . clone(), d . home_skgrepo . clone(),
-                  d . title . clone(), d . body . clone() );
-              if let ViewnodeKind::Vognode (
-                Vognode::Unrestricted (ref mut t)) = vn . kind
-              { t . overridesHere =
-                  Some ( skgid . clone() ); }
-              vn }},
+          mk_editable_viewnode(
+            skgid . clone(), d . home_skgrepo . clone(),
+            d . title . clone(), d . body . clone() ),
         ContentReality::Unknown => {
           let mut unknown : Viewnode = mk_unknown_viewnode ( skgid . clone() );
           if let ViewnodeKind::Vognode (Vognode::Unknown (u)) =
@@ -747,7 +591,6 @@ fn build_child_creation_data (
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   skgrepo_restriction : Option<&SkgrepoRestriction>,
-  substitution_enabled : bool,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_skgrepos : HashMap<ID, SkgrepoName> =
     { let node_ref : NodeRef<Viewnode> =
@@ -798,8 +641,7 @@ fn build_child_creation_data (
                         body         : None,
                         kind         : ContentReality::Unknown,
                         relRepo:
-                          unresolved_relRepos . get (skgid) . cloned (),
-                        shown_skgid : None } );
+                          unresolved_relRepos . get (skgid) . cloned () } );
           continue; } };
     if skgrepo_restriction
       . is_some_and ( |restriction| !restriction . contains_skgrepo (&child_skgrepo) )
@@ -809,39 +651,15 @@ fn build_child_creation_data (
       return Err ( format! (
         "build_child_creation_data: the goal names {}, which the skgrepo restriction hides",
         skgid . 0 ) . into () ); }
-    let shown_skgid : Option<ID> =
-      if substitution_enabled {
-        let resolution : OverrideResolution =
-          resolve_override (
-            config, graph_snap, skgrepo_restriction, skgid );
-        // A chain of any length resolves to its end; substitution
-        // shows that effective overrider (the carrier collects the
-        // original id, so the parent's contains round-trips to N).
-        if resolution . effective != *skgid {
-          Some ( resolution . effective )
-        } else { None }
-      } else { None };
-    let fetch_skgid : &ID = shown_skgid . as_ref () . unwrap_or (skgid);
-    let fetch_skgrepo : SkgrepoName = match &shown_skgid {
-      None => child_skgrepo,
-      Some (shown) =>
-        // The overrider is owned and unrestricted (the resolver's
-        // gates), so the graph knows its skgrepo.
-        graph_snap . pid_and_skgrepo (shown)
-        . map ( |(_pid, src)| src )
-        . ok_or_else ( || format! (
-          "build_child_creation_data: no repo for overrider {}",
-          shown . 0 )) ? };
     let skg : Graphnode =
       graphnode_graphFirst_by_pid_and_skgrepo (
-        graph_snap, config, fetch_skgid, &fetch_skgrepo ) ?;
+        graph_snap, config, skgid, &child_skgrepo ) ?;
     result . insert( skgid . clone(),
                    ChildData { title: skg . title . clone(),
                                home_skgrepo: skg . home_skgrepo . clone(),
                                body: skg . body . clone(),
                                kind: ContentReality::Real,
-                               relRepo: None,
-                               shown_skgid } ); }
+                               relRepo: None } ); }
   Ok (result) }
 
 #[cfg(test)]

@@ -29,9 +29,8 @@ impl Folder {
   /// crash gives the reader an immediately greppable hit.
   pub fn caller_label (&self) -> &'static str {
     match self {
-      Folder::Subscribee =>
-        "reconcile_subscribeeFolder_children",
-      Folder::Subscriber
+      Folder::Subscribee
+        | Folder::Subscriber
         | Folder::Overridden
         | Folder::Overrider
         | Folder::Hider

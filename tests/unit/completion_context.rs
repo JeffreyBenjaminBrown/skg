@@ -29,8 +29,6 @@ fn straddle () -> GraphStraddle {
 struct Settings {
   skgrepo_restriction            : Option<SkgrepoRestriction>,
   node_budget                    : usize,
-  create_partnerFolders_for_fresh_nodes : bool,
-  substitute_existing_content_overrides : bool,
   has_warning_sink               : bool,
   diffView_mode                  : Option<(*const GraphStraddle, DiffViewBufferKind)>, // None for a content view
   nodes_before_completion        : HashSet<NodeId>,
@@ -43,10 +41,6 @@ fn settings_of (
   Settings {
     skgrepo_restriction            : context . skgrepo_restriction . cloned (),
     node_budget                    : context . node_budget,
-    create_partnerFolders_for_fresh_nodes :
-      context . create_partnerFolders_for_fresh_nodes,
-    substitute_existing_content_overrides :
-      context . substitute_existing_content_overrides,
     has_warning_sink               : context . warning_sink . is_some (),
     diffView_mode                  : match context . mode {
       CompletionMode::ContentView => None,
@@ -68,8 +62,6 @@ fn for_diffView_gives_the_first_renderings_settings () {
   assert_eq! ( settings_of (&context), Settings {
     skgrepo_restriction            : None,
     node_budget                    : runtime . config . initial_node_limit,
-    create_partnerFolders_for_fresh_nodes : false,
-    substitute_existing_content_overrides : false,
     has_warning_sink               : false,
     diffView_mode                  :
       Some (( &straddle as *const GraphStraddle, DiffViewBufferKind::Merges )),
@@ -100,8 +92,6 @@ fn for_rerender_gives_the_first_renderings_settings_and_keeps_the_rest () {
   assert_eq! ( settings_of (&context), Settings {
     skgrepo_restriction            : None,
     node_budget                    : runtime . config . initial_node_limit,
-    create_partnerFolders_for_fresh_nodes : false,
-    substitute_existing_content_overrides : false,
     has_warning_sink               : true,
     diffView_mode                  : Some ((
       &straddle as *const GraphStraddle, DiffViewBufferKind::AllChanges )),

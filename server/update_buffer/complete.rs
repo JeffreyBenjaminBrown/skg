@@ -12,7 +12,6 @@ use crate::to_org::util::{EditableMap, make_member_children_nonMembers};
 use crate::types::env::RuntimeGeneration;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
-use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, entombstone_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
@@ -29,9 +28,7 @@ use crate::types::viewnode::{Vognode};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
 use super::reconcile::partner_folder::{
-  reconcile_containerward_chains_under_folder_members,
   reconcile_partnerFolder_children};
-use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
 use super::reconcile::content::extend_true_content_at_unrestrictedVognode;
 
 use ego_tree::{Tree, NodeId};
@@ -52,18 +49,6 @@ pub(crate) struct CompletionContext<'a> {
   /// a content list is extended whole); when it reaches 0 no later
   /// vognode other than a root extends (and the cascade stops).
   pub(super) node_budget                    : usize,
-  /// True only for a de-novo (initial) render driven through
-  /// view completion. When set, each fresh editable node gets its default
-  /// PartnerFolders created at its visit, the way
-  /// build_node_branch_minus_content does when it builds a node.
-  /// False for post-save rerender, where existing PartnerFolders round-trip
-  /// from the saved buffer. A node made editable by a request still gets its
-  /// defaults independently of this flag.
-  pub(super) create_partnerFolders_for_fresh_nodes : bool,
-  /// Replace an already-present raw content member with its newly visible
-  /// overrider. This is true only for the view whose edit created the override;
-  /// ordinary collateral rerenders retain their existing raw positions.
-  pub(super) substitute_existing_content_overrides : bool,
   /// Some only when this completion serves the view the user just
   /// saved: write-protected PartnerFolder reconcilers report their repairs
   /// here, and the save response surfaces them as warnings. None for
@@ -111,8 +96,6 @@ impl<'a> CompletionContext<'a> {
       editable_map, runtime, graph_snap, errors,
       skgrepo_restriction            : None,
       node_budget                    : runtime . config . initial_node_limit,
-      create_partnerFolders_for_fresh_nodes : false,
-      substitute_existing_content_overrides : false,
       warning_sink                   : None,
       mode                           : CompletionMode::DiffView {
         straddle, buffer_kind : diffView_buffer_kind },
@@ -231,14 +214,6 @@ fn dispatch_node_update (
   match &kind {
     ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
       visit_normal_node (tree, treeid, context) ?,
-    ViewnodeKind::Folder (Folder::Subscribee)
-      if context . mode . subscribeeFolder_has_own_reconciler () =>
-      // A folder fills its members whole and is budget-neutral (the node budget): the owning
-      // vognode already spent its 1 budget unit when it extended, so extending all
-      // the members here costs nothing more and never truncates a group.
-      reconcile_subscribeeFolder_children (
-        treeid, tree, context . runtime,
-        context . skgrepo_restriction ) ?,
     ViewnodeKind::Folder (Folder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
         treeid, tree, context . runtime,
@@ -261,8 +236,7 @@ fn dispatch_node_update (
       reconcile_partnerFolder_children (
         treeid, tree, role,
         context . mode,
-        context . runtime, context . graph_snap,
-        context . skgrepo_restriction,
+        context . runtime,
         context . warning_sink . as_deref_mut () ) ?,
     // In a diff view, 'diffView_visit_before_extension' has finished
     // a changed property folder's visit: the node's visit filled it
@@ -291,24 +265,14 @@ fn dispatch_node_update (
       // Property leaves and BufferRoot. The prune sweep handles
       // empty/dead nodes.
     } }
-  if let ViewnodeKind::Folder (folder_kind) = &kind {
-    // In a content view, each member of the folder carries its
-    // containerward chain. Over the straddle, the diff view's folder
-    // reconciler reconciled the chains already; the two compound
-    // partner folders, which the diff view does not draw, carry none
-    // there.
-    if folder_kind . members_carry_containerward_chain ()
-      && matches! ( context . mode, CompletionMode::ContentView )
-    { reconcile_containerward_chains_under_folder_members (
-        tree, treeid, context . graph_snap, &context . runtime . config,
-        context . skgrepo_restriction ) ?; }}
+  // Over the straddle, the diff view's folder reconciler reconciles
+  // its members' containerward chains itself.
   Ok(( )) }
 
 /// The Unrestricted-node visit: settle the Finalizable state
 /// for a editable-view request *before* extending content (so a Final node
 /// can cascade), reconcile content, run the remaining (non-Editable) view
-/// requests, ensure an editable subscribee's HiddenInSubscribeeFolder, and
-/// finally (in a diff view) extend this node's changes. The BFS reaches
+/// requests, and finally extend this node's changes. The BFS reaches
 /// every folder/child this creates and reconciles it in turn.
 fn visit_normal_node (
   tree     : &mut Tree<Viewnode>,
@@ -398,41 +362,21 @@ fn update_normal_node (
     &context . runtime . config, context . graph_snap,
     context . skgrepo_restriction,
     settled, cascade,
-    if budgeted { Some (&mut context . node_budget) } else { None },
-    context . mode . substitution_enabled (), // off in diff-view mode: it shows raw graph facts
-    context . substitute_existing_content_overrides ) ?;
+    // The diff view substitutes no overrider: it shows raw graph facts.
+    if budgeted { Some (&mut context . node_budget) } else { None } ) ?;
   // The steps below apply only while the node is still an Unrestricted vognode.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &Viewnode| matches! ( &vn . kind,
         ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ) ) ?;
   if ! still_normal { return Ok (NormalNodeUpdate::NoLongerUnrestricted); }
-  // Create the default folders when this node is first presented as
-  // editable: on a de-novo render, or when a editable-view request has
-  // just extended an existing occurrence.  Folder members are included;
-  // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
-  // the subscribee-specific HiddenIn folder is added by the pass below.
   // A diff view creates no default folders.
-  if ( context . create_partnerFolders_for_fresh_nodes || had_editableViewRequest )
-    && context . mode . default_folders_allowed () {
-    maybe_add_default_partnerFolder_branches (
-      tree, treeid, &context . runtime . graph,
-      &context . runtime . config,
-      context . skgrepo_restriction ) ?; }
   // Remaining view requests (Aliases / Containerward / Mentionerward); the
   // Editable request was already consumed by apply_editability_rule.
   super::reconcile::view_requests::execute_unrestrictedVognode_view_requests (
     treeid, tree, &context . runtime . graph,
     &context . runtime . config,
     context . errors, context . skgrepo_restriction ) ?;
-  // Ensure an editable subscribee's HiddenInSubscribeeFolder exists; the BFS
-  // reconciles it on reaching it. (A default folder, so not in a
-  // diff view.)
-  if context . mode . default_folders_allowed () {
-    super::reconcile::view_requests::ensure_hiddenInFolder_under_editable_subscribee (
-      tree, treeid, &context . runtime . graph,
-      &context . runtime . config,
-      context . skgrepo_restriction ) ?; }
   Ok (NormalNodeUpdate::Updated) }
 
 /// Whether a folder of this kind, once childless, has nothing left to
