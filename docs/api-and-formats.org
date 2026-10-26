@@ -198,7 +198,8 @@ So far there are these endpoints:
        belongs here.\n*** new child\n- viewnode ID: 0d. ...")=. A
        correction is a headline the refresh changed because the
        buffer contradicted the graph (reinstated, entombstoned, marked
-       =noClaim=, merged, re-kinded, or an edit request dropped). What
+       =noClaim=, joined by a viewnode merge, re-kinded, or an edit
+       request dropped). What
        the refresh draws as extent is not one: the content of an
        occurrence it extends first, the members of a folder first
        requested, a fresh view's content. So a reinstatement is

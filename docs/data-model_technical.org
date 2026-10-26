@@ -373,9 +373,9 @@ rendered.
 The refresh reports what it changed because the buffer contradicted
 the truth; it does not warn (=server/refresh/corrections.rs=). A
 correction is a headline reinstated, entombstoned, marked =noClaim=,
-merged into, re-kinded, or stripped of an edit request its new kind
-has no slot for, named as a subtree is named, by viewnode ID and
-title. What the refresh draws as extent is no correction: the content
+the result of a viewnode merge, re-kinded, or stripped of an edit
+request its new kind has no slot for, named as a subtree is named,
+by viewnode ID and title. What the refresh draws as extent is no correction: the content
 of an occurrence it extends first, the members of a folder it added,
 a fresh view's content; nor, in the diff view, a change viewnode
 drawn or gone, since those describe the straddle. Nor is a change

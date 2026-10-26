@@ -6,7 +6,7 @@
 // warrants stays where it stands, unwarranted ('noWarrant'), and,
 // where its parent reads claims, claiming nothing ('noClaim'); it
 // keeps its editability and its subtree. Siblings standing for one
-// node merge. The first editable occurrence of a node keeps its
+// node are joined by a viewnode merge. The first editable occurrence of a node keeps its
 // editability; a later one the refresh draws is write-protected. Each
 // test rerenders a view over a fixture and saves the result.
 //

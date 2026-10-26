@@ -256,7 +256,7 @@ enum ChangeKey {
   BodyDiff,
   HomeSkgrepoMove,
   RelRepoMove,
-  Marker (ChangesetMarkerKind),
+  ChangesetMarker (ChangesetMarkerKind),
   Folder (Discriminant<Folder>),
 }
 
@@ -269,7 +269,7 @@ fn change_key (
       ChangeViewnode::BodyDiff { .. }        => ChangeKey::BodyDiff,
       ChangeViewnode::HomeSkgrepoMove { .. } => ChangeKey::HomeSkgrepoMove,
       ChangeViewnode::RelRepoMove { .. }     => ChangeKey::RelRepoMove,
-      ChangeViewnode::ChangesetMarker { kind } => ChangeKey::Marker (*kind), } ),
+      ChangeViewnode::ChangesetMarker { kind } => ChangeKey::ChangesetMarker (*kind), } ),
     ViewnodeKind::Folder (folder) => Some ( ChangeKey::Folder (discriminant (folder)) ),
     _ => None, } }
 
@@ -300,7 +300,7 @@ pub(crate) fn change_is_gone (
 /// The change viewnodes (and derived and changed folders) the parent
 /// at 'parent' should hold, in order, as freshly drawn: for an
 /// editable occurrence, its front change viewnodes, then its changed
-/// partner folders, then its markers; for an old text, its body diff
+/// partner folders, then its changeset markers; for an old text, its body diff
 /// when the body changed; for a ghost where content stands, its
 /// acquired-by folder. Empty for anything else.
 fn expected_change_viewnodes (
@@ -327,7 +327,7 @@ fn expected_change_viewnodes (
         model . root () . children () . map ( |child| child . value () . clone () )
         . collect ();
       let is_marker = |viewnode : &Viewnode| -> bool {
-        matches! ( change_key (viewnode), Some (ChangeKey::Marker (_)) ) };
+        matches! ( change_key (viewnode), Some (ChangeKey::ChangesetMarker (_)) ) };
       let partner_folders : Vec<Viewnode> =
         if in_c { changed_partner_folder_kinds (&aspects) . into_iter ()
                   . map ( |kind| viewnode_of (ViewnodeKind::Folder (kind)) )

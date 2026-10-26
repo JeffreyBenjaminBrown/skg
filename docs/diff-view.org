@@ -300,8 +300,8 @@ and every buffer it draws refreshes to itself
 'tests/idempotence.rs'). A child keeps its vnid, its fold state and
 its place; it is re-kinded where it stands, by the ID rule (a member
 whose node was deleted becomes its ghost and back); siblings standing
-for one gnid are merged, so a copy the user pasted beside a member
-merges into it. A child the goal does not name is kept, unwarranted
+for one gnid are joined by a viewnode merge, so a copy the user pasted
+beside a member is joined to it. A child the goal does not name is kept, unwarranted
 and, under an editable parent, claiming nothing; the refresh never
 detaches. A tombstone keeps its children, and is pruned when it holds
 nothing; so is a folder the prune leaves empty. The server sets a fold

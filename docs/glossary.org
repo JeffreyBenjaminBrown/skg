@@ -1257,7 +1257,7 @@ sibling did. It carries the union of the siblings' view requests,
 and the edit request and relationship request of whichever sibling
 carried one. It holds every sibling's children in sibling order,
 each marked =noClaim= unless the graph warrants it there. So a copy
-pasted beside a member merges into it. The buffer correction
+pasted beside a member is joined to it. The buffer correction
 "merged" names the result. A viewnode merge is neither a nodeMerge,
 which joins two graphnodes, nor an instructionMerge, and is never
 called a bare "merge". Both terms are coined by plan 06 ("tidy the
@@ -1296,8 +1296,9 @@ in the diff view".
 A buffer correction is a change the refresh made to what a buffer
 said because the buffer was wrong about the graph ('Correction',
 'CorrectionKind' in 'server/refresh/corrections.rs'): a headline
-reinstated, entombstoned, marked =noClaim=, merged into, re-kinded,
-or stripped of an edit request its new kind has no slot for. What
+reinstated, entombstoned, marked =noClaim=, the result of a viewnode
+merge, re-kinded, or stripped of an edit request its new kind has no
+slot for. What
 it draws as extent is no buffer correction. Nor are two changes
 the buffer was not wrong about, which the refresh learns of from
 its caller ('BufferCorrectionPolicy'): a tombstone it leaves where
