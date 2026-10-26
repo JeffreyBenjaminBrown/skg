@@ -18,8 +18,11 @@ fn content_takes_the_goals_order_and_riders_stay_after_what_they_followed () {
     ** {} z
     ** {} b
     ** {} a
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("y", "writeProtected noClaim"), occurrence_metadata ("c", ""),
-       occurrence_metadata ("z", "writeProtected noClaim"), occurrence_metadata ("b", ""), occurrence_metadata ("a", "") );
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("y", "writeProtected noClaim"),
+       occurrence_metadata ("c", ""),
+       occurrence_metadata ("z", "writeProtected noClaim"),
+       occurrence_metadata ("b", ""), occurrence_metadata ("a", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   node y wp noClaim ⊥
@@ -40,7 +43,8 @@ fn a_recorders_folder_keeps_its_order () {
     ** (skg containerFolder)
     *** {} b
     *** {} a
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected"), occurrence_metadata ("a", "writeProtected") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected"),
+       occurrence_metadata ("a", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   containerFolder
@@ -57,7 +61,8 @@ fn the_hidden_folder_takes_its_nodes_order () {
     ** (skg hiddenFolder)
     *** {} b
     *** {} a
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected"), occurrence_metadata ("a", "writeProtected") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("b", "writeProtected"),
+       occurrence_metadata ("a", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   hiddenFolder

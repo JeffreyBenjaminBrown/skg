@@ -37,19 +37,45 @@ fn an_occurrence_whose_node_head_has_and_the_worktree_lacks_becomes_its_ghost ()
 node p
   changesetMarker content
   node c wp
-  ghost d" );
+  ghost d noClaim ᗣ",
+    "p's list no longer names d, so its ghost claims nothing" );
   let d : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ()
     . children () . nth (2) . unwrap ();
   assert_eq! ( d . value () . viewnode_id, Some ( ViewnodeId ("dd" . into ()) ));
   assert_eq! ( d . value () . change_facts . change . node, Some (Existence::Removed) );
   assert_eq! ( d . value () . change_facts . change . rel, Some (Existence::Removed) ); }
 
+/// A dangling reference: the worktree deleted d but p still lists it.
+/// The occurrence re-kinded to d's ghost keeps its claim, since the
+/// list names it, so that a save keeps that list as it is.
+#[test]
+fn an_occurrence_re_kinded_to_a_ghost_claims_where_the_list_still_names_it () {
+  let straddle : GraphStraddle = straddle (
+    &[ Graphnode { contains : ids (&["d"]), .. node ("p") }, node ("d") ],
+    &[ Graphnode { contains : ids (&["d"]), .. node ("p") } ] );
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} d
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("d", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
+  assert_eq! ( run . outline (), "\
+node p
+  ghost d" );
+  let d : NodeRef<Viewnode> =
+    run . forest . roots () . next () . unwrap () . first_child () . unwrap ();
+  let ViewnodeKind::Vognode (Vognode::Ghost (ghost)) = &d . value () . kind
+    else { panic! ("d is no ghost: {:?}", d . value () . kind) };
+  assert! ( ghost . claimsMembership );
+  assert_eq! ( ghost . warrant, Warrant::ByGraph );
+  assert! ( ! run . text . contains ("noClaim"), "{}", run . text ); }
+
 #[test]
 fn a_relationship_head_alone_has_is_drawn_with_a_ghost_warrant_and_no_claim () {
   let straddle : GraphStraddle = straddle (
     &[ Graphnode { contains : ids (&["m"]), .. node ("p") }, node ("m") ],
     &[ node ("p"), node ("m") ] );
-  let run : Run = diff_run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
+  let run : Run = diff_run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
@@ -72,6 +98,51 @@ fn a_ghost_whose_node_is_back_becomes_an_occurrence_in_place () {
 node p
   node g wp" );
   assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
+
+/// The ghost asked that its node be restored, and the node is back:
+/// the occurrence it becomes has no slot for the request.
+#[test]
+fn a_restoreNode_request_on_a_ghost_whose_node_is_back_is_dropped_and_reported () {
+  let straddle : GraphStraddle = straddle (
+    &[ Graphnode { contains : ids (&["g"]), .. node ("p") }, node ("g") ],
+    &[ Graphnode { contains : ids (&["g"]), .. node ("p") }, node ("g") ] );
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg (vnid gg) ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode)) g
+    ", occurrence_metadata ("p", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
+  assert_eq! ( run . outline (), "\
+node p
+  node g wp" );
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::EditRequestDropped,
+                      BufferCorrectionKind::Rekinded (VognodeKind::Occurrence) ] ); }
+
+/// d, marked for deletion, was deleted since HEAD by another means:
+/// its ghost carries no delete, and the dropped request is reported.
+#[test]
+fn a_delete_on_an_occurrence_that_becomes_a_ghost_is_dropped_and_reported () {
+  let straddle : GraphStraddle = straddle (
+    &[ Graphnode { contains : ids (&["d"]), .. node ("p") }, node ("d") ],
+    &[ node ("p") ] );
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} d
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("d", "(editRequest delete)") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
+  assert_eq! ( run . outline (), "\
+node p
+  changesetMarker content
+  ghost d noClaim ᗣ" );
+  let d : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ()
+    . children () . nth (1) . unwrap ();
+  let ViewnodeKind::Vognode (Vognode::Ghost (ghost)) = &d . value () . kind
+    else { panic! ("d is no ghost: {:?}", d . value () . kind) };
+  assert! ( ! ghost . restoreNode_request );
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::EditRequestDropped,
+                      BufferCorrectionKind::Rekinded (VognodeKind::Ghost) ] ); }
 
 #[test]
 fn a_property_head_alone_has_is_a_member_with_a_ghost_warrant () {
@@ -115,13 +186,32 @@ node p
     run . forest . roots () . next () . unwrap () . first_child () . unwrap ();
   assert_eq! ( old_text . value () . viewnode_id, Some ( ViewnodeId ("ot" . into ()) )); }
 
+/// The user wrote a note, n, under the old text of p's title, and
+/// saved it; the title change is then committed, so the old text is
+/// gone. Its tombstone keeps the note.
+#[test]
+fn a_gone_change_viewnodes_tombstone_keeps_what_the_user_wrote_under_it () {
+  let graph_nodes : Vec<Graphnode> = vec! [ node ("p"), node ("n") ];
+  let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
+  let input : String = formatdoc! ("
+    * {} p
+    ** (skg (vnid ot) (oldText title)) old
+    *** {} n
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("n", "") );
+  let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
+  assert_eq! ( run . outline (), "\
+node p
+  tombstone
+    node n noClaim" ); }
+
 #[test]
 fn a_missing_change_viewnode_is_drawn () {
   let straddle : GraphStraddle = straddle (
     &[ Graphnode { title : "old" . into (), body : Some ("was\n" . into ()),
                    .. node ("p") } ],
     &[ Graphnode { body : Some ("is\n" . into ()), .. node ("p") } ] );
-  let run : Run = diff_run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
+  let run : Run = diff_run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert_eq! ( run . outline (), "\
 node p
   oldText
@@ -134,7 +224,8 @@ fn the_diff_view_substitutes_nothing () {
     node ("n"),
     Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ];
   let straddle : GraphStraddle = straddle (&graph_nodes, &graph_nodes);
-  let run : Run = diff_run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
+  let run : Run = diff_run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &straddle );
   assert_eq! ( run . outline (), "\
 node p
   node n wp" ); }
@@ -154,10 +245,10 @@ fn a_ghost_where_content_stands_holds_its_old_content () {
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
-  ghost d
+  ghost d noClaim ᗣ
     node d1 noClaim ᗣ
       containerFolder
-        ghost d",
+        ghost d noClaim ᗣ",
     "d1, which lost its container, is in U, so it is editable, and \
      shows the container it lost" ); }
 
@@ -177,7 +268,7 @@ fn a_deleted_node_that_its_parent_listed_by_an_extra_id_becomes_its_ghost () {
   assert_eq! ( run . outline (), "\
 node p
   changesetMarker content
-  ghost n",
+  ghost n noClaim ᗣ",
     "n's occurrence is its ghost, where it stood, and by the ID rule \
      the worktree's x, which HEAD resolves to n, is that ghost too" ); }
 
@@ -215,6 +306,7 @@ fn a_buffer_of_many_changes_is_a_fixpoint () {
     ** {} m
     ** {} q
     ", occurrence_metadata ("p", "(viewRequests (folder containers) flags)"),
-       occurrence_metadata ("b", ""), occurrence_metadata ("d", ""), occurrence_metadata ("m", ""), occurrence_metadata ("q", "") );
+       occurrence_metadata ("b", ""), occurrence_metadata ("d", ""),
+       occurrence_metadata ("m", ""), occurrence_metadata ("q", "") );
   let run : Run = diff_run_asserting_fixpoint (&input, &straddle);
   assert! ( run . outline () . contains ("ghost d"), "{}", run . outline () ); }

@@ -16,7 +16,8 @@ fn content_is_warranted_when_its_parent_lists_it () {
     * {} p
     ** {} c
     ** {} z
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("z", "writeProtected noClaim") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("z", "writeProtected noClaim") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   node c
@@ -32,7 +33,8 @@ fn a_folder_member_is_warranted_when_the_folders_relation_holds () {
     ** (skg containerFolder)
     *** {} q
     *** {} z
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"), occurrence_metadata ("z", "writeProtected") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("z", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   containerFolder
@@ -52,7 +54,8 @@ fn a_chain_node_is_warranted_when_it_contains_the_node_above () {
     **** {} top
     **** {} z
     ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"),
-       occurrence_metadata ("top", "writeProtected noClaim"), occurrence_metadata ("z", "writeProtected noClaim") );
+       occurrence_metadata ("top", "writeProtected noClaim"),
+       occurrence_metadata ("z", "writeProtected noClaim") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   containerFolder

@@ -19,7 +19,8 @@ fn an_occurrence_its_parent_lists_and_no_node_answers_to_becomes_an_unknown () {
     ** {} c
     ** (skg (vnid zz) folded node (gnid x) (skgRepos (nodeRepo main))) x
     *** {} k
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("k", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("k", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
@@ -42,7 +43,9 @@ fn an_occurrence_no_node_answers_to_and_no_list_names_becomes_a_tombstone () {
     ** {} x
     *** {} k
     ** {} y
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("x", ""), occurrence_metadata ("k", ""), occurrence_metadata ("y", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("x", ""), occurrence_metadata ("k", ""),
+       occurrence_metadata ("y", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
@@ -62,7 +65,8 @@ fn a_restricted_node_becomes_a_tombstone_whatever_its_parent_lists () {
     ** (skg node (gnid h) (skgRepos (nodeRepo private))) h
     *** {} k
     ** {} c
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("k", ""), occurrence_metadata ("c", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("k", ""),
+       occurrence_metadata ("c", "") );
   let restriction : SkgrepoRestriction = main_only ();
   let run : Run = run_asserting_fixpoint_in ( &input, &graph, Some (&restriction),
                            CompletionMode::ContentView, 100 );
@@ -136,7 +140,8 @@ fn a_deleted_node_that_its_parent_listed_by_an_extra_id_leaves_a_tombstone_and_a
     * {} p
     ** {} c
     ** {} n
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("n", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("n", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p

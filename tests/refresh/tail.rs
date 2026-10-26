@@ -8,7 +8,8 @@ use indoc::formatdoc;
 #[test]
 fn a_root_whose_node_vanished_is_pruned_and_the_buffer_may_end_empty () {
   let graph : InRustGraph = graph (&[]);
-  let run : Run = run_asserting_fixpoint ( &format! ("* {} gone\n", occurrence_metadata ("gone", "")), &graph );
+  let run : Run = run_asserting_fixpoint (
+    &format! ("* {} gone\n", occurrence_metadata ("gone", "")), &graph );
   assert_eq! ( run . outline (), "" );
   assert_eq! ( run . text, "" );
   assert_eq! ( run . buffer_correction_kinds (), vec! [ BufferCorrectionKind::Entombstoned ] ); }
@@ -29,7 +30,8 @@ tombstone
 fn every_viewnode_gets_a_vnid () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["c"]), .. node ("p") }, node ("c") ]);
-  let run : Run = run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "(viewRequests (folder aliases))")),
+  let run : Run = run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "(viewRequests (folder aliases))")),
                         &graph );
   assert! ( run . forest . nodes () . all ( |node| node . value () . viewnode_id . is_some () ),
             "{}", run . text );
@@ -46,5 +48,6 @@ fn a_folder_the_prune_leaves_childless_goes_too () {
     * {} p
     ** (skg containerFolder)
     *** {} gone
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("gone", "writeProtected") );
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("gone", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "node p" ); }

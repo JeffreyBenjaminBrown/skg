@@ -214,8 +214,10 @@ fn describe (
       parts . extend ( warrant_atom (occurrence . viewStats . warrant) );
       if let Some (original) = &occurrence . overridesHere {
         parts . push ( format! ("(overridesHere {})", original) ); }},
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      parts . push ( format! ("ghost {}", ghost . gnid) ),
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => {
+      parts . push ( format! ("ghost {}", ghost . gnid) );
+      if ! ghost . claimsMembership { parts . push ("noClaim" . into ()); }
+      parts . extend ( warrant_atom (ghost . warrant) ); },
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
       parts . push ( format! ("unknown {}", unknown . gnid) );
       if ! unknown . claimsMembership { parts . push ("noClaim" . into ()); }},

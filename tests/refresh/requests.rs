@@ -10,6 +10,7 @@
 
 use super::*;
 use crate::types::nodes::complete::Flag;
+use crate::types::viewnode::{NodeEditRequest, Occurrence, ViewRequest};
 use indoc::formatdoc;
 
 /// p contains c and d; c contains c1; q contains p, and top contains q.
@@ -21,6 +22,18 @@ fn family () -> InRustGraph {
     Graphnode { contains : ids (&["p"]), .. node ("q") },
     Graphnode { contains : ids (&["q"]), .. node ("top") }, ]) }
 
+/// The occurrence at 'path' (child indices from the first root).
+fn occurrence_at<'a> (
+  run  : &'a Run,
+  path : &[usize],
+) -> &'a Occurrence {
+  let mut viewnode : NodeRef<Viewnode> = run . forest . roots () . next () . unwrap ();
+  for index in path {
+    viewnode = viewnode . children () . nth (*index) . unwrap (); }
+  match &viewnode . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => occurrence,
+    other => panic! ("no occurrence at {:?}: {:?}", path, other), }}
+
 #[test]
 fn editableView_moves_the_editable_occurrence_and_draws_its_content () {
   let input : String = formatdoc! ("
@@ -29,7 +42,8 @@ fn editableView_moves_the_editable_occurrence_and_draws_its_content () {
     ** {} c
     ** {} d
     ", occurrence_metadata ("c", ""), occurrence_metadata ("p", ""),
-       occurrence_metadata ("c", "writeProtected (viewRequests editableView)"), occurrence_metadata ("d", "") );
+       occurrence_metadata ("c", "writeProtected (viewRequests editableView)"),
+       occurrence_metadata ("d", "") );
   let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node c wp
@@ -48,7 +62,8 @@ fn editableView_extends_content_shown_write_protected () {
     ** {} c
     ** {} d
     ", occurrence_metadata ("p", "(viewRequests editableView)"),
-       occurrence_metadata ("c", "writeProtected"), occurrence_metadata ("d", "writeProtected") );
+       occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("d", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &family ()) . outline (), "\
 node p
   node c
@@ -64,7 +79,8 @@ fn editableView_extends_content_shown_write_protected_within_the_budget () {
     ** {} c
     ** {} d
     ", occurrence_metadata ("p", "(viewRequests editableView)"),
-       occurrence_metadata ("c", "writeProtected"), occurrence_metadata ("d", "writeProtected") );
+       occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("d", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint_in ( &input, &family (), None, CompletionMode::ContentView, 2 )
                . outline (), "\
 node p
@@ -79,7 +95,8 @@ fn writeProtectedView_write_protects_the_occurrence_alone () {
     ** {} c
     *** {} c1
     ** {} d
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "(viewRequests writeProtectedView)"),
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("c", "(viewRequests writeProtectedView)"),
        occurrence_metadata ("c1", ""), occurrence_metadata ("d", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &family ()) . outline (), "\
 node p
@@ -95,7 +112,8 @@ fn writeProtectedSubtreeView_write_protects_the_content_subtree () {
     *** {} c1
     ** {} d
     ", occurrence_metadata ("p", "(viewRequests writeProtectedSubtreeView)"),
-       occurrence_metadata ("c", ""), occurrence_metadata ("c1", ""), occurrence_metadata ("d", "") );
+       occurrence_metadata ("c", ""), occurrence_metadata ("c1", ""),
+       occurrence_metadata ("d", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &family ()) . outline (), "\
 node p wp
   node c wp noClaim
@@ -140,7 +158,8 @@ fn a_flags_request_adds_the_flags_folder_even_when_no_flag_is_true () {
   let input : String = formatdoc! ("
     * {} p
     * {} r
-    ", occurrence_metadata ("p", "(viewRequests flags)"), occurrence_metadata ("r", "(viewRequests flags)") );
+    ", occurrence_metadata ("p", "(viewRequests flags)"),
+       occurrence_metadata ("r", "(viewRequests flags)") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   flagsFolder
@@ -166,7 +185,9 @@ node p
 fn a_fork_request_stays_for_the_save () {
   let graph : InRustGraph = graph (&[ node ("p") ]);
   let input : String = format! ( "* {} p\n", occurrence_metadata ("p", "(viewRequests fork)") );
-  assert! ( run_asserting_fixpoint (&input, &graph) . text . contains ("(viewRequests fork)") ); }
+  let run : Run = run_asserting_fixpoint (&input, &graph);
+  assert_eq! ( occurrence_at (&run, &[]) . view_requests,
+               HashSet::from ([ ViewRequest::Fork ]) ); }
 
 #[test]
 fn an_edit_request_is_carried_through () {
@@ -175,9 +196,11 @@ fn an_edit_request_is_carried_through () {
   let input : String = formatdoc! ("
     * {} p
     ** {} d
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("d", "(editRequest delete)") );
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("d", "(editRequest delete)") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
-  assert! ( run . text . contains ("(editRequest delete)"), "{}", run . text );
+  assert_eq! ( occurrence_at (&run, &[0]) . edit_request (),
+               Some (&NodeEditRequest::Delete) );
   assert! ( run . buffer_corrections . is_empty (), "{:?}", run . buffer_corrections ); }
 
 #[test]
@@ -187,15 +210,56 @@ fn an_edit_request_the_new_kind_has_no_slot_for_is_dropped_and_reported () {
   let input : String = formatdoc! ("
     * {} p
     ** {} x
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("x", "(editRequest delete)") );
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("x", "(editRequest delete)") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
   unknown x" );
-  assert! ( ! run . text . contains ("editRequest"), "{}", run . text );
+  let x : NodeRef<Viewnode> =
+    run . forest . roots () . next () . unwrap () . first_child () . unwrap ();
+  let ViewnodeKind::Vognode (Vognode::Unknown (unknown)) = &x . value () . kind
+    else { panic! ("x is no unknown: {:?}", x . value () . kind) };
+  assert_eq! ( unknown . relationshipEditRequest, None );
   assert_eq! ( run . buffer_correction_kinds (),
                vec! [ BufferCorrectionKind::EditRequestDropped,
                       BufferCorrectionKind::Rekinded (VognodeKind::Unknown) ] ); }
+
+/// x is in no graph and p's list does not name it, so its occurrence
+/// becomes a tombstone, which has no slot for a request; being
+/// childless, the tombstone is pruned.
+#[test]
+fn an_edit_request_on_what_becomes_a_tombstone_is_dropped_and_reported () {
+  let graph : InRustGraph = graph (&[ node ("p") ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} x
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("x", "(editRequest delete)") );
+  let run : Run = run_asserting_fixpoint (&input, &graph);
+  assert_eq! ( run . outline (), "node p" );
+  assert_eq! ( run . buffer_correction_kinds (),
+               vec! [ BufferCorrectionKind::Entombstoned,
+                      BufferCorrectionKind::EditRequestDropped ] ); }
+
+/// A subtree view request write-protects c, whose new state has no
+/// slot for the delete it carried.
+#[test]
+fn an_edit_request_on_what_becomes_write_protected_is_dropped_and_reported () {
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} c
+    ** {} d
+    ", occurrence_metadata ("p", "(viewRequests writeProtectedSubtreeView)"),
+       occurrence_metadata ("c", "(editRequest delete)"),
+       occurrence_metadata ("d", "") );
+  let run : Run = run_asserting_fixpoint (&input, &family ());
+  assert_eq! ( run . outline (), "\
+node p wp
+  node c wp noClaim
+  node d wp noClaim" );
+  assert_eq! ( occurrence_at (&run, &[0]) . edit_request (), None );
+  assert_eq! ( run . count (BufferCorrectionKind::EditRequestDropped), 1 ); }
 
 #[test]
 fn a_search_stub_of_write_protected_hits_draws_each_hits_containers () {
@@ -225,7 +289,8 @@ fn a_subscriptions_request_completes_a_subscribee_folder_already_there () {
     * {} s
     ** (skg subscribeeFolder)
     *** {} e
-    ", occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"), occurrence_metadata ("e", "writeProtected") );
+    ", occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
+       occurrence_metadata ("e", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s
   subscribeeFolder

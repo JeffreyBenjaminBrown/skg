@@ -30,10 +30,23 @@ fn a_fresh_view_reports_nothing () {
     &[ ID::from ("p"), ID::from ("b") ], &graph );
   let refreshed : Refreshed =
     refresh_once (&mut forest, &graph, &BufferCorrectionPolicy::default ());
-  assert! ( refreshed . text . contains ("(gnid a1)")
-            && refreshed . text . contains ("containerFolder"),
-            "the stub drew its roots' content and containers:\n{}",
-            refreshed . text );
+  assert_eq! ( outline (&forest), "\
+node p
+  containerFolder
+    node q wp noClaim
+  node a
+    node a1
+  node b wp
+node b
+  containerFolder
+    node p wp noClaim
+      node q wp noClaim
+  subscribeeFolder
+    node a wp
+      node p wp noClaim
+        node q wp noClaim
+  node s",
+    "the stub drew its roots' content and containers" );
   assert! ( refreshed . buffer_corrections . is_empty (),
             "{:?}", refreshed . buffer_corrections ); }
 
@@ -77,7 +90,8 @@ fn a_member_missing_from_a_list_already_drawn_is_reported () {
     ** {} a
     *** {} a1
     ** (skg containerFolder)
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""), occurrence_metadata ("a1", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""),
+       occurrence_metadata ("a1", "") );
   let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
@@ -112,7 +126,9 @@ fn a_tombstone_the_save_left_is_not_reported () {
     *** (skg containerFolder)
     ** {} y
     *** {} k
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("x", ""), occurrence_metadata ("y", ""), occurrence_metadata ("k", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("x", ""), occurrence_metadata ("y", ""),
+       occurrence_metadata ("k", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let policy : BufferCorrectionPolicy =
     BufferCorrectionPolicy::after_a_save_deleting (
@@ -140,7 +156,8 @@ fn a_member_drawn_after_a_restriction_change_is_not_reported () {
     * {} p
     ** {} a
     *** {} a1
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""), occurrence_metadata ("a1", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("a", ""),
+       occurrence_metadata ("a1", "") );
   let mut forest : ViewForest = parse (&input, IdResolution::ThroughGraph (&graph));
   let refreshed : Refreshed = refresh_once (
     &mut forest, &graph, &BufferCorrectionPolicy::after_a_switch (true) );

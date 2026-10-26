@@ -17,7 +17,8 @@ fn overridden () -> InRustGraph {
 
 #[test]
 fn a_drawn_member_is_shown_as_its_overrider () {
-  assert_eq! ( run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &overridden () ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &overridden () ) . outline (), "\
 node p
   node o (overridesHere n)" ); }
 
@@ -43,7 +44,8 @@ fn when_the_override_is_gone_the_overrider_is_unwarranted_and_the_original_retur
   let input : String = formatdoc! ("
     * {} p
     ** {} o
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("o", "(overridesHere n)") );
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("o", "(overridesHere n)") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
@@ -52,12 +54,15 @@ node p
   assert_eq! ( run . buffer_correction_kinds (),
                vec! [ BufferCorrectionKind::MarkedNoClaim, BufferCorrectionKind::Reinstated ] ); }
 
+/// n, a root, is overridden by o; q, a member of n's containers
+/// folder, is overridden by v. Each is shown as itself.
 #[test]
 fn a_root_and_a_folder_member_are_shown_raw () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["n"]), .. node ("q") },
     node ("n"),
-    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]);
+    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") },
+    Graphnode { overrides : msv_ids (&["q"]), .. node ("v") }, ]);
   let input : String = formatdoc! ("
     * {} n
     ** (skg containerFolder)
@@ -75,7 +80,8 @@ fn the_content_of_an_overridden_node_shown_raw_is_shown_raw () {
     Graphnode { overrides : msv_ids (&["r"]), .. node ("s") },
     node ("n"),
     Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]);
-  assert_eq! ( run_asserting_fixpoint ( &format! ("* {} r\n", occurrence_metadata ("r", "")), &graph ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} r\n", occurrence_metadata ("r", "")), &graph ) . outline (), "\
 node r
   node n" ); }
 
@@ -95,7 +101,8 @@ fn an_overrider_editable_elsewhere_is_shown_write_protected () {
     ** {} n
     ** {} q
     * {} o
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("n", ""), occurrence_metadata ("q", ""), occurrence_metadata ("o", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("n", ""),
+       occurrence_metadata ("q", ""), occurrence_metadata ("o", "") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node p
   node o wp (overridesHere n)

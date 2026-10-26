@@ -19,7 +19,8 @@ fn two_levels () -> InRustGraph {
 
 #[test]
 fn an_editable_occurrences_content_is_drawn_editable () {
-  let run : Run = run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels () );
+  let run : Run = run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels () );
   assert_eq! ( run . outline (), "\
 node p
   node a
@@ -44,8 +45,9 @@ node p
 
 #[test]
 fn once_the_budget_is_spent_what_is_drawn_is_write_protected () {
-  let run : Run = run_asserting_fixpoint_in ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels (),
-                           None, CompletionMode::ContentView, 2 );
+  let run : Run = run_asserting_fixpoint_in (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &two_levels (),
+    None, CompletionMode::ContentView, 2 );
   assert_eq! ( run . outline (), "\
 node p
   node a
@@ -60,7 +62,8 @@ fn a_repeat_is_write_protected () {
     Graphnode { contains : ids (&["a", "c"]), .. node ("p") },
     Graphnode { contains : ids (&["a"]), .. node ("c") },
     node ("a"), ]);
-  assert_eq! ( run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &graph ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &graph ) . outline (), "\
 node p
   node a
   node c
@@ -70,7 +73,8 @@ node p
 fn a_member_its_parent_lists_and_no_node_answers_to_is_drawn_as_an_unknown () {
   let graph : InRustGraph = graph (&[
     Graphnode { contains : ids (&["x"]), .. node ("p") } ]);
-  assert_eq! ( run_asserting_fixpoint ( &format! ("* {} p\n", occurrence_metadata ("p", "")), &graph ) . outline (), "\
+  assert_eq! ( run_asserting_fixpoint (
+    &format! ("* {} p\n", occurrence_metadata ("p", "")), &graph ) . outline (), "\
 node p
   unknown x" ); }
 
@@ -197,7 +201,8 @@ fn a_buffer_of_many_kinds_is_a_fixpoint () {
     *** (skg subscribeeFolder)
     * {} c1
     ", occurrence_metadata ("p", "(viewRequests (folder containers) flags (folder overrides))"),
-       occurrence_metadata ("c", "writeProtected"), occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected"),
+       occurrence_metadata ("q", "writeProtected"),
        occurrence_metadata ("s", "(viewRequests (folder subscribesTo))"),
        occurrence_metadata ("c1", "(viewRequests writeProtectedSubtreeView)") );
   let run : Run = run_asserting_fixpoint_in ( &input, &graph, None, CompletionMode::ContentView, 3 );

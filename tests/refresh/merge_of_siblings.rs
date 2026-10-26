@@ -34,7 +34,8 @@ fn duplicate_siblings_are_merged_into_one_where_the_first_stood () {
     ** (skg (vnid c2) node (gnid c) (skgRepos (nodeRepo main)) noClaim) c
     *** {} d
     *** {} e
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("e", "writeProtected"), occurrence_metadata ("d", ""),
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("e", "writeProtected"),
+       occurrence_metadata ("d", ""),
        occurrence_metadata ("e", "writeProtected") );
   let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
@@ -74,7 +75,9 @@ fn the_result_claims_when_the_claiming_sibling_is_second () {
     * {} p
     ** {} c
     ** {} c
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", "writeProtected noClaim"), occurrence_metadata ("c", "") );
+    ", occurrence_metadata ("p", ""),
+       occurrence_metadata ("c", "writeProtected noClaim"),
+       occurrence_metadata ("c", "") );
   let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
@@ -140,8 +143,10 @@ fn an_appended_child_the_truth_does_not_warrant_under_the_result_is_marked_noCla
     *** {} d
     ** {} c
     *** {} e
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("d", ""),
-       occurrence_metadata ("c", "writeProtected noClaim"), occurrence_metadata ("e", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("d", ""),
+       occurrence_metadata ("c", "writeProtected noClaim"),
+       occurrence_metadata ("e", "") );
   let run : Run = run_asserting_fixpoint (&input, &family ());
   assert_eq! ( run . outline (), "\
 node p
@@ -161,7 +166,8 @@ fn copies_of_one_folder_member_are_merged () {
     ** (skg containerFolder)
     *** {} q
     *** {} q
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"), occurrence_metadata ("q", "writeProtected") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("q", "writeProtected"),
+       occurrence_metadata ("q", "writeProtected") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p

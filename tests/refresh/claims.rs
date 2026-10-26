@@ -17,7 +17,8 @@ fn under_an_editable_occurrence_an_unwarranted_claimant_is_marked_noClaim () {
     ** {} c
     ** {} d
     ** {} z
-    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""), occurrence_metadata ("d", "noClaim"), occurrence_metadata ("z", "") );
+    ", occurrence_metadata ("p", ""), occurrence_metadata ("c", ""),
+       occurrence_metadata ("d", "noClaim"), occurrence_metadata ("z", "") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p
@@ -37,13 +38,17 @@ fn under_a_write_protected_occurrence_no_child_claims () {
     * {} p
     ** {} c
     ** {} z
-    ", occurrence_metadata ("p", "writeProtected"), occurrence_metadata ("c", "writeProtected"),
+    ", occurrence_metadata ("p", "writeProtected"),
+       occurrence_metadata ("c", "writeProtected"),
        occurrence_metadata ("z", "writeProtected") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node p wp
   node c wp noClaim
   node z wp noClaim ⊥" );
+  assert! ( ! run . text . contains ("noClaim"),
+            "the outline shows the field, but no atom is written there:\n{}",
+            run . text );
   assert! ( run . buffer_corrections . is_empty (),
             "no claim is read there, so none is corrected: {:?}", run . buffer_corrections ); }
 
@@ -63,7 +68,8 @@ fn in_an_editable_folder_an_unwarranted_member_is_marked_noClaim () {
     ** (skg subscribeeFolder)
     *** {} e
     *** {} z
-    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "writeProtected"), occurrence_metadata ("z", "writeProtected") );
+    ", occurrence_metadata ("s", ""), occurrence_metadata ("e", "writeProtected"),
+       occurrence_metadata ("z", "writeProtected") );
   let run : Run = run_asserting_fixpoint (&input, &graph);
   assert_eq! ( run . outline (), "\
 node s
@@ -80,7 +86,8 @@ fn in_an_editable_folder_of_a_write_protected_node_no_member_claims () {
     * {} s
     ** (skg subscribeeFolder)
     *** {} e
-    ", occurrence_metadata ("s", "writeProtected"), occurrence_metadata ("e", "writeProtected") );
+    ", occurrence_metadata ("s", "writeProtected"),
+       occurrence_metadata ("e", "writeProtected") );
   assert_eq! ( run_asserting_fixpoint (&input, &graph) . outline (), "\
 node s wp
   subscribeeFolder
