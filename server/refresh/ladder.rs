@@ -43,14 +43,14 @@ use crate::refresh::goal::{
 use crate::update_buffer::reconcile::partner_folder::partnerFolder_members_in_graph;
 use crate::refresh::id_rule::{
   EditabilityAndClaim, IdRuleAnswer, entombstone, entombstone_gone_change,
-  ghost_from_head, id_rule, occurrence_from_truth, rekind_vognode};
+  ghost_from_head, id_rule, occurrence_from_truth, point_occurrence_at,
+  rekind_vognode};
 use crate::refresh::{Walk, write_protect_occurrence};
 use crate::refresh::ancestry::{is_unsayable, parent_reads_claims};
 use crate::refresh::diff_view;
 use crate::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use crate::types::misc::ID;
-use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
   Editability, FoldAndFocus, Folder, FolderRelation, Ghost, PropertyMember, Unknown, Occurrence,
@@ -712,9 +712,7 @@ fn substitute_overriders (
   Ok (( )) }
 
 /// Make the occurrence at 'child' show 'shown', with 'overridesHere'
-/// as given, keeping where it stands, its fold state and its
-/// editability, unless the node it now shows has its editable
-/// occurrence elsewhere.
+/// as given ('point_occurrence_at').
 fn show_overrider (
   tree          : &mut Tree<Viewnode>,
   child         : NodeId,
@@ -722,22 +720,10 @@ fn show_overrider (
   overridesHere : Option<ID>,
   walk          : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let node : &GraphnodeInRust = walk . truth . graph . get (shown)
-    . ok_or ("show_overrider: the truth lacks the overrider") ?;
-  let was_editable_as : Option<ID> =
-    tree . get (child) . unwrap () . value () . editable_gnid () . cloned ();
+  point_occurrence_at (tree, child, shown, walk) ?;
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
-  { occurrence . gnid         = shown . clone ();
-    occurrence . title         = node . title . clone ();
-    occurrence . home_skgrepo  = node . home_skgrepo . clone ();
-    occurrence . overridesHere = overridesHere;
-    if let Editability::Editable { body, .. } = &mut occurrence . editability
-    { *body = node . body . clone (); }}
-  if let Some (was) = was_editable_as {
-    walk . release_editability (&was);
-    if ! walk . hold_editability (shown) {
-      write_protect_occurrence (tree, child, walk); }}
+  { occurrence . overridesHere = overridesHere; }
   Ok (( )) }
 
 /// The override that 'child' stood for is gone: it shows itself, is

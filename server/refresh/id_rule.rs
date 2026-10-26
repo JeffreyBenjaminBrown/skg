@@ -117,8 +117,8 @@ pub(crate) fn rekind_vognode (
     _ => return Ok (( )), };
   let gnid : ID = vognode . gnid () . clone ();
   match ( id_rule (&gnid, parent_goal, walk), vognode ) {
-    ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (occurrence) ) =>
-      refresh_occurrence_in_place (tree, child, occurrence, &pid, walk) ?,
+    ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (_) ) =>
+      point_occurrence_at (tree, child, &pid, walk) ?,
     ( IdRuleAnswer::Occurrence (pid), other ) => {
       let requests : EditRequests = EditRequests::of (&other);
       let claims : bool = match &other {
@@ -247,22 +247,27 @@ fn entombstone_reporting_requests_only (
   tree . get_mut (treeid) . unwrap () . value ()
     . replace_kind (ViewnodeKind::Tombstone); }
 
-/// An occurrence that the truth still has: it stands for the node's
-/// pid, with the truth's title and home skgrepo, and, when editable,
-/// its body.
-fn refresh_occurrence_in_place (
-  tree       : &mut Tree<Viewnode>,
-  child      : NodeId,
-  occurrence : Occurrence,
-  pid        : &ID,
-  walk       : &mut Walk,
+/// Point the occurrence at 'child' at the node 'pid' as the truth has
+/// it: its pid, title and home skgrepo, and, when editable, its body.
+/// It keeps where it stands, its fold state and its requests. When it
+/// was editable as another gnid (one that became an extra ID, or the
+/// overridden node an overrider is shown in place of), the gnid's one
+/// editability passes to 'pid', unless another occurrence holds that,
+/// and then it is write-protected.
+pub(crate) fn point_occurrence_at (
+  tree  : &mut Tree<Viewnode>,
+  child : NodeId,
+  pid   : &ID,
+  walk  : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   let node : &GraphnodeInRust = walk . truth . graph . get (pid)
-    . ok_or ("refresh_occurrence_in_place: the truth lacks a present node") ?;
-  if occurrence . gnid != *pid && ! occurrence . is_writeProtected () {
-    // A gnid that became an extra ID: the node it now names may have
-    // its editable occurrence elsewhere.
-    walk . release_editability (&occurrence . gnid);
+    . ok_or ("point_occurrence_at: the truth lacks the node") ?;
+  let was_editable_as : Option<ID> =
+    tree . get (child) . unwrap () . value () . editable_gnid () . cloned ();
+  if let Some (was) = was_editable_as . filter ( |was| was != pid ) {
+    // Write-protecting releases the gnid it holds, so it goes before
+    // the gnid becomes 'pid', which the other occurrence keeps.
+    walk . release_editability (&was);
     if ! walk . hold_editability (pid) {
       write_protect_occurrence (tree, child, walk); }}
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =

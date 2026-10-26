@@ -78,3 +78,27 @@ fn the_content_of_an_overridden_node_shown_raw_is_shown_raw () {
   assert_eq! ( run ( &format! ("* {} r\n", occ ("r", "")), &graph ) . outline (), "\
 node r
   node n" ); }
+
+// An overrider shown in place of an editable occurrence of the node
+// it overrides, while another occurrence holds the overrider's one
+// editability, is write-protected, and the other keeps it: an
+// occurrence of the overrider drawn later is write-protected too.
+#[test]
+fn an_overrider_editable_elsewhere_is_shown_write_protected () {
+  let graph : InRustGraph = graph (&[
+    Graphnode { contains : ids (&["n", "q"]), .. node ("p") },
+    node ("n"),
+    Graphnode { contains : ids (&["o"]), .. node ("q") },
+    Graphnode { overrides : msv_ids (&["n"]), .. node ("o") }, ]);
+  let input : String = formatdoc! ("
+    * {} p
+    ** {} n
+    ** {} q
+    * {} o
+    ", occ ("p", ""), occ ("n", ""), occ ("q", ""), occ ("o", "") );
+  assert_eq! ( run (&input, &graph) . outline (), "\
+node p
+  node o wp (overridesHere n)
+  node q
+    node o wp
+node o" ); }
