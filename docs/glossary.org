@@ -1460,9 +1460,10 @@ How the server's startup warnings reach the user: 'load_config'
 returns warnings beside the config, 'main' records them once on the
 runtime ('record_startup_warnings' in 'server/types/env.rs'), the
 server serves them on request ("server warnings"), and each client
-shows them in its '*SKG Server Warnings*' buffer on connect. The
-same buffer receives the buffer corrections a save or a rerender reports,
-under a headline per view.
+appends them on connect to its '*SKG Server Warnings*' buffer, under
+a headline "Startup warnings". The same buffer receives the buffer
+corrections a save or a rerender reports, under a headline per view;
+neither erases what the buffer holds.
 
 *** "snapshot" is always qualified: graph, git or buffer snapshot
 

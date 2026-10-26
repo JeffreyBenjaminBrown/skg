@@ -2,8 +2,10 @@
 -- started (unknown skgconfig.toml keys, say) and the buffer
 -- corrections it made to each view it refreshed. client.connect sends
 -- the startup request once per connection, as soon as the connection
--- is up and so before any view is requested. A non-empty answer opens M.buffer_name;
--- an empty one opens nothing. The buffer corrections arrive on a save's
+-- is up and so before any view is requested. A non-empty answer is
+-- appended to M.buffer_name under a headline 'Startup warnings', erasing
+-- nothing (the buffer corrections gathered before a reconnect stay); an
+-- empty one opens nothing. The buffer corrections arrive on a save's
 -- save-result and on a rerender stream's rerender-done; show_corrections
 -- appends them to the buffer, erasing nothing. The Lua port of
 -- elisp/skg-request-server-warnings.el.
@@ -37,16 +39,18 @@ function M.request_server_warnings (tcp)
   tcp:write('((request . "server warnings"))\n')
 end
 
----Show the warnings in a parsed server-warnings RESPONSE, if any.
+---Append the warnings in a parsed server-warnings RESPONSE, if any,
+---to M.buffer_name: a level-1 headline 'Startup warnings', each
+---warning a level-2 headline under it.
 ---@param response any
 function M.show_server_warnings (response)
   local warnings =
     payload.string_list(payload.field(response, 'warnings'))
   if #warnings == 0 then return end
-  local headlines = {}
+  local headlines = { '* Startup warnings' }
   for _, warning in ipairs(warnings) do
-    table.insert(headlines, '* ' .. warning) end
-  messages.big_nonfatal_message(
+    table.insert(headlines, '** ' .. warning) end
+  messages.big_nonfatal_message_appended(
     M.buffer_name,
     string.format('The skg server reported %d startup warning%s - see %s',
                   #warnings, #warnings == 1 and '' or 's', M.buffer_name),

@@ -429,7 +429,8 @@ since the command searches the current buffer.
   - Each client sends this once per connection, as soon as the
     connection is up and before it requests any view
     ('skg-tcp-connect-to-rust', 'client.connect'). A non-empty answer
-    opens a buffer listing the warnings, one headline each:
+    is appended to a buffer, keeping what it holds, under a level-1
+    headline "Startup warnings", each warning a level-2 headline:
     =*SKG Server Warnings*= in Emacs, =skg://messages/server-warnings=
     in Neovim. An empty answer opens nothing.
   - The same buffer receives the buffer corrections that a =save-result= or

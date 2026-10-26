@@ -47,9 +47,37 @@
             (warnings ("skgconfig.toml sets 'max_role_tree_depth', a key skg does not know, so it has no effect. Its current spelling is 'max_roleTree_depth'.")))))
         (with-current-buffer skg-server-warnings-buffer-name
           (should (derived-mode-p 'org-mode))
-          (should (string-match-p "^\\* skgconfig.toml sets 'max_role_tree_depth'"
-                                  (buffer-string)))
+          (should (string-match-p
+                   "\\`\\* Startup warnings\n\\*\\* skgconfig.toml sets 'max_role_tree_depth'"
+                   (buffer-string)))
           (should (string-match-p "max_roleTree_depth" (buffer-string)))))
+    (test-skg-server-warnings--kill-buffer)))
+
+(ert-deftest test-skg-startup-warnings-keep-the-buffer-corrections ()
+  "Startup warnings that a reconnect brings go after what the buffer
+held, under their own headline: the buffer corrections stay."
+  (test-skg-server-warnings--kill-buffer)
+  (unwind-protect
+      (progn
+        (with-current-buffer
+            (get-buffer-create skg-server-warnings-buffer-name)
+          (insert "* Buffer corrections in content-view:1\n"
+                  "** Drew what the graph says belongs here.\n"))
+        (cl-letf (((symbol-function 'display-buffer) (lambda (&rest _) nil)))
+          (skg--server-warnings-handler
+           nil
+           (prin1-to-string
+            '((response-type server-warnings)
+              (warnings ("first warning" "second warning"))))))
+        (with-current-buffer skg-server-warnings-buffer-name
+          (should
+           (equal (buffer-string)
+                  (concat "* Buffer corrections in content-view:1\n"
+                          "** Drew what the graph says belongs here.\n"
+                          "* Startup warnings\n"
+                          "** first warning\n"
+                          "** second warning\n")))
+          (should (looking-at-p "\\* Startup warnings"))))
     (test-skg-server-warnings--kill-buffer)))
 
 (ert-deftest test-skg-empty-server-warnings-open-nothing ()

@@ -1,7 +1,8 @@
--- Coverage for the buffer corrections half of skg.server_warnings:
--- each view's buffer corrections appended to the server-warnings buffer, after
--- whatever it held. Mirrors the Emacs client's
--- skg-show-corrections-in-server-warnings.
+-- Coverage for skg.server_warnings: each view's buffer corrections,
+-- and the startup warnings, appended to the server-warnings buffer,
+-- after whatever it held. Mirrors the Emacs client's
+-- skg-show-corrections-in-server-warnings and
+-- skg--server-warnings-handler.
 
 local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
@@ -87,6 +88,22 @@ describe('skg.server_warnings buffer corrections', function ()
     }, vim.api.nvim_buf_get_lines(warnings_buffer(), 0, -1, false))
     assert.are.equal(
       'skg: the server corrected 1 headline in 1 view - see '
+      .. server_warnings.buffer_name, notified[2])
+  end)
+
+  it('startup warnings go after the buffer corrections, under their'
+     .. ' own headline', function ()
+    server_warnings.show_corrections(sexpr.read(
+      '((content-view:1 "First.\\n*** one\\n"))'))
+    server_warnings.show_server_warnings(sexpr.read(
+      '((response-type server-warnings)'
+      .. ' (warnings ("first warning" "second warning")))'))
+    assert.are.same({
+      '* Buffer corrections in content-view:1', '** First.', '*** one',
+      '* Startup warnings', '** first warning', '** second warning',
+    }, vim.api.nvim_buf_get_lines(warnings_buffer(), 0, -1, false))
+    assert.are.equal(
+      'The skg server reported 2 startup warnings - see '
       .. server_warnings.buffer_name, notified[2])
   end)
 
