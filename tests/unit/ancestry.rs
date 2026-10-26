@@ -1,7 +1,7 @@
 use super::*;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
-  PropertyMember, Folder, viewnode_of };
+  PropertyMember, Folder, Vognode, viewnode_of };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SkgrepoName { SkgrepoName::from ("main") }
