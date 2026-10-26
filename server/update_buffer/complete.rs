@@ -289,11 +289,11 @@ fn dispatch_node_update (
         context . skgrepo_restriction,
         context . warning_sink . as_deref_mut () ) ?,
     ViewnodeKind::Folder (role)
-      // This arm serves every folder that reads one relation role: one
-      // whose goal is ordered (Overridden; Subscribee has its own
-      // completer above) and the write-protected ones. The reconciler
-      // branches on 'Folder::goal_is_ordered' where their treatment
-      // differs.
+      // This arm serves every folder that reads one relation role: the
+      // editable one (Overridden; Subscribee has its own completer
+      // above) and the write-protected ones. The reconciler branches
+      // on 'Folder::goal_is_ordered' and 'Folder::is_editable' where
+      // their treatment differs.
       if role . relation_member_role () . is_some () =>
       // In a diff view the folder shows the union of the straddle;
       // the Subscribee folder comes here too.

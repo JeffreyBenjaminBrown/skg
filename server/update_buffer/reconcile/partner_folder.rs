@@ -101,7 +101,7 @@ pub fn reconcile_partnerFolder_children (
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list (
       tree, node, kind, &goal_items, &child_data, graph_snap ) ?;
-  if ! kind . goal_is_ordered () {
+  if ! kind . is_editable () {
     // Repairs to an editable folder are not repairs: its membership is
     // whatever the user saved. Write-protected folders warn (when there is a
     // sink, i.e. when this completion serves the just-saved view).

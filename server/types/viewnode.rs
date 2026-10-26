@@ -687,6 +687,22 @@ impl Folder {
         | Folder::AcquiredBy | Folder::Acquired
         | Folder::ID | Folder::Flags { .. } => false, } }
 
+  /// Whether the save reads the folder's membership, so that a member
+  /// typed or removed there edits the graph: the subscribee,
+  /// overridden and alias folders, and the compound partner folder of
+  /// what the subscriber hides outside its subscribees. Every other
+  /// folder is write-protected: its members are edited from the other
+  /// side of the relationship, or derived.
+  pub fn is_editable (&self) -> bool {
+    match self {
+      Folder::Subscribee | Folder::Overridden
+        | Folder::HiddenOutsideOfSubscribee | Folder::Alias => true,
+      Folder::Subscriber | Folder::Overrider | Folder::Hider
+        | Folder::Hidden | Folder::HiddenInSubscribee
+        | Folder::Container | Folder::Mentioner
+        | Folder::AcquiredBy | Folder::Acquired
+        | Folder::ID | Folder::Flags { .. } => false, } }
+
   /// Whether each member of a folder of this kind carries its
   /// containerward chain: every kind whose members are live nodes,
   /// partners in a role or members of a compound partner folder. The

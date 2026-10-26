@@ -10,9 +10,10 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::{ViewForest, editable_occurrences};
 use std::collections::HashMap;
 
-// 'Folder::goal_is_ordered' and 'Folder::members_are_properties' are
-// the per-kind facts that the save, the reconcilers and the heralds
-// consult; this pins them.
+// 'Folder::goal_is_ordered', 'Folder::is_editable' and
+// 'Folder::members_are_properties' are the per-kind facts that the
+// save, the reconcilers, the refresh and the heralds consult; this
+// pins them.
 #[test]
 fn folder_kind_facts () {
   let ordered : Vec<Folder> = vec! [
@@ -26,6 +27,13 @@ fn folder_kind_facts () {
     assert! ( folder . goal_is_ordered (), "{:?}", folder ); }
   for folder in &unordered {
     assert! ( ! folder . goal_is_ordered (), "{:?}", folder ); }
+  for folder in ordered . iter () . chain (&unordered) {
+    assert_eq! ( folder . is_editable (),
+                 matches! ( folder,
+                            Folder::Subscribee | Folder::Overridden
+                            | Folder::HiddenOutsideOfSubscribee
+                            | Folder::Alias ),
+                 "{:?}", folder ); }
   for folder in ordered . iter () . chain (&unordered) {
     assert_eq! ( folder . members_are_properties (),
                  matches! ( folder,

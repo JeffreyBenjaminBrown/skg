@@ -51,7 +51,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
   let partners : Vec<Partner> =
     straddle . partners (viewparent_pid, member_role);
   let editable_set : bool = // the save reads the membership
-    kind . goal_is_ordered ();
+    kind . is_editable ();
   let items : Vec<FolderGoalItem> =
     partners . iter ()
     . filter_map ( |partner| straddle_goal_item (straddle, partner, editable_set) )
@@ -76,7 +76,7 @@ pub fn reconcile_partnerFolder_children_from_graph_straddle (
       tree, node, kind, &goal_items, &child_data, &straddle . after ) ?;
   attach_chains_under_straddle_folder_members (
     tree, node, kind, member_role, straddle, &partners, runtime ) ?;
-  if ! kind . goal_is_ordered () {
+  if ! kind . is_editable () {
     if let Some (sink) = warning_sink {
       push_repair_warnings (
         sink, kind, viewparent_pid,

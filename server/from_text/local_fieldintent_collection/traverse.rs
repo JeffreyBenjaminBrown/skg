@@ -103,7 +103,7 @@ fn visit (
     ViewnodeKind::Folder (Folder::Alias) =>
       visit_aliasFolder (node_ref, context, collected),
     // The three arms below, with the alias folder's above, are exactly
-    // the folders whose goal is ordered ('Folder::goal_is_ordered'): the
+    // the editable folders ('Folder::is_editable'): the
     // ones whose membership the save reads. The catch-all folder arm
     // after them covers the write-protected ones.
     ViewnodeKind::Folder (Folder::Subscribee) =>
