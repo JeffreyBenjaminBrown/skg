@@ -2276,3 +2276,23 @@ dead-code list does not name it.
 it calls; the report named only the ancestry rows' order.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 3 (2026-10-26)
+Launched 22:52 UTC, reported 23:19 UTC: twenty-seven minutes.
+One correction inserted, under slice 8, from the agent's two
+findings: a dead 'SkgEnv::find_skgrepo_in_generation' and a
+callee placed before its caller in 'ancestry.rs'. The
+deviations are sound; two are worth the review's eye: a latent
+bug in 'show_overrider' (editability released in the wrong
+order, so a buffer could hold two editable occurrences of one
+node) was found by a test written first and fixed with a
+regression test; and a new failure of two restore tests
+(the goal's list counted dangling IDs against a denominator of
+nodes) was caused and fixed within the slice. The agent ran
+the client suites though the slice did not ask, since both
+lens engines changed for the WHEN grammar; right. One slip
+reported: a stray 'git stash' and 'apply', checked and dropped,
+Jeff's three files intact. Suites: nextest 969 of 969, Emacs
+411, Neovim 401, integration 34 of 35 with the pre-existing
+failure.
+

@@ -1172,6 +1172,12 @@ table.rs' green.
 Read the readability report's item 1 and the vocabulary
 report's items 5, 7 and 16 first. The move is mechanical; no
 behavior changes, and every test passes before and after.
+*** Corrections carried from slice 3
+Two findings of slice 3's agent, both cheap and done with the
+move: 'SkgEnv::find_skgrepo_in_generation' has no caller and
+is deleted; in 'ancestry.rs', 'described_node' is placed before
+'compound_folder_parties', which it calls, as 'formatting.org'
+orders callers before callees.
 *** the moves
 The goal computers of 'server/update_buffer/reconcile/' and
 'server/to_org/complete/partner_folder/goal_list.rs' into
