@@ -1915,3 +1915,29 @@ longer loses a hide through them.
 See "The two timings" and the new 'TODO/problems.org' entry.
 *** Headline
 DONE.
+
+** Orchestrator's notes after slice 1 (2026-10-26)
+Launched 21:47 UTC, reported 22:18 UTC: thirty-one minutes.
+One correction inserted, at the head of slice 2: Jeff withdrew
+the emptied-folder pruning rule in '06_2_new-issues.org'
+("simpler yet") after the plan was committed, and slice 1 had
+built it; the agreed behavior now says an emptied folder stays,
+and slice 2 removes the rule. One correction carried into
+slice 9: the cause the agent found for the vanishing unknown
+('omit_restricted_members' drops every member it cannot
+resolve to a home) is the omission slice 9 splits by cause, so
+slice 9 keeps such a member as an unknown and closes the
+problems entry. The agent's seven deviations are sound; the
+two on silence (a switch's tombstones, and what a quiet
+tombstone makes unsayable) follow the definition, since both
+are what the truth changed under the user. The stats timing,
+3.1 s to 0.14 s for 4,000 children, met the plan; under a
+restriction 2.6 s remain in the gated graphnode stats, outside
+the plan's two functions, filed in 'TODO/problems.org' for the
+review. Suites: nextest 970 of 970, Emacs 410, Neovim 400,
+integration 34 of 35 with the pre-existing failure. Slice 2
+launches with the context of slice 1's names:
+'BufferCorrectionPolicy', 'SaveAffectedIds::deleted',
+'orphan_warnings', 'relationship_member_is_visible', the
+'prepass' hook gone.
+

@@ -263,20 +263,16 @@ it is restored or committed. The tombstone kind itself, and the
 The refresh, not a phase of the skgrepo-set switch's own,
 brings a view under the restriction: it entombstones the
 occurrences the restriction keeps out, draws no restricted
-member, prunes childless tombstones, and prunes the folders
-the restriction empties. 'convert_and_prune_for_skgrepo_switch'
-and the hook that ran it before the refresh are deleted. A
-switched buffer looks as it does today, except where the
-Restricted vognode stands.
-*** a folder the restriction empties is pruned
-An editable folder that is empty is pruned at the tail when
-the restriction emptied it: its goal had members before the
-restriction's omission and none after. A folder that would be
-empty under any restriction stays, since the user can add to
-it, and so does an emptied folder in the one refresh that
-draws it on the user's request. The refresh applies the rule
-from the goal alone; no caller tells it. A folder holding a
-Restricted vognode is not empty.
+member, and prunes childless tombstones.
+'convert_and_prune_for_skgrepo_switch' and the hook that ran it
+before the refresh are deleted. A switched buffer looks as it
+does today, except that an editable folder the restriction
+empties stays, and where the Restricted vognode stands.
+*** a folder the restriction empties stays
+An editable folder that the restriction empties stays, empty,
+as any empty editable folder does, since the user can add to
+it; it fills again when the restriction widens. No rule prunes
+it, and the goal computers need not say what they omitted.
 *** the Restricted vognode
 A vognode of a new kind, written '(skg restricted (gnid X)
 [(skgRepos (relRepo R))] [noClaim] [(editRequest ...)])',
@@ -312,13 +308,12 @@ other hide in 'hidesFromSubs' as it finds it. Today the save
 judges by the record's relRepo alone, and an empty folder
 deletes a hide ('06_1_prepass-experiment.org').
 *** the order of the two slices
-Slice 1 fixes the save, adds the emptied-folder rule and
-deletes the switch's phase; until slice 9 adds the Restricted
-vognode, a member with a visible record and a restricted home
-is omitted as today, so a folder it alone would fill is
-emptied and pruned, and no hide of it is replaceable. Slice 9
-then adds the kind and the goal's distinction, and the rules
-above hold in full.
+Slice 1 fixes the save and deletes the switch's phase; until
+slice 9 adds the Restricted vognode, a member with a visible
+record and a restricted home is omitted as today, so a folder
+it alone would fill stays empty, and no hide of it is
+replaceable. Slice 9 then adds the kind and the goal's
+distinction, and the rules above hold in full.
 ** The stats pass is linear (slice 1)
 The tail's derived facts no longer scan a recorder's whole
 contains list once per child. The relRepo of each child's
@@ -439,11 +434,10 @@ buffer corrections name headlines by vnid at report time).
 mod.rs') and 'omit_hidden' ('server/refresh/goal.rs') drop
 restricted members from a goal before any rung reads it, so
 nothing downstream can tell an emptied folder from an empty
-one unless the goal says it omitted something, and nothing
-can tell a restricted node under a visible record from one
-under a restricted record. The emptied-folder rule needs the
-first bit on 'Goal'; the Restricted vognode needs the omission
-split by its cause, the record or the node.
+one, and nothing can tell a restricted node under a visible
+record from one under a restricted record. The Restricted
+vognode needs the omission split by its cause, the record or
+the node.
 ** the save weaves invisible members back
 'preserve_invisible_members' ('traverse.rs') and 'weave.rs'
 restore to a saved list every member the buffer could not
@@ -784,7 +778,22 @@ with 'initial_node_limit' raised) before and after, through
 ** TODO Slice 2: the server's words
 Every item cites the report that locates it; read the finding,
 then change every site it names and every other site a grep
-finds. Each rename is mechanical; none changes behavior.
+finds. Each rename is mechanical; none changes behavior, except
+the correction carried from slice 1, which comes first.
+*** Corrections carried from slice 1
+Slice 1 built a rule that pruned an editable folder the
+restriction emptied; Jeff withdrew it ('06_2_new-issues.org',
+"simpler yet"), and the agreed behavior now says such a folder
+stays. Remove the rule from commit f653ce81's work:
+'RestrictedGoalList' and the goal computers' report of what
+they omitted, 'Walk::emptied_folders', and the tail's condition
+on it, with the three refresh tests of the rule (a folder empty
+under no restriction stays, an emptied one goes, an emptied one
+drawn on request shows once). The switched-buffer comparison
+test of 'tests/hidden_nodes.rs' changes its expectation: the
+emptied folders stay, empty, and the switch back fills them
+again; assert that. Run 'bash/nextest.sh' and the fixpoint
+sweeps before the renames below.
 *** restricted (vocabulary item 1)
 'GnidPresence::Hidden' to 'Restricted', 'omit_hidden' to
 'omit_restricted' (or delete it where it only wraps
@@ -1196,8 +1205,13 @@ Split the omission in 'omit_restricted_members' (now under
 'weave.rs' states: a member whose record's relRepo is
 restricted is omitted as today; one whose record is visible
 and whose home is restricted stays in the goal, marked
-restricted. 'Goal' carries the mark per member, and the
-emptied-folder rule counts only the omissions.
+restricted. 'Goal' carries the mark per member. A member whose
+record is visible and that resolves to no node at all is an
+unknown, as under no restriction: today 'omit_restricted_members'
+drops every member it cannot resolve to a home, which is why
+an unknown recorded in a visible skgrepo vanishes under a
+restriction ('TODO/problems.org', the entry so named, which
+this part closes).
 *** the kind
 'Vognode::Restricted { gnid, relRepo, claimsMembership }' in
 'server/types/viewnode.rs', beside 'Unknown', with the same
@@ -1248,9 +1262,9 @@ The glossary ("Restricted vognode", "restricted", "record"),
 'COMMANDS-nvim.org' under the skgrepo-set switch.
 *** tests
 'tests/refresh/' cases for the ID rule's new answer, the
-re-kind both ways, the goal's split and the emptied-folder rule
-with a Restricted member; the fixpoint sweeps; the suites with
-every script.
+re-kind both ways, the goal's split and the unknown with a
+visible record kept under a restriction; the fixpoint sweeps;
+the suites with every script.
 
 ** TODO Slice 10: the user docs and the glossary
 Read the user-docs report first; its items 1 to 15 locate every

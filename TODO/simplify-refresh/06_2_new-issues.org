@@ -1,0 +1,285 @@
+This discussion will be integrated into 06_plan_tidy-refresh.org.
+* New issues
+Things writing this plan turned up that the review's
+discussion did not decide. Each gives the problem and the
+solution the plan takes; Jeff may reverse it.
+** DONE the orphan warning's channel
+The review settled that the save warns; it did not say which
+warnings. The save-result carries warnings that both clients
+show in their save-warnings buffer, and the corrections ride on
+the same message into the server-warnings buffer. The plan puts
+the orphan line among the save warnings, since the save, not
+the refresh, made the node; a correction would be the wrong
+word for a thing the user asked for.
+** what the switch's entombstone-and-prune phase alone did
+The duplication report expected one behavior the refresh may
+not cover when the switch's entombstone-and-prune phase goes:
+an editable folder the phase emptied and pruned. The
+experiment below confirmed it and found a save bug the phase
+had masked. The plan's answer, in the agreed behavior and in
+slices 1 and 9: fix the save, prune a folder the restriction
+empties by a rule the refresh applies from the goal alone, then
+delete the phase; and, by Jeff's rule in the thread below, show
+a visible record of a restricted node as a Restricted vognode.
+*** DONE jeff : what is the prepass?
+I dislike that word; it says nothing but "this goes before
+something else goes". It could be almost anything.
+(I realize there is precedent for it in the codebase;
+I intend to change that.)
+
+I would prefer a much longer phrase: "The first|early phase
+of _, in which _ happens."
+**** DONE Claude says: defined; the word is gone from the plan
+It is the first phase of a skgrepo-set switch's rerender, in
+which the switch itself, before the refresh runs on a view,
+entombstones every occurrence of a node the new restriction
+keeps out and every unknown it excludes, and prunes the
+childless tombstones ('convert_and_prune_for_skgrepo_switch'
+in 'server/update_buffer/skgrepo_switch.rs'). The plan now
+calls it "the switch's entombstone-and-prune phase", defines
+it under "Words this plan uses", and says so at every former
+site. The precedent in the code is small: the hook parameter
+'prepass' of 'prepare_rerender_views_where' and its two
+wrappers in 'server/serve/rerender_stream.rs' (seven lines),
+one comment in 'server/serve/handlers/skgrepo_sets.rs', and a
+comment saying "pre-pass" in 'server/import_org_roam/parse.rs'.
+Slice 1 deletes the hook with its only user, and slice 2
+rewords the import comment, so the word is gone from code,
+comments and docs when the plan is done.
+*** jeff : can we anticipate whether this will actually be a problem
+by doing more research?
+**** Claude says: yes; it was run, and it is a problem
+The experiment is recorded in '06_1_prepass-experiment.org'
+beside this plan (run in a throwaway worktree, the whole Rust
+suite both ways plus throwaway probes). Three findings. First,
+the suites cannot see the phase: all 956 Rust tests pass with
+it skipped, so the check slice 1 was to make would have shown
+nothing. Second, the refresh alone leaves, after a narrowing
+switch, three empty editable folders the phase pruned (the
+subscribee folder, the hidden-outside folder inside it, and the
+overridden folder); the tail keeps empty editable folders on
+purpose ('folder_goes_when_empty' in 'ladder.rs' excludes
+editable and flags folders, since the user may add members
+there), and nothing else in the refresh knows the folder was
+emptied by the restriction. Third, and worse, one of those
+empty folders loses data: a hidden-outside folder saved empty
+under the narrowed restriction deletes the restricted hide from
+the subscriber's 'hidesFromSubs'. 'apply_hiddenoutside_edits'
+('server/from_text/local_fieldintent_collection/
+resolve_visibility.rs', lines 134 and 144) judges a hide
+replaceable by where the relationship is recorded (its relRepo)
+and not by whether its member is in view, so a hide recorded in
+public of a member homed in private counts as replaceable and
+the empty folder unhides it. The phase masked that save bug by
+pruning the folder first. The plan now does three things in
+slice 1, and the issue above says so: fix the save so that a
+hide whose member the restriction keeps out is never
+replaceable, with a regression test (switch, save, check
+'hidesFromSubs'), which the suite lacks; have the tail prune an
+empty editable folder the restriction emptied (the rule you
+state below, which replaced my first draft's caller-told
+pruning), so that a switched buffer looks exactly as it does
+today; then delete the phase and its hook.
+The experiment also saw, with and without the phase, an unknown
+recorded in public vanish under the public restriction, which
+it did not explain; slice 1 checks it with a throwaway test and
+records the cause, fixing it only if it is a one-line gating
+error. Both are entries in 'TODO/problems.org'.
+***** jeff : we need a principled rule.
+One problem, I suspect, is that only content relationships
+can have their telescope sections moved. But that shouldn't
+be hard to extend to the other folders, right?
+(I can imagine the compound folders being tricky.
+If a user asks to re-home the relationship to a hidden,
+from hidesIn or hidesOut or maybe a direct hides folder
+if such a thing exists, that changes the home of the hide
+relationship, not the contains relationhip from the subscribee
+to the hidden.)
+
+Next, if a skgrepo restriction empties a folder, we prune
+the folder. But if it doesn't, or if the user
+asks to see the folder, the folder can be visible.
+It doesn't show restricted relationships.
+It shows unrestricted relationships to restricted nodes
+much like an Unknown, but we'll need a new node type,
+Restricted, to carry the gnid. It should show
+"restricted" (in the "message" font), not "unknown".
+
+This should also apply to ordinary content relationships:
+Unrestricted content relationships to restricted nodes
+show with a Restricted vognode.
+
+Does this cover all our bases?
+****** Claude says: nearly; it is in the plan as slice 9
+Your rule is in the plan in two parts, and the plan grew a
+slice for the second.
+
+The first part, pruning. An editable folder that is empty is
+pruned at the tail when the restriction emptied it: its goal
+had members before the restriction's omission and none after.
+A folder that would be empty under any restriction stays,
+since the user can add to it, and an emptied folder drawn on
+request shows, empty, in that one refresh. The refresh applies
+this from the goal alone; the goal computers already omit
+restricted members before any rung sees the list, and the rule
+only needs them to say that they omitted something. So no
+caller tells the refresh anything for pruning; the caller's
+policy carries only the two silenced buffer corrections. This
+replaced my first draft, which had the caller say "a narrowing
+follows". One consequence: a folder requested under a
+restriction that hides all of it shows once and goes at the
+next refresh; answering such a request with a message instead
+is a one-line change if you prefer it.
+
+The second part, the Restricted vognode, reverses one decision
+of the de novo discussion, where you said of the old restricted
+placeholder "Yes, disappear it!", and it is a better rule than
+the one we took. The old placeholder carried nothing, not even
+the gnid, and lingered where its node had been; what you
+describe is a goal member: it stands exactly where a section
+the user may see names a node the user may not see, and it
+carries that section's gnid and nothing else. The visible file
+already holds that gnid, so showing it reveals nothing the
+visible data does not, with one exception you should weigh: a
+viewer learns that the gnid resolves to a node in a restricted
+skgrepo rather than to nothing, which the visible data does not
+say. [JEFF: Yeah that's fine.]
+
+An unknown would hide even that; you asked for
+"restricted", and the plan takes it. What the rule covers,
+base by base: every relation, since the goal computers decide
+visibility in one place by the record's relRepo and the
+member's home ('weave.rs' states it: a member is visible when
+both are unrestricted), and the change splits that into
+"omitted" (the record is restricted) and "Restricted" (the
+record is visible, the node is not); the write-protected
+folders, whose records live in the other node's file, where a
+restricted node's record is a restricted file and is omitted;
+a restricted occurrence under a visible record, which becomes
+a Restricted vognode in place, keeping its vnid, fold state and
+children, and an occurrence again when the restriction widens;
+a restricted occurrence under a restricted record, which is
+entombstoned as today, since the record itself may not be
+shown; the diff view, where a restricted node is never a ghost
+(a ghost would show HEAD's title) and the Restricted vognode
+may carry the visible record's change facts; the save, where a
+Restricted vognode claims as an unknown does, so a save keeps
+the record, and deleting its line removes a record the user
+could see, which today's weave of invisible members did not
+allow and now allows for visible records only; and the hides,
+where a Restricted member in the hidden-outside folder means
+the folder shows every visible hide, so slice 1's save rule
+("replaceable only when the folder could show the member")
+widens in slice 9 to count a Restricted member as shown. What
+it does not cover, and the plan decides: text typed on a
+Restricted line is refused as on an unknown; it carries no
+stats, since counts would reveal; the atom is 'restricted', a
+new spelling beside the retired 'restrictedNode', which the
+parser goes on refusing by name; and a restricted node's
+aliases and properties, which live in its own file, are not
+shown anywhere. The relRepo-move question is answered below
+and left out of the plan.
+
+On your first paragraph: relRepo moves are not confined to
+content. The request '(editRequest (relRepo R))' is honored on
+a content member, an alias member, and a member of the two
+editable partner folders, the subscribee and the overridden
+folder, where the save's writer is the folder's viewparent
+('relRepo_request_is_collected' in 'validate_tree.rs'). It is
+refused on a member of the hidden-outside folder, with the
+message "HiddenOutsideOfSubscribee membership is editable, but
+hide relRepos are derived" ('traverse.rs'): hides are inferred
+by the save from the subscriber's content removals and from
+the subscribee-as-such's visible content
+('resolve_visibility.rs'), and their relRepo follows the
+config's default for the two nodes' homes; I did not trace
+where that default is applied. The write-protected folders
+(containers, mentioners, subscriber, overrider, hider, and the
+direct hidden folder, which exists and is write-protected,
+editable only through the subscribee folder) take no request
+from their side. So the extension you ask about is one
+relation, the hide, and it is a design question rather than a
+mechanism: what the home of an inferred hide should be when
+the user moves it, and whether a moved hide stays moved when
+the save next infers hides. That is a feature beyond this
+plan; I would take it up as its own item after the run.
+******* TODO jeff : simpler yet
+That rule 'if narrowing emptied it, delete it'
+feels rather ad-hoc and seems to be making the code unnatural.
+Right? Unless I'm wrong, let's discard it.
+******** TODO Claude says: you are right; discarded
+Slice 1 had built it before your note was read (a
+'RestrictedGoalList', a 'Walk::emptied_folders' set and one
+tail condition, which the agent itself called contained), and
+the save fix makes an empty folder harmless, so nothing argues
+for it but today's buffers. The plan's agreed behavior now
+says an emptied folder stays and fills again when the
+restriction widens, and slice 2 opens with a correction that
+removes the rule and its three tests. The review will list
+the one thing the user sees differently: empty editable
+folders after a narrowing.
+******* TODO jeff : otherwise agreed
+******** TODO Claude says: noted
+** DONE the corrections' silence is per caller
+Silencing the saver's own deletions and the widening's
+reinstatements needs the refresh to be told by its caller. The
+plan threads a policy through 'Walk' from the two callers that
+know; every other caller passes none. An alternative, a flag
+on each view in the views state, was rejected as state the
+model forbids.
+*** DONE jeff : what are these "corrections"?
+**** DONE Claude says: what the refresh reports it changed
+A correction is what a refresh reports it changed in a buffer
+because the buffer contradicted the truth; the glossary's
+entry "corrections" defines it, and 'CorrectionKind' in
+'server/refresh/corrections.rs' lists the six kinds with the
+message each shows: a goal item drawn that no headline stood
+for ("Drew what the graph says belongs here."); a headline
+entombstoned because it can stand where it is for nothing; a
+claiming child marked 'noClaim' because the graph does not
+relate it to its parent; duplicate viewnode siblings merged
+into one; a headline re-kinded, as the graph has it; an edit
+request dropped because the headline's new kind has no slot
+for it. Each names its headline by vnid and title. The save
+and rerender responses carry every refreshed view's
+corrections, tagged with the view ID, and both clients append
+them to the server-warnings buffer ("*SKG Server Warnings*" in
+Emacs) under a headline per view. The word is from the de
+novo discussion, where the refresh's output was settled as
+the buffer plus its corrections. This issue concerns two of
+the six that today fire for things that are not the buffer's
+fault: after your own save deletes a node, your other open
+views report its occurrences entombstoned; after you widen
+the skgrepo restriction, the members it reveals are reported
+as drawn. Decide 10 of the review settled that neither is a
+correction, and the issue is only how the refresh learns it:
+from its caller, since the refresh itself is stateless.
+***** jeff : let's call it "buffer corrections"
+not simply "corrections".
+****** Claude says: done, in the plan
+The word is now "buffer corrections" under "Words this plan
+uses", and slice 2 renames the module, the three server types
+and the glossary entry, and rewords every doc and comment. The
+one thing it keeps is the wire field '(corrections ...)' on the
+save-result and rerender-done messages, since every wire atom
+stays in this plan and both clients' readers and tests spell
+it; say if you want it renamed too.
+******* jeff : no, that's good
+It's clear from context we're talking about buffer corrections
+in the case of the wire messages.
+***** jeff : otherwise, seems good
+****** Claude says: noted
+** DONE the one-phase search and giant searches
+With one phase a search of 3,000 hits waits about a second in a
+debug build before showing anything, where today it shows the
+hits after a tenth of a second. The plan accepts that, as the
+review decided, and does not add a hit cap or a budget. If it
+bites, the refresh's node budget already exists and the stub
+could be given one; that is a one-line change the plan leaves
+unmade.
+** DONE the metadata editor and the readiness request
+The two editors disagree on whether to show a readiness request
+(Emacs hides it, Neovim shows it). The plan picks showing it,
+since the user can clear a readiness request only by seeing it;
+Jeff may prefer hiding it in both.
+*** jeff : no, better to show, like you say
