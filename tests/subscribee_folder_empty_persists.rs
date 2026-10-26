@@ -85,7 +85,7 @@ async fn empty_subscribee_folder_persists_impl (
     response . errors );
   Ok (( )) }
 
-// Contrast: an empty *write-protected* PartnerFolder -- here a
+// Contrast: an empty *write-protected* partner folder -- here a
 // subscriberFolder -- is removed by the postorder prune sweep, because (unlike the
 // SubscribeeFolder) it is not an editable interface; an emptied one is just noise.
 async fn test_empty_subscriber_folder_is_removed (

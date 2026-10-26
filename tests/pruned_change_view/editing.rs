@@ -49,7 +49,7 @@ fn a_deleted_id_folder_respawns (
                  "the ID folder must be shown again" );
     Ok (( )) }) }
 
-/// Deleting an entry of the changed ID folder, while keeping the
+/// Deleting a member of the changed ID folder, while keeping the
 /// folder, aborts the save: the folder no longer matches the node's
 /// IDs. No file changes.
 #[test]
@@ -108,7 +108,7 @@ fn a_removed_id_does_not_abort_the_save (
     Ok (( )) }) }
 
 /// Deleting the save-inert images of removed things changes nothing:
-/// k1, removed from ct's content (an editable non-member, deleted
+/// k1, removed from ct's content (editable and claiming nothing, deleted
 /// with what it holds), and gone, a deleted subscriber of orph. Both
 /// are shown again where they stood.
 #[test]

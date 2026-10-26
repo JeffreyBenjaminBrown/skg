@@ -64,7 +64,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
     &config,
     None );
   // B has same skgrepo as A, so homeRepoAtBoundary should be false,
-  // even though B is a non-member.
+  // even though B claims nothing.
   let b_ref =
     viewforest . get (a_gnid) . unwrap ()
     . first_child () . unwrap ();
@@ -75,7 +75,7 @@ fn skgrepo_inheritance_across_non_content_same_skgrepo () {
             "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a non-content child (a non-member) has a different skgrepo
+/// When a non-content child (one claiming nothing) has a different skgrepo
 /// from its nearest occurrence ancestor,
 /// homeRepoAtBoundary should be true.
 #[test]

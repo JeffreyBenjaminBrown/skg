@@ -31,7 +31,7 @@ const N_UNDER_Y : &str = "** (skg node (gnid n) (skgRepos (nodeRepo main)) write
 
 /// 'buffer' with the first line at 'depth' (its leading stars) that
 /// shows 'node' editable made write-protected, without its body, and
-/// its child vognodes made non-members, since a write-protected
+/// its child vognodes claiming nothing, since a write-protected
 /// occurrence holds none.
 fn write_protecting_at (
   buffer : &str,
@@ -140,7 +140,7 @@ fn a_child_typed_under_a_writeProtected_occurrence_is_a_note (
               "{}", saved );
     Ok (( )) }) }
 
-/// Write-protecting n under x (its children becoming non-members)
+/// Write-protecting n under x (its children coming to claim nothing)
 /// while requesting n under y moves editability there: n is editable
 /// under y and write-protected under x, and a is shown once under each.
 #[test]
@@ -381,7 +381,7 @@ fn id_and_flags_folders_under_a_writeProtected_occurrence_are_checked (
       "{:?}", errors );
     Ok (( )) }) }
 
-/// Typed under n under y as non-members, b (folded) then a are n's
+/// Typed under n under y, claiming nothing, b (folded) then a are n's
 /// content in the wrong order. An editable-view request there makes
 /// that occurrence editable; it keeps their viewnodes (b stays
 /// folded), still claiming nothing (a claim is the user's to make),

@@ -337,7 +337,7 @@ mod tests {
 
   #[test]
   fn reordered_non_member_children_pass () {
-    // The graph has c1 before c2; non-members are the user's own.
+    // The graph has c1 before c2; children claiming nothing are the user's own.
     assert_eq! (errors_in (indoc! {"
       * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg node (gnid c2) (skgRepos (nodeRepo main)) noClaim) c2

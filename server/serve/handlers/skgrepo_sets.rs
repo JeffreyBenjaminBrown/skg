@@ -61,7 +61,7 @@ pub fn handle_skgrepo_set_request (
 /// nodes become tombstones; childless tombstones, the properties of the
 /// nodes they replaced and the folders these leave empty are pruned,
 /// and the rest keeps its viewnode IDs), then completion with
-/// PartnerFolder creation
+/// Partner folder creation
 /// enabled, because a switch can also activate skgrepos, revealing
 /// members and folders.  Results stream via the rerender-all message
 /// flow (lock, per-view, done).

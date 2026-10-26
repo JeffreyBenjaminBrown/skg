@@ -209,7 +209,7 @@ async fn stale_content_is_kept_unwarranted (
   Ok (( )) }
 
 /// In a view of k, a write-protected copy of m holding a note is
-/// pasted, as a non-member, beside the member m. The two siblings stand
+/// pasted, claiming nothing, beside the member m. The two siblings stand
 /// for one node, so the refresh merges them: the first, the member m,
 /// survives, still editable, and the note joins its content. When k
 /// loses l and m, saved from a second view of k, the first view's

@@ -14,7 +14,7 @@
 //! for a confirmation consumes nothing.
 //!
 //! After view completion of a buffer of the diff view, the
-//! '(ready ...)' display facts are set from the store, and the
+//! '(ready ...)' change facts are set from the store, and the
 //! '(leaves ...)' facts, which tell the clients what a request on a
 //! headline may name, from the same rule
 //! ('set_ready_facts_in_viewforest').
@@ -153,7 +153,7 @@ fn leaves_named_at (
           DiffObject::All =>
             all_of . push (pid . clone ()), }} },
     ViewnodeKind::PropertyMember (member) => {
-      // The change-forest leaf of an entry in a folder belongs to the
+      // The change-forest leaf of a property member belongs to the
       // folder's viewparent.
       let pid_of_folders_viewparent : ID =
         pid_of ( &grandparent_pid (node) ? );
@@ -221,7 +221,7 @@ fn keys_in_forest (
     . filter ( |key| forest . leaf (key) . is_some () )
     . collect () }
 
-/// Set the '(ready ...)' and '(leaves ...)' display facts of every
+/// Set the '(ready ...)' and '(leaves ...)' change facts of every
 /// viewnode that carries them. An object is ready when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'); the order-only marker is always ready. The

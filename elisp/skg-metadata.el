@@ -202,7 +202,7 @@ write-protected -- the save would refuse that edit. Returns
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
     containerFolder mentionerFolder acquiredByFolder acquiredFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
-  "The PartnerFolder atoms where an explicit relRepo
+  "The partner folder atoms where an explicit relRepo
 request is unsupported from this side.  The membership of
 hiddenOutsideOfSubscribeeFolder, a compound partner folder, is
 editable, but hide repos are still derived and cannot carry this
@@ -214,7 +214,7 @@ be meaningless.")
 (defconst skg--writable-folder-relations
   '((subscribeeFolder . "subscribesTo")
     (overriddenFolder . "overrides"))
-  "The PartnerFolder atoms whose members' relationships are writable
+  "The partner folder atoms whose members' relationships are writable
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The folder's viewparent (the anchor) owns the
@@ -530,8 +530,8 @@ subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`content', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
 where edits still affect the graph: it prunes below write-protected
-nodes and subscribee-as-such members, prunes non-member
-(noClaim) nodes -- except the walk's root, which the
+nodes and subscribee-as-such members, prunes noClaim
+nodes -- except the walk's root, which the
 user chose deliberately -- and prunes non-vognodes other than the two
 writable folders. Returns the number of relationships true."
   (let ((targets (skg--relRepo-recursive-targets kind)))
@@ -734,8 +734,8 @@ may sit on it depends also on where it stands
 
 (defun skg--restoreRel-position-at-point-p ()
   "Non-nil iff the headline at point stands where a restoreRel may:
-under a partner folder (whose removed members are non-members), or as
-a removed member, a non-member under a vognode that is no node of the
+under a partner folder (whose removed members claim nothing), or as
+a removed member, a child claiming nothing under a vognode that is no node of the
 containerward chain. The save checks the same
 ('restoreRel_stands_where_it_may', server/from_text/
 buffer_to_viewnodes/local.rs)."
@@ -751,7 +751,7 @@ buffer_to_viewnodes/local.rs)."
 
 (defun skg--containerward-chain-node-at-point-p ()
   "Non-nil iff the headline at point is a node of the containerward
-chain: a non-member vognode under a member of a partner folder whose
+chain: a vognode claiming nothing under a member of a partner folder whose
 members carry the chain (every one but the two acquisition folders),
 or under another such node ('is_in_containerward_chain',
 server/to_org/extend/containerward_chain.rs)."

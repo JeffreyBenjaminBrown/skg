@@ -65,7 +65,7 @@ pub struct LeavesFact {
 /// that it does not apply. A node in only one graph has no other
 /// properties to compare, so 'properties' is true only when 'node' is
 /// None. On a property leaf the one existence it shows is 'rel': that
-/// of its entry in its folder.
+/// of its membership in its folder.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DiffChange {
   pub node       : Option<Existence>,
@@ -75,7 +75,7 @@ pub struct DiffChange {
 
 /// One step of change between the two graphs of a straddle: 'Added'
 /// when only the after-graph holds the thing (a node, a relationship,
-/// a folder entry), 'Removed' when only the before-graph does.
+/// a property member), 'Removed' when only the before-graph does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Existence { Added, Removed }
 
@@ -110,7 +110,7 @@ pub struct ReadinessRequest {
 pub struct Viewnode {
   pub foldAndFocus    : FoldAndFocus,
   pub kind            : ViewnodeKind,
-  /// The diff view's display facts. Empty on a kind that never
+  /// The diff view's change facts. Empty on a kind that never
   /// carries a change (a folder, the buffer root, a tombstone,
   /// 'BodyDiff'), and outside the diff view.
   pub change_facts      : ChangeFacts,
@@ -196,9 +196,8 @@ pub enum Vognode {
 /// in a subtree from killing the whole view at its root. Inert on save (it emits
 /// no fieldIntents, though its descendants still might, so extraction recurses
 /// through it). If it is still a member of its parent's contains it is retained
-/// (a present-but-unresolvable reference); if it is no longer a member it
-/// converts to a tombstone (`convert_nonmember_unknown_children_to_tombstones`) and
-/// is pruned.
+/// (a present-but-unresolvable reference); if the list no longer names it,
+/// the refresh entombstones it and the prune removes it.
 ///
 /// DISTINCT INFO: it carries only the `id`: no skgrepo (it is the one
 /// vognode for which `pid_and_skgrepo` returns None) and no text.
@@ -406,7 +405,7 @@ pub struct ViewnodeStats {
   /// Some(NAME) when the relationship instance this position's
   /// binding relationship to its viewparent represents (=contains= for an
   /// ordinary content child; the folder's relation for a simple
-  /// PartnerFolder member -- see 'Folder::relation_member_role')
+  /// partner folder's member -- see 'Folder::relation_member_role')
   /// is recorded in a skgrepo that differs from that relationship's default
   /// (see the relationship-default policy in 'SkgConfig'). None when
   /// equal to the default:
@@ -414,11 +413,11 @@ pub struct ViewnodeStats {
   /// "What leaks, and what repair fixes") -- the herald marks
   /// exactly the deliberately privatized relationships. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (a non-member); and for the two
+  /// (one claiming nothing); and for the two
   /// compound partner folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
-  /// This is a display fact, unlike a requested replacement stored in
+  /// This is a derived fact, unlike a requested replacement stored in
   /// 'Occurrence::relationshipEditRequest'.  Save extraction never
   /// treats this value as a fieldIntent.
   /// Herald: red "~NAME" immediately before the ⌂ of repoBoundary
@@ -611,7 +610,7 @@ impl FolderRelation {
 /// - 'Folder(rel)' builds both folders of the relation, populated from the graph.
 /// - 'Editable' makes the (write-protected) node editable.
 /// - 'WriteProtected' makes the (editable) node write-protected,
-///   and its direct unrestricted children non-members.
+///   so that its children claim nothing.
 /// - 'WriteProtectedSubtree' does that to the node and its whole
 ///   content subtree.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)

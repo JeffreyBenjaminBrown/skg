@@ -14,7 +14,7 @@
 /// - If N is a claimsMembership viewchild of E but is not
 ///   graph-content of E, then it is not a hiderel edit.
 ///   This does not touch it. The completion/rerender pipeline
-///   will change it to a non-member.
+///   will mark it noClaim.
 /// .
 /// Resolution cannot run during collection, even in principle: it
 /// needs disk (the subscribee's contains, the subscriber's hides)

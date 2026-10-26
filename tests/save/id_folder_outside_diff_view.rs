@@ -26,8 +26,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-save-id-folder-outside-diff-view",
     |s| Box::pin ( async move {
-      s . reset ("a_nonMember_under_an_id_folder_survives_the_rerender", fixtures) ?;
-      a_nonMember_under_an_id_folder_survives_the_rerender (
+      s . reset ("a_noClaim_child_under_an_id_folder_survives_the_rerender", fixtures) ?;
+      a_noClaim_child_under_an_id_folder_survives_the_rerender (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -49,7 +49,7 @@ async fn save_buffer (
             response . errors, buffer );
   Ok (response . saved_view) }
 
-async fn a_nonMember_under_an_id_folder_survives_the_rerender (
+async fn a_noClaim_child_under_an_id_folder_survives_the_rerender (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -66,7 +66,7 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
 ";
   let saved : String = save_buffer (
     buffer, config, tantivy, &graph, &mut views_state ) . await ?;
-  println! ("Result of saving a non-member under an ID folder:\n{}", saved);
+  println! ("Result of saving a child claiming nothing under an ID folder:\n{}", saved);
   let lines : Vec<String> = saved . lines () . map ( |line|
     skg::metadata_canon::without_viewnode_ids (line) ) . collect ();
   assert_eq! ( lines, vec! [

@@ -723,7 +723,7 @@ local function parent_line (line_number)
 end
 
 ---Is the headline at LINE_NUMBER a node of the containerward chain: a
----non-member vognode under a member of a partner folder whose members
+---vognode claiming nothing under a member of a partner folder whose members
 ---carry the chain (every one but the two acquisition folders), or under
 ---another such node ('is_in_containerward_chain',
 ---server/to_org/extend/containerward_chain.rs)?
@@ -753,8 +753,8 @@ function M.containerward_chain_node_p (line_number)
 end
 
 ---Does the headline at LINE_NUMBER (default: point) stand where a
----restoreRel may: under a partner folder (whose removed members are
----non-members), or as a removed member, a non-member under a vognode
+---restoreRel may: under a partner folder (whose removed members
+---claim nothing), or as a removed member, a child claiming nothing under a vognode
 ---that is no node of the containerward chain? The save checks the
 ---same ('restoreRel_stands_where_it_may',
 ---server/from_text/buffer_to_viewnodes/local.rs).

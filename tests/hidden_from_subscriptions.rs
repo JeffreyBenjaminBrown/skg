@@ -326,9 +326,9 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_subscribee_and_compoundPartnerFolders",
+      s . reset_from_config ("test_subscribee_and_compound_partner_folders",
         "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
-      test_subscribee_and_compoundPartnerFolders (
+      test_subscribee_and_compound_partner_folders (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
@@ -552,12 +552,12 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral_views);
     // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
     // in-view subtree (e11) is a user branch, so the glossary's "retain
-    // as non-member or tombstone, then prune" retains the visible
-    // occurrence as non-member
+    // as noClaim or tombstone, then prune" retains the visible
+    // occurrence, claiming nothing,
     // rather than deleting it -- chaos-monkey safety: the user may
     // have deliberately placed content there, and we must not lose it. So e1
     // shows twice: once hidden (write-protected), once as a preserved
-    // non-member branch, still editable with e11 its content, whose stats
+    // branch claiming nothing, still editable with e11 its content, whose stats
     // say, as the hidden folder's member's do, that its viewparent (the
     // subscribee) contains it and the subscriber, three generations up,
     // hides it.
@@ -570,7 +570,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       . find ( |line| without_viewnode_ids (line) . starts_with ("**** (skg node (gnid e1)")
                       && line . contains ("noClaim") )
       . unwrap_or_else ( || panic! (
-        "Expected hidden branch e1 made a non-member (subtree preserved):\n{}",
+        "Expected hidden branch e1 marked noClaim (subtree preserved):\n{}",
         collateral ));
     assert! ( ! retained_e1 . contains ("writeProtected"),
       "the retained e1 keeps its editability:\n{}", collateral );
@@ -773,7 +773,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_kept_unwarranted (
 ///
 /// Also tests ordering rule: HiddenInSubscribeeFolder precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeFolder before E21.
-async fn test_subscribee_and_compoundPartnerFolders (
+async fn test_subscribee_and_compound_partner_folders (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

@@ -1121,7 +1121,7 @@ async fn test_writeProtect_and_editable_requests_move_editability_and_back (
 // Test: a retained content node is shown once
 // ===================================================
 // In a view of 1, 13 is marked as not affecting its parent and saved:
-// 1 no longer contains 13, which stays under 1 as a non-member. A
+// 1 no longer contains 13, which stays under 1 claiming nothing. A
 // save of another view of 1 puts 13 back in 1's content. The first
 // view, rerendered as collateral, shows the retained 13 once, not a
 // second 13 beside it: warranted again, but still claiming nothing,
@@ -1146,7 +1146,7 @@ async fn test_retained_content_node_is_shown_once (
         &config, tantivy, &graph, &viewforest_id, &mut views_state ) . await ?;
       assert! ( lines_starting (&retained, "** (skg node (gnid 13) ") . len () == 1
                 && retained . contains ("noClaim"),
-                "13 stays under 1 as a non-member:\n{}", retained );
+                "13 stays under 1 claiming nothing:\n{}", retained );
       let other_viewforest_id : ViewforestId = ViewforestId::ContentView ("other-view-of-1" . to_string ());
       let other : String = {
         let (text, pids, tree) : (String, Vec<ID>, Tree<Viewnode>) =

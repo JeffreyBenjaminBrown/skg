@@ -163,7 +163,7 @@ fn collateral_partner_folder_update_and_warning_scoping
 /// containerward chain. N's view shows S in its subscriberFolder; C
 /// contains T. A save of T's view that makes T subscribe to N
 /// rerenders N's view collaterally, its folder reconciler adding T,
-/// under which hangs T's chain: C, a write-protected non-member.
+/// under which hangs T's chain: C, write-protected and claiming nothing.
 #[test]
 fn a_member_added_at_a_later_visit_gets_its_chain
   () -> Result<(), Box<dyn Error>> {

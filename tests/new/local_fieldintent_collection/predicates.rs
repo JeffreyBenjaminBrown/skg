@@ -32,7 +32,7 @@ fn with_edit_request (
 fn relation_folder_membership_conditions () {
   assert!( member_counts_for_partnerFolder (
     &base_occurrence () ));
-  { // a non-member excludes.
+  { // a child claiming nothing excludes.
     let mut t : Occurrence = base_occurrence ();
     t . claimsMembership = false;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
@@ -63,7 +63,7 @@ fn content_membership_coincides_with_relation_folder_membership () {
 fn visible_content_membership_conditions () {
   assert!( occurrence_child_counts_as_visible_content (
     &base_occurrence () ));
-  { // a non-member excludes.
+  { // a child claiming nothing excludes.
     let mut t : Occurrence = base_occurrence ();
     t . claimsMembership = false;
     assert!( ! occurrence_child_counts_as_visible_content (&t) ); }

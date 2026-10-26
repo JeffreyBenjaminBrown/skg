@@ -111,7 +111,7 @@ fn unknown_members_write_their_editable_relationship_recorders_only () {
     *** (skg unknown (gnid overridden-unknown))
   "};
   let instructions = nodeInstructions_from_tree (checked_viewforest_from_org (input))
-    . expect ("Unknown relationship members are valid save input");
+    . expect ("Unknown relationship members are valid in a save");
   assert_eq! (save_gnids (&instructions), vec! [ID::from ("recorder")],
               "an Unknown must not create a node save, delete, merge, or fork instruction");
   let recorder = saved_node_by_gnid (&instructions, "recorder");

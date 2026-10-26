@@ -150,7 +150,7 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
                         "*** (skg alias) xa2" . to_string () ], "{}", committed );
     assert_saves_back_cleanly (f, &committed) }) }
 
-/// A write-protected non-member x that the user put under r, when
+/// A write-protected x claiming nothing, which the user put under r, when
 /// HEAD comes to say that r contained x, is adopted as the removed
 /// member: x stands under r once.
 #[test]

@@ -144,8 +144,8 @@ describe('skg.metadata commands', function ()
     assert.is_false(subtree_p(result, '(skg node (skgRepos (nodeRepo public)))'))
   end)
 
-  it('set_repo_recursive prunes non-members', function ()
-    -- Mirrors test-skg-set-repo-recursive-prunes-non-members.
+  it('set_repo_recursive prunes noClaim children', function ()
+    -- Mirrors test-skg-set-repo-recursive-prunes-noClaim-children.
     buffer_with(table.concat({
       '* (skg node (gnid root) (skgRepos (nodeRepo public))) root',
       '** (skg node (gnid content-child) (skgRepos (nodeRepo public))) content child',

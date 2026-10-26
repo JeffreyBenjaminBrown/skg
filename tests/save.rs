@@ -3,8 +3,8 @@
 #[path = "save/none_node_fields_are_noops.rs"]
 mod none_node_fields_are_noops;
 
-#[path = "save/nonMember_and_write_protected.rs"]
-mod nonMember_and_write_protected;
+#[path = "save/noClaim_and_write_protected.rs"]
+mod noClaim_and_write_protected;
 
 #[path = "save/write_protected_edits.rs"]
 mod write_protected_edits;

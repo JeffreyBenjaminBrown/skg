@@ -323,7 +323,7 @@ its herald, as they were: the save recomputes them."
                      "[[id:acquiree][Acquiree title]]"))
       (should (null skg-linkstack)))))
 
-(ert-deftest test-skg-set-repo-recursive-prunes-non-members ()
+(ert-deftest test-skg-set-repo-recursive-prunes-noClaim-children ()
   "Test recursive repo change follows only container org relationships."
   (with-temp-buffer
     (org-mode)

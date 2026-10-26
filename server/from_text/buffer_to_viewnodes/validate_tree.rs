@@ -348,7 +348,7 @@ fn writeProtected_relRepo_request_errors (
 /// Whether save reads the relRepo request on this occurrence:
 /// the node is a member of its view-parent, and the relationship's
 /// writer is save-eligible. That writer is the view-parent, or, when the
-/// view-parent is a writable PartnerFolder, the folder's view-parent.
+/// view-parent is a writable partner folder, the folder's view-parent.
 fn relRepo_request_is_collected (
   node_ref : NodeRef<Viewnode>,
   t        : &Occurrence,

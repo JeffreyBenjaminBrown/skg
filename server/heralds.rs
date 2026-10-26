@@ -427,7 +427,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vec! [
       leaf (Folder::Alias . repr_in_client (), "aliases"),
       leaf ("alias", "alias"), // PropertyMember::Alias
-      // An alias's stored relRepo is a display fact.  A
+      // An alias's stored relRepo is a derived fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
       when ( &[ "alias" ], vec! [
@@ -797,8 +797,8 @@ pub fn atoms_in_rule_table () -> std::collections::HashSet<&'static str> {
     . collect () }
 
 /// Every metadata atom the server can emit in a match (label)
-/// position. Value-position data (counts, IDs, skgrepo names,
-/// the homeRepoHerald payload) is consumed by ANY/IT
+/// position. Value-position data (counts, IDs, skgrepo names)
+/// is consumed by ANY/IT
 /// rules and so is deliberately absent.
 ///
 /// Each component is derived from the type that owns it; the

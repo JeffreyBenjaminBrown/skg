@@ -625,7 +625,7 @@ fn validate_occurrence (
   errors }
 
 /// Whether a restoreRel request stands where it may: on a member of a
-/// partner folder (whose removed members are non-members), or on a
+/// partner folder (whose removed members claim nothing), or on a
 /// removed member, a child claiming no membership under a vognode
 /// that is no node of the containerward chain
 /// ('stands_in_containerward_chain'). Under a parent that does not
@@ -717,7 +717,7 @@ pub fn nonignored_children_have_distinct_gnids (
 
 /// Whether a folder's members have distinct IDs. As for a content
 /// list ('nonignored_children_have_distinct_gnids'), only members
-/// count, so that a non-member copy of a member may stand beside it,
+/// count, so that a copy of a member claiming nothing may stand beside it,
 /// and only where the folder's claims are read.
 fn partnerFolder_children_have_distinct_gnids (
   tree    : &Tree<Viewnode>,

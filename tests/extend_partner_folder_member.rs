@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(extend_partner_folder_member::)'
 //
 // Default folders on ordinary editable nodes and on editable
-// PartnerFolder members.  The initial presentation contains only a nonempty
+// partner folder members.  The initial presentation contains only a nonempty
 // subscribeeFolder.  The other relation folders require explicit requests;
 // after one of their members is extended as editable, that member gets the
 // same default subscribeeFolder.  A subscribee-as-such additionally gets its
@@ -196,12 +196,12 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
         let subtree : String =
           subtree_for_node_in_folder (&saved, gnid, folder);
         assert! ( subtree . contains ("subscribeeFolder"),
-          "editable PartnerFolder member {} should get its nonempty \
+          "editable partner folder member {} should get its nonempty \
            subscribeeFolder:\n{}", gnid, saved );
         for exotic in [ "subscriberFolder", "overriddenFolder",
                          "overriderFolder", "hiderFolder", "hiddenFolder" ] {
           assert! ( ! subtree . contains (exotic),
-            "editable PartnerFolder member {} should not get {} by \
+            "editable partner folder member {} should not get {} by \
              default:\n{}", gnid, exotic, saved ); }}
       let subscribee_subtree : String =
         subtree_for_node_in_folder (

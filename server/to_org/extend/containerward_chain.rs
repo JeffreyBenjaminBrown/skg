@@ -1,6 +1,6 @@
 /// PURPOSE: Draw the containerward chain under the members of a
 /// partner folder ('Folder::members_carry_containerward_chain'):
-/// under each member, its containers as write-protected non-members;
+/// under each member, its containers, write-protected and claiming nothing;
 /// under each of those, its containers; and so on breadth-first to
 /// 'max_roleTree_depth', up to the roots.
 /// A node the walk met before (a cycle or a diamond) is shown once
@@ -115,8 +115,8 @@ fn insert_containerward_chain_recursive (
         container, chain_node, tree, graph, config, restriction ) ?; }}
   Ok (( )) }
 
-/// Prepend 'container' under 'parent', which it contains, as a
-/// write-protected non-member, or an unknown if no graph
+/// Prepend 'container' under 'parent', which it contains, write-protected and
+/// claiming nothing, or an unknown if no graph
 /// knows it. None, and nothing prepended, when the skgrepo
 /// restriction hides the container or the relationship: the
 /// containment is recorded by the container, perhaps in a more

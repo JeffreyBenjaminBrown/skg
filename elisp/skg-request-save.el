@@ -25,7 +25,7 @@
 Before sending, adds 'folded' atoms to folded headlines and 'focused' atom to current headline.
 The server sends three LP messages around the save:
   1. save-lock: acknowledges the client's early broad lock.
-  2. save-relax-lock: narrows the lock once the checked save inputs and
+  2. save-relax-lock: narrows the lock once the checked buffer and
      collateral set are known, plus a collateral-view per rerendered buffer.
   3. save-result: the saved buffer's final content (+ errors/warnings).
 All skg buffers are locked immediately.  The broad acknowledgement does not

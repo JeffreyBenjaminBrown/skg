@@ -261,7 +261,7 @@ fn removed_partners_buffer (
   Ok (buffer) }
 
 /// x's container folder shows b, the container it lost, between the
-/// two it kept, as a removed member: a non-member with '(diff (rel
+/// two it kept, as a removed member: noClaim, with '(diff (rel
 /// removed))', and, as a content member would, '(properties changed)',
 /// since b's file records the change.
 #[test]
@@ -423,7 +423,7 @@ fn the_removed_partners_buffer_saves_back_unchanged (
 
 /// In the 'historical_content' fixture h, which contained m, was
 /// deleted: h's ghost holds its old content m as a
-/// removed member, a non-member with '(diff (rel removed))', beside
+/// removed member, noClaim with '(diff (rel removed))', beside
 /// '(properties changed)' since m was retitled. It is m's first occurrence, so it is
 /// editable, its old title beneath it. A buffer showing it saves back
 /// unchanged.

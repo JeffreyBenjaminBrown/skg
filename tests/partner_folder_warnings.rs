@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_warnings::)'
 //
-// When the refresh corrects a write-protected PartnerFolder in the
+// When the refresh corrects a write-protected partner folder in the
 // view the user just saved, the save succeeds and
 // SaveResponse.corrections carries its corrections, tagged with the
 // view
@@ -103,7 +103,7 @@ async fn write_protected_folder_repairs_warn_impl (
       line_containing (&complete_buffer, "(gnid t)") . to_string ();
     let x_line : String = {
       // x: an editable member leaf placed inside the folder, with a
-      // (new) child so the repair makes it a non-member rather than removing it.
+      // (new) child so the repair marks it noClaim rather than removing it.
       let mut l : String =
         r_line
         . replace ("(gnid r)", "(gnid x)")

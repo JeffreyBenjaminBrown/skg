@@ -598,7 +598,7 @@ anchor (pruned below the write-protected node) or at the folder itself
 
 (ert-deftest test-recursive-walk-removes-overrides ()
   "The no-override choice removes pending repo requests throughout
-the subtree, while preserving display facts."
+the subtree, while preserving derived facts."
   (test--with-skg-content-view
    (concat
     "* (skg node (gnid r) (skgRepos (nodeRepo public))) r\n"

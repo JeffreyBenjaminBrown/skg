@@ -83,12 +83,12 @@ bare or heading a list, after any marker; nil for no kind."
 
 ;;
 ;; Fill in: a member (no noClaim atom) -> inserts 'false (default)';
-;; a non-member's bare atom -> shows 'true'
+;; a child claiming nothing has the bare atom -> shows 'true'
 ;;
 
 (ert-deftest test-fillIn-noClaim ()
   "Filling in offers noClaim as a bare atom: 'false (default)' on a
-member, 'true' on a non-member."
+member, 'true' on a child claiming nothing."
   (dolist (case '(((skg node (gnid abc) (skgRepos (nodeRepo jeff))) . "false (default)")
                   ((skg node (gnid abc) (skgRepos (nodeRepo jeff)) noClaim) . "true")))
     (let* ((org-text (sexp-to-org (car case)))

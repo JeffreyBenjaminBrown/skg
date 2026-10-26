@@ -117,8 +117,8 @@ fn new_note_skgrepo_and_membership (
 
 /// A headline without '(skgRepos (nodeRepo NAME))' inherits the skgrepo of its
 /// nearest ancestor that is an occurrence, through a
-/// ghost or a partner folder. A non-member note in a
-/// folder stays a non-member. Below a write-protected occurrence the
+/// ghost or a partner folder. A note claiming nothing in a
+/// folder still claims nothing. Below a write-protected occurrence the
 /// skgrepo is the one its ID will have after the save, as for a
 /// child. (Fixture node 'root-pid' lives in 'main'; 'alt' is a skgrepo
 /// no fixture node has, so only inheritance can supply it.)
@@ -132,7 +132,7 @@ async fn test_new_headline_inherits_through_ghosts_and_folders (
         ** (skg ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) gone
         *** new note
       "}, "alt", true ),
-    ( // In a partner folder of an editable node, as a non-member.
+    ( // In a partner folder of an editable node, claiming nothing.
       indoc! {"
         * (skg node (gnid editable) (skgRepos (nodeRepo alt))) editable
         ** (skg containerFolder)

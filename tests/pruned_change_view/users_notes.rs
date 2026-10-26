@@ -80,7 +80,7 @@ fn a_note_in_the_acquired_folder_survives (
 
 /// A note under a removed member survives the member going stale:
 /// once stage-and-commit makes the removal part of HEAD, the member
-/// is a plain non-member occurrence, still holding the note.
+/// is a plain occurrence claiming nothing, still holding the note.
 #[test]
 fn a_note_under_a_removed_member_survives_it_going_stale (
 ) -> Result<(), Box<dyn Error>> {
@@ -99,7 +99,7 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
     let committed : String = rerendered_view_content (&response);
     let parent : String = parent_line_of (&committed, "a note under x");
     assert! ( parent . starts_with (removed) && ! parent . contains ("(diff"),
-              "the note stands under a plain non-member occurrence of x:\n{}", committed );
+              "the note stands under a plain occurrence of x claiming nothing:\n{}", committed );
     assert_lines_in_order (&committed, &[
       "* (skg node (gnid b)", removed, " a note under x\n" ]);
     Ok (( )) }) }

@@ -18,7 +18,7 @@ relationship kind and a repo and applies the repo throughout the
 subtree at point.
 
 The headline at point represents one relationship: `contains' for a content
-child, the folder's relation for a writable PartnerFolder member. This
+child, the folder's relation for a writable partner folder member. This
 command asks the server for the relationship's default repo and its current
 repo, then
 prompts -- with both tab-completion and S-left/S-right cycling,
@@ -34,7 +34,7 @@ metadata request. The no-override choice removes that request, which on save mea
 keeps its saved repo (sticky), not that it resets to its default.
 To lower an relationship's privacy to its default (e.g. after making the
 more private endpoint's home more public), choose the default relRepo
-itself; once saved at the default, the display fact and its red ~herald
+itself; once saved at the default, the derived fact and its red ~herald
 stop being rendered.
 
 Refuses on write-protected folder members (the relationship belongs to the other

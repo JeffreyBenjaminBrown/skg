@@ -31,7 +31,7 @@ says it is a node of the containerward chain (see
 `headline--position-of'). A chain node returns its ROLENAME from its
 (view (rels ...)) facts (e.g. `container'); otherwise the result is
 `noClaim' for a child claiming nothing and `member' for a member."
-  (let* ((non-member (or claims-nothing
+  (let* ((claims-no-membership (or claims-nothing
                          (and sexp
                               (skg-sexp-subtree-p sexp '(skg node noClaim)))))
          (rels-body (when sexp
@@ -41,7 +41,7 @@ says it is a node of the containerward chain (see
     (cond
      ;; A chain node, with an outbound-ancestor herald.
      (chain-node-role chain-node-role)
-     (non-member 'noClaim)
+     (claims-no-membership 'noClaim)
      (t 'member))))
 
 (defun headline--kind-of (sexp metadata-str)

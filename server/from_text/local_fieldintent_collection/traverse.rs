@@ -36,9 +36,9 @@
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
 /// is an occurrence member direct child of a SubscribeeFolder.
-/// A non-member child of a SubscribeeFolder is not a member of the
+/// A child of a SubscribeeFolder claiming nothing is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
-/// self-writer that stands there as a non-member.
+/// self-writer that stands there claiming nothing.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
   occurrence_child_counts_as_content,
@@ -412,7 +412,7 @@ fn dedup_members_by_gnid (
   result }
 
 /// This returns the members of an OverriddenFolder: its occurrence
-/// children that pass the PartnerFolder membership predicate, silently
+/// children that pass the partner folder membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
 /// explicit '(editRequest (relRepo NAME))' request, if any (see
@@ -442,7 +442,7 @@ fn partnerFolder_members (
   dedup_members_by_gnid (members) }
 
 /// This returns the members of a SubscribeeFolder: its occurrence children
-/// that pass the PartnerFolder membership predicate, deduplicated (by
+/// that pass the partner folder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
 /// the same reason), a tombstone contributes nothing:
 /// 'subscribesTo' is order-meaningful, but disk supplementation (its weave)

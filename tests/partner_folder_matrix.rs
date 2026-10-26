@@ -7,7 +7,7 @@
 // scenario), then runs the matrix scenarios serially against it: de
 // novo omission of unrequested write-protected folders, and -- after explicit
 // folder requests, per folder -- save after
-// reorder, insertion of a non-member, deletion of a member, plus the
+// reorder, insertion of a child claiming nothing, deletion of a member, plus the
 // editable folders' membership edits and the restricted-set omission.
 // Scenario failures accumulate: every mismatch is collected and the
 // test fails once at the end, so one broken folder does not mask the
@@ -161,7 +161,7 @@ fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
 
 /// Fabricate an intruder member line (an editable public leaf) at the
 /// member's indentation, plus a child one level deeper, so the repair
-/// makes it a non-member rather than removing it. Built fresh
+/// marks it noClaim rather than removing it. Built fresh
 /// (not cloned from a member line) so it never inherits a foreign
 /// skgrepo -- the overriderFolder's members are foreign.
 fn intruder_with_child (
@@ -187,7 +187,7 @@ struct FolderSpec {
   recorder : &'static str,
   member_a : &'static str, // sorts before member_b
   member_b : &'static str,
-  intruder : &'static str, // a public non-member to place in the folder
+  intruder : &'static str, // a public node to place in the folder, claiming nothing
 }
 
 const WRITE_PROTECTED_FOLDERS : [FolderSpec; 6] = [

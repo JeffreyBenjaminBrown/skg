@@ -166,7 +166,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
 /// ('complete_occurrence_skgrepo').
 /// Returns (Viewnode, error, warning):
 /// - error if a Non-vognode has a body;
-/// - warning if a folder header (PropertyFolder or PartnerFolder) has nonempty
+/// - warning if a folder header (a property or partner folder) has nonempty
 ///   title text, which the server discards: folder headlines are
 ///   titleless server-side (heralds supply their labels), so any
 ///   text there is a user edit that cannot be saved. Property leaves

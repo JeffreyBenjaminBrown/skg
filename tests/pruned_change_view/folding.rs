@@ -64,7 +64,7 @@ fn a_context_body_unfolded_by_the_client_stays_open (
     Ok (( )) }) }
 
 /// The folds of the 'kinds' buffer the tests put there: the alias
-/// folder folded (its entries hidden), and txt's old text with its
+/// folder folded (its members hidden), and txt's old text with its
 /// body folded and its body diff hidden.
 fn fold_kinds_buffer (
   buffer : &str,

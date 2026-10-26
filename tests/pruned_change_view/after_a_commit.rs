@@ -27,7 +27,7 @@ use std::error::Error;
 const REMOVED_X_UNDER_E : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
   "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (in 2) (out 1))";
-const RETAINED_X_UNDER_E : &str = // retained as non-member, still editable
+const RETAINED_X_UNDER_E : &str = // retained claiming nothing, still editable
   "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (view (rels ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
@@ -59,7 +59,7 @@ fn line_starting<'a> (
   matching [0] }
 
 /// After the commit: the editable removed member with content is
-/// retained as non-member, still editable, holding it as its content,
+/// retained claiming nothing, still editable, holding it as its content,
 /// without facts; the childless removed member stays too, unwarranted;
 /// the deleted root, in neither graph now, is a tombstone, which keeps
 /// the old content drawn under it; the folders the buffer held stay,
@@ -102,7 +102,7 @@ fn a_commit_converts_what_the_diff_view_showed (
     Ok (( )) }) }
 
 /// A note typed under an editable removed member survives the commit
-/// under the converted member, retained as non-member and still
+/// under the converted member, retained claiming nothing and still
 /// editable.
 #[test]
 fn a_note_under_a_removed_member_survives_under_the_retained_member (
@@ -122,7 +122,7 @@ fn a_note_under_a_removed_member_survives_under_the_retained_member (
 
 /// A note typed under a write-protected removed member keeps that
 /// occurrence through the commit: the same viewnode, now a plain
-/// write-protected non-member, holds it where it stood.
+/// write-protected and claiming nothing, holds it where it stood.
 #[test]
 fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
 ) -> Result<(), Box<dyn Error>> {
@@ -145,7 +145,7 @@ fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
 
 /// A write-protected copy the user pasted under an editable removed
 /// member stays where it stood through the commit, write-protected,
-/// under the member retained as non-member: it is neither a change
+/// under the member retained claiming nothing: it is neither a change
 /// viewnode nor a removed member, so the conversion of the stale
 /// member leaves it.
 #[test]

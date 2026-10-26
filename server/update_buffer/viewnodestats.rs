@@ -161,8 +161,8 @@ fn set_herald_strings_in_viewnode (
       container_to_contents, content_to_containers,
       node_pid, anc_pid, *generation ); }
   if ! claimsMembership {
-    // A non-member under a subscribee-as-such: the content the
-    // subscriber hides, retained there as non-member with its subtree,
+    // A child claiming nothing under a subscribee-as-such: the content the
+    // subscriber hides, retained there claiming nothing, with its subtree,
     // says so, as the hiddenInSubscribeeFolder's members do.
     if let (Some (graph), Some (subscriber_pid)) =
       (graph, subscriber_above_subscribee_viewparent (tree, treeid))
@@ -324,7 +324,7 @@ fn flag_ancestor_relations (
 /// side of it, accounting for which ancestor -- read from the kind of
 /// its viewparent: for a folder's member, the relation the folder
 /// names, in the direction its role implies; for a content member, its
-/// viewparent's containment; for a non-member, none. Usually a
+/// viewparent's containment; for a child claiming nothing, none. Usually a
 /// singleton; a HiddenInSubscribee member has two.
 fn birth_facts (
   parent_kind : &ParentKind,
@@ -424,7 +424,7 @@ fn set_omitted_body (
 /// Computes the (recorder, relation, target) triple that identifies the
 /// binding relationship this position represents -- contains for an ordinary
 /// Vognode-parent content child; the folder's relation for a simple
-/// PartnerFolder member, oriented by which side owns the outbound relationship
+/// partner folder member, oriented by which side owns the outbound relationship
 /// (see 'RelationRole::is_first_role') -- then compares the relationship's
 /// actual skgrepo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: no
@@ -450,7 +450,7 @@ fn set_relRepo (
       t . collected_gnid () };
     if ! claimsMembership {
       // Not a genuine member at this position (a self-writer standing
-      // as a non-member under a folder, or a node of the containerward
+      // claiming nothing under a folder, or a node of the containerward
       // chain): there
       // is no binding relationship here to have a skgrepo at all.
       break 'compute None; }
