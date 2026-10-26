@@ -2,7 +2,7 @@
 //!
 //! It lives here rather than beside the type because it depends on
 //! 'RelationRole' (the dbs layer), which 'server/types/viewnode.rs'
-//! should not import. The pure per-kind facts, such as
+//! should not import. The pure per-kind rules, such as
 //! 'Folder::goal_is_ordered', live with the type.
 
 use crate::types::viewnode::Folder;
@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::relation_accessors::{
 
 impl Folder {
   /// The role its members play in the relation the folder shows, of
-  /// which its anchor plays the other; None for a folder that shows no
+  /// which the node it describes plays the other; None for a folder that shows no
   /// one relation.
   pub fn relation_member_role (&self) -> Option<RelationRole> {
     match self {

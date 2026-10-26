@@ -64,7 +64,7 @@ pub struct LeavesFact {
 /// existence means the thing is in both graphs of the straddle, or
 /// that it does not apply. A node in only one graph has no other
 /// properties to compare, so 'properties' is true only when 'node' is
-/// None. On a property leaf the one existence it shows is 'rel': that
+/// None. On a property member the one existence it shows is 'rel': that
 /// of its membership in its folder.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DiffChange {

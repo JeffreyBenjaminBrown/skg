@@ -294,7 +294,7 @@ fn readiness_request_rules (
       readiness_request_rule ("readyRequest",   "ready",   "request:ready"),
       readiness_request_rule ("unreadyRequest", "unready", "request:unready") ]) ] }
 
-/// The same for a leaf with a single diff object (a property leaf, an
+/// The same for a leaf with a single diff object (a property member, an
 /// unknown), whose '(ready)' names no object, or
 /// 'all' on a changeset marker. 'added' and 'removed' render its
 /// existence, whichever object it names.
@@ -479,7 +479,7 @@ pub fn herald_rule_table () -> HeraldRule {
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()) ],
       diffView_property_rules (),
-      // The diff view's facts on a property leaf: + and - for
+      // The diff view's facts on a property member: + and - for
       // its existence in its folder, ✓ when ready, then its readiness
       // request.
       vec! [ when ( &kinds_whose_diff_has_one_object (),

@@ -321,16 +321,16 @@ siblings, or a child without metadata."
       (should-not (seq-some (lambda (line) (string-match-p "changed files" line))
                             shown)))))
 
-;;; Moving between change headlines
+;;; Moving between headlines with change facts
 
-(defconst test-skg-readiness--change-headlines
+(defconst test-skg-readiness--headlines-with-change-facts
   '("* (skg node (gnid r) (skgRepos (nodeRepo main))) r"
     "** (skg node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (leaves 1 node))) a"
     "*** (skg node (gnid b) (skgRepos (nodeRepo main))) b"
     "** (skg node (gnid c) (skgRepos (nodeRepo main)) (diff (properties changed) (leaves 2 all) (ready all))) c"
     "** (skg containerFolder) its containers"
     "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) a1")
-  "Three change headlines (lines 2, 4 and 6), the middle one ready,
+  "Three headlines with change facts (lines 2, 4 and 6), the middle one ready,
 among headlines that carry no leaves fact, one of them a changed folder.")
 
 (defun test-skg-readiness--goto-changes (lines from command times)
@@ -359,9 +359,9 @@ not move it. A run that moves leaves point on '(skg'."
       (nreverse results))))
 
 (ert-deftest test-skg-diffView-goto-change-commands ()
-  "Each of the six commands visits the change headlines of its kind in
+  "Each of the six commands visits the headlines with change facts of its kind in
 buffer order and reports the end without wrapping."
-  (let ((lines test-skg-readiness--change-headlines))
+  (let ((lines test-skg-readiness--headlines-with-change-facts))
     (should (equal (test-skg-readiness--goto-changes
                     lines 1 #'skg-diffView-goto-next-change 4)
                    '(2 4 6 "No further change")))

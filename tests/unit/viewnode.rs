@@ -11,10 +11,10 @@ use crate::types::tree::forest::{ViewForest, editable_occurrences};
 use std::collections::HashMap;
 
 // 'Folder::goal_is_ordered', 'Folder::is_editable' and
-// 'Folder::members_are_properties' are the per-kind facts that the
+// 'Folder::members_are_properties' are the per-kind rules that the
 // save, the refresh and the heralds consult; this pins them.
 #[test]
-fn folder_kind_facts () {
+fn folder_kind_rules () {
   let ordered : Vec<Folder> = vec! [
     Folder::Subscribee, Folder::Overridden, Folder::Hidden,
     Folder::HiddenOutsideOfSubscribee, Folder::Alias ];

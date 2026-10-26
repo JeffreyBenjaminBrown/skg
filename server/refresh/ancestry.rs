@@ -135,6 +135,48 @@ pub fn required_ancestor_of (
     return None; }
   node . ancestors () . nth (i) . map ( |ancestor| ancestor . id () ) }
 
+/// A compound folder's two parties, as indices into its required
+/// ancestry (0 = its viewparent; 'required_ancestor_of'): the
+/// subscriber whose hides it shows, and, for the folder of what the
+/// subscriber hides in one subscribee, that subscribee as such. In
+///   subscriber > subscribeeFolder > subscribee > hiddenInSubscribeeFolder
+/// the subscribee is at 0 and the subscriber at 2; in
+///   subscriber > subscribeeFolder > hiddenOutsideOfSubscribeeFolder
+/// the subscriber is at 1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompoundFolderParties {
+  pub subscriber : usize,
+  pub subscribee : Option<usize>,
+}
+
+/// The parties of a compound folder; None for any other folder.
+pub fn compound_folder_parties (
+  folder : &Folder,
+) -> Option<CompoundFolderParties> {
+  match folder {
+    Folder::HiddenInSubscribee =>
+      Some ( CompoundFolderParties { subscriber : 2, subscribee : Some (0) } ),
+    Folder::HiddenOutsideOfSubscribee =>
+      Some ( CompoundFolderParties { subscriber : 1, subscribee : None } ),
+    _ => None, } }
+
+/// The node the folder at 'folder' describes, whose relationships,
+/// properties or hides it shows: for the folder of what a subscriber
+/// hides in a subscribee, that subscribee; for the folder of what it
+/// hides outside its subscribees, the subscriber; for any other
+/// folder, its viewparent. None if 'folder' is no folder, or stands
+/// where its ancestry is missing.
+pub fn described_node (
+  tree   : &Tree<Viewnode>,
+  folder : NodeId,
+) -> Option<NodeId> {
+  let ViewnodeKind::Folder (kind) = &tree . get (folder) ? . value () . kind
+    else { return None; };
+  let index : usize = match compound_folder_parties (kind) {
+    Some (parties) => parties . subscribee . unwrap_or (parties . subscriber),
+    None => 0, };
+  required_ancestor_of (tree, folder, index) }
+
 /// Whether the save reads the claims of the children of 'parent': an
 /// editable occurrence, or an editable folder whose node is an
 /// editable occurrence. Under any other parent no child claims
@@ -147,10 +189,8 @@ pub fn parent_reads_claims (
   match &tree . get (parent) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       ! occurrence . is_writeProtected (),
-    ViewnodeKind::Folder (folder) if folder . is_editable () => {
-      let anchor_depth : usize = // the node the folder describes
-        if matches! ( folder, Folder::HiddenOutsideOfSubscribee ) { 1 } else { 0 };
-      required_ancestor_of (tree, parent, anchor_depth)
-        . and_then ( |anchor| tree . get (anchor) )
-        . is_some_and ( |anchor| anchor . value () . editable_gnid () . is_some () ) },
+    ViewnodeKind::Folder (folder) if folder . is_editable () =>
+      described_node (tree, parent)
+        . and_then ( |described| tree . get (described) )
+        . is_some_and ( |described| described . value () . editable_gnid () . is_some () ),
     _ => false, } }

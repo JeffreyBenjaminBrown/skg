@@ -18,7 +18,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use crate::graph_straddle::types::Partner;
 use crate::refresh::Walk;
-use crate::refresh::ancestry::required_ancestor_of;
+use crate::refresh::ancestry::{
+  CompoundFolderParties, compound_folder_parties, described_node, required_ancestor_of};
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
 use crate::to_org::complete::partner_folder::goal_list::{
@@ -238,40 +239,47 @@ fn folder_goal (
   walk   : &Walk,
 ) -> Option<Goal> {
   let graph : &InRustGraph = walk . truth . graph;
-  let ancestor_pid = |i : usize| -> Option<ID> {
-    tree . get ( required_ancestor_of (tree, folder, i) ? ) ?
-      . value () . occurrence_gnid () . cloned () };
+  let occurrence_pid_of = |treeid : NodeId| -> Option<ID> {
+    tree . get (treeid) ? . value () . occurrence_gnid () . cloned () };
+  let party_pid = |index : usize| -> Option<ID> {
+    occurrence_pid_of ( required_ancestor_of (tree, folder, index) ? ) };
+  let described_pid = || -> Option<ID> {
+    occurrence_pid_of ( described_node (tree, folder) ? ) };
   match kind {
     Folder::Alias | Folder::ID | Folder::Flags { .. } =>
-      property_goal (kind, &ancestor_pid (0) ?, walk),
+      property_goal (kind, &described_pid () ?, walk),
     Folder::AcquiredBy | Folder::Acquired =>
       Some ( diff_view::acquisition_goal (tree, folder, kind, walk)
              . unwrap_or_else ( || Goal::new (Vec::new (), false) )),
-    Folder::HiddenInSubscribee =>
+    Folder::HiddenInSubscribee => {
+      let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
       Some ( gnid_goal ( hidden_in_subscribee (
-                           &ancestor_pid (0) ?, &ancestor_pid (2) ?, walk ),
-                         &HashMap::new (), false )),
-    Folder::HiddenOutsideOfSubscribee =>
-      Some ( gnid_goal ( hidden_outside_of_subscribees (&ancestor_pid (1) ?, walk),
-                         &HashMap::new (), true )),
+                           &party_pid (parties . subscribee ?) ?,
+                           &party_pid (parties . subscriber) ?, walk ),
+                         &HashMap::new (), false )) },
+    Folder::HiddenOutsideOfSubscribee => {
+      let parties : CompoundFolderParties = compound_folder_parties (kind) ?;
+      Some ( gnid_goal ( hidden_outside_of_subscribees (
+                           &party_pid (parties . subscriber) ?, walk ),
+                         &HashMap::new (), true )) },
     Folder::Subscribee | Folder::Subscriber
       | Folder::Overridden | Folder::Overrider
       | Folder::Hider | Folder::Hidden
       | Folder::Container | Folder::Mentioner => {
-      let anchor : ID = ancestor_pid (0) ?;
+      let described : ID = described_pid () ?;
       let member_role : RelationRole = kind . relation_member_role () ?;
       if let Some (goal) =
-        diff_view::folder_goal (kind, &anchor, member_role, walk)
+        diff_view::folder_goal (kind, &described, member_role, walk)
       { return Some (goal); }
       let members : Vec<ID> = partnerFolder_members_in_graph (
-        graph, walk . truth . config, &anchor, kind, walk . truth . restriction ) ?;
+        graph, walk . truth . config, &described, kind, walk . truth . restriction ) ?;
       let relRepos : HashMap<ID, SkgrepoName> =
         if member_role . opposite_role () . is_first_role () {
-          // The folder shows a list in the anchor's own file.
+          // The folder shows a list in the described node's own file.
           unknown_members_relRepos (
-            graph, &anchor,
+            graph, &described,
             &graph . outbound_member_keys_for_relation_gated (
-              &anchor, member_role . relation, walk . truth . restriction ))
+              &described, member_role . relation, walk . truth . restriction ))
         } else { HashMap::new () };
       Some ( gnid_goal (members, &relRepos, kind . goal_is_ordered ()) ) }, } }
 

@@ -1209,7 +1209,7 @@ ugly herald "~NAME", shown immediately before the ⌂. It is recomputed
 at every rendering, and the save never reads it as a request, which
 is =(editRequest (relRepo NAME))=. And =(overridesHere N)=, crucial
 =ĥ= immediately after the =O= token, is a load-bearing declared part,
-documented in "Override substitution and the overridesHere fact"
+documented in "Override substitution and the overridesHere part"
 below.
 
 ** Node flags
@@ -1223,7 +1223,7 @@ therefore blocks direct title, alias, body, regexp, operator, and
 field-qualified matches, but is not an access-control boundary and does not
 remove graph context.
 
-** Override substitution and the overridesHere fact
+** Override substitution and the overridesHere part
 
 Where a node N stands as content of an editable occurrence in a
 content view, and an owned overrider R of N is visible under the
@@ -1257,12 +1257,12 @@ a node whose only overrider is invisible under the skgrepo restriction is
 
 A substituted viewnode carries the keyed form
 =(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
-stands for. The fact is load-bearing at save: wherever it
+stands for. The part is load-bearing at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
 instead of being rewritten to the overrider. Edits to the shown
 node itself (title, body, folders) still save to the shown node.
-A buffer whose fact the server would not have rendered (the carrier
+A buffer whose part the server would not have rendered (the carrier
 is not on N's owned override chain -- the ownership-gated,
 visibility-ungated walk out of N) aborts the save with an
 explanation. With chains the honest carrier may be a middle link

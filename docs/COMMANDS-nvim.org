@@ -572,22 +572,22 @@ folding and what it made editable, and what was committed no longer
 shows as a change. The
 commit lapses the marks of everything it committed.
 *** <localleader>rnc : :SkgDiffViewGotoNextChange
-Moves the cursor to the next change headline after it: a headline
+Moves the cursor to the next headline with change facts after it: a headline
 whose metadata carries a '(leaves ...)' change fact, the server's count of
 the changes it names. The cursor lands on the headline's metadata, as
 with <localleader>in. It does not wrap: past the last one it says "No
 further change" and leaves the cursor. It works in any skg buffer;
 outside the diff view no headline names a change, so it finds none.
 *** <localleader>rnu : :SkgDiffViewGotoNextUnreadyChange
-The same, visiting only change headlines that are not ready (see
+The same, visiting only headlines with change facts that are not ready (see
 <localleader>rr for when a headline counts as ready). Past the last
 one it says "No further unready change".
 *** <localleader>rnr : :SkgDiffViewGotoNextReadyChange
-The same, visiting only ready change headlines. Past the last one it
+The same, visiting only ready headlines with change facts. Past the last one it
 says "No further ready change".
 *** <localleader>rpc : :SkgDiffViewGotoPreviousChange
 Like <localleader>rnc, backward: moves the cursor to the previous
-change headline before it. Before the first one it says "No earlier
+headline with change facts before it. Before the first one it says "No earlier
 change".
 *** <localleader>rpu : :SkgDiffViewGotoPreviousUnreadyChange
 Like <localleader>rnu, backward. Before the first one it says "No

@@ -127,8 +127,8 @@ rendering and nobody reads back: everything in =(view ...)= (the
 relationship facts, the warrant, =cycle=, =repoBoundary=,
 =omittedBody=) and in =(diff ...)= (the change facts). The parser
 skips both forms whole, so editing them changes nothing. The one
-load-bearing fact of a substitution, =(overridesHere N)=, is a
-declared part; see "override substitution".
+load-bearing part of a substitution, the overridesHere part
+=(overridesHere N)=, is declared; see "override substitution".
 
 *** view request vs edit request
 
@@ -254,7 +254,7 @@ move.
 
 *** warranted, 'noWarrant', 'ghostWarrant'
 
-A child *is warranted* when the graph relates it to its viewparent as
+A child *is warranted* when the truth relates it to its viewparent as
 its position implies: content its occurrence contains, a partner of
 the folder's relation in a folder, a container of the node above it
 in the containerward chain, a property of the node in a property
@@ -263,10 +263,13 @@ for a relationship HEAD has and the worktree lacks (see "removed
 member, former member"), or for a ghost under a parent that contained
 it at HEAD. The warrant is a derived fact, recomputed at every
 refresh, and written in =(view ...)= as =noWarrant= (herald ⊥) or
-=ghostWarrant= (herald ᗣ), nothing meaning warranted by the graph; a
+=ghostWarrant= (herald ᗣ), nothing meaning warranted by the truth; a
 root carries none, and a ghost no =ghostWarrant=, its kind being its
 own herald ('Warrant { ByGraph, ByHead, No }', 'isWarranted' in
-code). Claim and warrant are independent: a note the user puts under
+code). 'Warrant::ByGraph' is the truth's warrant (see "the truth"):
+the graph as the skgrepo restriction lets it be seen; a root, whose
+position implies no relationship, carries it too, and the wire
+writes nothing for it. Claim and warrant are independent: a note the user puts under
 a write-protected parent is unwarranted and carries no =noClaim=,
 since nothing claims there. The refresh keeps an unwarranted child
 where it stands; it never removes a child.
@@ -291,7 +294,7 @@ It exists only to name the relationship between its children and its parent.
 
 A *partner folder* is the general concept ('Folder' in code, one enum
 with the three property folders; see "Folder, and its per-kind
-facts").
+rules").
 Recall that there are five relations in the graph:
 containment, link, subscription, hiding, and overriding.
 Because a node can be on either side of each relationship --
@@ -898,10 +901,10 @@ from its members (see "changed folder").
 **** commit-readiness marker
 
 The '(ready ...)' part of a headline's '(diff ...)' form, and its
-herald: the derived readiness of a commit readiness aggregate or of a
-change headline's leaves. A changed folder's ✓, which the clients
-draw from its members, is one too. A folder's member takes one; a
-chain node takes none. It is never called a bare "marker", since a
+herald: the derived readiness of a commit readiness aggregate or of
+the leaves of a headline with change facts. A changed folder's ✓,
+which the clients draw from its members, is one too. A folder's
+member takes one; a chain node takes none. It is never called a bare "marker", since a
 changeset marker is another thing.
 
 **** changeset marker
@@ -1034,12 +1037,12 @@ one relationship as HEAD recorded it. C-c s n ('skg-restore-deleted-node') and C
 and consumes them as it does every edit request
 ('docs/diff-view.org', "Restoring what a change removed").
 
-**** change headline
+**** headline with change facts
 
-A headline whose metadata carries a '(leaves ...)' change fact. It is ready
-when its '(ready ...)' names every object its '(leaves ...)' lists,
+A headline whose metadata carries a '(leaves ...)' change fact. It
+is ready when its '(ready ...)' names every object its '(leaves ...)' lists,
 and otherwise unready. The navigation commands (C-c r n c and its
-kin) move between change headlines.
+kin) move between headlines with change facts.
 
 **** in, out, "(this file)", "(other files)"
 
@@ -1100,7 +1103,7 @@ is a member of the recorder's list.
 The node that has an ID, as its PID or as an extra ID, is that ID's
 *carrier*. (Not "owner": the user *owns* skgrepos.)
 
-*** Folder, and its per-kind facts
+*** Folder, and its per-kind rules
 
 How a folder (see "partner folder") is built. It is the
 =ViewnodeKind::Folder= variant and the payload type =Folder=, one
@@ -1110,7 +1113,7 @@ does not mean a filesystem directory.  “Role col”, “relation col”,
 and bare “sharing col” are retired names for the general concept.
 
 Each folder is named by its external non-vognode atom. Methods on
-=Folder= (=server/types/viewnode.rs=) give the per-kind facts that the
+=Folder= (=server/types/viewnode.rs=) give the per-kind rules that the
 refresh, the save and the heralds consult, so a new kind cannot
 acquire inconsistent treatment in different layers:
 - =is_editable=: the save reads the folder's membership, so a member

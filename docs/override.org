@@ -171,17 +171,17 @@ Collateral rerenders do not apply the root exception; their content
 occurrences substitute as every refresh's do.  A later independent direct
 visit to =F= still opens raw =F=, in accordance with the exact-visit rule.
 
-*** The =overridesHere= fact
+*** The =overridesHere= part
 
 A substituted viewnode carries =(overridesHere N)=, where =N= is the
-original node for which the displayed carrier substitutes.  The fact
+original node for which the displayed carrier substitutes.  The part
 is load-bearing during save: the viewnode contributes =N= to its parent's
 stored relationship list rather than the carrier's ID.  Editing the
 carrier's title, body, or folders still edits the carrier itself.
 
-The server rejects a forged or stale fact whose carrier is not on
+The server rejects a forged or stale part whose carrier is not on
 =N='s owned override chain.  The validation walk is intentionally
-visibility-ungated so that a fact which was honest when rendered does
+visibility-ungated so that a part which was honest when rendered does
 not become invalid merely because the skgrepo restriction changed.
 
 ** Heralds and reasons for placement
@@ -302,7 +302,7 @@ not perform interactive override substitution.
 - [[file:../server/refresh/ladder.rs][substitution and raw positions ('substitute_overriders')]]
 - [[file:../server/update_buffer.rs][saved-view fork replacement and collateral rerendering]]
 - [[file:../server/types/views_state.rs][open-view root registration]]
-- [[file:../server/types/viewnode.rs][folder facts and =overridesHere= collection]]
+- [[file:../server/types/viewnode.rs][folder rules and =overridesHere= collection]]
 - [[file:../server/refresh/ladder.rs][on-demand folder construction ('fulfill_view_requests')]]
 - [[file:../server/serve/handlers/text_search.rs][search suppression]]
 - [[file:../server/serve/handlers/text_search.rs][the search results' folders ('enrich_search_viewforest')]]

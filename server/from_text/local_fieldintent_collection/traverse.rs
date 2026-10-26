@@ -117,7 +117,7 @@ fn visit (
       | ViewnodeKind::PropertyMember (_)
       | ViewnodeKind::ChangeViewnode (_)
       | ViewnodeKind::Folder (_) =>
-      // These are the write-protected folders and the Property leaves. Vognodes
+      // These are the write-protected folders and the property members. Vognodes
       // found inside them are self-writers; their membership in the
       // folder is never read.
       recurse_with_uniform_context (

@@ -213,7 +213,7 @@ fn relationship_aspect_name (
 
 /// The leaves that a request naming the diff objects 'objects' at
 /// 'node' names. No objects on a vognode means both of its objects
-/// (only 'rel' on an unknown); a property leaf has one object.
+/// (only 'rel' on an unknown); a property member has one object.
 /// None for a viewnode that names no leaf, among them a node of the
 /// containerward chain, which shows no change.
 fn leaves_named_at (
@@ -507,7 +507,7 @@ pub(crate) fn relationship_to_viewparent (
     _ => None, } }
 
 /// The ID of the vognode two levels up: the node that owns a
-/// property leaf's folder.
+/// property member's folder.
 fn grandparent_pid (
   node : NodeRef<Viewnode>,
 ) -> Option<ID> {

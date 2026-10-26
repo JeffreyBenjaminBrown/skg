@@ -303,10 +303,10 @@ goal, and runs the *ladder*, its corrections in order, weakest first:
    overridden member is shown as its overrider with =(overridesHere
    N)=, except where P is itself overridden and shown raw (a root, or a
    member of a folder other than the subscribee folder); when the
-   override is gone, the shown overrider loses the fact and the
+   override is gone, the shown overrider loses the part and the
    original is reinstated beside it
    (=docs/api-and-formats.org=, "Override substitution and the
-   overridesHere fact");
+   overridesHere part");
 8. requests: each child's view requests are fulfilled and dropped
    (=writeProtectedView=, =writeProtectedSubtreeView=, =(folder
    REL)=, =flags=); =fork= stays for the save. An edit request is carried through untouched unless the

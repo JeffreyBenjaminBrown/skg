@@ -31,7 +31,7 @@ use crate::diff_view::pruned_change_view::{
 use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::Walk;
-use crate::refresh::ancestry::required_ancestor_of;
+use crate::refresh::ancestry::described_node;
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, member_of_child};
@@ -142,13 +142,13 @@ pub(crate) fn ghost_content_goal (
 /// is left out.
 pub(crate) fn folder_goal (
   kind        : &Folder,
-  anchor      : &ID,
+  described   : &ID,
   member_role : RelationRole,
   walk        : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
   Some ( Goal::new (
-    straddle . partners (anchor, member_role) . iter ()
+    straddle . partners (described, member_role) . iter ()
     . filter ( |partner| partner . existence != Some (Existence::Removed)
                          || ! kind . is_editable ()
                          || straddle . node_in_either_graph (&partner . id) )
@@ -226,20 +226,20 @@ pub(crate) fn acquisition_goal (
   walk   : &Walk,
 ) -> Option<Goal> {
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
-  let anchor : NodeRef<Viewnode> = tree . get ( required_ancestor_of (tree, folder, 0) ? ) ?;
-  let anchor_gnid : ID = match &anchor . value () . kind {
+  let described : NodeRef<Viewnode> = tree . get ( described_node (tree, folder) ? ) ?;
+  let described_gnid : ID = match &described . value () . kind {
     ViewnodeKind::Vognode (vognode) => vognode . gnid () . clone (),
     _ => return None, };
   Some ( match kind {
     Folder::Acquired => Goal::new (
-      straddle . acquirees_of (&anchor_gnid) . into_iter ()
+      straddle . acquirees_of (&described_gnid) . into_iter ()
       . map ( |acquiree| GoalItem {
         warrant : Warrant::ByHead,
         .. GoalItem::by_graph ( GoalMember::Gnid (acquiree) ) } )
       . collect (),
       false ),
     _ => Goal::new (
-      straddle . acquirer_of (&anchor_gnid) . into_iter ()
+      straddle . acquirer_of (&described_gnid) . into_iter ()
       . map ( |acquirer| GoalItem::by_graph ( GoalMember::Gnid (acquirer) ))
       . collect (),
       false ), } ) }

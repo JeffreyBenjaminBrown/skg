@@ -181,7 +181,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
 /// - warning if a folder header (a property or partner folder) has nonempty
 ///   title text, which the server discards: folder headlines are
 ///   titleless server-side (heralds supply their labels), so any
-///   text there is a user edit that cannot be saved. Property leaves
+///   text there is a user edit that cannot be saved. Property members
 ///   are exempt -- their title is their data.
 pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,

@@ -350,8 +350,8 @@ function M.ready_at_line (line_number)
   return metadata_sexp ~= nil and M.ready_p(metadata_sexp)
 end
 
--- ── moving between change headlines ─────────────────────────────
--- A change headline is one whose metadata carries a '(leaves ...)'
+-- ── moving between headlines with change facts ─────────────────────────────
+-- A headline with change facts is one whose metadata carries a '(leaves ...)'
 -- fact. It is ready when its '(ready ...)' names every object that
 -- fact lists, and otherwise unready. Outside the diff view no
 -- headline carries one, so these commands report no change there.
@@ -380,10 +380,10 @@ function M.diffView_goto_previous_ready_change ()
   M.diffView_goto_change('previous', 'ready')
 end
 
----Move point to the nearest change headline after point (DIRECTION
+---Move point to the nearest headline with change facts after point (DIRECTION
 ---'next') or before it (DIRECTION 'previous'), in buffer order,
 ---without wrapping: one whose readiness is READINESS ('ready' or
----'unready'), or any change headline when READINESS is nil. Point
+---'unready'), or any headline with change facts when READINESS is nil. Point
 ---lands where id_next puts it on a headline, the opening paren of its
 ---metadata. When there is none, say so and leave point.
 ---@param direction string
@@ -420,7 +420,7 @@ function M.diffView_change_position (direction, readiness)
   return nil
 end
 
----On a change headline at LINE_NUMBER whose readiness is READINESS
+---On a headline with change facts at LINE_NUMBER whose readiness is READINESS
 ---(any when nil), the 0-based column of its metadata's opening
 ---paren; otherwise nil.
 ---@param line_number integer

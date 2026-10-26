@@ -439,14 +439,14 @@ describe('skg.save readiness summary', function ()
   end)
 end)
 
-describe('skg.readiness moving between change headlines', function ()
+describe('skg.readiness moving between headlines with change facts', function ()
   -- Mirrors the 'goto-change' tests of
   -- tests/elisp/test-skg-readiness.el.
 
-  ---Three change headlines (lines 2, 4 and 6), the middle one ready,
+  ---Three headlines with change facts (lines 2, 4 and 6), the middle one ready,
   ---among headlines that carry no leaves fact, one of them a ready
   ---folder; line 7 is empty, the buffer's end.
-  local change_headlines = {
+  local headlines_with_change_facts = {
     '* (skg node (gnid r) (skgRepos (nodeRepo main))) r',
     '** (skg node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (leaves 1 node))) a',
     '*** (skg node (gnid b) (skgRepos (nodeRepo main))) b',
@@ -489,32 +489,32 @@ describe('skg.readiness moving between change headlines', function ()
     return results
   end
 
-  it('visits the change headlines of each kind and reports the ends',
+  it('visits the headlines with change facts of each kind and reports the ends',
      function ()
     assert.are.same({ 2, 4, 6, 'No further change' },
-      goto_changes(change_headlines, 1,
+      goto_changes(headlines_with_change_facts, 1,
                    readiness.diffView_goto_next_change, 4))
     assert.are.same({ 2, 6, 'No further unready change' },
-      goto_changes(change_headlines, 1,
+      goto_changes(headlines_with_change_facts, 1,
                    readiness.diffView_goto_next_unready_change, 3))
     assert.are.same({ 4, 'No further ready change' },
-      goto_changes(change_headlines, 1,
+      goto_changes(headlines_with_change_facts, 1,
                    readiness.diffView_goto_next_ready_change, 2))
     assert.are.same({ 6, 4, 2, 'No earlier change' },
-      goto_changes(change_headlines, 7,
+      goto_changes(headlines_with_change_facts, 7,
                    readiness.diffView_goto_previous_change, 4))
     assert.are.same({ 6, 2, 'No earlier unready change' },
-      goto_changes(change_headlines, 7,
+      goto_changes(headlines_with_change_facts, 7,
                    readiness.diffView_goto_previous_unready_change, 3))
     assert.are.same({ 4, 'No earlier ready change' },
-      goto_changes(change_headlines, 7,
+      goto_changes(headlines_with_change_facts, 7,
                    readiness.diffView_goto_previous_ready_change, 2))
     -- From the middle, each direction starts at the cursor.
     assert.are.same({ 2 },
-      goto_changes(change_headlines, 3,
+      goto_changes(headlines_with_change_facts, 3,
                    readiness.diffView_goto_previous_change, 1))
     assert.are.same({ 6 },
-      goto_changes(change_headlines, 3,
+      goto_changes(headlines_with_change_facts, 3,
                    readiness.diffView_goto_next_unready_change, 1))
   end)
 

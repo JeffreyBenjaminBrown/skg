@@ -79,7 +79,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
     viewforest, graph, config, &mut errors);
   idFolder_membership_errors (
     viewforest, graph, config, &mut errors ) ?;
-  overridesHere_fact_errors (
+  overridesHere_part_errors (
     viewforest, graph, config, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
@@ -166,16 +166,16 @@ fn idFolder_membership_errors (
             recorder, buffer_gnids, real, recorder_headline )); }}, }}
   Ok (( )) }
 
-/// Tamper validation for the '(overridesHere N)' fact
-/// ('docs/override.org', "The overridesHere fact").
-/// The fact is load-bearing text: wherever it appears, save
+/// Tamper validation for the '(overridesHere N)' part
+/// ('docs/override.org', "The overridesHere part").
+/// The part is load-bearing text: wherever it appears, save
 /// extraction collects N instead of the carrier's own ID. So a
-/// fact the server would not have rendered must abort the save --
+/// part the server would not have rendered must abort the save --
 /// otherwise hand-edited (or yanked, or stale) metadata could
 /// rewrite arbitrary contains members. The check: the carrier's ID
 /// must be on N's owned override chain
 /// ('carrier_on_owned_chain', visibility-ungated so ownership
-/// still gates but a fact honest when rendered does not start
+/// still gates but a part honest when rendered does not start
 /// failing after a skgrepo-set switch). With chains the shown node can
 /// be a middle link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
@@ -183,7 +183,7 @@ fn idFolder_membership_errors (
 /// The explicit graph is required, so every present fact is checked against
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
-fn overridesHere_fact_errors (
+fn overridesHere_part_errors (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,

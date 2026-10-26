@@ -158,7 +158,7 @@ grandparent) shows the 'b' medium, because of b's floor.
 
 Immediately after =O=, a crucial =ĥ= (precomposed h with circumflex)
 means this occurrence substitutes for a node it overrides. =2Oĥ3= is an
-example. It comes from the load-bearing 'overridesHere' fact; an
+example. It comes from the load-bearing 'overridesHere' part; an
 override folder or path occurrence without that fact has no =ĥ=. The
 eighth ancestor is a plain =h=, so =Oĥh= shows the two glyphs together.
 The fact preserves the original member ID when a substituted view

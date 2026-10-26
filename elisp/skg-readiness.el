@@ -291,47 +291,47 @@ facts."
     (skg-edit-metadata-at-point
      `(skg (ENSURE ,edit-request)))))
 
-;;; Moving between change headlines
-;;; A change headline is one whose metadata carries a '(leaves ...)'
-;;; fact. It is ready when its '(ready ...)' names every object that
-;;; fact lists, and otherwise unready. Outside the diff view no
+;;; Moving between headlines with change facts
+;;; A headline with change facts is one whose metadata carries a
+;;; '(leaves ...)' fact. It is ready when its '(ready ...)' names every
+;;; object that fact lists, and otherwise unready. Outside the diff view no
 ;;; headline carries one, so these commands report no change there.
 
 (defun skg-diffView-goto-next-change ()
-  "Move point to the next change headline after point."
+  "Move point to the next headline with change facts after point."
   (interactive)
   (skg--diffView-goto-change 'next nil))
 
 (defun skg-diffView-goto-next-unready-change ()
-  "Move point to the next unready change headline after point."
+  "Move point to the next unready headline with change facts after point."
   (interactive)
   (skg--diffView-goto-change 'next 'unready))
 
 (defun skg-diffView-goto-next-ready-change ()
-  "Move point to the next ready change headline after point."
+  "Move point to the next ready headline with change facts after point."
   (interactive)
   (skg--diffView-goto-change 'next 'ready))
 
 (defun skg-diffView-goto-previous-change ()
-  "Move point to the previous change headline before point."
+  "Move point to the previous headline with change facts before point."
   (interactive)
   (skg--diffView-goto-change 'previous nil))
 
 (defun skg-diffView-goto-previous-unready-change ()
-  "Move point to the previous unready change headline before point."
+  "Move point to the previous unready headline with change facts before point."
   (interactive)
   (skg--diffView-goto-change 'previous 'unready))
 
 (defun skg-diffView-goto-previous-ready-change ()
-  "Move point to the previous ready change headline before point."
+  "Move point to the previous ready headline with change facts before point."
   (interactive)
   (skg--diffView-goto-change 'previous 'ready))
 
 (defun skg--diffView-goto-change (direction readiness)
-  "Move point to the nearest change headline after point (DIRECTION
+  "Move point to the nearest headline with change facts after point (DIRECTION
 'next) or before it (DIRECTION 'previous), in buffer order, without
 wrapping: one whose readiness is READINESS ('ready or 'unready), or
-any change headline when READINESS is nil. Point lands where
+any headline with change facts when READINESS is nil. Point lands where
 `skg-id-next' puts it on a headline, the opening paren of its
 metadata. When there is none, say so and leave point."
   (let ((target (skg--diffView-change-position direction readiness)))
@@ -361,7 +361,7 @@ metadata. When there is none, say so and leave point."
                           (not (eobp)))))))
 
 (defun skg--diffView-change-start-on-line (readiness)
-  "On a change headline whose readiness is READINESS (any when nil),
+  "On a headline with change facts whose readiness is READINESS (any when nil),
 the position of its metadata's opening paren; otherwise nil."
   (when (looking-at "^\\*+ (skg")
     (let ((metadata-start (- (match-end 0) 4))

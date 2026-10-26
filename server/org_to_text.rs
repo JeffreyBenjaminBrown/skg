@@ -189,7 +189,7 @@ fn viewnode_to_string_without_viewnode_id (
   viewnode        : &Viewnode,
   claims_are_read : bool,
 ) -> Result < String, Box<dyn Error> > {
-  let facts   : &ChangeFacts = &viewnode . change_facts;
+  let change_facts : &ChangeFacts = &viewnode . change_facts;
   let request : &Option<ReadinessRequest> = &viewnode . readiness_request;
   match &viewnode . kind {
     ViewnodeKind::Folder (folder) =>
@@ -197,10 +197,10 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus, folder . repr_in_client () )),
     ViewnodeKind::PropertyMember (member) =>
       Ok ( propertyMember_metadata_to_string (
-        viewnode . foldAndFocus, member, claims_are_read, facts, request )),
+        viewnode . foldAndFocus, member, claims_are_read, change_facts, request )),
     ViewnodeKind::ChangeViewnode (change) =>
       Ok ( changeViewnode_metadata_to_string (
-        viewnode . foldAndFocus, change, facts, request )),
+        viewnode . foldAndFocus, change, change_facts, request )),
     ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewnodeKind::Tombstone =>
@@ -208,13 +208,13 @@ fn viewnode_to_string_without_viewnode_id (
         viewnode . foldAndFocus )),
     ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       Ok ( occurrence_metadata_to_string (
-        viewnode . foldAndFocus, occurrence, claims_are_read, facts, request )),
+        viewnode . foldAndFocus, occurrence, claims_are_read, change_facts, request )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( unknown_metadata_to_string (
-        viewnode . foldAndFocus, unknown_node, claims_are_read, facts, request )),
+        viewnode . foldAndFocus, unknown_node, claims_are_read, change_facts, request )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Ok ( ghost_metadata_to_string (
-        viewnode . foldAndFocus, ghost, claims_are_read, facts, request )), } }
+        viewnode . foldAndFocus, ghost, claims_are_read, change_facts, request )), } }
 
 /// The position atoms a headline carries, in their order on the wire.
 fn foldAndFocus_atoms (
@@ -240,7 +240,7 @@ fn propertyMember_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   member          : &PropertyMember,
   claims_are_read : bool,
-  facts           : &ChangeFacts,
+  change_facts    : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
@@ -270,13 +270,13 @@ fn propertyMember_metadata_to_string (
       parts . push ( format! ("(flag {})", flag . wire_name ()) );
       parts . extend ( editRequest_form ( None, request )); } }
   parts . extend ( view_form ( warrant_atom . into_iter () . collect () ));
-  parts . extend ( diff_form (facts) );
+  parts . extend ( diff_form (change_facts) );
   parts . join (" ") }
 
 fn changeViewnode_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   change          : &ChangeViewnode,
-  facts           : &ChangeFacts,
+  change_facts    : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
@@ -299,7 +299,7 @@ fn changeViewnode_metadata_to_string (
     ChangeViewnode::ChangesetMarker { kind } =>
       parts . push ( format! ( "(changesetMarker {})", kind . wire_name () )), }
   parts . extend ( editRequest_form ( None, request ));
-  parts . extend ( diff_form (facts) );
+  parts . extend ( diff_form (change_facts) );
   parts . join (" ") }
 
 /// '(skgRepos [(nodeRepo R)] [(relRepo R)])': the home skgrepo of the
@@ -381,25 +381,25 @@ fn view_form (
 /// the diff view, and wherever no part has: '(diff)' is never
 /// written.
 fn diff_form (
-  facts : &ChangeFacts,
+  change_facts : &ChangeFacts,
 ) -> Option<String> {
   let mut parts : Vec<String> = Vec::new ();
-  parts . extend ( facts . change . forms () );
-  if let Some (leaves) = &facts . leaves {
+  parts . extend ( change_facts . change . forms () );
+  if let Some (leaves) = &change_facts . leaves {
     let count : String = leaves . count . to_string ();
     parts . push ( sexp_form ( "leaves",
       once ( count . as_str () )
       . chain ( leaves . objects . iter () . map ( |object| object . wire_name () ))
       . collect () )); }
-  if let Some (objects) = &facts . ready {
+  if let Some (objects) = &change_facts . ready {
     parts . push ( sexp_form ( "ready",
       objects . iter () . map ( |object| object . wire_name () ) . collect () )); }
-  if let Some (home_skgrepo_move) = &facts . home_skgrepo_move {
+  if let Some (home_skgrepo_move) = &change_facts . home_skgrepo_move {
     parts . push ( format! (
       "(homeSkgrepoMove (old {}) (new {}))",
       metadata_value_atom (&home_skgrepo_move . old),
       metadata_value_atom (&home_skgrepo_move . new) )); }
-  if let Some (letter) = &facts . moved_like_ancestor {
+  if let Some (letter) = &change_facts . moved_like_ancestor {
     parts . push ( format! (
       "(movedLikeAncestor {})", metadata_value_atom (letter) )); }
   ( ! parts . is_empty () ) . then ( || format! (
@@ -416,13 +416,13 @@ fn occurrence_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   occurrence : & Occurrence,
   claims_are_read     : bool,
-  facts               : & ChangeFacts,
+  change_facts        : & ChangeFacts,
   request             : & Option<ReadinessRequest>,
 ) -> String {
   fn node_parts (
     occurrence : & Occurrence,
     claims_are_read     : bool,
-    facts     : & ChangeFacts,
+    change_facts : & ChangeFacts,
     request   : & Option<ReadinessRequest>,
   ) -> Vec < String > {
     fn view_facts (
@@ -487,10 +487,10 @@ fn occurrence_metadata_to_string (
       edit_request (occurrence), request ));
     parts . extend ( view_requests (occurrence) );
     parts . extend ( view_form ( view_facts (occurrence) ));
-    parts . extend ( diff_form (facts) );
+    parts . extend ( diff_form (change_facts) );
     parts }
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . extend ( node_parts (occurrence, claims_are_read, facts, request));
+  parts . extend ( node_parts (occurrence, claims_are_read, change_facts, request));
   parts . join (" ") }
 
 /// Render metadata for a ghost:
@@ -502,7 +502,7 @@ fn ghost_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   ghost           : &Ghost,
   claims_are_read : bool,
-  facts           : &ChangeFacts,
+  change_facts    : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
@@ -518,7 +518,7 @@ fn ghost_metadata_to_string (
     . chain ( view_form (
       ( ghost . isWarranted == Warrant::No ) . then ( || "noWarrant" . to_string () )
       . into_iter () . collect () ))
-    . chain ( diff_form (facts) ) );
+    . chain ( diff_form (change_facts) ) );
   parts . join (" ") }
 
 /// Render metadata for an unknown:
@@ -530,7 +530,7 @@ fn unknown_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
   unknown_node    : &Unknown,
   claims_are_read : bool,
-  facts           : &ChangeFacts,
+  change_facts    : &ChangeFacts,
   request         : &Option<ReadinessRequest>,
 ) -> String {
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
@@ -542,7 +542,7 @@ fn unknown_metadata_to_string (
     unknown_node . relationshipEditRequest . as_ref ()
       . map (relationshipEditRequest_element),
     request ));
-  parts . extend ( diff_form (facts) );
+  parts . extend ( diff_form (change_facts) );
   parts . join (" ") }
 
 /// Render metadata for a tombstone:

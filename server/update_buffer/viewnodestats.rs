@@ -9,10 +9,12 @@ use crate::refresh::ancestry::parent_reads_claims;
 use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
-use crate::refresh::ancestry::required_ancestor_of;
+use crate::refresh::ancestry::{
+  CompoundFolderParties, compound_folder_parties, required_ancestor_of};
 use crate::update_buffer::reconcile::content::unintegrated_content_gnids;
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
+use std::iter::once;
 
 /// The five graph relations whose flags the H/S/O/L checks consult via
 /// the in-Rust graph (contains is checked via the containment maps).
@@ -410,13 +412,19 @@ fn birth_facts_for_folder (
     //   subscriber > subscribeeFolder
     //     > hiddenOutsideOfSubscribeeFolder > member
     // the subscriber (generation 3) hides it.
-    Folder::HiddenInSubscribee =>
-      vec![ BirthFact::new (
-              NodeRelation::HidesFromSubs, Side::In, Some (4) ),
-            BirthFact::new ( NodeRelation::Contains, Side::In, Some (2) ) ],
-    Folder::HiddenOutsideOfSubscribee =>
-      vec![ BirthFact::new (
-              NodeRelation::HidesFromSubs, Side::In, Some (3) ) ],
+    Folder::HiddenInSubscribee | Folder::HiddenOutsideOfSubscribee => {
+      let parties : CompoundFolderParties = compound_folder_parties (folder)
+        . expect ("a compound folder has parties");
+      let generation_above_a_member = |required_ancestor : usize| -> Option<usize> {
+        // The folder is generation 1; its viewparent, required ancestor 0, is 2.
+        Some (required_ancestor + 2) };
+      once ( BirthFact::new (
+          NodeRelation::HidesFromSubs, Side::In,
+          generation_above_a_member (parties . subscriber) ))
+        . chain ( parties . subscribee . map ( |subscribee| BirthFact::new (
+            NodeRelation::Contains, Side::In,
+            generation_above_a_member (subscribee) )) )
+        . collect () },
     // 'ParentKind::Folder' holds partner folders only.
     Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (), } }
 
@@ -487,19 +495,19 @@ fn set_relRepo (
         ParentKind::Folder (folder, folder_treeid) => {
           let Some (role) = folder . relation_member_role ()
           else { break 'compute None; }; // compound partner folders
-          let Some (anchor_pid) =
+          let Some (described_pid) =
             tree . get (folder_treeid) . unwrap () . parent ()
             . and_then ( |p| p . value () . occurrence_gnid () . cloned () )
           else { break 'compute None; };
           if role . is_first_role () {
             // This position's own node owns the outbound relationship (e.g.
             // a subscriberFolder member, which itself subscribes to
-            // the folder's anchor).
-            (node_pid . clone (), role . relation, anchor_pid)
+            // the node the folder describes).
+            (node_pid . clone (), role . relation, described_pid)
           } else {
-            // The folder's anchor owns the outbound relationship (e.g. a
-            // subscribeeFolder member, which the anchor subscribes to).
-            (anchor_pid, role . relation, node_pid . clone ())
+            // The node the folder describes owns the outbound relationship
+            // (e.g. a subscribeeFolder member, which it subscribes to).
+            (described_pid, role . relation, node_pid . clone ())
           }},
         ParentKind::Other => break 'compute None, };
     let skgrepo : SkgrepoName =
