@@ -58,12 +58,79 @@
                                                (get-text-property i 'face display))))
                        (list (car case) (nth 2 case) (nth 3 case))))))))
 
+(defun test-heralds--folder-display (lines &optional edit)
+  "The display text of the folder headline among LINES, with heralds
+on, after EDIT (a function called with point at the buffer's start),
+if given."
+  (with-temp-buffer
+    (org-mode)
+    (insert (mapconcat #'identity lines "\n") "\n")
+    (heralds-minor-mode 1)
+    (when edit
+      (goto-char (point-min))
+      (funcall edit))
+    (goto-char (point-min))
+    (re-search-forward "(skg [a-zA-Z]*Folder)")
+    (let ((ov (cl-find-if (lambda (ov) (overlay-get ov 'display))
+                          (overlays-at (match-beginning 0)))))
+      (should ov)
+      (substring-no-properties (overlay-get ov 'display)))))
+
+(ert-deftest test-heralds-a-folder-is-changed-by-its-members ()
+  "The server writes a folder as its bare atom. Its headline renders
+\"its ... changed ...\" when a member carries a change of its
+relationship (a '(diff (rel ...))', or a '(relRepoMove ...)' child),
+with ✓ when every such change is ready, and its ordinary label
+otherwise. Editing a member rerenders the folder's herald."
+  (let ((ordinary (substring-no-properties
+                   (heralds-from-metadata "(skg containerFolder)")))
+        (changed "☮ its containers changed (other files)")
+        (ready-member "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel added) (leaves 1 rel) (ready rel))) c")
+        (unready-member "*** (skg node (gnid d) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (rel removed) (leaves 1 rel))) d"))
+    (should (equal (test-heralds--folder-display
+                    (list "* (skg node (gnid r) (skgRepos (nodeRepo r))) r"
+                          "** (skg containerFolder)"
+                          ready-member))
+                   (concat changed "✓")))
+    (should (equal (test-heralds--folder-display
+                    (list "* (skg node (gnid r) (skgRepos (nodeRepo r))) r"
+                          "** (skg containerFolder)"
+                          ready-member
+                          unready-member))
+                   changed))
+    ;; A member whose relRepo moved: changed, ready once the move is.
+    (should (equal (test-heralds--folder-display
+                    '("** (skg containerFolder)"
+                      "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected) c"
+                      "**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1)))"))
+                   changed))
+    (should (equal (test-heralds--folder-display
+                    '("** (skg containerFolder)"
+                      "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected) c"
+                      "**** (skg (relRepoMove (old a) (new b)) (diff (leaves 1) (ready)))"))
+                   (concat changed "✓")))
+    ;; No member's relationship changed: the ordinary label. A
+    ;; grandchild's '(rel ...)' is no member's.
+    (should (equal (test-heralds--folder-display
+                    '("** (skg containerFolder)"
+                      "*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim writeProtected (diff (node added) (leaves 1 node))) c"
+                      "**** (skg node (gnid g) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) g"
+                      "** (skg node (gnid s) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel))) sibling"))
+                   ordinary))
+    ;; Editing a member's line rerenders its folder.
+    (should (equal (test-heralds--folder-display
+                    (list "** (skg containerFolder)" unready-member)
+                    (lambda ()
+                      (search-forward "(leaves 1 rel)")
+                      (insert " (ready rel)")))
+                   (concat changed "✓")))))
+
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with heralds
-      (insert "Test line with (skg node (gnid 123) (rels (contains (out 2))) (viewStats cycle)) herald\n")
-      (insert "Another line (skg node (gnid 456) (rels (linksTo (in 3 (substantive 3)))) (editRequest delete)) more text\n")
+      (insert "Test line with (skg node (gnid 123) (view (rels (contains (out 2))) cycle)) herald\n")
+      (insert "Another line (skg node (gnid 456) (editRequest delete) (view (rels (linksTo (in 3 (substantive 3)))))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -88,6 +155,20 @@
       (should ;; Also check that heralds-overlays variable is cleared
        (null heralds-overlays)))))
 
+(ert-deftest test-heralds-props-render-with-or-without-rels ()
+  "The property counts in '(view (props ...))' render after the
+relation tokens, as one herald: the rule table draws a sentinel for
+'(rels ...)' and another for '(props ...)', and the second leaves no
+trace. Without '(rels ...)' the counts still show."
+  (should (equal (substring-no-properties
+                  (heralds-from-metadata
+                   "(skg node (gnid x) (view (rels (contains (out 3))) (props (aliases 2) (flags 1))))"))
+                 "C3 A2 F1"))
+  (should (equal (substring-no-properties
+                  (heralds-from-metadata
+                   "(skg node (gnid x) (view (props (extraIds 1))))"))
+                 "I1")))
+
 (ert-deftest test-heralds-minor-mode-visual-check ()
   "The relationship heralds render from semantic facts with per-token
 faces, the ⊥/⟳/delete heralds appear, the sentinel placeholder never
@@ -96,7 +177,7 @@ payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
 the C token 2aC: the in-side numeral \"2\" (medium), the ancestor \"a\"
 at its floor (low), and the birth letter \"C\" (low)."
   (with-temp-buffer
-    (insert "Line with (skg node (gnid 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats noWarrant cycle) (editRequest delete)) text")
+    (insert "Line with (skg node (gnid 123) noClaim (editRequest delete) (view (rels (contains (in 2 (ancestors 1)))) (birth (contains in 1)) noWarrant cycle)) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ( ( herald-start
@@ -140,7 +221,7 @@ at its floor (low), and the birth letter \"C\" (low)."
   "After a major-mode switch orphans overlays, disabling heralds
 should still remove them."
   (with-temp-buffer
-    (insert "(skg node (gnid 1) (skgRepos (nodeRepo s)) (rels (contains (out 2))))\n")
+    (insert "(skg node (gnid 1) (skgRepos (nodeRepo s)) (view (rels (contains (out 2)))))\n")
     (heralds-minor-mode 1)
     ;; Overlays exist
     (should (cl-some (lambda (ov) (overlay-get ov 'heralds))
@@ -167,7 +248,7 @@ the fixture table."
     (cl-letf (((symbol-function 'skg-request-herald-rules)
                (lambda () (skg-test-install-herald-rules))))
       (with-temp-buffer
-        (insert "(skg node (gnid 1) (skgRepos (nodeRepo s)) (rels (contains (out 2))))\n")
+        (insert "(skg node (gnid 1) (skgRepos (nodeRepo s)) (view (rels (contains (out 2)))))\n")
         (heralds-minor-mode 1)
         (should heralds-minor-mode)       ;; stayed on
         (should heralds--transform-rules) ;; table recovered

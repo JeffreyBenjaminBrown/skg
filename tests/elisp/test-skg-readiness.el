@@ -40,13 +40,13 @@ without a title ends in a space, as 'skg-format-headline' writes it."
 
 (ert-deftest test-skg-cycle-commit-ready-toggles-a-leaf ()
   (should (equal (test-skg-readiness--run
-                  '("** (skg alias (diff (rel removed) (leaves 1))) a1")
+                  '("** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) a1")
                   1 #'skg-cycle-commit-ready)
-                 '("** (skg alias (diff (rel removed) (leaves 1) (readyRequest))) a1")))
+                 '("** (skg alias noClaim (editRequest (ready)) (view ghostWarrant) (diff (rel removed) (leaves 1))) a1")))
   (should (equal (test-skg-readiness--run
                   '("** (skg (oldText title) (diff (leaves 1) (ready))) txt")
                   1 #'skg-cycle-commit-ready)
-                 '("** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) txt")))
+                 '("** (skg (oldText title) (editRequest (unready)) (diff (leaves 1) (ready))) txt")))
   ;; Without the server's '(diff (leaves ...))' fact, nothing is named.
   (with-temp-buffer
     (org-mode)
@@ -54,10 +54,10 @@ without a title ends in a space, as 'skg-format-headline' writes it."
     (goto-char (point-min))
     (should-error (skg-cycle-commit-ready) :type 'user-error)))
 
-(ert-deftest test-skg-write-readiness-request-places-it-in-the-diff-form ()
-  "The request replaces any other as the last part of the headline's
-'(diff ...)' form, two levels under 'skg' on a node; a headline
-without the form gets one."
+(ert-deftest test-skg-write-readiness-request-places-it-in-the-editRequest ()
+  "The request replaces any other readiness request as the last part of
+the headline's '(editRequest ...)', keeping the other request there; a
+headline without the form gets one, before its derived facts."
   (cl-flet ((write (line ready objects)
               (with-temp-buffer
                 (org-mode)
@@ -65,15 +65,21 @@ without the form gets one."
                 (goto-char (point-min))
                 (skg--write-readiness-request ready objects)
                 (car (split-string (buffer-string) "\n" t)))))
-    (should (equal (write "* (skg node (gnid k) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel) (readyRequest rel))) k"
+    (should (equal (write "* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest (ready rel)) (diff (rel added) (leaves 1 rel))) k"
                           nil '(rel))
-                   "* (skg node (gnid k) (skgRepos (nodeRepo r)) (diff (rel added) (leaves 1 rel) (unreadyRequest rel))) k"))
+                   "* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest (unready rel)) (diff (rel added) (leaves 1 rel))) k"))
+    (should (equal (write "* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest (ready node) delete) (viewRequests editableView) (diff (node added) (leaves 1 node))) k"
+                          nil '(node))
+                   "* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest delete (unready node)) (viewRequests editableView) (diff (node added) (leaves 1 node))) k"))
+    (should (equal (write "* (skg node (gnid k) (skgRepos (nodeRepo r)) (viewRequests editableView) (view cycle) (diff (node added) (leaves 1 node))) k"
+                          t '(node))
+                   "* (skg node (gnid k) (skgRepos (nodeRepo r)) (viewRequests editableView) (editRequest (ready node)) (view cycle) (diff (node added) (leaves 1 node))) k"))
     (should (equal (write "** (skg alias (diff (rel added) (leaves 1))) a"
                           t nil)
-                   "** (skg alias (diff (rel added) (leaves 1) (readyRequest))) a"))
+                   "** (skg alias (editRequest (ready)) (diff (rel added) (leaves 1))) a"))
     (should (equal (write "** (skg (homeSkgrepoMove (old x) (new b))) "
                           t nil)
-                   "** (skg (homeSkgrepoMove (old x) (new b)) (diff (readyRequest))) "))))
+                   "** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (ready))) "))))
 
 (ert-deftest test-skg-cycle-commit-ready-names-every-listed-object ()
   ;; A new member lists two objects, one of them ready: the gesture
@@ -81,18 +87,18 @@ without the form gets one."
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid k) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (ready rel))) k")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid k) (skgRepos (nodeRepo r)) (diff (node added) (rel added) (leaves 2 node rel) (ready rel) (readyRequest node rel))) k")))
+                 '("* (skg node (gnid k) (skgRepos (nodeRepo r)) (editRequest (ready node rel)) (diff (node added) (rel added) (leaves 2 node rel) (ready rel))) k")))
   ;; A modified node in a new relationship: one gesture marks its file
   ;; and the relationship.
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (rel added) (properties changed) (leaves 3 rel all) (ready rel))) m")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (rel added) (properties changed) (leaves 3 rel all) (ready rel) (readyRequest rel all))) m")))
+                 '("* (skg node (gnid m) (skgRepos (nodeRepo r)) (editRequest (ready rel all)) (diff (rel added) (properties changed) (leaves 3 rel all) (ready rel))) m")))
   ;; With one object, likewise.
   (should (equal (test-skg-readiness--run
                   '("* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node))) d")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (leaves 1 node) (readyRequest node))) d"))))
+                 '("* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (ready node)) (diff (node removed) (leaves 1 node))) d"))))
 
 (ert-deftest test-skg-cycle-commit-ready-a-modified-node-toggles-by-its-own-ready ()
   ;; '(ready all)': ready, so the gesture unmarks.
@@ -100,41 +106,41 @@ without the form gets one."
                   '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (ready all))) txt"
                     "** (skg (oldText title) (diff (leaves 1) (ready))) txt")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (ready all) (unreadyRequest all))) txt"
+                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (unready all)) (diff (properties changed) (leaves 1 all) (ready all))) txt"
                    "** (skg (oldText title) (diff (leaves 1) (ready))) txt")))
   ;; Without it, unready, whatever its children say: the gesture marks.
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all))) txt"
                     "** (skg (oldText title) (diff (leaves 1) (ready))) txt")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (readyRequest all))) txt"
+                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (ready all)) (diff (properties changed) (leaves 1 all))) txt"
                    "** (skg (oldText title) (diff (leaves 1) (ready))) txt")))
   ;; A '(ready rel)' does not make 'all' ready.
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (rel added) (properties changed) (leaves 2 rel all) (ready rel))) m")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid m) (skgRepos (nodeRepo r)) (diff (rel added) (properties changed) (leaves 2 rel all) (ready rel) (readyRequest rel all))) m"))))
+                 '("* (skg node (gnid m) (skgRepos (nodeRepo r)) (editRequest (ready rel all)) (diff (rel added) (properties changed) (leaves 2 rel all) (ready rel))) m"))))
 
 (ert-deftest test-skg-cycle-commit-ready-on-a-commit-readiness-aggregate-writes-one-level-down ()
   ;; A changed folder: a request on each leaf just below it.
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid ali) (skgRepos (nodeRepo r)) (diff (leaves 2 all))) ali"
-                    "** (skg (aliasFolder changed))"
-                    "*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1"
+                    "** (skg aliasFolder)"
+                    "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1"
                     "*** (skg alias) a2"
                     "*** (skg alias (diff (rel added) (leaves 1))) a3")
                   2 #'skg-cycle-commit-ready)
                  '("* (skg node (gnid ali) (skgRepos (nodeRepo r)) (diff (leaves 2 all))) ali"
-                   "** (skg (aliasFolder changed))"
-                   "*** (skg alias (diff (rel removed) (leaves 1) (ready) (readyRequest))) a1"
+                   "** (skg aliasFolder)"
+                   "*** (skg alias noClaim (editRequest (ready)) (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1"
                    "*** (skg alias) a2"
-                   "*** (skg alias (diff (rel added) (leaves 1) (readyRequest))) a3")))
+                   "*** (skg alias (editRequest (ready)) (diff (rel added) (leaves 1))) a3")))
   ;; A changed node: one request naming every leaf it records.
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) txt"
                     "** (skg (oldText title) (diff (leaves 1))) txt")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (leaves 1 all) (readyRequest all))) txt"
+                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (ready all)) (diff (leaves 1 all))) txt"
                    "** (skg (oldText title) (diff (leaves 1))) txt"))))
 
 (ert-deftest test-skg-cycle-commit-ready-recursively-touches-only-leaves ()
@@ -151,19 +157,19 @@ without the form gets one."
                     "* (skg node (gnid other) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) other"
                     "** (skg (oldText title) (diff (leaves 1))) other")
                   1 #'skg-cycle-commit-ready '(4))
-                 '("* (skg node (gnid r) (skgRepos (nodeRepo r)) (diff (leaves 3 all) (readyRequest all))) r"
+                 '("* (skg node (gnid r) (skgRepos (nodeRepo r)) (editRequest (ready all)) (diff (leaves 3 all))) r"
                    "** (skg (changesetMarker content) (diff (leaves 2 all)))"
-                   "** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (readyRequest node rel))) d"
+                   "** (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (ready node rel)) (diff (node removed) (rel removed) (leaves 2 node rel))) d"
                    "*** (skg node (gnid k) (skgRepos (nodeRepo r)) writeProtected) k"
-                   "** (skg node (gnid c) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (leaves 1 rel) (readyRequest rel))) c"
-                   "** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (diff (rel added) (properties changed) (leaves 2 rel all) (readyRequest rel))) m"
+                   "** (skg node (gnid c) (skgRepos (nodeRepo r)) writeProtected (editRequest (ready rel)) (diff (rel added) (leaves 1 rel))) c"
+                   "** (skg node (gnid m) (skgRepos (nodeRepo r)) writeProtected (editRequest (ready rel)) (diff (rel added) (properties changed) (leaves 2 rel all))) m"
                    "* (skg node (gnid other) (skgRepos (nodeRepo r)) (diff (leaves 1 all))) other"
                    "** (skg (oldText title) (diff (leaves 1))) other")))
   ;; At point, a changeset marker names its commit readiness aggregate.
   (should (equal (test-skg-readiness--run
                   '("** (skg (changesetMarker content) (diff (leaves 2 all)))")
                   1 #'skg-cycle-commit-ready '(4))
-                 '("** (skg (changesetMarker content) (diff (leaves 2 all) (readyRequest all))) "))))
+                 '("** (skg (changesetMarker content) (editRequest (ready all)) (diff (leaves 2 all))) "))))
 
 (ert-deftest test-skg-toggle-homeSkgrepo-move-commitReady ()
   (let ((lines '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
@@ -175,7 +181,7 @@ without the form gets one."
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-toggle-homeSkgrepo-move-commitReady)
                    '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
-                     "** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (readyRequest))) "
+                     "** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (ready)) (diff (leaves 1))) "
                      "** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c"
                      "*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1)))"
                      "** (skg node (gnid e) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) e"
@@ -184,21 +190,21 @@ without the form gets one."
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-toggle-homeSkgrepo-move-commitReady '(4))
                    '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
-                     "** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (readyRequest))) "
+                     "** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (ready)) (diff (leaves 1))) "
                      "** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c"
-                     "*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (readyRequest))) "
+                     "*** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (ready)) (diff (leaves 1))) "
                      "** (skg node (gnid e) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) e"
                      "*** (skg (homeSkgrepoMove (old y) (new b)) (diff (leaves 1)))")))))
 
 (ert-deftest test-skg-readiness-a-single-leaf-unmark-asks-nothing ()
   ;; The folder's one leaf is its only unmark: nothing is asked.
   (should (equal (test-skg-readiness--run
-                  '("** (skg (aliasFolder changed) (diff (ready)))"
-                    "*** (skg alias (diff (rel removed) (leaves 1) (ready))) a1"
+                  '("** (skg aliasFolder)"
+                    "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1"
                     "*** (skg alias) a2")
                   1 #'skg-cycle-commit-ready)
-                 '("** (skg (aliasFolder changed) (diff (ready)))"
-                   "*** (skg alias (diff (rel removed) (leaves 1) (ready) (unreadyRequest))) a1"
+                 '("** (skg aliasFolder)"
+                   "*** (skg alias noClaim (editRequest (unready)) (view ghostWarrant) (diff (rel removed) (leaves 1) (ready))) a1"
                    "*** (skg alias) a2")))
   ;; A modified node whose only leaf is ready: one leaf, as the server
   ;; counts, so nothing is asked.
@@ -206,7 +212,7 @@ without the form gets one."
                   '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (ready all))) txt"
                     "** (skg (oldText title) (diff (leaves 1) (ready))) txt")
                   1 #'skg-cycle-commit-ready)
-                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 1 all) (ready all) (unreadyRequest all))) txt"
+                 '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (editRequest (unready all)) (diff (properties changed) (leaves 1 all) (ready all))) txt"
                    "** (skg (oldText title) (diff (leaves 1) (ready))) txt"))))
 
 (ert-deftest test-skg-readiness-a-wide-unmark-asks-first ()
@@ -218,8 +224,8 @@ without the form gets one."
                    lines))
     (should (equal (test-skg-readiness--run
                     lines 1 #'skg-cycle-commit-ready '(4) 'yes)
-                   '("* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel) (unreadyRequest node rel))) d"
-                     "** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) d"))))
+                   '("* (skg ghost (gnid d) (skgRepos (nodeRepo r)) (editRequest (unready node rel)) (diff (node removed) (rel removed) (leaves 2 node rel) (ready node rel))) d"
+                     "** (skg (oldText title) (editRequest (unready)) (diff (leaves 1) (ready))) d"))))
   ;; Unmarking a modified node unmarks every leaf it records: two here.
   (should (equal (test-skg-readiness--run
                   '("* (skg node (gnid txt) (skgRepos (nodeRepo r)) (diff (properties changed) (leaves 2 all) (ready all))) txt"
@@ -240,7 +246,7 @@ without the form gets one."
   (should (equal (test-skg-readiness--run
                   '("** (skg (oldText title) (diff (leaves 1) (ready))) txt")
                   1 #'skg-cycle-commit-ready)
-                 '("** (skg (oldText title) (diff (leaves 1) (ready) (unreadyRequest))) txt"))))
+                 '("** (skg (oldText title) (editRequest (unready)) (diff (leaves 1) (ready))) txt"))))
 
 (ert-deftest test-skg-toggle-homeSkgrepo-move-commitReady-unmarks ()
   (let ((lines '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
@@ -253,7 +259,7 @@ without the form gets one."
                       lines line-number
                       #'skg-toggle-homeSkgrepo-move-commitReady)
                      '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
-                       "** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready) (unreadyRequest))) "
+                       "** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (unready)) (diff (leaves 1) (ready))) "
                        "** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c"
                        "*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready)))"))))
     ;; Recursively, two moves: asked first.
@@ -261,9 +267,9 @@ without the form gets one."
                     lines 1 #'skg-toggle-homeSkgrepo-move-commitReady
                     '(4) 'yes)
                    '("* (skg node (gnid a) (skgRepos (nodeRepo b)) (diff (leaves 1 all))) a"
-                     "** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready) (unreadyRequest))) "
+                     "** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (unready)) (diff (leaves 1) (ready))) "
                      "** (skg node (gnid c) (skgRepos (nodeRepo b)) writeProtected (diff (leaves 1 all))) c"
-                     "*** (skg (homeSkgrepoMove (old x) (new b)) (diff (leaves 1) (ready) (unreadyRequest))) ")))))
+                     "*** (skg (homeSkgrepoMove (old x) (new b)) (editRequest (unready)) (diff (leaves 1) (ready))) ")))))
 
 (ert-deftest test-skg-readiness-do-children-visits-exactly-one-level-below-point ()
   "The children of the headline at point, not its grandchildren, its
@@ -322,10 +328,10 @@ siblings, or a child without metadata."
     "** (skg node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (leaves 1 node))) a"
     "*** (skg node (gnid b) (skgRepos (nodeRepo main))) b"
     "** (skg node (gnid c) (skgRepos (nodeRepo main)) (diff (properties changed) (leaves 2 all) (ready all))) c"
-    "** (skg (containerFolder changed) (diff (ready))) its containers"
-    "*** (skg alias (diff (rel removed) (leaves 1))) a1")
+    "** (skg containerFolder) its containers"
+    "*** (skg alias noClaim (view ghostWarrant) (diff (rel removed) (leaves 1))) a1")
   "Three change headlines (lines 2, 4 and 6), the middle one ready,
-among headlines that carry no leaves fact, one of them a ready folder.")
+among headlines that carry no leaves fact, one of them a changed folder.")
 
 (defun test-skg-readiness--goto-changes (lines from command times)
   "Insert LINES, put point at the start of line FROM (or at the

@@ -98,7 +98,7 @@ LINE-NUMBER is zero-based."
       (setq skg-port (string-to-number test-port))))
 
   (let ((expected-with-aliases
-         (concat "* (skg node (gnid test-node) (skgRepos (nodeRepo main)) (rels (aliases 2))) Test Node\n"
+         (concat "* (skg node (gnid test-node) (skgRepos (nodeRepo main)) (view (props (aliases 2)))) Test Node\n"
                  "** (skg aliasFolder)\n"
                  "*** (skg alias) first alias\n"
                  "*** (skg alias) second alias\n"))

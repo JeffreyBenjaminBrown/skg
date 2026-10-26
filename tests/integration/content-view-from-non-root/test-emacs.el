@@ -36,10 +36,10 @@
         (when (string-match-p "noClaim" root-line)
           (fail "contained view-root should be content, not false; line: %S"
                 root-line))
-        (when (string-match-p "noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" root-line)
+        (when (string-match-p "noClaim writeProtected (view (rels (contains (out 1 (ancestors 1)))) (birth (contains out 1)))" root-line)
           (fail "contained view-root should be content, not content; line: %S"
                 root-line))
-        (when (string-match-p "noClaim writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" root-line)
+        (when (string-match-p "noClaim writeProtected (view (rels (linksTo (out (ancestors 1)))) (birth (linksTo out 1)))" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
       (unless (string-match-p "^\\* (skg node (gnid child) .*\n\\*\\* (skg containerFolder" text)
@@ -49,7 +49,7 @@
                        (match-string 0 text))))
         (unless line
           (fail "no level-3 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "(gnid parent) (skgRepos (nodeRepo main)) writeProtected (rels (contains (out 1 (ancestors 2))) (birth (contains out 2)))" line)
+        (unless (string-match-p "(gnid parent) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (out 1 (ancestors 2)))) (birth (contains out 2)))" line)
           (fail "parent is not a write-protected member of the folder; line: %S" line))
         (unless (string-match-p " writeProtected\\b" line)
           (fail "parent is not writeProtected; line: %S" line))))))

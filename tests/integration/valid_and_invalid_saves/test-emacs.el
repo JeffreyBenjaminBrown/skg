@@ -102,7 +102,7 @@
       (message "Updated buffer content: %s" updated-content)
 
       ;; Should contain cycle and write-protected atoms
-      ;; Note: cycle sits in (viewStats ...), write-protected beside the node atom
+      ;; Note: cycle sits in (view ...), write-protected beside the node atom
       (if (and (string-match-p "cycle" updated-content)
                (string-match-p "\\bwriteProtected\\b" updated-content))
           (progn

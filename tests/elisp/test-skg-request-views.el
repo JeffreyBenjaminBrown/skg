@@ -45,7 +45,7 @@ unchanged, and one save is requested."
                  #'skg-request-ghost-tombstone)))
     (should (equal (car result)
                    '("* (skg node (gnid r) (skgRepos (nodeRepo main))) r"
-                     "** (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)) (viewRequests tombstone)) g")))
+                     "** (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed) (rel removed))) g")))
     (should (= (cdr result) 1))))
 
 (ert-deftest test-skg-request-ghost-tombstone-refuses-anything-but-a-ghost ()
@@ -83,7 +83,7 @@ carrying it, too); no other headline changes; one save is requested."
                  #'skg-request-buffer-ghosts-tombstone)))
     (should (equal (car result)
                    '("* (skg node (gnid r) (skgRepos (nodeRepo main))) r"
-                     "** (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)) (viewRequests tombstone)) g"
+                     "** (skg (vnid 0d) ghost (gnid g) (skgRepos (nodeRepo main)) (viewRequests tombstone) (diff (node removed) (rel removed))) g"
                      "*** (skg node (gnid k) (skgRepos (nodeRepo main)) writeProtected) k"
                      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (diff (rel removed))) x"
                      "** (skg unknown (gnid u))"

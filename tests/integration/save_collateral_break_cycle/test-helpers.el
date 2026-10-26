@@ -3,7 +3,7 @@
 
 (defun headline--role-of-chain-node-from-rels (rels-body)
   "Classify a chain node from its semantic relationship facts, or nil.
-RELS-BODY is the cdr of the (rels ...) form -- a list of relation
+RELS-BODY is the cdr of the (view (rels ...)) form -- a list of relation
 sub-forms like (contains (in ...) (out ...)). A chain node (a
 non-member of the containerward chain) relates outbound to a tracked
 ancestor: it has a relation with an (out ... (ancestors ...)) side.
@@ -26,13 +26,13 @@ outbound ancestor (e.g. a cycle) yet is not a chain node."
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP by membership and chain position.
 A chain node (a node with noClaim and an outbound-ancestor relation)
-returns its ROLENAME from its (rels ...) facts (e.g. `container');
+returns its ROLENAME from its (view (rels ...)) facts (e.g. `container');
 otherwise the result is `noClaim' for a non-member and `member' for
 a member."
   (let* ((non-member (and sexp
                           (skg-sexp-subtree-p sexp '(skg node noClaim))))
          (rels-body (when sexp
-                      (skg-sexp-cdr-at-path sexp '(skg rels))))
+                      (skg-sexp-cdr-at-path sexp '(skg view rels))))
          (chain-node-role (when non-member
                        (headline--role-of-chain-node-from-rels rels-body))))
     (cond

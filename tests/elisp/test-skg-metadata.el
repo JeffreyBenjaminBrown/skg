@@ -187,8 +187,47 @@ the folder commands are the way to show a node's partners."
                 (cdr pair))))
   (should-not (lookup-key skg-content-view-mode-map (kbd "C-c p"))))
 
+(ert-deftest test-skg-folder-change-readiness ()
+  "A folder is changed when a member carries a change of its
+relationship to the folder's viewparent, and ready when every such
+change is. The cases the server pinned when it computed this."
+  (let ((ready-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready rel))))
+        (unready-member '(skg node (gnid m) (diff (rel added) (leaves 2 node rel) (ready node))))
+        (ready-unknown '(skg unknown (gnid u) (diff (rel added) (leaves 1) (ready))))
+        (unready-alias '(skg alias noClaim (view ghostWarrant) (diff (rel removed))))
+        (unchanged '(skg node (gnid n) (diff (node added) (ready node)))))
+    (cl-flet ((readiness (&rest member-sexps)
+                (skg--folder-change-readiness
+                 (mapcar #'list member-sexps))))
+      (should (eq (readiness ready-member) 'ready))
+      (should (eq (readiness unready-member) 'unready))
+      (should (eq (readiness ready-unknown) 'ready))
+      (should (eq (readiness unready-alias) 'unready))
+      (should (null (readiness unchanged)))
+      (should (eq (readiness ready-member ready-unknown unchanged) 'ready))
+      (should (eq (readiness ready-member unready-member ready-unknown
+                             unready-alias)
+                  'unready))))
+  ;; A '(relRepoMove ...)' child changes its member's relationship too.
+  (let ((member '(skg node (gnid m))))
+    (should (eq (skg--folder-change-readiness
+                 (list (list member '(skg (relRepoMove (old a) (new b))
+                                          (diff (leaves 1) (ready))))))
+                'ready))
+    (should (eq (skg--folder-change-readiness
+                 (list (list member '(skg (relRepoMove (old a) (new b))
+                                          (diff (leaves 1))))))
+                'unready))
+    ;; Both must be ready.
+    (should (eq (skg--folder-change-readiness
+                 (list (list '(skg node (gnid m) (diff (rel added) (leaves 1 rel) (ready rel)))
+                             '(skg (relRepoMove (old a) (new b))
+                                   (diff (leaves 1))))))
+                'unready))))
+
 (ert-deftest test-skg-set-repo ()
-  "Test skg-set-repo replaces the node repo field."
+  "Test skg-set-repo replaces the node repo field, and writes no
+derived fact: the save recomputes '(view repoBoundary)'."
   (with-temp-buffer
     (org-mode)
     (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public))) title")
@@ -202,18 +241,17 @@ the folder commands are the way to show a node's partners."
       (should (skg-sexp-subtree-p
                result
                '(skg node (gnid 1) (skgRepos (nodeRepo private)))))
-      (should (skg-sexp-subtree-p
-               result
-               '(skg node (viewStats (homeRepoHerald ⌂:private)))))
+      (should-not (assq 'view (cdr result)))
       (should-not (skg-sexp-subtree-p
                    result
                    '(skg node (skgRepos (nodeRepo public))))))))
 
-(ert-deftest test-skg-set-repo-updates-displayed-repo-herald ()
-  "Test skg-set-repo changes the repo herald for the current node."
+(ert-deftest test-skg-set-repo-leaves-the-repo-boundary-to-the-save ()
+  "Test skg-set-repo leaves the node's '(view repoBoundary)', and so
+its herald, as they were: the save recomputes them."
   (with-temp-buffer
     (org-mode)
-    (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public)) (viewStats (homeRepoHerald ⌂:public))) title")
+    (insert "* (skg node (gnid 1) (skgRepos (nodeRepo public)) (view repoBoundary)) title")
     (goto-char (point-min))
     (heralds-minor-mode 1)
     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
@@ -228,9 +266,10 @@ the folder commands are the way to show a node's partners."
             (cl-find-if (lambda (ov) (overlay-get ov 'display))
                         (overlays-at metadata-start))))
       (should display-overlay)
-      (let ((display-text (overlay-get display-overlay 'display)))
-        (should (string-match-p "⌂private" display-text))
-        (should-not (string-match-p "⌂public" display-text))))))
+      (should (equal (test-skg--extract-metadata-sexp)
+                     '(skg node (gnid 1) (skgRepos (nodeRepo private))
+                           (view repoBoundary))))
+      (should (string-match-p "⌂" (overlay-get display-overlay 'display))))))
 
 (ert-deftest test-skg-set-merge-request-with-bare-id ()
   "Test skg-set-merge-request adds a merge editRequest."
@@ -312,9 +351,7 @@ the folder commands are the way to show a node's partners."
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id skgid)
                '(skg node (skgRepos (nodeRepo private)))))
-      (should (skg-sexp-subtree-p
-               (test-skg--metadata-sexp-by-id skgid)
-               '(skg node (viewStats (homeRepoHerald ⌂:private))))))
+      (should-not (assq 'view (cdr (test-skg--metadata-sexp-by-id skgid)))))
     (should (skg-sexp-subtree-p
              (test-skg--metadata-sexp-by-id "mismatched-content")
              '(skg node (skgRepos (nodeRepo foreign)))))

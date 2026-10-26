@@ -34,6 +34,12 @@
   "The kind of the headline being edited, from
 'shared/metadata-fields.json', or nil.")
 
+(defvar-local skg-sexp-edit--readiness-request nil
+  "The readiness request, '(ready ...)' or '(unready ...)', that the
+'(editRequest ...)' of the headline being edited carried, or nil. The
+readiness commands set it, so the edit buffer does not show it, and
+applying writes it back.")
+
 ;;
 ;; Minor mode for the edit buffer
 ;;
@@ -62,7 +68,11 @@ Kill the buffer to cancel without saving."
               (skg-metadata-fields-strip-defaults-from-org
                org-text skg-sexp-edit--kind)
             org-text))
-         (new-sexp (org-to-sexp final-org))
+         (new-sexp (if skg-sexp-edit--readiness-request
+                       (skg--metadata-with-readiness-request
+                        (org-to-sexp final-org)
+                        skg-sexp-edit--readiness-request)
+                     (org-to-sexp final-org)))
          (new-text (prin1-to-string new-sexp))
          (source-buffer skg-sexp-edit--source-buffer)
          (start skg-sexp-edit--start)
@@ -79,10 +89,13 @@ Kill the buffer to cancel without saving."
 
 
 (defun skg-sexp-edit--open-edit-buffer (org-text source-buffer
-                                       sexp-start sexp-end kind)
+                                       sexp-start sexp-end kind
+                                       &optional readiness-request)
   "Open a sexp-edit buffer with ORG-TEXT from SOURCE-BUFFER.
 SEXP-START and SEXP-END delimit the sexp in SOURCE-BUFFER. KIND is the
-headline's kind from 'shared/metadata-fields.json', or nil."
+headline's kind from 'shared/metadata-fields.json', or nil.
+READINESS-REQUEST is the readiness request ORG-TEXT leaves out (see
+`skg-sexp-edit--readiness-request'), or nil."
   (let (( edit-buffer (generate-new-buffer "*skg-metadata-edit*") ))
     (switch-to-buffer edit-buffer)
     (insert skg-edit--help-text)
@@ -102,7 +115,8 @@ headline's kind from 'shared/metadata-fields.json', or nil."
     (setq-local skg-sexp-edit--source-buffer source-buffer)
     (setq-local skg-sexp-edit--start sexp-start)
     (setq-local skg-sexp-edit--end sexp-end)
-    (setq-local skg-sexp-edit--kind kind)))
+    (setq-local skg-sexp-edit--kind kind)
+    (setq-local skg-sexp-edit--readiness-request readiness-request)))
 
 (defun skg-sexp-edit--decorate-with-heralds ()
   "Append, per headline, the herald its metadata path produces:
@@ -327,6 +341,8 @@ If the headline has no metadata, populates a minimal
 \(skg node (skgRepos (nodeRepo X)))
 in place and opens the empty-node view over it -- repo pre-filled, the
 other editable fields childless (see `skg-view-metadata--open-empty-node-view').
+A readiness request in its '(editRequest ...)' is not shown, and
+saving keeps it.
 Use C-c C-c to save changes back to the source buffer.
 Kill the buffer to cancel without saving."
   (interactive)
@@ -341,7 +357,12 @@ Kill the buffer to cancel without saving."
       (if no-metadata
           (skg-view-metadata--open-empty-node-view (caddr split))
         (let* (( source-buffer (current-buffer) )
-               (sexp (read metadata-str) )
+               ( readiness-request (skg--readiness-request-of
+                                    (read metadata-str)) )
+               (sexp (if readiness-request
+                         (skg--metadata-with-readiness-request
+                          (read metadata-str) nil)
+                       (read metadata-str)) )
                (kind (skg-metadata-fields-kind-of-sexp sexp) )
                (sexp-start (+ (line-beginning-position)
                               (length (car split))) )
@@ -355,7 +376,8 @@ Kill the buffer to cancel without saving."
                                   title))
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer
-           org-text source-buffer sexp-start sexp-end kind)
+           org-text source-buffer sexp-start sexp-end kind
+           readiness-request)
           (skg-sexp-edit--goto-field-value "nodeRepo"))))))
 
 (provide 'skg-sexpr-edit)

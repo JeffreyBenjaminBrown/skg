@@ -2,10 +2,10 @@
 ;;;
 ;;; PURPOSE: The commit-readiness gestures of the diff view
 ;;; ('docs/diff-view.org', "Readiness requests and gestures"). Each writes
-;;; readiness requests, '(readyRequest OBJECTS)' or '(unreadyRequest
-;;; OBJECTS)', into headline metadata, then saves. The save consumes
-;;; them, setting or clearing the marks, and answers with the buffer
-;;; rerendered and the readiness summary.
+;;; readiness requests, '(ready OBJECTS)' or '(unready OBJECTS)', into
+;;; the '(editRequest ...)' of headline metadata, then saves. The save
+;;; consumes them, setting or clearing the marks, and answers with the
+;;; buffer rerendered and the readiness summary.
 ;;;
 ;;; The server says which leaves (single changes) a headline names:
 ;;; it writes '(leaves N OBJECT...)' in the headline's '(diff ...)'
@@ -20,7 +20,9 @@
 ;;; object the headline lists, and toggles by the headline's own '(ready
 ;;; ...)': it is ready when that names every listed object. A folder
 ;;; shown because of a change names no leaf itself; a gesture on it acts
-;;; on its children.
+;;; on its children. The server writes such a folder as its bare atom;
+;;; whether it is changed, and ready, follows from its members
+;;; (`skg--folder-change-readiness-at-point').
 ;;;
 ;;; Below the headline a gesture acts on, it names no 'all': the leaves
 ;;; of a modified node or a commit readiness aggregate there are named
@@ -138,22 +140,14 @@ carries any '(ready ...)'."
          (seq-every-p (lambda (object) (memq object (cdr ready)))
                       objects))))
 
-(defun skg--readiness-changed-folder-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP is a folder shown because of a change."
-  (seq-some (lambda (element)
-              (and (consp element)
-                   (string-suffix-p "Folder" (symbol-name (car element)))
-                   (memq 'changed (cdr element))))
-            (cdr metadata-sexp)))
-
 (defun skg--readiness-ready-p (metadata-sexp)
-  "Non-nil when the headline with METADATA-SEXP is ready: a headline
-that names leaves, on all the objects it lists, or a changed folder
-whose '(diff ...)' carries its aggregate, the objectless '(ready)'."
+  "Non-nil when the headline with METADATA-SEXP, at point, is ready: a
+headline that names leaves, on all the objects it lists, or a changed
+folder when every change of its members' relationships is ready."
   (let ((leaves (skg--readiness-leaves metadata-sexp)))
-    (cond (leaves (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
-          ((skg--readiness-changed-folder-p metadata-sexp)
-           (skg--readiness-form metadata-sexp 'ready)))))
+    (if leaves
+        (skg--readiness-objects-ready-p metadata-sexp (cdr leaves))
+      (eq (skg--folder-change-readiness-at-point) 'ready))))
 
 (defun skg--readiness-homeSkgrepo-move (metadata-sexp)
   "The (OLD NEW) skgrepos of METADATA-SEXP when it is a home skgrepo move."
@@ -224,7 +218,7 @@ in buffer order."
       (list (skg--readiness-request-here
              (not (skg--readiness-objects-ready-p metadata-sexp (cdr leaves)))
              (cdr leaves))))
-     ((skg--readiness-changed-folder-p metadata-sexp)
+     ((skg--folder-change-readiness-at-point)
       (let ((ready (not (skg--readiness-ready-p metadata-sexp))))
         (skg--readiness-do-children
          (lambda (child-sexp)
@@ -282,19 +276,20 @@ On refusal, write nothing and return nil."
 
 (defun skg--write-readiness-request (ready objects)
   "Replace the readiness request of the headline at point with one
-that marks (READY non-nil) or unmarks the leaves on OBJECTS. The
-request is the last part of the headline's '(diff ...)' form, which
-stands at the top level of its metadata, whatever its kind. A
-headline without the form gets one."
+that marks (READY non-nil) or unmarks the leaves on OBJECTS: '(ready
+OBJECTS)' or '(unready OBJECTS)', the last part of the headline's
+'(editRequest ...)', which stands at the top level of its metadata,
+whatever its kind. The headline's other edit request stays. A
+headline without '(editRequest ...)' gets one, before its derived
+facts."
   (let* ((metadata-sexp (skg--current-headline-metadata-sexp))
-         (request (cons (if ready 'readyRequest 'unreadyRequest) objects))
-         (diff-edit
-          (if (skg--readiness-diff-form metadata-sexp)
-              `(diff (DELETE (readyRequest) (unreadyRequest)) ,request)
-            ;; A missing form is appended whole, so it holds no DELETE.
-            `(diff ,request))))
+         (request (cons (if ready 'ready 'unready) objects))
+         (edit-request
+          (assq 'editRequest
+                (cdr (skg--metadata-with-readiness-request
+                      metadata-sexp request)))))
     (skg-edit-metadata-at-point
-     `(skg ,diff-edit))))
+     `(skg (ENSURE ,edit-request)))))
 
 ;;; Moving between change headlines
 ;;; A change headline is one whose metadata carries a '(leaves ...)'

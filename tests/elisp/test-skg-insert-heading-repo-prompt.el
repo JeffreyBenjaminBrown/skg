@@ -250,6 +250,37 @@ open the sexp-edit buffer (not prompt in minibuffer)."
          (should (get-text-property (point) 'read-only)))
        (kill-buffer edit-buf)))))
 
+(ert-deftest test-edit-metadata-keeps-a-readiness-request ()
+  "The metadata editor does not show a readiness request in the
+headline's '(editRequest ...)', and applying keeps it, beside the
+other request or alone."
+  (dolist (case '(("(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x"
+                   . "(skg node (gnid x) (skgRepos (nodeRepo public)) (editRequest delete (ready node)) (diff (node added) (leaves 1 node))) x")
+                  ("(skg alias (editRequest (unready)) (diff (rel added) (leaves 1)))"
+                   . "(skg alias (editRequest (unready)) (diff (rel added) (leaves 1)))")))
+    (test--with-skg-content-view
+     (concat "* " (car case) "\n")
+     test--config-public-and-private
+     (lambda ()
+       (let ((source-buffer (current-buffer)))
+         (skg-view-metadata)
+         (let ((edit-buf
+                (cl-find-if
+                 (lambda (b)
+                   (buffer-local-value 'skg-sexp-edit--source-buffer b))
+                 (buffer-list))))
+           (should edit-buf)
+           (with-current-buffer edit-buf
+             (should-not (string-match-p
+                          "^\\*+ \\(un\\)?ready$"
+                          (buffer-substring-no-properties
+                           (point-min) (point-max))))
+             (skg-sexp-edit--apply)))
+         (with-current-buffer source-buffer
+           (should (equal (buffer-substring-no-properties
+                           (point-min) (point-max))
+                          (concat "* " (cdr case) "\n")))))))))
+
 (ert-deftest test-view-repo-list-includes-all-repos ()
   "skg-view-repo-list should list every configured repo and path."
   (test--with-skg-content-view

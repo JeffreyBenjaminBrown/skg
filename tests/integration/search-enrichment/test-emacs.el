@@ -26,11 +26,11 @@
       (message "✗ FAIL: leaf-b search root is false during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "noClaim writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))" line)
+    (when (string-match-p "noClaim writeProtected (view (rels (contains (out 1 (ancestors 1)))) (birth (contains out 1)))" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "noClaim writeProtected (rels (linksTo (out (ancestors 1))) (birth (linksTo out 1)))" line)
+    (when (string-match-p "noClaim writeProtected (view (rels (linksTo (out (ancestors 1)))) (birth (linksTo out 1)))" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))

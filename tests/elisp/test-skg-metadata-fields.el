@@ -21,7 +21,7 @@ bare or heading a list, after any marker; nil for no kind."
                   ((skg ghost (gnid g) (skgRepos (nodeRepo r))) . "ghost")
                   ((skg alias (skgRepos (relRepo r))) . "alias")
                   ((skg (flag noSearchMatching)) . "flag")
-                  ((skg (subscribeeFolder changed)) . "folder")
+                  ((skg subscribeeFolder) . "folder")
                   ((skg folded tombstone) . "tombstone")
                   ((skg (relRepo r)) . nil)
                   ((foo) . nil)))
@@ -522,6 +522,7 @@ atom; filling in shows it at its default and stripping drops it."
     (should (equal (org-to-sexp--extract-headlines
                     (split-string filledIn "\n"))
                    '((1 . "skg") (2 . "focused") (2 . "alias")
+                     (2 . "noClaim") (3 . "false (default)")
                      (2 . "editRequest") (3 . "none (default)"))))
     (should (equal (org-to-sexp (skg-metadata-fields-strip-defaults-from-org
                                  filledIn kind))

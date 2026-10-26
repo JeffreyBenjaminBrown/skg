@@ -14,6 +14,7 @@
 ;;; for that property rather than relying solely on the tracking list.
 
 (require 'cl-lib)
+(require 'skg-metadata) ;; for skg--folder-change-readiness-at-point
 (require 'skg-sexpr-search)
 (require 'skg-shared)
 
@@ -51,9 +52,13 @@ directives, ANY/IT, ABUT, and INTERC are documented there. The rule
 patterns the table uses are documented on `herald_rule_table` in
 server/heralds.rs.
 
-No client-side normalisation is needed: a member carries no
-membership atom and so no membership herald of its own. Its relationship
-and birth facts arrive in `(rels ...)'.")
+A member carries no membership atom and so no membership herald of
+its own. Its relationship facts arrive in `(view (rels ...))', its
+birth facts in `(view (birth ...))' and its property counts in `(view
+(props ...))'. The one normalisation is a changed folder's: the
+server writes every folder as its bare atom, and the client, finding
+a member's relationship changed, hands the lens `(FOLDER changed)'
+\(see `heralds--as-changed-folder').")
 
 (defun heralds-install-rules (rules)
   "Install RULES (a list whose car is `skg') as the herald rule table.
@@ -157,7 +162,11 @@ rule table after repeated attempts.")
 Each org headline the server sends starts with `(skg ...)` metadata.
 This mode lenses that tree via `skg-transform-sexp-flat`, producing
 coloured tokens that summarise view and code information. The served
-rules place non-relationship tokens; this client renders `(rels ...)'."
+rules place non-relationship tokens; this client renders the
+relationship heralds from `(view (rels ...) (props ...) (birth ...))'.
+A folder's herald depends on its members' metadata, so editing a
+headline also refreshes the herald of each folder above it, up to two
+levels (a member's '(relRepoMove ...)' child counts)."
   :lighter " ⟪Y⟫"
   (if heralds-minor-mode
       (if (not (heralds--ensure-rules))
@@ -200,7 +209,27 @@ rules place non-relationship tokens; this client renders `(rels ...)'."
         (goto-char lbeg)
         (dotimes (_ (1+ (- end-line start-line)) )
           (heralds-apply-to-line)
-          (forward-line 1)) )) ))
+          (forward-line 1))
+        (heralds--refresh-folders-above lbeg) )) ))
+
+(defun heralds--refresh-folders-above (pos)
+  "Re-apply the herald of each folder headline among the two headlines
+enclosing the one at POS, since a folder's herald depends on its
+members and on their children."
+  (save-excursion
+    (goto-char pos)
+    (let ((level (skg--headline-level-on-line)))
+      (dotimes (_ 2)
+        (when (and level
+                   (> level 1)
+                   (re-search-backward
+                    (format "^\\*\\{1,%d\\}\\(?: \\|$\\)" (1- level))
+                    nil t))
+          (setq level (skg--headline-level-on-line))
+          (when (skg--folder-atom (skg--metadata-sexp-on-line))
+            (heralds-clear-overlays-in-region (line-beginning-position)
+                                              (line-end-position))
+            (heralds-apply-to-line)))))))
 
 (defun heralds-apply-to-line ()
   "On the current line, lens only the first (skg ...) occurrence.
@@ -216,7 +245,9 @@ Creates one overlay (at most) and pushes it onto `heralds-overlays`."
           (when sexp-end-pos
             (let* ((end (+ start sexp-end-pos -1))
                    (skg-sexp (buffer-substring-no-properties start (1+ end)))
-                   (heralds (heralds-from-metadata skg-sexp)))
+                   (heralds (heralds-from-metadata
+                             skg-sexp
+                             (skg--folder-change-readiness-at-point))))
               (when heralds
                 (let ((ov (make-overlay start (1+ end))))
                   (overlay-put ov 'display heralds)
@@ -251,52 +282,65 @@ buffer-local `heralds-overlays' list) are also deleted."
     (setq heralds-overlays (nreverse keep))))
 
 (defconst heralds--rels-sentinel "__RELS_SPANS__"
-  "Placeholder token the server's `rels' rule emits (RELS_SPANS_SENTINEL
-in server/heralds.rs). The relationship heralds are per-character styled
-spans -- more than the rule table's atom-level coloring can express -- so
-the rule only positions them by emitting this sentinel, and
-`heralds-from-metadata' swaps it for the spans it renders itself from the
-`(rels (STYLE \"text\") ...)' payload.")
+  "Placeholder token the server's `rels' and `props' rules emit
+\(RELS_SPANS_SENTINEL in server/heralds.rs). The relationship heralds are
+per-character styled spans -- more than the rule table's atom-level
+coloring can express -- so the rules only position them by emitting this
+sentinel, and `heralds-from-metadata' swaps the first for the spans it
+renders itself from `(view (rels ...) (props ...) (birth ...))'.")
 
 (defun heralds-from-metadata
-    (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
+    (metadata-sexp ;; Begins with '(skg ' and ends with ')'.
+     &optional folder-change)
   "Return a display-ready herald string for METADATA-SEXP.
 Most composition lives in `heralds--transform-rules' (the served rule
 table); the one exception is the relationship heralds, whose semantic
-`(rels ...)' facts the rule table only positions with a sentinel token
-that this function replaces with `heralds--render-rel-facts' output.
+facts in `(view ...)' the rule table only positions with a sentinel
+token that this function replaces with `heralds--render-rel-facts'
+output. FOLDER-CHANGE is what `skg--folder-change-readiness' says of
+the headline when it is a folder: nil, `ready' or `unready'.
 Returns nil if METADATA-SEXP doesn't parse as an `(skg ...)' form."
   (let* ((sexp (heralds--read-metadata metadata-sexp))
          (is-skg (and (listp sexp) (eq (car sexp) 'skg)))
+         (lensed (if (and is-skg folder-change)
+                     (heralds--as-changed-folder sexp folder-change)
+                   sexp))
          (tokens (when is-skg
                    (skg-transform-sexp-flat
-                    sexp heralds--transform-rules)))
+                    lensed heralds--transform-rules)))
          (rel-str (when is-skg (heralds--render-rel-facts sexp))))
     (heralds--tokens->text
      (heralds--splice-rel-spans tokens rel-str))))
 
-(defun heralds--splice-rel-spans (tokens rel-str)
-  "Return TOKENS with the sentinel token replaced by REL-STR.
-When REL-STR is nil (no `(rels ...)' payload, so the sentinel should be
-na anyway) any stray sentinel token is dropped."
-  (when tokens
-    (delq nil
-          (mapcar
-           (lambda (tok)
-             (if (equal (substring-no-properties tok)
-                        heralds--rels-sentinel)
-                 rel-str ;; may be nil -> removed by delq
-               tok))
-           tokens))))
+(defun heralds--as-changed-folder (sexp folder-change)
+  "SEXP, a folder's metadata, as the lens reads a changed folder: its
+bare atom FOLDER replaced by `(FOLDER changed)', followed by `(diff
+\(ready))' when FOLDER-CHANGE is `ready'."
+  (let ((folder (skg--folder-atom sexp)))
+    (append (mapcar (lambda (part)
+                      (if (eq part folder) (list folder 'changed) part))
+                    sexp)
+            (when (eq folder-change 'ready)
+              (list '(diff (ready)))))))
 
-(defun heralds--find-rels (sexp)
-  "Return the first `(rels ...)' sub-list anywhere within SEXP, else nil."
-  (when (consp sexp)
-    (if (eq (car-safe sexp) 'rels)
-        sexp
-      (cl-loop for child in (cdr sexp)
-               for found = (and (consp child) (heralds--find-rels child))
-               when found return found))))
+(defun heralds--splice-rel-spans (tokens rel-str)
+  "Return TOKENS with the first sentinel token replaced by REL-STR and
+every other sentinel dropped: a headline with both `(rels ...)' and
+`(props ...)' draws two, and REL-STR renders both. When REL-STR is nil
+\(nothing to render, so the sentinel should be absent anyway) the first
+is dropped too."
+  (when tokens
+    (let ((spliced nil))
+      (delq nil
+            (mapcar
+             (lambda (tok)
+               (cond ((not (equal (substring-no-properties tok)
+                                  heralds--rels-sentinel))
+                      tok)
+                     (spliced nil)
+                     (t (setq spliced t)
+                        rel-str))) ;; may be nil -> removed by delq
+             tokens)))))
 
 ;; ── relationship heralds: render the server's semantic facts ─────────
 ;; All presentation lives here (letters, styles, order, count-omission,
@@ -472,14 +516,17 @@ of birth facts (RELATION SIDE [GEN]), already accounts for."
               out-s))))
 
 (defun heralds--render-rel-facts (sexp)
-  "Render the semantic `(rels ...)' payload in SEXP to one propertized
-string, or nil if there is none / it produces nothing. Tokens are the
-relations in display order (C L S O H), then the property counts A I F,
-space-separated."
-  (let ((rels (heralds--find-rels sexp)))
-    (when rels
+  "Render the semantic `(rels ...)' and `(props ...)' facts in SEXP's
+`(view ...)', styled by its `(birth ...)', to one propertized string,
+or nil if there are none / they produce nothing. Tokens are the
+relations in display order (C L S O H), then the property counts A I
+F, space-separated."
+  (let* ((view (cdr (assq 'view (cdr sexp))))
+         (rels (assq 'rels view))
+         (props (assq 'props view)))
+    (when (or rels props)
       (let* ((parts (cdr sexp)) ;; a node's parts stand beside its kind atom
-             (birth (cdr (assq 'birth (cdr rels)))) ;; facts (RELATION SIDE [GEN])
+             (birth (cdr (assq 'birth view))) ;; facts (RELATION SIDE [GEN])
              (write-protected (memq 'writeProtected parts))
              (overrides-here (assq 'overridesHere parts))
              (property-style (heralds--relationship-style 'property_counts))
@@ -491,7 +538,7 @@ space-separated."
                                              overrides-here)))
                 (when tok (push tok tokens))))))
         (dolist (count '((aliases . "A") (extraIds . "I") (flags . "F")))
-          (let ((k (cadr (assq (car count) (cdr rels)))))
+          (let ((k (cadr (assq (car count) (cdr props)))))
             (when k (push (heralds--styled (format "%s%d" (cdr count) k)
                                            property-style)
                           tokens))))
@@ -501,8 +548,8 @@ space-separated."
 (defun heralds--read-metadata (metadata-sexp)
   "Read METADATA-SEXP string into a Lisp object.
 Returns nil if parsing fails. A member carries no membership atom
-and so no membership herald of its own; relationship and birth facts
-are rendered from `(rels ...)'."
+and so no membership herald of its own; relationship, birth and
+property facts are rendered from `(view ...)'."
   (condition-case nil
       (car (read-from-string metadata-sexp))
     (error nil)))

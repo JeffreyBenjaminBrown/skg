@@ -125,23 +125,22 @@ Tests position 1, position 17 (end of line 1), and one random in [2,16]."
 ;;
 
 (ert-deftest test-strip-heralds-removes-herald-subfields ()
-  "Heralds (node-level semantic rels facts and
-homeRepoHerald inside viewStats) are removed; a viewStats emptied by the
-removal is dropped, other data is kept."
+  "The derived facts, '(view ...)' and '(diff ...)', are removed whole;
+the other parts are kept, in their order."
   (should (equal
            (skg-strip-heralds-from-sexp
-            '(skg node (gnid x)
-                  (rels (contains (in 1 (ancestors 1)) (out 3))
-                        (birth (contains in 1)))
-                  (viewStats (homeRepoHerald ⌂:priv) cycle)))
-           '(skg node (gnid x) (viewStats cycle)))))
+            '(skg node (gnid x) (editRequest (ready rel))
+                  (view (rels (contains (in 1 (ancestors 1)) (out 3)))
+                        (birth (contains in 1)) repoBoundary cycle)
+                  (diff (rel added) (leaves 1 rel))))
+           '(skg node (gnid x) (editRequest (ready rel))))))
 
-(ert-deftest test-strip-heralds-drops-stats-form-with-only-heralds ()
-  "A graphStats/viewStats holding only herald subfields is dropped."
+(ert-deftest test-strip-heralds-strips-every-kinds-derived-facts ()
+  "Every kind's derived facts are stripped, not only a node's."
   (should (equal
            (skg-strip-heralds-from-sexp
-            '(skg node (gnid x) (viewStats (homeRepoHerald ⌂:priv))))
-           '(skg node (gnid x)))))
+            '(skg alias noClaim (view ghostWarrant) (diff (rel removed))))
+           '(skg alias noClaim))))
 
 (ert-deftest test-strip-heralds-does-not-fabricate-node ()
   "A non-UnrestrictedVognode sexp (no (node ...)) is returned unchanged, so it
@@ -151,8 +150,8 @@ never gains a fabricated (node ...) and never matches (skg node)."
     (should-not (skg-sexp-subtree-p stripped '(skg node)))))
 
 (ert-deftest test-strip-heralds-unrestrictedNode-without-stats-unchanged ()
-  "An UnrestrictedVognode lacking stats keeps exactly its fields -- no fabricated
-graphStats/viewStats."
+  "An UnrestrictedVognode lacking derived facts keeps exactly its fields
+-- no fabricated '(view ...)'."
   (should (equal
            (skg-strip-heralds-from-sexp '(skg node (gnid x) (skgRepos (nodeRepo y))))
            '(skg node (gnid x) (skgRepos (nodeRepo y))))))

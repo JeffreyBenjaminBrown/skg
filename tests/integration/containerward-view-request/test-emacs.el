@@ -117,14 +117,14 @@
                     "*** 121\n"
                     "** 13\n"))
            (expected
-            (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (rels (contains (in 1) (out 3)))) 1\n"
-                    "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 11\n"
-                    "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 12\n"
+            (concat "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (view (rels (contains (in 1) (out 3))))) 1\n"
+                    "** (skg node (gnid 11) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 11\n"
+                    "** (skg node (gnid 12) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)) (out 1))) (birth (contains in 1)))) 12\n"
                     "*** (skg containerFolder)\n"
-                    "**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (rels (contains (in 1) (out 3 (ancestors 2))) (birth (contains out 2))) (viewStats cycle)) 1\n"
-                    "***** (skg node (gnid 0) (skgRepos (nodeRepo main)) noClaim writeProtected (rels (contains (out 1 (ancestors 1))))) 0\n"
-                    "*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 121\n"
-                    "** (skg node (gnid 13) (skgRepos (nodeRepo main)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13\n")))
+                    "**** (skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected (view (rels (contains (in 1) (out 3 (ancestors 2)))) (birth (contains out 2)) cycle)) 1\n"
+                    "***** (skg node (gnid 0) (skgRepos (nodeRepo main)) noClaim writeProtected (view (rels (contains (out 1 (ancestors 1)))))) 0\n"
+                    "*** (skg node (gnid 121) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 121\n"
+                    "** (skg node (gnid 13) (skgRepos (nodeRepo main)) (view (rels (contains (in 1 (ancestors 1)))) (birth (contains in 1)))) 13\n")))
 
       (message "Buffer-Content with metadata: %s" buffer-content)
       (message "Expected buffer-content with metadata: %s" expected)

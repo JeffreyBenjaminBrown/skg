@@ -799,13 +799,123 @@ server/types/viewnode.rs, but for the three property folders).")
 
 (defun skg--partner-folder-atom (metadata-sexp)
   "The partner folder's atom if METADATA-SEXP is a partner folder's,
-bare or as the diff view writes a changed one, '(ATOM changed)';
-else nil."
+else nil. A folder is always its bare atom."
   (and (consp metadata-sexp)
        (seq-some (lambda (item)
-                   (let ((atom (if (consp item) (car item) item)))
-                     (car (memq atom skg--partner-folder-atoms))))
+                   (and (symbolp item)
+                        (car (memq item skg--partner-folder-atoms))))
                  (cdr metadata-sexp))))
+
+;;; A changed folder
+;;; The server writes every folder as its bare atom. Whether the diff
+;;; view shows it because of a change, and whether that change is
+;;; ready, follows from its members (its child headlines), as computed
+;;; here ('folder_change_facts' did it on the server before).
+
+(defun skg--folder-atom (metadata-sexp)
+  "The folder's atom if METADATA-SEXP is a folder's (a kind 'folder'
+in 'shared/metadata-fields.json'), else nil."
+  (and (consp metadata-sexp)
+       (seq-some (lambda (item)
+                   (and (symbolp item)
+                        (equal (alist-get 'kind (skg-shared-metadata-kind
+                                                 (symbol-name item)))
+                               "folder")
+                        item))
+                 (cdr metadata-sexp))))
+
+(defun skg--membership-change-readiness (member-sexp child-sexps)
+  "Whether the folder member with metadata MEMBER-SEXP, whose child
+headlines carry CHILD-SEXPS, carries a change of its relationship to
+the folder's viewparent, and whether that change is ready: nil when
+it carries none, else `ready' or `unready'. It carries one when its
+'(diff ...)' has a '(rel ...)', or when a child is a
+'(relRepoMove ...)'. The change is ready when both hold: a '(rel ...)'
+comes with a '(ready ...)' that names 'rel' if the member's
+'(leaves ...)' lists 'rel'; a '(relRepoMove ...)' child carries
+'(diff (ready ...))'."
+  (let* ((diff (cdr (assq 'diff (cdr member-sexp))))
+         (rel-change (assq 'rel diff))
+         (relRepo-move
+          (seq-find (lambda (child-sexp)
+                      (assq 'relRepoMove (cdr child-sexp)))
+                    child-sexps)))
+    (when (or rel-change relRepo-move)
+      (if (and (or (not rel-change)
+                   (let ((ready (assq 'ready diff)))
+                     (and ready
+                          (or (not (memq 'rel (cdr (assq 'leaves diff))))
+                              (memq 'rel (cdr ready))))))
+               (or (not relRepo-move)
+                   (assq 'ready (cdr (assq 'diff (cdr relRepo-move))))))
+          'ready
+        'unready))))
+
+(defun skg--folder-change-readiness (members)
+  "Whether a folder whose MEMBERS are as given is changed, and whether
+that change is ready: nil when no member carries a change of its
+relationship to the folder's viewparent, `ready' when every such
+change is ready, else `unready'. Each of MEMBERS is (MEMBER-SEXP
+. CHILD-SEXPS), as `skg--membership-change-readiness' takes them."
+  (let ((changes (delq nil (mapcar (lambda (member)
+                                     (skg--membership-change-readiness
+                                      (car member) (cdr member)))
+                                   members))))
+    (when changes
+      (if (memq 'unready changes) 'unready 'ready))))
+
+(defun skg--folder-change-readiness-at-point ()
+  "`skg--folder-change-readiness' of the folder headline on the line
+at point, or nil when that line is no folder's headline. Reads
+headline levels by their stars, so it works in any buffer."
+  (save-excursion
+    (beginning-of-line)
+    (let ((level (skg--headline-level-on-line)))
+      (when (and level
+                 (skg--folder-atom (skg--metadata-sexp-on-line)))
+        (skg--folder-change-readiness
+         (skg--folder-members-below level))))))
+
+(defun skg--folder-members-below (folder-level)
+  "The members of the folder whose headline, at FOLDER-LEVEL, is on the
+line at point: for each headline one level below it, (MEMBER-SEXP
+. CHILD-SEXPS), the metadata of the member and of its own child
+headlines, nil where a headline carries none. Moves point."
+  (let ((members '())
+        (done nil))
+    (while (and (not done) (zerop (forward-line 1)) (not (eobp)))
+      (let ((level (skg--headline-level-on-line)))
+        (cond ((null level))
+              ((<= level folder-level) (setq done t))
+              ((= level (1+ folder-level))
+               (push (list (skg--metadata-sexp-on-line)) members))
+              ((and members (= level (+ 2 folder-level)))
+               (setcdr (car members)
+                       (append (cdar members)
+                               (list (skg--metadata-sexp-on-line))))))))
+    (nreverse members)))
+
+(defun skg--headline-level-on-line ()
+  "The number of stars of the headline on the line at point, or nil
+when the line is no headline."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at "\\(\\*+\\)\\(?: \\|$\\)")
+      (length (match-string 1)))))
+
+(defun skg--metadata-sexp-on-line ()
+  "The '(skg ...)' metadata of the headline on the line at point, read,
+or nil when it has none or it does not read."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at "\\*+ +(skg[ )]")
+      (let* ((start (- (match-end 0) 5))
+             (text (buffer-substring-no-properties
+                    start (line-end-position)))
+             (end (skg-find-sexp-end text)))
+        (when end
+          (ignore-errors
+            (car (read-from-string (substring text 0 end)))))))))
 
 (defun skg--vognode-sexp-p (metadata-sexp)
   "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode,
@@ -967,16 +1077,11 @@ METADATA-SEXP is not an UnrestrictedVognode's)."
 
 (defun skg--change-repo-at-point (new-skgrepo)
   "Set the repo at point to NEW-REPO.
-Returns 1 if the current line was edited."
+Returns 1 if the current line was edited. The headline's derived
+'(view repoBoundary)' is left as it is: the save recomputes it."
   (skg-edit-metadata-at-point
    `(skg (skgRepos)
-         (skgRepos (ENSURE (nodeRepo ,(intern new-skgrepo))))
-         (viewStats)))
-  (skg-edit-metadata-at-point
-   `(skg (viewStats
-          (ENSURE
-           (homeRepoHerald ,(intern
-                            (format "⌂:%s" new-skgrepo)))))))
+         (skgRepos (ENSURE (nodeRepo ,(intern new-skgrepo))))))
   1)
 
 (defun skg-parse-headline-metadata (headline-text)
@@ -1112,8 +1217,9 @@ checks\" entry in PITFALLs.org."
                  (metadata-sexp (nth 1 match-result))
                  (title (nth 2 match-result))
                  (host-sexp (read metadata-sexp))
-                 (merged-sexp (skg-edit-nested-sexp
-                               host-sexp edits)))
+                 (merged-sexp (skg--derived-facts-last
+                               (skg-edit-nested-sexp
+                                host-sexp edits))))
             (let ((new-metadata-sexp (substring-no-properties
                                       (format "%S" merged-sexp))))
               (skg-replace-current-line
@@ -1126,6 +1232,51 @@ checks\" entry in PITFALLs.org."
                                  (format "%S" edits))))
             (skg-replace-current-line
              (skg-format-headline stars metadata-sexp title)))))))))
+
+(defun skg--readiness-request-p (part)
+  "Non-nil when PART, an element of an '(editRequest ...)', is a
+readiness request, '(ready OBJECT...)' or '(unready OBJECT...)'."
+  (memq (car-safe part) '(ready unready)))
+
+(defun skg--readiness-request-of (metadata-sexp)
+  "The readiness request in METADATA-SEXP's '(editRequest ...)', or nil."
+  (seq-find #'skg--readiness-request-p
+            (cdr (assq 'editRequest (cdr metadata-sexp)))))
+
+(defun skg--metadata-with-readiness-request (metadata-sexp request)
+  "METADATA-SEXP with REQUEST as the readiness request of its
+'(editRequest ...)': any readiness request there replaced, the other
+request kept, REQUEST last. A nil REQUEST removes it, and with it an
+'(editRequest ...)' left empty. A headline without '(editRequest ...)'
+gets one, before its derived facts."
+  (let* ((parts (cdr metadata-sexp))
+         (old (assq 'editRequest parts))
+         (kept (seq-remove #'skg--readiness-request-p (cdr old)))
+         (new (when (or kept request)
+                (append '(editRequest) kept (and request (list request))))))
+    (skg--derived-facts-last
+     (cons 'skg
+           (cond ((and old new)
+                  (mapcar (lambda (part) (if (eq part old) new part)) parts))
+                 (old (remq old parts))
+                 (new (append parts (list new)))
+                 (t parts))))))
+
+(defun skg--derived-facts-last (metadata-sexp)
+  "METADATA-SEXP with its derived facts, '(view ...)' then '(diff ...)',
+after every other part, as the server writes them, so that a part an
+edit appends lands before them. The other parts keep their order."
+  (if (not (and (consp metadata-sexp) (eq (car metadata-sexp) 'skg)))
+      metadata-sexp
+    (let ((derived-fact-p (lambda (part)
+                            (and (consp part)
+                                 (memq (car part) '(view diff))))))
+      (cons 'skg
+            (append (seq-remove derived-fact-p (cdr metadata-sexp))
+                    (seq-filter (lambda (part) (eq (car-safe part) 'view))
+                                (cdr metadata-sexp))
+                    (seq-filter (lambda (part) (eq (car-safe part) 'diff))
+                                (cdr metadata-sexp)))))))
 
 (defun skg-replace-current-line (new-content)
   "Replace the current line with NEW-CONTENT.
@@ -1228,12 +1379,13 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
                        (eq (car element) 'graphStats))
                   (let ((graphstats-sexp (format "%S" element)))
                     (push (cons "graphStats" graphstats-sexp) alist)))
-                 (;; Special case: (viewStats ...) sub-s-expr
+                 (;; Special case: the derived facts, (view ...) and (diff ...)
                   (and (listp element)
                        (> (length element) 1)
-                       (eq (car element) 'viewStats))
-                  (let ((viewstats-sexp (format "%S" element)))
-                    (push (cons "viewStats" viewstats-sexp) alist)))
+                       (memq (car element) '(view diff)))
+                  (push (cons (symbol-name (car element))
+                              (format "%S" element))
+                        alist))
                  (t ;; Bare value (symbol or other atom)
                   (let ((bare-val (format "%s" element)))
                     (push bare-val set))))))
@@ -1245,12 +1397,12 @@ Returns (ALIST SET) where ALIST contains (key value) pairs and SET contains bare
   "Reconstruct complete (skg ...) metadata s-expression from ALIST and BARE-VALUES.
 Returns a string containing the complete s-expression.
 Key-value pairs are formatted as (key value),
-except 'graphStats' and 'viewStats' which are already complete s-expressions."
+except 'graphStats', 'view' and 'diff', whose values are already complete
+s-expressions."
   (let ((parts '()))
     (dolist (kv alist)
-      (if (or (string-equal (car kv) "graphStats")
-              (string-equal (car kv) "viewStats"))
-          ;; graphStats/viewStats value is already a complete sexp string
+      (if (member (car kv) '("graphStats" "view" "diff"))
+          ;; a graphStats, view or diff value is already a complete sexp string
           (push (cdr kv) parts)
         ;; Regular key-value pair
         (push (format "(%s %s)" (car kv) (cdr kv))

@@ -134,8 +134,8 @@
 parent's (skgRepos (nodeRepo X)) with each child's (gnid N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
-    (insert "* (skg node (skgRepos (nodeRepo owned2)) (viewStats (homeRepoHerald ⌂:owned2))) N-edited\n")
-    (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected (rels \"aO\")) N-original\n")
+    (insert "* (skg node (skgRepos (nodeRepo owned2)) (view repoBoundary)) N-edited\n")
+    (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected (view (rels \"aO\"))) N-original\n")
     (org-mode)
     (should (equal (skg--fork-repos-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
@@ -162,7 +162,7 @@ ordinary-save refusal on C-x C-s."
   (let ((source (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg node (skgRepos (nodeRepo owned))) N-edited\n** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected (rels \"aO\")) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg node (skgRepos (nodeRepo owned))) N-edited\n** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected (view (rels \"aO\"))) N-original\n"
                     source)))
           (unwind-protect
               (with-current-buffer buf
@@ -235,12 +235,13 @@ skg-content-view-mode-map (which would break C-x C-s in real views)."
 (ert-deftest test-fork-choose-placeholder-repos-prompts-with-suggestion ()
   "skg--fork-choose-placeholder-repos prompts once per placeholder
 clone, offering the server's suggested repo (the comment above the
-clone) as the default, and writes the choice into the metadata."
+clone) as the default, and writes the choice into the metadata,
+leaving the derived '(view repoBoundary)' for the save to recompute."
   (with-temp-buffer
     (insert "* Fork confirmation -- what this buffer is\n")
     (insert "Some explanation.\n")
     (insert "# Suggested repo for the clone below: owned2\n")
-    (insert "* (skg node (skgRepos (nodeRepo PICK-A-REPO)) (viewStats (homeRepoHerald ⌂:PICK-A-REPO))) N-edited\n")
+    (insert "* (skg node (skgRepos (nodeRepo PICK-A-REPO)) (view repoBoundary)) N-edited\n")
     (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected) N-original\n")
     (org-mode)
     (let ((offered-defaults nil))
@@ -254,7 +255,8 @@ clone) as the default, and writes the choice into the metadata."
         (skg--fork-choose-placeholder-repos))
       (should (equal offered-defaults '("owned2")))
       (should (string-match-p "(skgRepos (nodeRepo owned2))" (buffer-string)))
-      (should (string-match-p "⌂:owned2" (buffer-string)))
+      (should (string-match-p "(skgRepos (nodeRepo owned2)) (view repoBoundary)"
+                              (buffer-string)))
       (should-not (string-match-p "(skgRepos (nodeRepo PICK-A-REPO))"
                                   (buffer-string))))))
 
@@ -262,7 +264,7 @@ clone) as the default, and writes the choice into the metadata."
   "A clone whose repo is already real (the user specified it in the
 saved metadata, so the server omitted the placeholder) prompts nothing."
   (with-temp-buffer
-    (insert "* (skg node (skgRepos (nodeRepo owned2)) (viewStats (homeRepoHerald ⌂:owned2))) N-edited\n")
+    (insert "* (skg node (skgRepos (nodeRepo owned2)) (view repoBoundary)) N-edited\n")
     (insert "** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim writeProtected) N-original\n")
     (org-mode)
     (cl-letf (((symbol-function 'skg--completing-read-with-cycle)

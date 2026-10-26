@@ -207,10 +207,10 @@ is offered; the server's save-time floor check backstops."
      (should (string-match-p "(relRepo trusted)"
                              (test--buffer-line 1))))))
 
-(ert-deftest test-apply-relRepo-preserves-existing-viewstats ()
-  "Setting relRepo must not disturb a pre-existing viewStats sibling."
+(ert-deftest test-apply-relRepo-preserves-existing-view-facts ()
+  "Setting relRepo must not disturb a pre-existing (view ...) sibling."
   (test--with-skg-content-view
-   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (viewStats cycle)) x\n"
+   "* (skg node (gnid x) (skgRepos (nodeRepo public)) (view cycle)) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
