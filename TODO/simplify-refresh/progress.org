@@ -579,3 +579,85 @@ integration suite is rerun in full; under slice 13, the two-slot
 '(editRequest ...)' and the 'noClaim' on lost members are
 documented.
 
+** Slice 6: the heralds
+*** What's done
+The rule table: ᗣ for the 'ghost' kind and 'ghostWarrant' and ⊥
+for 'noWarrant' are its first rules, kind-independent, so they
+stand first again, the ☮ of a node or a ghost abutting them
+("⊥☮B", "ᗣ☮"). 'ghost' is a style of its own. The tombstone
+reads "something stood here". A ghost's '(viewRequests
+tombstone)' shows "req:tombstone". A pending detachment shows
+"detach", styled as a request. The changed-folder rules are
+gone. The herald-rules response carries '(skgrepoLabels ("REPO"
+"LABEL")...)', and both clients render "⌂:LABEL". Both clients'
+merge, restore and relRepo commands keep a pending readiness
+request. The problem entries on the tombstone's DELETED and on
+the raw skgrepo name (the plan's line 388) moved to
+'TODO/DONE/problems.org'.
+*** Deviations from the plan's "how"
+**** WHEN stays
+'(diff ...)' still reads three ways by kind (two objects on a
+node or ghost, one relationship on an unknown, one object on a
+property or change viewnode), so the directive stays. It is
+documented in 'docs/heralds.org' ("How the rule table reads a
+headline") and both lens headers; the test
+'herald_rules_WHEN_names_only_kinds' checks every WHEN names
+kind atoms only. The warrant glyphs left their WHENs.
+**** the label reaches the lens as (repoBoundary LABEL)
+The client replaces the atom by '(repoBoundary LABEL)' (LABEL
+looked up by nodeRepo, or the nodeRepo when the table lacks
+it), and '(repoBoundary (ANY "⌂" IT))' echoes it. Both clients'
+colon stripping now keeps a colon after ⌂; the old herald
+showed "⌂pub". A node naming no nodeRepo shows a bare "⌂".
+Tests read the label table from the new fixture
+'tests/shared/herald-skgrepo-labels.sexp'.
+**** the detachment is the clients' to see
+Neither the missing warrant nor the parent shows in the child's
+metadata, so each client adds the atom 'pendingDetachment'
+(rendered by the table, counted by the conformance test among
+the client-computed atoms) when the headline is 'noClaim', has
+no 'noWarrant', 'ghostWarrant' or '(rel removed)', and stands
+under a node that is not write-protected, or under a folder not
+write-protected whose anchor is such a node.
+**** the changed folder's label lives in shared JSON
+With its rules dropped, each client draws a changed folder's
+herald: ☮ if write-protected, the label, ✓ when ready. The
+labels and the write-protected folders are 'folder_heralds' in
+'shared/herald-styles.json'; the server checks at startup that
+its write-protected list matches the table's ☮ rules and that
+its labels name folders. Folders left the one-object diff WHEN,
+since a folder carries no '(diff ...)'.
+**** the rendering cases take a context line
+A case may give '---- context: folderChange ready|unready' or
+'---- context: pendingDetachment' for what a client learns from
+the headlines around it.
+**** smaller choices
+- 'tombstone' joined 'ViewRequest::EMITTABLE_MATCH_ATOMS'.
+- The readiness gestures already kept the edit request in both
+  clients; the delete and flag commands merge into the form and
+  keep it too, so they were left as they were.
+- Emacs's reload keeps the label table as it keeps the rules.
+- The glossary's "changed folder" (stale since slice 5) and the
+  API doc's "Herald rules" and tombstone paragraphs follow.
+- Reported in 'TODO/problems.org': a relRepo request renders
+  "request~:NAME" in Emacs, which this slice did not change.
+**** the Neovim client has no relRepo command
+'docs/nvim-client-deviations.org' lists setting a relRepo as
+not ported, so only Neovim's merge and restore commands had an
+edit request to keep; a unit test of 'with_edit_request' covers
+removing one. Neovim's edit step leaves '(view ...)' and
+'(diff ...)' where they stand, unlike Emacs's, as before.
+*** Suite failures and their classification
+**** first failure: two plenary specs before the Neovim change
+Expected fixture adaptation: the shared rendering cases and the
+pinned table changed under the old Neovim renderer. After it,
+one spec was adapted: it asserted that "⌂:public" loses its
+colon. No Rust test or ERT test failed.
+**** a Neovim run that lost one spec file's output
+Unrelated: one full run printed no result for
+'length_prefix_spec.lua' yet exited 0; the next full run
+printed all 32 files, 396 specs, none failing.
+**** integration: import-md-and-org
+Unrelated and pre-existing, as in slices 0 to 5, with either
+client; the other 34 pass with each, 'herald-rules' among them,
+which now checks "⌂:m" from the served label table.

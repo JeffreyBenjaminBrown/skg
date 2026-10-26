@@ -16,6 +16,15 @@
 -- see the elisp docstring of 'skg-transform-sexp-flat', reproduced in
 -- spirit across the functions below, and the test suite, which
 -- demonstrates the rule grammar perhaps better than any explanation.
+--
+-- The directive WHEN ('(WHEN KIND... RULE...)') applies its rules to an
+-- object only when one of the object's elements is labeled KIND. The
+-- herald rule table needs it because a headline's parts stand beside
+-- its kind atom, and a part such as '(diff ...)' reads differently by
+-- kind. Its full semantics are in the docstring of
+-- 'skg-transform-sexp-flat' (elisp/skg-sexpr/skg-lens.el);
+-- 'docs/heralds.org' says how the table uses it, and the Rust
+-- conformance test checks that each WHEN names only kind atoms.
 
 local parse = require('skg.sexpr.parse')
 local compare = require('skg.sexpr.compare')

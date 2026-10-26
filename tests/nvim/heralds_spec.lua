@@ -4,17 +4,13 @@
 -- tests/shared/herald-rules.sexp is installed directly (the analog of
 -- skg-test-install-herald-rules), so no server is needed.
 
+local helpers = dofile(
+  debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
+
 local herald_rules = require('skg.herald_rules')
 local heralds = require('skg.heralds')
-local sexpr = require('skg.sexpr.parse')
 
-local function install_fixture_rules ()
-  local path = _G.skg_test_repo_root() .. '/tests/shared/herald-rules.sexp'
-  local handle = assert(io.open(path, 'r'))
-  local text = handle:read('*a')
-  handle:close()
-  herald_rules.install_rules(sexpr.read(text))
-end
+local install_fixture_rules = helpers.install_fixture_herald_rules
 
 local function herald_text (metadata_text)
   return heralds.chunks_text(heralds.chunks_from_metadata(metadata_text))
@@ -32,8 +28,10 @@ local function herald_extmarks (buf)
     buf, heralds.namespace, 0, -1, { details = true })
 end
 
----{name, metadata, text, styles} for each case in the file, which the
----Emacs tests read too. STYLES has one style name (or '-') per character.
+---{name, metadata, text, styles, context} for each case in the file,
+---which the Emacs tests read too. STYLES has one style name (or '-')
+---per character; CONTEXT is the text of its '---- context: ' line, or
+---nil.
 local function shared_cases ()
   local path = _G.skg_test_repo_root()
     .. '/tests/shared/herald-rendering-cases.txt'
@@ -41,6 +39,8 @@ local function shared_cases ()
   for line in io.lines(path) do
     if line:sub(1, 5) == '==== ' then
       current = { name = line:sub(6) }
+    elseif line:sub(1, 14) == '---- context: ' then
+      current.context = line:sub(15)
     elseif line:sub(1, 11) == '---- text: ' then
       current.text = line:sub(12)
     elseif line:sub(1, 13) == '---- styles: ' then
@@ -76,8 +76,12 @@ describe('skg.heralds', function ()
   it('renders the cases shared with Emacs', function ()
     local cases = shared_cases()
     assert.is_true(#cases > 40)
+    local folder_changes = { ['folderChange ready'] = { ready = true },
+                             ['folderChange unready'] = { ready = false } }
     for _, case in ipairs(cases) do
-      local chunks = heralds.chunks_from_metadata(case.metadata)
+      local chunks = heralds.chunks_from_metadata(
+        case.metadata, folder_changes[case.context],
+        case.context == 'pendingDetachment')
       assert.are.same({ case.name, case.text, case.styles },
                       { case.name, heralds.chunks_text(chunks),
                         character_styles(chunks) })
@@ -234,7 +238,7 @@ describe('skg.heralds', function ()
     assert.are.equal('☮ its containers changed (other files)✓',
                      folder_herald())
     heralds.disable(buf)
-    -- The lens reads the shape the server no longer writes.
+    -- A changed folder's label stands in for its own, with ✓ when ready.
     assert.are.equal('its aliases changed (this file)✓',
       heralds.chunks_text(heralds.chunks_from_metadata(
         '(skg aliasFolder)', { ready = true })))
@@ -253,14 +257,60 @@ describe('skg.heralds', function ()
 
   it('strips structural colons the way the elisp display does',
      function ()
-    -- '⌂:public' -> '⌂public' ('⌂' is outside the keep-class), while
-    -- alphanumeric neighbors keep their colon ('req:folder').
-    local cells = heralds.strip_structural_colons(
-      heralds.token_character_cells(
-        { chunks = { { text = '⌂:public', style = nil } },
-          abut = false }))
-    local text = ''
-    for _, cell in ipairs(cells) do text = text .. cell.character end
-    assert.are.equal('⌂public', text)
+    -- '☮:x' -> '☮x' ('☮' is outside the keep-class), while
+    -- alphanumeric neighbors keep their colon ('req:folder'), and so
+    -- does a colon after '⌂' ('⌂:public').
+    local function stripped (text)
+      local cells = heralds.strip_structural_colons(
+        heralds.token_character_cells(
+          { chunks = { { text = text, style = nil } }, abut = false }))
+      local result = ''
+      for _, cell in ipairs(cells) do result = result .. cell.character end
+      return result
+    end
+    assert.are.same({ '☮x', 'req:folder', '⌂:public', '⌂:(' },
+                    { stripped('☮:x'), stripped('req:folder'),
+                      stripped('⌂:public'), stripped('⌂:(') })
+  end)
+
+  ---The display text of the herald on the last of LINES, with heralds
+  ---on, or nil when it has none.
+  local function last_line_display (lines)
+    local buf = scratch_buffer_with(lines)
+    heralds.enable(buf)
+    local marks = vim.api.nvim_buf_get_extmarks(
+      buf, heralds.namespace, { #lines - 1, 0 }, { #lines - 1, -1 },
+      { details = true })
+    heralds.disable(buf)
+    return marks[1] and heralds.chunks_text(marks[1][4].virt_text)
+  end
+
+  it('renders a pending detachment as a request', function ()
+    -- Mirrors test-heralds-a-pending-detachment-renders-as-a-request: a
+    -- child that is 'noClaim' and warranted under an editable parent (a
+    -- node that is not write-protected, or an editable folder whose
+    -- anchor is one) shows "detach". Under a write-protected parent or
+    -- folder, or unwarranted, it shows no request.
+    local child = '** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) c'
+    local editable = '* (skg node (gnid r) (skgRepos (nodeRepo r))) r'
+    local protected =
+      '* (skg node (gnid r) (skgRepos (nodeRepo r)) writeProtected) r'
+    assert.are.equal('detach', last_line_display({ editable, child }))
+    assert.is_nil(last_line_display({ protected, child }))
+    assert.are.equal('⊥', last_line_display({ editable,
+      '** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim'
+      .. ' (view noWarrant)) c' }))
+    assert.is_nil(last_line_display({
+      '** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim) a root' }))
+    assert.are.equal('alias detach', last_line_display({
+      editable, '** (skg aliasFolder) aliases',
+      '*** (skg alias noClaim) an alias' }))
+    assert.are.equal('alias', last_line_display({
+      protected, '** (skg aliasFolder) aliases',
+      '*** (skg alias noClaim) an alias' }))
+    assert.are.equal('☮', last_line_display({
+      editable, '** (skg containerFolder) containers',
+      '*** (skg node (gnid c) (skgRepos (nodeRepo r)) noClaim'
+      .. ' writeProtected) c' }))
   end)
 end)

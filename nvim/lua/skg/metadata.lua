@@ -370,6 +370,27 @@ function M.edit_metadata_at_line (line_number, edits)
   end
 end
 
+---Make REQUEST the edit request of the headline at point, keeping the
+---readiness request its '(editRequest ...)' holds
+---(skg.readiness.with_edit_request). A nil REQUEST removes the edit
+---request. KIND, when given, is the kind atom a headline without
+---metadata gets.
+---@param request any|nil
+---@param kind string|nil
+function M.write_edit_request (request, kind)
+  local metadata_sexp = M.metadata_sexp_at_line_or_nil(nil)
+  local edits = { SKG }
+  if kind then table.insert(edits, sexpr.symbol(kind)) end
+  if metadata_sexp then
+    table.insert(edits, (sexpr.read('(DELETE (editRequest))'))) end
+  for _, part in ipairs(require('skg.readiness').with_edit_request(
+                          metadata_sexp or { SKG }, request)) do
+    if sexpr.is_list(part) and part[1] == sexpr.symbol('editRequest') then
+      table.insert(edits, part) end
+  end
+  M.edit_metadata_at_point(edits)
+end
+
 -- ── user commands ──────────────────────────────────────────────────
 
 ---Mark the headline at point for deletion (metadata gains
@@ -608,9 +629,8 @@ function M.set_merge_request (acquiree_id_or_link)
   local acquiree_skgid = M.id_from_link_or_text(answer)
   if acquiree_skgid == '' then
     error('Acquiree ID cannot be empty') end
-  M.edit_metadata_at_point(sexpr.read(string.format(
-    '(skg node (DELETE (editRequest)) (editRequest (merge %s)))',
-    acquiree_skgid)))
+  M.write_edit_request(
+    { sexpr.symbol('merge'), sexpr.symbol(acquiree_skgid) }, 'node')
   vim.notify(string.format(
     'Merge request set for acquiree %s. Save to apply.', acquiree_skgid))
 end
@@ -641,7 +661,14 @@ end
 ---its relationship was removed? Whether a restoreRel may sit on it
 ---depends also on where it stands (M.restoreRel_position_p).
 function M.removed_membership_p (metadata_sexp)
-  if not M.unrestrictedNode_sexp_p(metadata_sexp) then return false end
+  return M.unrestrictedNode_sexp_p(metadata_sexp)
+         and M.relationship_removed_p(metadata_sexp)
+end
+
+---@param metadata_sexp any
+---@return boolean does its '(diff ...)' say its relationship was
+---removed, by a '(rel removed)'?
+function M.relationship_removed_p (metadata_sexp)
   local rel = M.sexp_cdr_at_path(metadata_sexp,
                                  { 'skg', 'diff', 'rel' })
   return rel ~= nil and #rel == 1
@@ -752,8 +779,7 @@ end
 function M.restore_deleted_node ()
   if not M.ghost_sexp_p(M.metadata_sexp_at_line_or_nil(nil)) then
     error(M.restore_node_on_a_node_not_deleted, 0) end
-  M.edit_metadata_at_point(sexpr.read(
-    '(skg (DELETE (editRequest)) (editRequest restoreNode))'))
+  M.write_edit_request(sexpr.symbol('restoreNode'), 'ghost')
   vim.notify('Restore request set. Save to apply.')
 end
 
@@ -768,8 +794,7 @@ function M.restore_removed_membership ()
   if not (M.removed_membership_p(metadata_sexp)
           and M.restoreRel_position_p(nil)) then
     error(M.restore_rel_without_a_removed_membership, 0) end
-  M.edit_metadata_at_point(sexpr.read(
-    '(skg (DELETE (editRequest)) (editRequest restoreRel))'))
+  M.write_edit_request(sexpr.symbol('restoreRel'), 'node')
   vim.notify('Restore request set. Save to apply.')
 end
 

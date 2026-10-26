@@ -337,6 +337,41 @@ describe('skg.metadata commands', function ()
     end
   end)
 
+  it('the merge and restore commands keep the readiness request',
+     function ()
+    -- Mirrors test-skg-edit-request-commands-keep-the-readiness-request:
+    -- each replaces the edit request in '(editRequest ...)' and keeps
+    -- the readiness request pending there.
+    local function edit_request_after (headline, command)
+      buffer_at_last_line(headline)
+      command()
+      for _, part in ipairs(last_metadata_sexp()) do
+        if sexpr.is_list(part) and part[1] == sexpr.symbol('editRequest')
+        then return sexpr.to_string(part) end
+      end
+      return nil
+    end
+    assert.are.equal('(editRequest (merge b) (ready node))',
+      edit_request_after(
+        '* (skg node (gnid a) (skgRepos (nodeRepo main))'
+        .. ' (editRequest delete (ready node))'
+        .. ' (diff (node added) (leaves 1 node))) a',
+        function () metadata.set_merge_request('b') end))
+    assert.are.equal('(editRequest restoreNode (unready node))',
+      edit_request_after(
+        '* (skg ghost (gnid g) (skgRepos (nodeRepo main))'
+        .. ' (editRequest (unready node)) (diff (node removed) (rel removed)'
+        .. ' (leaves 1 node) (ready node))) g',
+        metadata.restore_deleted_node))
+    assert.are.equal('(editRequest restoreRel (ready rel))',
+      edit_request_after(
+        '* (skg node (gnid r) (skgRepos (nodeRepo main))) r\n'
+        .. '** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim'
+        .. ' (editRequest (ready rel)) (view noWarrant)'
+        .. ' (diff (rel removed) (leaves 1 rel))) x',
+        metadata.restore_removed_membership))
+  end)
+
   it('the restore commands refuse the wrong kind of headline', function ()
     assert.are.equal(
       'This node is deleted; restore it first (skg-restore-deleted-node)',

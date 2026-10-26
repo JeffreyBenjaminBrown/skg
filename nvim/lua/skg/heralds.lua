@@ -4,6 +4,11 @@
 -- tokens that summarize view and code information. The served rule
 -- table (server/heralds.rs) places non-relationship tokens. This client
 -- renders semantic relationship facts and their per-character styles.
+-- Three heralds need what the headline's own metadata cannot say, so
+-- this client supplies it: a 'repoBoundary' gets its skgrepo's label
+-- (M.with_repoBoundary_label), a pending detachment the atom
+-- 'pendingDetachment' (M.sexp_for_lens), and a changed folder its
+-- label in place of the lens's (M.changed_folder_chunks).
 -- The Lua port of elisp/heralds-minor-mode.el.
 --
 -- DISPLAY MECHANISM. Where Emacs used an overlay with a 'display'
@@ -29,6 +34,13 @@ local sexpr = require('skg.sexpr.parse')
 local shared = require('skg.shared')
 
 local M = {}
+
+---skg.readiness, required late: it requires modules that require this
+---one.
+---@return table
+local function readiness ()
+  return require('skg.readiness')
+end
 
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
 
@@ -109,7 +121,8 @@ end
 
 ---Is CHARACTER in the keep-class of the structural-colon rule?
 ---(Alphanumerics, '+', ' ' and '-' keep an adjacent colon, since they
----often appear as label values or separators.)
+---often appear as label values or separators. A colon after '⌂' stays
+---too, as in "⌂:LABEL", which M.strip_structural_colons sees to.)
 ---@param character string|nil one character, possibly multibyte
 ---@return boolean
 function M.keeps_adjacent_colon (character)
@@ -133,23 +146,26 @@ function M.token_character_cells (token)
 end
 
 ---Remove structural colons from CELLS: a colon is structural when
----the character before or after it is outside the keep-class. The
----scan mirrors the elisp regex's two alternatives, left to right and
----non-overlapping ('(X):' -> X, then ':(Y)' -> Y).
+---the character before or after it is outside the keep-class, unless
+---the character before it is '⌂'. The scan mirrors the elisp regex's
+---two alternatives, left to right and non-overlapping ('(X):' -> X,
+---then ':(Y)' -> Y).
 ---@param cells table[]
 ---@return table[]
 function M.strip_structural_colons (cells)
   local kept = {}
   local i = 1
   while i <= #cells do
+    local previous = cells[i - 1]
     local this = cells[i]
     local following = cells[i + 1]
     if following and following.character == ':'
-       and this.character ~= ':'
+       and this.character ~= ':' and this.character ~= '⌂'
        and not M.keeps_adjacent_colon(this.character) then
       table.insert(kept, this)
       i = i + 2
     elseif this.character == ':' and following
+           and not (previous and previous.character == '⌂')
            and not M.keeps_adjacent_colon(following.character) then
       table.insert(kept, following)
       i = i + 2
@@ -527,47 +543,111 @@ function M.tokens_to_chunks_with_rels (tokens, rel_chunks)
   return chunks
 end
 
----SEXP, a headline's metadata, as the lens reads it. When
----FOLDER_CHANGE (as skg.readiness.folder_change_in_lines gives it)
----says the folder is changed, its bare folder atom becomes '(FOLDER
----changed)', followed by '(diff (ready))' when the folder is ready:
----the rule table's changed-folder rules read that shape, which the
----server does not write.
+---SEXP, a headline's metadata, as the lens reads it: its
+---'repoBoundary' labeled (M.with_repoBoundary_label), and, when
+---PENDING_DETACHMENT says it is a pending detachment
+---(skg.readiness.pending_detachment_p), the atom 'pendingDetachment'
+---appended, which the rule table renders as a request.
 ---@param sexp any
----@param folder_change table|nil
+---@param pending_detachment boolean|nil
 ---@return any
-function M.sexp_for_lens (sexp, folder_change)
-  if not folder_change then return sexp end
-  local folder_atom = require('skg.readiness').folder_atom(sexp)
+function M.sexp_for_lens (sexp, pending_detachment)
+  local result = M.with_repoBoundary_label(sexp)
+  if pending_detachment then
+    table.insert(result, sexpr.symbol('pendingDetachment')) end
+  return result
+end
+
+---A copy of SEXP, a headline's metadata, with the atom 'repoBoundary'
+---in its '(view ...)' replaced by '(repoBoundary LABEL)': LABEL is the
+---label skg.herald_rules.get_skgrepo_labels gives the nodeRepo of its
+---'(skgRepos ...)', or that nodeRepo when the table lacks it. A
+---headline naming no nodeRepo keeps the bare atom, which renders "⌂"
+---alone.
+---@param sexp any
+---@return any
+function M.with_repoBoundary_label (sexp)
+  local node_repo_form = assq(assq(sexp, 'skgRepos'), 'nodeRepo')
+  local node_repo = node_repo_form and node_repo_form[2] ~= nil
+    and sexpr.atom_text(node_repo_form[2])
+  local label = node_repo
+    and (herald_rules.get_skgrepo_labels()[node_repo] or node_repo)
   local result = {}
-  for _, element in ipairs(sexp) do
-    if element == sexpr.symbol(folder_atom) then
-      table.insert(result, { element, sexpr.symbol('changed') })
-      if folder_change.ready then
-        table.insert(result, { sexpr.symbol('diff'),
-                               { sexpr.symbol('ready') } }) end
-    else
-      table.insert(result, element) end
+  for _, part in ipairs(sexp) do
+    if label and sexpr.is_list(part) and part[1] == sexpr.symbol('view') then
+      local labeled_view = {}
+      for _, fact in ipairs(part) do
+        table.insert(labeled_view,
+          fact == sexpr.symbol('repoBoundary')
+            and { fact, label } or fact) end
+      part = labeled_view end
+    table.insert(result, part)
   end
   return result
 end
 
----Display chunks for METADATA_TEXT (a string beginning '(skg'), a
----folder's changed when FOLDER_CHANGE says so (M.sexp_for_lens).
----Returns nil if it does not parse as an (skg ...) form or the rules
----produce no tokens. The analog of 'heralds-from-metadata'.
+local folder_heralds = shared.herald_styles.folder_heralds
+
+---The label 'shared/herald-styles.json' gives FOLDER, a folder's atom,
+---when the diff view shows it because of a change, or nil.
+---@param folder string
+---@return string|nil
+function M.changed_folder_label (folder)
+  return folder_heralds.changed_labels[folder]
+end
+
+---TEXT as a chunk in the style 'node_heralds' in
+---'shared/herald-styles.json' gives KEY.
+---@param text string
+---@param key string
+---@return table
+local function node_herald_chunk (text, key)
+  return styled(text, shared.herald_styles.node_heralds[key])
+end
+
+---The herald chunks of FOLDER, a folder's atom, shown because a
+---member's relationship changed: its ☮ when it is write-protected, its
+---changed label styled as its ordinary one, then ✓ when FOLDER_CHANGE
+---(as skg.readiness.folder_change_in_lines gives it) says it is ready.
+---@param folder string
+---@param folder_change table
+---@return table[]
+function M.changed_folder_chunks (folder, folder_change)
+  local chunks = {}
+  if vim.tbl_contains(folder_heralds.write_protected, folder) then
+    table.insert(chunks, node_herald_chunk('☮', 'writeProtected'))
+    table.insert(chunks, { ' ', 'Normal' }) end
+  table.insert(chunks,
+               node_herald_chunk(M.changed_folder_label(folder), folder))
+  if folder_change.ready then
+    table.insert(chunks, node_herald_chunk('✓', 'ready')) end
+  return chunks
+end
+
+---Display chunks for METADATA_TEXT (a string beginning '(skg'). A
+---folder FOLDER_CHANGE says is changed, and to which
+---'shared/herald-styles.json' gives a changed label, gets
+---M.changed_folder_chunks; any other headline the lens's, of
+---M.sexp_for_lens, PENDING_DETACHMENT saying whether it is a pending
+---detachment. Returns nil if it does not parse as an (skg ...) form or
+---the rules produce no tokens. The analog of 'heralds-from-metadata'.
 ---@param metadata_text string
 ---@param folder_change table|nil
+---@param pending_detachment boolean|nil
 ---@return table[]|nil
-function M.chunks_from_metadata (metadata_text, folder_change)
+function M.chunks_from_metadata (metadata_text, folder_change,
+                                 pending_detachment)
   local ok, sexp = pcall(sexpr.read, metadata_text)
   if not ok or not sexpr.is_list(sexp)
      or sexp[1] ~= sexpr.symbol('skg') then
     return nil end
+  local folder = folder_change and readiness().folder_atom(sexp)
+  if folder and M.changed_folder_label(folder) then
+    return M.changed_folder_chunks(folder, folder_change) end
   local rules = herald_rules.get_rules()
   if not rules then return nil end
   local tokens = lens.transform_sexp_flat(
-    M.sexp_for_lens(sexp, folder_change), rules)
+    M.sexp_for_lens(sexp, pending_detachment), rules)
   return M.tokens_to_chunks_with_rels(tokens, M.render_rel_facts(sexp))
 end
 
@@ -633,7 +713,9 @@ end
 ---Lens the first (skg ...) occurrence on 0-based line ROW of BUF into
 ---one conceal+virtual-text extmark (at most). A folder's herald
 ---depends on its members' metadata (skg.readiness.folder_change_in_lines),
----read from LINES, BUF's lines, when given.
+---and a 'noClaim' headline's on its parents'
+---(skg.readiness.pending_detachment_in_lines), read from LINES, BUF's
+---lines, when given.
 ---@param buf integer
 ---@param row integer
 ---@param lines string[]|nil
@@ -644,12 +726,20 @@ function M.apply_to_line (buf, row, lines)
   if not start_index then return end
   local end_index = sexpr.find_sexp_end(line, start_index)
   if not end_index then return end
+  local function buffer_lines ()
+    lines = lines or vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    return lines
+  end
   local folder_change = nil
   if line:find('Folder', 1, true) then
-    folder_change = require('skg.readiness').folder_change_in_lines(
-      lines or vim.api.nvim_buf_get_lines(buf, 0, -1, false), row + 1) end
+    folder_change = readiness().folder_change_in_lines(
+      buffer_lines(), row + 1) end
+  local pending_detachment = false
+  if line:find('noClaim', 1, true) then
+    pending_detachment = readiness().pending_detachment_in_lines(
+      buffer_lines(), row + 1) end
   local chunks = M.chunks_from_metadata(
-    line:sub(start_index, end_index), folder_change)
+    line:sub(start_index, end_index), folder_change, pending_detachment)
   if not chunks then return end
   vim.api.nvim_buf_set_extmark(buf, M.namespace, row, start_index - 1, {
     end_col = end_index,

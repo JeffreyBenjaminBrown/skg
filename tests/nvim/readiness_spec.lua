@@ -361,6 +361,35 @@ describe('skg.readiness', function ()
           1, readiness.cycle_commit_ready))
   end)
 
+  it('replaces the edit request and keeps the readiness request',
+     function ()
+    -- with_edit_request, the counterpart of with_readiness_request,
+    -- which the merge and restore commands write with. A nil request
+    -- removes the edit request (the relRepo removal of
+    -- test-apply-relRepo-keeps-the-readiness-request), and the form
+    -- with it when nothing is left.
+    local function with_edit_request (metadata_text, request_text)
+      return sexpr.to_string(readiness.with_edit_request(
+        sexpr.read(metadata_text),
+        request_text and sexpr.read(request_text)))
+    end
+    assert.are.same(
+      { '(skg node (gnid x) (editRequest (relRepo private) (ready rel)) (diff (rel added)))',
+        '(skg node (gnid x) (editRequest (ready rel)) (diff (rel added)))',
+        '(skg node (gnid x) (diff (rel added)))',
+        '(skg node (gnid x) (editRequest restoreRel) (view noWarrant))' },
+      { with_edit_request(
+          '(skg node (gnid x) (editRequest (relRepo trusted) (ready rel)) (diff (rel added)))',
+          '(relRepo private)'),
+        with_edit_request(
+          '(skg node (gnid x) (editRequest (relRepo trusted) (ready rel)) (diff (rel added)))',
+          nil),
+        with_edit_request(
+          '(skg node (gnid x) (editRequest delete) (diff (rel added)))', nil),
+        with_edit_request('(skg node (gnid x) (view noWarrant))',
+                          'restoreRel') })
+  end)
+
   it('walks exactly the headlines one level below the line', function ()
     -- Mirrors test-skg-readiness-do-children-visits-exactly-one-level-below-point.
     local buf = vim.api.nvim_create_buf(true, false)

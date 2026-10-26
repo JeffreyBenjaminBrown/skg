@@ -6,6 +6,19 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems noticed while executing plan 04.1, slice 6 (2026-10-26)
+** A relRepo request renders as "request~:NAME" in Emacs
+  The herald rule '(editRequest (relRepo (ANY "request:~" IT)))'
+  ('server/heralds.rs') makes the lens token "request:~:priv", and
+  Emacs's 'heralds--strip-structural-colons' consumes the colon
+  before "~" with the "~" itself, so the colon after it survives:
+  the herald reads "request~:priv" where 'docs/heralds.org' promises
+  "request:~NAME" (run in batch Emacs against the pinned table;
+  'tests/results/slice6/relrepo-request.el'). No rendering case
+  covers a relRepo request. The relRepo display fact "~NAME" renders
+  right. Found while slice 6 of
+  'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org' taught the
+  stripping to keep the colon of "⌂:LABEL"; left as it was.
 * Problems noticed while executing plan 04.1, slice 3 (2026-10-26)
 ** A dismissed ghost under its former container comes back
   Slice 3 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
@@ -23,16 +36,6 @@
   ('tests/pruned_change_view/ghost_tombstone.rs'), which checks
   only the save that carries the request; a throwaway test saving
   once more saw the ghost drawn again under q.
-* Problems noticed while executing plan 04.1, slice 2 (2026-10-26)
-** FIX PLANNED: A tombstone over a hidden node's children reads DELETED
-  Since slice 2 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
-  a switch of the skgrepo restriction entombstones every occurrence
-  of a now-hidden node, and the herald rule for a tombstone
-  ('server/heralds.rs') renders it as "DELETED", which is false
-  there: the node is only hidden. The plan wants one kind of
-  tombstone that "reveals nothing of what stood there", so the
-  herald should say something neutral; slice 6 rewrites the
-  heralds and could take it up.
 * Problems noticed while executing plan 19, slice 12 (2026-10-24)
 ** Emacs's relRepo info request always sends a nil recorder
   'skg-set-relRepo' asks the server which skgrepos a relationship may
@@ -399,16 +402,6 @@ gap too. Details, options and questions:
    ForkRepoInactive on BufferValidationError) but DEFERRED the broad
    string consolidation -- it is a nice-to-have touching fs/git/diff
    layers, out of proportion to the fork work. Worth doing on its own.
-** FIX PLANNED: Minor: confirmation-buffer homeRepoHerald shows the raw skgrepo name
-   'build_fork_confirmation_buffer' emits the clone's '(homeRepoHerald
-   ⌂:NAME)' with the raw RepoName, not the configured abbreviation
-   ('SkgRepo::herald_label') that every other rendered view uses.
-   Left raw deliberately: the client's C-c s s rotation also writes
-   '⌂:<raw-name>', so the confirmation flow is self-consistent; fixing
-   only the server side would make the initial display disagree with the
-   post-rotation display. Cosmetic; the load-bearing '(repo X)' atom is
-   unaffected. (Noted in case a future change routes BOTH sides through
-   herald_label.)
 * Problems found during herald overhaul research
 ** (mostly fixed) Save validation and extraction use different edit-request surfaces
    The save extraction path uses 'collect_savenode_candidates' to define

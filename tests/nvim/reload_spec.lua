@@ -37,6 +37,18 @@ describe('skg.reload', function ()
     assert.are.equal(rules, reloaded.get_rules())
   end)
 
+  it('preserves the skgrepo label table across a reload', function ()
+    local herald_rules = require('skg.herald_rules')
+    herald_rules.install_skgrepo_labels(require('skg.sexpr.parse').read(
+      '(skgrepoLabels ("main" "m"))'))
+    local labels = herald_rules.get_skgrepo_labels()
+    reload.reload()
+    local reloaded = require('skg.herald_rules')
+    assert.are_not.equal(herald_rules, reloaded)
+    assert.are.equal(labels, reloaded.get_skgrepo_labels())
+    assert.are.same({ main = 'm' }, reloaded.get_skgrepo_labels())
+  end)
+
   it('preserves the herald rule table even when the reload fails',
      function ()
     -- The unwind-protect case: a load error must not cost the session

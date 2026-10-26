@@ -908,7 +908,7 @@ rewritten to the grammar in this slice, since the old text
 would lie. Tests: the parser's unit tests; the canon; the
 fixpoint harness; both client unit suites; the integration
 suite.
-** TODO Slice 6: the heralds
+** DONE Slice 6: the heralds
 The rule table ('server/heralds.rs'): ⊥ keyed on 'noWarrant';
 ᗣ first for 'ghostWarrant' and the 'ghost' kind, in a style
 of its own in 'shared/herald-styles.json'; 'repoBoundary'

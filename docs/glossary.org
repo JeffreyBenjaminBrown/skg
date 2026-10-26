@@ -411,7 +411,7 @@ glossary:
 *** tombstone, entombstone
 
 A *tombstone* is a viewnode with no title, no ID and no change facts,
-shown as DELETED, left where a viewnode the graph no longer warrants
+shown as "something stood here", left where a viewnode the graph no longer warrants
 stood and holding that viewnode's children. To *entombstone* a
 viewnode is to make it one. The prune removes a childless tombstone
 before the buffer is rendered, so a user sees one only where it holds
@@ -861,11 +861,12 @@ text.
 **** changed folder
 
 A partner, alias, ID or flags folder the diff view shows because its
-membership changed since HEAD. It is written '(FOLDER changed)' in
-place of the bare folder atom, holds the members of either graph,
-each tagged with the three kinds of change, and reads "its X changed
-(this file)" or "(other files)" (see "in, out"). Its '(diff ...)'
-holds only '(diff (ready))', when every changed membership is ready.
+membership changed since HEAD. It is written as its bare folder atom,
+holds the members of either graph, each tagged with the three kinds
+of change, and reads "its X changed (this file)" or "(other files)"
+(see "in, out"), with ✓ when every changed membership is ready: each
+client sees the change in the members and draws that label in place
+of the folder's own.
 
 **** what a changed folder's member holds
 

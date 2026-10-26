@@ -15,6 +15,7 @@ local metadata = require('skg.metadata')
 local modify_graph = require('skg.modify_graph')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 
 local M = {}
 
@@ -235,6 +236,98 @@ function M.folder_change_at_line (line_number)
     vim.api.nvim_buf_get_lines(0, 0, -1, false), line_number)
 end
 
+-- ── a pending detachment ───────────────────────────────────────────
+-- A child the user marked 'noClaim' under an editable parent stays in
+-- the buffer but leaves the parent's list at the next save. Until then
+-- it is warranted and claims nothing, which no part of its own
+-- metadata says, so the heralds ask here and render it as a request.
+
+---@param metadata_sexp any
+---@param parent_sexp any|nil
+---@param grandparent_sexp any|nil
+---@return boolean is METADATA_SEXP, under a parent with PARENT_SEXP
+---whose own parent has GRANDPARENT_SEXP, a pending detachment: does it
+---carry 'noClaim', does the graph warrant it, and is its parent
+---editable?
+function M.pending_detachment_p (metadata_sexp, parent_sexp,
+                                 grandparent_sexp)
+  return sexpr.is_list(metadata_sexp)
+         and not metadata.node_member_p(metadata_sexp)
+         and M.warranted_by_the_graph_p(metadata_sexp)
+         and M.editable_parent_p(parent_sexp, grandparent_sexp)
+end
+
+---@param metadata_sexp any
+---@return boolean is it warranted by the graph: does its '(view ...)'
+---carry neither 'noWarrant' nor 'ghostWarrant', and its '(diff ...)'
+---no '(rel removed)'? What HEAD alone warrants is no detachment.
+function M.warranted_by_the_graph_p (metadata_sexp)
+  local view_atoms = arguments(child_with_head(metadata_sexp, 'view'))
+  return not (vim.tbl_contains(view_atoms, 'noWarrant')
+              or vim.tbl_contains(view_atoms, 'ghostWarrant')
+              or metadata.relationship_removed_p(metadata_sexp))
+end
+
+---@param sexp any|nil
+---@return boolean is it a node that is not write-protected?
+local function editable_node_p (sexp)
+  return metadata.unrestrictedNode_sexp_p(sexp)
+         and not metadata.node_write_protected_p(sexp)
+end
+
+---@param parent_sexp any|nil
+---@param grandparent_sexp any|nil
+---@return boolean does a headline under a parent with PARENT_SEXP,
+---whose own parent has GRANDPARENT_SEXP, stand under an editable
+---parent: a node that is not write-protected, or a folder
+---'shared/herald-styles.json' does not list as write-protected whose
+---anchor is such a node?
+function M.editable_parent_p (parent_sexp, grandparent_sexp)
+  local folder = M.folder_atom(parent_sexp)
+  if folder then
+    return not vim.tbl_contains(
+             shared.herald_styles.folder_heralds.write_protected, folder)
+           and editable_node_p(grandparent_sexp) end
+  return editable_node_p(parent_sexp)
+end
+
+---M.pending_detachment_p of the headline LINES[INDEX], LINES being a
+---buffer's lines, 1-based. Reads headline levels by their stars, and
+---looks for the parents only of a headline carrying 'noClaim'.
+---@param lines string[]
+---@param index integer
+---@return boolean
+function M.pending_detachment_in_lines (lines, index)
+  local metadata_sexp = headline_sexp(lines[index])
+  if not (metadata_sexp and not metadata.node_member_p(metadata_sexp)) then
+    return false end
+  local ancestors = M.ancestor_sexps_in_lines(lines, index, 2)
+  return M.pending_detachment_p(metadata_sexp, ancestors[1], ancestors[2])
+end
+
+---The metadata of the COUNT nearest ancestor headlines of the
+---headline LINES[INDEX], nearest first: element N is nil where the
+---Nth ancestor has no metadata or there is none.
+---@param lines string[]
+---@param index integer
+---@param count integer
+---@return table
+function M.ancestor_sexps_in_lines (lines, index, count)
+  local ancestors = {}
+  local level = headline_level(lines[index])
+  local ancestor_index = index
+  for generation = 1, count do
+    if not (level and level > 1) then break end
+    repeat ancestor_index = ancestor_index - 1
+    until ancestor_index < 1
+          or (headline_level(lines[ancestor_index]) or level) < level
+    if ancestor_index < 1 then break end
+    level = headline_level(lines[ancestor_index])
+    ancestors[generation] = headline_sexp(lines[ancestor_index])
+  end
+  return ancestors
+end
+
 ---Whether the headline is ready: one that names leaves, on all the
 ---objects it lists. (A changed folder's readiness depends on its
 ---members: M.ready_at_line.)
@@ -391,6 +484,45 @@ end
 local FORMS_AFTER_EDIT_REQUEST = { viewRequests = true, view = true,
                                    diff = true }
 
+---@param request any a part of an '(editRequest ...)'
+---@return boolean is it a readiness request, '(ready OBJECT...)' or
+---'(unready OBJECT...)'?
+local function readiness_request_p (request)
+  local head = head_name(request)
+  return head == 'ready' or head == 'unready'
+end
+
+---METADATA_SEXP with its '(editRequest ...)' holding the requests
+---REQUESTS_FROM returns when given those it holds (none when the
+---headline has no such form). An '(editRequest ...)' left empty goes. A
+---headline without the form gets one, where the server writes it:
+---before its '(viewRequests ...)', '(view ...)' and '(diff ...)'.
+---@param metadata_sexp any
+---@param requests_from fun(requests: any[]): any[]
+---@return any
+local function with_edit_request_form (metadata_sexp, requests_from)
+  local old_form = child_with_head(metadata_sexp, 'editRequest')
+  local new_form = { sexpr.symbol('editRequest') }
+  for _, request in ipairs(requests_from(
+                             old_form and { unpack(old_form, 2) } or {})) do
+    table.insert(new_form, request) end
+  if #new_form == 1 then new_form = nil end
+  local unplaced_form = not old_form and new_form or nil
+  local result = { metadata_sexp[1] }
+  for i = 2, #metadata_sexp do
+    local element = metadata_sexp[i]
+    if element == old_form then
+      if new_form then table.insert(result, new_form) end
+    else
+      if unplaced_form and FORMS_AFTER_EDIT_REQUEST[head_name(element)] then
+        table.insert(result, unplaced_form)
+        unplaced_form = nil end
+      table.insert(result, element) end
+  end
+  if unplaced_form then table.insert(result, unplaced_form) end
+  return result
+end
+
 ---METADATA_SEXP with READINESS_REQUEST, '(ready OBJECT...)' or
 ---'(unready OBJECT...)', in its '(editRequest ...)' in place of any
 ---readiness request there, after the headline's other request if it
@@ -401,30 +533,28 @@ local FORMS_AFTER_EDIT_REQUEST = { viewRequests = true, view = true,
 ---@param readiness_request any
 ---@return any
 function M.with_readiness_request (metadata_sexp, readiness_request)
-  local result = { metadata_sexp[1] }
-  local placed = false
-  for i = 2, #metadata_sexp do
-    local element = metadata_sexp[i]
-    local head = head_name(element)
-    if head == 'editRequest' then
-      local edit_request = { element[1] }
-      for j = 2, #element do
-        local part = head_name(element[j])
-        if part ~= 'ready' and part ~= 'unready' then
-          table.insert(edit_request, element[j]) end
-      end
-      table.insert(edit_request, readiness_request)
-      element = edit_request
-      placed = true
-    elseif not placed and head and FORMS_AFTER_EDIT_REQUEST[head] then
-      table.insert(result, { sexpr.symbol('editRequest'), readiness_request })
-      placed = true end
-    table.insert(result, element)
-  end
-  if not placed then
-    table.insert(result, { sexpr.symbol('editRequest'), readiness_request })
-  end
-  return result
+  return with_edit_request_form(metadata_sexp, function (requests)
+    local kept = vim.tbl_filter(
+      function (request) return not readiness_request_p(request) end,
+      requests)
+    table.insert(kept, readiness_request)
+    return kept end)
+end
+
+---METADATA_SEXP with EDIT_REQUEST as the edit request of its
+---'(editRequest ...)': any edit request there replaced, its readiness
+---request kept after it. A nil EDIT_REQUEST removes the edit request,
+---and with it an '(editRequest ...)' left empty. A headline without the
+---form gets one, where M.with_readiness_request puts it. The
+---counterpart of M.with_readiness_request.
+---@param metadata_sexp any
+---@param edit_request any|nil
+---@return any
+function M.with_edit_request (metadata_sexp, edit_request)
+  return with_edit_request_form(metadata_sexp, function (requests)
+    local kept = vim.tbl_filter(readiness_request_p, requests)
+    if edit_request ~= nil then table.insert(kept, 1, edit_request) end
+    return kept end)
 end
 
 ---Replace the readiness request of the headline at LINE_NUMBER with

@@ -18,7 +18,7 @@ style, so two occurrences of the same node can have different heralds.
 
 ** Styles
 A herald's style states its importance tier, or for a few heralds a
-polarity or kind, never its hue. There are eleven styles.
+polarity or kind, never its hue. There are twelve styles.
 
 | Style       | Look                           | Meaning                         |
 |-------------+--------------------------------+---------------------------------|
@@ -33,6 +33,7 @@ polarity or kind, never its hue. There are eleven styles.
 | nonstandard | white on purple                | requests and change facts       |
 | ugly        | pink foreground, no background | error-flavored, but not too bad |
 | boring      | white on dark gray             | counts seldom worth reading     |
+| ghost       | ghost-white on dark slate blue | kind: what HEAD alone warrants  |
 
 The tiers, least to greatest, are normal, low, medium, high and crucial.
 
@@ -59,18 +60,19 @@ assumes 'termguicolors', since the styles are given as RGB colors.
 | the birth letter     | low         | the letter of a relation that put this occurrence here                       |
 | relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
 | property counts      | boring      | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
-| position glyphs      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= overrides here                      |
+| position glyphs      | ghost       | =ᗣ= a ghost, or what HEAD alone warrants                                      |
+|                      | crucial     | =☮= write-protected, =⊥= unwarranted, =ĥ= overrides here                      |
 |                      | high        | =B= omitted body                                                              |
 |                      | medium      | =⟳= cycle                                                                     |
 | home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
 |                      | ugly        | =~NAME=, a relRepo more private than the default                              |
 | labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
-| requests             | nonstandard | =delete=, =merge:...=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
+| requests             | nonstandard | =delete=, =merge:...=, =detach=, =restore node=, =restore membership=, =request:~NAME=, =request:...= flags, =req:...= views, =request:ready...= |
 | change facts         | nonstandard | =∃+ ∃- M ~+ ~-=, =+ -= on a leaf, ~Δ⌂=a~                                        |
 |                      | go          | =✓= commit-ready                                                              |
 |                      | normal      | the skgrepo names in =⌂ -OLD +NEW= and =relationship moved from OLD to NEW=   |
 | diff labels          | message     | =old title=, =body diff=, =its content changed=, =its X changed (this file)=  |
-| phantoms, restricted   | message     | =Reference to unknown node.=, =node from restricted skgrepo=, =DELETED=            |
+| unknowns, tombstones | message     | =Reference to unknown node.=, =something stood here=                          |
 | link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
 |                      | ugly        | =[⌂:restricted]=, =[⌂:…]=, =[⌂:lookup failed]=, a dangling link's label           |
 
@@ -163,17 +165,31 @@ The fact preserves the original member ID when a substituted view
 is saved. See [[file:override.org][override behavior]].
 
 ** Other heralds
-=☮= marks a write-protected position: a node, a folder, or a flag row.
-On a node, =B= rides the ☮ when the node's body exists but is omitted from the buffer.
-=⊥= marks an unwarranted position (the atom =noWarrant= in
-=(viewStats ...)=): the graph does not relate the node to its
-viewparent as the position implies -- content its parent does not
+The position glyphs stand first among a headline's heralds, the ☮
+riding the glyph before it, as in =⊥☮B= or =ᗣ☮=.
+=ᗣ= marks a ghost (a node the worktree lacks, shown in the diff view
+with HEAD's text) and, in the diff view, what HEAD alone warrants
+(the atom =ghostWarrant= in =(view ...)=), such as an alias the
+worktree lost. =⊥= marks an unwarranted position (the atom
+=noWarrant= in =(view ...)=): the graph does not relate the node to
+its viewparent as the position implies -- content its parent does not
 contain, a folder member the folder's relation does not hold for, a
-chain node that does not contain the node above. The bare atom
-=noClaim= (a child that does not affect its parent's membership on
-save) has no glyph of its own. =⟳= marks a cycle.
+chain node that does not contain the node above. =☮= marks a
+write-protected position: a node, a ghost, a folder, or a flag row.
+On a node, =B= rides the ☮ when the node's body exists but is
+omitted from the buffer. =⟳= marks a cycle.
 
-=⌂:LABEL= marks a node's home skgrepo boundary. A =~NAME= immediately
+The bare atom =noClaim= (a child that does not affect its parent's
+membership on save) has no glyph of its own. Under an editable parent
+a child the graph warrants and that claims nothing is one the user
+marked =noClaim= to detach it: it shows the request =detach= until the
+next save takes it out of its parent's list. The client sees that
+from the parent, since the child's own metadata cannot say it.
+
+=⌂:LABEL= marks a node's home skgrepo boundary (the atom
+=repoBoundary= in =(view ...)=). LABEL is the skgrepo's herald label,
+its =abbreviation= in the config or else its name, from the label
+table the server sends beside the herald rules. A =~NAME= immediately
 before it reports a relationship stored at a more private relRepo than
 its default; =request:~NAME= is an explicit pending request to change
 that relationship's skgrepo on save. The home skgrepo belongs to the
@@ -183,14 +199,15 @@ Folder labels, =alias=, =ID= and the flag rows describe their view
 positions. The flags folder spells out =had ID before import=, =was
 overloaded during org-roam import=, and =no search matching= when true.
 =req:folder:...=, =req:flags=, =req:editable=,
-=req:write-protected= and =req:write-protected-subtree= request a view. =delete=, =merge:...=, =request:no search matching=
+=req:write-protected= and =req:write-protected-subtree= request a view;
+on a ghost, =req:tombstone= asks the save to entombstone it. =delete=, =merge:...=, =request:no search matching=
 or =request:search matching=, and in the diff view =restore membership=
 and =restore node=, are save requests.
 
-An unknown node is labeled =Reference to unknown node.=. =DELETED=
-marks a tombstone: a viewnode that stands where a node a save deleted,
-or a node the skgrepo restriction now hides, stood, which reveals no
-node title or skgrepo.
+An unknown node is labeled =Reference to unknown node.=. =something
+stood here= marks a tombstone: a viewnode that stands where a node a
+save deleted, or a node the skgrepo restriction now hides, stood,
+which reveals no node title or skgrepo, nor which of the two it was.
 
 ** Diff heralds
 In the diff view (see the glossary's "Terms a user meets in the
@@ -204,7 +221,7 @@ those. A folder member shows them as a content member does, so a
 modified write-protected member reads =☮ M=; its =~+= or =~-= is its
 relationship, of the folder's kind, to the folder's viewparent. On an alias, ID or
 flag entry, which has one diff object, the same change facts read =+= and
-=-=, and an unknown phantom's one object reads =~+= or =~-=. A =✓= after a diff object's change facts says its
+=-=, and an unknown's one object reads =~+= or =~-=. A =✓= after a diff object's change facts says its
 changes are marked commit-ready, so =∃+✓ ~+= is a new node, approved,
 in a new relationship that is not; =M✓= is a modified node every
 change of whose file is marked. A commit readiness aggregate (a
@@ -219,23 +236,40 @@ come from its =(node added)= and =(node removed)= parts, =M= from
 removed)= (the style keys 'existence' and 'properties' in
 'shared/herald-styles.json'), each =✓= from its =(ready ...)= part
 (=M='s from =all= there), and the request from its last part; its
-=(leaves ...)= part shows nothing. A changed folder's =✓= comes from
-its =(diff (ready))=. The rules match the ready part once per diff
-object, so a =✓= follows its own object whatever the raw order of the
-parts.
+=(leaves ...)= part shows nothing. The rules match the ready part once
+per diff object, so a =✓= follows its own object whatever the raw
+order of the parts.
 
 A ghost (a node the worktree lacks, shown with HEAD's
-text) carries =☮=. The properties the view adds are labels: =old title
+text) reads =ᗣ☮=. The properties the view adds are labels: =old title
 and body= (or =old title=, =old body=) with its =body diff=, =⌂ -OLD
 +NEW= for a home skgrepo move, =relationship moved from OLD to NEW=, and the
 changeset markers =its content changed=, =some content relationships
 changed skgrepo= and =order-only change=. A folder shown because its
-membership changed reads =its X changed (this file)= or =(other files)=;
-the nodeMerge folders read =it was acquired by= and =it acquired=.
+membership changed reads =its X changed (this file)= or =(other files)=,
+with =✓= when every changed membership is ready; the server writes the
+folder as its bare atom, and the client sees the change in its
+members and draws that label, from 'folder_heralds' in
+'shared/herald-styles.json', in place of the folder's own. The
+nodeMerge folders read =it was acquired by= and =it acquired=.
 
 In the skgrepo-changes buffer a moved node's own heralds add =-OLD
 +NEW=, and ~Δ⌂=a~ when the nearest moved ancestor (here the parent, a)
 moved the same way.
+
+** How the rule table reads a headline
+Every part of a headline's metadata stands beside its kind atom, at
+the top level of =(skg ...)=; only =(view ...)= and =(diff ...)= nest
+facts. The table lists rules in presentation order. Most rules match
+an atom or form wherever it appears, but a part that reads
+differently by kind sits under a WHEN directive,
+=(WHEN KIND... RULE...)=, whose rules apply to a headline only when
+one of its elements is one of the KINDs. A =(diff ...)= needs it: on
+a node or a ghost it has two diff objects (=∃+=, =~+=), on an unknown
+one relationship (=~+=), and on a property or a change viewnode one
+object (=+=). The lens engines ('elisp/skg-sexpr/skg-lens.el',
+'nvim/lua/skg/sexpr/lens.lua') document the directive, and the Rust
+conformance test checks that each WHEN names only kind atoms.
 
 ** Link annotations
 The current buffer can display a suffix after each literal

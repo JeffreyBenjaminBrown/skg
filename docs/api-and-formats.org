@@ -330,16 +330,22 @@ So far there are these endpoints:
 
 ** Herald rules
   - Request: ((request . "herald rules"))
-  - Response: LP response-type "herald-rules" with =((content "RULES_SEXP"))=.
+  - Response: LP response-type "herald-rules" with
+    =((content "RULES_SEXP") (skgrepoLabels ("REPO" "LABEL")...))=.
     =RULES_SEXP= is the herald rule table -- one sexp, rooted at =(skg ...)=,
     in the grammar =elisp/skg-sexpr/skg-lens.el= interprets. Inside it,
     strings are always double-quoted and match atoms are bare symbols;
     the distinction is load-bearing for the lens engine.
+    =skgrepoLabels= names each configured skgrepo with its herald label
+    (its =abbreviation=, or else its name). A client renders a node's
+    =repoBoundary= as "⌂:LABEL", LABEL looked up by the node's
+    =nodeRepo= (the =nodeRepo= itself when the table lacks it), so no
+    rendered text rides in the metadata.
   - The table in =server/heralds.rs= supplies non-relationship labels,
     colors and placement. Both clients render the semantic =(rels ...)=,
     =(props ...)= and =(birth ...)= facts of =(view ...)= themselves,
     including fractions and per-character styles.
-    Emacs fetches the table at connection setup and re-fetches on reconnect.
+    Each client fetches both at connection setup and re-fetches on reconnect.
     If the fetch fails, its herald display disables after bounded retries;
     there is no client-side fallback table. The user-facing legend is
     [[file:./heralds.org][heralds.org]].
@@ -1511,7 +1517,7 @@ instead, when HEAD has the node), and the prune
 removes it once it is childless, a view root included, so a buffer
 may end with no headlines (the glossary's "tombstone"
 and "retain as non-member or tombstone, then prune"). Herald
-"DELETED".
+"something stood here".
 
 ** Metadata of the diff view
 

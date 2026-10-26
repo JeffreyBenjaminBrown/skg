@@ -1,6 +1,8 @@
 -- Integration test for the herald-rules fetch path, nvim client.
 -- Fetches the herald rule table from a running server and checks
--- that it lands in the heralds cache and drives the lens engine.
+-- that it lands in the heralds cache and drives the lens engine, and
+-- that the skgrepo label table served beside it labels a repo
+-- boundary.
 --
 -- The Lua mirror of test-emacs.el in this directory.
 
@@ -29,9 +31,20 @@ local chunks = heralds.chunks_from_metadata(
   '(skg node (gnid 1) (skgRepos (nodeRepo main)) writeProtected)')
 local herald_text = chunks and heralds.chunks_text(chunks) or nil
 
-if herald_text and herald_text:find('☮', 1, true) then
-  T.pass('PASS: Integration test successful!')
-else
+if not (herald_text and herald_text:find('☮', 1, true)) then
   T.fail('fetched table did not produce the writeProtected herald: '
          .. tostring(herald_text))
 end
+
+do -- The label table served beside the rules labels a boundary.
+  local boundary_chunks = heralds.chunks_from_metadata(
+    '(skg node (gnid 1) (skgRepos (nodeRepo main)) (view repoBoundary))')
+  local boundary_text =
+    boundary_chunks and heralds.chunks_text(boundary_chunks) or nil
+  if not (boundary_text and boundary_text:find('⌂:m', 1, true)) then
+    T.fail('the served label table did not label the repo boundary: '
+           .. tostring(boundary_text))
+  end
+end
+
+T.pass('PASS: Integration test successful!')

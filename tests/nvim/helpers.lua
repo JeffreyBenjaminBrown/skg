@@ -4,16 +4,27 @@
 
 local M = {}
 
----Install the pinned herald-rule fixture (the analog of
----'skg-test-install-herald-rules'), so specs need no server.
-function M.install_fixture_herald_rules ()
-  local path =
-    _G.skg_test_repo_root() .. '/tests/shared/herald-rules.sexp'
-  local handle = assert(io.open(path, 'r'))
+---The parsed sexp in the file at PATH_IN_REPO, relative to the
+---repository root.
+---@param path_in_repo string
+---@return any
+local function read_fixture_sexp (path_in_repo)
+  local handle = assert(io.open(
+    _G.skg_test_repo_root() .. '/' .. path_in_repo, 'r'))
   local text = handle:read('*a')
   handle:close()
-  require('skg.herald_rules').install_rules(
-    require('skg.sexpr.parse').read(text))
+  return require('skg.sexpr.parse').read(text)
+end
+
+---Install the pinned herald-rule fixture, and the skgrepo label table
+---the rendering cases assume (the analog of
+---'skg-test-install-herald-rules'), so specs need no server.
+function M.install_fixture_herald_rules ()
+  local herald_rules = require('skg.herald_rules')
+  herald_rules.install_rules(
+    read_fixture_sexp('tests/shared/herald-rules.sexp'))
+  herald_rules.install_skgrepo_labels(
+    read_fixture_sexp('tests/shared/herald-skgrepo-labels.sexp'))
 end
 
 ---An LP-framed message around PAYLOAD.

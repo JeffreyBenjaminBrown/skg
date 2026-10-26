@@ -1,3 +1,31 @@
+* Problems noticed while executing plan 04.1, slice 2 (2026-10-26; fixed 2026-10-26)
+** A tombstone over a hidden node's children reads DELETED
+  Since slice 2 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
+  a switch of the skgrepo restriction entombstones every occurrence
+  of a now-hidden node, and the herald rule for a tombstone
+  ('server/heralds.rs') renders it as "DELETED", which is false
+  there: the node is only hidden. The plan wants one kind of
+  tombstone that "reveals nothing of what stood there", so the
+  herald should say something neutral; slice 6 rewrites the
+  heralds and could take it up.
+  Fixed by slice 6 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org':
+  the tombstone's herald reads "something stood here".
+* Problems noted during the forks arc (TODO/forks/) (fixed 2026-10-26)
+** Minor: confirmation-buffer homeRepoHerald shows the raw skgrepo name
+   'build_fork_confirmation_buffer' emits the clone's '(homeRepoHerald
+   ⌂:NAME)' with the raw RepoName, not the configured abbreviation
+   ('SkgRepo::herald_label') that every other rendered view uses.
+   Left raw deliberately: the client's C-c s s rotation also writes
+   '⌂:<raw-name>', so the confirmation flow is self-consistent; fixing
+   only the server side would make the initial display disagree with the
+   post-rotation display. Cosmetic; the load-bearing '(repo X)' atom is
+   unaffected. (Noted in case a future change routes BOTH sides through
+   herald_label.)
+   Fixed by slices 5 and 6 of
+   'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org': the metadata
+   carries only '(view repoBoundary)' and the nodeRepo, and both clients
+   render "⌂:LABEL" from the label table served beside the herald rules,
+   so the confirmation buffer and the rotation agree.
 * Herald-system drift found while designing override-ancestry-in-search-results (2026-07-21; fixed 2026-10-26)
 ** fork.rs hand-emits a (viewStats parentOverrides) atom that no longer renders
    server/from_text/fork.rs:266 writes '(viewStats parentOverrides)' on
