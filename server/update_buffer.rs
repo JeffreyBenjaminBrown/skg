@@ -396,7 +396,7 @@ pub fn render_initial_view (
 /// as a fresh view always has. A node requested twice is editable at
 /// its first root only. A gnid no node answers to is an unknown, which
 /// the refresh entombstones.
-fn stub_of_fresh_content_view (
+pub(crate) fn stub_of_fresh_content_view (
   root_skgids : &[ID],
   graph       : &InRustGraph,
 ) -> ViewForest {

@@ -26,7 +26,9 @@ node p
     node a1
   node b
     node b1" );
-  assert_eq! ( run . count (CorrectionKind::Reinstated), 4 ); }
+  assert_eq! ( run . count (CorrectionKind::Reinstated), 2,
+               "p's list, already drawn, lacked a and b; what a and b \
+                hold is drawn as they are first extended, not corrected" ); }
 
 #[test]
 fn a_write_protected_occurrences_content_is_not_drawn () {

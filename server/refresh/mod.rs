@@ -107,6 +107,10 @@ pub(crate) struct Walk<'a> {
   /// folded: in the clients' encoding a folder's collapse lives on its
   /// members, since 'folded' on a headline hides it in its parent.
   pub newborn_folders : HashSet<NodeId>,
+  /// The folders this refresh added, on request or by default, or
+  /// drew as change viewnodes. Their members are extent
+  /// ('Walk::record_drawn').
+  pub added_folders  : HashSet<NodeId>,
   pub corrections    : CorrectionLog,
 }
 
@@ -121,12 +125,39 @@ impl<'a> Walk<'a> {
            drawn_editable           : HashSet::new (),
            had_editableView_request : HashSet::new (),
            newborn_folders          : HashSet::new (),
+           added_folders            : HashSet::new (),
            corrections              : CorrectionLog::default (), } }
 
   pub fn is_diff_view (
     &self,
   ) -> bool {
     matches! ( self . mode, CompletionMode::DiffView { .. } ) }
+
+  /// Whether this refresh draws what stands under 'parent' for the
+  /// first time: the content of an occurrence it extends first (one
+  /// it drew editable, or one an editable-view request extends, the
+  /// roots of a fresh view's stub among them) and the members of a
+  /// folder it added. Drawing those is extent, not correction.
+  pub fn draws_first_under (
+    &self,
+    parent : NodeId,
+  ) -> bool {
+    self . drawn_editable . contains (&parent)
+    || self . had_editableView_request . contains (&parent)
+    || self . added_folders . contains (&parent) }
+
+  /// Report the headline drawn at 'drawn', under 'parent', as
+  /// reinstated, unless drawing it is extent ('draws_first_under'):
+  /// a reinstatement is a correction only where a list already drawn
+  /// was missing a member.
+  pub(crate) fn record_drawn (
+    &mut self,
+    tree   : &Tree<Viewnode>,
+    parent : NodeId,
+    drawn  : NodeId,
+  ) {
+    if ! self . draws_first_under (parent) {
+      self . corrections . record (tree, drawn, CorrectionKind::Reinstated); }}
 }
 
 /// Visit every parent in level order, starting at the buffer root:

@@ -23,6 +23,7 @@ use std::sync::Arc;
 
 mod ancestry;
 mod claims;
+mod corrections;
 mod diff_view;
 mod merge;
 mod re_kind;

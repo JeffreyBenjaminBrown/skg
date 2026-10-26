@@ -158,7 +158,8 @@ fn add_default_folders (
         . id ();
       move_to_first_child (tree, parent, folder)
         . expect ("add_default_folders: the folder was just added");
-      walk . newborn_folders . insert (folder); }}}
+      walk . newborn_folders . insert (folder);
+      walk . added_folders . insert (folder); }}}
 
 //
 // 1. re-kind
@@ -415,7 +416,7 @@ fn reinstate (
 
 /// Book what a drawn child is: an editable occurrence claims its
 /// node's editability; a folder member carries its chain. Then
-/// report it.
+/// report it, unless drawing it is extent ('Walk::record_drawn').
 fn after_drawing (
   tree   : &mut Tree<Viewnode>,
   parent : NodeId,
@@ -446,7 +447,7 @@ fn after_drawing (
   if walk . newborn_folders . contains (&parent) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
-  walk . corrections . record (tree, treeid, CorrectionKind::Reinstated);
+  walk . record_drawn (tree, parent, treeid);
   Ok (( )) }
 
 /// The viewnode that stands for 'item' under 'parent': for a gnid,
@@ -794,6 +795,7 @@ fn add_folders (
         let new : NodeId = tree . get_mut (treeid) . unwrap ()
           . append ( viewnode_of ( ViewnodeKind::Folder (folder . clone ()) )) . id ();
         added . push (new);
+        walk . added_folders . insert (new);
         new }, };
     let hides_outside_its_subscribees = || -> bool {
       occurrence_pid ( tree . get (treeid) . unwrap () )
@@ -805,7 +807,8 @@ fn add_folders (
     { let hidden_outside : NodeId = tree . get_mut (folder_treeid) . unwrap ()
         . append ( viewnode_of (
           ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
-      walk . newborn_folders . insert (hidden_outside); }}
+      walk . newborn_folders . insert (hidden_outside);
+      walk . added_folders . insert (hidden_outside); }}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)
       . expect ("add_folders: the folder was just added"); }}

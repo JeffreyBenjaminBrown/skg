@@ -33,7 +33,6 @@ use crate::graph_straddle::types::{GraphStraddle, Partner};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::refresh::Walk;
 use crate::refresh::ancestry::required_ancestor_of;
-use crate::refresh::corrections::CorrectionKind;
 use crate::refresh::extent::is_chain_parent;
 use crate::refresh::goal::{
   Goal, GoalItem, GoalMember, folder_goal_is_ordered, member_of_child};
@@ -382,7 +381,10 @@ pub(crate) fn draw_change_viewnodes (
       None => {
         let drawn : NodeId =
           tree . get_mut (parent) . unwrap () . append (model) . id ();
-        walk . corrections . record (tree, drawn, CorrectionKind::Reinstated);
+        walk . record_drawn (tree, parent, drawn);
+        if matches! ( tree . get (drawn) . unwrap () . value () . kind,
+                      ViewnodeKind::Folder (_) ) {
+          walk . added_folders . insert (drawn); }
         created . insert (drawn);
         order . push (drawn); }, }}
   place_created_children_after_their_model_predecessors (
@@ -465,7 +467,7 @@ fn keep_one_relRepo_move (
         let drawn : NodeId = tree . get_mut (member) . unwrap () . append (moved) . id ();
         move_to_first_child (tree, member, drawn)
           . expect ("keep_one_relRepo_move: the move was just drawn");
-        walk . corrections . record (tree, drawn, CorrectionKind::Reinstated); }, }}
+        walk . record_drawn (tree, member, drawn); }, }}
   for stale in extra {
     entombstone (tree, stale, walk); }}
 
