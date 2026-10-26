@@ -57,9 +57,9 @@ pub fn build_and_integrate_flags (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+  use crate::dbs::in_rust_graph::InRustGraph;
+  use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
   use crate::org_to_text::viewforest_to_string;
-  use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
   use crate::types::misc::{SkgrepoName, Skgrepo};
   use crate::types::nodes::complete::empty_graphnode;
   use crate::types::viewnode::mk_editable_viewnode;
@@ -126,11 +126,10 @@ mod tests {
       *** (skg (flag wasOverloaded))
       *** (skg (flag noSearchMatching))
     "};
-    let (maybe, errors, warnings) =
-      org_to_uninterpreted_viewforest (org) . unwrap ();
+    let (placed, errors, warnings, _provenance) =
+      org_to_viewforest (org, &InRustGraph::new ()) . unwrap ();
     assert! (errors . is_empty (), "{:?}", errors);
     assert! (warnings . is_empty (), "{:?}", warnings);
-    let placed = maybePlaced_to_placed_viewforest (maybe) . unwrap ();
     assert_eq! (viewforest_to_string (&placed, &config ()) . unwrap (), org);
   }
 }

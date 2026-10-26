@@ -8,8 +8,8 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::viewnode::NodeEditRequest;
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpUnrestrictedVognode};
-use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::viewnode::{Viewnode, ViewnodeKind, UnrestrictedVognode};
+use crate::types::viewnode::Vognode;
 use crate::types::misc::ID;
 use crate::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 struct NodeMergeValidationData<'a> {
-  acquirer_viewnodes    : Vec<&'a MpViewnode>,
+  acquirer_viewnodes    : Vec<&'a Viewnode>,
   acquirer_to_acquirees : HashMap<ID, HashSet<ID>>,
   acquiree_to_acquirers : HashMap<ID, HashSet<ID>>,
   to_delete_skgids      : HashSet<ID>, }
@@ -26,23 +26,19 @@ struct NodeMergeValidationData<'a> {
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub fn validate_nodeMerge_requests(
-  viewforest: &Tree<MpViewnode>,
+  viewforest: &Tree<Viewnode>,
   graph: &InRustGraph,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let nodeMerge_validation_data : NodeMergeValidationData =
     collect_nodeMerge_validation_data (viewforest);
   for node in nodeMerge_validation_data . acquirer_viewnodes {
-    let t : &MpUnrestrictedVognode = match &node . kind {
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => t,
+    let t : &UnrestrictedVognode = match &node . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
       _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
                                      node . kind));
              continue; }};
-    let acquirer_skgid : &ID = match &t . skgid {
-      Some (skgid) => skgid,
-      None => { errors . push(format!(
-                  "Acquirer node '{}' must have an ID", t . title));
-                continue; }};
+    let acquirer_skgid : &ID = &t . skgid;
     if let Some(NodeEditRequest::NodeMerge (acquiree_skgid))
       = t . edit_request ()
     { let pair_errors : Vec<String> = validate_nodeMerge_pair(
@@ -60,18 +56,18 @@ pub fn validate_nodeMerge_requests(
 /// To understand what this function does,
 /// it's easiest to read the definition of its return type.
 fn collect_nodeMerge_validation_data<'a>(
-  viewforest: &'a Tree<MpViewnode>,
+  viewforest: &'a Tree<Viewnode>,
 ) -> NodeMergeValidationData<'a> {
-  let mut acquirer_viewnodes : Vec<&MpViewnode> = Vec::new();
+  let mut acquirer_viewnodes : Vec<&Viewnode> = Vec::new();
   let mut acquirer_to_acquirees : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut acquiree_to_acquirers : HashMap<ID, HashSet<ID>> = HashMap::new();
   let mut to_delete_skgids : HashSet<ID> = HashSet::new();
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      let viewnode : &MpViewnode = node_ref . value();
-      if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+      let viewnode : &Viewnode = node_ref . value();
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
         = &viewnode . kind
-      { if let Some (skgid) = &t . skgid {
+      { { let skgid : &ID = &t . skgid;
           if matches!(t . edit_request (),
                       Some (NodeEditRequest::Delete)) {
             to_delete_skgids . insert(skgid . clone()); } // mutate!

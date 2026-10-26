@@ -20,8 +20,8 @@ use crate::types::views_state::ViewforestId;
 use crate::types::misc::{MSV, SkgConfig, Skgrepo, ID, TantivyIndex, SkgrepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{NodeInstruction, SaveNode};
 use crate::types::nodes::complete::Graphnode;
-use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
-use crate::types::maybe_placed_viewnode::{MpVognode};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind };
+use crate::types::viewnode::{Vognode};
 
 use ego_tree::{Tree, NodeRef};
 use futures::FutureExt;
@@ -368,9 +368,15 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
 pub fn graph_handle_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraphHandle, Box<dyn Error>> {
+  Ok ( new_handle ( graph_from_config (config) ? )) }
+
+/// Build an in-Rust graph from the test config's fixtures on disk.
+pub fn graph_from_config (
+  config : &SkgConfig,
+) -> Result<InRustGraph, Box<dyn Error>> {
   let nodes : Vec<Graphnode> =
     read_all_skg_files_from_skgrepos (config) ?;
-  Ok ( new_handle ( InRustGraph::from_graphnodes (&nodes) )) }
+  Ok ( InRustGraph::from_graphnodes (&nodes) ) }
 
 /// Bundle a test's existing handles into a 'SkgEnv'.
 pub fn skg_env_from_parts (
@@ -597,36 +603,36 @@ pub fn compare_headlines_modulo_skgid(
     _ => false,  // One is headline, other is not, or they have different errors
   }}
 
-/// Compare two MpViewnode trees by DFS.
+/// Compare two Viewnode trees by DFS.
 /// (PITFALL: Naive comparison of trees just compares NodeIds,
 /// which are nearly meaningless.)
 pub fn compare_viewnode_trees (
-  node1 : NodeRef < MpViewnode >,
-  node2 : NodeRef < MpViewnode >
+  node1 : NodeRef < Viewnode >,
+  node2 : NodeRef < Viewnode >
 ) -> bool {
-  let n1 : & MpViewnode =
+  let n1 : & Viewnode =
     node1 . value ();
-  let n2 : & MpViewnode =
+  let n2 : & Viewnode =
     node2 . value ();
   if n1 != n2 { return false; }
   { // recurse
-    let children1 : Vec < NodeRef < '_, MpViewnode >> =
+    let children1 : Vec < NodeRef < '_, Viewnode >> =
       node1 . children () . collect ();
-    let children2 : Vec < NodeRef < '_, MpViewnode >> =
+    let children2 : Vec < NodeRef < '_, Viewnode >> =
       node2 . children () . collect ();
     children1 . len () == children2 . len () &&
       children1 . iter () . zip ( children2 . iter () )
       . all ( | ( c1, c2 ) |
               compare_viewnode_trees ( *c1, *c2 )) }}
 
-/// Compares ignoring ID value but not ID presence/absence.
+/// Compares ignoring ID values.
 pub fn compare_viewnode_trees_modulo_skgid(
-  viewforest1: &Tree<MpViewnode>,
-  viewforest2: &Tree<MpViewnode>
+  viewforest1: &Tree<Viewnode>,
+  viewforest2: &Tree<Viewnode>
 ) -> bool {
-  let root1 : Vec < NodeRef < '_, MpViewnode >> =
+  let root1 : Vec < NodeRef < '_, Viewnode >> =
     viewforest1 . root() . children() . collect();
-  let root2 : Vec < NodeRef < '_, MpViewnode >> =
+  let root2 : Vec < NodeRef < '_, Viewnode >> =
     viewforest2 . root() . children() . collect();
   if root1 . len() != root2 . len() {
     return false; }
@@ -636,41 +642,41 @@ pub fn compare_viewnode_trees_modulo_skgid(
     { return false; }}
   true }
 
-/// Compare two MpViewnode subtrees, ignoring ID values.
+/// Compare two Viewnode subtrees, ignoring ID values.
 fn compare_two_viewnode_branches_recursively_modulo_skgid (
-  node1: NodeRef<MpViewnode>,
-  node2: NodeRef<MpViewnode>
+  node1: NodeRef<Viewnode>,
+  node2: NodeRef<Viewnode>
 ) -> bool {
-  let n1 : &MpViewnode = node1 . value();
-  let n2 : &MpViewnode = node2 . value();
+  let n1 : &Viewnode = node1 . value();
+  let n2 : &Viewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
-    ( MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)),
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)) ) =>
+    ( ViewnodeKind::Vognode (Vognode::Unrestricted (_)),
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t2)) ) =>
     { // Copy the ID from one to the other, then compare.
-      let id2 : Option<ID> = n2 . skgid_opt () . cloned ();
-      let mut n1_copy : MpViewnode =
+      let id2 : ID = t2 . skgid . clone ();
+      let mut n1_copy : Viewnode =
         n1 . clone();
-      if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) = &mut n1_copy . kind
+      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut n1_copy . kind
         { t . skgid = id2; }
       if n1_copy != *n2 { return false; }}
-    ( MpViewnodeKind::Folder (_)
-      | MpViewnodeKind::PropertyMember (_)
-      | MpViewnodeKind::ChangeViewnode (_)
-      | MpViewnodeKind::BufferRoot,
-      MpViewnodeKind::Folder (_)
-      | MpViewnodeKind::PropertyMember (_)
-      | MpViewnodeKind::ChangeViewnode (_)
-      | MpViewnodeKind::BufferRoot) =>
+    ( ViewnodeKind::Folder (_)
+      | ViewnodeKind::PropertyMember (_)
+      | ViewnodeKind::ChangeViewnode (_)
+      | ViewnodeKind::BufferRoot,
+      ViewnodeKind::Folder (_)
+      | ViewnodeKind::PropertyMember (_)
+      | ViewnodeKind::ChangeViewnode (_)
+      | ViewnodeKind::BufferRoot) =>
     { if n1 != n2 { return false; }}
-    ( MpViewnodeKind::Tombstone,
-      MpViewnodeKind::Tombstone) =>
+    ( ViewnodeKind::Tombstone,
+      ViewnodeKind::Tombstone) =>
     { if n1 != n2 { return false; }}
     _ => return false, // mismatched kinds
   }
   { // Recurse on children
-    let children1 : Vec < NodeRef < '_, MpViewnode >> =
+    let children1 : Vec < NodeRef < '_, Viewnode >> =
       node1 . children() . collect();
-    let children2 : Vec < NodeRef < '_, MpViewnode >> =
+    let children2 : Vec < NodeRef < '_, Viewnode >> =
       node2 . children() . collect();
     ( children1 . len() == children2 . len() &&
       children1 . iter() . zip(children2 . iter())

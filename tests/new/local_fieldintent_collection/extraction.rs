@@ -3,12 +3,13 @@
 // expectations were carried over from the old extraction path; the
 // ones that changed (the new recursion surface) say so in comments.
 
+use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use ego_tree::Tree;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
-  org_to_uninterpreted_nodes,
-  org_to_uninterpreted_viewforest};
+  org_to_viewnode_tree,
+  org_to_viewforest};
 use skg::from_text::local_fieldintent_collection::extract_nonmergeSavePlan_locally;
 use skg::from_text::local_fieldintent_collection::lower::{
   lower_collected_fieldIntents, LoweringOutput, NodeIntent };
@@ -16,17 +17,15 @@ use skg::from_text::local_fieldintent_collection::traverse::collect_instructions
 use skg::from_text::local_fieldintent_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_graphnode_if_save_else_error;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, SaveNode, DeleteNode};
-use skg::types::maybe_placed_viewnode::{
-  MpViewnode,
-  maybePlaced_to_placed_tree,
-  maybePlaced_to_placed_viewforest};
-use skg::types::tree::forest::{MpViewForest, ViewForest};
-use skg::types::viewnode::{Viewnode, viewforest_root_viewnode};
+use skg::types::viewnode::{
+  Viewnode};
+use skg::types::tree::forest::ViewForest;
+use skg::types::viewnode::viewforest_root_viewnode;
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
@@ -53,9 +52,9 @@ fn saved_node_by_skgid<'a> (
 fn checked_viewforest_from_org (
   input : &str,
 ) -> Tree<Viewnode> {
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() }
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+  viewforest }
 
 /// This runs collection plus lowering, with no disk involved: the
 /// pure half of extraction.
@@ -133,13 +132,9 @@ async fn nodeInstructions_from_org_with_disk (
   config   : &skg::types::misc::SkgConfig,
 
 ) -> Result<Vec<NodeInstruction>, Box<dyn Error>> {
-  let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
-    org_to_uninterpreted_viewforest (org_text) ?;
-  add_missing_info_to_viewforest (
-    &mut maybePlaced_viewforest, &config)?;
-  let viewforest : ViewForest =
-    maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ?;
+  let (viewforest, _parsing_errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+    org_to_viewforest (org_text, &graph_from_config (config) ?) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (
       &viewforest, config, None)?;
@@ -157,10 +152,8 @@ fn test_extract_nonmergeSavePlan_basic() {
             Root 2 body
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -210,10 +203,8 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
             Content body
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -251,10 +242,8 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
             Child body
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -312,10 +301,8 @@ fn test_extract_nonmergeSavePlan_multiple_alias_folders() {
             ** (skg node (gnid content1) (skgRepos (nodeRepo main))) content node
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let result : Result<Vec<NodeInstruction>, String> =
     nodeInstructions_from_tree (viewforest);
 
@@ -337,10 +324,8 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
             ** (skg node (gnid unrelated2) (skgRepos (nodeRepo main)) noClaim) another unrelated child
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -366,10 +351,8 @@ fn extraction_preserves_content_and_independent_children (
             ** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -393,10 +376,8 @@ fn extraction_skips_alias_and_id_display_nodes (
             ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -425,10 +406,8 @@ fn extraction_collects_subscribees_without_hidden_branches (
             **** (skg node (gnid hidden-outside) (skgRepos (nodeRepo main))) hidden outside child
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -462,10 +441,8 @@ fn extraction_collects_overridden_folder (
             *** (skg node (gnid overridden-b) (skgRepos (nodeRepo main))) overridden B
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -492,10 +469,8 @@ fn empty_overridden_folder_means_empty_override_set (
             ** (skg overriddenFolder)
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -519,10 +494,8 @@ fn write_protected_folder_members_save_themselves_but_not_their_recorder (
             *** (skg node (gnid hidden) (skgRepos (nodeRepo main))) hidden
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -706,10 +679,8 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
             Doomed body
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -750,10 +721,8 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
             Doomed body
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1227,10 +1196,8 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
             ** (skg node (gnid level2b) (skgRepos (nodeRepo main))) level 2b
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1258,24 +1225,25 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
   assert_eq!(level2b_skg . contains, vec![]); // Leaf node
 }
 
+/// The parse mints a gnid for a headline without one, so the
+/// tree the save reads has no ID-less occurrence.
 #[test]
-fn test_extract_nonmergeSavePlan_error_missing_skgid() {
+fn test_parse_mints_a_gnid_for_a_headline_without_one() {
   let input: &str =
     indoc! {"
             * (skg node (gnid good_node) (skgRepos (nodeRepo main))) good node
             * node without ID
         "};
-
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let result : Result<Tree<Viewnode>, String> =
-    // This conversion fails because of missing ID
-    maybePlaced_to_placed_tree (maybePlaced_viewforest);
-
-  assert!(result . is_err(), "Should return error for missing ID");
-  let error_msg : String = result . unwrap_err();
-  assert!(error_msg . contains ("node without ID") ||
-          error_msg . contains ("has no ID"));
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
+  let gnids : Vec<ID> =
+    viewforest . root () . children ()
+    . filter_map ( |root| root . value () . unrestricted_skgid () . cloned () )
+    . collect ();
+  assert_eq!(gnids . len (), 2);
+  assert_eq!(gnids [0], ID::from ("good_node"));
+  assert!( ! gnids [1] . 0 . is_empty () && gnids [1] != gnids [0],
+           "the headline without an ID gets a fresh one" );
 }
 
 #[test]
@@ -1297,10 +1265,8 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
             *** (skg alias) alias two
         "};
 
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 
@@ -1330,10 +1296,8 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
             * (skg node (gnid doc2) (skgRepos (nodeRepo main))) Document 2
             ** (skg node (gnid ref_section) (skgRepos (nodeRepo main)) noClaim) Reference Section
         "};
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<Viewnode> =
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let instructions: Vec<NodeInstruction> =
     nodeInstructions_from_tree (viewforest) . unwrap();
 

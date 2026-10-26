@@ -667,3 +667,72 @@ synthesize for the lens and the label table the herald-rules
 endpoint serves. No correction to code. The run paused here at
 Jeff's request (machine restart); slice 7 not yet launched.
 
+** Slice 7: the parser's twin goes
+*** What's done
+The parse ('org_to_viewforest', in 'uninterpreted.rs') builds
+real 'Viewnode's and returns the 'EnrichmentProvenance' beside
+the errors and warnings. As it builds the tree it replaces each
+occurrence's gnid with its pid, makes an occurrence typed under
+an alias folder an alias, gives a repoless occurrence the
+graph's skgrepo (write-protected, known gnid) or its nearest
+occurrence ancestor's, and mints a gnid for one without
+('viewnode_from_metadata'). 'validate_tree' and its helpers,
+the nodeMerge validator and 'local.rs' read real viewnodes.
+'maybe_placed_viewnode.rs', every 'Mp' type, the generic
+'UnrestrictedVognode_Generic', the conversions and
+'id_resolution.rs' are gone; the glossary's "mp = maybe-placed"
+entry too. A new test pins the provenance's distinctions (a new
+headline inheriting is in both sets, one naming its skgrepo only
+in 'new_nodes', an existing repoless one only in the inherited
+set; a graph-placed reference and an alias in neither).
+Verified at the TCP surface on a scratch server: a bare child
+got a gnid and its parent's skgrepo, a headline typed under an
+alias folder was saved as an alias, a bare top-level headline
+was refused ("must have a repo"), and re-saving the server's
+own output returned it unchanged.
+*** Deviations from the plan's "how"
+**** add_missing_info.rs stays, as the parse's helpers
+It holds the provenance and what the parse calls per headline
+(pid, alias, skgrepo); the build loop is the parse's own.
+**** a headline nothing places gets the NOT_FOUND skgrepo
+A real occurrence has a skgrepo, so one that neither writes one
+nor can inherit one (a bare top-level headline) gets
+'SkgrepoName::not_found'; validation refuses it with the message
+it gave a repoless one. Its children inherit the sentinel and
+are refused alike, as before.
+**** the parse's names
+'org_to_uninterpreted_viewforest' is 'org_to_viewforest' and
+'org_to_uninterpreted_nodes' is 'org_to_viewnode_tree': both
+take the graph now, and the old names said "without supplying
+missing IDs". The file keeps its name. Callers with no graph
+pass 'InRustGraph::new ()': the dirty-view dependency scan (so
+it reads the IDs as written, as before) and tests of fully
+written text. The search buffer's parse passes the runtime's.
+**** two checks that could no longer fire are gone
+"A flag request requires a saved node ID" and an occurrence's
+"must have an ID" ran after the enrichment had minted every
+gnid. A flag on a new node is still refused, by
+'FlagEditOnUnknownNode'.
+**** smaller choices
+An alias typed as an occurrence is built as one, then turned
+into the alias (its minted gnid is dropped, and it enters no
+provenance set). The orphaned-headline message names the
+headline by the IDs it writes, not a minted one
+('ViewnodeMetadata::headline_name'). 'Viewnode' gained
+'error_label' and 'is_occurrence'; tests gained
+'graph_from_config'.
+*** Fixtures adapted
+'finds_buffer_errors_for_saving' typed an occurrence under an
+alias folder to provoke "AliasFolder children must be Aliases";
+the parse now makes it an alias, so the fixture types an
+unknown there, and the repo and total counts drop by one.
+'test_extract_nonmergeSavePlan_error_missing_skgid' tested the
+conversion's missing-ID failure; it now tests the minting. The
+parse tests assert minted gnids and 'not_found' where they
+asserted absence.
+*** Suite failures and their classification
+**** first failure: finds_buffer_errors_for_saving
+Expected fixture adaptation (above). Then 'bash/nextest.sh':
+931 of 931 passed. No file under elisp/, nvim/ or shared/
+changed, and no buffer text, so the client and integration
+suites were not run.

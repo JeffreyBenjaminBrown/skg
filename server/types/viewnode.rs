@@ -259,16 +259,12 @@ pub struct Ghost {
   pub tombstone_request : bool,
 }
 
-pub type UnrestrictedVognode   = UnrestrictedVognode_Generic < ID, SkgrepoName >;
-pub type MpUnrestrictedVognode = UnrestrictedVognode_Generic < Option < ID >,
-                                             Option < SkgrepoName >>;
-
 /// A Viewnode that corresponds to a Graphnode.
 #[derive( Debug, Clone, PartialEq )]
-pub struct UnrestrictedVognode_Generic < Id, Repo > {
+pub struct UnrestrictedVognode {
   pub title         : String,
-  pub skgid         : Id,
-  pub home_skgrepo  : Repo,
+  pub skgid         : ID,
+  pub home_skgrepo  : SkgrepoName,
   /// Whether the save reads this occurrence as an entry of its
   /// viewparent's list. For an occurrence parent, that list is the
   /// parent's content; for a partner folder, the folder's relation
@@ -408,7 +404,7 @@ pub struct ViewnodeStats {
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a skgrepo from.
   /// This is a display fact, unlike a requested replacement stored in
-  /// 'UnrestrictedVognode_Generic::relationshipEditRequest'.  Save extraction never
+  /// 'UnrestrictedVognode::relationshipEditRequest'.  Save extraction never
   /// treats this value as a fieldIntent.
   /// Herald: red "~NAME" immediately before the ⌂ of repoBoundary
   /// (server/heralds.rs).
@@ -625,7 +621,7 @@ pub enum ViewRequest {
 // Implementations
 //
 
-impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
+impl UnrestrictedVognode {
   pub fn is_writeProtected (&self) -> bool {
     matches! ( self . editability,
                Editability::WriteProtected ) }
@@ -648,9 +644,7 @@ impl < Id, Repo > UnrestrictedVognode_Generic < Id, Repo > {
       Editability::Editable { edit_request, .. } =>
         edit_request . as_ref(),
       Editability::WriteProtected => None, }}
-}
 
-impl UnrestrictedVognode {
   /// The collected ID: what this viewnode contributes to its
   /// parent's collected lists -- the 'overridesHere' original when
   /// the node is shown in place of one, else its own ID. Save
@@ -661,14 +655,6 @@ impl UnrestrictedVognode {
   pub fn collected_skgid (&self) -> ID {
     self . overridesHere . clone ()
     . unwrap_or_else ( || self . skgid . clone () ) }
-}
-
-impl MpUnrestrictedVognode {
-  /// As 'UnrestrictedVognode::collected_id', for the maybe-placed stage (the
-  /// node might not have an ID yet; a marker, if present, wins).
-  pub fn collected_skgid (&self) -> Option<ID> {
-    self . overridesHere . clone ()
-    . or_else ( || self . skgid . clone () ) }
 }
 
 impl Folder {
@@ -1084,6 +1070,32 @@ impl Viewnode {
     HeadlineName::of ( self . viewnode_id . as_ref (), graphnode_id,
                        self . title () ) }
 
+  /// A distinguishable label for error messages.
+  pub fn error_label (&self) -> String {
+    match &self . kind {
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        => t . title . clone(),
+      ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. }) =>
+        format!("property:alias({})", text),
+      ViewnodeKind::PropertyMember (PropertyMember::ID { skgid, .. }) =>
+        format!("property:id({})", skgid),
+      ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
+        format!("property:flag({})", flag . wire_name ()),
+      ViewnodeKind::ChangeViewnode (change) =>
+        format! ("changeViewnode:{}", change . repr_in_client ()),
+      ViewnodeKind::Folder (folder) if folder . members_are_properties () =>
+        format!("propertyFolder:{}", folder . repr_in_client ()),
+      ViewnodeKind::Folder (folder) =>
+        format!("partnerFolder:{}", folder . repr_in_client ()),
+      ViewnodeKind::BufferRoot =>
+        "forestRoot" . to_string (),
+      ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
+        format!("ghost:{}", h . skgid . 0),
+      ViewnodeKind::Tombstone =>
+        "tombstone" . to_string (),
+      ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
+        format!("unknown:{}", u . skgid . 0), }}
+
   /// Reasonable for both UnrestrictedVognodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
@@ -1103,6 +1115,11 @@ impl Viewnode {
   /// server's own trees carry change facts: the parser skips them.
   pub fn is_ghostWarranted (&self) -> bool {
     self . change_facts . change . rel == Some (Existence::Removed) }
+
+  /// Whether this viewnode is an occurrence.
+  pub fn is_occurrence (&self) -> bool {
+    matches! ( &self . kind,
+               ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ) }
 
   pub fn is_unrestrictedVognode_and_member (&self) -> bool {
     match &self . kind {

@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
 use skg::types::viewnode::PropertyMember;
-use skg::types::maybe_placed_viewnode::MpViewnodeKind;
+use skg::types::viewnode::ViewnodeKind;
 
 #[test]
 fn test_text_search_org_format (
@@ -111,7 +111,7 @@ fn test_text_search_org_format (
                     ( skgid . to_string (), title ) ); }} },
             _ => {
               if let Some (md) = metadata {
-                if let Some ( MpViewnodeKind::PropertyMember (
+                if let Some ( ViewnodeKind::PropertyMember (
                   PropertyMember::Alias { .. } ) )
                   = md . non_vognode
                   { aliases_under_current . push (title); }} }, }} }

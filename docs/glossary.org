@@ -1429,11 +1429,6 @@ the type signature should clarify what's going on.
 
 *** mk = make / create
 
-*** mp = maybe-placed
-
-A viewnode that might have an ID and skgrepo,
-but might not, is maybe-placed.
-
 *** Terms of the diff view's implementation
 
 How the diff view ('docs/diff-view.org') is computed.

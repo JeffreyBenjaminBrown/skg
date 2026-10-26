@@ -1,15 +1,22 @@
 /// DANGER: This was vibe-coded without much oversight.
 /// I *believe* the tests constrain its behavior sufficiently.
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::sexp::find_sexp_end;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::serve::parse_metadata_sexp::{ parse_metadata_to_viewnodemd, default_metadata, viewnode_from_metadata, ViewnodeMetadata };
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::misc::ID;
-use crate::types::tree::forest::MpViewForest;
-use crate::types::viewnode::ViewnodeId;
+use crate::types::tree::forest::ViewForest;
+use crate::types::viewnode::{Viewnode, ViewnodeId, ViewnodeKind};
+use super::add_missing_info::{
+  EnrichmentProvenance,
+  complete_occurrence_skgrepo,
+  make_occurrence_an_alias,
+  replace_gnid_with_pid,
+  skgrepos_after_save_of_writeProtected_occurrences,
+  viewparent_makes_aliases};
 
-use ego_tree::{Tree, NodeId, NodeMut};
+use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use regex::Regex;
 use sexp::{Atom, Sexp};
 use std::collections::HashSet;
@@ -28,43 +35,51 @@ struct ViewnodeLineCol {
   body: Vec<String>,
 }
 
+/// As 'org_to_viewforest', but returning the internal tree,
+/// the parsing errors, and nothing else.
+pub fn org_to_viewnode_tree (
+  input : &str,
+  graph : &InRustGraph,
+) -> Result < ( Tree<Viewnode>,
+                Vec<BufferValidationError> ),
+              String > {
+  let (viewforest, parsing_errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>,
+       EnrichmentProvenance) =
+    org_to_viewforest (input, graph)?;
+  Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
+
 /// Parse org text into a view forest.
 /// Each level-1 headline becomes a forest root.
-/// The result takes the org-buffer at face value,
-/// without changing the tree (e.g. without absorbing aliases
-/// into the relevant ancestor) and without supplementing information
-/// (e.g. missing IDs).
+/// The tree is the buffer's, but complete: as the parse builds it,
+/// it supplies what a headline may leave out ('add_missing_info.rs'):
+/// an occurrence's gnid becomes its pid (per GRAPH), an occurrence
+/// without one gets a fresh one, an occurrence without a skgrepo gets
+/// one where one can be found, and an occurrence typed under an alias
+/// folder becomes an alias.
 ///
-/// Returns (tree, parsing_errors).
+/// Returns (viewforest, parsing_errors, parsing_warnings, provenance).
+/// The warnings are nonfatal (e.g. discarded headline text on a
+/// folder), destined for 'SaveResponse.warnings'. The provenance
+/// records what the parse invented.
 ///
 /// Shares responsibility for error detection
 /// with 'find_buffer_errors_for_saving', which runs later.
 /// That function detects the majority of possible errors,
-/// but it can't detect them all because it uses a tree of MpViewnodes,
+/// but it can't detect them all because it uses a tree of Viewnodes,
 /// which permit fewer kinds of invalid state than the raw text.
 /// (For instance, Alias and AliasFolder cannot have bodies,
 /// but they can in the raw text, and that's an error.)
-pub fn org_to_uninterpreted_nodes(
-  input: &str
-) -> Result < ( Tree<MpViewnode>,
-                Vec<BufferValidationError> ),
-              String > {
-  let (viewforest, parsing_errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
-    org_to_uninterpreted_viewforest (input)?;
-  Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
-
-/// The third element of the result is nonfatal parse warnings
-/// (e.g. discarded headline text on a folder), destined for
-/// 'SaveResponse.warnings'.
-pub fn org_to_uninterpreted_viewforest(
-  input: &str
-) -> Result < ( MpViewForest,
+pub fn org_to_viewforest (
+  input : &str,
+  graph : &InRustGraph,
+) -> Result < ( ViewForest,
                 Vec<BufferValidationError>,
-                Vec<String> ),
+                Vec<String>,
+                EnrichmentProvenance ),
               String > {
-  let mut viewforest: MpViewForest =
-    MpViewForest::new();
+  let mut viewforest: ViewForest =
+    ViewForest::new();
   let mut parsing_errors: Vec<BufferValidationError> = Vec::new();
   let mut parsing_warnings: Vec<String> = Vec::new();
   let mut viewnode_ids_seen: HashSet<ViewnodeId> = HashSet::new();
@@ -74,27 +89,29 @@ pub fn org_to_uninterpreted_viewforest(
     let viewforest_root_treeid: NodeId =
       viewforest . internal_root_skgid ();
     viewforest_root_treeid } ];
-  for viewnode_line_col in &mut {
-    let viewnode_line_cols: Vec<ViewnodeLineCol> =
-      divide_into_viewNodeLineCols (input)?;
-    viewnode_line_cols } {
-    if let Some (metadata) = &mut viewnode_line_col . headline . 1 {
-      if let Some (viewnode_id) = &metadata . viewnode_id {
-        // Of two headlines with one viewnode ID, the first in buffer order
-        // keeps it; the second is a copy, and will get a fresh one.
-        // (Dropped before the headline becomes a viewnode, so that no
-        // message names the copy by the original's viewnode ID.)
-        // One the view's record does not know is dropped after the
-        // parse ('drop_unknown_viewnode_ids_in_parsed_viewforest').
-        if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
-          metadata . viewnode_id = None; }}}
-    let (level, viewnode, error_opt, warning_opt)
-      : (usize, MpViewnode, Option<BufferValidationError>, Option<String>)
-      = linecol_to_viewnode (viewnode_line_col)?;
-    if let Some (error) = error_opt {
-      parsing_errors . push (error); }
-    if let Some (warning) = warning_opt {
-      parsing_warnings . push (warning); }
+  let mut viewnode_line_cols: Vec<ViewnodeLineCol> =
+    divide_into_viewNodeLineCols (input)?;
+  for viewnode_line_col in &mut viewnode_line_cols {
+    let metadata : &mut ViewnodeMetadata =
+      viewnode_line_col . headline . 1 . get_or_insert_with (default_metadata);
+    if let Some (viewnode_id) = &metadata . viewnode_id {
+      // Of two headlines with one viewnode ID, the first in buffer order
+      // keeps it; the second is a copy, and will get a fresh one.
+      // (Dropped before the headline becomes a viewnode, so that no
+      // message names the copy by the original's viewnode ID.)
+      // One the view's record does not know is dropped after the
+      // parse ('drop_unknown_viewnode_ids_in_parsed_viewforest').
+      if ! viewnode_ids_seen . insert (viewnode_id . clone ()) {
+        metadata . viewnode_id = None; }}
+    replace_gnid_with_pid (metadata, graph); }
+  let mut provenance : EnrichmentProvenance =
+    EnrichmentProvenance::new (
+      skgrepos_after_save_of_writeProtected_occurrences (
+        viewnode_line_cols . iter ()
+          . filter_map ( |line_col| line_col . headline . 1 . as_ref () ),
+        graph ));
+  for viewnode_line_col in &mut viewnode_line_cols {
+    let level : usize = viewnode_line_col . headline . 0;
     // Adjust treeid_stack to proper level
     // (the internal forest root is level 0; view roots are level 1).
     while treeid_stack . len() > level {
@@ -103,19 +120,71 @@ pub fn org_to_uninterpreted_viewforest(
     // treeid_stack.len() should equal level
     // because the internal forest root is at level 0.
     if treeid_stack . len() < level {
+      let viewnode : Viewnode = // only to name it
+        linecol_to_viewnode (viewnode_line_col)? . 1;
+      let headline : HeadlineName = { // by what it writes, not a minted gnid
+        let (_level, metadata, title) : &HeadlineInfo =
+          &viewnode_line_col . headline;
+        metadata . as_ref () . map_or_else (
+          || HeadlineName::of ( None, None, title ),
+          |metadata| metadata . headline_name (title) ) };
       return Err ( with_org_subheadlines (
         &format! (
           "Node \"{}\" at level {} jumps too far between levels (no valid parent at level {}).",
           viewnode . error_label(), level, level - 1),
-        &[ viewnode . headline_name () ] )); }
+        &[ headline ] )); }
+    let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
+    let (viewnode, error_opt, warning_opt)
+      : (Viewnode, Option<BufferValidationError>, Option<String>)
+      = complete_linecol_to_viewnode (
+          viewnode_line_col,
+          viewforest . get (parent_treeid) . unwrap (),
+          graph, &mut provenance )?;
+    if let Some (error) = error_opt {
+      parsing_errors . push (error); }
+    if let Some (warning) = warning_opt {
+      parsing_warnings . push (warning); }
     treeid_stack . push( {
-      let parent_treeid: NodeId = *treeid_stack . last() . unwrap();
       let new_treeid: NodeId = {
-        let mut parent_mut : NodeMut<MpViewnode> =
+        let mut parent_mut : NodeMut<Viewnode> =
           viewforest . get_mut (parent_treeid) . unwrap();
         parent_mut . append (viewnode) . id() };
       new_treeid } ); }
-  Ok ( ( viewforest, parsing_errors, parsing_warnings ) ) }
+  Ok ( ( viewforest, parsing_errors, parsing_warnings, provenance ) ) }
+
+/// The viewnode a headline under VIEWPARENT stands for, with what the
+/// headline leaves out supplied ('add_missing_info.rs'), recording in
+/// PROVENANCE what was invented.
+/// Returns (Viewnode, error, warning), as 'linecol_to_viewnode'.
+fn complete_linecol_to_viewnode (
+  viewnode_line_col : &mut ViewnodeLineCol,
+  viewparent        : NodeRef<Viewnode>,
+  graph             : &InRustGraph,
+  provenance        : &mut EnrichmentProvenance,
+) -> Result < ( Viewnode,
+                Option<BufferValidationError>,
+                Option<String> ),
+              String > {
+  let metadata : &mut ViewnodeMetadata =
+    viewnode_line_col . headline . 1 . get_or_insert_with (default_metadata);
+  let is_alias : bool =
+    metadata . names_an_occurrence ()
+    && viewparent_makes_aliases (viewparent);
+  let skgrepo_inherited : bool =
+    ! is_alias
+    && complete_occurrence_skgrepo (
+         metadata, viewparent, graph,
+         & provenance . writeProtected_skgrepos_after_save );
+  let gnid_minted : bool =
+    metadata . names_an_occurrence () && metadata . skgid . is_none ();
+  let (_level, mut viewnode, error_opt, warning_opt)
+    : (usize, Viewnode, Option<BufferValidationError>, Option<String>)
+    = linecol_to_viewnode (viewnode_line_col)?;
+  if is_alias {
+    make_occurrence_an_alias (&mut viewnode);
+  } else {
+    provenance . record (&viewnode, gnid_minted, skgrepo_inherited); }
+  Ok (( viewnode, error_opt, warning_opt )) }
 
 /// Parse input text into org node line collections.
 /// Each org node consists of a headline and its following body lines.
@@ -174,12 +243,12 @@ mod imported_body_tests {
   }
 }
 
-/// Create an MpViewnode from an ViewnodeLineCol.
+/// Create a Viewnode from a ViewnodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
-/// Returns (level, MpViewnode, error, warning).
+/// Returns (level, Viewnode, error, warning).
 fn linecol_to_viewnode(
   viewnode_line_col: &ViewnodeLineCol
-) -> Result < ( usize, MpViewnode,
+) -> Result < ( usize, Viewnode,
                 Option<BufferValidationError>,
                 Option<String> ),
               String > {
@@ -199,11 +268,11 @@ fn linecol_to_viewnode(
     && body_text . as_ref () . is_some_and (
       |body| ! body . trim () . is_empty () );
   let ( viewnode, error_opt, warning_opt )
-    : ( MpViewnode, Option<BufferValidationError>, Option<String> )
+    : ( Viewnode, Option<BufferValidationError>, Option<String> )
     = viewnode_from_metadata ( &metadata, title . clone (), body_text );
   if matches! (
     &viewnode . kind,
-    MpViewnodeKind::BufferRoot)
+    ViewnodeKind::BufferRoot)
   { return Err (
       "forestRoot metadata is internal and cannot appear in buffer text"
       . to_string () ); }

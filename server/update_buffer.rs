@@ -613,7 +613,7 @@ pub fn finish_viewforest (
     viewforest_to_string ( viewforest, config ) } }
 
 /// When the server first receives the buffer, it replaces
-/// each Viewnode's ID with a PID (`replace_ids_with_pids`).
+/// each Viewnode's ID with a PID (`replace_gnid_with_pid`).
 /// Later it updates the graph, which can involve merging nodes.
 /// After a nodeMerge, the acquiree is gone, and what was the Viewnode
 /// onto it now an extra_id of the acquirer, not a PID.

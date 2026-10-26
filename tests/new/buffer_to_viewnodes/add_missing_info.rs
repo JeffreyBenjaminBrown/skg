@@ -1,19 +1,19 @@
 // cargo test test_add_missing_info_comprehensive
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
-  org_to_uninterpreted_nodes,
-  org_to_uninterpreted_viewforest};
-use skg::from_text::buffer_to_viewnodes::add_missing_info::{
-  add_missing_info_to_viewforest};
+  org_to_viewnode_tree,
+  org_to_viewforest};
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::types::errors::BufferValidationError;
-use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees};
-use skg::types::maybe_placed_viewnode::{
-  MpViewnode, MpViewnodeKind, MpVognode};
+use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_skgid, compare_viewnode_trees, graph_from_config};
+use skg::types::viewnode::{
+  PropertyMember, Viewnode, ViewnodeKind, Vognode};
+use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
 use skg::types::misc::{SkgConfig, ID, SkgrepoName, TantivyIndex};
 use skg::types::tree::forest::{
-  MpViewForest,
+  ViewForest,
   tree_forest_root_skgids};
 
 use ego_tree::Tree;
@@ -50,16 +50,66 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_new_headline_at_top_level_is_refused (
         &s . config ) . await ?;
+      s . reset ("test_provenance_records_what_the_parse_invented",
+                 "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
+      test_provenance_records_what_the_parse_invented (
+        &s . config ) . await ?;
       Ok (( )) } )) }
+
+/// The provenance keeps apart what the parse invented: a new headline
+/// that inherits its skgrepo is in both sets (a rider on its
+/// ancestor's fork), a new headline naming its skgrepo only in
+/// 'new_nodes' (the explicitly placed new node), an existing node
+/// without a skgrepo only in 'inherited_skgrepo_nodes'. A
+/// write-protected reference the graph places, and an alias, are in
+/// neither. (Fixture node 'root-pid' lives in 'main'.)
+async fn test_provenance_records_what_the_parse_invented (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let input : &str = indoc! {"
+    * (skg node (gnid recorder) (skgRepos (nodeRepo alt))) recorder
+    ** inheriting new
+    ** (skg node (skgRepos (nodeRepo main))) explicit new
+    ** (skg node (gnid existing)) existing without a repo
+    ** (skg node (gnid root) writeProtected) placed by the graph
+    ** (skg aliasFolder)
+    *** typed alias
+  "};
+  let (viewforest, errors, _warnings, provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>,
+       EnrichmentProvenance)
+    = org_to_viewforest (input, &graph_from_config (config) ?) ?;
+  assert! (errors . is_empty (), "{:?}", errors);
+  let gnid_of = |title : &str| -> ID {
+    viewforest . nodes ()
+    . find_map ( |node_ref| match &node_ref . value () . kind {
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          if t . title == title => Some (t . skgid . clone ()),
+        _ => None } )
+    . expect (title) };
+  let inheriting : ID = gnid_of ("inheriting new");
+  let explicit   : ID = gnid_of ("explicit new");
+  let existing   : ID = gnid_of ("existing without a repo");
+  assert_eq! ( provenance . new_nodes,
+               [ inheriting . clone (), explicit ] . into_iter () . collect () );
+  assert_eq! ( provenance . inherited_skgrepo_nodes,
+               [ inheriting, existing ] . into_iter () . collect () );
+  assert_eq! ( gnid_of ("placed by the graph"), ID::from ("root-pid") );
+  assert! ( viewforest . nodes () . any ( |node_ref| matches! (
+              &node_ref . value () . kind,
+              ViewnodeKind::PropertyMember (PropertyMember::Alias { text, .. })
+                if text == "typed alias" )),
+            "an occurrence typed under an alias folder is an alias" );
+  Ok (( )) }
 
 /// The 'new note' headline of 'viewforest': its skgrepo and its
 /// membership.
 fn new_note_skgrepo_and_membership (
-  viewforest : &MpViewForest,
-) -> (Option<SkgrepoName>, bool) {
+  viewforest : &ViewForest,
+) -> (SkgrepoName, bool) {
   viewforest . nodes ()
     . find_map ( |node_ref| match &node_ref . value () . kind {
-        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           if t . title == "new note"
           => Some (( t . home_skgrepo . clone (), t . claimsMembership )),
         _ => None } )
@@ -96,27 +146,24 @@ async fn test_new_headline_inherits_through_phantoms_and_folders (
         *** (skg containerFolder)
         **** (skg node noClaim) new note
       "}, "main", false ), ] {
-    let mut viewforest : MpViewForest =
-      org_to_uninterpreted_viewforest (input) . unwrap() . 0;
-    add_missing_info_to_viewforest (
-      &mut viewforest, &config) ?;
+    let viewforest : ViewForest =
+      org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
     assert_eq! ( new_note_skgrepo_and_membership (&viewforest),
-                 ( Some (SkgrepoName::from (expected_skgrepo)),
+                 ( SkgrepoName::from (expected_skgrepo),
                    expected_membership ),
                  "new note, in:\n{}", input ); }
   Ok (( )) }
 
-/// The buffer root supplies no skgrepo: a headline without '(repo
-/// NAME)' at top level stays repoless, and validation refuses it.
+/// The buffer root supplies no skgrepo: a headline without '(skgRepos
+/// (nodeRepo NAME))' at top level gets 'SkgrepoName::not_found', and
+/// validation refuses it.
 async fn test_new_headline_at_top_level_is_refused (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let mut viewforest : MpViewForest =
-    org_to_uninterpreted_viewforest ("* new note\n") . unwrap() . 0;
-  add_missing_info_to_viewforest (
-    &mut viewforest, &config) ?;
+  let viewforest : ViewForest =
+    org_to_viewforest ("* new note\n", &graph_from_config (config) ?) . unwrap() . 0;
   assert_eq! ( new_note_skgrepo_and_membership (&viewforest) . 0,
-               None );
+               SkgrepoName::not_found () );
   let errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (&viewforest, config) ?;
   assert! ( errors . iter () . any ( |error| matches! (
@@ -146,20 +193,18 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
         ** (skg node (gnid root) (skgRepos (nodeRepo stale)) writeProtected) root again
         *** new child
       "}, "main" ), ] {
-    let mut viewforest : MpViewForest =
-      org_to_uninterpreted_viewforest (input) . unwrap() . 0;
-    add_missing_info_to_viewforest (
-      &mut viewforest, &config) ?;
-    let new_child_skgrepo : Option<SkgrepoName> =
+    let viewforest : ViewForest =
+      org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
+    let new_child_skgrepo : SkgrepoName =
       viewforest . nodes ()
       . find_map ( |node_ref| match &node_ref . value () . kind {
-          MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
             if t . title == "new child"
             => Some (t . home_skgrepo . clone ()),
           _ => None } )
       . expect ("the new child should be in the forest");
     assert_eq! ( new_child_skgrepo,
-                 Some (SkgrepoName::from (expected_skgrepo)),
+                 SkgrepoName::from (expected_skgrepo),
                  "new child of a write-protected occurrence, in:\n{}",
                  input ); }
   Ok (( )) }
@@ -185,22 +230,20 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
             ** (skg subscribeeFolder)
             *** (skg node (gnid root) writeProtected) subscribee reference
         "};
-  let mut viewforest : MpViewForest =
-    org_to_uninterpreted_viewforest (input) . unwrap() . 0;
-  add_missing_info_to_viewforest (
-    &mut viewforest, &config) ?;
+  let viewforest : ViewForest =
+    org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
   let recorder = viewforest . root() . first_child() . unwrap();
   let folder   = recorder . first_child() . unwrap();
   let member = folder . first_child() . unwrap();
   match &member . value() . kind {
-    MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) => {
+    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
       assert_eq! (
-        t . home_skgrepo, Some (SkgrepoName::from ("main")),
+        t . home_skgrepo, SkgrepoName::from ("main"),
         "Repoless folder member should inherit its repo from the \
          graph (node root-pid lives in repo 'main'), not stay \
          repoless." );
       assert_eq! (
-        t . skgid . as_ref() . unwrap() . 0, "root-pid",
+        t . skgid . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
          'root-pid'." ); }
     _ => panic! ("expected an UnrestrictedVognode subscribee member") }
@@ -217,7 +260,7 @@ async fn test_add_missing_info_logic (
   config : &SkgConfig,
 
 ) -> Result<(), Box<dyn Error>> {
-  // Applying 'add_missing_info_to_viewforest' should make
+  // Parsing with the missing info supplied should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
   // Also tests skgrepo inheritance from parent to children.
@@ -239,15 +282,10 @@ async fn test_add_missing_info_logic (
             ** (skg node (gnid unpredictable) (skgRepos (nodeRepo main))) no id
             *** (skg node (gnid unpredictable) (skgRepos (nodeRepo main))) also no id
         "};
-  let mut after_adding_missing_info : MpViewForest =
-    org_to_uninterpreted_viewforest (
-      with_missing_info) . unwrap() . 0;
-  add_missing_info_to_viewforest(
-    &mut after_adding_missing_info,
-    &config) ?;
-  let expected_viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes(
-      without_missing_info ) . unwrap() . 0;
+  let after_adding_missing_info : ViewForest =
+    org_to_viewforest (with_missing_info, &graph_from_config (config) ?) . unwrap() . 0;
+  let expected_viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (without_missing_info, &InRustGraph::new ()) . unwrap() . 0;
   assert_eq!(
     tree_forest_root_skgids (&expected_viewforest) . len(),
     1,
@@ -256,12 +294,12 @@ async fn test_add_missing_info_logic (
     compare_viewnode_trees_modulo_skgid(
       &after_adding_missing_info,
       &expected_viewforest),
-    "add_missing_info_to_viewforest: Forests not equivalent modulo ID." );
+    "org_to_viewforest: Forests not equivalent modulo ID." );
 
-  { let actual_root : &MpViewnode =
+  { let actual_root : &Viewnode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
     let actual_root_skgid : &ID =
-      actual_root . skgid_opt() . unwrap();
+      actual_root . unrestricted_skgid () . unwrap ();
     assert_eq!(
       actual_root_skgid . 0,
       "root-pid",
@@ -307,13 +345,10 @@ async fn test_skgrepo_inheritance_logic (
             ** (skg node (gnid 22)) _
         "};
 
-  let mut actual_viewforest: MpViewForest =
-    org_to_uninterpreted_viewforest (input) . unwrap() . 0;
-  add_missing_info_to_viewforest(
-    &mut actual_viewforest,
-    &config) ?;
-  let expected_viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (expected) . unwrap() . 0;
+  let actual_viewforest : ViewForest =
+    org_to_viewforest (input, &graph_from_config (config) ?) . unwrap() . 0;
+  let expected_viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (expected, &InRustGraph::new ()) . unwrap() . 0;
 
   assert!(
     compare_viewnode_trees(

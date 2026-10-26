@@ -1,14 +1,11 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::save::PreparedSave;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::ClientViewSnapshot;
-use crate::types::maybe_placed_viewnode::{
-  MpViewnodeKind, MpVognode,
-};
 use crate::types::misc::ID;
 use crate::types::links::links_from_text;
-use crate::types::tree::forest::{MpViewForest, ViewForest};
+use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   Editability, NodeEditRequest, PropertyMember, ViewnodeKind, Vognode,
 };
@@ -117,7 +114,9 @@ fn dependencies_from_text (
   text : &str,
   viewforest_id : &ViewforestId,
 ) -> Result<HashSet<ID>, String> {
-  let (forest, errors, _) = org_to_uninterpreted_viewforest (text)
+  let (forest, errors, _, _) =
+    // An empty graph: the IDs as the text writes them.
+    org_to_viewforest (text, &InRustGraph::new ())
     .map_err (|error| format! (
       "Cannot inspect dirty view {}: {}. Run its recovery command before saving.",
       viewforest_id . repr_in_client (), error)) ?;
@@ -134,23 +133,23 @@ fn dependencies_from_text (
 }
 
 fn dependencies_from_uninterpreted (
-  forest : &MpViewForest,
+  forest : &ViewForest,
 ) -> HashSet<ID> {
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (restriction)) => {
-        result . extend (restriction . skgid . iter () . cloned ());
+      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
+        result . insert (restriction . skgid . clone ());
         result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
         { result . insert (target . clone ()); }}
-      MpViewnodeKind::Vognode (MpVognode::Unknown (phantom)) => {
+      ViewnodeKind::Vognode (Vognode::Unknown (phantom)) => {
         result . insert (phantom . skgid . clone ()); }
-      MpViewnodeKind::Vognode (MpVognode::Ghost (phantom)) => {
+      ViewnodeKind::Vognode (Vognode::Ghost (phantom)) => {
         result . insert (phantom . skgid . clone ()); }
-      MpViewnodeKind::PropertyMember (
+      ViewnodeKind::PropertyMember (
         PropertyMember::ID { skgid, .. }) => {
         result . insert (skgid . clone ()); }
       _ => {}, }}

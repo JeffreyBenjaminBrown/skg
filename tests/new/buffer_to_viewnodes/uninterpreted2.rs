@@ -1,10 +1,11 @@
 // cargo test uninterpreted2
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::misc::ID;
-use skg::types::maybe_placed_viewnode::{
-  MpViewnode, MpViewnodeKind, MpVognode};
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
+use skg::types::misc::{ID, SkgrepoName};
+use skg::types::viewnode::{
+  Viewnode, ViewnodeKind, Vognode};
 use ego_tree::Tree;
 
 #[test]
@@ -25,8 +26,8 @@ fn test_org_to_uninterpreted_nodes2() {
             ** bb
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
 
   let viewforest_roots: Vec<_> = viewforest . root() . children() . collect();
   assert_eq!(viewforest_roots . len(), 2, "Should have exactly 2 tree roots");
@@ -77,8 +78,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             This node has cycle flag
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
 
   // Get tree roots (children of BufferRoot)
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
@@ -92,8 +93,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test independent root node
   let unrel_node = tree_roots[1] . value();
   let rel_t = match &unrel_node . kind {
-    MpViewnodeKind::Vognode (
-      MpVognode::Unrestricted (t)) => t,
+    ViewnodeKind::Vognode (
+      Vognode::Unrestricted (t)) => t,
     _ => panic!("expected UnrestrictedVognode") };
   assert_eq!(unrel_node . title(), "independent root node");
   assert_eq!(rel_t . claimsMembership, false);
@@ -103,8 +104,8 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   // Test cycling node
   let cycle_node = tree_roots[2] . value();
   let cycle_t = match &cycle_node . kind {
-    MpViewnodeKind::Vognode (
-      MpVognode::Unrestricted (t)) => t,
+    ViewnodeKind::Vognode (
+      Vognode::Unrestricted (t)) => t,
     _ => panic!("expected UnrestrictedVognode") };
   assert_eq!(cycle_node . title(), "cycling node");
   // 'cycle' is a derived fact, in '(view ...)', which the parser skips.
@@ -120,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_restrictedNode_is_refused() {
   // of the forms it once took.
   for input in [ "* (skg restrictedNode)\n",
                  "* (skg (restrictedNode (gnid hidden) (skgRepos (nodeRepo private))))\n" ] {
-    let parsed = org_to_uninterpreted_nodes (input);
+    let parsed = org_to_viewnode_tree (input, &InRustGraph::new ());
     let refused : bool = match &parsed {
       Err (_) => true,
       Ok ((_, errors)) => ! errors . is_empty (), };
@@ -136,8 +137,8 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
             * another node
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
 
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
   assert_eq!(tree_roots . len(), 2);
@@ -145,12 +146,15 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   // Test first node - should have all default values except title and body
   let first_node = tree_roots[0] . value();
   let first_t = match &first_node . kind {
-    MpViewnodeKind::Vognode (
-      MpVognode::Unrestricted (t)) => t,
+    ViewnodeKind::Vognode (
+      Vognode::Unrestricted (t)) => t,
     _ => panic!("expected UnrestrictedVognode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
-  assert_eq!(first_t . skgid . as_ref(), None);
+  assert!( ! first_t . skgid . 0 . is_empty (),
+           "the parse mints a gnid for a headline without one" );
+  assert_eq!(first_t . home_skgrepo, SkgrepoName::not_found (),
+             "nothing supplies a top-level headline's skgrepo" );
   assert_eq!(first_t . viewStats . cycle, false);
   assert!(first_t . claimsMembership);
   assert_eq!(first_node . foldAndFocus . focused, false);
@@ -178,8 +182,8 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
                 line 3 with 4 spaces
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
 
   assert_eq!(tree_roots . len(), 2);
@@ -205,8 +209,8 @@ fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
             ** dogfood it
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
   let root = tree_roots[0] . value();
   let root_children: Vec<_> = tree_roots[0] . children() . collect();
@@ -230,8 +234,8 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
             Regular body
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
 
   // Get tree roots (children of BufferRoot)
   let tree_roots: Vec<_> = viewforest . root() . children() . collect();
@@ -241,13 +245,16 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let meta_node = tree_roots[0] . value();
   assert_eq!(meta_node . title(), "simple node with metadata");
   assert_eq!(meta_node . body(), Some(&"Node body" . to_string()));
-  assert_eq!(meta_node . skgid_opt(), Some(&ID::from ("test")));
+  assert_eq!(meta_node . unrestricted_skgid (), Some(&ID::from ("test")));
   assert_eq!(meta_node . foldAndFocus . folded, true);
 
   // Test node without metadata (should have defaults)
   let regular_node = tree_roots[1] . value();
   assert_eq!(regular_node . title(), "regular node without metadata");
-  assert_eq!(regular_node . skgid_opt(), None);
+  assert!(regular_node . unrestricted_skgid ()
+          . is_some_and ( |gnid| ! gnid . 0 . is_empty ()
+                                 && *gnid != ID::from ("test") ),
+          "the parse mints a fresh gnid for a headline without one" );
   assert_eq!(regular_node . foldAndFocus . folded, false);
   assert_eq!(regular_node . body(), Some(&"Regular body" . to_string()));
 }
@@ -255,14 +262,14 @@ fn test_org_to_uninterpreted_nodes2_basic_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes2_empty_input() {
   let input = "";
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   // BufferRoot should have no children
   assert_eq!(viewforest . root() . children() . count(), 0);
 
   let input2 = "   \n  \n  ";
-  let trees2: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input2) . unwrap() . 0;
+  let trees2: Tree<Viewnode> =
+    org_to_viewnode_tree (input2, &InRustGraph::new ()) . unwrap() . 0;
   assert_eq!(trees2 . root() . children() . count(), 0);
 }
 
@@ -275,8 +282,8 @@ fn test_org_to_uninterpreted_nodes2_only_text() {
             at all
         "};
 
-  let viewforest: Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest: Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   assert_eq!(viewforest . root() . children() . count(), 0,
              "Should have no tree roots when there are no headlines");
 }
@@ -292,13 +299,13 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
 
   // Test invalid key in node
   let input_invalid_key = "* (skg node (invalidKey value)) invalid key";
-  let result = org_to_uninterpreted_nodes (input_invalid_key);
+  let result = org_to_viewnode_tree (input_invalid_key, &InRustGraph::new ());
   assert!(result . is_err());
   assert!(result . unwrap_err() . contains ("Unknown metadata key: invalidKey"));
 
   // Test invalid non-vognode value
   let input_invalid_value = "* (skg invalidAtom) invalid value";
-  let result = org_to_uninterpreted_nodes (input_invalid_value);
+  let result = org_to_viewnode_tree (input_invalid_value, &InRustGraph::new ());
   assert!(result . is_err());
   // Error message for unknown top-level element
   let err_msg = result . unwrap_err();
@@ -306,7 +313,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
 
   // Test unknown flag
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";
-  let result = org_to_uninterpreted_nodes (input_unknown_flag);
+  let result = org_to_viewnode_tree (input_unknown_flag, &InRustGraph::new ());
   assert!(result . is_err());
   // Error message for unknown top-level value
   let err_msg = result . unwrap_err();
@@ -316,7 +323,7 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
 #[test]
 fn test_org_to_uninterpreted_nodes_rejects_forest_root() {
   let input: &str = "* (skg forestRoot) illegal root";
-  let result = org_to_uninterpreted_nodes (input);
+  let result = org_to_viewnode_tree (input, &InRustGraph::new ());
   assert!(result . is_err());
   assert!(result . unwrap_err() . contains ("forestRoot metadata is internal"));
 }
@@ -330,7 +337,7 @@ fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
             This should cause an error
         "};
 
-  let result = org_to_uninterpreted_nodes (input_orphaned);
+  let result = org_to_viewnode_tree (input_orphaned, &InRustGraph::new ());
   assert!(result . is_err());
   let error_msg = result . unwrap_err();
   assert!(error_msg . contains ("jumps too far between levels"));
@@ -342,7 +349,7 @@ fn test_org_to_uninterpreted_nodes2_orphaned_nodes() {
             *** deeply orphaned level 3 node
         "};
 
-  let result = org_to_uninterpreted_nodes (input_level3_orphaned);
+  let result = org_to_viewnode_tree (input_level3_orphaned, &InRustGraph::new ());
   assert!(result . is_err());
   let error_msg = result . unwrap_err();
   assert!(error_msg . contains ("jumps too far between levels"));

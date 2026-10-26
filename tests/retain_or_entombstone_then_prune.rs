@@ -16,6 +16,7 @@
 // x, x contains xc, p contains b; al has the aliases one and two; d
 // contains e and f, e contains ec.
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use std::error::Error;
 use std::io::BufReader;
@@ -23,7 +24,7 @@ use std::net::TcpStream;
 
 use crate::git_fixture_helpers::{mk_test_tcp_stream_pair, without_lines_containing};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::metadata_canon::without_viewnode_ids;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_rerender_all_views_request;
@@ -35,7 +36,6 @@ use skg::test_utils::{
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::env::SkgEnv;
-use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::Viewnode;
 use skg::types::views_state::{OpenViews, ViewforestId};
@@ -439,8 +439,7 @@ fn rerendered_stored_view (
   graph         : &InRustGraphHandle,
   views_state   : &mut ViewsState,
 ) -> Result<String, Box<dyn Error>> {
-  let stored_tree : Tree<Viewnode> = maybePlaced_to_placed_tree (
-    org_to_uninterpreted_nodes (stored) ? . 0 ) ?;
+  let stored_tree : Tree<Viewnode> = org_to_viewnode_tree (stored, &InRustGraph::new ()) ? . 0;
   views_state . open_views . register_view (
     &graph . load_full (), viewforest_id . clone (), stored_tree, &[ID::from ("d")] );
   let env : SkgEnv = skg_env_from_parts (config, tantivy, graph);

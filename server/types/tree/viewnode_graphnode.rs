@@ -1,4 +1,4 @@
-/// Node access utilities for ego_tree::Tree<Viewnode> and Tree<MpViewnode>
+/// Node access utilities for ego_tree::Tree<Viewnode>
 
 use crate::to_org::util::get_skgid_from_viewnode_at;
 use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_skgrepo;
@@ -7,9 +7,6 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoName};
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, UnrestrictedVognode, viewnode_of };
 use crate::types::viewnode::{Vognode, Folder};
-use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind };
-use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::nodes::complete::Graphnode;
 use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
@@ -57,20 +54,20 @@ pub fn pid_and_skgrepo_from_viewnode_at (
       caller_name ) . into() ),
   }}
 
-/// Get the ID from this node if it's an MpUnrestrictedVognode with an ID,
-/// otherwise recursively try ancestors.
+/// The ID of this node if it is an occurrence,
+/// else that of its nearest occurrence ancestor.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn skgid_from_self_or_nearest_ancestor (
-  tree    : &Tree<MpViewnode>,
+  tree    : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result<ID, String> {
-  let mut node : NodeRef<MpViewnode> =
+  let mut node : NodeRef<Viewnode> =
     tree . get (treeid)
     . ok_or ("id_from_self_or_nearest_ancestor: node not found")?;
   loop {
     match &node . value() . kind {
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
-        { if let Some (skgid) = &t . skgid { return Ok(skgid . clone()); }}
+      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+        return Ok (t . skgid . clone ()),
       _ => {} }
     node = node . parent()
       . ok_or ("id_from_self_or_nearest_ancestor: reached root without finding ID")?; }}
@@ -172,13 +169,13 @@ pub fn find_children_by_skgids (
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_non_content, excludes UnrestrictedVognodes that are non-members.
 pub fn generation_includes_only<F> (
-  tree                : &Tree<MpViewnode>,
+  tree                : &Tree<Viewnode>,
   treeid : NodeId,
   generation          : i32,
   skip_non_content    : bool,
   predicate           : F,
 ) -> bool
-where F: Fn (&MpViewnode) -> bool
+where F: Fn (&Viewnode) -> bool
 { collect_generation( tree, treeid, generation, skip_non_content )
     . iter()
     . all ( |&skgid| predicate(
@@ -188,13 +185,13 @@ where F: Fn (&MpViewnode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_non_content, excludes UnrestrictedVognodes that are non-members.
 pub fn generation_exists_and_includes<F> (
-  tree                : &Tree<MpViewnode>,
+  tree                : &Tree<Viewnode>,
   treeid : NodeId,
   generation          : i32,
   skip_non_content    : bool,
   predicate           : F,
 ) -> bool
-where F: Fn (&MpViewnode) -> bool
+where F: Fn (&Viewnode) -> bool
 { let nodes = collect_generation(
     tree, treeid, generation, skip_non_content);
   !nodes . is_empty() &&
@@ -206,7 +203,7 @@ where F: Fn (&MpViewnode) -> bool
 /// Negative generations = ancestors; positive = descendants.
 /// If skip_non_content, excludes UnrestrictedVognodes that are non-members.
 pub fn generation_does_not_exist (
-  tree                : &Tree<MpViewnode>,
+  tree                : &Tree<Viewnode>,
   treeid : NodeId,
   generation          : i32,
   skip_non_content    : bool,
@@ -221,7 +218,7 @@ pub fn generation_does_not_exist (
 /// If 'skip_non_content' is true and generation > 0,
 ///   then we exclude UnrestrictedVognodes that are non-members.
 fn collect_generation (
-  tree               : &Tree<MpViewnode>,
+  tree               : &Tree<Viewnode>,
   treeid : NodeId,
   generation         : i32,
   skip_non_content   : bool,
@@ -231,7 +228,7 @@ fn collect_generation (
   let Some (node_ref) = tree . get (treeid)
     else { return vec![]; };
   if generation <= 0 {
-    let mut current : NodeRef<'_, MpViewnode> =
+    let mut current : NodeRef<'_, Viewnode> =
       node_ref;
     for _ in 0..(-generation) {
       match current . parent() {
@@ -252,7 +249,7 @@ fn collect_generation (
                           // A phantom has no membership field and is implicitly
                           // a member (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
-                                    MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+                                    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
                                     if ! t . claimsMembership ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
@@ -263,11 +260,11 @@ fn collect_generation (
 /// or if the predicate returns false for all siblings.
 /// Short-circuits on the first sibling where the predicate returns true.
 pub fn siblings_cannot_include<F> (
-  tree      : &Tree<MpViewnode>,
+  tree      : &Tree<Viewnode>,
   treeid : NodeId,
   predicate : F,
 ) -> bool
-where F: Fn (&MpViewnode) -> bool
+where F: Fn (&Viewnode) -> bool
 { let Some (node_ref) = tree . get (treeid)
     else { return true; };
   let Some (parent_ref) = node_ref . parent()

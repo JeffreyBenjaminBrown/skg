@@ -1,18 +1,20 @@
 // cargo test validate_tree
 
+use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
 use skg::types::misc::{SkgConfig, Skgrepo, SkgrepoName, TantivyIndex};
-use skg::types::tree::forest::MpViewForest;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use skg::types::tree::forest::ViewForest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::test_utils::run_with_test_stores;
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use skg::types::maybe_placed_viewnode::MpViewnodeKind;
+use skg::types::viewnode::ViewnodeKind;
 use ego_tree::NodeId;
 
 const FIXTURES : &str =
@@ -154,9 +156,9 @@ async fn test_writeProtected_relRepo_request_needs_an_editable_recorder (
       ** (skg node (gnid protected_parent) (skgRepos (nodeRepo main)) writeProtected) write-protected parent
       *** (skg node (gnid orphaned) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under a write-protected parent
     "};
-  let (viewforest, parsing_errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input) ?;
+  let (viewforest, parsing_errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input, &InRustGraph::new ()) ?;
   assert! ( parsing_errors . is_empty (),
             "Parsing should accept every relRepo request: {:?}",
             parsing_errors );
@@ -187,7 +189,7 @@ async fn test_find_buffer_errors_for_saving (
                 * (skg node (gnid root) (skgRepos (nodeRepo main))) Valid root node
                 ** (skg aliasFolder) AliasFolder with body problem
                 This body should not exist on AliasFolder
-                *** (skg node (gnid bad_child)) Child of AliasFolder with ID
+                *** (skg unknown (gnid bad_child))
                 ** (skg alias) Alias with body problem and orphaned
                 This body should not exist on Alias
                 *** (skg node (gnid alias_child)) Any child of Alias (bad)
@@ -197,10 +199,9 @@ async fn test_find_buffer_errors_for_saving (
                 * (skg node (gnid conflict) (skgRepos (nodeRepo main))) Same ID but no toDelete flag
             "};
 
-      let (viewforest, parsing_errors, _warnings)
-        : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-        = org_to_uninterpreted_viewforest(
-            input_with_errors) . unwrap();
+      let (viewforest, parsing_errors, _warnings, _provenance)
+        : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+        = org_to_viewforest (input_with_errors, &InRustGraph::new ()) . unwrap();
       let validation_errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -213,7 +214,9 @@ async fn test_find_buffer_errors_for_saving (
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _, _)))
         . collect();
 
-      // AliasFolder children must be Aliases (bad_child is an UnrestrictedVognode child of AliasFolder)
+      // AliasFolder children must be Aliases (bad_child is an unknown
+      // child of AliasFolder; an occurrence typed there the parse makes
+      // an alias)
       { let aliasfolder_children_re =
           Regex::new(r"(?i)aliasFolder.*children.*must.*alias") . unwrap();
         let aliasfolder_children_errors: Vec<&BufferValidationError> =
@@ -270,15 +273,15 @@ async fn test_find_buffer_errors_for_saving (
           assert_eq!(skgid . 0, "conflict",
                      "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
 
-      // Repo validation (bad_child and alias_child have no skgrepos)
+      // Repo validation (alias_child has no skgrepo)
       { let skgrepo_re = Regex::new(r"(?i)must.*repo") . unwrap();
         let skgrepo_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _, _)
                                if skgrepo_re . is_match (msg)))
           . collect();
-        assert_eq!(skgrepo_errors . len(), 2,
-                   "Should find 2 repo validation errors"); }
+        assert_eq!(skgrepo_errors . len(), 1,
+                   "Should find 1 repo validation error"); }
 
       // Body_of_NonVognode (from parsing phase)
       { let body_of_non_vognode_errors: Vec<&BufferValidationError> = errors . iter()
@@ -319,8 +322,8 @@ async fn test_find_buffer_errors_for_saving (
 
       // "Alias with body problem" fails two checks (no children + AliasFolder parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
-      assert_eq!(local_errors . len(), 7,
-                 "Should find exactly 7 LocalStructureViolation errors");
+      assert_eq!(local_errors . len(), 6,
+                 "Should find exactly 6 LocalStructureViolation errors");
 
       Ok (( )) }
 
@@ -339,9 +342,9 @@ async fn test_find_buffer_errors_for_saving_valid_input (
                 This body is allowed on normal nodes
             "};
 
-      let (viewforest, parsing_errors, _warnings)
-        : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
-        org_to_uninterpreted_viewforest (valid_input) . unwrap();
+      let (viewforest, parsing_errors, _warnings, _provenance)
+        : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+        org_to_viewforest (valid_input, &InRustGraph::new ()) . unwrap();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&viewforest, config)?;
 
       assert_eq!(parsing_errors . len(), 0, "Should find no parsing errors in valid input");
@@ -354,7 +357,7 @@ async fn test_find_buffer_errors_for_saving_empty_input (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test empty input (viewforest with just BufferRoot, no tree roots)
-      let empty_viewforest: MpViewForest = MpViewForest::new();
+      let empty_viewforest: ViewForest = ViewForest::new();
       let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_viewforest, config)?;
 
       assert_eq!(errors . len(), 0, "Should find no errors in empty input");
@@ -375,8 +378,8 @@ async fn test_multiple_aliasfolders_in_children (
                 *** (skg alias) Second alias
             "};
 
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input_with_multiple_aliasfolders) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input_with_multiple_aliasfolders, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -405,8 +408,8 @@ async fn test_duplicated_content_error (
                 ** (skg node (gnid 1)) 1
             "};
 
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input_with_duplicated_content) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input_with_duplicated_content, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -439,8 +442,8 @@ async fn test_no_duplicated_content_error_when_different_skgids (
                 ** (skg node (gnid 2)) 2
             "};
 
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input_without_duplicated_content) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input_without_duplicated_content, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -467,8 +470,8 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
                 ** (skg ghost (gnid 1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) phantom child
             "};
 
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -495,8 +498,8 @@ async fn test_root_without_skgrepo_validation (
                 * (skg node (gnid root2)) Root without repo (invalid)
             "};
 
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -527,8 +530,8 @@ async fn test_nonexistent_skgrepo_validation (
                   ** (skg node (gnid child1) (skgRepos (nodeRepo nonexistent))) Child with invalid repo
                   * (skg node (gnid root2) (skgRepos (nodeRepo invalid_repo))) Root with nonexistent repo
               "};
-        let viewforest: MpViewForest =
-          org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+        let viewforest: ViewForest =
+          org_to_viewforest (input, &InRustGraph::new ()) . unwrap() . 0;
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -570,8 +573,8 @@ async fn test_empty_title_rejected_for_editable_node (
                 * (skg node (gnid has-title) (skgRepos (nodeRepo main))) has a title
                 * (skg node (gnid no-title) (skgRepos (nodeRepo main)))
             "};
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -601,8 +604,8 @@ async fn test_empty_title_allowed_for_writeProtected_and_delete (
                 * (skg node (gnid writeProtected) (skgRepos (nodeRepo main)) writeProtected)
                 * (skg node (gnid deleting) (skgRepos (nodeRepo main)) (editRequest delete))
             "};
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
@@ -633,8 +636,8 @@ async fn test_editable_view_request_on_an_editable_node_with_content_is_allowed 
                 * (skg node (gnid other) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) other
                 ** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected) shown child
             "};
-      let viewforest : MpViewForest =
-        org_to_uninterpreted_viewforest (input) . unwrap () . 0;
+      let viewforest : ViewForest =
+        org_to_viewforest (input, &InRustGraph::new ()) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
           &viewforest, config ) ?;
@@ -654,8 +657,8 @@ async fn test_two_editable_view_requests_for_one_node_are_rejected (
                 * (skg node (gnid parent) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) parent
                 * (skg node (gnid parent) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) parent again
             "};
-      let viewforest : MpViewForest =
-        org_to_uninterpreted_viewforest (input) . unwrap () . 0;
+      let viewforest : ViewForest =
+        org_to_viewforest (input, &InRustGraph::new ()) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
           &viewforest, config ) ?;
@@ -683,7 +686,7 @@ async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected 
           request );
         let errors : Vec<BufferValidationError> =
           find_buffer_errors_for_saving (
-            &org_to_uninterpreted_viewforest (&contradictory) . unwrap () . 0,
+            &org_to_viewforest (&contradictory, &InRustGraph::new ()) . unwrap () . 0,
             config ) ?;
         assert! ( matches! (
           &errors [..],
@@ -696,7 +699,7 @@ async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected 
           request );
         let errors : Vec<BufferValidationError> =
           find_buffer_errors_for_saving (
-            &org_to_uninterpreted_viewforest (&moving) . unwrap () . 0,
+            &org_to_viewforest (&moving, &InRustGraph::new ()) . unwrap () . 0,
             config ) ?;
         assert! ( errors . is_empty (), "{}: {:?}", request, errors ); }
       Ok (( )) }
@@ -713,9 +716,9 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
       * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
       ** (skg node (gnid phantom) (skgRepos (nodeRepo main)) writeProtected (editRequest delete)) phantom child
     "};
-  let (_viewforest, parsing_errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input_delete) . unwrap ();
+  let (_viewforest, parsing_errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input_delete, &InRustGraph::new ()) . unwrap ();
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
     . filter ( |e| matches! (
@@ -732,9 +735,9 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
       * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
       ** (skg node (gnid phantom) (skgRepos (nodeRepo main)) writeProtected (editRequest (merge other))) phantom child
     "};
-  let (_viewforest2, parsing_errors2, _warnings__viewforest2)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input_merge) . unwrap ();
+  let (_viewforest2, parsing_errors2, _warnings__viewforest2, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input_merge, &InRustGraph::new ()) . unwrap ();
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
@@ -751,9 +754,9 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
       * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
       ** (skg node (gnid leaf) (skgRepos (nodeRepo main)) (editRequest delete)) leaf
     "};
-  let (_viewforest3, parsing_errors3, _warnings__viewforest3)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input_editable) . unwrap ();
+  let (_viewforest3, parsing_errors3, _warnings__viewforest3, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input_editable, &InRustGraph::new ()) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
     matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_, _)) ),
     "(editRequest delete) on a editable node must not trigger EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
@@ -774,9 +777,9 @@ fn a_tombstone_holding_a_visible_child_passes_local_validation () {
       * (skg tombstone)
       ** (skg node (gnid other) (skgRepos (nodeRepo main))) another visible child
     "};
-  let (viewforest, parsing_errors, _warnings_viewforest)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input) . unwrap ();
+  let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input, &InRustGraph::new ()) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
@@ -784,7 +787,7 @@ fn a_tombstone_holding_a_visible_child_passes_local_validation () {
   let config : SkgConfig = validation_config ();
   let tombstones : Vec<NodeId> = viewforest . root () . descendants ()
     . filter ( |node_ref| matches! ( node_ref . value () . kind,
-                                     MpViewnodeKind::Tombstone ))
+                                     ViewnodeKind::Tombstone ))
     . map ( |node_ref| node_ref . id () )
     . collect ();
   assert_eq! ( tombstones . len (), 2 );
@@ -807,9 +810,9 @@ fn a_tombstone_does_not_collide_with_content () {
       ** (skg node (gnid hidden) (skgRepos (nodeRepo main))) visible child
       ** (skg tombstone)
     "};
-  let (viewforest, parsing_errors, _warnings_viewforest)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input) . unwrap ();
+  let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input, &InRustGraph::new ()) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
@@ -837,9 +840,9 @@ fn duplicate_members_of_defining_folders_pass_validation () {
       *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
       *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
     "};
-  let (viewforest, parsing_errors, _warnings_viewforest)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input) . unwrap ();
+  let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input, &InRustGraph::new ()) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
@@ -858,9 +861,9 @@ fn duplicate_members_of_write_protected_folders_are_still_rejected () {
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
       *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
     "};
-  let (viewforest, parsing_errors, _warnings_viewforest)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (input) . unwrap ();
+  let (viewforest, parsing_errors, _warnings_viewforest, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (input, &InRustGraph::new ()) . unwrap ();
   assert_eq! (
     parsing_errors . len(), 0,
     "Test fixture should not have parse errors: {:?}",
@@ -877,7 +880,7 @@ fn duplicate_members_of_write_protected_folders_are_still_rejected () {
       error ); }}
 
 fn partner_folder_treeids (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
 ) -> Vec<ego_tree::NodeId> {
   viewforest . nodes ()
     . filter ( |node_ref| node_ref . value () . kind . is_partner_folder () )

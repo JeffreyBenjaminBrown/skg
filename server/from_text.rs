@@ -19,13 +19,10 @@ use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::misc::{ID, SkgConfig, members_of};
 use crate::types::save::{NodeMerge, NodeInstruction, SavePlan};
-use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-use crate::types::tree::forest::{MpViewForest, ViewForest};
+use crate::types::tree::forest::ViewForest;
 
-use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
-use buffer_to_viewnodes::add_missing_info::{
-  add_missing_info_to_viewforest_in_graph,
-  EnrichmentProvenance};
+use buffer_to_viewnodes::uninterpreted::org_to_viewforest;
+use buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
 use fork::{
   CloneSkgrepoInputs,
   explicit_new_child_skgrepos_for_foreign_vognodes,
@@ -46,8 +43,8 @@ use crate::types::save::ForkSpec;
 /// Save preparation deliberately validates at several
 /// data-maturity stages:
 /// - raw org parse: errors only visible before tree construction;
-/// - metadata-filled maybePlaced tree: global/local buffer structure;
-/// - placed, role-aware viewforest: saved-view role policy;
+/// - the parsed viewforest, its missing gnids and skgrepos supplied:
+///   global/local buffer structure, then saved-view role policy;
 /// - disk-supplemented NodeInstructions: foreign write policy;
 /// - non-nodeMerge plus nodeMerge plan: cross-plan repo-move/nodeMerge policy.
 ///
@@ -85,29 +82,23 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // The set 'all' restricts nothing; downstream stages treat None
     // as "no restriction", so normalize here, once.
     skgrepo_restriction . filter ( |a| ! a . is_all () );
-  let ( mut maybePlaced_viewforest, parsing_errors, parsing_warnings )
-    : ( MpViewForest, Vec<BufferValidationError>, Vec<String> )
+  let ( viewforest, parsing_errors, parsing_warnings, enrichment )
+    : ( ViewForest, Vec<BufferValidationError>, Vec<String>,
+        EnrichmentProvenance )
     = { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "org_to_uninterpreted_viewforest" ). entered();
-        // parse the raw buffer
-        org_to_uninterpreted_viewforest (buffer_text) }
+          "org_to_viewforest" ). entered();
+        // Parse the raw buffer, supplying missing gnids and skgrepos,
+        // which the validators need: they compare nodes by pid,
+        // and expect skgrepos to be inherited/resolved.
+        org_to_viewforest (buffer_text, graph) }
           . map_err (SaveError::ParseError) ?;
-  let enrichment : EnrichmentProvenance =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "add_missing_info_to_viewforest" ). entered();
-      // Metadata filling must precede maybePlaced-tree validation,
-      // because those validators compare nodes by pid,
-      // and expect skgrepos to be inherited/resolved.
-      add_missing_info_to_viewforest_in_graph (
-        & mut maybePlaced_viewforest, graph )
-      } . map_err (SaveError::DatabaseError) ?;
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "find_buffer_errors_for_saving" ). entered();
         crate::from_text::buffer_to_viewnodes::validate_tree
           ::find_buffer_errors_for_saving_in_graph (
-          & maybePlaced_viewforest, graph, config )
+          & viewforest, graph, config )
  } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
@@ -116,11 +107,6 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
       return Err ( SaveError::BufferValidationErrors {
         errors   : validation_errors,
         warnings : parsing_warnings, } ); }}
-  let viewforest : ViewForest =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "maybePlaced_to_placed_viewforest" ). entered();
-      maybePlaced_to_placed_viewforest (maybePlaced_viewforest) }
-        . map_err ( |e| SaveError::ParseError (e) ) ?;
   { let errors : Vec<BufferValidationError> =
       write_protected_edits::errors_for_writeProtected_occurrences (
         &viewforest, graph, config, skgrepo_restriction );
@@ -173,7 +159,7 @@ pub fn buffer_to_validated_saveplan_with_fork_skgrepos_in_graph (
     // Bare new headlines under a foreign node are not foreign-creation
     // errors; they ride that node's fork, adopting its clone's skgrepo.
     // Ancestry is likewise only visible here, while the viewforest is
-    // live; only enrichment knew which nodes were new and repoless.
+    // live; only the parse knew which nodes were new and repoless.
     let new_with_inherited_skgrepo : HashSet<ID> =
       enrichment . new_nodes
       . intersection (& enrichment . inherited_skgrepo_nodes)

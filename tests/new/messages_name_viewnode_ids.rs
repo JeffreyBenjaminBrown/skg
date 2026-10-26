@@ -8,16 +8,18 @@
 // lines; a parse error and a warning end with theirs
 // ('docs/api-and-formats.org', "How a message names a headline").
 
+use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
-  headline_to_triple, org_to_uninterpreted_viewforest};
+  headline_to_triple, org_to_viewforest};
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::test_utils::run_with_test_stores;
 use skg::types::errors::{BufferValidationError, HeadlineName, SaveError};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::save::format_save_error_as_org;
-use skg::types::tree::forest::MpViewForest;
+use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::ViewnodeId;
 use std::error::Error;
 
@@ -58,9 +60,9 @@ fn org_form_of (
 fn parse_errors_and_warnings (
   buffer : &str,
 ) -> (Vec<BufferValidationError>, Vec<String>) {
-  let (_viewforest, errors, warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
-    = org_to_uninterpreted_viewforest (buffer) . unwrap ();
+  let (_viewforest, errors, warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance)
+    = org_to_viewforest (buffer, &InRustGraph::new ()) . unwrap ();
   (errors, warnings) }
 
 #[test]
@@ -110,7 +112,7 @@ async fn one_headline_at_validation (
     "};
   let errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (
-      &org_to_uninterpreted_viewforest (buffer) . unwrap () . 0,
+      &org_to_viewforest (buffer, &InRustGraph::new ()) . unwrap () . 0,
       config ) ?;
   assert! ( errors . contains (
               &BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence (
@@ -130,11 +132,11 @@ async fn one_headline_at_validation (
 
 #[test]
 fn messages_about_several_occurrences_name_each_as_a_subheadline () {
-  let viewforest : MpViewForest =
-    org_to_uninterpreted_viewforest ( indoc! {"
+  let viewforest : ViewForest =
+    org_to_viewforest (indoc! {"
       * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a
       * (skg (vnid 0b) node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete)) a again
-      "} ) . unwrap () . 0;
+      "}, &InRustGraph::new ()) . unwrap () . 0;
   let (ambiguous_deletions, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
   let both : Vec<HeadlineName> =
@@ -170,12 +172,12 @@ fn a_metadata_parse_error_ends_with_its_headline () {
 fn a_headline_without_a_viewnode_id_is_not_yet_saved () {
   // The second headline is a copy of the first, so it loses the viewnode ID
   // it carries; the third the user typed.
-  let viewforest : MpViewForest =
-    org_to_uninterpreted_viewforest ( indoc! {"
+  let viewforest : ViewForest =
+    org_to_viewforest (indoc! {"
       * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a
       * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a copied
       * (skg node (gnid a) (skgRepos (nodeRepo main))) a typed
-      "} ) . unwrap () . 0;
+      "}, &InRustGraph::new ()) . unwrap () . 0;
   let (_, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
   let names : Vec<HeadlineName> = vec! [

@@ -63,25 +63,28 @@ use crate::types::viewnode::{
   Ghost, Unknown,
   Editability, RelationshipEditRequest, ViewnodeId, Warrant,
 };
-use crate::types::maybe_placed_viewnode::{
-    MpViewnode, MpViewnodeKind, MpUnrestrictedVognode,
-    MpVognode,
+use crate::types::viewnode::{
+    Viewnode, ViewnodeKind, UnrestrictedVognode,
+    Vognode, viewnode_of,
 };
 
 use sexp::Sexp;
 use std::collections::{BTreeSet, HashSet};
+use uuid::Uuid;
 
 //
 // Parsing-internal types
 //
 
 /// Intermediate parsed metadata. Converted to Viewnode via viewnode_from_metadata().
+/// It holds what the headline says, so an occurrence's gnid and skgrepo
+/// may be absent; the parse completes them ('org_to_viewforest').
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeMetadata {
   pub foldAndFocus: FoldAndFocus,
   pub viewnode_id: Option<ViewnodeId>,
   // None means vognode, Some means non-vognode.
-  pub non_vognode: Option<MpViewnodeKind>,
+  pub non_vognode: Option<ViewnodeKind>,
   // UnrestrictedVognode fields (ignored if non-vognode is Some)
   pub skgid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
@@ -111,6 +114,26 @@ pub struct ViewnodeMetadata {
   pub unknown_relRepo_request : Option<SkgrepoName>,
 }
 
+impl ViewnodeMetadata {
+  /// Whether the headline is an occurrence: no other kind is named.
+  pub fn names_an_occurrence (&self) -> bool {
+    self . non_vognode . is_none ()
+    && ! self . is_ghost
+    && ! self . is_tombstone
+    && self . unknown_node_skgid . is_none () }
+
+  /// What a message says of the headline that wrote this metadata and
+  /// TITLE: the IDs it writes, not any the parse supplies.
+  pub fn headline_name (
+    &self,
+    title : &str,
+  ) -> HeadlineName {
+    HeadlineName::of (
+      self . viewnode_id . as_ref (),
+      self . skgid . as_ref ()
+        . or ( self . unknown_node_skgid . as_ref () ),
+      title ) }}
+
 pub fn default_metadata() -> ViewnodeMetadata {
   ViewnodeMetadata {
     foldAndFocus: FoldAndFocus::default(),
@@ -135,9 +158,13 @@ pub fn default_metadata() -> ViewnodeMetadata {
     unknown_relRepo: None,
     unknown_relRepo_request: None, }}
 
-/// Create an MpViewnode from parsed metadata components.
-/// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
-/// Returns (MpViewnode, error, warning):
+/// Create a Viewnode from parsed metadata components.
+/// This is the bridge between parsing (ViewnodeMetadata) and runtime (Viewnode).
+/// An occurrence without a gnid gets a fresh one. One without a
+/// skgrepo gets 'SkgrepoName::not_found', which validation refuses;
+/// the parse gives it a real one first wherever one can be found
+/// ('complete_occurrence_skgrepo').
+/// Returns (Viewnode, error, warning):
 /// - error if a Non-vognode has a body;
 /// - warning if a folder header (PropertyFolder or PartnerFolder) has nonempty
 ///   title text, which the server discards: folder headlines are
@@ -148,17 +175,13 @@ pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,
   title    : String,
   body     : Option < String >,
-) -> ( MpViewnode, Option < BufferValidationError >, Option < String > ) {
+) -> ( Viewnode, Option < BufferValidationError >, Option < String > ) {
   let headline : HeadlineName =
-    HeadlineName::of (
-      metadata . viewnode_id . as_ref (),
-      metadata . skgid . as_ref ()
-        . or ( metadata . unknown_node_skgid . as_ref () ),
-      &title );
+    metadata . headline_name (&title);
   let (kind, error, warning)
-    : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
+    : (ViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_skgid {
-        ( MpViewnodeKind::Vognode (MpVognode::Unknown (
+        ( ViewnodeKind::Vognode (Vognode::Unknown (
             Unknown {
               skgid           : uid . clone (),
               relRepo         : metadata . unknown_relRepo . clone (),
@@ -173,9 +196,9 @@ pub fn viewnode_from_metadata (
           } else { None },
           None )
       } else if metadata . is_tombstone {
-        ( MpViewnodeKind::Tombstone, None, None )
+        ( ViewnodeKind::Tombstone, None, None )
       } else if metadata . is_ghost {
-        ( MpViewnodeKind::Vognode (MpVognode::Ghost ( Ghost {
+        ( ViewnodeKind::Vognode (Vognode::Ghost ( Ghost {
             skgid : metadata . skgid . clone ()
                     . unwrap_or_else ( || ID::from ("")),
             home_skgrepo : metadata . home_skgrepo . clone ()
@@ -190,77 +213,77 @@ pub fn viewnode_from_metadata (
           } )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
-          MpViewnodeKind::Folder (Folder::Flags { .. }));
+          ViewnodeKind::Folder (Folder::Flags { .. }));
         let is_flag = matches! (non_vognode,
-          MpViewnodeKind::PropertyMember (PropertyMember::Flag { .. }));
+          ViewnodeKind::PropertyMember (PropertyMember::Flag { .. }));
         let carries_text : bool = // the diff view's text properties
           matches! (non_vognode,
-            MpViewnodeKind::ChangeViewnode (
+            ViewnodeKind::ChangeViewnode (
               ChangeViewnode::OldText { .. } | ChangeViewnode::BodyDiff { .. } ));
         let error : Option<BufferValidationError> =
           if body . is_some () && ! is_flags_folder && ! is_flag
              && ! carries_text {
             Some ( BufferValidationError::Body_of_NonVognode (
               title . clone (),
-              maybeplaced_kind_error_label (non_vognode),
+              kind_error_label (non_vognode),
               headline . clone () ))
           } else { None };
         let folder_title_warning : Option<String> =
           if ! title . is_empty ()
             && ! is_flags_folder
             && matches! ( non_vognode,
-                          MpViewnodeKind::Folder (_) )
+                          ViewnodeKind::Folder (_) )
           { Some ( with_org_subheadlines (
               &format! ( "Headline text on a {} is not saved; discarded: {:?}",
-                         maybeplaced_kind_error_label (non_vognode),
+                         kind_error_label (non_vognode),
                          title ),
               &[ headline . clone () ] )) }
           else { None };
-        let non_vognode_with_title : MpViewnodeKind = match non_vognode {
+        let non_vognode_with_title : ViewnodeKind = match non_vognode {
           // Use headline title for string
-          MpViewnodeKind::PropertyMember (PropertyMember::Alias { .. }) =>
-            MpViewnodeKind::PropertyMember (PropertyMember::Alias {
+          ViewnodeKind::PropertyMember (PropertyMember::Alias { .. }) =>
+            ViewnodeKind::PropertyMember (PropertyMember::Alias {
               text : title . clone (),
               relRepo : metadata . property_relRepo . clone (),
               relationshipEditRequest : metadata . property_relRepo_request . clone ()
                 . map (RelationshipEditRequest::RelRepo),
               claimsMembership : metadata . claimsMembership,
               isWarranted : Warrant::ByGraph }),
-          MpViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
-            MpViewnodeKind::PropertyMember (PropertyMember::ID {
+          ViewnodeKind::PropertyMember (PropertyMember::ID { .. }) =>
+            ViewnodeKind::PropertyMember (PropertyMember::ID {
               skgid : title . clone () . into (),
               claimsMembership : metadata . claimsMembership,
               isWarranted : Warrant::ByGraph }),
-          MpViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
-            MpViewnodeKind::PropertyMember (PropertyMember::flag (
+          ViewnodeKind::PropertyMember (PropertyMember::Flag { flag, .. }) =>
+            ViewnodeKind::PropertyMember (PropertyMember::flag (
               *flag, title . clone (), body . clone () )),
-          MpViewnodeKind::Folder (Folder::Flags { .. }) =>
-            MpViewnodeKind::Folder (Folder::Flags {
+          ViewnodeKind::Folder (Folder::Flags { .. }) =>
+            ViewnodeKind::Folder (Folder::Flags {
               title : title . clone (), body : body . clone () }),
           // The parser marks which aspects an OldText shows; its text
           // comes from the headline and the body.
-          MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText {
+          ViewnodeKind::ChangeViewnode (ChangeViewnode::OldText {
             title : title_changed, body : body_changed, .. }) =>
-            MpViewnodeKind::ChangeViewnode (ChangeViewnode::OldText {
+            ViewnodeKind::ChangeViewnode (ChangeViewnode::OldText {
               title : title_changed . as_ref () . map ( |_| title . clone () ),
               body  : body_changed . as_ref ()
                       . map ( |_| body . clone () . unwrap_or_default () ) }),
-          MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) =>
-            MpViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff {
+          ViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff { .. }) =>
+            ViewnodeKind::ChangeViewnode (ChangeViewnode::BodyDiff {
               diff : body . clone () . unwrap_or_default () }),
-          MpViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove { skgrepo_change, .. }) =>
-            MpViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove {
+          ViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove { skgrepo_change, .. }) =>
+            ViewnodeKind::ChangeViewnode (ChangeViewnode::HomeSkgrepoMove {
               skgrepo_change    : skgrepo_change . clone () }),
-          MpViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { skgrepo_change, .. }) =>
-            MpViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove {
+          ViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove { skgrepo_change, .. }) =>
+            ViewnodeKind::ChangeViewnode (ChangeViewnode::RelRepoMove {
               skgrepo_change    : skgrepo_change . clone () }),
-          MpViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker { kind, .. }) =>
-            MpViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker {
+          ViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker { kind, .. }) =>
+            ViewnodeKind::ChangeViewnode (ChangeViewnode::ChangesetMarker {
               kind : *kind }),
           other => other . clone () };
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
-      // MpUnrestrictedVognode
+      // UnrestrictedVognode
       { let relationshipEditRequest : Option<RelationshipEditRequest> =
           // lives outside 'Editability'
           if matches! ( metadata . edit_request,
@@ -297,10 +320,13 @@ pub fn viewnode_from_metadata (
             . map ( |skgid| BufferValidationError::EditRequestOnWriteProtectedOccurrence (
                       skgid, headline . clone () )) }
           else { None };
-        let t : MpUnrestrictedVognode = MpUnrestrictedVognode {
+        let t : UnrestrictedVognode = UnrestrictedVognode {
             title,
-            skgid            : metadata . skgid . clone (),
-            home_skgrepo     : metadata . home_skgrepo . clone (),
+            skgid            : metadata . skgid . clone ()
+                               . unwrap_or_else ( || ID (
+                                 Uuid::new_v4 () . to_string () )),
+            home_skgrepo     : metadata . home_skgrepo . clone ()
+                               . unwrap_or_else (SkgrepoName::not_found),
             claimsMembership : metadata . claimsMembership,
             overridesHere    : metadata . overridesHere . clone (),
             graphStats       : metadata . graphStats . clone (),
@@ -308,12 +334,12 @@ pub fn viewnode_from_metadata (
             relationshipEditRequest,
             view_requests    : metadata . view_requests . clone (),
             editability, };
-        let node_kind : MpViewnodeKind =
-          MpViewnodeKind::Vognode ( MpVognode::Unrestricted (t) );
+        let node_kind : ViewnodeKind =
+          ViewnodeKind::Vognode ( Vognode::Unrestricted (t) );
         ( node_kind,
           error, None ) }
     };
-  ( MpViewnode { foldAndFocus      : metadata . foldAndFocus,
+  ( Viewnode { foldAndFocus      : metadata . foldAndFocus,
                  kind,
                  // derived facts, which the parser skips
                  change_facts      : ChangeFacts::default (),
@@ -321,24 +347,22 @@ pub fn viewnode_from_metadata (
                  viewnode_id       : metadata . viewnode_id . clone () },
     error, warning ) }
 
-fn maybeplaced_kind_error_label (
-  kind : &MpViewnodeKind,
+fn kind_error_label (
+  kind : &ViewnodeKind,
 ) -> String {
   match kind {
-    MpViewnodeKind::Folder (folder) =>
+    ViewnodeKind::Folder (folder) =>
       folder . repr_in_client () . to_string (),
-    MpViewnodeKind::PropertyMember (member) =>
+    ViewnodeKind::PropertyMember (member) =>
       member . repr_in_client () . to_string (),
-    MpViewnodeKind::ChangeViewnode (change) =>
+    ViewnodeKind::ChangeViewnode (change) =>
       change . repr_in_client () . to_string (),
-    MpViewnodeKind::BufferRoot =>
+    ViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
-    MpViewnodeKind::Tombstone =>
+    ViewnodeKind::Tombstone =>
       "tombstone" . to_string (),
-    MpViewnodeKind::Vognode (_) =>
-      MpViewnode { kind : kind . clone (),
-                   .. MpViewnode::default () }
-      . error_label (), } }
+    ViewnodeKind::Vognode (_) =>
+      viewnode_of ( kind . clone () ) . error_label (), } }
 
 
 /// The grammar every headline's metadata follows, named by the
@@ -365,7 +389,7 @@ enum MetadataKind {
   Ghost,
   Unknown,
   Tombstone,
-  Other (MpViewnodeKind),
+  Other (ViewnodeKind),
 }
 
 /// The parts a kind accepts, beside the position atoms and the
@@ -382,17 +406,17 @@ fn parts_of_kind (
     MetadataKind::Unknown =>
       &[ "gnid", "skgRepos", "noClaim", "editRequest", "diff" ],
     MetadataKind::Tombstone => &[],
-    MetadataKind::Other (MpViewnodeKind::PropertyMember (
+    MetadataKind::Other (ViewnodeKind::PropertyMember (
       PropertyMember::Alias { .. } )) =>
       &[ "skgRepos", "noClaim", "editRequest", "view", "diff" ],
-    MetadataKind::Other (MpViewnodeKind::PropertyMember (
+    MetadataKind::Other (ViewnodeKind::PropertyMember (
       PropertyMember::ID { .. } )) =>
       &[ "noClaim", "editRequest", "view", "diff" ],
-    MetadataKind::Other (MpViewnodeKind::PropertyMember (
+    MetadataKind::Other (ViewnodeKind::PropertyMember (
       PropertyMember::Flag { .. } )) =>
       &[ "editRequest", "view", "diff" ],
     MetadataKind::Other (
-      MpViewnodeKind::ChangeViewnode (
+      ViewnodeKind::ChangeViewnode (
         ChangeViewnode::OldText { .. }
         | ChangeViewnode::HomeSkgrepoMove { .. }
         | ChangeViewnode::RelRepoMove { .. }
@@ -409,7 +433,7 @@ fn kind_name (
     MetadataKind::Ghost     => "ghost" . to_string (),
     MetadataKind::Unknown   => "unknown" . to_string (),
     MetadataKind::Tombstone => "tombstone" . to_string (),
-    MetadataKind::Other (kind) => maybeplaced_kind_error_label (kind), } }
+    MetadataKind::Other (kind) => kind_error_label (kind), } }
 
 /// Parse metadata from org-mode headline into ViewnodeMetadata.
 /// See file header comment for full syntax.
@@ -488,14 +512,14 @@ fn classify_metadata_element (
         "unknown"    => a_kind (MetadataKind::Unknown),
         "tombstone"  => a_kind (MetadataKind::Tombstone),
         "alias"      => a_kind ( MetadataKind::Other (
-          MpViewnodeKind::PropertyMember (
+          ViewnodeKind::PropertyMember (
             PropertyMember::alias ( String::new (), None, None ) ))),
         "id"         => a_kind ( MetadataKind::Other (
-          MpViewnodeKind::PropertyMember (
+          ViewnodeKind::PropertyMember (
             PropertyMember::id ( ID::default () ) ))),
-        "forestRoot" => a_kind ( MetadataKind::Other (MpViewnodeKind::BufferRoot) ),
+        "forestRoot" => a_kind ( MetadataKind::Other (ViewnodeKind::BufferRoot) ),
         "bodyDiff"   => a_kind ( MetadataKind::Other (
-          MpViewnodeKind::ChangeViewnode (
+          ViewnodeKind::ChangeViewnode (
             ChangeViewnode::BodyDiff { diff : String::new () } ))),
         "nonMember" | "restrictedNode" | "omittedBody" =>
           Err ( retired_spelling (&atom) ),
@@ -524,14 +548,14 @@ fn classify_metadata_element (
               "body"         => (false, true),
               other => return Err ( format! (
                 "Unknown oldText aspect: {}", other )), };
-          a_kind ( MetadataKind::Other ( MpViewnodeKind::ChangeViewnode (
+          a_kind ( MetadataKind::Other ( ViewnodeKind::ChangeViewnode (
             ChangeViewnode::OldText {
               title : title_changed . then (String::new),
               body  : body_changed  . then (String::new) } ))) },
         "homeSkgrepoMove" | "relRepoMove" => {
           let skgrepo_change : SkgrepoChange =
             parse_old_and_new_skgrepos (&head, args) ?;
-          a_kind ( MetadataKind::Other ( MpViewnodeKind::ChangeViewnode (
+          a_kind ( MetadataKind::Other ( ViewnodeKind::ChangeViewnode (
             if head == "homeSkgrepoMove" {
               ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
             } else {
@@ -542,14 +566,14 @@ fn classify_metadata_element (
             ChangesetMarkerKind::from_wire_name (&name)
             . ok_or_else ( || format! (
               "Unknown changesetMarker kind: {}", name )) ?;
-          a_kind ( MetadataKind::Other ( MpViewnodeKind::ChangeViewnode (
+          a_kind ( MetadataKind::Other ( ViewnodeKind::ChangeViewnode (
             ChangeViewnode::ChangesetMarker { kind } ))) },
         "flag" => {
           let name : String = single_argument (&head, args)
             . map_err ( |_| "flag requires exactly one flag name" . to_string () ) ?;
           let flag : Flag = Flag::from_wire_name (&name)
             . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
-          a_kind ( MetadataKind::Other ( MpViewnodeKind::PropertyMember (
+          a_kind ( MetadataKind::Other ( ViewnodeKind::PropertyMember (
             PropertyMember::flag ( flag, String::new (), None ) ))) },
         "node" | "ghost" | "unknown" | "deleted" | "historical"
           | "id" | "repo" | "relRepo" | "rels" | "viewStats"
@@ -628,7 +652,7 @@ fn read_metadata_part (
         let takes_a_relRepo_request : bool =
           matches! ( kind,
             MetadataKind::Unknown
-            | MetadataKind::Other ( MpViewnodeKind::PropertyMember (
+            | MetadataKind::Other ( ViewnodeKind::PropertyMember (
                 PropertyMember::Alias { .. } )));
         if request_metadata . edit_request . is_some ()
            || ( request_metadata . relRepo_request . is_some ()
@@ -686,10 +710,7 @@ fn check_where_the_edit_request_sits (
   metadata : &ViewnodeMetadata,
 ) -> Result<(), String> {
   let is_unrestricted_vognode : bool =
-    metadata . non_vognode . is_none ()
-    && ! metadata . is_ghost
-    && ! metadata . is_tombstone
-    && metadata . unknown_node_skgid . is_none ();
+    metadata . names_an_occurrence ();
   if metadata . view_requests . contains (&ViewRequest::Tombstone)
      && ! metadata . is_ghost
   { return Err ( TOMBSTONE_REQUEST_ON_A_NON_GHOST . to_string () ); }
@@ -715,8 +736,8 @@ fn check_where_the_edit_request_sits (
 /// The folder a bare folder atom names.
 fn folder_kind_of_atom (
   atom : &str,
-) -> Option<MpViewnodeKind> {
-  Folder::from_client_string (atom) . map (MpViewnodeKind::Folder) }
+) -> Option<ViewnodeKind> {
+  Folder::from_client_string (atom) . map (ViewnodeKind::Folder) }
 
 
 /// The one atom argument of the form whose head is 'head'.

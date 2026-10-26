@@ -1,6 +1,6 @@
 use crate::types::viewnode::NodeEditRequest;
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
-use crate::types::maybe_placed_viewnode::MpVognode;
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
+use crate::types::viewnode::Vognode;
 use crate::types::errors::HeadlineName;
 use crate::types::misc::ID;
 
@@ -37,7 +37,7 @@ enum WhetherToDelete {
 /// Each reported ID comes with the names of its defining
 /// containers, in buffer order. */
 pub fn find_inconsistent_instructions(
-  viewforest: &Tree<MpViewnode>
+  viewforest: &Tree<Viewnode>
 ) -> (Vec<(ID, Vec<HeadlineName>)>, // IDs with inconsistent deletions across nodes
       Vec<(ID, Vec<HeadlineName>)>) // IDs with multiple defining nodes
 { let (id_toDelete_instructions, mut id_to_definers) =
@@ -63,21 +63,21 @@ pub fn find_inconsistent_instructions(
 
 /// Collect delete instructions and defining containers.
 fn collect_instructions(
-  viewforest: &Tree<MpViewnode>
+  viewforest: &Tree<Viewnode>
 ) -> (HashMap<ID, HashSet<WhetherToDelete>>, // deletes
       HashMap<ID, Vec<HeadlineName>>) { // defining containers
 
   fn collect_instructions_rec(
-    node_ref: NodeRef<MpViewnode>,
+    node_ref: NodeRef<Viewnode>,
     id_toDelete_instructions: &mut
       HashMap<ID, HashSet<WhetherToDelete>>,
     id_definers: &mut
       HashMap<ID, Vec<HeadlineName>>
   ) {
-    let viewnode : &MpViewnode = node_ref . value();
-    if let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))
+    let viewnode : &Viewnode = node_ref . value();
+    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
       = &viewnode . kind
-    { if let Some (skgid) = &t . skgid {
+    { { let skgid : &ID = &t . skgid;
         if ! t . is_writeProtected () { // write-protected nodes contribute no instructions
           let delete_instruction : WhetherToDelete =
             if matches!(t . edit_request (),

@@ -1,6 +1,3 @@
-use crate::types::maybe_placed_viewnode::{
-  MpViewnode,
-  maybePlaced_viewforest_root_viewnode};
 use crate::types::misc::ID;
 use crate::types::viewnode::{
   Viewnode, ViewnodeKind, Vognode, viewforest_root_viewnode};
@@ -19,7 +16,6 @@ pub struct Forest<T> {
   tree : Tree<T> }
 
 pub type ViewForest = Forest<Viewnode>;
-pub type MpViewForest = Forest<MpViewnode>;
 
 impl Forest<Viewnode> {
   pub fn new () -> Self {
@@ -59,11 +55,6 @@ pub fn in_content_position (
         in_content_position (parent),
       _ => false, },
     None => false, }}
-
-impl Forest<MpViewnode> {
-  pub fn new () -> Self {
-    Forest { tree : Tree::new (
-      maybePlaced_viewforest_root_viewnode () ) }}}
 
 /// The 'internal' functions expose the awkward internal representation
 /// that Forest is designed to hide when possible.

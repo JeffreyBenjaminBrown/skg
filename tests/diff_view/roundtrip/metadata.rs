@@ -8,7 +8,6 @@ use skg::serve::parse_metadata_sexp::{
   RESTORE_NODE_ON_A_NODE_NOT_DELETED, RESTORE_REL_ON_A_DELETED_NODE,
   RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP,
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoChange, SkgrepoName};
 use skg::types::viewnode::{
   ChangeFacts, ChangesetMarkerKind, DiffChange, Existence, Folder, Ghost, ChangeViewnode, PropertyMember, DiffObject, ReadinessRequest, RelationshipEditRequest, Viewnode,
@@ -43,7 +42,7 @@ fn assert_round_trip (
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) )
     . unwrap ();
-  let (parsed, error, warning) : (MpViewnode, _, _) =
+  let (parsed, error, warning) : (Viewnode, _, _) =
     viewnode_from_metadata (
       &metadata, node . title () . to_string (), node . body () . cloned () );
   assert_eq! ( error, None );

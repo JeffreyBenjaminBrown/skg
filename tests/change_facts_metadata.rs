@@ -11,7 +11,6 @@ use crate::git_fixture_helpers::with_facts;
 use skg::org_to_text::viewnode_to_string;
 use skg::serve::parse_metadata_sexp::{
   ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
-use skg::types::maybe_placed_viewnode::MpViewnode;
 use skg::types::misc::{ID, SkgConfig, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::viewnode::{
@@ -64,7 +63,7 @@ fn assert_round_trip (
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) )
     . unwrap ();
-  let (parsed, error, _warning) : (MpViewnode, _, _) =
+  let (parsed, error, _warning) : (Viewnode, _, _) =
     viewnode_from_metadata (
       &metadata, node . title () . to_string (), node . body () . cloned () );
   assert_eq! ( error, None );

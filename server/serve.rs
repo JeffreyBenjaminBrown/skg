@@ -12,7 +12,7 @@ pub mod protocol;
 pub mod rerender_stream;
 pub mod util;
 
-use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use crate::graph_straddle::types::GraphStraddle;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
@@ -50,7 +50,6 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::skgrepo_sets::entombstone_hidden_occurrences;
-use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::SkgrepoSetName;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::{OpenViews, ViewforestId, ViewnodeIdRecord};
@@ -393,15 +392,11 @@ fn enrich_search_buffer_snapshot (
   if payload . terms != terms {
     return Err ( format! ("terms mismatch ('{}' vs '{}')",
                           payload . terms, terms )); }
-  let parse_result : Result<(Tree<MpViewnode>,
+  let parse_result : Result<(Tree<Viewnode>,
                              Vec<BufferValidationError>), String>
-    = org_to_uninterpreted_nodes (buffer_text);
+    = org_to_viewnode_tree (buffer_text, &runtime . graph);
   let mut viewforest : Tree<Viewnode> = match parse_result {
-    Ok (( maybePlaced_viewforest, _errors )) =>
-      match maybePlaced_to_placed_tree (maybePlaced_viewforest) {
-        Ok (f) => f,
-        Err (e) => {
-          return Err ( format! ("check failed: {}", e )); }},
+    Ok (( viewforest, _errors )) => viewforest,
     Err (e) => {
       return Err ( format! ("parse failed: {}", e )); }};
   let viewforest_id : ViewforestId =

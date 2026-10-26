@@ -24,14 +24,13 @@ use std::error::Error;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::org_to_text::viewforest_to_string;
 use skg::skgrepo_sets::{SkgrepoRestriction, SkgrepoSetName, run_with_skgrepo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
 use skg::to_org::render::content_view::multi_root_view_with_skgrepo_set;
-use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Graphnode;
 use skg::types::viewnode::{RelationCounts, Viewnode, ViewnodeKind, Vognode};
@@ -42,9 +41,7 @@ use std::collections::HashMap;
 fn viewforest_from_org (
   input : &str,
 ) -> Result<Tree<Viewnode>, Box<dyn Error>> {
-  let unchecked_viewforest =
-    org_to_uninterpreted_nodes (input)? . 0;
-  Ok ( maybePlaced_to_placed_tree (unchecked_viewforest)? ) }
+  Ok ( org_to_viewnode_tree (input, &InRustGraph::new ())? . 0 ) }
 
 fn first_child_skgid (
   tree : &Tree<Viewnode>,

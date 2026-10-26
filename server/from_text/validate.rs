@@ -317,7 +317,7 @@ pub(crate) fn flatten_ms<T: Clone>(
 /// Requires both completed non-nodeMerge extraction and nodeMerge extraction:
 /// Skgrepo moves are detected during disk supplementation of
 /// NodeInstructions, while merge acquiree/acquirer ids come from merge
-/// requests in the "placed" (i.e. no longer "maybePlaced") viewforest.
+/// requests in the parsed viewforest.
 pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   skgrepo_moves          : &[SkgrepoMove],
   nodeMerge_instructions : &[NodeMerge],

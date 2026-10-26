@@ -1,7 +1,7 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use super::*;
 use crate::from_text::buffer_to_viewnodes::uninterpreted
-  ::org_to_uninterpreted_viewforest;
-use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
+  ::org_to_viewforest;
 use crate::types::misc::{MSV, Skgrepo, SkgrepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{Flag, Graphnode, empty_graphnode};
 use crate::types::tree::forest::ViewForest;
@@ -12,10 +12,10 @@ use std::path::PathBuf;
 fn forest (
   text : &str,
 ) -> ViewForest {
-  let (forest, errors, _warnings) =
-    org_to_uninterpreted_viewforest (text) . unwrap ();
+  let (forest, errors, _warnings, _provenance) =
+    org_to_viewforest (text, &InRustGraph::new ()) . unwrap ();
   assert! (errors . is_empty (), "unexpected parse errors: {:?}", errors);
-  maybePlaced_to_placed_viewforest (forest) . unwrap () }
+  forest }
 
 /// p contains c and is contained by q, which top contains; p has the
 /// alias "another name" and the flag noSearchMatching. s subscribes

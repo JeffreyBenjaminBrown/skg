@@ -7,9 +7,9 @@ use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::node_lookup::opt_graphnode_by_skgid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
-use crate::types::maybe_placed_viewnode::{MpVognode, MpUnrestrictedVognode};
-use crate::types::tree::forest::MpViewForest;
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
+use crate::types::viewnode::{Vognode, UnrestrictedVognode};
+use crate::types::tree::forest::ViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
 use crate::nodeMerge::validate_nodeMerge::validate_nodeMerge_requests;
@@ -23,23 +23,22 @@ use std::collections::HashMap;
 /// when a user asks to save it.
 ///
 /// Shares responsibility for error detection
-/// with 'org_to_uninterpreted_nodes',
+/// with 'org_to_viewforest',
 /// which runs earlier and detects a few errors that this one can't,
-/// because this one acts on a tree of MpViewnodes rather than raw text.
+/// because this one acts on a tree of Viewnodes rather than raw text.
 /// (Namely, Alias and AliasFolder should not have body text.)
 ///
-/// Assumes that in the viewforest:
-/// - IDs have been replaced with PIDs, per
-///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
-///   might refer to the same skg node, yet appear not to.)
-/// - All nodes have skgrepos, per
-///   'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'.
+/// Assumes the viewforest is as 'org_to_viewforest' makes it:
+/// every occurrence's ID is its PID when the graph knows it
+/// (otherwise two org nodes might refer to the same skg node, yet
+/// appear not to), and every occurrence has a skgrepo, perhaps
+/// 'SkgrepoName::not_found', which this refuses.
 ///
-/// This is the maybePlaced tree validation stage: metadata is complete,
+/// This is the tree validation stage: metadata is complete,
 /// but role classification, save-intent extraction, and disk
 /// supplementation have not happened yet.
 pub fn find_buffer_errors_for_saving_in_graph (
-  viewforest: &MpViewForest,
+  viewforest: &ViewForest,
   graph: &InRustGraph,
   config: &SkgConfig,
 ) -> Result<Vec<BufferValidationError>,
@@ -98,7 +97,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
 
 /// Transitional compatibility for direct validator tests.
 pub fn find_buffer_errors_for_saving (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   config     : &SkgConfig,
 ) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
@@ -122,7 +121,7 @@ pub fn find_buffer_errors_for_saving (
 /// here rather than double-reported.
 #[allow(non_snake_case)]
 fn idFolder_membership_errors (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
@@ -131,22 +130,20 @@ fn idFolder_membership_errors (
     let node_ref = match edge {
       Edge::Open (node_ref)
         if matches! ( &node_ref . value () . kind,
-                      MpViewnodeKind::Folder (Folder::ID) )
+                      ViewnodeKind::Folder (Folder::ID) )
         => node_ref,
       _ => continue };
     let (recorder, recorder_headline) : (ID, HeadlineName) =
       match node_ref . parent ()
         . map ( |p| (p . value (), &p . value () . kind) ) {
-        Some ((parent, MpViewnodeKind::Vognode (MpVognode::Unrestricted (t))))
-          => match &t . skgid {
-              Some (skgid) => (skgid . clone (), parent . headline_name ()),
-              None      => continue },
+        Some ((parent, ViewnodeKind::Vognode (Vognode::Unrestricted (t))))
+          => (t . skgid . clone (), parent . headline_name ()),
         _ => continue };
     let mut buffer_skgids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
           // An ID that claims no membership is one the worktree lost.
-          MpViewnodeKind::PropertyMember (PropertyMember::ID {
+          ViewnodeKind::PropertyMember (PropertyMember::ID {
             skgid, claimsMembership : true, .. })
             => Some ( skgid . clone () ),
           _ => None } )
@@ -186,34 +183,29 @@ fn idFolder_membership_errors (
 /// the same graph snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
 fn overridesHere_fact_errors (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
 ) {
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let (carrier, original) : (Option<ID>, ID) =
+    let (carrier, original) : (ID, ID) =
       match &node_ref . value () . kind {
-        MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
+        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
           match &t . overridesHere {
             Some (original) =>
               ( t . skgid . clone (), original . clone () ),
             None => continue },
         _ => continue };
     let chain_ok : bool =
-      match &carrier {
-        Some (c) =>
-          carrier_on_owned_chain (config, graph, &original, c),
-        // An id-less carrier is never a node the server legitimately showed as
-        // a substitute, so fail closed.
-        _ => false };
+      carrier_on_owned_chain (config, graph, &original, &carrier);
     if ! chain_ok {
       let effective : Option<ID> = // the chain end, for the message
         Some (resolve_override (config, graph, None, &original) . effective);
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
-          carrier, original, effective,
+          Some (carrier), original, effective,
           node_ref . value () . headline_name () )); }}}
 
 /// For each node carrying a Fork view request (the explicit
@@ -229,7 +221,7 @@ fn overridesHere_fact_errors (
 /// invariant check remains a defense in depth.
 #[allow(non_snake_case)]
 fn validate_fork_view_requests (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
@@ -253,16 +245,16 @@ fn validate_fork_view_requests (
           skgid, existing )); }} }
 
 fn validate_view_roots (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   errors     : &mut Vec<BufferValidationError>,
 ) {
   for root in viewforest . roots () {
     if ! matches! (
       &root . value () . kind,
-        MpViewnodeKind::Vognode (MpVognode::Unrestricted (_))
-        | MpViewnodeKind::Tombstone // e.g. a root the skgrepo restriction hides, kept for its children (the API doc's "Restricted-skgrepo nodes")
-        | MpViewnodeKind::Vognode (MpVognode::Unknown (_))
-        | MpViewnodeKind::Vognode (MpVognode::Ghost (_)))
+        ViewnodeKind::Vognode (Vognode::Unrestricted (_))
+        | ViewnodeKind::Tombstone // e.g. a root the skgrepo restriction hides, kept for its children (the API doc's "Restricted-skgrepo nodes")
+        | ViewnodeKind::Vognode (Vognode::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::Ghost (_)))
     { errors . push (
         BufferValidationError::Other (
           "View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts."
@@ -278,7 +270,7 @@ fn validate_view_roots (
 /// Children typed under a write-protected occurrence are refused
 /// elsewhere, by 'errors_for_writeProtected_occurrences'.
 fn validate_editable_view_requests (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   errors : &mut Vec<BufferValidationError>,
 ) {
   for (skgid, headlines) in
@@ -288,15 +280,15 @@ fn validate_editable_view_requests (
         skgid, headlines )); }}
   for edge in viewforest . root() . traverse()
   { if let Edge::Open (node_ref) = edge
-    { let viewnode : &MpViewnode =
+    { let viewnode : &Viewnode =
         node_ref . value();
       // Only an Unrestricted node carries view_requests; a phantom never can,
       // so the Editable-request validations below apply to Unrestricted only.
-      if let MpViewnodeKind::Vognode (
-        MpVognode::Unrestricted (t))
+      if let ViewnodeKind::Vognode (
+        Vognode::Unrestricted (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Editable)
-        { if let Some (skgid) = &t . skgid {
+        { { let skgid : &ID = &t . skgid;
           if t . view_requests . contains (&ViewRequest::WriteProtected)
              || t . view_requests . contains (&ViewRequest::WriteProtectedSubtree)
           { errors . push( BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence(
@@ -304,10 +296,9 @@ fn validate_editable_view_requests (
 
 /// For each ID some Unrestricted occurrence of which carries
 /// 'request', in buffer order of first appearance: the names of those
-/// occurrences, in buffer order. An occurrence without an ID is
-/// skipped (enrichment gives every node a pid).
+/// occurrences, in buffer order.
 fn occurrences_requesting (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   request    : &ViewRequest,
 ) -> Vec<(ID, Vec<HeadlineName>)> {
   let mut skgids_in_order : Vec<ID> = Vec::new ();
@@ -315,10 +306,10 @@ fn occurrences_requesting (
     HashMap::new ();
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       & node_ref . value () . kind else { continue; };
     if ! t . view_requests . contains (request) { continue; }
-    let Some (skgid) = & t . skgid else { continue; };
+    let skgid : &ID = & t . skgid;
     if ! headlines_by_skgid . contains_key (skgid) {
       skgids_in_order . push (skgid . clone ()); }
     headlines_by_skgid . entry (skgid . clone ()) . or_default ()
@@ -341,12 +332,12 @@ fn occurrences_requesting (
 /// vanish, so it is an error.
 #[allow(non_snake_case)]
 fn writeProtected_relRepo_request_errors (
-  viewforest : &MpViewForest,
+  viewforest : &ViewForest,
   errors     : &mut Vec<BufferValidationError>,
 ) {
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
       &node_ref . value () . kind else { continue; };
     if t . is_writeProtected ()
        && RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some ()
@@ -355,8 +346,7 @@ fn writeProtected_relRepo_request_errors (
       errors . push ( BufferValidationError::Other ( with_org_subheadlines (
         &format! (
           "relRepo request on write-protected node {} that no editable node collects:\n- Its view-parent is write-protected (or marked for deletion, or a subscribee shown as such), or it is not a member of that view-parent.\n- Make the relRepo request from a view where the view-parent is editable.\n",
-          t . skgid . as_ref () . map ( |skgid| skgid . 0 . as_str () )
-            . unwrap_or ("(no ID)") ),
+          t . skgid . 0 ),
         &[ headline ] ))); }} }
 
 /// Whether save reads the relRepo request on this Unrestricted node:
@@ -364,17 +354,17 @@ fn writeProtected_relRepo_request_errors (
 /// writer is save-eligible. That writer is the view-parent, or, when the
 /// view-parent is a writable PartnerFolder, the folder's view-parent.
 fn relRepo_request_is_collected (
-  node_ref : NodeRef<MpViewnode>,
-  t        : &MpUnrestrictedVognode,
+  node_ref : NodeRef<Viewnode>,
+  t        : &UnrestrictedVognode,
 ) -> bool {
   let is_member : bool =
     t . claimsMembership;
   is_member
   && match node_ref . parent () {
     Some (parent) => match &parent . value () . kind {
-      MpViewnodeKind::Vognode (MpVognode::Unrestricted (_)) =>
+      ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
         is_saveEligible_unrestricted_vognode (parent),
-      MpViewnodeKind::Folder (
+      ViewnodeKind::Folder (
         Folder::Subscribee | Folder::Overridden ) =>
         parent . parent ()
         . map ( is_saveEligible_unrestricted_vognode )
@@ -384,19 +374,19 @@ fn relRepo_request_is_collected (
 
 /// As the save-eligibility of
 /// 'from_text/local_fieldintent_collection/traverse.rs', at the
-/// maybe-placed stage: an editable Unrestricted node, not marked for
+/// tree validation stage: an editable Unrestricted node, not marked for
 /// deletion, not in subscribee-as-such position.
 #[allow(non_snake_case)]
 fn is_saveEligible_unrestricted_vognode (
-  node_ref : NodeRef<MpViewnode>,
+  node_ref : NodeRef<Viewnode>,
 ) -> bool {
-  let MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =
+  let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
     &node_ref . value () . kind else { return false; };
   let is_subscribee_as_such : bool =
     t . claimsMembership
     && node_ref . parent ()
        . map ( |p| matches! ( &p . value () . kind,
-                 MpViewnodeKind::Folder (Folder::Subscribee) ))
+                 ViewnodeKind::Folder (Folder::Subscribee) ))
        . unwrap_or (false);
   ! t . is_writeProtected ()
   && ! matches! ( t . edit_request (), Some (&NodeEditRequest::Delete) )

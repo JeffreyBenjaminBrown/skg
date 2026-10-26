@@ -1,12 +1,12 @@
 // cargo test --test rebuild -- --nocapture
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use std::error::Error;
 
 use skg::update_buffer::complete::prune_childless_tombstones;
 use skg::update_buffer::reconcile::aliasfolder::reconcile_aliasFolder_children;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::viewnode::Viewnode;
 use skg::types::misc::SkgConfig;
@@ -59,10 +59,8 @@ async fn test_reconcile_alias_folder_children_logic (
       ** (skg alias) the above should break
     " };
 
-  let unchecked_viewforest =
-    org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut viewforest : Tree < Viewnode > =
-    maybePlaced_to_placed_tree (unchecked_viewforest) ?;
+    org_to_viewnode_tree (org_text, &InRustGraph::new ()) ?. 0;
 
   // Get the first "tree root" (node "a" and its children)
   let tree_a_skgid : NodeId =
@@ -197,10 +195,8 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
       *** (skg alias) b
     " };
 
-  let unchecked_viewforest =
-    org_to_uninterpreted_nodes (org_text) ?. 0;
   let mut viewforest : Tree < Viewnode > =
-    maybePlaced_to_placed_tree (unchecked_viewforest) ?;
+    org_to_viewnode_tree (org_text, &InRustGraph::new ()) ?. 0;
 
   let tree_root_skgid : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();

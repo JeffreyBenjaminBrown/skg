@@ -360,9 +360,9 @@ fn describe_body_change (
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::dbs::in_rust_graph::InRustGraph;
   use crate::from_text::buffer_to_viewnodes::uninterpreted
-    ::org_to_uninterpreted_viewforest;
-  use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
+    ::org_to_viewforest;
   use crate::types::misc::{MSV, rel_partners_at_relRepo};
   use crate::skgrepo_sets::SkgrepoSetName;
   use crate::types::misc::Skgrepo;
@@ -372,10 +372,10 @@ mod tests {
   use std::path::PathBuf;
 
   fn forest (text : &str) -> ViewForest {
-    let (forest, errors, _warnings) =
-      org_to_uninterpreted_viewforest (text) . unwrap ();
+    let (forest, errors, _warnings, _provenance) =
+      org_to_viewforest (text, &InRustGraph::new ()) . unwrap ();
     assert! (errors . is_empty (), "unexpected parse errors: {:?}", errors);
-    maybePlaced_to_placed_viewforest (forest) . unwrap ()
+    forest
   }
 
   /// root contains recorder, which contains c1 then c2, has the alias
@@ -743,11 +743,11 @@ mod tests {
 
   #[test]
   fn body_on_an_writeProtected_occurrence_is_a_parse_error () {
-    let (_forest, errors, _warnings) = org_to_uninterpreted_viewforest (
+    let (_forest, errors, _warnings, _provenance) = org_to_viewforest (
       indoc! {"
         * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
         body that would otherwise disappear
-      "}) . unwrap ();
+      "}, &InRustGraph::new ()) . unwrap ();
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
         skgid, title, changes, .. }] if skgid == &ID::from ("recorder")

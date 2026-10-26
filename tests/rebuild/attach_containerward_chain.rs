@@ -1,10 +1,10 @@
 // cargo nextest run --test grouped_saves -E 'test(attach_containerward_chain::)'
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use skg::to_org::extend::containerward_chain::{
   ContainerwardChainPartners, attach_containerward_chains_under_members};
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::misc::SkgConfig;
 use skg::types::viewnode::Viewnode;
@@ -37,7 +37,7 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     * (skg node (gnid a11) (skgRepos (nodeRepo main))) a11
   "};
   let mut viewforest : Tree<Viewnode> =
-    maybePlaced_to_placed_tree ( org_to_uninterpreted_nodes (input) ? . 0 ) ?;
+    org_to_viewnode_tree (input, &InRustGraph::new ()) ? . 0;
   let a11 : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
   attach_containerward_chains_under_members (
@@ -54,7 +54,7 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     *** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected) b
   "};
   let expected_trees : Tree<Viewnode> =
-    maybePlaced_to_placed_tree ( org_to_uninterpreted_nodes (expected) ? . 0 ) ?;
+    org_to_viewnode_tree (expected, &InRustGraph::new ()) ? . 0;
   assert_metadata_eq! (
     viewforest_to_string (&viewforest, config) ?,
     viewforest_to_string (&expected_trees, config) ?,

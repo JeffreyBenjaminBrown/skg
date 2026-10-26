@@ -6,25 +6,24 @@
 /// the old extraction path before its deletion. The cases marked
 /// "new recursion surface" are the deliberate behavior changes.
 
+use skg::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::{
-  org_to_uninterpreted_nodes,
-  org_to_uninterpreted_viewforest };
+  org_to_viewnode_tree,
+  org_to_viewforest };
 use skg::from_text::local_fieldintent_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, graph_from_config};
 use skg::types::errors::BufferValidationError;
-use skg::types::maybe_placed_viewnode::{
-  MpViewnode,
-  maybePlaced_to_placed_tree,
-  maybePlaced_to_placed_viewforest };
+use skg::types::viewnode::{
+  Viewnode };
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{NodeInstruction, NodeMerge, SaveNode, DeleteNode};
-use skg::types::tree::forest::{MpViewForest, ViewForest};
+use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG : &str =
@@ -33,23 +32,21 @@ const SUBSCRIBEE_EDIT_CONFIG : &str =
 fn placed_forest_from_org (
   input : &str,
 ) -> ViewForest {
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   ViewForest::from_internal_tree (
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() ) }
+    viewforest ) }
 
-/// This parses the way production does, including id/repo
-/// enrichment from the db. Orgs that mention on-disk nodes need it.
+/// This parses the way production does, supplying ids and repos
+/// from the graph on disk. Orgs that mention on-disk nodes need it.
 async fn placed_forest_from_org_with_disk (
   input  : &str,
   config : &SkgConfig,
 ) -> Result<ViewForest, Box<dyn Error>> {
-  let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
-    org_to_uninterpreted_viewforest (input) ?;
-  add_missing_info_to_viewforest (
-    &mut maybePlaced_viewforest, &config)?;
-  Ok ( maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ? ) }
+  let (viewforest, _parsing_errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+    org_to_viewforest (input, &graph_from_config (config) ?) ?;
+  Ok ( viewforest ) }
 
 fn save_skgids (
   instructions : &[NodeInstruction],

@@ -3,16 +3,17 @@
 /// (server/from_text/local_fieldintent_collection/traverse.rs).
 /// The traversal is pure and synchronous, so these tests need no db.
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use indoc::indoc;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::from_text::local_fieldintent_collection::traverse::collect_instructions_locally;
 use skg::types::errors::HeadlineName;
 use skg::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, FieldIntentsForOneId, SubscribeeTextClaim,
   SubscribeeVisibility };
-use skg::types::maybe_placed_viewnode::{
-  MpViewnode, maybePlaced_to_placed_tree };
+use skg::types::viewnode::{
+  Viewnode };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
@@ -26,10 +27,10 @@ fn collected_from_org (
 fn forest_from_org (
   input : &str,
 ) -> ViewForest {
-  let maybePlaced_viewforest : Tree<MpViewnode> =
-    org_to_uninterpreted_nodes (input) . unwrap() . 0;
+  let viewforest : Tree<Viewnode> =
+    org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   ViewForest::from_internal_tree (
-    maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() ) }
+    viewforest ) }
 
 fn entry<'a> (
   collected : &'a CollectedFieldIntents,

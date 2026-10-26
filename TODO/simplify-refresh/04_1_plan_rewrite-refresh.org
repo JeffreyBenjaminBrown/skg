@@ -957,7 +957,7 @@ command will preserve the request it does not set, with a unit
 test per client. Sixth, the Neovim integration suite was not
 rerun in full after slice 5's last fixture fix; this slice's
 integration run covers both clients.
-** TODO Slice 7: the parser's twin goes
+** DONE Slice 7: the parser's twin goes
 The parse mints a gnid for a headline without one and gives a
 headline without a repo its nearest occurrence ancestor's as
 it builds the tree, returns 'Viewnode's and the

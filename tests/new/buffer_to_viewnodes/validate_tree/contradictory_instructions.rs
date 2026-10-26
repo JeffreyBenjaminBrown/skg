@@ -1,10 +1,11 @@
 // cargo test contradictory_instructions
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
-use skg::types::tree::forest::MpViewForest;
+use skg::types::tree::forest::ViewForest;
 use skg::types::misc::ID;
 use skg::types::errors::BufferValidationError;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
 use skg::test_utils::run_with_test_stores;
@@ -20,8 +21,8 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg node (gnid node1) (editRequest delete)) duplicate of first node (same delete instruction)
         "};
 
-  let viewforest_consistent: MpViewForest =
-    org_to_uninterpreted_viewforest (input_consistent) . unwrap() . 0;
+  let viewforest_consistent: ViewForest =
+    org_to_viewforest (input_consistent, &InRustGraph::new ()) . unwrap() . 0;
   let (inconsistent_ids_consistent, _) =
     find_inconsistent_instructions (&viewforest_consistent);
   assert_eq!(inconsistent_ids_consistent . len(), 0, "Should have no inconsistent IDs when all nodes with same ID have same toDelete value");
@@ -36,8 +37,8 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg node (gnid conflict2)) another conflict end
         "};
 
-  let viewforest_inconsistent: MpViewForest =
-    org_to_uninterpreted_viewforest (input_inconsistent) . unwrap() . 0;
+  let viewforest_inconsistent: ViewForest =
+    org_to_viewforest (input_inconsistent, &InRustGraph::new ()) . unwrap() . 0;
   let (inconsistent_skgids, _) = find_inconsistent_instructions (&viewforest_inconsistent);
 
   assert_eq!(inconsistent_skgids . len(), 2, "Should find exactly 2 conflicting IDs");
@@ -52,14 +53,14 @@ fn test_find_inconsistent_toDelete_instructions() {
             * (skg node (gnid valid_node)) only node with id
         "};
 
-  let viewforest_no_skgids: MpViewForest =
-    org_to_uninterpreted_viewforest (input_no_skgids) . unwrap() . 0;
+  let viewforest_no_skgids: ViewForest =
+    org_to_viewforest (input_no_skgids, &InRustGraph::new ()) . unwrap() . 0;
   let (inconsistent_no_skgids, _) = find_inconsistent_instructions (&viewforest_no_skgids);
   assert_eq!(inconsistent_no_skgids . len(), 0, "Should have no conflicts when only one node has each ID");
 
   // Test empty viewforest (just BufferRoot, no tree roots)
-  let empty_viewforest: MpViewForest =
-    MpViewForest::new();
+  let empty_viewforest: ViewForest =
+    ViewForest::new();
   let (inconsistent_empty, _) =
     find_inconsistent_instructions (&empty_viewforest);
   assert_eq!(inconsistent_empty . len(), 0,
@@ -88,8 +89,8 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
                 This one is fine
             "};
 
-      let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input_with_multiple_defining_containers) . unwrap() . 0;
+      let viewforest: ViewForest =
+        org_to_viewforest (input_with_multiple_defining_containers, &InRustGraph::new ()) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 

@@ -2,12 +2,11 @@
 
 use indoc::indoc;
 use regex::Regex;
-use skg::test_utils::{strip_org_comments, cleanup_test_tantivy};
+use skg::test_utils::{strip_org_comments, cleanup_test_tantivy, graph_from_config};
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
-use skg::types::tree::forest::MpViewForest;
+use skg::types::tree::forest::ViewForest;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::SkgConfig;
 
@@ -37,10 +36,8 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
-    let mut viewforest: MpViewForest =
-      org_to_uninterpreted_viewforest (&buffer_text)?. 0;
-    add_missing_info_to_viewforest(
-      &mut viewforest, &config)?;
+    let viewforest: ViewForest =
+      org_to_viewforest (&buffer_text, &graph_from_config (&config) ?)?. 0;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
         &viewforest, &config)?;

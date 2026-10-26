@@ -1,11 +1,11 @@
+use skg::dbs::in_rust_graph::InRustGraph;
 use indoc::indoc;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::types::tree::forest::ViewForest;
-use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
+use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewnode_tree;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::types::misc::{ID, MSV, SkgrepoName, members_msv};
 use skg::types::save::SaveNode;
-use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use std::error::Error;
 
 #[test]
@@ -21,8 +21,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
           * (skg node (gnid 1) (skgRepos (nodeRepo main)) (editRequest (merge 2))) 1
         "};
 
-        let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-        let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
+        let viewforest = org_to_viewnode_tree (input, &InRustGraph::new ())?. 0;
         let nodeMerge_instructions =
         nodeMerge_instructions_from_viewforest(
          &ViewForest::from_internal_tree (viewforest),

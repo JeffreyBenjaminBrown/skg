@@ -1,11 +1,13 @@
+use crate::from_text::buffer_to_viewnodes::add_missing_info::EnrichmentProvenance;
+use crate::dbs::in_rust_graph::InRustGraph;
 use super::*;
-use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
+use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_viewforest;
 use crate::org_to_text::viewnode_to_string;
 use crate::serve::parse_metadata_sexp::{ViewnodeMetadata, parse_metadata_to_viewnodemd, viewnode_from_metadata};
 use crate::types::errors::BufferValidationError;
-use crate::types::maybe_placed_viewnode::MpViewnode;
+use crate::types::viewnode::Viewnode;
 use crate::types::misc::SkgConfig;
-use crate::types::tree::forest::{MpViewForest, ViewForest, editable_occurrences};
+use crate::types::tree::forest::{ViewForest, editable_occurrences};
 use std::collections::HashMap;
 
 // 'Folder::goal_is_ordered' and 'Folder::members_are_properties' are
@@ -182,7 +184,7 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
     let metadata : ViewnodeMetadata =
       parse_metadata_to_viewnodemd (&format! ("(skg {})", rendered)) . unwrap ();
     let (parsed, _error, _warning)
-      : (MpViewnode, Option<BufferValidationError>, Option<String>)
+      : (Viewnode, Option<BufferValidationError>, Option<String>)
       = viewnode_from_metadata (
       &metadata, viewnode . title () . to_string (), None );
     assert_eq! ( parsed . viewnode_id, Some (viewnode_id), "{}", rendered ); }}
@@ -191,13 +193,13 @@ fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
 // the second, a copy, loses it. A headline with no viewnode ID has none.
 #[test]
 fn a_repeated_viewnode_id_stays_with_its_first_headline () {
-  let (forest, errors, _warnings)
-    : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
-    org_to_uninterpreted_viewforest ( concat! (
+  let (forest, errors, _warnings, _provenance)
+    : (ViewForest, Vec<BufferValidationError>, Vec<String>, EnrichmentProvenance) =
+    org_to_viewforest (concat! (
       "* (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a\n",
       "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",
       "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",
-      "** typed\n" )) . unwrap ();
+      "** typed\n" ), &InRustGraph::new ()) . unwrap ();
   assert! ( errors . is_empty (), "{:?}", errors );
   let viewnode_ids : Vec<Option<ViewnodeId>> =
     forest . nodes () . map ( |node| node . value () . viewnode_id . clone () ) . collect ();
