@@ -119,21 +119,6 @@ function M.objects_ready_p (metadata_sexp, objects)
   return true
 end
 
----The atom of METADATA_SEXP when it is a folder's, or nil.
----@param metadata_sexp any
----@return string|nil
-function M.folder_atom (metadata_sexp)
-  if not sexpr.is_list(metadata_sexp) then return nil end
-  for i = 2, #metadata_sexp do
-    local element = metadata_sexp[i]
-    if not sexpr.is_list(element) then
-      local atom = sexpr.atom_text(element)
-      if vim.endswith(atom, 'Folder') then return atom end
-    end
-  end
-  return nil
-end
-
 ---Whether a folder member carries a change of its relationship to
 ---the folder's viewparent, and if so whether that change is ready.
 ---MEMBER_SEXP is the member's metadata; CHILD_SEXPS that of its own
@@ -198,7 +183,7 @@ end
 ---@return table|nil
 function M.folder_change_in_lines (lines, index)
   local level = headline_level(lines[index])
-  if not (level and M.folder_atom(headline_sexp(lines[index]))) then
+  if not (level and metadata.folder_atom(headline_sexp(lines[index]))) then
     return nil end
   local members = {} -- each { sexp, child_sexps }
   for i = index + 1, #lines do
@@ -283,7 +268,7 @@ end
 ---'shared/herald-styles.json' does not list as write-protected whose
 ---anchor is such a node?
 function M.editable_parent_p (parent_sexp, grandparent_sexp)
-  local folder = M.folder_atom(parent_sexp)
+  local folder = metadata.folder_atom(parent_sexp)
   if folder then
     return not vim.tbl_contains(
              shared.herald_styles.folder_heralds.write_protected, folder)

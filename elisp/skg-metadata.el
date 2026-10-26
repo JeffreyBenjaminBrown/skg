@@ -780,22 +780,18 @@ server/to_org/extend/containerward_chain.rs)."
                                   '(acquiredByFolder acquiredFolder))))
               (throw 'answer t))))))))
 
-(defconst skg--partner-folder-atoms
-  '(subscribeeFolder subscriberFolder overriddenFolder overriderFolder
-    hiderFolder hiddenFolder hiddenInSubscribeeFolder
-    hiddenOutsideOfSubscribeeFolder containerFolder mentionerFolder
-    acquiredByFolder acquiredFolder)
-  "The atoms of the partner folders ('Folder::repr_in_client' in
-server/types/viewnode.rs, but for the three property folders).")
+(defconst skg--property-folder-atoms
+  '(aliasFolder idFolder flagsFolder)
+  "The atoms of the property folders, whose members are a node's
+aliases, IDs and flags. Every other folder is a partner folder.")
 
 (defun skg--partner-folder-atom (metadata-sexp)
-  "The partner folder's atom if METADATA-SEXP is a partner folder's,
-else nil. A folder is always its bare atom."
-  (and (consp metadata-sexp)
-       (seq-some (lambda (item)
-                   (and (symbolp item)
-                        (car (memq item skg--partner-folder-atoms))))
-                 (cdr metadata-sexp))))
+  "The partner folder's atom if METADATA-SEXP is a partner folder's
+\(`skg--folder-atom', but for the property folders), else nil."
+  (let ((folder (skg--folder-atom metadata-sexp)))
+    (and folder
+         (not (memq folder skg--property-folder-atoms))
+         folder)))
 
 ;;; A changed folder
 ;;; The server writes every folder as its bare atom. Whether the diff

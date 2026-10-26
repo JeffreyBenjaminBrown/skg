@@ -42,6 +42,12 @@ local function readiness ()
   return require('skg.readiness')
 end
 
+---skg.metadata, required late for the same reason.
+---@return table
+local function metadata ()
+  return require('skg.metadata')
+end
+
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
 
 -- The placeholder token the server's `rels` and `props` rules emit
@@ -644,7 +650,7 @@ function M.chunks_from_metadata (metadata_text, folder_change,
   if not ok or not sexpr.is_list(sexp)
      or sexp[1] ~= sexpr.symbol('skg') then
     return nil end
-  local folder = folder_change and readiness().folder_atom(sexp)
+  local folder = folder_change and metadata().folder_atom(sexp)
   if folder and M.changed_folder_label(folder) then
     return M.changed_folder_chunks(folder, folder_change) end
   local rules = herald_rules.get_rules()

@@ -17,6 +17,7 @@ local compare = require('skg.sexpr.compare')
 local edit_dsl = require('skg.sexpr.edit_dsl')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 
 local M = {}
 
@@ -612,28 +613,35 @@ function M.relationship_removed_p (metadata_sexp)
          and sexpr.atom_text(rel[1]) == 'removed'
 end
 
----The atoms of the partner folders ('Folder::repr_in_client' in
----server/types/viewnode.rs, but for the three property folders).
-M.partner_folder_atoms = {
-  subscribeeFolder = true, subscriberFolder = true,
-  overriddenFolder = true, overriderFolder = true,
-  hiderFolder = true, hiddenFolder = true,
-  hiddenInSubscribeeFolder = true, hiddenOutsideOfSubscribeeFolder = true,
-  containerFolder = true, mentionerFolder = true,
-  acquiredByFolder = true, acquiredFolder = true }
-
 ---@param metadata_sexp any
----@return string|nil the partner folder's atom if METADATA_SEXP is a
----partner folder's
-function M.partner_folder_atom (metadata_sexp)
+---@return string|nil the folder's atom if METADATA_SEXP is a folder's
+---(a kind 'folder' in 'shared/metadata-fields.json'). A folder is
+---always its bare atom.
+function M.folder_atom (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return nil end
   for i = 2, #metadata_sexp do
     local item = metadata_sexp[i]
-    if not sexpr.is_list(item) then
+    if sexpr.is_symbol(item) then
       local atom = sexpr.atom_text(item)
-      if M.partner_folder_atoms[atom] then return atom end
+      local kind = shared.metadata_kind(atom)
+      if kind and kind.kind == 'folder' then return atom end
     end
   end
+  return nil
+end
+
+---The atoms of the property folders, whose members are a node's
+---aliases, IDs and flags. Every other folder is a partner folder.
+M.property_folder_atoms = {
+  aliasFolder = true, idFolder = true, flagsFolder = true }
+
+---@param metadata_sexp any
+---@return string|nil the partner folder's atom if METADATA_SEXP is a
+---partner folder's (M.folder_atom, but for the property folders)
+function M.partner_folder_atom (metadata_sexp)
+  local folder = M.folder_atom(metadata_sexp)
+  if folder and not M.property_folder_atoms[folder] then
+    return folder end
   return nil
 end
 
