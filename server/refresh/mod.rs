@@ -22,7 +22,7 @@ pub mod ancestry;
 pub mod buffer_corrections;
 mod diff_view;
 mod extent;
-mod goal;
+pub(crate) mod goal;
 mod id_rule;
 mod ladder;
 mod tail;

@@ -11,7 +11,7 @@ use crate::types::viewnode::{
   GraphnodeStats, Folder, Viewnode, ViewnodeKind, Vognode, Warrant };
 use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, required_ancestor_of};
-use crate::update_buffer::reconcile::content::unintegrated_content_gnids;
+use crate::refresh::goal::{content_goal_gnids, subscriber_of_subscribee_as_such};
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
@@ -200,34 +200,26 @@ fn set_herald_strings_in_viewnode (
     // with its subtree, says so, as the hiddenInSubscribeeFolder's
     // members do.
     if let Some (subscriber_pid) =
-      subscriber_above_subscribee_viewparent (tree, treeid)
+      tree . get (treeid) . unwrap () . parent ()
+      . and_then ( |parent| subscriber_of_subscribee_as_such (tree, parent . id ()) )
     { if graph . relation_membership_is_visible (
         node_pid, &subscriber_pid,
         RelationRole::new (NodeRelation::HidesFromSubs, BinaryRolePosition::First),
         restriction )
       { flags . record (NodeRelation::HidesFromSubs, true, 3); }}}
   let unintegrated : Option<usize> =
-    if stands_as_member_here
-      && matches! (parent_kind, ParentKind::Folder (Folder::Subscribee, _)) {
-      ancestors . iter () . find (|(_, generation)| *generation == 2)
-      . map (|(subscriber_pid, _)| {
-        let g : &InRustGraph = graph;
-        let visible = |gnid : &ID| -> bool {
-          match restriction {
-            None => true,
-            Some (a) if a . is_all () => true,
-            Some (a) => g . nodes . get (gnid)
-              .is_some_and (|n| a . contains_skgrepo (&n . home_skgrepo)), }};
-        let contents : Vec<ID> = g . outbound_pids_for_relation_gated (
-          node_pid, NodeRelation::Contains, restriction )
-          . into_iter () . filter (|gnid| visible (gnid)) . collect ();
-        let hidden : Vec<ID> = g . outbound_pids_for_relation_gated (
-          subscriber_pid, NodeRelation::HidesFromSubs, restriction );
-        let contained : Vec<ID> = g . outbound_pids_for_relation_gated (
-          subscriber_pid, NodeRelation::Contains, restriction );
-        let members : HashSet<ID> = unintegrated_content_gnids (
-          g, &contents, &hidden, &contained )
-          . into_iter () . collect ();
+    // A subscribee as such counts the nodes its content goal draws:
+    // nodes, as the count of its contents is ('RelationCounts').
+    if stands_as_member_here {
+      subscriber_of_subscribee_as_such (tree, treeid) . map ( |subscriber| {
+        let members : HashSet<ID> = content_goal_gnids (
+          graph, restriction,
+          &graph . outbound_member_keys_for_relation_gated (
+            node_pid, NodeRelation::Contains, restriction ),
+          Some (&subscriber) )
+          . into_iter ()
+          . filter ( |gnid| graph . pid_of (gnid) . is_some () )
+          . collect ();
         for (gnid, generation) in &ancestors {
           if members . contains (gnid)
             && flags . contains_out . contains (generation) {
@@ -242,21 +234,6 @@ fn set_herald_strings_in_viewnode (
   if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
-
-/// When the viewparent of the vognode at 'treeid' is a subscribee as
-/// such (subscriber > subscribeeFolder > subscribee > the vognode),
-/// the subscriber's ID; it is three generations up.
-fn subscriber_above_subscribee_viewparent (
-  tree   : &Tree<Viewnode>,
-  treeid : NodeId,
-) -> Option<ID> {
-  let subscribee : NodeRef<Viewnode> = tree . get (treeid) ? . parent () ?;
-  let folder : NodeRef<Viewnode> = subscribee . parent () ?;
-  if ! matches! ( &folder . value () . kind,
-                  ViewnodeKind::Folder (Folder::Subscribee) )
-  { return None; }
-  subscribee . value () . occurrence_gnid () ?;
-  folder . parent () ? . value () . occurrence_gnid () . cloned () }
 
 fn parent_kind_of (
   tree   : &Tree<Viewnode>,

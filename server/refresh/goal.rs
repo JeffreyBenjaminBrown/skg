@@ -22,6 +22,7 @@ use crate::refresh::ancestry::{
   CompoundFolderParties, compound_folder_parties, described_node, required_ancestor_of};
 use crate::refresh::diff_view;
 use crate::refresh::extent::is_chain_parent;
+use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::to_org::complete::partner_folder::goal_list::{
   goal_list_for_hiddenInSubscribee_folder,
   goal_list_for_hiddenOutsideOfSubscribee_folder};
@@ -191,10 +192,8 @@ fn chain_goal (
                     . map ( |gnid| GoalItem::by_graph (GoalMember::Gnid (gnid)) )
                     . collect () ) }
 
-/// An occurrence's content: its 'contains' list, its unresolved
-/// members as raw IDs, less the restricted members; for a
-/// subscribee as such, less what its subscriber hides or contains
-/// ('unintegrated_content_gnids').
+/// An occurrence's content ('content_goal_gnids'), with the relRepo
+/// of each unknown member.
 fn content_goal (
   tree   : &Tree<Viewnode>,
   parent : NodeId,
@@ -202,29 +201,61 @@ fn content_goal (
   walk   : &Walk,
 ) -> Goal {
   let graph : &InRustGraph = walk . truth . graph;
+  let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
   let subscriber : Option<ID> = subscriber_of_subscribee_as_such (tree, parent);
   let unintegrated = |contents : Vec<ID>| -> Vec<ID> {
     match &subscriber {
       None => contents,
-      Some (subscriber) => unintegrated_content_gnids (
-        graph, &contents,
-        &graph . outbound_gnids_for_relation_gated (
-          subscriber, NodeRelation::HidesFromSubs, walk . truth . restriction ),
-        &graph . outbound_gnids_for_relation_gated (
-          subscriber, NodeRelation::Contains, walk . truth . restriction )), } };
+      Some (subscriber) => less_what_the_subscriber_integrates (
+        graph, restriction, subscriber, &contents ), } };
   if let Some (goal) = diff_view::content_goal (pid, &unintegrated, walk) {
     return goal; }
   let members : Vec<RelPartner<RelationshipMemberKey>> =
     graph . outbound_member_keys_for_relation_gated (
-      pid, NodeRelation::Contains, walk . truth . restriction );
+      pid, NodeRelation::Contains, restriction );
   let relRepos : HashMap<ID, SkgrepoName> =
     unknown_members_relRepos (graph, pid, &members);
-  let contents : Vec<ID> = omit_restricted (
-    unintegrated ( members . into_iter ()
-                   . map ( |member| member . member . into_id () )
-                   . collect () ),
-    walk );
-  Goal::ordered ( gnid_items (contents, &relRepos) ) }
+  Goal::ordered ( gnid_items (
+    content_goal_gnids ( graph, restriction, &members, subscriber . as_ref () ),
+    &relRepos )) }
+
+/// The content an occurrence shows outside the diff view: the members
+/// of its 'contains' list ('members', a raw ID where nothing answers),
+/// less what 'subscriber' hides or contains when the occurrence is a
+/// subscribee as such, less the restricted members. The stats pass
+/// counts a subscribee's unintegrated content from it, so that the
+/// count is what is drawn.
+pub(crate) fn content_goal_gnids (
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
+  members     : &[RelPartner<RelationshipMemberKey>],
+  subscriber  : Option<&ID>,
+) -> Vec<ID> {
+  let contents : Vec<ID> = members . iter ()
+    . map ( |member| member . member . id () . clone () )
+    . collect ();
+  omit_restricted_by_graph (
+    match subscriber {
+      None => contents,
+      Some (subscriber) => less_what_the_subscriber_integrates (
+        graph, restriction, subscriber, &contents ), },
+    graph, restriction ) }
+
+/// 'contents' less what 'subscriber' hides or contains, as the truth
+/// has it ('unintegrated_content_gnids'): what a subscribee as such
+/// shows of its content.
+pub(crate) fn less_what_the_subscriber_integrates (
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
+  subscriber  : &ID,
+  contents    : &[ID],
+) -> Vec<ID> {
+  unintegrated_content_gnids (
+    graph, contents,
+    &graph . outbound_gnids_for_relation_gated (
+      subscriber, NodeRelation::HidesFromSubs, restriction ),
+    &graph . outbound_gnids_for_relation_gated (
+      subscriber, NodeRelation::Contains, restriction )) }
 
 /// When the occurrence at 'treeid' is a subscribee as such (a member
 /// of a subscribee folder that the folder's relation warrants), its
@@ -405,8 +436,14 @@ fn omit_restricted (
   gnids : Vec<ID>,
   walk  : &Walk,
 ) -> Vec<ID> {
-  let graph : &InRustGraph = walk . truth . graph;
+  omit_restricted_by_graph (gnids, walk . truth . graph, walk . truth . restriction) }
+
+fn omit_restricted_by_graph (
+  gnids       : Vec<ID>,
+  graph       : &InRustGraph,
+  restriction : Option<&SkgrepoRestriction>,
+) -> Vec<ID> {
   omit_restricted_members (
-    gnids, walk . truth . restriction,
+    gnids, restriction,
     |gnid : &ID| graph . pid_and_skgrepo (gnid) . map ( |(_, home)| home )) }
 
