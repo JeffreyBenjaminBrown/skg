@@ -287,29 +287,19 @@ pub fn headline_to_triple (
     Err("__NOT_A_HEADLINE__" . to_string())
   }}
 
-/// The graphnode ID a headline's '(skg ...)' sexp carries in its
-/// '(node ...)' or '(unknown ...)' form as '(id X)', or in its
-/// '(ghost ...)' form as '(gnid X)', read without parsing the rest of
-/// it, so that an error in the rest can name the headline. None if it
-/// carries none.
+/// The graphnode ID a headline's '(skg ...)' sexp carries as '(gnid
+/// X)', read without parsing the rest of it, so that an error in the
+/// rest can name the headline. None if it carries none.
 fn graphnode_id_written_in_metadata (
   metadata_sexp : &Sexp,
 ) -> Option<ID> {
   let Sexp::List (elements) = metadata_sexp else { return None; };
-  elements . iter () . find_map ( |element| {
-    let Sexp::List (form) = element else { return None; };
-    let [ Sexp::Atom (Atom::S (head)), fields @ .. ] = form . as_slice ()
-      else { return None; };
-    let id_key : &str = match head . as_str () {
-      "node" | "unknown" => "id",
-      "ghost"            => "gnid",
-      _                  => return None, };
-    fields . iter () . find_map ( |field| match field {
-      Sexp::List (pair) => match pair . as_slice () {
-        [ Sexp::Atom (Atom::S (key)), Sexp::Atom (Atom::S (value)) ]
-          if key == id_key => Some ( ID::from ( value . as_str () )),
-        _ => None },
-      _ => None } ) } ) }
+  elements . iter () . find_map ( |element| match element {
+    Sexp::List (pair) => match pair . as_slice () {
+      [ Sexp::Atom (Atom::S (key)), Sexp::Atom (Atom::S (value)) ]
+        if key == "gnid" => Some ( ID::from ( value . as_str () )),
+      _ => None },
+    _ => None } ) }
 
 /// The viewnode ID a headline's '(skg ...)' sexp carries, read without
 /// parsing the rest of it, so that an error in the rest can name the

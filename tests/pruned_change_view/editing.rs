@@ -116,8 +116,8 @@ fn deleted_images_of_removed_members_respawn (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String = without_lines_containing (
-      &without_subtree_starting (&buffer, "** (skg (node (id k1)"),
-      "*** (skg (ghost (gnid gone)" );
+      &without_subtree_starting (&buffer, "** (skg node (gnid k1)"),
+      "*** (skg ghost (gnid gone)" );
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let response : SaveResponse = save (f, &edited) ?;
     assert! ( response . errors . is_empty (),
@@ -137,7 +137,7 @@ fn a_new_child_is_created_and_shown_as_new (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String = insert_after_line_starting (
-      &buffer, "* (skg (node (id ct)", "** a new child" );
+      &buffer, "* (skg node (gnid ct)", "** a new child" );
     let response : SaveResponse = save (f, &edited) ?;
     assert! ( response . errors . is_empty (),
               "the save must succeed, got {:?}", response . errors );
@@ -149,7 +149,7 @@ fn a_new_child_is_created_and_shown_as_new (
               . join ( format! ("{}.skg", new_child . 0) ) . exists (),
               "the new child's file must exist" );
     assert! ( response . saved_view . lines () . any ( |line|
-      line . starts_with ( &format! ("** (skg (node (id {})", new_child . 0) )
+      without_viewnode_ids (line) . starts_with ( &format! ("** (skg node (gnid {})", new_child . 0) )
       && line . contains ("(diff (node added) (rel added)")
       && line . ends_with ("a new child") ),
       "the new child must be shown as new:\n{}", response . saved_view );
@@ -168,7 +168,7 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
     let content_view : String = register_content_view_of (
       f, "ct", &content_viewforest_id ) ?;
     let edited : String = insert_after_line_starting (
-      &content_view, "* (skg (node (id ct)", "** a new child" );
+      &content_view, "* (skg node (gnid ct)", "** a new child" );
     let (mut stream, read_end) : (TcpStream, TcpStream) =
       mk_test_tcp_stream_pair ();
     let response : SaveResponse = block_on (
@@ -192,7 +192,7 @@ fn a_collateral_buffer_shows_the_new_change_and_keeps_the_old (
       "the new child must be shown as new:\n{}", collateral );
     assert! ( without_viewnode_ids (&collateral) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
               "txt's old text must stay:\n{}", collateral );
-    assert! ( without_viewnode_ids (&collateral) . contains ("(diff (rel removed) (leaves 1 rel)))) k1"),
+    assert! ( without_viewnode_ids (&collateral) . contains ("(diff (rel removed) (leaves 1 rel))) k1"),
               "the removed member k1 must stay:\n{}", collateral );
     Ok (( )) }) }
 
@@ -221,7 +221,7 @@ fn override_substitution_is_off (
               ordinary_view );
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( buffer . lines () . any ( |line|
-                line . starts_with ("** (skg (node (id n)") ),
+                without_viewnode_ids (line) . starts_with ("** (skg node (gnid n)") ),
               "n must be shown as itself under p:\n{}", buffer );
     assert! ( ! buffer . contains ("overridesHere"),
               "no member is shown in place of another:\n{}", buffer );

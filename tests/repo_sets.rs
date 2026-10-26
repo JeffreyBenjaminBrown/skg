@@ -44,6 +44,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use skg::metadata_canon::without_viewnode_ids;
 
 #[test]
 fn all_tests
@@ -447,9 +448,9 @@ async fn tombstone_in_buffer_does_not_drive_contains (
         // private-a at its disk position (after active-a), not the
         // buffer position, and writes no SaveNode for it.
         let reordered = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-a) (skgRepos (nodeRepo public)) writeProtected) active-a
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
           ** (skg tombstone)
         "};
         let instructions : Vec<NodeInstruction> =
@@ -497,9 +498,9 @@ async fn restricted_skgrepo_search_and_save_work_together_end_to_end (
         "restricted content view must omit restricted members: {}",
         rendered );
       let edited_buffer = indoc! {"
-        * (skg (node (id root) (repo public))) root
-        ** (skg (node (id active-a) (repo public) writeProtected)) active-a
-        ** (skg (node (id active-b) (repo public))) active-b edited through restricted view
+        * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+        ** (skg node (gnid active-a) (skgRepos (nodeRepo public)) writeProtected) active-a
+        ** (skg node (gnid active-b) (skgRepos (nodeRepo public))) active-b edited through restricted view
       "};
       let instructions : Vec<NodeInstruction> =
         buffer_to_validated_saveplan (
@@ -533,7 +534,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
           SkgrepoSetName::from ("public"))?;
       let mut viewforest : Tree<Viewnode> =
         viewforest_from_org (indoc! {"
-          * (skg (node (id child-for-backpath) (repo public))) child-for-backpath
+          * (skg node (gnid child-for-backpath) (skgRepos (nodeRepo public))) child-for-backpath
         "})?;
       let child_skgid : NodeId = first_child_skgid (&viewforest);
       attach_containerward_chains_under_members (
@@ -628,7 +629,7 @@ fn search_enrichment_truncates_containers_folder_before_restricted_container (
         &restriction)?;
   assert! (
     rendered . lines () . any ( |line|
-      line . starts_with ("** (skg folded containerFolder") ),
+      without_viewnode_ids (line) . starts_with ("** (skg folded containerFolder") ),
     "the hit's containers folder hangs under it, folded: {}",
     rendered );
   assert! (
@@ -686,10 +687,10 @@ async fn tombstones_under_folders_save_without_error (
   // restriction can hold tombstones under folders, where hidden
   // members stood; saving it must not error.
       let buffer = indoc! {"
-        * (skg (node (id root) (repo public))) root
+        * (skg node (gnid root) (skgRepos (nodeRepo public))) root
         ** (skg subscriberFolder)
         *** (skg tombstone)
-        ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+        ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
       "};
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
@@ -713,10 +714,10 @@ async fn tombstone_in_subscribee_folder_does_not_contribute_to_subscribesTo (
   // recorder's subscribeeFolder. (root has no subscribesTo on disk, so the
   // unrestricted member is the only one written.)
       let buffer = indoc! {"
-        * (skg (node (id root) (repo public))) root
+        * (skg node (gnid root) (skgRepos (nodeRepo public))) root
         ** (skg subscribeeFolder)
         *** (skg tombstone)
-        *** (skg (node (id active-b) (repo public) writeProtected)) active-b
+        *** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
       "};
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
@@ -749,9 +750,9 @@ async fn weave_preserves_omitted_restricted_content_members (
         // The restricted buffer omits private-a; saving must keep it,
         // anchored after active-a.
         let buffer = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-a) (skgRepos (nodeRepo public)) writeProtected) active-a
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
@@ -766,9 +767,9 @@ async fn weave_preserves_omitted_restricted_content_members (
       { // Reordering the visible members carries the anchored
         // invisible member with its anchor.
         let buffer = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (node (id active-a) (repo public) writeProtected)) active-a
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
+          ** (skg node (gnid active-a) (skgRepos (nodeRepo public)) writeProtected) active-a
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
@@ -783,8 +784,8 @@ async fn weave_preserves_omitted_restricted_content_members (
       { // Deleting a visible member lands; the invisible member
         // reattaches leftward (here, to START's successor region).
         let buffer = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
@@ -821,9 +822,9 @@ async fn restricted_save_preserves_invisible_override_targets (
         // (If the merge reproduces disk exactly the recorder is a no-op and
         // emits no SaveNode -- which is itself preservation.)
         let unmodified = indoc! {"
-          * (skg (node (id ovr-owner) (repo public))) ovr-owner
+          * (skg node (gnid ovr-owner) (skgRepos (nodeRepo public))) ovr-owner
           ** (skg overriddenFolder)
-          *** (skg (node (id ovr-visible) (repo public) writeProtected)) ovr-visible
+          *** (skg node (gnid ovr-visible) (skgRepos (nodeRepo public)) writeProtected) ovr-visible
         "};
         let instructions : Vec<NodeInstruction> =
           buffer_to_validated_saveplan (
@@ -839,7 +840,7 @@ async fn restricted_save_preserves_invisible_override_targets (
              target: {:?}", recorder . overrides ); } }
       { // Delete the visible member: disk holds exactly [ovr-inactive].
         let deleted = indoc! {"
-          * (skg (node (id ovr-owner) (repo public))) ovr-owner
+          * (skg node (gnid ovr-owner) (skgRepos (nodeRepo public))) ovr-owner
           ** (skg overriddenFolder)
         "};
         let instructions : Vec<NodeInstruction> =

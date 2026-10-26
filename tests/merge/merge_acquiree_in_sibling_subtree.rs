@@ -62,10 +62,10 @@ async fn merge_acquiree_in_sibling_subtree_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id a) (repo main))) a
-    ** (skg (node (id b) (repo main))) b
-    * (skg (node (id c) (repo main))) c
-    ** (skg (node (id d) (repo main) (editRequest (merge b)))) d
+    * (skg node (gnid a) (skgRepos (nodeRepo main))) a
+    ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
+    * (skg node (gnid c) (skgRepos (nodeRepo main))) c
+    ** (skg node (gnid d) (skgRepos (nodeRepo main)) (editRequest (merge b))) d
   "};
 
   let graph : InRustGraphHandle =
@@ -102,7 +102,7 @@ async fn merge_acquiree_in_sibling_subtree_impl (
 
   // 2. a's first (and only) content child should be d, not b.
   let a_idx : Option<usize> =
-    lines . iter() . position ( |l| l . contains ("(id a)") );
+    lines . iter() . position ( |l| l . contains ("(gnid a)") );
   if let Some (a_i) = a_idx {
     let a_child_line : Option<&&str> =
       lines[a_i + 1 ..] . iter()
@@ -112,9 +112,9 @@ async fn merge_acquiree_in_sibling_subtree_impl (
       None => failures . push (
         "a has no ** child in the rendered view" . to_string() ),
       Some (l) => {
-        if ! l . contains ("(id d)") {
+        if ! l . contains ("(gnid d)") {
           failures . push ( format! (
-            "a's first ** child does not reference (id d); got: {}",
+            "a's first ** child does not reference (gnid d); got: {}",
             l ) ); } } }
   } else {
     failures . push (
@@ -123,14 +123,14 @@ async fn merge_acquiree_in_sibling_subtree_impl (
   // 3. d should also appear under c (same pid, editable under
   //    whichever root comes first in document order).
   let c_idx : Option<usize> =
-    lines . iter() . position ( |l| l . contains ("(id c)") );
+    lines . iter() . position ( |l| l . contains ("(gnid c)") );
   if let Some (c_i) = c_idx {
     let under_c : Vec<&&str> =
       lines[c_i + 1 ..] . iter()
       . take_while ( |l| ! l . starts_with ("* ") )
       . collect();
     let d_under_c : bool =
-      under_c . iter() . any ( |l| l . contains ("(id d)") );
+      under_c . iter() . any ( |l| l . contains ("(gnid d)") );
     if ! d_under_c {
       failures . push (
         "d not found under c in rendered view" . to_string() ); }

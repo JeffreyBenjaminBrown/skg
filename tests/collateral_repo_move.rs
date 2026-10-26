@@ -80,8 +80,8 @@ fn test_skgrepo_move_updates_collateral_view_metadata (
 
       let save_input : String =
         initial_buffer . replace (
-          "(id b) (repo public)",
-          "(id b) (repo private)" );
+          "(gnid b) (skgRepos (nodeRepo public))",
+          "(gnid b) (skgRepos (nodeRepo private))" );
       let (mut stream, read_end) : (TcpStream, TcpStream) =
         mk_test_tcp_stream_pair ();
       let save_response : SaveResponse =
@@ -150,8 +150,8 @@ fn successful_save_consumes_relRepo_edit_request (
     let (initial_buffer, _pids, _viewforest) = multi_root_view (
       &config, None, &[ID::new ("a")] ) ?;
     let save_input : String = initial_buffer . replace (
-      "(id b) (repo public)",
-      "(id b) (repo public) (editRequest (relRepo private))" );
+      "(gnid b) (skgRepos (nodeRepo public))",
+      "(gnid b) (skgRepos (nodeRepo public)) (editRequest (relRepo private))" );
     assert_ne! (save_input, initial_buffer,
       "fixture rendering should expose b's unrestricted-node metadata");
 
@@ -168,7 +168,7 @@ fn successful_save_consumes_relRepo_edit_request (
   } ) ?;
 
   let b_line : &str = saved . lines ()
-    . find (|line| line . contains ("(id b)"))
+    . find (|line| line . contains ("(gnid b)"))
     . unwrap_or_else (|| panic! ("rerender omitted b:\n{}", saved));
   assert! (b_line . contains ("(relRepo private)"),
     "the completed relRepo remains as display state:\n{}", b_line);
@@ -208,9 +208,9 @@ fn buffer_has_skgrepo_for_title (
   skgrepo : &str,
 ) -> bool {
   let id_fragment : String =
-    format! ("(id {})", title);
+    format! ("(gnid {})", title);
   let skgrepo_fragment : String =
-    format! ("(repo {})", skgrepo);
+    format! ("(skgRepos (nodeRepo {}))", skgrepo);
   let title_suffix : String =
     format! (") {}", title);
   buffer . lines() . any ( |line|

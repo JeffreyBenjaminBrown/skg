@@ -15,9 +15,9 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with consistent toDelete instructions (no conflicts)
   let input_consistent: &str =
     indoc! {"
-            * (skg (node (id node1) (editRequest delete))) first node
-            * (skg (node (id node2))) second node
-            * (skg (node (id node1) (editRequest delete))) duplicate of first node (same delete instruction)
+            * (skg node (gnid node1) (editRequest delete)) first node
+            * (skg node (gnid node2)) second node
+            * (skg node (gnid node1) (editRequest delete)) duplicate of first node (same delete instruction)
         "};
 
   let viewforest_consistent: MpViewForest =
@@ -29,11 +29,11 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with inconsistent toDelete instructions (conflicts)
   let input_inconsistent: &str =
     indoc! {"
-            * (skg (node (id conflict1) (editRequest delete))) first conflicting node (toDelete=true)
-            * (skg (node (id normal))) normal node
-            * (skg (node (id conflict1))) duplicate node but toDelete=false
-            * (skg (node (id conflict2) (editRequest delete))) another conflict start
-            * (skg (node (id conflict2))) another conflict end
+            * (skg node (gnid conflict1) (editRequest delete)) first conflicting node (toDelete=true)
+            * (skg node (gnid normal)) normal node
+            * (skg node (gnid conflict1)) duplicate node but toDelete=false
+            * (skg node (gnid conflict2) (editRequest delete)) another conflict start
+            * (skg node (gnid conflict2)) another conflict end
         "};
 
   let viewforest_inconsistent: MpViewForest =
@@ -47,9 +47,9 @@ fn test_find_inconsistent_toDelete_instructions() {
   // Test case with nodes that have no IDs (should be skipped)
   let input_no_skgids: &str =
     indoc! {"
-            * (skg (node (editRequest delete))) node without id (should be skipped)
+            * (skg node (editRequest delete)) node without id (should be skipped)
             * regular node without any metadata
-            * (skg (node (id valid_node))) only node with id
+            * (skg node (gnid valid_node)) only node with id
         "};
 
   let viewforest_no_skgids: MpViewForest =
@@ -76,15 +76,15 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
       // Test input with multiple nodes having the same ID and write-protected=false
       let input_with_multiple_defining_containers: &str =
         indoc! {"
-                * (skg (node (id duplicate))) First defining container
+                * (skg node (gnid duplicate)) First defining container
                 Regular node with shared ID
-                * (skg (node (id duplicate))) Second defining container
+                * (skg node (gnid duplicate)) Second defining container
                 Another regular node with the same ID
-                * (skg (node (id duplicate) writeProtected)) Repeated node (not defining)
+                * (skg node (gnid duplicate) writeProtected) Repeated node (not defining)
                 This one is ok because writeProtected=true
-                * (skg (node (id duplicate) writeProtected)) Might contain more (not defining)
+                * (skg node (gnid duplicate) writeProtected) Might contain more (not defining)
                 This one is also ok because writeProtected=true
-                * (skg (node (id unique))) Unique node
+                * (skg node (gnid unique)) Unique node
                 This one is fine
             "};
 

@@ -33,17 +33,17 @@ async fn merge_preserves_acquiree_child_bodies_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id a) (repo main) (editRequest (merge b)))) a
+    * (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest (merge b))) a
     a text
-    ** (skg (node (id a1) (repo main))) a1
+    ** (skg node (gnid a1) (skgRepos (nodeRepo main))) a1
     a1 text
-    ** (skg (node (id a2) (repo main))) a2
+    ** (skg node (gnid a2) (skgRepos (nodeRepo main))) a2
     a2 text
-    * (skg (node (id b) (repo main))) b
+    * (skg node (gnid b) (skgRepos (nodeRepo main))) b
     b text
-    ** (skg (node (id b1) (repo main))) b1
+    ** (skg node (gnid b1) (skgRepos (nodeRepo main))) b1
     b1 text
-    ** (skg (node (id b2) (repo main))) b2
+    ** (skg node (gnid b2) (skgRepos (nodeRepo main))) b2
     b2 text
   "};
 

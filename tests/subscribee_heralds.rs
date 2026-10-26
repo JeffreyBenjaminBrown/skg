@@ -13,7 +13,7 @@ fn one_subscribee_has_contextual_counts_under_two_subscribers (
     let (view, _, _) : (String, Vec<ID>, _) = single_root_view (
       &config, None, &ID::from (subscriber) ) ?;
     let b_line : &str = view . lines ()
-      . find (|line| line . contains ("(id B)"))
+      . find (|line| line . contains ("(gnid B)"))
       . expect ("shared subscribee in view");
     assert! (b_line . contains (&format! (
       "(contains (out 3 (unintegrated {}))", numerator)),

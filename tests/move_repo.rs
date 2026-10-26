@@ -94,9 +94,9 @@ async fn test_move_node_to_another_owned_skgrepo (
     // a (public) contains b (public) contains c (public).
     // Edit b's skgrepo to private.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (repo public))) a
-      ** (skg (node (id b) (repo private))) b
-      *** (skg (node (id c) (repo public))) c
+      * (skg node (gnid a) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b) (skgRepos (nodeRepo private))) b
+      *** (skg node (gnid c) (skgRepos (nodeRepo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
@@ -185,9 +185,9 @@ async fn test_move_node_referenced_by_extra_id (
 
     // Use extra_ids (a-alias, b-alias, c-alias) instead of PIDs.
     let org_text : &str = indoc! {"
-      * (skg (node (id a-alias) (repo public))) a
-      ** (skg (node (id b-alias) (repo private))) b
-      *** (skg (node (id c-alias) (repo public))) c
+      * (skg node (gnid a-alias) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b-alias) (skgRepos (nodeRepo private))) b
+      *** (skg node (gnid c-alias) (skgRepos (nodeRepo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
@@ -246,9 +246,9 @@ async fn test_move_multiple_nodes (
 
     // Move both b and c to private.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (repo public))) a
-      ** (skg (node (id b) (repo private))) b
-      *** (skg (node (id c) (repo private))) c
+      * (skg node (gnid a) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b) (skgRepos (nodeRepo private))) b
+      *** (skg node (gnid c) (skgRepos (nodeRepo private))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
@@ -302,9 +302,9 @@ async fn test_move_to_foreign_skgrepo_rejected (
 
     // Try to move b to foreign skgrepo.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (repo public))) a
-      ** (skg (node (id b) (repo foreign))) b
-      *** (skg (node (id c) (repo public))) c
+      * (skg node (gnid a) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b) (skgRepos (nodeRepo foreign))) b
+      *** (skg node (gnid c) (skgRepos (nodeRepo public))) c
     "};
     let result =
       buffer_to_validated_saveplan (
@@ -337,7 +337,7 @@ async fn test_move_from_foreign_skgrepo_rejected (
 
     // Try to move foreign-node to public.
     let org_text : &str = indoc! {"
-      * (skg (node (id foreign-node) (repo public))) foreign-node
+      * (skg node (gnid foreign-node) (skgRepos (nodeRepo public))) foreign-node
     "};
     let result =
       buffer_to_validated_saveplan (
@@ -359,10 +359,10 @@ async fn test_move_and_merge_simultaneously_rejected (
 ) -> Result<(), Box<dyn Error>> {
     // Move b to private and merge b into stay.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (repo public))) a
-      ** (skg (node (id b) (repo private) (editRequest (merge stay)))) b
-      *** (skg (node (id c) (repo public))) c
-      * (skg (node (id stay) (repo public))) stay
+      * (skg node (gnid a) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b) (skgRepos (nodeRepo private)) (editRequest (merge stay))) b
+      *** (skg node (gnid c) (skgRepos (nodeRepo public))) c
+      * (skg node (gnid stay) (skgRepos (nodeRepo public))) stay
     "};
     let result =
       buffer_to_validated_saveplan (
@@ -390,9 +390,9 @@ async fn test_no_skgrepo_change_produces_no_moves (
 ) -> Result<(), Box<dyn Error>> {
     // Save with same skgrepos as on disk.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (repo public))) a
-      ** (skg (node (id b) (repo public))) b
-      *** (skg (node (id c) (repo public))) c
+      * (skg node (gnid a) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b) (skgRepos (nodeRepo public))) b
+      *** (skg node (gnid c) (skgRepos (nodeRepo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
@@ -419,9 +419,9 @@ async fn test_skgrepo_only_change_with_populated_pool (
     // Change only b's skgrepo to private.
     // Title, body, contains — all identical to disk.
     let org_text : &str = indoc! {"
-      * (skg (node (id a) (repo public))) a
-      ** (skg (node (id b) (repo private))) b
-      *** (skg (node (id c) (repo public))) c
+      * (skg node (gnid a) (skgRepos (nodeRepo public))) a
+      ** (skg node (gnid b) (skgRepos (nodeRepo private))) b
+      *** (skg node (gnid c) (skgRepos (nodeRepo public))) c
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (

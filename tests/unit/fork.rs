@@ -151,7 +151,7 @@ fn fork_clone_hides_children_the_edit_deleted () {
     "the clone must hide exactly the children the edit deleted" ); }
 
 #[test]
-fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
+fn confirmation_buffer_is_two_level () {
   let buf : String =
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited (false) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
@@ -166,7 +166,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   // -- the elisp walk keys off the level.)
   assert! ( lines . iter () . any ( |l|
       l . starts_with (
-        & format! ("* (skg (node (repo {})", FORK_SKGREPO_PLACEHOLDER) )
+        & format! ("* (skg node (skgRepos (nodeRepo {}))", FORK_SKGREPO_PLACEHOLDER) )
       && l . ends_with ("N-edited") ),
     "clone-to-be parent (level-1, edited title, placeholder repo) missing:\n{}", buf );
   // The computed skgrepo is shown only as a suggestion comment,
@@ -177,17 +177,16 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
       && w[0] . contains ("owned2")
       && w[1] . starts_with ("* (skg") ),
     "the clone's suggested repo must sit directly above it:\n{}", buf );
-  assert! ( ! buf . contains ("(id N) (repo owned2)"),
+  assert! ( ! buf . contains ("(gnid N) (skgRepos (nodeRepo owned2))"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a level-2 headline ("** "), real id, foreign
-  // skgrepo, write-protected, independent, pO, original title.
+  // skgrepo, write-protected, independent, original title.
   assert! ( lines . iter () . any ( |l|
-      l . starts_with ("** (skg (node (id N) (repo foreign)")
+      l . starts_with ("** (skg node (gnid N) (skgRepos (nodeRepo foreign))")
       && l . contains ("noClaim")
       && l . contains ("writeProtected")
-      && l . contains ("parentOverrides")
       && l . ends_with ("N-original") ),
-    "original child (level-2, id/foreign/writeProtected/independent/pO) missing:\n{}", buf ); }
+    "original child (level-2, id/foreign/writeProtected/independent) missing:\n{}", buf ); }
 
 #[test]
 fn confirmation_buffer_shows_a_confirmed_skgrepo_as_settled () {
@@ -198,11 +197,11 @@ fn confirmation_buffer_shows_a_confirmed_skgrepo_as_settled () {
     build_fork_confirmation_buffer ( & [ fork_spec_n_edited (true) ] );
   let lines : Vec<&str> = buf . lines () . collect ();
   assert! ( lines . iter () . any ( |l|
-      l . starts_with ("* (skg (node (repo owned2)")
+      l . starts_with ("* (skg node (skgRepos (nodeRepo owned2))")
       && l . ends_with ("N-edited") ),
     "a confirmed clone must show its real repo:\n{}", buf );
   assert! ( ! buf . contains (
-      & format! ("(repo {})", FORK_SKGREPO_PLACEHOLDER) ),
+      & format! ("(skgRepos (nodeRepo {}))", FORK_SKGREPO_PLACEHOLDER) ),
     // (The instructions body may mention the placeholder; only the
     // metadata form matters.)
     "no placeholder repo when every repo is confirmed:\n{}", buf );

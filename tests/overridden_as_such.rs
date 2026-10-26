@@ -112,14 +112,14 @@ async fn extend_e_under (
   let view_with_folder : String =
     if folder == "overriddenFolder" {
       let request : String = de_novo . replacen (
-        "(node ",
-        "(node (viewRequests (folder overrides))", 1 );
+        "node ",
+        "node (viewRequests (folder overrides))", 1 );
       save_and_rerender (&request, config, tantivy) . await ?
     } else { de_novo };
   let edited : String =
     { let mut out : Vec<String> = Vec::new ();
       for (line_col, line) in lines_by_enclosing_folder (&view_with_folder) {
-        if line_col == folder && line . contains ("(id E)") {
+        if line_col == folder && line . contains ("(gnid E)") {
           out . push ( line . replace (
             "writeProtected",
             "writeProtected (viewRequests editableView)" )); }
@@ -143,17 +143,17 @@ async fn subscribee_as_such_extension_hides_and_substitutes (
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "subscribeeFolder"
                   && l . contains ("(overridesHere G)")
-                  && l . contains ("(id X)") ),
+                  && l . contains ("(gnid X)") ),
         "the general rule applies below a subscribee-as-such: \
          G is shown as X, marked:\n{}", view );
       assert! ( ! tagged . iter () . any ( |(c, l)|
                   *c == "subscribeeFolder"
-                  && l . contains ("(id H)") ),
+                  && l . contains ("(gnid H)") ),
         "R's hides apply to the subscribee-as-such extension; H \
          appears only under the hiddenInSubscribeeFolder:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "hiddenInSubscribeeFolder"
-                  && l . contains ("(id H)") ),
+                  && l . contains ("(gnid H)") ),
         "H shows in the hiddenInSubscribeeFolder:\n{}", view );
       Ok (( )) }
 
@@ -170,16 +170,16 @@ async fn overridden_as_such_extension_is_raw_and_unhidden (
         lines_by_enclosing_folder (&view);
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "overriddenFolder"
-                  && l . contains ("(id G)")
+                  && l . contains ("(gnid G)")
                   && ! l . contains ("overridesHere") ),
         "the bypass: G is shown raw (not as X) below an \
          overridden-as-such:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
                   *c == "overriddenFolder"
-                  && l . contains ("(id H)") ),
+                  && l . contains ("(gnid H)") ),
         "no hides apply: H is shown below the overridden-as-such \
          (hides are scoped to subscriptions):\n{}", view );
-      assert! ( ! view . contains ("(id X)"),
+      assert! ( ! view . contains ("(gnid X)"),
         "X appears nowhere in this extension:\n{}", view );
       Ok (( )) }
 
@@ -194,8 +194,8 @@ async fn folder_members_never_substitute (
           config, Some (tantivy),
           &[ ID::from ("R") ] ) ?;
       let request : String = de_novo . replacen (
-        "(node ",
-        "(node (viewRequests (folder overrides))", 1 );
+        "node ",
+        "node (viewRequests (folder overrides))", 1 );
       let view : String =
         save_and_rerender (&request, config, tantivy) . await ?;
       // R overrides E, yet both folder copies of E are shown raw: the
@@ -204,7 +204,7 @@ async fn folder_members_never_substitute (
       // inside either would obscure the fact displayed.
       let e_lines : Vec<&str> =
         view . lines ()
-        . filter ( |l| l . contains ("(id E)") )
+        . filter ( |l| l . contains ("(gnid E)") )
         . collect ();
       assert_eq! ( e_lines . len (), 2,
         "E appears under both folders:\n{}", view );

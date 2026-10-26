@@ -231,8 +231,8 @@ async fn delete_preserves_foreign_referencer (
   let mut stream : TcpStream = TcpStream::connect (
     listener . local_addr () ? ) ?;
   let input_org_text : &str = indoc! {"
-    * (skg (node (id cheese) (repo foreign))) cheese
-    ** (skg (node (id victim) (repo owned) (editRequest delete))) victim
+    * (skg node (gnid cheese) (skgRepos (nodeRepo foreign))) cheese
+    ** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
   "};
   let response = update_from_and_rerender_buffer (
     &mut stream, input_org_text, config, tantivy, &graph,
@@ -257,7 +257,7 @@ async fn delete_preserves_foreign_referencer (
     "foreign raw membership must survive deletion" );
   let (fresh_view, _, _) = single_root_view (
     config, Some (tantivy), &ID::from ("cheese") ) ?;
-  assert! (fresh_view . contains ("(unknown (id victim-alt))"),
+  assert! (fresh_view . contains ("unknown (gnid victim-alt)"),
     "the raw foreign original must retain its extra ID as Unknown after the \
      owned primary is deleted: {}", fresh_view);
   Ok (( )) }
@@ -274,9 +274,9 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg (node (id subscriber) (repo foreign))) foreign subscriber
+      * (skg node (gnid subscriber) (skgRepos (nodeRepo foreign))) foreign subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id victim) (repo owned) noClaim (editRequest delete))) victim
+      *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) noClaim (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
@@ -285,7 +285,7 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
     response . saved_view);
   let (fresh, _, _) = single_root_view (
     config, Some (tantivy), &ID::from ("subscriber") ) ?;
-  assert! (fresh . contains ("(unknown (id victim-alt))"),
+  assert! (fresh . contains ("unknown (gnid victim-alt)"),
     "the raw foreign subscribee must retain the deleted node's extra ID as \
      Unknown: {}", fresh);
   Ok (( ))
@@ -303,9 +303,9 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg (node (id overrider) (repo foreign))) foreign overrider
+      * (skg node (gnid overrider) (skgRepos (nodeRepo foreign))) foreign overrider
       ** (skg overriddenFolder)
-      *** (skg (node (id victim) (repo owned) (editRequest delete))) victim
+      *** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
@@ -333,20 +333,20 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
-      * (skg (node (id hide-subscriber) (repo foreign))) foreign hide subscriber
+      * (skg node (gnid hide-subscriber) (skgRepos (nodeRepo foreign))) foreign hide subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id hide-subscribee) (repo foreign))) foreign hide subscribee
+      *** (skg node (gnid hide-subscribee) (skgRepos (nodeRepo foreign))) foreign hide subscribee
       *** (skg hiddenOutsideOfSubscribeeFolder)
-      **** (skg (node (id victim) (repo owned) (editRequest delete))) victim
+      **** (skg node (gnid victim) (skgRepos (nodeRepo owned)) (editRequest delete)) victim
     "}, config, tantivy, &graph,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
-  assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
+  assert! (response . saved_view . contains ("unknown (gnid victim-alt)"),
     "a retained foreign hide must become its raw extra ID immediately: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
     config, Some (tantivy), &ID::from ("hide-subscriber") ) ?;
-  assert! (fresh . contains ("(unknown (id victim-alt))"),
+  assert! (fresh . contains ("unknown (gnid victim-alt)"),
     "immediate hidden-outside rerender must match a fresh render: {}", fresh);
   Ok (( ))
 }
@@ -364,7 +364,7 @@ async fn delete_strips_references_impl (
 ) -> Result<(), Box<dyn Error>> {
   // Single-root content view of victim with editRequest delete.
   let input_org_text : &str = indoc! {"
-    * (skg (node (id victim) (repo main) (editRequest delete))) victim
+    * (skg node (gnid victim) (skgRepos (nodeRepo main)) (editRequest delete)) victim
   "};
 
   let graph : InRustGraphHandle =
@@ -517,7 +517,7 @@ async fn strip_pass_handles_extra_ids_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id aliased) (repo main) (editRequest delete))) aliased
+    * (skg node (gnid aliased) (skgRepos (nodeRepo main)) (editRequest delete)) aliased
   "};
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;

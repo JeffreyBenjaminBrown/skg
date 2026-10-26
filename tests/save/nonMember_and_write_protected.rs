@@ -41,9 +41,9 @@ fn test_nonMember_and_write_protected(
         // without affecting it, as a write-protected node holds no member.
         // Node 2 should not affect node 1 because it is noClaim
         let org_text = indoc! {"
-          * (skg (node (id 1) (repo main))) 1
-          ** (skg (node (id 2) (repo main) noClaim writeProtected)) 2
-          *** (skg (node (id 4) (repo main) noClaim)) 4
+          * (skg node (gnid 1) (skgRepos (nodeRepo main))) 1
+          ** (skg node (gnid 2) (skgRepos (nodeRepo main)) noClaim writeProtected) 2
+          *** (skg node (gnid 4) (skgRepos (nodeRepo main)) noClaim) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(

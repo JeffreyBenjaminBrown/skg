@@ -20,9 +20,9 @@ The `contains` relationship forms a simple structure:
 The test simulates saving this buffer:
 
 ```org
-* (skg (node (id 1) (repo main))) 1
-** (skg (node (id 2) (repo main) noClaim writeProtected)) 2
-*** (skg (node (id 4) (repo main))) 4
+* (skg node (gnid 1) (skgRepos (nodeRepo main))) 1
+** (skg node (gnid 2) (skgRepos (nodeRepo main)) noClaim writeProtected) 2
+*** (skg node (gnid 4) (skgRepos (nodeRepo main))) 4
 ```
 
 ## Expected Behavior

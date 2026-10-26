@@ -59,10 +59,10 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
     open_views     : OpenViews::new (),
     graph_straddle : None };
   let buffer : &str = "\
-* (skg (node (id n) (repo main))) n
+* (skg node (gnid n) (skgRepos (nodeRepo main))) n
 ** (skg idFolder)
 *** (skg id) n
-*** (skg (node (id x) (repo main) noClaim)) x
+*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim) x
 ";
   let saved : String = save_buffer (
     buffer, config, tantivy, &graph, &mut views_state ) . await ?;
@@ -70,7 +70,7 @@ async fn a_nonMember_under_an_id_folder_survives_the_rerender (
   assert! ( ! saved . contains ("idFolder") && ! saved . contains ("(skg id)"),
             "the rerender removes the ID folder and its entries:\n{}", saved );
   let x_line : &str = saved . lines ()
-    . find ( |line| line . contains ("(id x)") )
+    . find ( |line| line . contains ("(gnid x)") )
     . unwrap_or_else ( || panic! ("x must survive the rerender:\n{}", saved) );
   assert! ( x_line . starts_with ("*** ") && x_line . contains ("noClaim"),
             "x stays a non-member at its depth:\n{}", saved );

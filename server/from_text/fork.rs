@@ -13,7 +13,7 @@
 use crate::dbs::in_rust_graph::override_invariants::existing_owned_overrider_of;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
-use crate::org_to_text::metadata_value_atom;
+use crate::org_to_text::{metadata_value_atom, skgRepos_form};
 use crate::skgrepo_sets::SkgrepoRestriction;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SkgrepoName, members_of, rel_partners_at_relRepo};
@@ -24,6 +24,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
 
 use std::collections::{HashMap, HashSet};
+use std::iter::once;
 
 /// For every foreign vognode in the view, the skgrepo of its nearest
 /// vognode ancestor, recorded iff that ancestor is an owned Unrestricted
@@ -228,14 +229,14 @@ pub const FORK_SKGREPO_PLACEHOLDER : &str = "PICK-A-REPO";
 /// both the original N and the (possibly re-titled) clone C:
 ///
 ///   * <edited title>     -- the clone-to-be C: the user's edited title,
-///                           no id (none yet). Its (repo ...) is the
+///                           no gnid (none yet). Its nodeRepo is the
 ///                           resolved skgrepo when repo_confirmed, else
 ///                           the PICK-A-REPO placeholder, preceded by a
 ///                           one-line suggestion comment the client
 ///                           offers as the prompt's default.
-///   ** <original title>  -- the original N that C overrides: its real id,
+///   ** <original title>  -- the original N that C overrides: its real gnid,
 ///                           real skgrepo, write-protected,
-///                           noClaim, marked "pO".
+///                           noClaim.
 ///
 /// The client shows this and asks the user to approve (re-save the
 /// source buffer with the chosen skgrepos) or decline (kill the buffer),
@@ -251,8 +252,8 @@ pub fn build_fork_confirmation_buffer (
      Forking turns a node into an editable clone, in a repo you\n\
      own, that subscribes to and overrides the original. Each\n\
      top-level headline below is a clone-to-be; its child is the\n\
-     original it forks (real id, marked \"pO\": its viewparent\n\
-     overrides it).\n\
+     original it forks (real id; the clone above it overrides\n\
+     it).\n\
      APPROVE with C-c C-c: the source buffer is re-saved, skgsave-committing\n\
      each fork into the repo its clone-to-be shows. A clone still\n\
      showing PICK-A-REPO needs a real repo first: Emacs prompts\n\
@@ -269,18 +270,44 @@ pub fn build_fork_confirmation_buffer (
           "# Suggested repo for the clone below: {}\n",
           spec . clone . 0 . home_skgrepo ));
         FORK_SKGREPO_PLACEHOLDER };
-    out . push_str ( & format! (
-      "* (skg (node (repo {}) (viewStats (homeRepoHerald {})))) {}\n",
-      metadata_value_atom (shown_skgrepo),
-      metadata_value_atom (&format! ("⌂:{}", shown_skgrepo)),
-      spec . clone . 0 . title ));
-    out . push_str ( & format! (
-      "** (skg (node (id {}) (repo {}) noClaim writeProtected \
-       (viewStats parentOverrides))) {}\n",
-      spec . original_skgid . 0,
-      metadata_value_atom (&spec . original_skgrepo),
-      spec . original_title )); }
+    out . push_str ( &fork_clone_headline (
+      &SkgrepoName::from (shown_skgrepo), &spec . clone . 0 . title ));
+    out . push_str ( &forked_original_headline (
+      &spec . original_skgid, &spec . original_skgrepo,
+      &spec . original_title )); }
   out }
+
+/// The headline of a clone-to-be, in the metadata grammar: a node
+/// with no gnid yet, its home skgrepo, and the home skgrepo's herald.
+fn fork_clone_headline (
+  skgrepo : &SkgrepoName,
+  title   : &str,
+) -> String {
+  let parts : Vec<String> =
+    once ( "node" . to_string () )
+    . chain ( skgRepos_form ( Some (skgrepo), None ))
+    . chain ( once ( format! ( "(viewStats (homeRepoHerald {}))",
+      metadata_value_atom ( &format! ("⌂:{}", skgrepo) )) ))
+    . collect ();
+  format! ( "* (skg {}) {}\n", parts . join (" "), title ) }
+
+/// The headline of the original a clone-to-be forks, in the metadata
+/// grammar: a write-protected node that claims no membership in its
+/// viewparent, the clone.
+fn forked_original_headline (
+  gnid    : &ID,
+  skgrepo : &SkgrepoName,
+  title   : &str,
+) -> String {
+  let parts : Vec<String> =
+    [ "node" . to_string (),
+      format! ( "(gnid {})", gnid . 0 ) ]
+    . into_iter ()
+    . chain ( skgRepos_form ( Some (skgrepo), None ))
+    . chain ( [ "noClaim" . to_string (),
+                "writeProtected" . to_string () ] )
+    . collect ();
+  format! ( "** (skg {}) {}\n", parts . join (" "), title ) }
 
 /// Reject any fork that monogamy or the skgrepo-set forbids. Run after
 /// the clones are built (their skgrepos resolved) but before the save

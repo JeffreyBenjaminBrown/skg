@@ -56,7 +56,7 @@ async fn test_unmodified_foreign_node_allowed (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign1) (repo foreign))) Foreign node unchanged
+        * (skg node (gnid foreign1) (skgRepos (nodeRepo foreign))) Foreign node unchanged
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
@@ -78,7 +78,7 @@ async fn test_modified_foreign_node_forks_with_default_skgrepo (
       // fork rides in the plan's fork_specs (skgsave-committed only on
       // confirmation); the foreign node itself is not written.
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign2) (repo foreign))) MODIFIED TITLE
+        * (skg node (gnid foreign2) (skgRepos (nodeRepo foreign))) MODIFIED TITLE
         Original body
       "};
       let ( _viewforest, save_plan, _warnings ) =
@@ -103,7 +103,7 @@ async fn test_modified_foreign_node_body_forks_with_default_skgrepo (
       // Editing a foreign node's body forks it too; same no-owned-ancestor
       // situation -> the clone defaults to the first owned skgrepo.
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign2) (repo foreign))) Foreign node to modify
+        * (skg node (gnid foreign2) (skgRepos (nodeRepo foreign))) Foreign node to modify
         MODIFIED BODY
       "};
       let ( _viewforest, save_plan, _warnings ) =
@@ -122,7 +122,7 @@ async fn test_writeProtected_foreign_node_filtered (
 ) -> Result<(), Box<dyn Error>> {
       // Save buffer with write-protected foreign node
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign3) (repo foreign) writeProtected)) Foreign write-protected node
+        * (skg node (gnid foreign3) (skgRepos (nodeRepo foreign)) writeProtected) Foreign write-protected node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config, None) ;
@@ -140,9 +140,9 @@ async fn test_owned_node_unchanged_behavior (
 ) -> Result<(), Box<dyn Error>> {
       // Save buffer with owned node
       let org_text: &str = indoc! {"
-        * (skg (node (id node1) (repo main))) Modified owned node
-        ** (skg (node (id child1) (repo main))) _
-        ** (skg (node (id child2) (repo main))) _
+        * (skg node (gnid node1) (skgRepos (nodeRepo main))) Modified owned node
+        ** (skg node (gnid child1) (skgRepos (nodeRepo main))) _
+        ** (skg node (gnid child2) (skgRepos (nodeRepo main))) _
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config , None) ;
@@ -160,7 +160,7 @@ async fn test_delete_foreign_node_rejected (
 ) -> Result<(), Box<dyn Error>> {
       // Try to delete a foreign node
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign1) (repo foreign) (editRequest delete))) Foreign node unchanged
+        * (skg node (gnid foreign1) (skgRepos (nodeRepo foreign)) (editRequest delete)) Foreign node unchanged
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
@@ -181,7 +181,7 @@ async fn test_new_foreign_node_rejected (
 ) -> Result<(), Box<dyn Error>> {
       // Try to create a new node in foreign skgrepo
       let org_text: &str = indoc! {"
-        * (skg (node (id new_foreign) (repo foreign))) New foreign node
+        * (skg node (gnid new_foreign) (skgRepos (nodeRepo foreign))) New foreign node
         This should not be allowed
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
@@ -202,10 +202,10 @@ async fn test_mixed_owned_and_foreign_nodes (
 ) -> Result<(), Box<dyn Error>> {
       // Save buffer with mix of owned and unmodified foreign nodes
       let org_text: &str = indoc! {"
-        * (skg (node (id node1) (repo main))) Modified owned node
-        ** (skg (node (id child1) (repo main))) _
-        ** (skg (node (id child2) (repo main))) _
-        * (skg (node (id foreign1) (repo foreign))) Foreign node unchanged
+        * (skg node (gnid node1) (skgRepos (nodeRepo main))) Modified owned node
+        ** (skg node (gnid child1) (skgRepos (nodeRepo main))) _
+        ** (skg node (gnid child2) (skgRepos (nodeRepo main))) _
+        * (skg node (gnid foreign1) (skgRepos (nodeRepo foreign))) Foreign node unchanged
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
@@ -230,10 +230,10 @@ async fn test_merge_with_foreign_acquirer_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       // Try to merge where the acquirer is foreign
-      // Format: (skg (node ... (editRequest (merge ID)))) - acquiree merges into acquirer
+      // Format: (skg node ... (editRequest (merge ID))) - acquiree merges into acquirer
       let org_text: &str = indoc! {"
-        * (skg (node (id node1) (repo main) (editRequest (merge foreign1)))) Node merging into foreign
-        * (skg (node (id foreign1) (repo foreign))) Foreign node unchanged
+        * (skg node (gnid node1) (skgRepos (nodeRepo main)) (editRequest (merge foreign1))) Node merging into foreign
+        * (skg node (gnid foreign1) (skgRepos (nodeRepo foreign))) Foreign node unchanged
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
@@ -254,9 +254,9 @@ async fn test_merge_with_foreign_acquiree_rejected (
 ) -> Result<(), Box<dyn Error>> {
       // Try to merge where the acquiree is foreign
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign1) (repo foreign) (editRequest (merge node1)))) Foreign merging into owned
+        * (skg node (gnid foreign1) (skgRepos (nodeRepo foreign)) (editRequest (merge node1))) Foreign merging into owned
         This is a foreign node
-        * (skg (node (id node1) (repo main))) Owned node
+        * (skg node (gnid node1) (skgRepos (nodeRepo main))) Owned node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config , None) ;
@@ -276,8 +276,8 @@ async fn test_merge_with_both_owned_allowed (
 ) -> Result<(), Box<dyn Error>> {
       // NodeMerge where both nodes are owned - should work
       let org_text: &str = indoc! {"
-        * (skg (node (id node1) (repo main) (editRequest (merge child1)))) Node merging into child
-        * (skg (node (id child1) (repo main))) Child node
+        * (skg node (gnid node1) (skgRepos (nodeRepo main)) (editRequest (merge child1))) Node merging into child
+        * (skg node (gnid child1) (skgRepos (nodeRepo main))) Child node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config , None) ;

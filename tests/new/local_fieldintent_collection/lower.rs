@@ -31,15 +31,15 @@ fn collected_from_org (
 fn lowering_produces_ordered_nodeInstructions_and_signals () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (repo main))) root
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       Root body
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
-      ** (skg (node (id child) (repo main))) child
+      ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (repo main))) e
-      **** (skg (node (id visible) (repo main))) visible
-      * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
+      *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
+      **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
+      * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       "} );
   let LoweringOutput { intents, visibility, .. } =
     lower_collected_fieldIntents (collected) . unwrap();
@@ -87,9 +87,9 @@ fn lowering_produces_ordered_nodeInstructions_and_signals () {
 fn nodeMerge_pairs_come_from_the_map_in_order () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id a) (repo main) (editRequest (merge x)))) a
-      * (skg (node (id b) (repo main))) b
-      * (skg (node (id c) (repo main) (editRequest (merge y)))) c
+      * (skg node (gnid a) (skgRepos (nodeRepo main)) (editRequest (merge x))) a
+      * (skg node (gnid b) (skgRepos (nodeRepo main))) b
+      * (skg node (gnid c) (skgRepos (nodeRepo main)) (editRequest (merge y))) c
       "} );
   assert_eq!(
     nodeMerge_pairs (&collected),

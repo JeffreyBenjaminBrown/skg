@@ -10,7 +10,7 @@
 // arise in real use).
 //
 // Expected: rendering the view of `parent` succeeds, with `ghost`
-// represented as a Unknown (skg metadata `(unknown (id ghost))`)
+// represented as a Unknown (skg metadata ` unknown (gnid ghost) `)
 // rather than killing the view.
 
 use indoc::indoc;
@@ -57,8 +57,8 @@ async fn test_dangling_reference_renders_unknown_node (
       // hides (containers 0) for a member.
       // The unknown line has no headline title -- the id already
       // appears in the metadata, no need to duplicate it.
-      let expected = indoc! {"* (skg (node (id parent) (repo main))) parent
-                              ** (skg (unknown (id ghost)))
+      let expected = indoc! {"* (skg node (gnid parent) (skgRepos (nodeRepo main))) parent
+                              ** (skg unknown (gnid ghost))
                               "};
       assert_metadata_eq! (rendered, expected,
                   "view should render the dangling child as an \
@@ -82,8 +82,8 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id parent) (repo main))) parent
-    ** (skg (unknown (id ghost)))
+    * (skg node (gnid parent) (skgRepos (nodeRepo main))) parent
+    ** (skg unknown (gnid ghost))
   "};
   let graph : InRustGraphHandle =
     new_handle (InRustGraph::new ());
@@ -104,7 +104,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
             response . errors); }
   let (rerendered, _, _) = single_root_view (
     config, None, &ID::from ("parent") ) ?;
-  assert! ( rerendered . contains ("(unknown (id ghost))"),
+  assert! ( rerendered . contains ("unknown (gnid ghost)"),
     "an unchanged Unknown must preserve its raw relationship member: {}",
     rerendered );
   Ok (( )) }

@@ -90,23 +90,23 @@ async fn write_protected_folder_repairs_warn_impl (
       config, Some (tantivy),
       &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replacen (
-    "(node ",
-    "(node (viewRequests (folder subscribesTo))", 1 );
+    "node ",
+    "node (viewRequests (folder subscribesTo))", 1 );
   let mut views_state : ViewsState = fresh_views_state ();
   let complete_buffer : String =
     save_buffer (&folder_request, config, tantivy, &graph, &mut views_state)
     . await ? . saved_view;
   let edited : String = {
     let r_line : String =
-      line_containing (&complete_buffer, "(id r)") . to_string ();
+      line_containing (&complete_buffer, "(gnid r)") . to_string ();
     let t_line : String =
-      line_containing (&complete_buffer, "(id t)") . to_string ();
+      line_containing (&complete_buffer, "(gnid t)") . to_string ();
     let x_line : String = {
       // x: an editable member leaf placed inside the folder, with a
       // (new) child so the repair makes it a non-member rather than removing it.
       let mut l : String =
         r_line
-        . replace ("(id r)", "(id x)")
+        . replace ("(gnid r)", "(gnid x)")
         . replace (" writeProtected", "");
       if l . ends_with (" r") {
         l . truncate (l . len () - 2);
@@ -155,9 +155,9 @@ async fn write_protected_folder_repairs_warn_impl (
     "discarded folder headline text must warn: {:?}",
     response . warnings );
   let saved : String = response . saved_view;
-  assert! ( saved . contains ("(id r)"),
+  assert! ( saved . contains ("(gnid r)"),
     "deleted member r must respawn:\n{}", saved );
-  { let x_line_after : &str = line_containing (&saved, "(id x)");
+  { let x_line_after : &str = line_containing (&saved, "(gnid x)");
     assert! ( x_line_after . contains ("noClaim"),
       "x must be rerendered as a non-member: {}", x_line_after ); }
   assert! ( ! line_containing (&saved, "subscriberFolder")
@@ -187,10 +187,10 @@ async fn failed_save_carries_warnings_with_errors (
         (
           graph_handle_from_config (config) ? );
       let buffer : &str = "\
-* (skg (node (id n) (repo main))) n
+* (skg node (gnid n) (skgRepos (nodeRepo main))) n
 ** (skg subscriberFolder) leftover headline text
-*** (skg (node (id r) (repo main) writeProtected)) r
-*** (skg (node (id t) (repo main) writeProtected)) t
+*** (skg node (gnid r) (skgRepos (nodeRepo main)) writeProtected) r
+*** (skg node (gnid t) (skgRepos (nodeRepo main)) writeProtected) t
 ** (skg idFolder)
 *** (skg id) bogus-id
 ";

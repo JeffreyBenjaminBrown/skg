@@ -47,7 +47,7 @@ fn root_ids (
 ) -> Vec<String> {
   buffer . lines () . filter ( |line| line . starts_with ("* ") )
     . map ( |line| {
-      let start : usize = line . find ("(id ") . unwrap () + 4;
+      let start : usize = line . find ("(gnid ") . unwrap () + 6;
       line [start ..] . split (')') . next () . unwrap () . to_string () } )
     . collect () }
 
@@ -59,7 +59,7 @@ fn subtree_starting<'a> (
 ) -> Vec<&'a str> {
   let lines : Vec<&str> = buffer . lines () . collect ();
   let start : usize = lines . iter ()
-    . position ( |line| line . starts_with (prefix) )
+    . position ( |line| without_viewnode_ids (line) . starts_with (prefix) )
     . unwrap_or_else ( || panic! ( "no line starts {:?}:\n{}", prefix, buffer ));
   let depth = |line : &str| line . chars () . take_while ( |c| *c == '*' ) . count ();
   let own_depth : usize = depth (lines [start]);
@@ -143,9 +143,9 @@ fn a_change_under_a_new_origin_is_appended_as_a_root_by_the_command (
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert_eq! ( root_ids (&shown), vec! [ "q", "r", "s" ], "{}", shown );
-    let s_subtree : Vec<&str> = subtree_starting (&shown, "* (skg bodyFolded (node (id s) ");
+    let s_subtree : Vec<&str> = subtree_starting (&shown, "* (skg bodyFolded node (gnid s) ");
     assert! ( s_subtree . iter () . any ( |line|
-                line . starts_with ("** (skg (node (id s1) ")
+                without_viewnode_ids (line) . starts_with ("** (skg node (gnid s1) ")
                 && ! line . contains ("writeProtected") )
               && s_subtree . iter () . any ( |line| without_viewnode_ids (line) == "*** (skg (oldText title) (diff (leaves 1))) s1" ),
               "s1's change must be shown under s:\n{}", shown );
@@ -169,7 +169,7 @@ fn a_changed_cycle_membership_appends_no_second_root (
       // subtree under z.
       let lines : Vec<&str> = buffer . lines () . collect ();
       let at : usize = lines . iter () . position ( |line|
-        line . starts_with ("** (skg (node (id p) ")
+        without_viewnode_ids (line) . starts_with ("** (skg node (gnid p) ")
         && ! line . contains ("writeProtected") ) . unwrap ();
       let end : usize = at + 1 + lines [ at + 1 .. ] . iter ()
         . take_while ( |line| ! line . starts_with ("* ")
@@ -184,7 +184,7 @@ fn a_changed_cycle_membership_appends_no_second_root (
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &edited) ?;
     let saved : String = response . saved_view;
     assert! ( saved . lines () . any ( |line|
-                line . starts_with ("** (skg (node (id ") && line . ends_with (") z") ),
+                without_viewnode_ids (line) . starts_with ("** (skg node (gnid ") && line . ends_with (") z") ),
               "z must be shown under q:\n{}", saved );
     assert_eq! ( root_ids (&saved), vec! [ "q", "r" ], "{}", saved );
     let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
@@ -202,8 +202,8 @@ fn a_node_the_user_write_protected_stays_so_until_the_command (
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_eq! ( node_lines (&buffer, "a") . len (), 1, "{}", buffer );
     let requested : String = buffer . replacen (
-      "(node (id a) (repo main) ",
-      "(node (id a) (repo main) (viewRequests writeProtectedView) ", 1 );
+      "node (gnid a) (skgRepos (nodeRepo main)) ",
+      "node (gnid a) (skgRepos (nodeRepo main)) (viewRequests writeProtectedView) ", 1 );
     let saved : SaveResponse = save_cleanly (f, &all_changes_view (), &requested) ?;
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &saved . saved_view) ?;
     for response in [ &saved, &again ] {
@@ -242,8 +242,8 @@ fn an_editable_view_request_cascades_within_the_node_budget (
     f . config . initial_node_limit = 2;
     let buffer : String = open_all_changes_buffer (f) ?;
     let requested : String = buffer . replacen (
-      "(node (id w) (repo main) writeProtected",
-      "(node (id w) (repo main) writeProtected (viewRequests editableView)", 1 );
+      "node (gnid w) (skgRepos (nodeRepo main)) writeProtected",
+      "node (gnid w) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)", 1 );
     assert_ne! ( requested, buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     for node in [ "w", "w1" ] {
@@ -273,19 +273,19 @@ fn an_editable_view_request_moves_editability_between_occurrences (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("shared", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let n_under_y : &str = "** (skg (node (id n) (repo main) writeProtected ";
-    assert! ( subtree_starting (&buffer, "* (skg (node (id y) ") . iter ()
-                . any ( |line| line . starts_with (n_under_y) ),
+    let n_under_y : &str = "** (skg node (gnid n) (skgRepos (nodeRepo main)) writeProtected ";
+    assert! ( subtree_starting (&buffer, "* (skg node (gnid y) ") . iter ()
+                . any ( |line| without_viewnode_ids (line) . starts_with (n_under_y) ),
               "n must be write-protected under y:\n{}", buffer );
     let requested : String = requesting_editable_at (&buffer, n_under_y);
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
-    let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id x) ");
-    let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id y) ");
+    let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg node (gnid x) ");
+    let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg node (gnid y) ");
     for (subtree, editable) in [ (&x_subtree, false), (&y_subtree, true) ] {
       for node in [ "n", "a" ] {
-        let atom : String = format! ("(node (id {}) ", node);
+        let atom : String = format! ("node (gnid {}) ", node);
         let line : &str = subtree . iter ()
-          . find ( |line| line . contains (&atom) )
+          . find ( |line| without_viewnode_ids (line) . contains (&atom) )
           . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
         assert_eq! ( ! line . contains ("writeProtected"), editable,
                      "{}:\n{}", node, saved ); }}
@@ -310,46 +310,46 @@ fn an_editable_view_request_moves_editability_back (
     let buffer : String = open_all_changes_buffer (f) ?;
     let moved : String = save_cleanly (
       f, &all_changes_view (), &requesting_editable_at (
-        &buffer, "** (skg (node (id n) (repo main) writeProtected " )) ?
+        &buffer, "** (skg node (gnid n) (skgRepos (nodeRepo main)) writeProtected " )) ?
       . saved_view;
-    let n_under_x : &str = "(node (id n) (repo main) writeProtected ";
+    let n_under_x : &str = "node (gnid n) (skgRepos (nodeRepo main)) writeProtected ";
     let members_of_n_under_x = |buffer : &str| -> Vec<String> {
-      subtree_starting (buffer, "* (skg (node (id x) ") . iter ()
+      subtree_starting (buffer, "* (skg node (gnid x) ") . iter ()
         . filter ( |line| line . starts_with ("*** ") )
         . map ( |line| [ "writeProtected ", "omittedBody ", "bodyFolded ", "folded ",
                          "noClaim ", " (birth (contains in 1))" ]
                          . iter () . fold ( line . to_string (),
                                             |line, atom| line . replace (atom, "") ))
         . collect () };
-    let b_under_x : &str = "(skg (node (id b) (repo main) noClaim writeProtected ";
+    let b_under_x : &str = "(skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected ";
     assert! ( without_viewnode_ids (&moved) . contains (n_under_x) && without_viewnode_ids (&moved) . contains (b_under_x),
               "n and b must be write-protected under x:\n{}", moved );
     let requested : String = requesting_editable_at (
-      &moved . replacen ( b_under_x,
-                          "(skg folded (node (id b) (repo main) noClaim writeProtected ",
+      &moved . replacen ( "node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected ",
+                          "folded node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected ",
                           1 ),
       n_under_x );
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
-    let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id x) ");
-    let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg (node (id y) ");
+    let x_subtree : Vec<&str> = subtree_starting (&saved, "* (skg node (gnid x) ");
+    let y_subtree : Vec<&str> = subtree_starting (&saved, "* (skg node (gnid y) ");
     for (subtree, editable) in [ (&x_subtree, true), (&y_subtree, false) ] {
       for node in [ "n", "a" ] {
-        let atom : String = format! ("(node (id {}) ", node);
+        let atom : String = format! ("node (gnid {}) ", node);
         let line : &str = subtree . iter ()
-          . find ( |line| line . contains (&atom) )
+          . find ( |line| without_viewnode_ids (line) . contains (&atom) )
           . unwrap_or_else ( || panic! ( "{} must be shown:\n{}", node, saved ));
         assert_eq! ( ! line . contains ("writeProtected"), editable,
                      "{}:\n{}", node, saved ); }}
     assert_eq! ( members_of_n_under_x (&saved)
-                   . iter () . filter ( |line| line . contains ("(node ") )
+                   . iter () . filter ( |line| line . contains ("node (gnid ") )
                    . cloned () . collect::<Vec<String>> (),
                  members_of_n_under_x (&moved)
-                   . iter () . filter ( |line| line . contains ("(node ") )
+                   . iter () . filter ( |line| line . contains ("node (gnid ") )
                    . cloned () . collect::<Vec<String>> (),
                  "n's members under x are kept:\n{}", saved );
     assert! ( x_subtree . iter ()
-                . any ( |line| line . starts_with ("*** (skg folded ")
-                               && line . contains ("(node (id b) ") ),
+                . any ( |line| without_viewnode_ids (line) . starts_with ("*** (skg folded ")
+                               && line . contains ("node (gnid b) ") ),
               "b stays folded under x:\n{}", saved );
     assert! ( x_subtree . iter () . any ( |line| without_viewnode_ids (line) == "**** (skg (oldText body) (diff (leaves 1)))" ),
               "a's change must be shown under x:\n{}", saved );
@@ -371,8 +371,8 @@ fn an_editable_view_request_on_a_node_of_u_extends_its_members (
     f . config . initial_node_limit = 2;
     let buffer : String = open_all_changes_buffer (f) ?;
     let requested : String = buffer . replacen (
-      "* (skg bodyFolded (node (id r) (repo main) ",
-      "* (skg bodyFolded (node (id r) (repo main) (viewRequests editableView) ", 1 );
+      "bodyFolded node (gnid r) (skgRepos (nodeRepo main)) ",
+      "bodyFolded node (gnid r) (skgRepos (nodeRepo main)) (viewRequests editableView) ", 1 );
     assert_ne! ( requested, buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     for node in [ "r", "a", "w", "w1" ] {
@@ -446,16 +446,16 @@ fn a_change_shown_only_in_a_container_folder_is_appended_as_a_root_by_the_comman
               "{}", response . saved_view );
     assert_eq! ( response . readiness_summary . unwrap () . changes_not_editable_here, 1 );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
-    let c1_in_the_folder : &str = subtree_starting (&shown, "*** (skg (node (id c1) ") [0];
+    let c1_in_the_folder : &str = subtree_starting (&shown, "*** (skg node (gnid c1) ") [0];
     assert! ( c1_in_the_folder . contains ("writeProtected"),
               "c1 stays write-protected in the container folder:\n{}", shown );
     assert_eq! ( root_ids (&shown), vec! [ "m", "c1" ], "{}", shown );
-    let c1_root : Vec<&str> = subtree_starting (&shown, "* (skg (node (id c1) ");
+    let c1_root : Vec<&str> = subtree_starting (&shown, "* (skg node (gnid c1) ");
     assert! ( ! c1_root [0] . contains ("writeProtected"),
               "the root c1 is editable:\n{}", shown );
     assert! ( c1_root . iter () . any ( |line| without_viewnode_ids (line) == "** (skg (oldText title) (diff (leaves 1))) c1" )
               && c1_root . iter () . any ( |line|
-                   line . starts_with ("** (skg (node (id m) ") ),
+                   without_viewnode_ids (line) . starts_with ("** (skg node (gnid m) ") ),
               "c1's change and content must be shown under it:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     let again : SaveResponse = save_cleanly (f, &all_changes_view (), &shown) ?;
@@ -474,12 +474,12 @@ fn a_root_the_command_appended_stays_once_outside_u (
     let buffer : String = retitle_in_a_content_view (f, "c1", "c1 retitled", &buffer) ?;
     save_cleanly (f, &all_changes_view (), &buffer) ?;
     let (shown, _) : (String, usize) = integrate_unshown_changes (f) ?;
-    let root_line : &str = subtree_starting (&shown, "* (skg (node (id c1) ") [0];
+    let root_line : &str = subtree_starting (&shown, "* (skg node (gnid c1) ") [0];
     let reverted : String = // at the root; the folder's member follows the graph
       shown . replacen ( root_line, &root_line . replacen ("c1 retitled", "c1", 1), 1 );
     let after : String = save_cleanly (f, &all_changes_view (), &reverted) ? . saved_view;
     assert_eq! ( root_ids (&after), vec! [ "m", "c1" ], "{}", after );
-    let c1_line : &str = subtree_starting (&after, "* (skg (node (id c1) ") [0];
+    let c1_line : &str = subtree_starting (&after, "* (skg node (gnid c1) ") [0];
     assert! ( c1_line . ends_with (") c1") && ! c1_line . contains ("writeProtected"),
               "c1 must stay an editable root:\n{}", after );
     let again : String = save_cleanly (f, &all_changes_view (), &after) ? . saved_view;
@@ -538,12 +538,12 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
 fn the_command_makes_a_member_under_a_historical_phantom_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("historical_content", &["main"], |f| {
-    let m_line : &str = "*** (skg (node (id m) (repo main) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled";
+    let m_line : &str = "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (m_line), "{}", buffer );
     let requested : String = buffer . replacen (
-      "(node (id m) (repo main) ",
-      "(node (id m) (repo main) (viewRequests writeProtectedView) ", 1 );
+      "node (gnid m) (skgRepos (nodeRepo main)) ",
+      "node (gnid m) (skgRepos (nodeRepo main)) (viewRequests writeProtectedView) ", 1 );
     let protected : String =
       save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     assert! ( ! shown_editable (&protected, "m"), "{}", protected );
@@ -564,18 +564,18 @@ fn the_command_makes_a_member_under_a_historical_phantom_editable (
 fn the_command_makes_a_removed_member_under_a_live_vognode_editable (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
-    let x_under_b : &str = "** (skg (node (id x) (repo main) noClaim (rels";
+    let x_under_b : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( buffer . contains (x_under_b), "{}", buffer );
+    assert! ( without_viewnode_ids (&buffer) . contains (x_under_b), "{}", buffer );
     let requested : String = buffer . replacen (
-      "(node (id x) (repo main) noClaim ",
-      "(node (id x) (repo main) noClaim (viewRequests writeProtectedView) ", 1 );
+      "node (gnid x) (skgRepos (nodeRepo main)) noClaim ",
+      "node (gnid x) (skgRepos (nodeRepo main)) noClaim (viewRequests writeProtectedView) ", 1 );
     let protected : String =
       save_cleanly (f, &all_changes_view (), &requested) ? . saved_view;
     assert! ( ! shown_editable (&protected, "x"), "{}", protected );
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     assert_eq! ( not_editable, 0, "{}", shown );
-    assert! ( shown . contains (x_under_b), "{}", shown );
+    assert! ( without_viewnode_ids (&shown) . contains (x_under_b), "{}", shown );
     assert_eq! ( node_lines (&shown, "x") . iter ()
                  . filter ( |line| ! line . contains ("writeProtected") ) . count (),
                  1, "{}", shown );

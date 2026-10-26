@@ -8,6 +8,7 @@
 // root holding x, whose changed container folder holds a and c, and
 // under c its containerward tree has two branches, b and d.
 
+use skg::metadata_canon::without_viewnode_ids;
 use crate::git_fixture::{Fixture, save_cleanly};
 use crate::pruned_change_view::common::{
   all_changes_buffer, all_changes_view, assert_lines_in_order,
@@ -16,11 +17,11 @@ use crate::pruned_change_view::common::{
 use std::error::Error;
 
 const C_IN_THE_FOLDER : &str =
-  "**** (skg (node (id c) (repo main) writeProtected";
+  "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected";
 const B_UNDER_C : &str =
-  "***** (skg (node (id b) (repo main) noClaim writeProtected";
+  "***** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected";
 const D_UNDER_C : &str =
-  "***** (skg (node (id d) (repo main) noClaim writeProtected";
+  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected";
 
 /// Save 'buffer' as the "all changes" buffer, and require that it
 /// comes back as it went.
@@ -59,7 +60,7 @@ fn a_role_tree_reordered_by_the_user_keeps_that_order_through_a_save (
     let buffer : String = open_all_changes_buffer (f) ?;
     let lines : Vec<&str> = buffer . lines () . collect ();
     let position = |prefix : &str| -> usize {
-      lines . iter () . position ( |line| line . starts_with (prefix) )
+      lines . iter () . position ( |line| without_viewnode_ids (line) . starts_with (prefix) )
         . unwrap_or_else ( || panic! ( "no line starts {:?}:\n{}", prefix, buffer )) };
     let (b, d) : (usize, usize) = ( position (B_UNDER_C), position (D_UNDER_C) );
     let mut swapped_lines : Vec<&str> = lines . clone ();

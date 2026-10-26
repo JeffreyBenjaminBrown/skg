@@ -54,11 +54,11 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
   with_git_fixture ( Path::new (FIXTURES), OwnedSkgrepos::OnlyMain, &[], |f| {
     { // The relationship object of a member, and an alias leaf.
       let response : SaveResponse = save (f, "\
-* (skg (node (id r) (repo main))) r, retitled
-** (skg (node (id a) (repo main) (diff (readyRequest rel)))) a
+* (skg node (gnid r) (skgRepos (nodeRepo main))) r, retitled
+** (skg node (gnid a) (skgRepos (nodeRepo main)) (diff (readyRequest rel))) a
 *** (skg aliasFolder)
 **** (skg alias (diff (readyRequest))) ay
-** (skg (node (id b) (repo main))) b
+** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
       assert_eq! ( marked_keys (f),
                    [ r_contains_a (), a_alias () ] . into_iter () . collect () );
@@ -74,26 +74,26 @@ fn a_save_marks_and_unmarks_the_leaves_its_requests_name (
             &key, straddle . change_leaves () . leaf_fingerprint (&key) . unwrap () )); }} }
     { // 'all' on a node names every leaf it owns.
       save (f, "\
-* (skg (node (id r) (repo main) (diff (readyRequest all)))) r, retitled
-** (skg (node (id a) (repo main))) a
-** (skg (node (id b) (repo main))) b
+* (skg node (gnid r) (skgRepos (nodeRepo main)) (diff (readyRequest all))) r, retitled
+** (skg node (gnid a) (skgRepos (nodeRepo main))) a
+** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
       assert_eq! ( marked_keys (f),
                    [ r_text (), r_contains_a (), a_alias () ]
                    . into_iter () . collect () ); }
     { // Unmarking.
       save (f, "\
-* (skg (node (id r) (repo main) (diff (unreadyRequest all)))) r, retitled
-** (skg (node (id a) (repo main))) a
-** (skg (node (id b) (repo main))) b
+* (skg node (gnid r) (skgRepos (nodeRepo main)) (diff (unreadyRequest all))) r, retitled
+** (skg node (gnid a) (skgRepos (nodeRepo main))) a
+** (skg node (gnid b) (skgRepos (nodeRepo main))) b
 ") ?;
       assert_eq! ( marked_keys (f),
                    [ a_alias () ] . into_iter () . collect () ); }
     { // A request that names no change is dropped, with a warning.
       let response : SaveResponse = save (f, "\
-* (skg (node (id r) (repo main))) r, retitled
-** (skg (node (id a) (repo main))) a
-** (skg (node (id b) (repo main) (diff (readyRequest rel))) (vnid 0z)) b
+* (skg node (gnid r) (skgRepos (nodeRepo main))) r, retitled
+** (skg node (gnid a) (skgRepos (nodeRepo main))) a
+** (skg (vnid 0z) node (gnid b) (skgRepos (nodeRepo main)) (diff (readyRequest rel))) b
 ") ?;
       assert_eq! ( marked_keys (f),
                    [ a_alias () ] . into_iter () . collect () );

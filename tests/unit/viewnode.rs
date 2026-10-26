@@ -93,7 +93,7 @@ fn writeProtect_requests_round_trip () {
     assert_eq! ( request . to_string (), atom );
     let metadata : ViewnodeMetadata =
       parse_metadata_to_viewnodemd (
-        &format! ( "(skg (node (id x) (viewRequests {})))", atom ) )
+        &format! ( "(skg node (gnid x) (viewRequests {}))", atom ) )
       . unwrap ();
     assert_eq! ( metadata . view_requests,
                  [request] . into_iter () . collect () ); }}
@@ -157,10 +157,10 @@ fn viewnode_ids_are_base_36_and_at_least_two_characters_long () {
   for not_a_viewnode_id in [ "", "0A", "a-b", "a b" ] {
     assert! ( ViewnodeId::parse (not_a_viewnode_id) . is_err (), "{:?}", not_a_viewnode_id ); }}
 
-// Every kind of viewnode prints its viewnode ID as the last part of its
+// Every kind of viewnode prints its viewnode ID as the first part of its
 // '(skg ...)' wrapper, and the parser reads it back.
 #[test]
-fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
+fn every_kind_prints_its_viewnode_id_first_and_parses_it_back () {
   let config : SkgConfig = SkgConfig::dummyFromSkgrepos (HashMap::new ());
   let kinds : Vec<Viewnode> = vec! [
     mk_editable_viewnode ( ID::from ("n"), SkgrepoName::from ("main"),
@@ -181,7 +181,7 @@ fn every_kind_prints_its_viewnode_id_last_and_parses_it_back () {
     let viewnode_id : ViewnodeId = ViewnodeId::from_counter (10 + counter as u64);
     let viewnode : Viewnode = Viewnode { viewnode_id : Some (viewnode_id . clone ()), .. kind };
     let rendered : String = viewnode_to_string (&viewnode, &config) . unwrap ();
-    assert! ( rendered . ends_with (&format! (" (vnid {})", viewnode_id)), "{}", rendered );
+    assert! ( rendered . starts_with (&format! ("(vnid {}) ", viewnode_id)), "{}", rendered );
     let metadata : ViewnodeMetadata =
       parse_metadata_to_viewnodemd (&format! ("(skg {})", rendered)) . unwrap ();
     let (parsed, _error, _warning)
@@ -197,9 +197,9 @@ fn a_repeated_viewnode_id_stays_with_its_first_headline () {
   let (forest, errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest ( concat! (
-      "* (skg (node (id a) (repo main)) (vnid 0a)) a\n",
-      "** (skg (node (id b) (repo main)) (vnid 0b)) b\n",
-      "** (skg (node (id b) (repo main)) (vnid 0b)) b\n",
+      "* (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a\n",
+      "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",
+      "** (skg (vnid 0b) node (gnid b) (skgRepos (nodeRepo main))) b\n",
       "** typed\n" )) . unwrap ();
   assert! ( errors . is_empty (), "{:?}", errors );
   let viewnode_ids : Vec<Option<ViewnodeId>> =

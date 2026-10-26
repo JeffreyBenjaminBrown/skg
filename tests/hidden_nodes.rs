@@ -126,7 +126,7 @@ fn a_tightened_restriction_leaves_a_tombstone_over_the_hidden_nodes_children (
           "a tombstone stands where h stood:\n{}", switched ));
       assert! ( headlines . get (tombstone + 1) . is_some_and (
                   |line| line . starts_with ("*** ")
-                         && line . contains ("(id s1)") ),
+                         && line . contains ("(gnid s1)") ),
                 "the tombstone holds s1:\n{}", switched );
       { // switching back draws h again; the tombstone, which says
         // nothing of what it stood for, stays beside it with s1
@@ -141,7 +141,7 @@ fn assert_no_trace_of_the_hidden_nodes (
   what   : &str,
   buffer : &str,
 ) {
-  for trace in ["secret", "(id h)", "(id hs)"] {
+  for trace in ["secret", "(gnid h)", "(gnid hs)"] {
     assert! ( ! buffer . contains (trace),
               "{} shows {:?}:\n{}", what, trace, buffer ); }}
 

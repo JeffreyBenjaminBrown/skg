@@ -42,18 +42,18 @@ fn entry<'a> (
 fn ordinary_editable_emissions () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (repo main) (editRequest (flag noSearchMatching true)))) root
+      * (skg node (gnid root) (skgRepos (nodeRepo main)) (editRequest (flag noSearchMatching true))) root
       Root body
-      ** (skg (node (id child) (repo main))) child
-      ** (skg (node (id independent) (repo main) noClaim)) independent
+      ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
+      ** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (repo main) writeProtected)) s
+      *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (repo main) writeProtected)) o
-      * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
-      * (skg (node (id acquirer) (repo main) (editRequest (merge acquiree)))) acquirer
+      *** (skg node (gnid o) (skgRepos (nodeRepo main)) writeProtected) o
+      * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
+      * (skg node (gnid acquirer) (skgRepos (nodeRepo main)) (editRequest (merge acquiree))) acquirer
       "} );
   { let root : &FieldIntentsForOneId = entry (&collected, "root");
     assert_eq!( root . title_and_body,
@@ -90,12 +90,12 @@ fn writeProtected_members_relRepo_requests_reach_their_editable_recorder () {
   // carrying it is write-protected.
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (repo main))) root
-      ** (skg (node (id c) (repo main) writeProtected (editRequest (relRepo private)))) c
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+      ** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo private))) c
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (repo main) writeProtected (editRequest (relRepo private)))) s
+      *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo private))) s
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (repo main) writeProtected (editRequest (relRepo private)))) o
+      *** (skg node (gnid o) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo private))) o
       "} );
   let root : &FieldIntentsForOneId = entry (&collected, "root");
   let private : Option<SkgrepoName> = Some (SkgrepoName::from ("private"));
@@ -110,13 +110,13 @@ fn writeProtected_members_relRepo_requests_reach_their_editable_recorder () {
 fn subscribee_as_such_emits_claim_and_visibility () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (repo main))) subscriber
+      * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (repo main))) e
+      *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       Subscribee body
-      **** (skg (node (id visible) (repo main))) visible
-      **** (skg (node (id hidden) (repo main) noClaim)) hidden
-      **** (skg (node (id leaving) (repo main) (editRequest delete))) leaving
+      **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
+      **** (skg node (gnid hidden) (skgRepos (nodeRepo main)) noClaim) hidden
+      **** (skg node (gnid leaving) (skgRepos (nodeRepo main)) (editRequest delete)) leaving
       "} );
   { let e : &FieldIntentsForOneId = entry (&collected, "e");
     // The subscribee-as-such emits no Set* intents, only a text
@@ -148,9 +148,9 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   // would write the subscribee's aliases.
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (repo main))) subscriber
+      * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (repo main))) e
+      *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
       **** (skg aliasFolder) aliases
       ***** (skg alias) sneaky alias
       "} );
@@ -160,16 +160,16 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
 fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
+      * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
       ** (skg aliasFolder) aliases
       *** (skg alias) dead alias
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (repo main) writeProtected)) s
-      * (skg (node (id ghost) (repo main) writeProtected)) ghost
+      *** (skg node (gnid s) (skgRepos (nodeRepo main)) writeProtected) s
+      * (skg node (gnid ghost) (skgRepos (nodeRepo main)) writeProtected) ghost
       ** (skg aliasFolder) aliases
       *** (skg alias) ghost alias
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (repo main) writeProtected)) o
+      *** (skg node (gnid o) (skgRepos (nodeRepo main)) writeProtected) o
       "} );
   { let doomed : &FieldIntentsForOneId = entry (&collected, "doomed");
     assert!( doomed . delete );
@@ -182,11 +182,11 @@ fn folders_under_toDelete_or_writeProtected_recorders_emit_nothing () {
 fn editable_member_of_write_protected_folder_emits_for_itself_only () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id recorder) (repo main))) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg subscriberFolder)
-      *** (skg (node (id intruder) (repo main))) intruder
+      *** (skg node (gnid intruder) (skgRepos (nodeRepo main))) intruder
       Intruder body
-      **** (skg (node (id intruder-child) (repo main))) intruder child
+      **** (skg node (gnid intruder-child) (skgRepos (nodeRepo main))) intruder child
       "} );
   { let intruder : &FieldIntentsForOneId = entry (&collected, "intruder");
     assert_eq!( intruder . title_and_body,
@@ -203,9 +203,9 @@ fn editable_member_of_write_protected_folder_emits_for_itself_only () {
 fn editable_child_of_tombstone_emits () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (repo main))) root
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
       ** (skg tombstone)
-      *** (skg (node (id stowaway) (repo main))) stowaway
+      *** (skg node (gnid stowaway) (skgRepos (nodeRepo main))) stowaway
       "} );
   { let stowaway : &FieldIntentsForOneId = entry (&collected, "stowaway");
     assert!( stowaway . title_and_body . is_some() ); }
@@ -219,9 +219,9 @@ fn editable_child_of_tombstone_emits () {
 fn editable_node_inside_historical_phantom_subtree_emits () {
   let input : &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) root
-      ** (skg (ghost (gnid fading) (skgRepos (nodeRepo main)))) fading
-      *** (skg (node (id survivor) (repo main))) survivor
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+      ** (skg ghost (gnid fading) (skgRepos (nodeRepo main))) fading
+      *** (skg node (gnid survivor) (skgRepos (nodeRepo main))) survivor
       "};
   let forest : ViewForest = forest_from_org (input);
   let collected : CollectedFieldIntents =
@@ -238,10 +238,10 @@ fn editable_node_inside_historical_phantom_subtree_emits () {
 fn writeProtected_subscribee_as_such_emits_nothing () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (repo main))) subscriber
+      * (skg node (gnid subscriber) (skgRepos (nodeRepo main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (repo main) writeProtected)) e
-      **** (skg (node (id under) (repo main) writeProtected)) under
+      *** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected) e
+      **** (skg node (gnid under) (skgRepos (nodeRepo main)) writeProtected) under
       "} );
   assert!( collected . by_pid . get (&ID::from ("e")) . is_none() );
   assert_eq!( entry (&collected, "subscriber") . visibility, vec![] ); }
@@ -250,10 +250,10 @@ fn writeProtected_subscribee_as_such_emits_nothing () {
 fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (repo main) writeProtected)) subscriber
+      * (skg node (gnid subscriber) (skgRepos (nodeRepo main)) writeProtected) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (repo main))) e
-      **** (skg (node (id visible) (repo main))) visible
+      *** (skg node (gnid e) (skgRepos (nodeRepo main))) e
+      **** (skg node (gnid visible) (skgRepos (nodeRepo main))) visible
       "} );
   assert_eq!(
     entry (&collected, "e") . text_claims,
@@ -268,11 +268,11 @@ fn editable_subscribee_under_writeProtected_subscriber_claims_without_visibility
 fn present_but_empty_folders_differ_from_absent_folders () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id explicit) (repo main))) explicit
+      * (skg node (gnid explicit) (skgRepos (nodeRepo main))) explicit
       ** (skg aliasFolder) aliases
       ** (skg subscribeeFolder)
       ** (skg overriddenFolder)
-      * (skg (node (id silent) (repo main))) silent
+      * (skg node (gnid silent) (skgRepos (nodeRepo main))) silent
       "} );
   { let explicit : &FieldIntentsForOneId = entry (&collected, "explicit");
     // A present-but-empty folder is an explicitly empty field.
@@ -289,19 +289,19 @@ fn present_but_empty_folders_differ_from_absent_folders () {
 fn duplicate_defining_folder_members_dedup_preserving_order () {
   let collected : CollectedFieldIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id recorder) (repo main))) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg aliasFolder) aliases
       *** (skg alias) echo
       *** (skg alias) other
       *** (skg alias) echo
       ** (skg subscribeeFolder)
-      *** (skg (node (id s1) (repo main) writeProtected)) s1
-      *** (skg (node (id s2) (repo main) writeProtected)) s2
-      *** (skg (node (id s1) (repo main) writeProtected)) s1
+      *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
+      *** (skg node (gnid s2) (skgRepos (nodeRepo main)) writeProtected) s2
+      *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
       ** (skg overriddenFolder)
-      *** (skg (node (id o1) (repo main) writeProtected)) o1
-      *** (skg (node (id o2) (repo main) writeProtected)) o2
-      *** (skg (node (id o1) (repo main) writeProtected)) o1
+      *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
+      *** (skg node (gnid o2) (skgRepos (nodeRepo main)) writeProtected) o2
+      *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
       "} );
   let recorder : &FieldIntentsForOneId = entry (&collected, "recorder");
   assert_eq!( recorder . aliases,

@@ -64,7 +64,7 @@ fn e_lines_by_enclosing_folder (
   for line in buf . lines () {
     if without_viewnode_ids (line) . contains ("subscribeeFolder)") { current_folder = "subscribeeFolder"; }
     else if without_viewnode_ids (line) . contains ("overriddenFolder)") { current_folder = "overriddenFolder"; }
-    else if line . contains ("(id E)") {
+    else if line . contains ("(gnid E)") {
       result . push ((current_folder, line)); }}
   result }
 
@@ -101,7 +101,7 @@ fn assert_sharing_stats_in_view_of_R (
       other => panic! (
         "{}: E shown outside any folder ({:?}):\n{}", label, other, buf ),
     }}
-  for f_line in lines_containing (buf, "(id F)") {
+  for f_line in lines_containing (buf, "(gnid F)") {
     // F is a subscribee R does not override, so it has no overrides
     // relation at all -- only its folder subscribe (its birth).
     assert! ( ! f_line . contains ("(overrides"),
@@ -111,7 +111,7 @@ fn assert_sharing_stats_in_view_of_R (
     // C in place of P (C overrides P), marked; the Op position (C
     // under a shown P) is asserted from a view of P instead, in
     // assert_op_in_view_of_P.
-    let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
+    let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
     assert! ( c_lines . iter ()
               . any ( |l| l . contains ("(overridesHere P)") ),
       "{}: C is shown in place of P, marked:\n{}", label, buf ); }}
@@ -120,7 +120,7 @@ fn assert_op_in_view_of_P (
   buf   : &str,
   label : &str,
 ) {
-  let c_lines : Vec<&str> = lines_containing (buf, "(id C)");
+  let c_lines : Vec<&str> = lines_containing (buf, "(gnid C)");
   // Op ("overridesParent"): C overrides its viewparent (a = P), so
   // it is born of an overrides-out relation to generation 1.
   assert! ( c_lines . iter ()
@@ -164,8 +164,8 @@ async fn sharing_view_stats_appear_and_roundtrip (
           config, Some (tantivy),
           &[ ID ("R" . to_string ()) ] ) ?;
       let folder_request : String = initial . replacen (
-        "(node ",
-        "(node (viewRequests (folder overrides))", 1 );
+        "node ",
+        "node (viewRequests (folder overrides))", 1 );
       let de_novo : String =
         save_and_rerender (&folder_request, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&de_novo, "de novo");
@@ -200,7 +200,7 @@ async fn overridesParent_is_position_relative (
           &[ ID ("C" . to_string ()) ] ) ?;
       let c_root_line : &str =
         view_of_c . lines ()
-        . find ( |l| l . starts_with ("* ") && l . contains ("(id C)") )
+        . find ( |l| l . starts_with ("* ") && l . contains ("(gnid C)") )
         . expect ("view of C should have C as its root");
       assert! ( ! c_root_line . contains ("overridesParent"),
         "C as a view root has no viewparent to override:\n{}",

@@ -98,8 +98,8 @@ fn collateral_partner_folder_update_and_warning_scoping
         single_root_view (
           config, Some (tantivy), &ID::from ("N") ) ?;
       let n_folder_request : String = n_view . replacen (
-        "(node ",
-        "(node (viewRequests (folder subscribesTo))", 1 );
+        "node ",
+        "node (viewRequests (folder subscribesTo))", 1 );
       let (n_response, initial_collateral) =
         save_and_read_collateral (
           &n_folder_request, &n_viewforest_id, config, tantivy, &graph,
@@ -111,7 +111,7 @@ fn collateral_partner_folder_update_and_warning_scoping
         initial_collateral );
       let n_view : String = n_response . saved_view;
       assert! ( n_view . contains ("subscriberFolder")
-                && n_view . contains ("(id S)"),
+                && n_view . contains ("(gnid S)"),
         "N's view should show S in a subscriberFolder:\n{}", n_view );
 
       // Render S (subscribeeFolder shows N) and register it as the saved
@@ -120,14 +120,14 @@ fn collateral_partner_folder_update_and_warning_scoping
         single_root_view (
           config, Some (tantivy), &ID::from ("S") ) ?;
       assert! ( s_view . contains ("subscribeeFolder")
-                && s_view . contains ("(id N)"),
+                && s_view . contains ("(gnid N)"),
         "S's view should show N in a subscribeeFolder:\n{}", s_view );
       views_state . open_views . register_view (
         &graph . load_full (), s_viewforest_id . clone (), s_vf, &s_pids );
 
       // Drop N from S's subscribeeFolder (emptying it = explicit empty
       // set) and save S's view.
-      let edited_s : String = drop_member_line (&s_view, "(id N)");
+      let edited_s : String = drop_member_line (&s_view, "(gnid N)");
       let (response, collateral_views) =
         save_and_read_collateral (
           &edited_s, &s_viewforest_id, config, tantivy, &graph,
@@ -139,9 +139,9 @@ fn collateral_partner_folder_update_and_warning_scoping
       assert_eq! ( collateral_views . len (), 1,
         "exactly N's view should be collateral: {:?}", collateral_views );
       let n_collateral : &str = &collateral_views[0];
-      assert! ( n_collateral . contains ("(id N)"),
+      assert! ( n_collateral . contains ("(gnid N)"),
         "the collateral view should be N's:\n{}", n_collateral );
-      assert! ( ! n_collateral . contains ("(id S)"),
+      assert! ( ! n_collateral . contains ("(gnid S)"),
         "S must be gone from N's subscriberFolder collaterally:\n{}",
         n_collateral );
       assert! ( ! n_collateral . contains ("subscriberFolder"),
@@ -189,19 +189,19 @@ fn a_member_added_at_a_later_visit_gets_its_chain
       let (n_response, _) =
         save_and_read_collateral (
           &n_view . replacen (
-            "(node ", "(node (viewRequests (folder subscribesTo))", 1 ),
+            "node ", "node (viewRequests (folder subscribesTo))", 1 ),
           &n_viewforest_id, config, tantivy, &graph,
           &mut views_state ) . await ?;
       assert! ( n_response . errors . is_empty ()
-                && n_response . saved_view . contains ("(id S)")
-                && ! n_response . saved_view . contains ("(id T)"),
+                && n_response . saved_view . contains ("(gnid S)")
+                && ! n_response . saved_view . contains ("(gnid T)"),
         "N's subscriberFolder should hold S alone:\n{}",
         n_response . saved_view );
       let (response, collateral_views) =
         save_and_read_collateral (
-          "* (skg (node (id T) (repo main))) T\n\
+          "* (skg node (gnid T) (skgRepos (nodeRepo main))) T\n\
            ** (skg subscribeeFolder)\n\
-           *** (skg (node (id N) (repo main) writeProtected)) N\n",
+           *** (skg node (gnid N) (skgRepos (nodeRepo main)) writeProtected) N\n",
           &t_viewforest_id, config, tantivy, &graph,
           &mut views_state ) . await ?;
       assert! ( response . errors . is_empty (),
@@ -212,11 +212,11 @@ fn a_member_added_at_a_later_visit_gets_its_chain
           "N's view should be collateral: {:?}", collateral_views ));
       let lines : Vec<&str> = n_collateral . lines () . collect ();
       let t_index : usize = lines . iter ()
-        . position ( |line| line . starts_with ("*** ") && line . contains ("(id T)") )
+        . position ( |line| line . starts_with ("*** ") && line . contains ("(gnid T)") )
         . unwrap_or_else ( || panic! (
           "T should be a member of N's subscriberFolder:\n{}", n_collateral ));
       let chain_node : &str = lines . get (t_index + 1) . copied () . unwrap_or ("");
-      assert! ( chain_node . starts_with ("**** ") && chain_node . contains ("(id C)")
+      assert! ( chain_node . starts_with ("**** ") && chain_node . contains ("(gnid C)")
                 && chain_node . contains ("noClaim")
                 && chain_node . contains ("writeProtected"),
         "T should hold its chain, C:\n{}", n_collateral );

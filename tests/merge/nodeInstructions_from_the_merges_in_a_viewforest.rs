@@ -18,7 +18,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
       Box::pin(async move {
         // Create a viewforest with node 1 requesting to merge node 2
         let input = indoc! {"
-          * (skg (node (id 1) (repo main) (editRequest (merge 2)))) 1
+          * (skg node (gnid 1) (skgRepos (nodeRepo main)) (editRequest (merge 2))) 1
         "};
 
         let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;

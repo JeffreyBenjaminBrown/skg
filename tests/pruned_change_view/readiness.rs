@@ -31,12 +31,12 @@ fn a_headline_carries_the_leaves_it_names (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let without_ctx : String =
-      without_lines_containing (&buffer, "** (skg (node (id ctx)");
+      without_lines_containing (&buffer, "** (skg node (gnid ctx)");
     let saved : String =
       save_cleanly (f, &all_changes_view (), &without_ctx) ? . saved_view;
     for line in [
       "** (skg (changesetMarker content) (diff (leaves 3 all)))",
-      "*** (skg (ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel)))) gone",
+      "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel))) gone",
       "** (skg (oldText titleAndBody) (diff (leaves 1))) txt" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |l| l == line ),
                 "{:?} in:\n{}", line, saved ); }
@@ -51,16 +51,16 @@ fn a_mark_shows_on_both_images_of_a_relationship (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let marked : String = edit_line (
-      &buffer, "*** (skg (node (id s1)",
-      |line| line . replace ( "(diff (rel removed) (leaves 1 rel)))) s1",
-                              "(diff (rel removed) (leaves 1 rel) (readyRequest rel)))) s1" ));
+      &buffer, "*** (skg node (gnid s1)",
+      |line| line . replace ( "(diff (rel removed) (leaves 1 rel))) s1",
+                              "(diff (rel removed) (leaves 1 rel) (readyRequest rel))) s1" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "*** (skg (node (id s1) (repo public) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel) (ready rel)))) s1" ),
+      "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel) (ready rel))) s1" ),
       "the image under sub is ready:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
-      line . starts_with ("*** (skg (node (id sub)")
-      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel)))) sub") ),
+      without_viewnode_ids (line) . starts_with ("*** (skg node (gnid sub)")
+      && line . ends_with ("(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel))) sub") ),
       "the image under s1 is ready:\n{}", saved );
     assert! ( ! without_viewnode_ids (&saved) . contains ("readyRequest"),
               "the request was consumed:\n{}", saved );
@@ -78,26 +78,26 @@ fn a_gesture_on_a_modified_folder_member_marks_its_file (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let member : &str =
-      "*** (skg (node (id sub) (repo public) noClaim writeProtected";
+      "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) noClaim writeProtected";
     let marked : String = edit_line (
       &buffer, member,
       |line| line . replace (
-        "(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub",
-        "(diff (rel removed) (properties changed) (leaves 2 rel all) (readyRequest rel all)))) sub" ));
+        "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub",
+        "(diff (rel removed) (properties changed) (leaves 2 rel all) (readyRequest rel all))) sub" ));
     assert_ne! ( marked, buffer, "the member shows its properties:\n{}", buffer );
     let saved : String = without_viewnode_ids (
       & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
     let lines_of_sub : Vec<&str> = saved . lines ()
-      . filter ( |line| line . contains ("(node (id sub) ") ) . collect ();
+      . filter ( |line| line . contains ("node (gnid sub) ") ) . collect ();
     for (prefix, ending) in [
       ( member,
-        "(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel all)))) sub" ),
-      ( "*** (skg (node (id sub) (repo public) writeProtected",
-        "(diff (rel added) (properties changed) (leaves 2 rel all) (ready rel all)))) sub" ),
-      ( "* (skg (node (id sub)",
-        "(diff (properties changed) (leaves 2 all) (ready all)))) sub" ) ] {
+        "(diff (rel removed) (properties changed) (leaves 2 rel all) (ready rel all))) sub" ),
+      ( "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) writeProtected",
+        "(diff (rel added) (properties changed) (leaves 2 rel all) (ready rel all))) sub" ),
+      ( "* (skg node (gnid sub)",
+        "(diff (properties changed) (leaves 2 all) (ready all))) sub" ) ] {
       assert! ( lines_of_sub . iter () . any ( |line|
-                  line . starts_with (prefix) && line . ends_with (ending) ),
+                  without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (ending) ),
                 "{:?} ... {:?} in:\n{}", prefix, ending, saved ); }
     Ok (( )) }) }
 
@@ -112,21 +112,21 @@ fn a_chain_node_carries_no_change_and_takes_no_gesture (
   with_fixture ("removed_partners", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let chain_node : &str =
-      "***** (skg (node (id d) (repo main) noClaim writeProtected";
+      "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected";
     let marked : String = edit_line (
       &buffer, chain_node,
       |line| { assert! ( ! line . contains ("(diff"), "{}", line );
-               format! ( "{} (diff (readyRequest rel)))) d", // inside the node form
-                         line . strip_suffix (")) d") . unwrap () ) } );
+               format! ( "{} (diff (readyRequest rel))) d", // beside the node's parts
+                         line . strip_suffix (") d") . unwrap () ) } );
     assert_ne! ( marked, buffer, "the gesture was typed:\n{}", buffer );
     let saved : String = without_viewnode_ids (
       & save_cleanly (f, &all_changes_view (), &marked) ? . saved_view );
     assert! ( saved . lines () . any ( |line|
-                line . starts_with (chain_node) && ! line . contains ("(diff") ),
+                without_viewnode_ids (line) . starts_with (chain_node) && ! line . contains ("(diff") ),
               "the chain node shows no change:\n{}", saved );
     assert! ( saved . lines () . any ( |line|
-                line . starts_with ("** (skg (node (id c) (repo main) noClaim")
-                && line . ends_with ("(diff (rel removed) (leaves 1 rel)))) c") ),
+                without_viewnode_ids (line) . starts_with ("** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim")
+                && line . ends_with ("(diff (rel removed) (leaves 1 rel))) c") ),
               "c, as d's removed member, is not ready:\n{}", saved );
     Ok (( )) }) }
 
@@ -165,7 +165,7 @@ fn editing_a_node_lapses_its_mark (
     assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1) (ready))) txt"),
               "the old text is ready:\n{}", saved );
     let edited : String = edit_line (
-      &saved, "* (skg (node (id txt)",
+      &saved, "* (skg node (gnid txt)",
       |line| line . replace ( "txt, retitled", "txt, retitled again" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &edited) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText titleAndBody) (diff (leaves 1))) txt"),
@@ -196,7 +196,7 @@ fn the_save_reports_the_readiness_summary (
     let only_r : String = { // drop the roots cy2, ln and mc, which precede r
       let lines : Vec<&str> = response . saved_view . lines () . collect ();
       let start : usize = lines . iter ()
-        . position ( |line| line . starts_with ("* (skg (node (id r)") )
+        . position ( |line| without_viewnode_ids (line) . starts_with ("* (skg node (gnid r)") )
         . expect ("r is a root");
       lines [start ..] . join ("\n") + "\n" };
     let response : SaveResponse = save_cleanly (f, &all_changes_view (), &only_r) ?;
@@ -207,9 +207,9 @@ fn the_save_reports_the_readiness_summary (
     let (shown, not_editable) : (String, usize) = integrate_unshown_changes (f) ?;
     let roots : Vec<&str> = shown . lines ()
       . filter ( |line| line . starts_with ("* ") ) . collect ();
-    assert! ( roots . len () == 4 && roots [0] . starts_with ("* (skg (node (id r)")
-              && roots [1] . contains ("(id cy2)") && roots [2] . contains ("(id ln)")
-              && roots [3] . contains ("(id mc)"),
+    assert! ( roots . len () == 4 && without_viewnode_ids (roots [0]) . starts_with ("* (skg node (gnid r)")
+              && roots [1] . contains ("(gnid cy2)") && roots [2] . contains ("(gnid ln)")
+              && roots [3] . contains ("(gnid mc)"),
               "the dropped roots return, after r:\n{}", shown );
     assert_eq! ( not_editable, 0 );
     Ok (( )) }) }
@@ -280,7 +280,7 @@ fn save_deleting (
   prefix : &str,
   pid    : &str,
 ) -> Result<String, Box<dyn Error>> {
-  let node : String = format! ("(node (id {})", pid);
+  let node : String = format! ("node (gnid {})", pid);
   let deleting : String = edit_line (
     buffer, prefix,
     |line| line . replacen (
@@ -300,10 +300,10 @@ fn a_member_deleted_in_the_buffer_is_rerendered_as_removed (
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = save_deleting (
-      f, &buffer, "** (skg bodyFolded (node (id cy1)", "cy1" ) ?;
-    assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (id cy1)"), "{}", saved );
+      f, &buffer, "** (skg bodyFolded node (gnid cy1)", "cy1" ) ?;
+    assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (gnid cy1)"), "{}", saved );
     let historical : &str =
-      "(ghost (gnid cy1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) cy1";
+      "ghost (gnid cy1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) cy1";
     assert_eq! ( without_viewnode_ids (&saved) . matches (historical) . count (), 2,
                  "in cy2's content and in its container folder:\n{}", saved );
     assert! ( without_viewnode_ids (&saved) . contains ( &format! ("** (skg bodyFolded {}", historical) ),
@@ -316,11 +316,11 @@ fn a_root_deleted_in_the_buffer_is_rerendered_as_removed (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = save_deleting (
-      f, &buffer, "* (skg (node (id flg)", "flg" ) ?;
+      f, &buffer, "* (skg node (gnid flg)", "flg" ) ?;
     assert! ( without_viewnode_ids (&saved) . contains (
-      "* (skg (ghost (gnid flg) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node)))) flg" ),
+      "* (skg ghost (gnid flg) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node))) flg" ),
       "{}", saved );
-    assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (id flg)"), "{}", saved );
+    assert! ( ! without_viewnode_ids (&saved) . contains ("(deleted (gnid flg)"), "{}", saved );
     Ok (( )) }) }
 
 /// A node in both graphs that records a leaf is modified: its change is
@@ -335,21 +335,21 @@ fn a_modified_node_lists_all_and_one_mark_readies_its_file (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    let modified : &str = "(diff (properties changed) (leaves 1 all)))) cy2, retitled";
+    let modified : &str = "(diff (properties changed) (leaves 1 all))) cy2, retitled";
     assert! ( without_viewnode_ids (&buffer) . lines () . any ( |line|
-      line . starts_with ("*** (skg (node (id cy2) (repo main) writeProtected")
+      without_viewnode_ids (line) . starts_with ("*** (skg node (gnid cy2) (skgRepos (nodeRepo main)) writeProtected")
       && line . ends_with (modified) ),
       "cy2 is modified in cy1's content:\n{}", buffer );
     let marked : String = edit_line (
-      &buffer, "*** (skg (node (id cy2)",
-      |line| line . replace ( "(leaves 1 all))))",
-                              "(leaves 1 all) (readyRequest all))))" ));
+      &buffer, "*** (skg node (gnid cy2)",
+      |line| line . replace ( "(leaves 1 all)))",
+                              "(leaves 1 all) (readyRequest all)))" ));
     let saved : String = save_cleanly (f, &all_changes_view (), &marked) ? . saved_view;
     let ready : &str =
-      "(diff (properties changed) (leaves 1 all) (ready all)))) cy2, retitled";
-    for prefix in [ "* (skg (node (id cy2)", "*** (skg (node (id cy2)" ] {
+      "(diff (properties changed) (leaves 1 all) (ready all))) cy2, retitled";
+    for prefix in [ "* (skg node (gnid cy2)", "*** (skg node (gnid cy2)" ] {
       assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
-        line . starts_with (prefix) && line . ends_with (ready) ),
+        without_viewnode_ids (line) . starts_with (prefix) && line . ends_with (ready) ),
         "{:?} is ready:\n{}", prefix, saved ); }
     assert! ( without_viewnode_ids (&saved) . contains ("** (skg (oldText title) (diff (leaves 1) (ready))) cy2"),
               "cy2's old text is ready:\n{}", saved );
@@ -363,15 +363,15 @@ fn a_modified_node_in_a_new_relationship_lists_rel_and_all (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("sets", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert! ( without_viewnode_ids (&buffer) . contains ("(diff (rel added) (leaves 1 rel)))) lo\n"),
+    assert! ( without_viewnode_ids (&buffer) . contains ("(diff (rel added) (leaves 1 rel))) lo\n"),
               "lo, unmodified, is new in ln's content:\n{}", buffer );
     let retitled : String = edit_line (
-      &buffer, "** (skg (node (id lo)",
+      &buffer, "** (skg node (gnid lo)",
       |line| format! ( "{}, retitled", line ));
     let saved : String = save_cleanly (f, &all_changes_view (), &retitled) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
-      line . starts_with ("** (skg (node (id lo)")
-      && line . ends_with ("(diff (rel added) (properties changed) (leaves 2 rel all)))) lo, retitled") ),
+      without_viewnode_ids (line) . starts_with ("** (skg node (gnid lo)")
+      && line . ends_with ("(diff (rel added) (properties changed) (leaves 2 rel all))) lo, retitled") ),
       "lo is modified, in a new relationship:\n{}", saved );
     Ok (( )) }) }
 
@@ -383,11 +383,11 @@ fn a_new_node_lists_node_and_rel (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let edited : String = insert_after_line_starting (
-      &buffer, "* (skg (node (id ct)", "** a new child" );
+      &buffer, "* (skg node (gnid ct)", "** a new child" );
     let saved : String = save_cleanly (f, &all_changes_view (), &edited) ? . saved_view;
     assert! ( without_viewnode_ids (&saved) . lines () . any ( |line|
-      line . starts_with ("** (skg (node (id ")
-      && line . ends_with ("(diff (node added) (rel added) (leaves 2 node rel)))) a new child") ),
+      without_viewnode_ids (line) . starts_with ("** (skg node (gnid ")
+      && line . ends_with ("(diff (node added) (rel added) (leaves 2 node rel))) a new child") ),
       "the new child is new, in a new relationship:\n{}", saved );
     Ok (( )) }) }
 
@@ -399,7 +399,7 @@ fn a_modified_root_carries_its_change (
   with_fixture ("kinds", &["public", "private"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . lines () . any ( |line|
-      line . starts_with ("* (skg (node (id txt)")
-      && line . ends_with ("(diff (properties changed) (leaves 1 all)))) txt, retitled") ),
+      without_viewnode_ids (line) . starts_with ("* (skg node (gnid txt)")
+      && line . ends_with ("(diff (properties changed) (leaves 1 all))) txt, retitled") ),
       "txt is a modified root:\n{}", buffer );
     Ok (( )) }) }

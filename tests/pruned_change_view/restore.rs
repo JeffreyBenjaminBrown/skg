@@ -16,6 +16,7 @@
 // a removed member (g, historical, in gc's container folder), and t
 // with g in its subscribee folder.
 
+use skg::metadata_canon::without_viewnode_ids;
 use crate::pruned_change_view::common::{
   assert_lines_in_order, open_all_changes_buffer, save, saved_and_rerendered, with_fixture};
 use crate::git_fixture::{edit_line, skg_files};
@@ -31,21 +32,21 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 const X_REMOVED_FROM_B : &str =
-  "** (skg (node (id x) (repo main) noClaim (rels";
+  "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels";
 const D_REMOVED_AS_CS_CONTAINER : &str =
-  "**** (skg (node (id d) (repo main) noClaim writeProtected (viewStats noWarrant cycle)";
+  "**** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (viewStats noWarrant cycle)";
 const S_REMOVED_AS_S2S_SUBSCRIBER : &str =
-  "*** (skg (node (id s) (repo main) noClaim writeProtected";
+  "*** (skg node (gnid s) (skgRepos (nodeRepo main)) noClaim writeProtected";
 /// d, a node of the containerward chain under c, a member of x's
 /// containers folder.
 const D_IN_THE_CHAIN_UNDER_C : &str =
-  "***** (skg (node (id d) (repo main) noClaim writeProtected (viewStats noWarrant))";
+  "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected (viewStats noWarrant)";
 const G_UNDER_Q : &str =
-  "** (skg (ghost (gnid g)";
+  "** (skg ghost (gnid g)";
 const GC_UNDER_G : &str =
-  "*** (skg (node (id gc) (repo main) noClaim writeProtected";
+  "*** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim writeProtected";
 const GC_REMOVED_FROM_R : &str =
-  "** (skg (node (id gc) (repo main) noClaim (viewStats noWarrant) (diff";
+  "** (skg node (gnid gc) (skgRepos (nodeRepo main)) noClaim (viewStats noWarrant) (diff";
 
 /// g's file at HEAD, as the save writes a node.
 const G_AT_HEAD : &str =
@@ -98,8 +99,8 @@ fn restoring_a_removed_content_member () -> Result<(), Box<dyn Error>> {
               "the request is consumed:\n{}", response . saved_view );
     assert_lines_in_order ( &response . saved_view, &[
       // b no longer differs from HEAD, and x is its member again
-      "* (skg (node (id b) (repo main) (rels (contains (out 1))))) b",
-      "** (skg (node (id x) (repo main) (rels (contains (in 3 (ancestors 1)) (out 1)) (birth (contains in 1))))) x" ] );
+      "* (skg node (gnid b) (skgRepos (nodeRepo main)) (rels (contains (out 1)))) b",
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) (rels (contains (in 3 (ancestors 1)) (out 1)) (birth (contains in 1)))) x" ] );
     saved_and_rerendered (f, &response . saved_view) ?;
     Ok (( )) }) }
 
@@ -149,10 +150,10 @@ fn restoring_a_deleted_node () -> Result<(), Box<dyn Error>> {
     assert! ( ! files . contains_key ("main/gd.skg") );
     assert! ( response . warnings . is_empty (), "{:?}", response . warnings );
     let rerendered : &str = &response . saved_view;
-    assert! ( ! rerendered . contains ("(ghost (gnid g)"),
+    assert! ( ! rerendered . contains ("ghost (gnid g)"),
               "g is no longer deleted:\n{}", rerendered );
     assert! ( ! rerendered . contains ("restoreNode"), "{}", rerendered );
-    assert! ( rerendered . contains ("*** (skg (unknown (id gd))"),
+    assert! ( without_viewnode_ids (rerendered) . contains ("*** (skg unknown (gnid gd)"),
               "g's out-link to gd, still deleted, shows as an unknown phantom:\n{}",
               rerendered );
     saved_and_rerendered (f, rerendered) ?;
@@ -202,7 +203,7 @@ fn restore_requests_on_the_wrong_kind_stop_the_save () -> Result<(), Box<dyn Err
     for (prefix, request, message) in [
       ( G_UNDER_Q, "restoreRel", RESTORE_REL_ON_A_DELETED_NODE ),
       ( GC_REMOVED_FROM_R, "restoreNode", RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
-      ( "* (skg (node (id q) ", "restoreRel", RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ), ] {
+      ( "* (skg node (gnid q) ", "restoreRel", RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ), ] {
       let refusal : String = match save ( f, &requesting (&buffer, prefix, request) ) {
         Err (e) => e . to_string (),
         Ok (response) => format! ( "{:?}", response . errors ), };
@@ -226,7 +227,7 @@ fn restoreRel_is_refused_on_a_chain_node_under_a_subscriber_folders_member (
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let requested : String = edit_line (
       &buffer,
-      "***** (skg (node (id p) (repo main) noClaim writeProtected",
+      "***** (skg node (gnid p) (skgRepos (nodeRepo main)) noClaim writeProtected",
       |line : &str| line . replacen (
         "writeProtected", "writeProtected (editRequest restoreRel) (diff (rel removed))", 1 ));
     assert_ne! ( requested, buffer );

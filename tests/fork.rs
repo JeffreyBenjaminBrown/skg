@@ -41,19 +41,19 @@ use skg::types::views_state::{OpenViews, ViewforestId};
 /// title to "N-edited" -- a real change, so saving forks N. (N's
 /// children stay write-protected foreign content.)
 const FORK_BUFFER : &str = indoc! {"
-  * (skg (node (id P) (repo owned))) P-container
-  ** (skg (node (id N) (repo foreign))) N-edited
-  *** (skg (node (id N1) (repo foreign) writeProtected)) N1
-  *** (skg (node (id N2) (repo foreign) writeProtected)) N2
+  * (skg node (gnid P) (skgRepos (nodeRepo owned))) P-container
+  ** (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-edited
+  *** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+  *** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
   "};
 
 /// A foreign node N opened as a bare root -- no owned ancestor to infer
 /// a clone skgrepo from. Editing its title forks it; the clone's skgrepo
 /// must then default to the user's first owned skgrepo.
 const FORK_ROOT_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (repo foreign))) N-edited
-  ** (skg (node (id N1) (repo foreign) writeProtected)) N1
-  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
+  * (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-edited
+  ** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+  ** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
   "};
 
 /// ('docs/forks.org', "Adding new content under a foreign node"): a bare
@@ -63,9 +63,9 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
 /// which forks N, and the new node rides that fork, adopting the clone's
 /// skgrepo.
 const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (repo foreign))) N-original
-  ** (skg (node (id N1) (repo foreign) writeProtected)) N1
-  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
+  * (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-original
+  ** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+  ** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
   ** Can I add to this?
   "};
 
@@ -73,20 +73,20 @@ const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
 /// then move old content N1 beneath it. The new node and its inherited
 /// `contains N1` relationship must both adopt the clone's owned skgrepo.
 const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (repo foreign))) N-original
+  * (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-original
   ** New parent
-  *** (skg (node (id N1) (repo foreign) writeProtected)) N1
-  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
+  *** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+  ** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
   "};
 
 /// Same shape, but the new node explicitly claims the foreign skgrepo:
 /// a deliberate attempt to create a node in a write-protected skgrepo, which
 /// must stay rejected.
 const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
-  * (skg (node (id N) (repo foreign))) N-original
-  ** (skg (node (id N1) (repo foreign) writeProtected)) N1
-  ** (skg (node (id N2) (repo foreign) writeProtected)) N2
-  ** (skg (node (repo foreign))) Can I add to this?
+  * (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-original
+  ** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+  ** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
+  ** (skg node (skgRepos (nodeRepo foreign))) Can I add to this?
   "};
 
 /// The explicit 'skg-fork-node' gesture: an owned node (P) carries
@@ -94,14 +94,14 @@ const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
 /// own save; saving adds a clone C that overrides P, built from P's disk
 /// snapshot.
 const EXPLICIT_FORK_BUFFER : &str = indoc! {"
-  * (skg (node (id P) (repo owned) (viewRequests fork))) P-container
-  ** (skg (node (id N) (repo foreign) writeProtected)) N-original
+  * (skg node (gnid P) (skgRepos (nodeRepo owned)) (viewRequests fork)) P-container
+  ** (skg node (gnid N) (skgRepos (nodeRepo foreign)) writeProtected) N-original
   "};
 
 /// An explicit fork request on a brand-new (id-less) headline: enrichment
 /// mints a fresh pid that is not in the graph, so the fork is rejected.
 const EXPLICIT_FORK_UNKNOWN_BUFFER : &str = indoc! {"
-  * (skg (node (repo owned) (viewRequests fork))) Brand New
+  * (skg node (skgRepos (nodeRepo owned)) (viewRequests fork)) Brand New
   "};
 
 fn clone_overriding_on_disk (
@@ -380,11 +380,11 @@ async fn fork_no_owned_ancestor_defaults (
      the first owned repo (alphabetically 'owned'); got {:?}", c . home_skgrepo );
   let root_line : &str = response . saved_view . lines () . next ()
     . ok_or ("the saved root view must not be empty") ?;
-  assert! ( root_line . contains (&format! ("(id {})", c . pid . 0))
+  assert! ( root_line . contains (&format! ("(gnid {})", c . pid . 0))
             && root_line . contains ("(overridesHere N)"),
     "the buffer that forked root N must immediately show its clone in N's place:\n{}",
     response . saved_view );
-  assert! ( ! root_line . contains ("(id N)"),
+  assert! ( ! root_line . contains ("(gnid N)"),
     "the saved buffer must not leave the fork origin as its root:\n{}",
     response . saved_view );
   Ok (( )) }
@@ -426,10 +426,10 @@ async fn explicit_new_child_skgrepo_confirms_clone_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id N) (repo foreign))) N-original
-    ** (skg (node (id N1) (repo foreign) writeProtected)) N1
-    ** (skg (node (id N2) (repo foreign) writeProtected)) N2
-    ** (skg (node (repo owned2))) Can I add to this?
+    * (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-original
+    ** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+    ** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
+    ** (skg node (skgRepos (nodeRepo owned2))) Can I add to this?
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     buffer, config, None )  ?;
@@ -442,10 +442,10 @@ async fn explicit_new_child_skgrepo_confirms_clone_skgrepo (
   let confirmation : String =
     skg::from_text::fork::build_fork_confirmation_buffer (
       & save_plan . fork_specs );
-  assert! ( confirmation . contains ("(repo owned2)"),
+  assert! ( confirmation . contains ("(skgRepos (nodeRepo owned2))"),
     "the buffer must show the specified repo as settled:\n{}",
     confirmation );
-  assert! ( ! confirmation . contains ("(repo PICK-A-REPO)"),
+  assert! ( ! confirmation . contains ("(skgRepos (nodeRepo PICK-A-REPO))"),
     // (The instructions body may mention the placeholder; only the
     // metadata form matters.)
     "no placeholder repo when the repo was specified:\n{}",
@@ -459,9 +459,9 @@ async fn disagreeing_new_child_skgrepos_leave_clone_skgrepo_unconfirmed (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id N) (repo foreign))) N-original
-    ** (skg (node (repo owned))) New thing one
-    ** (skg (node (repo owned2))) New thing two
+    * (skg node (gnid N) (skgRepos (nodeRepo foreign))) N-original
+    ** (skg node (skgRepos (nodeRepo owned))) New thing one
+    ** (skg node (skgRepos (nodeRepo owned2))) New thing two
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
     buffer, config, None )  ?;
@@ -479,12 +479,12 @@ async fn clone_skgrepo_inferred_from_a_moved_writeProtected_ancestor (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id P) (repo owned) writeProtected)) P-container
-    ** (skg (node (id N) (repo foreign) noClaim)) N-edited
-    *** (skg (node (id N1) (repo foreign) writeProtected)) N1
-    *** (skg (node (id N2) (repo foreign) writeProtected)) N2
-    * (skg (node (id P) (repo owned2))) P-container
-    ** (skg (node (id N) (repo foreign) writeProtected)) N-original
+    * (skg node (gnid P) (skgRepos (nodeRepo owned)) writeProtected) P-container
+    ** (skg node (gnid N) (skgRepos (nodeRepo foreign)) noClaim) N-edited
+    *** (skg node (gnid N1) (skgRepos (nodeRepo foreign)) writeProtected) N1
+    *** (skg node (gnid N2) (skgRepos (nodeRepo foreign)) writeProtected) N2
+    * (skg node (gnid P) (skgRepos (nodeRepo owned2))) P-container
+    ** (skg node (gnid N) (skgRepos (nodeRepo foreign)) writeProtected) N-original
     "};
   let fork_specs : Vec<ForkSpec> =
     fork_specs_from (buffer, config) . await ?;
@@ -518,7 +518,7 @@ async fn fork_confirmation_gates_skgsave_commit (
   assert! ( response . fork_confirmation . is_some (),
     "an unapproved save with forks must return a fork-confirmation" );
   assert! ( response . saved_view . contains ("* Fork confirmation")
-            && response . saved_view . contains ("(id N)"),
+            && response . saved_view . contains ("(gnid N)"),
     "the confirmation buffer must list N:\n{}", response . saved_view );
   assert! ( clone_on_disk (config) . is_err (),
     "no clone may be skgsave-committed before approval" );
@@ -813,7 +813,7 @@ async fn fork_round_trip (
   assert! ( p_view . contains ("(overridesHere N)"),
     "the clone must be shown in N's place with (overridesHere N):\n{}",
     p_view );
-  assert! ( p_view . contains (& format! ("(id {})", clone_skgid . 0)),
+  assert! ( p_view . contains (& format! ("(gnid {})", clone_skgid . 0)),
     "the shown substitute must be the clone {}:\n{}", clone_skgid . 0, p_view );
   assert! ( p_view . contains ("subscribeeFolder"),
     "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
@@ -864,7 +864,7 @@ async fn fork_collateral_rerender_without_substitution (
     . viewforest_id_to_view (&collateral_viewforest_id)
     .ok_or ("the collateral view must remain open") ?;
   let collateral_text : String = viewforest_to_string (collateral, config) ?;
-  assert! ( collateral_text . contains ("(id N)"),
+  assert! ( collateral_text . contains ("(gnid N)"),
     "the collateral view must retain raw N:\n{}", collateral_text );
   assert! ( ! collateral_text . contains ("(overridesHere N)"),
     "the collateral view must not substitute the clone:\n{}", collateral_text );

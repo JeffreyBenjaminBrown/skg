@@ -29,6 +29,7 @@ use skg::types::viewnode::Viewnode;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use ego_tree::Tree;
+use skg::metadata_canon::without_viewnode_ids;
 
 fn mk_pair () -> (TcpStream, TcpStream) {
   let listener : TcpListener =
@@ -58,7 +59,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       let (p_view, p_pids, p_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("P") ) ?;
-      assert! ( p_view . contains ("(id L)"),
+      assert! ( p_view . contains ("(gnid L)"),
         "P's view should show L:\n{}", p_view );
       views_state . open_views . register_view (
         &graph . load_full (), p_viewforest_id . clone (), p_vf, &p_pids );
@@ -105,7 +106,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       views_state . open_views . register_view (
         &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids );
       let delete_buffer : String =
-        "* (skg (node (id L) (repo main) (editRequest delete))) [[id:X][to X]]\n"
+        "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
       let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
       let response : SaveResponse =
@@ -153,10 +154,10 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
       { // A view whose roots are L, holding X as a note, and P.
         let stored : Tree<Viewnode> = maybePlaced_to_placed_tree (
           org_to_uninterpreted_nodes (
-            "* (skg (node (id L) (repo main))) [[id:X][to X]]\n\
-             ** (skg (node (id X) (repo main) noClaim)) X\n\
-             * (skg (node (id P) (repo main))) P\n\
-             ** (skg (node (id L) (repo main) writeProtected)) [[id:X][to X]]\n" ) ? . 0 ) ?;
+            "* (skg node (gnid L) (skgRepos (nodeRepo main))) [[id:X][to X]]\n\
+             ** (skg node (gnid X) (skgRepos (nodeRepo main)) noClaim) X\n\
+             * (skg node (gnid P) (skgRepos (nodeRepo main))) P\n\
+             ** (skg node (gnid L) (skgRepos (nodeRepo main)) writeProtected) [[id:X][to X]]\n" ) ? . 0 ) ?;
         views_state . open_views . register_view (
           &graph . load_full (), both_viewforest_id . clone (), stored,
           &[ID::from ("L"), ID::from ("P")] ); }
@@ -166,7 +167,7 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
       views_state . open_views . register_view (
         &graph . load_full (), l_viewforest_id . clone (), l_vf, &l_pids );
       let delete_buffer : String =
-        "* (skg (node (id L) (repo main) (editRequest delete))) [[id:X][to X]]\n"
+        "* (skg node (gnid L) (skgRepos (nodeRepo main)) (editRequest delete)) [[id:X][to X]]\n"
         . to_string ();
       let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
       let response : SaveResponse =
@@ -184,11 +185,11 @@ fn a_deleted_root_vanishes_and_a_buffer_may_end_with_no_roots
         . find ( |msg| msg . contains ("response-type collateral-view")
                        && msg . contains ("collat-del-root-both") )
         . expect ("the view of L and P should be rerendered");
-      assert! ( ! both . contains ("(id L)"), "L is gone:\n{}", both );
-      assert! ( both . contains ("* (skg tombstone")
-                && both . contains ("** (skg (node (id X)"),
+      assert! ( ! both . contains ("(gnid L)"), "L is gone:\n{}", both );
+      assert! ( without_viewnode_ids (both) . contains ("* (skg tombstone")
+                && without_viewnode_ids (both) . contains ("** (skg node (gnid X)"),
         "the tombstone where L stood holds X:\n{}", both );
-      assert! ( both . contains ("(id P)"), "P stays:\n{}", both );
+      assert! ( both . contains ("(gnid P)"), "P stays:\n{}", both );
       Ok (( )) } )) }
 
 /// A saved
@@ -205,7 +206,7 @@ fn dead_links_warn_on_save
     "/tmp/tantivy-test-dead-links",
     |config, _tantivy| Box::pin ( async move {
       let buffer : &str =
-        "* (skg (node (id P) (repo main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
+        "* (skg node (gnid P) (skgRepos (nodeRepo main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
       let ( _vf, _plan, warnings ) =
         buffer_to_validated_saveplan (
           buffer, config, None )  ?;

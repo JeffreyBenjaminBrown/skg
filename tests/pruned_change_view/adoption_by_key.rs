@@ -26,8 +26,8 @@ use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-const ROOT_X : &str = "* (skg (node (id x)";
-const REQUESTED_ALIASES : &str = "(repo main) (viewRequests (folder aliases))";
+const ROOT_X : &str = "* (skg node (gnid x)";
+const REQUESTED_ALIASES : &str = "(skgRepos (nodeRepo main)) (viewRequests (folder aliases))";
 
 /// The child headlines, without their viewnode IDs, of the one line
 /// of 'buffer' that starts, viewnode ID aside, with 'parent'.
@@ -56,7 +56,7 @@ fn assert_one_child_with (
   key    : &str,
 ) {
   let matching : usize = children_of (buffer, parent) . iter ()
-    . filter ( |child| child . contains (key) ) . count ();
+    . filter ( |child| without_viewnode_ids (child) . contains (key) ) . count ();
   assert_eq! ( matching, 1,
                "one child of {:?} should contain {:?}, in\n{}", parent, key, buffer ); }
 
@@ -108,7 +108,7 @@ fn a_requested_alias_folder_becomes_the_changed_one (
   with_fixture ("requested_alias_folder", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let requested : String = saved ( f, &edit_line ( &buffer, ROOT_X, |line|
-      line . replacen ("(repo main)", REQUESTED_ALIASES, 1) )) ?;
+      line . replacen ("(skgRepos (nodeRepo main))", REQUESTED_ALIASES, 1) )) ?;
     assert_one_child_with (&requested, ROOT_X, "aliasFolder");
     let changed : String = saved ( f, &insert_after_line_starting (
       &requested, "** (skg aliasFolder", "*** (skg alias) xa2" )) ?;
@@ -130,7 +130,7 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
   with_fixture ("requested_alias_folder", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let requested : String = saved ( f, &edit_line ( &buffer, ROOT_X, |line|
-      line . replacen ("(repo main)", REQUESTED_ALIASES, 1) )) ?;
+      line . replacen ("(skgRepos (nodeRepo main))", REQUESTED_ALIASES, 1) )) ?;
     let collateral : String = edit_in_a_content_view ( f, "x", &requested,
       |text : &str| format! ( "{}** (skg aliasFolder)\n*** (skg alias) xa2\n", text )) ?;
     assert_eq! ( children_of (&collateral, "** (skg (aliasFolder changed)"), vec! [
@@ -156,21 +156,21 @@ fn a_requested_alias_folder_is_refreshed_and_kept (
 fn a_note_of_a_node_becomes_its_removed_member (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("graft_beside_removed_member", &["main"], |f| {
-    let member_r : &str = "** (skg (node (id r)";
+    let member_r : &str = "** (skg node (gnid r)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let noted : String = { // x typed as r's first child, after r's body
       let mut lines : Vec<&str> = buffer . lines () . collect ();
       let r_index : usize = lines . iter ()
-        . position ( |line| line . starts_with (member_r) )
+        . position ( |line| without_viewnode_ids (line) . starts_with (member_r) )
         . expect ("r is shown");
       let after_r_body : usize = r_index + 1 + lines [ r_index + 1 .. ] . iter ()
         . take_while ( |line| ! line . starts_with ('*') ) . count ();
-      lines . insert ( after_r_body, "*** (skg (node (id x) noClaim writeProtected)) x" );
+      lines . insert ( after_r_body, "*** (skg node (gnid x) noClaim writeProtected) x" );
       saved ( f, &( lines . join ("\n") + "\n" )) ? };
-    assert_one_child_with (&noted, member_r, "(node (id x) (repo main) noClaim writeProtected");
+    assert_one_child_with (&noted, member_r, "node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected");
     rewrite_head (f, "r", "pid: r\ntitle: r\nbody: old\ncontains:\n- x\n") ?;
     let after_head : String = saved (f, &noted) ?;
-    assert_one_child_with (&after_head, member_r, "(node (id x)");
+    assert_one_child_with (&after_head, member_r, "node (gnid x)");
     assert_one_child_with (&after_head, member_r, "(diff (rel removed) (leaves 1 rel))");
     assert_saves_back_cleanly (f, &after_head) }) }
 
@@ -181,18 +181,18 @@ fn a_note_of_a_node_becomes_its_removed_member (
 fn a_pasted_copy_beside_a_removed_member_is_not_doubled (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("copy_beside_removed_member", &["main"], |f| {
-    let root_p : &str = "* (skg (node (id p)";
+    let root_p : &str = "* (skg node (gnid p)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let pasted : String = saved ( f, &format! (
-      "{}** (skg (node (id y) noClaim writeProtected)) y\n", buffer )) ?;
+      "{}** (skg node (gnid y) noClaim writeProtected) y\n", buffer )) ?;
     assert_eq! ( children_of (&pasted, root_p) . iter ()
-                 . filter ( |child| child . contains ("(node (id y)") ) . count (),
+                 . filter ( |child| child . contains ("node (gnid y)") ) . count (),
                  2, "{}", pasted );
     let collateral : String = edit_in_a_content_view ( f, "p", &pasted,
       |text : &str| text . lines ()
-        . filter ( |line| ! line . contains ("(node (id y)") )
+        . filter ( |line| ! line . contains ("node (gnid y)") )
         . collect::<Vec<&str>> () . join ("\n") + "\n" ) ?;
-    assert_one_child_with (&collateral, root_p, "(node (id y)");
+    assert_one_child_with (&collateral, root_p, "node (gnid y)");
     assert_one_child_with (&collateral, root_p, "(diff (rel removed) (leaves 1 rel))");
     assert_saves_back_cleanly (f, &collateral) }) }
 
@@ -202,9 +202,9 @@ fn a_pasted_copy_beside_a_removed_member_is_not_doubled (
 fn copies_of_a_write_protected_graft_merge (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let member_a : &str = "**** (skg (node (id a) (repo main) writeProtected";
+    let member_a : &str = "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected";
     let graft_p  : &str =
-      "***** (skg (node (id p) (repo main) noClaim writeProtected";
+      "***** (skg node (gnid p) (skgRepos (nodeRepo main)) noClaim writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     let graft_line : String = buffer . lines ()
       . find ( |line| without_viewnode_ids (line) . starts_with (graft_p) )
@@ -212,8 +212,8 @@ fn copies_of_a_write_protected_graft_merge (
     let copied : String = insert_after_line_starting ( &buffer, graft_p,
       &without_viewnode_ids (&graft_line) );
     assert_eq! ( children_of (&copied, member_a) . iter ()
-                 . filter ( |child| child . starts_with (graft_p) ) . count (),
+                 . filter ( |child| without_viewnode_ids (child) . starts_with (graft_p) ) . count (),
                  2, "{}", copied );
     let merged : String = saved (f, &copied) ?;
-    assert_one_child_with (&merged, member_a, "(node (id p)");
+    assert_one_child_with (&merged, member_a, "node (gnid p)");
     assert_saves_back_cleanly (f, &merged) }) }

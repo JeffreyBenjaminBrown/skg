@@ -30,10 +30,10 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
     // Comments indicate the expected error for each line/group
     let buffer_with_errors: &str =
       indoc! {"
-        * (skg (node (id pub-1))) pub-1                                      # root with no repo
-        * (skg (node (id dub-1) (repo dub))) dub-1                         # repo does not exist
-        * (skg (node (id priv-1) (repo public))) priv-1 # This line includes an error, mismatch between buffer and disk repos, which is not caught yet, but it is caught by 'buffer_to_validated_saveplan', as verified by 'test_reconciliation_errors'.
-        * (skg (node (id priv-1) (repo private))) priv-1                   # error: multiple defining viewnodes for this id
+        * (skg node (gnid pub-1)) pub-1                                      # root with no repo
+        * (skg node (gnid dub-1) (skgRepos (nodeRepo dub))) dub-1                         # repo does not exist
+        * (skg node (gnid priv-1) (skgRepos (nodeRepo public))) priv-1 # This line includes an error, mismatch between buffer and disk repos, which is not caught yet, but it is caught by 'buffer_to_validated_saveplan', as verified by 'test_reconciliation_errors'.
+        * (skg node (gnid priv-1) (skgRepos (nodeRepo private))) priv-1                   # error: multiple defining viewnodes for this id
       "};
     let buffer_text: String =
       strip_org_comments (buffer_with_errors);
@@ -76,7 +76,7 @@ fn test_multi_skgrepo_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(skgid . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
     assert_eq!(errors . len(), 3,
-               "Expected exactly 3 errors: 2 LocalStructureViolation (repo errors), 1 Multiple_Defining_Viewnodes");
+               "Expected exactly 3 errors: 2 LocalStructureViolation (skgRepos (nodeRepo errors)), 1 Multiple_Defining_Viewnodes");
 
     cleanup_test_tantivy(
       Some(config . tantivy_folder . as_path())
@@ -97,16 +97,16 @@ fn test_foreign_node_modification_errors(
     // Each line tests a different type of modification to get separate error reports
     {
       let buffer_with_errors: &str = indoc! {"
-        * (skg (node (id ext-1) (repo ext))) ext-1
+        * (skg node (gnid ext-1) (skgRepos (nodeRepo ext))) ext-1
         ** (skg aliasFolder) aliases         # edit to aliases (set to empty)
-        * (skg (node (id ext-2) (repo ext))) ext-2-edited           # edit to title
-        * (skg (node (id ext-3) (repo ext))) ext-3
+        * (skg node (gnid ext-2) (skgRepos (nodeRepo ext))) ext-2-edited           # edit to title
+        * (skg node (gnid ext-3) (skgRepos (nodeRepo ext))) ext-3
         new body                                               # edit to body
-        * (skg (node (id ext-4) (repo ext))) ext-4                  # edit to content
-        ** (skg (node (id ext-5) (repo ext))) ext-5
-        * (skg (node (id ext-new) (repo ext))) ext-new              # add new node to foreign repo
-        * (skg (node (id ext-6) (repo ext) (editRequest delete))) ext-6  # delete from foreign repo
-        * (skg (node (id ext-7) (repo ext) (editRequest delete))) ext-7  # delete with body modification
+        * (skg node (gnid ext-4) (skgRepos (nodeRepo ext))) ext-4                  # edit to content
+        ** (skg node (gnid ext-5) (skgRepos (nodeRepo ext))) ext-5
+        * (skg node (gnid ext-new) (skgRepos (nodeRepo ext))) ext-new              # add new node to foreign repo
+        * (skg node (gnid ext-6) (skgRepos (nodeRepo ext)) (editRequest delete)) ext-6  # delete from foreign repo
+        * (skg node (gnid ext-7) (skgRepos (nodeRepo ext)) (editRequest delete)) ext-7  # delete with body modification
         Different body.
       "}; // note that nothing is wrong with ext-5
 
@@ -180,8 +180,8 @@ fn test_foreign_node_modification_errors(
     // Pipeline short-circuits on modification errors, so this tests merge errors separately
     {
       let buffer_with_merges: &str = indoc! {"
-        * (skg (node (id pub-1) (repo public) (editRequest (merge ext-8)))) pub-1  # merge into foreign acquirer (ext-8)
-        * (skg (node (id ext-9) (repo ext) (editRequest (merge pub-2)))) ext-9     # merge foreign acquiree (would delete ext-9)
+        * (skg node (gnid pub-1) (skgRepos (nodeRepo public)) (editRequest (merge ext-8))) pub-1  # merge into foreign acquirer (ext-8)
+        * (skg node (gnid ext-9) (skgRepos (nodeRepo ext)) (editRequest (merge pub-2))) ext-9     # merge foreign acquiree (would delete ext-9)
       "};
 
       let buffer_text: String = strip_org_comments(
@@ -250,7 +250,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // Both skgrepos are owned, so this should succeed (producing a RepoMove).
     {
       let buffer_with_move: &str = indoc! {"
-        * (skg (node (id priv-1) (repo public))) priv-1  # disk has 'private', buffer says 'public'
+        * (skg node (gnid priv-1) (skgRepos (nodeRepo public))) priv-1  # disk has 'private', buffer says 'public'
       "};
 
       let buffer_text: String =
@@ -281,8 +281,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     // one whose skgrepo is stale is refused.
     {
       let buffer_moving_with_a_write_protected_repeat: &str = indoc! {"
-        * (skg (node (id pub-1) (repo private))) pub-1               # editable instance moved to 'private'
-        * (skg (node (id pub-1) (repo public) writeProtected)) pub-1  # write-protected instance as rendered
+        * (skg node (gnid pub-1) (skgRepos (nodeRepo private))) pub-1               # editable instance moved to 'private'
+        * (skg node (gnid pub-1) (skgRepos (nodeRepo public)) writeProtected) pub-1  # write-protected instance as rendered
       "};
       let buffer_text: String =
         strip_org_comments (buffer_moving_with_a_write_protected_repeat);
@@ -298,8 +298,8 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
                  "Only the editable occurrence should move pub-1");
       assert_eq!(save_plan . skgrepo_moves[0] . skgrepo_change . new . as_str(), "private");
       let buffer_with_stale_write_protected_skgrepo: &str = indoc! {"
-        * (skg (node (id pub-1) (repo public))) pub-1
-        * (skg (node (id pub-1) (repo private) writeProtected)) pub-1
+        * (skg node (gnid pub-1) (skgRepos (nodeRepo public))) pub-1
+        * (skg node (gnid pub-1) (skgRepos (nodeRepo private)) writeProtected) pub-1
       "};
       let result = buffer_to_validated_saveplan(
         buffer_with_stale_write_protected_skgrepo,

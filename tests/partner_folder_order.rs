@@ -78,7 +78,7 @@ fn line_containing<'a> (
 
 fn assert_member_order (
   buf    : &str,
-  first  : &str, // a metadata fragment, e.g. "(id t)"
+  first  : &str, // a metadata fragment, e.g. "(gnid t)"
   second : &str,
   label  : &str,
 ) {
@@ -99,16 +99,16 @@ async fn write_protected_folder_order_is_preserved_impl (
       config, Some (tantivy),
       &[ ID ("n" . to_string ()) ] ) ?;
   let folder_request : String = initial_buffer . replacen (
-    "(node ",
-    "(node (viewRequests (folder subscribesTo))", 1 );
+    "node ",
+    "node (viewRequests (folder subscribesTo))", 1 );
   let complete_buffer : String =
     save_and_rerender (&folder_request, config, tantivy) . await ?;
   assert_member_order (
-    &complete_buffer, "(id r)", "(id t)", "de novo (sorted)" );
+    &complete_buffer, "(gnid r)", "(gnid t)", "de novo (sorted)" );
   let swapped : String = {
     // Swap the two member lines, putting t before r.
-    let r_line : &str = line_containing (&complete_buffer, "(id r)");
-    let t_line : &str = line_containing (&complete_buffer, "(id t)");
+    let r_line : &str = line_containing (&complete_buffer, "(gnid r)");
+    let t_line : &str = line_containing (&complete_buffer, "(gnid t)");
     complete_buffer
       . replace ( r_line, "SWAP_PLACEHOLDER" )
       . replace ( t_line, r_line )
@@ -116,11 +116,11 @@ async fn write_protected_folder_order_is_preserved_impl (
   let first_save : String =
     save_and_rerender (&swapped, config, tantivy) . await ?;
   assert_member_order (
-    &first_save, "(id t)", "(id r)", "after reorder + save" );
+    &first_save, "(gnid t)", "(gnid r)", "after reorder + save" );
   let second_save : String =
     save_and_rerender (&first_save, config, tantivy) . await ?;
   assert_member_order (
-    &second_save, "(id t)", "(id r)", "after second (unchanged) save" );
+    &second_save, "(gnid t)", "(gnid r)", "after second (unchanged) save" );
   assert_eq! ( first_save, second_save,
     "the reordered view must be a completion fixpoint" );
   Ok (( )) }
@@ -193,31 +193,31 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
   let (n_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("n")) ?;
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &n_view . replacen (
-      "(node ",
-      "(node (viewRequests (folder subscribesTo))", 1 ),
+      "node ",
+      "node (viewRequests (folder subscribesTo))", 1 ),
     &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let reordered : String = { // t above r, and a note placed after them
-    let r_line : &str = line_containing (&n_view, "(id r)");
-    let t_line : &str = line_containing (&n_view, "(id t)");
+    let r_line : &str = line_containing (&n_view, "(gnid r)");
+    let t_line : &str = line_containing (&n_view, "(gnid t)");
     n_view
       . replace ( r_line, "SWAP_PLACEHOLDER" )
       . replace ( t_line, &format! (
-        "{}\n*** (skg (node noClaim)) a placed note", r_line ))
+        "{}\n*** (skg node noClaim) a placed note", r_line ))
       . replace ( "SWAP_PLACEHOLDER", t_line ) };
   let (n_view, _) : (String, Vec<String>) = save_view_and_read_collateral (
     &reordered, &n_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   assert_lines_in_order (
-    &n_view, &[ "(id t)", "(id r)", "a placed note" ],
+    &n_view, &[ "(gnid t)", "(gnid r)", "a placed note" ],
     "the note stays below the members" );
   let (u_view, u_pids, u_viewforest) =
     single_root_view (config, Some (tantivy), &ID::from ("u")) ?;
   views_state . open_views . register_view (
     &graph . load_full (), u_viewforest_id . clone (), u_viewforest, &u_pids );
   let repo : &str = { // u's skgrepo, which n shares
-    let start : usize = u_view . find ("(repo ") . expect ("u's line names its repo") + 6;
+    let start : usize = u_view . find ("(nodeRepo ") . expect ("u's line names its repo") + 10;
     &u_view [ start .. start + u_view [start ..] . find (')') . unwrap () ] };
   let subscribing : String = format! (
-    "{}** (skg subscribeeFolder)\n*** (skg (node (id n) (repo {}))) n\n",
+    "{}** (skg subscribeeFolder)\n*** (skg node (gnid n) (skgRepos (nodeRepo {}))) n\n",
     u_view, repo );
   let (_, collateral_views) : (String, Vec<String>) = save_view_and_read_collateral (
     &subscribing, &u_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
@@ -225,6 +225,6 @@ async fn a_member_added_elsewhere_follows_the_kept_ones_impl (
     . find ( |view| view . contains ("subscriberFolder") )
     . unwrap_or_else ( || panic! ( "n's view is rerendered: {:?}", collateral_views ));
   assert_lines_in_order (
-    collateral_n, &[ "(id t)", "(id r)", "(id u)", "a placed note" ],
+    collateral_n, &[ "(gnid t)", "(gnid r)", "(gnid u)", "a placed note" ],
     "u follows the kept members, and nothing kept moves" );
   Ok (( )) }

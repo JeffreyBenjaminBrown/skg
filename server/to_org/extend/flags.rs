@@ -122,7 +122,7 @@ mod tests {
   fn flags_surface_render_parse_round_trip_uses_all_canonical_atoms (
   ) {
     let org = indoc! {"
-      * (skg (node (id recorder) (repo main))) Recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) Recorder
       ** (skg flagsFolder)
       *** (skg (flag hadId))
       *** (skg (flag wasOverloaded))

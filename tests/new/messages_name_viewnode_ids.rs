@@ -66,10 +66,10 @@ fn parse_errors_and_warnings (
 #[test]
 fn messages_about_one_headline_name_it_as_a_subheadline_at_parse_time () {
   let (errors, warnings) = parse_errors_and_warnings ( indoc! {"
-    * (skg (node (id root) (repo main)) (vnid 0a)) root
-    ** (skg (node (id gone) (repo main) writeProtected (editRequest delete)) (vnid 0b)) gone
-    ** (skg aliasFolder (vnid 0c)) typed on a folder
-    *** (skg alias (vnid 0d)) an alias
+    * (skg (vnid 0a) node (gnid root) (skgRepos (nodeRepo main))) root
+    ** (skg (vnid 0b) node (gnid gone) (skgRepos (nodeRepo main)) writeProtected (editRequest delete)) gone
+    ** (skg (vnid 0c) aliasFolder) typed on a folder
+    *** (skg (vnid 0d) alias) an alias
     with a body
     "} );
   assert! ( errors . contains (
@@ -105,8 +105,8 @@ async fn one_headline_at_validation (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
-    * (skg (node (id parent) (repo main) (viewRequests editableView writeProtectedView)) (vnid 0e)) parent
-    ** (skg alias (vnid 0f)) a stray alias
+    * (skg (vnid 0e) node (gnid parent) (skgRepos (nodeRepo main)) (viewRequests editableView writeProtectedView)) parent
+    ** (skg (vnid 0f) alias) a stray alias
     "};
   let errors : Vec<BufferValidationError> =
     find_buffer_errors_for_saving (
@@ -132,8 +132,8 @@ async fn one_headline_at_validation (
 fn messages_about_several_occurrences_name_each_as_a_subheadline () {
   let viewforest : MpViewForest =
     org_to_uninterpreted_viewforest ( indoc! {"
-      * (skg (node (id a) (repo main)) (vnid 0a)) a
-      * (skg (node (id a) (repo main) (editRequest delete)) (vnid 0b)) a again
+      * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a
+      * (skg (vnid 0b) node (gnid a) (skgRepos (nodeRepo main)) (editRequest delete)) a again
       "} ) . unwrap () . 0;
   let (ambiguous_deletions, multiple_definers) =
     find_inconsistent_instructions (&viewforest);
@@ -154,13 +154,13 @@ fn messages_about_several_occurrences_name_each_as_a_subheadline () {
 fn a_metadata_parse_error_ends_with_its_headline () {
   let with_viewnode_id : String =
     headline_to_triple (
-      "* (skg (node (id a) (repo main) (bogus 1)) (vnid 0c)) a" )
+      "* (skg (vnid 0c) node (gnid a) (skgRepos (nodeRepo main)) (bogus 1)) a" )
     . unwrap_err ();
   assert! ( with_viewnode_id . ends_with ( &format! (
               "\n{}", subheadline ("a", "a", "0c") )),
             "{}", with_viewnode_id );
   let without_viewnode_id : String =
-    headline_to_triple ( "* (skg (node (id a) (repo main) (bogus 1))) a typed" )
+    headline_to_triple ( "* (skg node (gnid a) (skgRepos (nodeRepo main)) (bogus 1)) a typed" )
     . unwrap_err ();
   assert! ( without_viewnode_id . ends_with (
               "\n*** a typed\n- graphnode ID: a\n- not yet saved\n" ),
@@ -172,9 +172,9 @@ fn a_headline_without_a_viewnode_id_is_not_yet_saved () {
   // it carries; the third the user typed.
   let viewforest : MpViewForest =
     org_to_uninterpreted_viewforest ( indoc! {"
-      * (skg (node (id a) (repo main)) (vnid 0a)) a
-      * (skg (node (id a) (repo main)) (vnid 0a)) a copied
-      * (skg (node (id a) (repo main))) a typed
+      * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a
+      * (skg (vnid 0a) node (gnid a) (skgRepos (nodeRepo main))) a copied
+      * (skg node (gnid a) (skgRepos (nodeRepo main))) a typed
       "} ) . unwrap () . 0;
   let (_, multiple_definers) =
     find_inconsistent_instructions (&viewforest);

@@ -18,6 +18,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::ID;
 use ego_tree::Tree;
 use skg::types::viewnode::Viewnode;
+use skg::metadata_canon::without_viewnode_ids;
 
 #[test]
 fn raw_shown_overridden_root_children_are_raw
@@ -34,11 +35,11 @@ fn raw_shown_overridden_root_children_are_raw
  ?;
       // X is shown raw (a view root).
       assert! ( x_view . lines () . any (
-          |l| l . starts_with ("* (skg (node (id X)") ),
+          |l| without_viewnode_ids (l) . starts_with ("* (skg node (gnid X)") ),
         "X should be the raw root:\n{}", x_view );
       // X's immediate content child X1 is shown raw, as itself, under X.
       assert! ( x_view . lines () . any (
-          |l| l . starts_with ("** (skg (node (id X1)") ),
+          |l| without_viewnode_ids (l) . starts_with ("** (skg node (gnid X1)") ),
         "X1 should appear raw as X's immediate child:\n{}", x_view );
       // Nothing is substituted in this view: no overrider stands in for
       // X1 (the bug this change removes).
@@ -46,6 +47,6 @@ fn raw_shown_overridden_root_children_are_raw
         "no immediate child of a raw-shown overridden node may be \
          substituted:\n{}", x_view );
       assert! ( ! x_view . lines () . any (
-          |l| l . starts_with ("** (skg (node (id R1)") ),
+          |l| without_viewnode_ids (l) . starts_with ("** (skg node (gnid R1)") ),
         "the overrider R1 must not stand in for X1:\n{}", x_view );
       Ok (( )) } )) }

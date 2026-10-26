@@ -299,21 +299,47 @@ pub fn node_lines (
   buffer : &str,
   node   : &str,
 ) -> Vec<String> {
-  let atom : String = format! ("(node (id {}) ", node);
+  let atom : String = format! ("node (gnid {}) ", node);
   buffer . lines () . filter ( |line| line . contains (&atom) )
     . map (without_viewnode_ids) . collect () }
 
-/// 'buffer' with an editable-view request at the first occurrence of
-/// 'metadata', which must show a write-protected node.
+/// The byte offset in 'buffer' of its first line starting, viewnode
+/// ID aside, 'prefix'.
+pub fn line_start_of (
+  buffer : &str,
+  prefix : &str,
+) -> Option<usize> {
+  let mut start : usize = 0;
+  for line in buffer . split_inclusive ('\n') {
+    if without_viewnode_ids (line) . starts_with (prefix) {
+      return Some (start); }
+    start += line . len (); }
+  None }
+
+/// 'buffer' with an editable-view request on the first line holding
+/// (starting with, if 'metadata' starts with a newline), viewnode ID
+/// aside, 'metadata', which must show a write-protected node.
 pub fn requesting_editable_at (
   buffer   : &str,
   metadata : &str,
 ) -> String {
-  let at : usize = buffer . find (metadata)
-    . unwrap_or_else ( || panic! ( "no {:?} in:\n{}", metadata, buffer ));
-  format! ( "{}{}", &buffer [.. at],
-            buffer [at ..] . replacen (
-              "writeProtected", "writeProtected (viewRequests editableView)", 1 )) }
+  let (at_line_start, metadata) : (bool, &str) =
+    match metadata . strip_prefix ('\n') {
+      Some (rest) => (true, rest),
+      None        => (false, metadata), };
+  let mut requested : bool = false;
+  let lines : Vec<String> = buffer . lines () . map ( |line| {
+    let plain : String = without_viewnode_ids (line);
+    let holds_it : bool =
+      if at_line_start { plain . starts_with (metadata) }
+      else { plain . contains (metadata) };
+    if ! requested && holds_it {
+      requested = true;
+      line . replacen (
+        "writeProtected", "writeProtected (viewRequests editableView)", 1 )
+    } else { line . to_string () }} ) . collect ();
+  assert! ( requested, "no {:?} in:\n{}", metadata, buffer );
+  lines . join ("\n") + "\n" }
 
 /// 'buffer' with 'new_line' inserted after its first line starting,
 /// viewnode ID aside, 'prefix'.
@@ -376,7 +402,7 @@ pub fn note (
   stars : usize,
   title : &str,
 ) -> String {
-  format! ( "{} (skg (node noClaim)) {}",
+  format! ( "{} (skg node noClaim) {}",
             "*" . repeat (stars), title ) }
 
 /// Save 'buffer', then save what the save rendered: both without errors,

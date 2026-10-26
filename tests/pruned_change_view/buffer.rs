@@ -55,18 +55,18 @@ fn the_roots_are_d_in_id_order (
     . collect ();
   assert_eq! ( roots . len (), 4, "{:?}", roots );
   for (root, id) in roots . iter () . zip ([ "cy2", "ln", "mc", "r" ]) {
-    assert! ( root . contains (&format! ("(id {})", id)), "{} in {}", id, root ); }
+    assert! ( root . contains (&format! ("(gnid {})", id)), "{} in {}", id, root ); }
   Ok (( )) }
 
 #[test]
 fn context_bodies_are_folded_and_members_outside_u_are_leaves (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = sets_buffer () ?;
-  assert! ( buffer . contains (
-    "** (skg bodyFolded (node (id cy1) (repo main)" ),
+  assert! ( without_viewnode_ids (&buffer) . contains (
+    "** (skg bodyFolded node (gnid cy1) (skgRepos (nodeRepo main))" ),
     "cy1, in U but not C, is context:\n{}", buffer );
-  assert! ( buffer . contains (
-    "** (skg (node (id keep) (repo main) writeProtected" ),
+  assert! ( without_viewnode_ids (&buffer) . contains (
+    "** (skg node (gnid keep) (skgRepos (nodeRepo main)) writeProtected" ),
     "keep, outside U, is a write-protected member without its content:\n{}", buffer );
   Ok (( )) }
 
@@ -74,42 +74,42 @@ fn context_bodies_are_folded_and_members_outside_u_are_leaves (
 fn a_multiply_contained_root_gets_a_folded_container_folder (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
-    "* (skg (node (id mc)",
+    "* (skg node (gnid mc)",
     "** (skg folded containerFolder)",
-    "*** (skg (node (id ma) (repo main) writeProtected",
-    "*** (skg (node (id mb) (repo main) writeProtected" ] );
+    "*** (skg node (gnid ma) (skgRepos (nodeRepo main)) writeProtected",
+    "*** (skg node (gnid mb) (skgRepos (nodeRepo main)) writeProtected" ] );
   Ok (( )) }
 
 #[test]
 fn a_deleted_subtree_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
-    "* (skg (node (id r)",
+    "* (skg node (gnid r)",
     "** (skg (changesetMarker content) (diff (leaves 1 all)))",
-    "** (skg (ghost (gnid del) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) del",
+    "** (skg ghost (gnid del) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) del",
     "the body del had",
-    "*** (skg (ghost (gnid delc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) delc",
-    "** (skg (node (id keep)" ] );
+    "*** (skg ghost (gnid delc) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) delc",
+    "** (skg node (gnid keep)" ] );
   Ok (( )) }
 
 #[test]
 fn an_in_changed_only_change_shows_its_changed_containers (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &sets_buffer () ?, &[
-    "* (skg (node (id ln)",
+    "* (skg node (gnid ln)",
     "** (skg (changesetMarker content) (diff (leaves 1 all)))",
-    "** (skg (node (id lo)", "(diff (rel added) (leaves 1 rel)))) lo",
+    "** (skg node (gnid lo) ", " (diff (rel added) (leaves 1 rel))) lo",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id ln) (repo main) writeProtected",
-    "(diff (rel added) (properties changed) (leaves 1 rel all)))) ln",
-    "**** (skg (node (id lp) (repo main) writeProtected" ] );
+    "**** (skg node (gnid ln) (skgRepos (nodeRepo main)) writeProtected",
+    "(diff (rel added) (properties changed) (leaves 1 rel all))) ln",
+    "**** (skg node (gnid lp) (skgRepos (nodeRepo main)) writeProtected" ] );
   Ok (( )) }
 
 #[test]
 fn a_text_change_shows_the_old_text_and_its_body_diff (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
-    "* (skg (node (id txt)", "txt, retitled\nline one\nline 2\n",
+    "* (skg node (gnid txt)", "txt, retitled\nline one\nline 2\n",
     "** (skg (oldText titleAndBody) (diff (leaves 1))) txt\nline one\nline two\n",
     "*** (skg bodyDiff)\n line one\n-line two\n+line 2\n" ] );
   Ok (( )) }
@@ -118,11 +118,11 @@ fn a_text_change_shows_the_old_text_and_its_body_diff (
 fn a_content_change_tags_the_members_and_shows_the_removed_one (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
-    "* (skg (node (id ct)",
+    "* (skg node (gnid ct)",
     "** (skg (changesetMarker content) (diff (leaves 2 all)))",
-    "** (skg (node (id k1) (repo public) noClaim (rels (contains (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel)))) k1",
-    "** (skg (node (id ctx) (repo public) writeProtected",
-    "** (skg (node (id k2) (repo public)", "(diff (rel added) (leaves 1 rel)))) k2" ] );
+    "** (skg node (gnid k1) (skgRepos (nodeRepo public)) noClaim (rels (contains (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel))) k1",
+    "** (skg node (gnid ctx) (skgRepos (nodeRepo public)) writeProtected",
+    "** (skg node (gnid k2) (skgRepos (nodeRepo public)) ", " (diff (rel added) (leaves 1 rel))) k2" ] );
   Ok (( )) }
 
 /// k1, whose only container ct dropped it, stands only as ct's
@@ -134,11 +134,11 @@ fn a_node_its_only_container_dropped_is_editable_as_the_removed_member (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id ct)",
-    "** (skg (node (id k1) (repo public) noClaim (rels",
+    "* (skg node (gnid ct)",
+    "** (skg node (gnid k1) (skgRepos (nodeRepo public)) noClaim (rels",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id ct) (repo public) noClaim writeProtected",
-    "*** (skg (node (id k1c) (repo public) writeProtected" ] );
+    "**** (skg node (gnid ct) (skgRepos (nodeRepo public)) noClaim writeProtected",
+    "*** (skg node (gnid k1c) (skgRepos (nodeRepo public)) writeProtected" ] );
   assert_eq! ( node_lines (&buffer, "k1") . len (), 1, "{}", buffer );
   Ok (( )) }
 
@@ -168,15 +168,15 @@ fn a_subscription_change_shows_on_both_sides (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id sub)",
+    "* (skg node (gnid sub)",
     "** (skg (subscribeeFolder changed))",
-    "*** (skg (node (id s1) (repo public) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel)))) s1",
-    "*** (skg (node (id s2)", "(diff (rel added) (leaves 1 rel)))) s2" ] );
+    "*** (skg node (gnid s1) (skgRepos (nodeRepo public)) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel))) s1",
+    "*** (skg node (gnid s2) ", " (diff (rel added) (leaves 1 rel))) s2" ] );
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id s1)",
+    "* (skg node (gnid s1)",
     "** (skg (subscriberFolder changed))",
-    "*** (skg (node (id sub) (repo public) noClaim writeProtected",
-    "(diff (rel removed) (properties changed) (leaves 2 rel all)))) sub" ] );
+    "*** (skg node (gnid sub) (skgRepos (nodeRepo public)) noClaim writeProtected",
+    "(diff (rel removed) (properties changed) (leaves 2 rel all))) sub" ] );
   Ok (( )) }
 
 #[test]
@@ -184,12 +184,12 @@ fn home_and_relRepo_moves_are_shown (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id mv) (repo private)",
+    "* (skg node (gnid mv) (skgRepos (nodeRepo private))",
     "** (skg (homeSkgrepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id rr)",
+    "* (skg node (gnid rr)",
     "** (skg (changesetMarker relRepo) (diff (leaves 1 all)))",
-    "** (skg (node (id rm)",
+    "** (skg node (gnid rm)",
     "*** (skg (relRepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   Ok (( )) }
 
@@ -198,13 +198,13 @@ fn a_node_merge_shows_both_acquisition_folders (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = kinds_buffer () ?;
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id acq)",
+    "* (skg node (gnid acq)",
     "** (skg acquiredFolder)",
-    "*** (skg (ghost (gnid acqd) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node)))) acqd" ] );
+    "*** (skg ghost (gnid acqd) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node))) acqd" ] );
   assert_lines_in_order ( &buffer, &[
-    "* (skg (ghost (gnid acqd) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node)))) acqd",
+    "* (skg ghost (gnid acqd) (skgRepos (nodeRepo public)) (diff (node removed) (leaves 1 node))) acqd",
     "** (skg acquiredByFolder)",
-    "*** (skg (node (id acq) (repo public) writeProtected" ] );
+    "*** (skg node (gnid acq) (skgRepos (nodeRepo public)) writeProtected" ] );
   Ok (( )) }
 
 #[test]
@@ -232,9 +232,9 @@ fn marks_in_the_store_show_as_ready (
 fn a_deleted_subscriber_is_shown_in_the_changed_subscriber_folder (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &kinds_buffer () ?, &[
-    "* (skg (node (id orph)",
+    "* (skg node (gnid orph)",
     "** (skg (subscriberFolder changed))",
-    "*** (skg (ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel)))) gone" ] );
+    "*** (skg ghost (gnid gone) (skgRepos (nodeRepo public)) (diff (node removed) (rel removed) (leaves 2 node rel))) gone" ] );
   Ok (( )) }
 
 #[test]
@@ -268,12 +268,12 @@ fn removed_partners_buffer (
 fn a_removed_container_stands_between_the_kept_ones (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
-    "** (skg (node (id x) (repo main) noClaim (rels",
+    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id a) (repo main) writeProtected",
-    "**** (skg (node (id b) (repo main) noClaim writeProtected",
-    "(diff (rel removed) (properties changed) (leaves 1 rel all)))) b",
-    "**** (skg (node (id c) (repo main) writeProtected" ] );
+    "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
+    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "(diff (rel removed) (properties changed) (leaves 1 rel all))) b",
+    "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected" ] );
   Ok (( )) }
 
 /// x stands first as b's removed member, so it is editable there,
@@ -287,18 +287,18 @@ fn a_removed_member_first_in_level_order_is_editable_with_its_changes (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : String = removed_partners_buffer () ?;
   assert_lines_in_order ( &buffer, &[
-    "* (skg (node (id b)",
-    "** (skg (node (id x) (repo main) noClaim (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel)))) x",
+    "* (skg node (gnid b)",
+    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel))) x",
     "*** (skg (containerFolder changed))",
-    "**** (skg (node (id a) (repo main) writeProtected",
-    "**** (skg (node (id b) (repo main) noClaim writeProtected",
-    "**** (skg (node (id c) (repo main) writeProtected",
-    "***** (skg (node (id d) (repo main) noClaim writeProtected",
-    "**** (skg (node (id e) (repo main) noClaim writeProtected",
-    "*** (skg (node (id xc) (repo main) writeProtected",
-    "* (skg (node (id d)",
-    "** (skg (node (id c) (repo main) noClaim (rels",
-    "*** (skg (node (id x) (repo main) writeProtected" ] );
+    "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected",
+    "**** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
+    "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "**** (skg node (gnid e) (skgRepos (nodeRepo main)) noClaim writeProtected",
+    "*** (skg node (gnid xc) (skgRepos (nodeRepo main)) writeProtected",
+    "* (skg node (gnid d)",
+    "** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim (rels",
+    "*** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected" ] );
   let editable : Vec<String> = node_lines (&buffer, "x") . into_iter ()
     . filter ( |line| ! line . contains ("writeProtected") ) . collect ();
   assert_eq! ( editable . len (), 1, "{}", buffer );
@@ -326,12 +326,12 @@ fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
         . unwrap_or_else ( || panic! ( "a changed {}:\n{}", folder, buffer ));
       let member_line : &str = lines [folder_index + 1];
       assert! ( member_line . starts_with (
-                  &format! ( "**** (skg (node (id {}) ", member ))
+                  &format! ( "**** (skg node (gnid {}) ", member ))
                 && member_line . contains ("(diff (rel added)"),
                 "{} is the folder's added member:\n{}", member, buffer );
       let chain_line : &str = lines . get (folder_index + 2) . copied () . unwrap_or ("");
       assert! ( chain_line . starts_with (
-                  &format! ( "***** (skg (node (id {}) ", chain_node ))
+                  &format! ( "***** (skg node (gnid {}) ", chain_node ))
                 && chain_line . contains ("noClaim")
                 && chain_line . contains ("writeProtected")
                 && ! chain_line . contains ("(diff"),
@@ -346,10 +346,10 @@ fn a_member_of_a_changed_subscriber_folder_holds_its_chain (
 fn a_removed_member_whose_node_has_an_earlier_occurrence_is_write_protected (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
-    "* (skg (node (id b)",
-    "** (skg (node (id x) (repo main) noClaim (rels",
-    "* (skg (node (id e)",
-    "** (skg (node (id x) (repo main) noClaim writeProtected (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel)))) x\n* " ] );
+    "* (skg node (gnid b)",
+    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels",
+    "* (skg node (gnid e)",
+    "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel))) x\n* " ] );
   Ok (( )) }
 
 /// The chain node d under c in x's container folder, from a
@@ -360,16 +360,16 @@ fn a_chain_node_under_an_editable_removed_member_keeps_its_place_through_a_save 
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let chain_node : &str =
-      "***** (skg (node (id d) (repo main) noClaim writeProtected";
+      "***** (skg node (gnid d) (skgRepos (nodeRepo main)) noClaim writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert_eq! ( buffer . matches (chain_node) . count (), 1, "{}", buffer );
+    assert_eq! ( without_viewnode_ids (&buffer) . matches (chain_node) . count (), 1, "{}", buffer );
     let saved : String = save_cleanly (f, &all_changes_view (), &buffer) ? . saved_view;
     let again : String = save_cleanly (f, &all_changes_view (), &saved) ? . saved_view;
     for view in [ &saved, &again ] {
-      assert_eq! ( view . matches (chain_node) . count (), 1, "{}", view );
+      assert_eq! ( without_viewnode_ids (view) . matches (chain_node) . count (), 1, "{}", view );
       assert_lines_in_order ( view, &[
-        "** (skg (node (id x) (repo main) noClaim",
-        "**** (skg (node (id c) (repo main) writeProtected",
+        "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim",
+        "**** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected",
         chain_node ] ); }
     Ok (( )) }) }
 
@@ -381,20 +381,20 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("removed_partners", &["main"], |f| {
     let x_line : &str =
-      "** (skg (node (id x) (repo main) noClaim (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel)))) x\n";
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (leaves 1 rel))) x\n";
     let buffer : String = open_all_changes_buffer (f) ?;
     assert! ( without_viewnode_ids (&buffer) . contains (x_line), "{}", buffer );
     let retitled : String = edit_line (
       &buffer, x_line . trim_end (),
-      |line| line . replacen ( ")))) x", ")))) x, retitled", 1 ));
+      |line| line . replacen ( "))) x", "))) x, retitled", 1 ));
     let files_before : BTreeMap<String, String> = skg_files (f) ?;
     let saved : String = save_cleanly (f, &all_changes_view (), &retitled) ? . saved_view;
     assert_ne! ( skg_files (f) ?, files_before );
     assert_eq! ( read_graphnode ( &f . root . path () . join ("main"), "x" ) ? . title,
                  "x, retitled" );
     assert_lines_in_order ( &saved, &[
-      "* (skg (node (id b)",
-      "** (skg (node (id x) (repo main) noClaim (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (properties changed)",
+      "* (skg node (gnid b)",
+      "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels (contains (in 2) (out 1))) (viewStats noWarrant) (diff (rel removed) (properties changed)",
       "x, retitled\n",
       "*** (skg (oldText title)" ] );
     let editable : Vec<String> = node_lines (&saved, "x") . into_iter ()
@@ -408,11 +408,11 @@ fn a_removed_member_editable_before_a_save_stays_editable_after_it (
 fn a_removed_subscribee_is_shown_where_it_stood (
 ) -> Result<(), Box<dyn Error>> {
   assert_lines_in_order ( &removed_partners_buffer () ?, &[
-    "* (skg (node (id s)",
+    "* (skg node (gnid s)",
     "** (skg (subscribeeFolder changed))",
-    "*** (skg (node (id s1) (repo main) writeProtected",
-    "*** (skg (node (id s2) (repo main) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel)))) s2",
-    "*** (skg (node (id s3) (repo main) writeProtected" ] );
+    "*** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected",
+    "*** (skg node (gnid s2) (skgRepos (nodeRepo main)) noClaim writeProtected (viewStats noWarrant) (diff (rel removed) (leaves 1 rel))) s2",
+    "*** (skg node (gnid s3) (skgRepos (nodeRepo main)) writeProtected" ] );
   Ok (( )) }
 
 #[test]
@@ -434,7 +434,7 @@ fn a_historical_phantoms_old_content_is_shown_as_removed_members (
     buffer = buffer_of (f) ?;
     Ok (( )) }) ?;
   assert_lines_in_order ( &buffer, &[
-    "** (skg (ghost (gnid h) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel)))) h",
-    "*** (skg (node (id m) (repo main) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all)))) m, retitled",
+    "** (skg ghost (gnid h) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (leaves 2 node rel))) h",
+    "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed) (properties changed) (leaves 2 rel all))) m, retitled",
     "**** (skg (oldText title) (diff (leaves 1))) m" ] );
   saves_back_unchanged ("historical_content", &["main"], DiffViewBufferKind::AllChanges) }

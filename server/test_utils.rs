@@ -716,9 +716,9 @@ pub fn tantivy_contains_skgid(
 /// # Example
 /// ```
 /// use skg::test_utils::strip_org_comments;
-/// let input = "  * (skg (id 1)) title 1 # here's a comment\n  ** (skg (id 2)) title 2 # here's another";
+/// let input = "  * (skg node (gnid 1)) title 1 # here's a comment\n  ** (skg node (gnid 2)) title 2 # here's another";
 /// let result = strip_org_comments(input);
-/// assert_eq!(result, "  * (skg (id 1)) title 1\n  ** (skg (id 2)) title 2");
+/// assert_eq!(result, "  * (skg node (gnid 1)) title 1\n  ** (skg node (gnid 2)) title 2");
 /// ```
 pub fn strip_org_comments(s: &str) -> String {
   s . lines()

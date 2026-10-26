@@ -58,9 +58,9 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
       { // An edited now-restricted editable node: write suppressed,
         // warning attached, containment preserved.
         let buffer = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (node (id private-a) (repo private))) edited private title
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
+          ** (skg node (gnid private-a) (skgRepos (nodeRepo private))) edited private title
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
@@ -80,9 +80,9 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
       { // The same stale node untouched: the noop filter drops its
         // nodeInstruction before suppression looks, so no warning.
         let buffer = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-b) (repo public) writeProtected)) active-b
-          ** (skg (node (id private-a) (repo private))) private title must not leak
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo public)) writeProtected) active-b
+          ** (skg node (gnid private-a) (skgRepos (nodeRepo private))) private title must not leak
           private body must not leak
         "};
         let (_viewforest, plan, warnings) =
@@ -100,8 +100,8 @@ fn writes_to_restricted_nodes_are_suppressed_with_warning (
       { // Moving a node into a restricted skgrepo: move suppressed,
         // warning attached, node unmoved.
         let buffer = indoc! {"
-          * (skg (node (id root) (repo public))) root
-          ** (skg (node (id active-b) (repo private))) active-b
+          * (skg node (gnid root) (skgRepos (nodeRepo public))) root
+          ** (skg node (gnid active-b) (skgRepos (nodeRepo private))) active-b
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (

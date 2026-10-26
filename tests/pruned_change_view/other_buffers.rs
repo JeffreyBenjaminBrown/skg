@@ -54,7 +54,7 @@ fn headline_of<'a> (
   text : &'a str,
   id   : &str,
 ) -> &'a str {
-  let node : String = format! ( "(node (id {}) ", id );
+  let node : String = format! ( "node (gnid {}) ", id );
   text . lines () . find ( |line| line . contains (&node) )
     . unwrap_or_else ( || panic! ( "no headline of {} in\n{}", id, text )) }
 
@@ -70,7 +70,7 @@ fn child_headlines_of_editable<'a> (
   text : &'a str,
   id   : &str,
 ) -> Vec<&'a str> {
-  let node : String = format! ( "(node (id {}) ", id );
+  let node : String = format! ( "node (gnid {}) ", id );
   let headline : &str =
     text . lines ()
     . find ( |line| line . contains (&node)
@@ -122,13 +122,13 @@ fn the_skgrepo_changes_buffer_shows_the_recorder_of_a_relRepo_move (
   let text : String =
     buffer_of_case ("kinds", DiffViewBufferKind::SkgrepoChanges) ?;
   assert_lines_in_order ( &text, &[
-    "* (skg (node (id rr)",
+    "* (skg node (gnid rr)",
     "** (skg (changesetMarker relRepo) (diff (leaves 1 all)))",
-    "** (skg (node (id rm)",
+    "** (skg node (gnid rm)",
     "*** (skg (relRepoMove (old public) (new private)) (diff (leaves 1)))" ] );
   assert! ( ! headline_of (&text, "rr") . contains ("homeSkgrepoMove"),
             "rr's home did not move:\n{}", text );
-  assert! ( ! text . contains ("(id txt)"),
+  assert! ( ! text . contains ("(gnid txt)"),
             "txt's only change is its text:\n{}", text );
   Ok (( )) }
 
@@ -138,17 +138,17 @@ fn the_merges_buffer_shows_only_the_merge (
   let text : String = buffer (DiffViewBufferKind::Merges) ?;
   let roots : Vec<&str> = roots (&text);
   assert_eq! ( roots . len (), 2, "{}", text );
-  assert! ( roots [0] . contains ("(ghost (gnid acqd)"), "{}", text );
-  assert! ( roots [1] . contains ("(node (id top)"), "{}", text );
+  assert! ( roots [0] . contains ("ghost (gnid acqd)"), "{}", text );
+  assert! ( roots [1] . contains ("node (gnid top)"), "{}", text );
   assert! ( child_headlines_of_editable (&text, "acq") . iter ()
-            . any ( |line| line . contains ("(node (id pres)") ),
+            . any ( |line| line . contains ("node (gnid pres)") ),
             "the text preserver is shown in acq's content:\n{}", text );
   assert! ( headline_of (&text, "pres") . contains ("(diff (node added) (rel added)"),
             "the text preserver is new in acq's content:\n{}", text );
   assert! ( text . contains ("acquiredByFolder")
             && text . contains ("acquiredFolder"), "{}", text );
   for unrelated in [ "txt", "mvp", "ord" ] {
-    assert! ( ! text . contains (&format! ( "(id {})", unrelated )),
+    assert! ( ! text . contains (&format! ( "(gnid {})", unrelated )),
               "{} is not involved in a merge:\n{}", unrelated, text ); }
   Ok (( )) }
 
@@ -169,7 +169,7 @@ fn the_skgrepo_changes_buffer_heralds_each_move_and_moves_like_an_ancestor (
   assert! ( ! headline_of (&text, "mvs") . contains ("homeSkgrepoMove"),
             "mvs did not move:\n{}", text );
   for unrelated in [ "txt", "acq", "ord" ] {
-    assert! ( ! text . contains (&format! ( "(id {})", unrelated )),
+    assert! ( ! text . contains (&format! ( "(gnid {})", unrelated )),
               "{} did not move:\n{}", unrelated, text ); }
   Ok (( )) }
 
@@ -186,11 +186,11 @@ fn the_order_only_buffer_is_a_flat_list_with_markers (
   let text : String = without_viewnode_ids ( &buffer (DiffViewBufferKind::OrderOnlyChanges) ? );
   let lines : Vec<&str> = text . lines () . collect ();
   assert_eq! ( roots (&text) . len (), 1, "{}", text );
-  assert! ( lines [0] . starts_with ("* (skg bodyFolded (node (id ord)"),
+  assert! ( without_viewnode_ids (lines [0]) . starts_with ("* (skg bodyFolded node (gnid ord)"),
             "{}", text );
   assert_eq! ( lines [1], "** (skg (changesetMarker orderOnly) (diff (ready all)))" );
-  assert! ( lines [2] . contains ("(node (id o2) (repo public) writeProtected")
-            && lines [3] . contains ("(node (id o1) (repo public) writeProtected"),
+  assert! ( lines [2] . contains ("node (gnid o2) (skgRepos (nodeRepo public)) writeProtected")
+            && lines [3] . contains ("node (gnid o1) (skgRepos (nodeRepo public)) writeProtected"),
             "the content is shown in its new order, as leaves:\n{}", text );
   assert_eq! ( lines . len (), 4, "{}", text );
   Ok (( )) }

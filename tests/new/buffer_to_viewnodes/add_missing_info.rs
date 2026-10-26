@@ -65,7 +65,7 @@ fn new_note_skgrepo_and_membership (
         _ => None } )
     . expect ("the new note should be in the forest") }
 
-/// A headline without '(repo NAME)' inherits the skgrepo of its
+/// A headline without '(skgRepos (nodeRepo NAME))' inherits the skgrepo of its
 /// nearest ancestor that is an unrestricted vognode, through a
 /// historical phantom or a partner folder. A non-member note in a
 /// folder stays a non-member. Below a write-protected occurrence the
@@ -78,23 +78,23 @@ async fn test_new_headline_inherits_through_phantoms_and_folders (
   for (input, expected_skgrepo, expected_membership) in [
     ( // Under a historical phantom under an editable node.
       indoc! {"
-        * (skg (node (id editable) (repo alt))) editable
-        ** (skg (ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))) gone
+        * (skg node (gnid editable) (skgRepos (nodeRepo alt))) editable
+        ** (skg ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) gone
         *** new note
       "}, "alt", true ),
     ( // In a partner folder of an editable node, as a non-member.
       indoc! {"
-        * (skg (node (id editable) (repo alt))) editable
+        * (skg node (gnid editable) (skgRepos (nodeRepo alt))) editable
         ** (skg containerFolder)
-        *** (skg (node noClaim)) new note
+        *** (skg node noClaim) new note
       "}, "alt", false ),
     ( // In a partner folder under a write-protected occurrence whose
       // shown skgrepo is stale: the graph says 'main'.
       indoc! {"
-        * (skg (node (id other) (repo alt))) other
-        ** (skg (node (id root) (repo stale) writeProtected)) root again
+        * (skg node (gnid other) (skgRepos (nodeRepo alt))) other
+        ** (skg node (gnid root) (skgRepos (nodeRepo stale)) writeProtected) root again
         *** (skg containerFolder)
-        **** (skg (node noClaim)) new note
+        **** (skg node noClaim) new note
       "}, "main", false ), ] {
     let mut viewforest : MpViewForest =
       org_to_uninterpreted_viewforest (input) . unwrap() . 0;
@@ -135,15 +135,15 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_skgid_skgrepo (
   for (input, expected_skgrepo) in [
     ( // The editable occurrence moves root-pid to 'moved'.
       indoc! {"
-        * (skg (node (id root) (repo moved))) root
-        * (skg (node (id other) (repo main))) other
-        ** (skg (node (id root) (repo main) writeProtected)) root again
+        * (skg node (gnid root) (skgRepos (nodeRepo moved))) root
+        * (skg node (gnid other) (skgRepos (nodeRepo main))) other
+        ** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root again
         *** new child
       "}, "moved" ),
     ( // No editable occurrence: the graph says 'main'.
       indoc! {"
-        * (skg (node (id other) (repo main))) other
-        ** (skg (node (id root) (repo stale) writeProtected)) root again
+        * (skg node (gnid other) (skgRepos (nodeRepo main))) other
+        ** (skg node (gnid root) (skgRepos (nodeRepo stale)) writeProtected) root again
         *** new child
       "}, "main" ), ] {
     let mut viewforest : MpViewForest =
@@ -181,9 +181,9 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
   // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
     indoc! {"
-            * (skg (node (id recorder) (repo main))) recorder
+            * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
             ** (skg subscribeeFolder)
-            *** (skg (node (id root) writeProtected)) subscribee reference
+            *** (skg node (gnid root) writeProtected) subscribee reference
         "};
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
@@ -223,7 +223,7 @@ async fn test_add_missing_info_logic (
   // Also tests skgrepo inheritance from parent to children.
   let with_missing_info: &str =
     indoc! {"
-            * (skg (node (id root) (repo main))) root
+            * (skg node (gnid root) (skgRepos (nodeRepo main))) root
             ** (skg aliasFolder) aliases
             *** new alias
             *** (skg alias) preexisting alias
@@ -232,12 +232,12 @@ async fn test_add_missing_info_logic (
         "};
   let without_missing_info: &str =
     indoc! {"
-            * (skg (node (id root-pid) (repo main))) root
+            * (skg node (gnid root-pid) (skgRepos (nodeRepo main))) root
             ** (skg aliasFolder) aliases
             *** (skg alias) new alias
             *** (skg alias) preexisting alias
-            ** (skg (node (id unpredictable) (repo main))) no id
-            *** (skg (node (id unpredictable) (repo main))) also no id
+            ** (skg node (gnid unpredictable) (skgRepos (nodeRepo main))) no id
+            *** (skg node (gnid unpredictable) (skgRepos (nodeRepo main))) also no id
         "};
   let mut after_adding_missing_info : MpViewForest =
     org_to_uninterpreted_viewforest (
@@ -285,26 +285,26 @@ async fn test_skgrepo_inheritance_logic (
   // with explicit skgrepos overriding inheritance at various depths.
   let input: &str =
     indoc! {"
-            * (skg (node (id 1) (repo main))) _
-            ** (skg (node (id 11))) _
-            *** (skg (node (id 111) (repo alt))) _
-            **** (skg (node (id 1111))) _
-            *** (skg (node (id 112))) _
-            * (skg (node (id 2))) _
-            ** (skg (node (id 21) (repo alt))) _
-            ** (skg (node (id 22))) _
+            * (skg node (gnid 1) (skgRepos (nodeRepo main))) _
+            ** (skg node (gnid 11)) _
+            *** (skg node (gnid 111) (skgRepos (nodeRepo alt))) _
+            **** (skg node (gnid 1111)) _
+            *** (skg node (gnid 112)) _
+            * (skg node (gnid 2)) _
+            ** (skg node (gnid 21) (skgRepos (nodeRepo alt))) _
+            ** (skg node (gnid 22)) _
         "};
 
   let expected: &str =
     indoc! {"
-            * (skg (node (id 1) (repo main))) _
-            ** (skg (node (id 11) (repo main))) _
-            *** (skg (node (id 111) (repo alt))) _
-            **** (skg (node (id 1111) (repo alt))) _
-            *** (skg (node (id 112) (repo main))) _
-            * (skg (node (id 2))) _
-            ** (skg (node (id 21) (repo alt))) _
-            ** (skg (node (id 22))) _
+            * (skg node (gnid 1) (skgRepos (nodeRepo main))) _
+            ** (skg node (gnid 11) (skgRepos (nodeRepo main))) _
+            *** (skg node (gnid 111) (skgRepos (nodeRepo alt))) _
+            **** (skg node (gnid 1111) (skgRepos (nodeRepo alt))) _
+            *** (skg node (gnid 112) (skgRepos (nodeRepo main))) _
+            * (skg node (gnid 2)) _
+            ** (skg node (gnid 21) (skgRepos (nodeRepo alt))) _
+            ** (skg node (gnid 22)) _
         "};
 
   let mut actual_viewforest: MpViewForest =

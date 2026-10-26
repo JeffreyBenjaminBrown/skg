@@ -187,20 +187,20 @@ async fn a_stale_content_leaf_goes_and_a_stale_branch_is_retained_as_nonMember (
   let without_content : String =
     without_lines_containing (
       &without_lines_containing (
-        &without_lines_containing (&k_view, "(id l)"),
-        "(id m)" ),
-      "(id mc)" );
+        &without_lines_containing (&k_view, "(gnid l)"),
+        "(gnid m)" ),
+      "(gnid mc)" );
   let (_, collateral_views) : (String, Vec<String>) = save_view (
     &without_content, &second_viewforest_id, config, tantivy, &graph,
     &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  assert! ( lines_containing (first_view, "(id l)") . is_empty (),
+  assert! ( lines_containing (first_view, "(gnid l)") . is_empty (),
     "the stale leaf is gone:\n{}", first_view );
-  let m : String = the_line (first_view, "** ", "(id m)");
+  let m : String = the_line (first_view, "** ", "(gnid m)");
   assert! ( m . contains ("noClaim") && ! m . contains ("writeProtected"),
     "the stale branch is retained as non-member, still editable:\n{}", first_view );
-  let mc : String = the_line (first_view, "*** ", "(id mc)");
+  let mc : String = the_line (first_view, "*** ", "(gnid mc)");
   assert! ( ! mc . contains ("noClaim") && ! mc . contains ("writeProtected"),
     "mc stays m's content:\n{}", first_view );
   save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
@@ -223,28 +223,28 @@ async fn a_pasted_writeProtected_copy_beside_a_stale_member_stays_writeProtected
   let (k_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("k")) ?;
   let with_copy : String = {
     let mc_line : String = k_view . lines ()
-      . find ( |line| line . contains ("(id mc)") )
+      . find ( |line| line . contains ("(gnid mc)") )
       . unwrap_or_else ( || panic! ( "mc is in the view:\n{}", k_view ))
       . to_string ();
     k_view . replacen (
       &mc_line,
-      &format! ( "{}\n** (skg (node (id m) (repo main) noClaim writeProtected)) m\n\
-                  *** (skg (node noClaim)) a note under the copy", mc_line ),
+      &format! ( "{}\n** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim writeProtected) m\n\
+                  *** (skg node noClaim) a note under the copy", mc_line ),
       1 ) };
   save_view ( &with_copy, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let without_content : String =
     without_lines_containing (
       &without_lines_containing (
-        &without_lines_containing (&k_view, "(id l)"),
-        "(id m)" ),
-      "(id mc)" );
+        &without_lines_containing (&k_view, "(gnid l)"),
+        "(gnid m)" ),
+      "(gnid mc)" );
   let (_, collateral_views) : (String, Vec<String>) = save_view (
     &without_content, &second_viewforest_id, config, tantivy, &graph,
     &mut views_state ) . await ?;
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  let m_lines : Vec<String> = lines_containing (first_view, "(id m)");
+  let m_lines : Vec<String> = lines_containing (first_view, "(gnid m)");
   assert_eq! ( m_lines . len (), 2, "two copies of m remain:\n{}", first_view );
   assert! ( m_lines . iter () . any ( |line| line . contains ("noClaim")
                                            && ! line . contains ("writeProtected") ),
@@ -276,23 +276,23 @@ async fn a_retained_editable_copy_yields_the_claim_to_a_member_met_later (
               &mut views_state ) . await ?;
   let m_under_l : String = // m directly follows l, so one level deeper it is l's
     k_view . lines ()
-    . map ( |line| if line . contains ("(id m)") || line . contains ("(id mc)")
+    . map ( |line| if line . contains ("(gnid m)") || line . contains ("(gnid mc)")
                    { format! ("*{}", line) } else { line . to_string () } )
     . collect::<Vec<String>> () . join ("\n") + "\n";
   let (second_view, collateral_views) : (String, Vec<String>) = save_view (
     &m_under_l, &second_viewforest_id, config, tantivy, &graph,
     &mut views_state ) . await ?;
-  the_line (&second_view, "*** ", "(id m)"); // the second view moved m under l
+  the_line (&second_view, "*** ", "(gnid m)"); // the second view moved m under l
   assert_eq! ( collateral_views . len (), 1, "{:?}", collateral_views );
   let first_view : &str = &collateral_views [0];
-  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "** ", "(id m)") ),
+  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "** ", "(gnid m)") ),
     "the retained m yields the claim:\n{}", first_view );
-  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "*** ", "(id mc)") ),
+  assert! ( is_writeProtected_nonMember ( &the_line (first_view, "*** ", "(gnid mc)") ),
     "with its subtree:\n{}", first_view );
-  let member_m : String = the_line (first_view, "*** ", "(id m)");
+  let member_m : String = the_line (first_view, "*** ", "(gnid m)");
   assert! ( ! member_m . contains ("noClaim") && ! member_m . contains ("writeProtected"),
     "l's member m takes the claim:\n{}", first_view );
-  let member_mc : String = the_line (first_view, "**** ", "(id mc)");
+  let member_mc : String = the_line (first_view, "**** ", "(gnid mc)");
   assert! ( ! member_mc . contains ("noClaim") && ! member_mc . contains ("writeProtected"),
     "and its content is extended:\n{}", first_view );
   save_view ( first_view, &first_viewforest_id, config, tantivy, &graph,
@@ -316,46 +316,46 @@ async fn a_folder_member_retained_as_nonMember_is_adopted_when_its_membership_re
   let (x_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("x")) ?;
   let (x_view, _) : (String, Vec<String>) = save_view (
     &x_view . replacen (
-      "(node ",
-      "(node (viewRequests (folder containers))", 1 ),
+      "node ",
+      "node (viewRequests (folder containers))", 1 ),
     &x_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let with_note : String = {
     let member_b : String = x_view . lines ()
-      . find ( |line| line . starts_with ("*** ") && line . contains ("(id b)") )
+      . find ( |line| line . starts_with ("*** ") && line . contains ("(gnid b)") )
       . unwrap_or_else ( || panic! ( "b is in the folder:\n{}", x_view ))
       . to_string ();
     x_view . replacen (
       &member_b,
-      &format! ( "{}\n**** (skg (node noClaim)) a note under b", member_b ),
+      &format! ( "{}\n**** (skg node noClaim) a note under b", member_b ),
       1 ) };
   save_view ( &with_note, &x_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let (b_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("b")) ?;
   let (b_view, collateral_views) : (String, Vec<String>) = save_view (
     &without_lines_containing (
-      &without_lines_containing (&b_view, "(id x)"), "(id xc)" ),
+      &without_lines_containing (&b_view, "(gnid x)"), "(gnid xc)" ),
     &b_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let x_after_drop : &String = collateral_views . iter ()
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
-  assert! ( is_writeProtected_nonMember ( &the_line (x_after_drop, "*** ", "(id b)") ),
+  assert! ( is_writeProtected_nonMember ( &the_line (x_after_drop, "*** ", "(gnid b)") ),
     "the stale member is a write-protected non-member:\n{}", x_after_drop );
-  assert! ( the_line_after (x_after_drop, "*** ", "(id b)") . contains ("a note under b"),
+  assert! ( the_line_after (x_after_drop, "*** ", "(gnid b)") . contains ("a note under b"),
     "the note stands under it:\n{}", x_after_drop );
   let (_, collateral_views) : (String, Vec<String>) = save_view (
-    &format! ( "{}** (skg (node (id x) (repo main))) x\n\
-                *** (skg (node (id xc) (repo main))) xc\n", b_view ),
+    &format! ( "{}** (skg node (gnid x) (skgRepos (nodeRepo main))) x\n\
+                *** (skg node (gnid xc) (skgRepos (nodeRepo main))) xc\n", b_view ),
     &b_viewforest_id, config, tantivy, &graph, &mut views_state ) . await ?;
   let x_after_return : &String = collateral_views . iter ()
     . find ( |view| view . contains ("containerFolder") )
     . unwrap_or_else ( || panic! ( "x's view is rerendered: {:?}", collateral_views ));
-  let member_b : String = the_line (x_after_return, "*** ", "(id b)");
+  let member_b : String = the_line (x_after_return, "*** ", "(gnid b)");
   assert! ( ! member_b . contains ("noClaim"),
     "the retained b is the member again, and the only b in the folder:\n{}",
     x_after_return );
-  let under_b : Vec<String> = the_lines_under (x_after_return, "*** ", "(id b)");
+  let under_b : Vec<String> = the_lines_under (x_after_return, "*** ", "(gnid b)");
   assert! ( under_b . len () == 2
-            && under_b [0] . contains ("(id p)")
+            && under_b [0] . contains ("(gnid p)")
             && is_writeProtected_nonMember (&under_b [0])
             && under_b [1] . contains ("a note under b"),
     "b's chain is back, and the note still stands under it:\n{}", x_after_return );
@@ -376,21 +376,21 @@ async fn a_duplicate_member_leaves_one_member_and_one_retained_copy (
   let mut views_state : ViewsState = empty_views_state ();
   let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-d" . into ());
   let view : String = rerendered_stored_view (
-    "* (skg (node (id d) (repo main))) d\n\
-     ** (skg (node (id e) (repo main) writeProtected)) e\n\
-     *** (skg (node (id ec) (repo main))) ec\n\
-     ** (skg (node (id f) (repo main))) f\n\
-     ** (skg (node (id e) (repo main))) e\n\
-     ** (skg (node (id f) (repo main))) f\n",
+    "* (skg node (gnid d) (skgRepos (nodeRepo main))) d\n\
+     ** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected) e\n\
+     *** (skg node (gnid ec) (skgRepos (nodeRepo main))) ec\n\
+     ** (skg node (gnid f) (skgRepos (nodeRepo main))) f\n\
+     ** (skg node (gnid e) (skgRepos (nodeRepo main))) e\n\
+     ** (skg node (gnid f) (skgRepos (nodeRepo main))) f\n",
     &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
-  let e_lines : Vec<String> = lines_containing (&view, "(id e)");
+  let e_lines : Vec<String> = lines_containing (&view, "(gnid e)");
   assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
   assert! ( is_writeProtected_nonMember (&e_lines [0]),
     "the write-protected copy is retained as non-member:\n{}", view );
   assert! ( ! e_lines [1] . contains ("noClaim")
             && ! e_lines [1] . contains ("writeProtected"),
     "the editable copy is the member:\n{}", view );
-  assert_eq! ( lines_containing (&view, "(id f)") . len (), 1,
+  assert_eq! ( lines_containing (&view, "(gnid f)") . len (), 1,
     "the extra leaf copy of f is gone:\n{}", view );
   save_view ( &view, &viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
@@ -408,14 +408,14 @@ async fn an_editable_extra_copy_of_a_duplicate_is_writeProtected (
   let mut views_state : ViewsState = empty_views_state ();
   let viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-d" . into ());
   let view : String = rerendered_stored_view (
-    "* (skg (node (id d) (repo main))) d\n\
-     ** (skg (node (id e) (repo main))) e\n\
-     *** (skg (node (id ec) (repo main))) ec\n\
-     ** (skg (node (id f) (repo main))) f\n\
-     ** (skg (node (id e) (repo main))) e\n\
-     *** (skg (node (id ec) (repo main))) ec\n",
+    "* (skg node (gnid d) (skgRepos (nodeRepo main))) d\n\
+     ** (skg node (gnid e) (skgRepos (nodeRepo main))) e\n\
+     *** (skg node (gnid ec) (skgRepos (nodeRepo main))) ec\n\
+     ** (skg node (gnid f) (skgRepos (nodeRepo main))) f\n\
+     ** (skg node (gnid e) (skgRepos (nodeRepo main))) e\n\
+     *** (skg node (gnid ec) (skgRepos (nodeRepo main))) ec\n",
     &viewforest_id, config, tantivy, &graph, &mut views_state ) ?;
-  let e_lines : Vec<String> = lines_containing (&view, "(id e)");
+  let e_lines : Vec<String> = lines_containing (&view, "(gnid e)");
   assert_eq! ( e_lines . len (), 2, "two copies of e remain:\n{}", view );
   // The reconciler puts what it converts before the members.
   assert! ( is_writeProtected_nonMember (&e_lines [0]),
@@ -470,8 +470,8 @@ async fn a_stale_alias_goes (
   let second_viewforest_id : ViewforestId = ViewforestId::ContentView ("convert-al-2" . into ());
   let (al_view, _, _) = single_root_view (config, Some (tantivy), &ID::from ("al")) ?;
   let requesting : String = al_view . replacen (
-    "(node ",
-    "(node (viewRequests (folder aliases))", 1 );
+    "node ",
+    "node (viewRequests (folder aliases))", 1 );
   save_view ( &requesting, &first_viewforest_id, config, tantivy, &graph,
               &mut views_state ) . await ?;
   let (second_view, _) : (String, Vec<String>) = save_view (

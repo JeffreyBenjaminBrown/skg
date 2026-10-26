@@ -1,51 +1,58 @@
 /// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
 ///
-/// Format:
-///   Non-vognodes: (skg [focused] [folded] nonVognodeKind)
-///   UnrestrictedVognodes: (skg [focused] [folded]
-///                   (node [(id ID)]
-///                         [(repo REPO)]
-///                         [noClaim]          ; the occurrence claims no membership
-///                         [writeProtected]   ; marks the occurrence write-protected
-///                         [cycle]
-///                         [(stats [containsParent]
-///                                 [(containers N)]
-///                                 [(contents N)]
-///                                 [(linksIn N)])]
-///                         [(editRequest <delete | (merge ID) | (relRepo REPO)
-///                                       | (flag FLAG true|false)
-///                                       | restoreRel>)]
-///                         [(viewRequests REQUEST...)]
-///                         [(diff [(node added|removed)]
-///                                [(rel added|removed)]
-///                                [(properties changed)]
-///                                [(leaves N OBJECT...)]
-///                                [(ready OBJECT...)]
-///                                [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]))
-///   where OBJECT is node, rel or all. The '(diff ...)' form may also
-///   appear in (unknown ...) and (ghost ...), and
-///   at top level on an alias, id or flag property and on the
-///   diff view's properties other than bodyDiff. A changed folder,
-///   '(KIND changed)', may carry '(diff (ready))' at top level, and
-///   nothing else in it.
-///   'restoreRel' is valid only on a node carrying '(rel removed)': a
-///   removed member, or a folder member whose relationship to the
-///   folder's viewparent was removed. Which of those the headline is
-///   depends on where it stands, which the save checks
-///   ('validate_restoreRel_position', local.rs). It may sit beside
-///   'writeProtected'.
-///   The diff view's own viewnodes:
-///     (ghost (gnid ID) (skgRepos (nodeRepo REPO))
-///            [(editRequest restoreNode)] [(viewRequests tombstone)] ...)
-///                                            a ghost
-///     (oldText titleAndBody | title | body)  the text at HEAD
-///     bodyDiff
+/// Format ('METADATA_GRAMMAR'): one shape for every headline,
+///   (skg (vnid X) [ ] [focused] [folded] [bodyFolded] KIND PART...)
+/// KIND a bare atom, or for a few kinds a small form naming its
+/// parameter, and every part beside it at the top level, in any order.
+/// The kinds and the parts each takes ('parts_of_kind'):
+///   node [(gnid ID)] [(skgRepos [(nodeRepo REPO)] [(relRepo REPO)])]
+///        [noClaim]          ; the occurrence claims no membership
+///        [writeProtected]   ; marks the occurrence write-protected
+///        [(overridesHere ID)]
+///        [omittedBody] [(rels ...)]
+///        [(viewStats [noWarrant] [cycle] [(homeRepoHerald LABEL)]
+///                    [(homeSkgrepoMove ...)] [(movedLikeAncestor X)])]
+///        [(editRequest <delete | (merge ID) | (relRepo REPO)
+///                      | (flag FLAG true|false) | restoreRel>)]
+///        [(viewRequests REQUEST...)]
+///        [(diff [(node added|removed)]
+///               [(rel added|removed)]
+///               [(properties changed)]
+///               [(leaves N OBJECT...)]
+///               [(ready OBJECT...)]
+///               [(readyRequest OBJECT...) | (unreadyRequest OBJECT...)])]
+///     where OBJECT is node, rel or all. A headline naming no kind is
+///     a node.
+///   ghost (gnid ID) (skgRepos (nodeRepo REPO))
+///         [(editRequest restoreNode)] [(viewRequests tombstone)] [(diff ...)]
+///   unknown (gnid ID) [(skgRepos (relRepo REPO))]
+///           [(editRequest (relRepo REPO))] [(diff ...)]
+///   alias [(skgRepos (relRepo REPO))] [(editRequest (relRepo REPO))]
+///         [(diff ...)]
+///   id, (flag hadId | wasOverloaded | noSearchMatching),
+///   and the diff view's own viewnodes
+///     (oldText titleAndBody | title | body)
 ///     (homeSkgrepoMove (old REPO) (new REPO))
 ///     (relRepoMove (old REPO) (new REPO))
 ///     (changesetMarker content | relRepo | orderOnly)
-///     acquiredByFolder, acquiredFolder
-///   Every kind may end with its viewnode ID, '(vnid X)', X being one or
-///   more lowercase letters and digits.
+///   each of which may carry a '(diff ...)';
+///   bodyDiff, tombstone and forestRoot, which carry nothing;
+///   a folder, its bare atom, or '(FOLDER changed)' for one the diff
+///   view shows because of a change, which may carry '(diff (ready))'
+///   and nothing else in its diff.
+/// 'restoreRel' is valid only on a node carrying '(rel removed)': a
+/// removed member, or a folder member whose relationship to the
+/// folder's viewparent was removed. Which of those the headline is
+/// depends on where it stands, which the save checks
+/// ('validate_restoreRel_position', local.rs). It may sit beside
+/// 'writeProtected'.
+/// The viewnode ID, '(vnid X)', X being one or more lowercase letters
+/// and digits, comes first when written.
+/// A retired spelling ('(node ...)', '(ghost ...)' or '(unknown ...)' as
+/// a form, '(deleted ...)', '(historical ...)', '(id X)', '(repo R)', a
+/// top-level '(relRepo R)', a relRepo or overridesHere inside
+/// '(viewStats ...)', 'nonMember', 'restrictedNode') is refused with
+/// a message naming the grammar.
 
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SkgrepoChange, SkgrepoName};
@@ -345,193 +352,318 @@ fn maybeplaced_kind_error_label (
       . error_label (), } }
 
 
+/// The grammar every headline's metadata follows, named by the
+/// parser's refusal of a retired spelling.
+pub const METADATA_GRAMMAR : &str =
+  "(skg (vnid X) [focused] [folded] [bodyFolded] KIND PART...), \
+   KIND a bare atom (node, ghost, unknown, alias, id, tombstone, a folder, ...) \
+   and every part beside it at the top level, among them (gnid X) and \
+   (skgRepos (nodeRepo R) [(relRepo R)])";
+
+/// The refusal of a retired spelling.
+fn retired_spelling (
+  spelling : &str,
+) -> String {
+  format! ( "'{}' is a retired metadata spelling; the grammar is {}",
+            spelling, METADATA_GRAMMAR ) }
+
+/// The kind a headline's metadata names.
+#[derive(Debug, Clone)]
+enum MetadataKind {
+  Node,
+  Ghost,
+  Unknown,
+  Tombstone,
+  Other (MpViewnodeKind),
+}
+
+/// The parts a kind accepts, beside the position atoms and the
+/// viewnode ID, which every kind accepts.
+fn parts_of_kind (
+  kind : &MetadataKind,
+) -> &'static [&'static str] {
+  match kind {
+    MetadataKind::Node =>
+      &[ "gnid", "skgRepos", "noClaim", "writeProtected",
+         "overridesHere", "omittedBody", "rels", "viewStats",
+         "editRequest", "viewRequests", "diff" ],
+    MetadataKind::Ghost =>
+      &[ "gnid", "skgRepos", "editRequest", "viewRequests", "diff" ],
+    MetadataKind::Unknown =>
+      &[ "gnid", "skgRepos", "editRequest", "diff" ],
+    MetadataKind::Tombstone => &[],
+    MetadataKind::Other (MpViewnodeKind::PropertyMember (
+      PropertyMember::Alias { .. } )) =>
+      &[ "skgRepos", "editRequest", "diff" ],
+    MetadataKind::Other (
+      MpViewnodeKind::PropertyMember (_)
+      | MpViewnodeKind::Folder (_)
+      | MpViewnodeKind::ChangeViewnode (
+        ChangeViewnode::OldText { .. }
+        | ChangeViewnode::HomeSkgrepoMove { .. }
+        | ChangeViewnode::RelRepoMove { .. }
+        | ChangeViewnode::ChangesetMarker { .. } )) => &[ "diff" ],
+    MetadataKind::Other (_) => &[], } }
+
+/// The name of 'kind' in an error message.
+fn kind_name (
+  kind : &MetadataKind,
+) -> String {
+  match kind {
+    MetadataKind::Node      => "node" . to_string (),
+    MetadataKind::Ghost     => "ghost" . to_string (),
+    MetadataKind::Unknown   => "unknown" . to_string (),
+    MetadataKind::Tombstone => "tombstone" . to_string (),
+    MetadataKind::Other (kind) => maybeplaced_kind_error_label (kind), } }
+
 /// Parse metadata from org-mode headline into ViewnodeMetadata.
 /// See file header comment for full syntax.
 pub fn parse_metadata_to_viewnodemd (
   sexp_str : &str
 ) -> Result<ViewnodeMetadata, String> {
-  let mut result : ViewnodeMetadata =
-    default_metadata ();
-
   let parsed : Sexp =
     sexp::parse (sexp_str)
     . map_err ( |e| format! ( "Failed to parse metadata as s-expression: {}", e ) ) ?;
-
-  // Extract the list of elements from (skg ...)
-  let elements : &[Sexp] =
+  let elements : &[Sexp] = // what follows the symbol 'skg'
     match &parsed {
       Sexp::List (items) => {
-        // First element should be the symbol 'skg'
         if items . is_empty () {
           return Err ( "Empty metadata s-expression" . to_string () ); }
-        // Skip the 'skg' symbol and return the rest
-        &items[1..]
-      },
-      _ => return Err ( "Expected metadata to be a list" . to_string () ),
-    };
-
-  let mut top_level_diff : bool = false;
-  // Process each element
+        &items[1..] },
+      _ => return Err ( "Expected metadata to be a list" . to_string () ), };
+  let mut result : ViewnodeMetadata = default_metadata ();
+  let mut kind : Option<MetadataKind> = None;
+  let mut parts : Vec<(String, &Sexp)> = Vec::new ();
   for element in elements {
-    match element {
-      Sexp::List (items) if items . len () >= 1 => {
-        let first : String =
-          atom_to_string ( &items[0] ) ?;
-        match first . as_str () {
-          "node" => {
-            parse_node_sexp ( &items[1..], &mut result ) ?; },
-          "ghost" => {
-            result . is_ghost = true;
-            parse_ghost_sexp ( &items[1..], &mut result ) ?; },
-          "oldText" => {
-            let aspect : String = single_argument (&first, &items[1..]) ?;
-            let (title_changed, body_changed) : (bool, bool) =
-              match aspect . as_str () {
-                "titleAndBody" => (true,  true),
-                "title"        => (true,  false),
-                "body"         => (false, true),
-                other => return Err ( format! (
-                  "Unknown oldText aspect: {}", other )), };
-            result . non_vognode = Some ( MpViewnodeKind::ChangeViewnode (
-              ChangeViewnode::OldText {
-                title : title_changed . then (String::new),
-                body  : body_changed  . then (String::new) } )); },
-          "homeSkgrepoMove" | "relRepoMove" => {
-            let skgrepo_change : SkgrepoChange =
-              parse_old_and_new_skgrepos (&first, &items[1..]) ?;
-            result . non_vognode = Some ( MpViewnodeKind::ChangeViewnode (
-              if first == "homeSkgrepoMove" {
-                ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
-              } else {
-                ChangeViewnode::RelRepoMove { skgrepo_change } } )); },
-          "changesetMarker" => {
-            let name : String = single_argument (&first, &items[1..]) ?;
-            let kind : ChangesetMarkerKind =
-              ChangesetMarkerKind::from_wire_name (&name)
-              . ok_or_else ( || format! (
-                "Unknown changesetMarker kind: {}", name )) ?;
-            result . non_vognode = Some ( MpViewnodeKind::ChangeViewnode (
-              ChangeViewnode::ChangesetMarker { kind } )); },
-          "unknown" => {
-            // (unknown (id X)) -- placeholder for a referenced
-            // node with no record anywhere. No skgrepo/title/body.
-            parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
-          "relRepo" => {
-            if items . len () != 2 {
-              return Err (
-                "relRepo requires exactly one repo name"
-                . to_string () ); }
-            if result . property_relRepo . is_some () {
-              return Err ( "Alias relRepo may appear only once"
-                           . to_string () ); }
-            result . property_relRepo = Some ( SkgrepoName::from (
-              atom_to_string (&items [1]) ? )); },
-          "editRequest" => {
-            let mut request_metadata : ViewnodeMetadata = default_metadata ();
-            parse_editrequest_sexp (
-              &items[1..], &mut request_metadata ) ?;
-            if let Some (message) = misplaced_restore_request_message (
-                 &request_metadata . edit_request, false ) {
-              return Err (message); }
-            if request_metadata . edit_request . is_some () {
-              return Err ( "Only Alias may carry a top-level editRequest relRepo"
-                           . to_string () ); }
-            if result . property_relRepo_request . is_some () {
-              return Err ( "Alias editRequest may appear only once"
-                           . to_string () ); }
-            result . property_relRepo_request =
-              request_metadata . relRepo_request; },
-          "vnid" => {
-            if result . viewnode_id . is_some () {
-              return Err ( "a viewnode ID may appear only once" . to_string () ); }
-            result . viewnode_id = Some ( ViewnodeId::parse (
-              & single_argument (&first, &items[1..]) ? ) ? ); },
-          "diff" => {
-            // At top level, valid only on a property leaf, and on a
-            // changed folder holding only '(ready)' (checked below).
-            parse_diff_form ( &items[1..], &mut result ) ?;
-            top_level_diff = true; },
-          "flag" => {
-            if items . len () != 2 {
-              return Err ("flag requires exactly one flag name"
-                          . to_string ()); }
-            let name : String = atom_to_string (&items[1]) ?;
-            let flag : Flag = Flag::from_wire_name (&name)
-              . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
-            result . non_vognode = Some (MpViewnodeKind::PropertyMember (
-              PropertyMember::Flag {
-                flag, title: String::new (), body: None })); },
-          // Note: "alias" as a list like (alias "string") is no longer supported.
-          // Use bare "alias" atom instead - the alias string comes from headline title.
-          // Legacy format detection - reject with helpful error
-          "id" | "repo" | "view" | "code" => {
-            return Err ( format! (
-              "Legacy metadata format detected (found '{}' at top level). \
-               The new format uses (skg [focused] [folded] (node ...)) for UnrestrictedVognodes \
-               and (skg [focused] [folded] nonVognodeKind) for Non-vognodes.",
-              first )); },
-          folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
-            // '(KIND changed)': a folder the diff view shows
-            // because of a change. A display fact, like its '(diff
-            // (ready))'.
-            if items . len () != 2
-              || atom_to_string (&items[1]) ? != "changed" {
-              return Err ( format! (
-                "A folder form must be ({} changed)", folder_atom )); }
-            result . non_vognode = folder_kind_of_atom (folder_atom); },
-          _ => { return Err ( format! ( "Unknown metadata key: {}",
-                                         first )); }} },
-      Sexp::Atom (_) => {
-        let bare_value : String =
-          atom_to_string (element) ?;
-        match bare_value . as_str () {
-          "focused"  => result . foldAndFocus . focused = true,
-          "folded"   => result . foldAndFocus . folded = true,
-          "bodyFolded" => result . foldAndFocus . bodyFolded = true,
-          // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::Alias { text: String::new(), relRepo: None, relationshipEditRequest: None } ) ),
-          "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
-          "bodyDiff" =>
-            result . non_vognode = Some (MpViewnodeKind::ChangeViewnode (
-              ChangeViewnode::BodyDiff { diff : String::new () } )),
-          "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::PropertyMember ( PropertyMember::ID { skgid: ID::default() } ) ),
-          "tombstone" => result . is_tombstone = true,
-          folder_atom if folder_kind_of_atom (folder_atom) . is_some () =>
-            result . non_vognode = folder_kind_of_atom (folder_atom),
-          _ => {
-            return Err ( format! ( "Unknown top-level value: {}",
-                                    bare_value )); }} },
-      _ => { return Err ( format! (
-        "Unexpected element in metadata sexp: {}",
-        sexp_str )); }} }
-  if ( result . property_relRepo . is_some ()
-       || result . property_relRepo_request . is_some () )
-     && ! matches! ( result . non_vognode,
-                     Some (MpViewnodeKind::PropertyMember (PropertyMember::Alias { .. })) )
-  { return Err ( "relRepo and its editRequest are valid only on Alias properties"
-                 . to_string () ); }
+    let (name, kind_named) : (String, Option<MetadataKind>) =
+      classify_metadata_element (element, &mut result) ?;
+    if let Some (named) = kind_named {
+      if let Some (earlier) = &kind {
+        return Err ( format! ( "A headline has one kind; this one names {} and {}",
+                               kind_name (earlier), kind_name (&named) )); }
+      kind = Some (named);
+    } else if ! name . is_empty () {
+      if parts . iter () . any ( |(seen, _)| *seen == name ) {
+        return Err ( format! ( "{} may appear only once", name )); }
+      parts . push ( (name, element) ); }}
+  let kind : MetadataKind = kind . unwrap_or (MetadataKind::Node);
+  for (name, _) in &parts {
+    if ! parts_of_kind (&kind) . contains ( &name . as_str () ) {
+      return Err ( format! ( "A headline of kind {} does not take {}",
+                             kind_name (&kind), name )); }}
+  for (name, element) in &parts {
+    read_metadata_part (&kind, name, element, &mut result) ?; }
+  match kind {
+    MetadataKind::Node => {},
+    MetadataKind::Ghost => result . is_ghost = true,
+    MetadataKind::Unknown =>
+      if result . unknown_node_skgid . is_none () {
+        return Err ( "An unknown requires its (gnid X)" . to_string () ); },
+    MetadataKind::Tombstone => result . is_tombstone = true,
+    MetadataKind::Other (other) => result . non_vognode = Some (other), }
   let is_folder : bool = matches! ( result . non_vognode,
     Some ( MpViewnodeKind::Folder (_) ));
   let holds_only_an_objectless_ready : bool =
     result . change_facts == ChangeFacts {
       ready : Some (BTreeSet::new ()), .. ChangeFacts::default () }
     && result . readiness_request . is_none ();
-  if top_level_diff && is_folder && ! holds_only_an_objectless_ready
+  if is_folder && parts . iter () . any ( |(name, _)| name == "diff" )
+     && ! holds_only_an_objectless_ready
   { return Err ( "A folder's diff may hold only an objectless (ready)"
-                 . to_string () ); }
-  if top_level_diff && ! is_folder
-     && ! matches! ( result . non_vognode,
-                     Some ( MpViewnodeKind::PropertyMember (_)
-                            | MpViewnodeKind::ChangeViewnode (
-                              ChangeViewnode::OldText { .. }
-                              | ChangeViewnode::HomeSkgrepoMove { .. }
-                              | ChangeViewnode::RelRepoMove { .. }
-                              | ChangeViewnode::ChangesetMarker { .. } )) )
-  { return Err ( "A top-level diff is valid only on alias, id and flag properties, the diff view's properties other than bodyDiff, and changed folders"
                  . to_string () ); }
   check_where_the_edit_request_sits (&result) ?;
   Ok (result) }
+
+/// What one element of '(skg ...)' is: a position atom or the
+/// viewnode ID, read into 'metadata' at once (the name returned is
+/// empty); the kind (returned second, with its parameters read); or
+/// a part, whose name is returned, to be read once the kind is
+/// known. Refuses a retired spelling and anything unknown.
+fn classify_metadata_element (
+  element  : &Sexp,
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(String, Option<MetadataKind>), String> {
+  let part = |name : &str| -> Result<(String, Option<MetadataKind>), String> {
+    Ok (( name . to_string (), None )) };
+  let a_kind = |kind : MetadataKind| -> Result<(String, Option<MetadataKind>), String> {
+    Ok (( String::new (), Some (kind) )) };
+  match element {
+    Sexp::Atom (_) => {
+      let atom : String = atom_to_string (element) ?;
+      match atom . as_str () {
+        "focused"    => { metadata . foldAndFocus . focused = true;
+                          Ok (( String::new (), None )) },
+        "folded"     => { metadata . foldAndFocus . folded = true;
+                          Ok (( String::new (), None )) },
+        "bodyFolded" => { metadata . foldAndFocus . bodyFolded = true;
+                          Ok (( String::new (), None )) },
+        "noClaim" | "writeProtected" | "omittedBody" => part (&atom),
+        "node"       => a_kind (MetadataKind::Node),
+        "ghost"      => a_kind (MetadataKind::Ghost),
+        "unknown"    => a_kind (MetadataKind::Unknown),
+        "tombstone"  => a_kind (MetadataKind::Tombstone),
+        "alias"      => a_kind ( MetadataKind::Other (
+          MpViewnodeKind::PropertyMember ( PropertyMember::Alias {
+            text : String::new (), relRepo : None,
+            relationshipEditRequest : None } ))),
+        "id"         => a_kind ( MetadataKind::Other (
+          MpViewnodeKind::PropertyMember (
+            PropertyMember::ID { skgid : ID::default () } ))),
+        "forestRoot" => a_kind ( MetadataKind::Other (MpViewnodeKind::BufferRoot) ),
+        "bodyDiff"   => a_kind ( MetadataKind::Other (
+          MpViewnodeKind::ChangeViewnode (
+            ChangeViewnode::BodyDiff { diff : String::new () } ))),
+        "nonMember" | "restrictedNode" => Err ( retired_spelling (&atom) ),
+        folder_atom if folder_kind_of_atom (folder_atom) . is_some () =>
+          a_kind ( MetadataKind::Other (
+            folder_kind_of_atom (folder_atom) . expect ("a folder") )),
+        _ => Err ( format! ( "Unknown top-level value: {}", atom )), }},
+    Sexp::List (items) if ! items . is_empty () => {
+      let head : String = atom_to_string ( &items[0] ) ?;
+      let args : &[Sexp] = &items[1..];
+      match head . as_str () {
+        "vnid" => {
+          if metadata . viewnode_id . is_some () {
+            return Err ( "a viewnode ID may appear only once" . to_string () ); }
+          metadata . viewnode_id = Some ( ViewnodeId::parse (
+            & single_argument (&head, args) ? ) ? );
+          Ok (( String::new (), None )) },
+        "gnid" | "skgRepos" | "rels" | "viewStats" | "overridesHere"
+          | "editRequest" | "viewRequests" | "diff" => part (&head),
+        "oldText" => {
+          let aspect : String = single_argument (&head, args) ?;
+          let (title_changed, body_changed) : (bool, bool) =
+            match aspect . as_str () {
+              "titleAndBody" => (true,  true),
+              "title"        => (true,  false),
+              "body"         => (false, true),
+              other => return Err ( format! (
+                "Unknown oldText aspect: {}", other )), };
+          a_kind ( MetadataKind::Other ( MpViewnodeKind::ChangeViewnode (
+            ChangeViewnode::OldText {
+              title : title_changed . then (String::new),
+              body  : body_changed  . then (String::new) } ))) },
+        "homeSkgrepoMove" | "relRepoMove" => {
+          let skgrepo_change : SkgrepoChange =
+            parse_old_and_new_skgrepos (&head, args) ?;
+          a_kind ( MetadataKind::Other ( MpViewnodeKind::ChangeViewnode (
+            if head == "homeSkgrepoMove" {
+              ChangeViewnode::HomeSkgrepoMove { skgrepo_change }
+            } else {
+              ChangeViewnode::RelRepoMove { skgrepo_change } } ))) },
+        "changesetMarker" => {
+          let name : String = single_argument (&head, args) ?;
+          let kind : ChangesetMarkerKind =
+            ChangesetMarkerKind::from_wire_name (&name)
+            . ok_or_else ( || format! (
+              "Unknown changesetMarker kind: {}", name )) ?;
+          a_kind ( MetadataKind::Other ( MpViewnodeKind::ChangeViewnode (
+            ChangeViewnode::ChangesetMarker { kind } ))) },
+        "flag" => {
+          let name : String = single_argument (&head, args)
+            . map_err ( |_| "flag requires exactly one flag name" . to_string () ) ?;
+          let flag : Flag = Flag::from_wire_name (&name)
+            . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
+          a_kind ( MetadataKind::Other ( MpViewnodeKind::PropertyMember (
+            PropertyMember::Flag {
+              flag, title : String::new (), body : None } ))) },
+        "node" | "ghost" | "unknown" | "deleted" | "historical"
+          | "id" | "repo" | "relRepo" =>
+          Err ( retired_spelling ( &format! ( "({} ...)", head )) ),
+        folder_atom if folder_kind_of_atom (folder_atom) . is_some () => {
+          // '(KIND changed)': a folder the diff view shows
+          // because of a change. A display fact, like its '(diff
+          // (ready))'.
+          if args . len () != 1
+            || atom_to_string (&args[0]) ? != "changed" {
+            return Err ( format! (
+              "A folder form must be ({} changed)", folder_atom )); }
+          a_kind ( MetadataKind::Other (
+            folder_kind_of_atom (folder_atom) . expect ("a folder") )) },
+        _ => Err ( format! ( "Unknown metadata key: {}", head )), }},
+    _ => Err ( format! ( "Unexpected element in metadata sexp: {:?}",
+                         element )), }}
+
+/// Read the part named 'name', 'element', of a headline of kind
+/// 'kind' into 'metadata'. 'parts_of_kind' has already said the kind
+/// takes it.
+fn read_metadata_part (
+  kind     : &MetadataKind,
+  name     : &str,
+  element  : &Sexp,
+  metadata : &mut ViewnodeMetadata,
+) -> Result<(), String> {
+  let args : &[Sexp] = match element {
+    Sexp::List (items) => &items[1..],
+    _ => &[], };
+  match name {
+    "noClaim" =>
+      // the occurrence claims no membership; a claimant carries nothing
+      metadata . claimsMembership = false,
+    "writeProtected" =>
+      metadata . writeProtected = true,
+    "omittedBody" | "rels" => {}, // derived facts the view regenerates
+    "gnid" => {
+      let gnid : ID = ID::from ( single_argument (name, args) ? );
+      if matches! (kind, MetadataKind::Unknown) {
+        metadata . unknown_node_skgid = Some (gnid);
+      } else { metadata . skgid = Some (gnid); }},
+    "skgRepos" => {
+      let (nodeRepo, relRepo) : (Option<SkgrepoName>, Option<SkgrepoName>) =
+        parse_skgRepos (args) ?;
+      match kind {
+        MetadataKind::Node => {
+          metadata . home_skgrepo = nodeRepo;
+          metadata . viewStats . relRepo = relRepo; },
+        MetadataKind::Ghost => {
+          if relRepo . is_some () || nodeRepo . is_none () {
+            return Err ( "A ghost's skgRepos holds only (nodeRepo R)"
+                         . to_string () ); }
+          metadata . home_skgrepo = nodeRepo; },
+        _ => {
+          if nodeRepo . is_some () || relRepo . is_none () {
+            return Err ( format! (
+              "The skgRepos of a headline of kind {} holds only (relRepo R)",
+              kind_name (kind) )); }
+          if matches! (kind, MetadataKind::Unknown) {
+            metadata . unknown_relRepo = relRepo;
+          } else { metadata . property_relRepo = relRepo; }}, }},
+    "viewStats" =>
+      parse_viewstats_sexp ( args, &mut metadata . viewStats ) ?,
+    "overridesHere" =>
+      // Load-bearing: save extraction round-trips the original ID
+      // through it.
+      metadata . overridesHere = Some ( ID::from (
+        single_argument (name, args) ? )),
+    "editRequest" => match kind {
+      MetadataKind::Node | MetadataKind::Ghost => {
+        // Where a ghost's request may sit is checked once the whole
+        // metadata is read ('check_where_the_edit_request_sits').
+        parse_editrequest_sexp ( args, metadata ) ?;
+        if matches! (kind, MetadataKind::Ghost)
+           && metadata . relRepo_request . is_some () {
+          return Err ( "A ghost accepts no edit request but restoreNode"
+                       . to_string () ); }},
+      _ => {
+        let mut request_metadata : ViewnodeMetadata = default_metadata ();
+        parse_editrequest_sexp ( args, &mut request_metadata ) ?;
+        if let Some (message) = misplaced_restore_request_message (
+             &request_metadata . edit_request, false ) {
+          return Err (message); }
+        if request_metadata . edit_request . is_some () {
+          return Err ( format! (
+            "A headline of kind {} accepts only an editRequest relRepo",
+            kind_name (kind) )); }
+        if matches! (kind, MetadataKind::Unknown) {
+          metadata . unknown_relRepo_request = request_metadata . relRepo_request;
+        } else {
+          metadata . property_relRepo_request = request_metadata . relRepo_request; }}, },
+    "viewRequests" =>
+      parse_viewrequests_sexp ( args, &mut metadata . view_requests ) ?,
+    "diff" =>
+      parse_diff_form ( args, metadata ) ?,
+    other => return Err ( format! ( "Unknown metadata part: {}", other )), }
+  Ok (( )) }
 
 /// What the parser says to a restoreRel on a ghost.
 pub const RESTORE_REL_ON_A_DELETED_NODE : &str =
@@ -607,127 +739,6 @@ fn folder_kind_of_atom (
   Folder::from_client_string (atom) . map (MpViewnodeKind::Folder) }
 
 
-/// Parse the (node ...) s-expression contents.
-fn parse_node_sexp (
-  items : &[Sexp],
-  metadata : &mut ViewnodeMetadata
-) -> Result<(), String> {
-  for element in items {
-    match element {
-      Sexp::List (subitems) if subitems . len () >= 1 => {
-        let key : String =
-          atom_to_string ( &subitems[0] ) ?;
-        match key . as_str () {
-          "id" => {
-            if subitems . len () != 2 {
-              return Err ( "id requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . skgid = Some ( ID::from (value)); },
-          "repo" => {
-            if subitems . len () != 2 {
-              return Err ( "repo requires exactly one value" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . home_skgrepo = Some ( SkgrepoName::from (value) ); },
-          // Semantic relationship facts are display-only; the view
-          // regenerates them.
-          "rels" => {},
-          "viewStats" => {
-            parse_viewstats_sexp (
-              &subitems[1..], &mut metadata . viewStats,
-              &mut metadata . overridesHere ) ?; },
-          "editRequest" => {
-            if metadata . edit_request . is_some ()
-               || metadata . relRepo_request . is_some () {
-              return Err ( "node editRequest may appear only once"
-                           . to_string () ); }
-            parse_editrequest_sexp ( &subitems[1..], metadata ) ?; },
-          "viewRequests" => {
-            parse_viewrequests_sexp (
-              &subitems[1..], &mut metadata . view_requests ) ?; },
-          "diff" =>
-            parse_diff_form ( &subitems[1..], metadata ) ?,
-          _ => { return Err ( format! ( "Unknown node key: {}",
-                                         key )); }} },
-      Sexp::Atom (_) => {
-        let bare_value : String =
-          atom_to_string (element) ?;
-        match bare_value . as_str () {
-          // A `writeProtected` atom makes this occurrence write-protected.
-          // The server emits and accepts this exact atom (see org_to_text.rs).
-          "writeProtected" =>
-            metadata . writeProtected = true,
-          // A 'noClaim' atom says this occurrence does not claim
-          // membership; a claimant carries nothing.
-          "noClaim" =>
-            metadata . claimsMembership = false,
-          "omittedBody" =>
-            // Display-only (like rels): the view
-            // regenerates it, so accept and discard.
-            {},
-          _ => {
-            return Err ( format! ( "Unknown node value: {}",
-                                    bare_value )); }} },
-      _ => { return Err ( "Unexpected element in node"
-                           . to_string () ); }} }
-  Ok (( )) }
-
-/// Parse the (unknown (id X)) s-expression contents.
-/// Sets metadata.unknown_node_id when an id is found.
-fn parse_unknownnode_sexp (
-  items    : &[Sexp],
-  metadata : &mut ViewnodeMetadata,
-) -> Result<(), String> {
-  for element in items {
-    match element {
-      Sexp::List (subitems) if ! subitems . is_empty () => {
-        let key : String =
-          atom_to_string ( &subitems[0] ) ?;
-        match key . as_str () {
-          "id" => {
-            if subitems . len () != 2 {
-              return Err ( "unknown id requires exactly one value" . to_string () ); }
-            if metadata . unknown_node_skgid . is_some () {
-              return Err ( "unknown id may appear only once" . to_string () ); }
-            let value : String =
-              atom_to_string ( &subitems[1] ) ?;
-            metadata . unknown_node_skgid =
-              Some ( ID::from (value)); },
-          "viewStats" => {
-            if metadata . unknown_relRepo . is_some () {
-              return Err ( "unknown viewStats may appear only once" . to_string () ); }
-            let mut stats : ViewnodeStats = ViewnodeStats::default ();
-            let mut overridesHere : Option<ID> = None;
-            parse_viewstats_sexp ( &subitems[1..], &mut stats, &mut overridesHere ) ?;
-            if stats . relRepo . is_none ()
-               || stats . cycle || overridesHere . is_some () {
-              return Err ( "Unknown viewStats supports only relRepo"
-                           . to_string () ); }
-            metadata . unknown_relRepo = stats . relRepo; },
-          "editRequest" => {
-            if metadata . unknown_relRepo_request . is_some () {
-              return Err ( "unknown editRequest may appear only once"
-                           . to_string () ); }
-            let mut request_metadata : ViewnodeMetadata = default_metadata ();
-            parse_editrequest_sexp (
-              &subitems[1..], &mut request_metadata ) ?;
-            if let Some (message) = misplaced_restore_request_message (
-                 &request_metadata . edit_request, false ) {
-              return Err (message); }
-            if request_metadata . edit_request . is_some () {
-              return Err ( "Unknown supports only an editRequest relRepo"
-                           . to_string () ); }
-            metadata . unknown_relRepo_request =
-              request_metadata . relRepo_request; },
-          "diff" =>
-            parse_diff_form ( &subitems[1..], metadata ) ?,
-          _ => { return Err ( format! (
-            "Unknown 'unknown' key: {}", key )); }} },
-      _ => { return Err ( "Unexpected element in unknown sexp"
-                           . to_string () ); }} }
-  Ok (( )) }
-
 /// The one atom argument of the form whose head is 'head'.
 fn single_argument (
   head : &str,
@@ -762,71 +773,42 @@ fn parse_old_and_new_skgrepos (
     (Some (old), Some (new)) => Ok ( SkgrepoChange { old, new } ),
     _ => Err ( format! ( "{} requires both (old REPO) and (new REPO)", head )), } }
 
-/// Parse the contents of '(ghost (gnid X) (skgRepos (nodeRepo R))
-/// ...)'.
-fn parse_ghost_sexp (
-  items    : &[Sexp],
-  metadata : &mut ViewnodeMetadata,
-) -> Result<(), String> {
-  for element in items {
-    match element {
-      Sexp::List (subitems) if subitems . len () >= 1 => {
-        let key : String =
-          atom_to_string ( &subitems[0] ) ?;
-        match key . as_str () {
-          "gnid" => {
-            if metadata . skgid . is_some () {
-              return Err ( "ghost gnid may appear only once" . to_string () ); }
-            metadata . skgid = Some ( ID::from (
-              single_argument ("ghost gnid", &subitems[1..]) ? )); },
-          "skgRepos" => {
-            if metadata . home_skgrepo . is_some () {
-              return Err ( "ghost skgRepos may appear only once" . to_string () ); }
-            metadata . home_skgrepo = Some (
-              parse_ghost_skgRepos (&subitems[1..]) ? ); },
-          "editRequest" => {
-            // Where a ghost's request may sit is checked once the
-            // whole metadata is read ('check_where_the_edit_request_sits').
-            if metadata . edit_request . is_some () {
-              return Err ( "ghost editRequest may appear only once"
-                           . to_string () ); }
-            parse_editrequest_sexp ( &subitems[1..], metadata ) ?;
-            if metadata . relRepo_request . is_some () {
-              return Err ( "A ghost accepts no edit request but restoreNode"
-                           . to_string () ); }},
-          "viewRequests" =>
-            parse_viewrequests_sexp (
-              &subitems[1..], &mut metadata . view_requests ) ?,
-          "diff" =>
-            parse_diff_form ( &subitems[1..], metadata ) ?,
-          _ => { return Err ( format! ( "Unknown ghost key: {}",
-                                         key )); }} },
-      _ => { return Err ( "Unexpected element in ghost sexp"
-                           . to_string () ); }} }
-  Ok (( )) }
-
-/// A ghost's '(skgRepos (nodeRepo R))': its home skgrepo. A ghost has
-/// no relRepo.
-fn parse_ghost_skgRepos (
+/// The skgrepos of '(skgRepos [(nodeRepo R)] [(relRepo R)])', whose
+/// parts are 'parts': the home skgrepo of the node a headline stands
+/// for, and the skgrepo recording its relationship to its viewparent.
+fn parse_skgRepos (
   parts : &[Sexp],
-) -> Result<SkgrepoName, String> {
-  match parts {
-    [ Sexp::List (pair) ] => match pair . as_slice () {
-      [ head, value ] if atom_to_string (head) ? == "nodeRepo" =>
-        Ok ( SkgrepoName::from ( atom_to_string (value) ? )),
-      _ => Err ( "A ghost's skgRepos holds only (nodeRepo R)"
-                 . to_string () ), },
-    _ => Err ( "A ghost's skgRepos holds only (nodeRepo R)"
-               . to_string () ), } }
+) -> Result<(Option<SkgrepoName>, Option<SkgrepoName>), String> {
+  let mut nodeRepo : Option<SkgrepoName> = None;
+  let mut relRepo  : Option<SkgrepoName> = None;
+  for part in parts {
+    let Sexp::List (pair) = part else {
+      return Err ( "skgRepos holds only (nodeRepo R) and (relRepo R)"
+                   . to_string () ); };
+    let key : String = match pair . first () {
+      Some (key) => atom_to_string (key) ?,
+      None => return Err ( "skgRepos has an empty form" . to_string () ), };
+    let slot : &mut Option<SkgrepoName> = match key . as_str () {
+      "nodeRepo" => &mut nodeRepo,
+      "relRepo"  => &mut relRepo,
+      other => return Err ( format! ( "Unknown skgRepos key: {}", other )), };
+    if slot . is_some () {
+      return Err ( format! ( "skgRepos names {} twice", key )); }
+    *slot = Some ( SkgrepoName::from (
+      single_argument (&key, &pair [1..]) ? )); }
+  if nodeRepo . is_none () && relRepo . is_none () {
+    return Err ( "skgRepos holds (nodeRepo R), (relRepo R) or both"
+                 . to_string () ); }
+  Ok (( nodeRepo, relRepo )) }
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
-/// 'cycle' stat, the discarded bare atom 'noWarrant', and the keyed 'overridesHere' / 'homeRepoHerald' /
-/// 'homeSkgrepoMove' / 'movedLikeAncestor' sub-forms. Relationship stats are semantic display-only '(rels ...)'
-/// facts, parsed and discarded at node level instead.
+/// 'cycle' stat, the discarded bare atom 'noWarrant', and the
+/// discarded keyed 'homeRepoHerald' / 'homeSkgrepoMove' /
+/// 'movedLikeAncestor' sub-forms. Relationship stats are semantic
+/// display-only '(rels ...)' facts, parsed and discarded beside it.
 fn parse_viewstats_sexp (
   items         : &[Sexp],
   stats         : &mut ViewnodeStats,
-  overridesHere : &mut Option<ID>, // an occurrence's, which it carries outside its stats
 ) -> Result<(), String> {
   for element in items {
     match element {
@@ -849,18 +831,9 @@ fn parse_viewstats_sexp (
         let key : String = atom_to_string ( &kv_pair[0] ) ?;
         match key . as_str () {
           "homeRepoHerald" => {}, // output-only, silently discard
-          "overridesHere" => {
-            // Load-bearing, unlike the other view stats: save
-            // extraction round-trips the original ID through it.
-            let value : String =
-              atom_to_string ( &kv_pair[1] ) ?;
-            *overridesHere = Some ( ID::from (value)); },
-          "relRepo" => {
-            // Display-only skgrepo fact.  A save request must instead
-            // appear as (editRequest (relRepo REPO)).
-            let value : String =
-              atom_to_string ( &kv_pair[1] ) ?;
-            stats . relRepo = Some ( SkgrepoName::from (value)); },
+          "overridesHere" | "relRepo" =>
+            return Err ( retired_spelling ( &format! (
+              "(viewStats ({} ...))", key )) ),
           _ => { return Err ( format! (
             "Unknown viewStats key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in viewStats"

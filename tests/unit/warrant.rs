@@ -87,17 +87,17 @@ fn expect (
 
 #[test]
 fn a_root_is_warranted () {
-  assert_eq! ( warrants ("* (skg (node (id c) (repo main))) c\n"),
+  assert_eq! ( warrants ("* (skg node (gnid c) (skgRepos (nodeRepo main))) c\n"),
                expect (&[("c", Warrant::ByGraph)]) ); }
 
 #[test]
 fn content_is_warranted_when_its_parent_contains_it () {
   assert_eq! (
     warrants (indoc! {"
-      * (skg (node (id p) (repo main))) p
-      ** (skg (node (id c) (repo main))) c
-      ** (skg (node (id typed) (repo main) noClaim)) typed
-      ** (skg (node (id top) (repo main) writeProtected)) top
+      * (skg node (gnid p) (skgRepos (nodeRepo main))) p
+      ** (skg node (gnid c) (skgRepos (nodeRepo main))) c
+      ** (skg node (gnid typed) (skgRepos (nodeRepo main)) noClaim) typed
+      ** (skg node (gnid top) (skgRepos (nodeRepo main)) writeProtected) top
     "}),
     expect (&[ ("p",     Warrant::ByGraph),
                ("c",     Warrant::ByGraph),
@@ -108,10 +108,10 @@ fn content_is_warranted_when_its_parent_contains_it () {
 fn a_folder_member_is_warranted_when_the_folders_relation_holds () {
   assert_eq! (
     warrants (indoc! {"
-      * (skg (node (id p) (repo main))) p
+      * (skg node (gnid p) (skgRepos (nodeRepo main))) p
       ** (skg containerFolder)
-      *** (skg (node (id q) (repo main) writeProtected)) q
-      *** (skg (node (id c) (repo main) writeProtected)) c
+      *** (skg node (gnid q) (skgRepos (nodeRepo main)) writeProtected) q
+      *** (skg node (gnid c) (skgRepos (nodeRepo main)) writeProtected) c
     "}),
     expect (&[ ("p", Warrant::ByGraph),
                ("q", Warrant::ByGraph),
@@ -121,11 +121,11 @@ fn a_folder_member_is_warranted_when_the_folders_relation_holds () {
 fn a_chain_node_is_warranted_when_it_contains_the_node_above () {
   assert_eq! (
     warrants (indoc! {"
-      * (skg (node (id p) (repo main))) p
+      * (skg node (gnid p) (skgRepos (nodeRepo main))) p
       ** (skg containerFolder)
-      *** (skg (node (id q) (repo main) writeProtected)) q
-      **** (skg (node (id top) (repo main) noClaim writeProtected)) top
-      **** (skg (node (id c) (repo main) noClaim writeProtected)) c
+      *** (skg node (gnid q) (skgRepos (nodeRepo main)) writeProtected) q
+      **** (skg node (gnid top) (skgRepos (nodeRepo main)) noClaim writeProtected) top
+      **** (skg node (gnid c) (skgRepos (nodeRepo main)) noClaim writeProtected) c
     "}),
     expect (&[ ("p",   Warrant::ByGraph),
                ("q",   Warrant::ByGraph),
@@ -136,15 +136,15 @@ fn a_chain_node_is_warranted_when_it_contains_the_node_above () {
 fn a_compound_folders_member_is_warranted_by_the_hide_and_the_containment () {
   assert_eq! (
     warrants (indoc! {"
-      * (skg (node (id s) (repo main))) s
+      * (skg node (gnid s) (skgRepos (nodeRepo main))) s
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (repo main) writeProtected)) e
+      *** (skg node (gnid e) (skgRepos (nodeRepo main)) writeProtected) e
       **** (skg hiddenInSubscribeeFolder)
-      ***** (skg (node (id h1) (repo main) writeProtected)) h1
-      ***** (skg (node (id h2) (repo main) writeProtected)) h2
+      ***** (skg node (gnid h1) (skgRepos (nodeRepo main)) writeProtected) h1
+      ***** (skg node (gnid h2) (skgRepos (nodeRepo main)) writeProtected) h2
       *** (skg hiddenOutsideOfSubscribeeFolder)
-      **** (skg (node (id o) (repo main) writeProtected)) o
-      **** (skg (node (id h1) (repo main) writeProtected)) h1
+      **** (skg node (gnid o) (skgRepos (nodeRepo main)) writeProtected) o
+      **** (skg node (gnid h1) (skgRepos (nodeRepo main)) writeProtected) h1
     "}),
     expect (&[ ("s",  Warrant::ByGraph),
                ("e",  Warrant::ByGraph),
@@ -157,7 +157,7 @@ fn a_compound_folders_member_is_warranted_by_the_hide_and_the_containment () {
 fn a_property_member_is_warranted_when_the_node_has_the_property () {
   assert_eq! (
     warrants (indoc! {"
-      * (skg (node (id p) (repo main))) p
+      * (skg node (gnid p) (skgRepos (nodeRepo main))) p
       ** (skg aliasFolder)
       *** (skg alias) another name
       *** (skg alias) no name of p
@@ -179,6 +179,6 @@ fn under_a_tombstone_everything_is_warranted () {
   assert_eq! (
     warrants (indoc! {"
       * (skg tombstone)
-      ** (skg (node (id typed) (repo main))) typed
+      ** (skg node (gnid typed) (skgRepos (nodeRepo main))) typed
     "}),
     expect (&[ ("typed", Warrant::ByGraph) ]) ); }

@@ -34,7 +34,7 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let input : &str = indoc! {"
-    * (skg (node (id a11) (repo main))) a11
+    * (skg node (gnid a11) (skgRepos (nodeRepo main))) a11
   "};
   let mut viewforest : Tree<Viewnode> =
     maybePlaced_to_placed_tree ( org_to_uninterpreted_nodes (input) ? . 0 ) ?;
@@ -45,13 +45,13 @@ fn a_chain_branches_and_shows_a_repeat_as_a_leaf (
     &graph_handle_from_config (config) ? . load_full (), config, None,
     ContainerwardChainPartners::LiveGraph ) ?;
   let expected : &str = indoc! {"
-    * (skg (node (id a11) (repo main))) a11
-    ** (skg (node (id a1) (repo main) noClaim writeProtected)) a1
-    *** (skg (node (id a) (repo main) noClaim writeProtected)) a
-    *** (skg (node (id a1) (repo main) noClaim writeProtected)) a1
-    ** (skg (node (id a2) (repo main) noClaim writeProtected)) a2
-    *** (skg (node (id a) (repo main) noClaim writeProtected)) a
-    *** (skg (node (id b) (repo main) noClaim writeProtected)) b
+    * (skg node (gnid a11) (skgRepos (nodeRepo main))) a11
+    ** (skg node (gnid a1) (skgRepos (nodeRepo main)) noClaim writeProtected) a1
+    *** (skg node (gnid a) (skgRepos (nodeRepo main)) noClaim writeProtected) a
+    *** (skg node (gnid a1) (skgRepos (nodeRepo main)) noClaim writeProtected) a1
+    ** (skg node (gnid a2) (skgRepos (nodeRepo main)) noClaim writeProtected) a2
+    *** (skg node (gnid a) (skgRepos (nodeRepo main)) noClaim writeProtected) a
+    *** (skg node (gnid b) (skgRepos (nodeRepo main)) noClaim writeProtected) b
   "};
   let expected_trees : Tree<Viewnode> =
     maybePlaced_to_placed_tree ( org_to_uninterpreted_nodes (expected) ? . 0 ) ?;

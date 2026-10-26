@@ -239,7 +239,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
               "{}", first );
     let roots : Vec<String> = // but the ghosts
       buffer . lines ()
-      . filter ( |line| line . starts_with ("* ") && ! line . contains ("(ghost ") )
+      . filter ( |line| line . starts_with ("* ") && ! line . contains (" ghost (gnid ") )
       . map ( |line| root_id (line) ) . collect ();
     let second : String = send_stage_and_commit_request ( f, &env,
       "((request . \"stage and commit\") (message . \"one message\") (confirmed . t))\n" ) ?;
@@ -254,7 +254,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
       . map ( |line| root_id (line) ) . collect ();
     assert_eq! ( roots_after, roots, "the roots remain:\n{}", content );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  "(ghost ", "homeSkgrepoMove", "(ready" ] {
+                  " ghost (gnid ", "homeSkgrepoMove", "(ready" ] {
       assert! ( ! content . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, content ); }
     assert! ( f . views_state . open_views . views
@@ -267,7 +267,7 @@ fn a_confirmed_resend_commits_and_rerenders_the_open_buffers (
 fn root_id (
   line : &str,
 ) -> String {
-  let start : usize = line . find ("(id ") . expect ("a root has an ID") + 4;
+  let start : usize = line . find ("(gnid ") . expect ("a root has an ID") + 6;
   line [start ..] . split (')') . next () . unwrap () . to_string () }
 
 #[test]

@@ -108,7 +108,7 @@ fn outline (
         if metadata . contains ("(skg containerFolder") {
           "containerFolder" . to_string ()
         } else {
-          let skgid : &str = metadata . split ("(id ") . nth (1)
+          let skgid : &str = metadata . split ("(gnid ") . nth (1)
             . and_then ( |rest| rest . split (')') . next () )
             . unwrap_or ("?");
           let mut shown : String = skgid . to_string ();
@@ -126,13 +126,13 @@ fn requesting_at (
   request        : &str,
 ) -> String {
   let lines : Vec<&str> = buffer . lines ()
-    . filter ( |line| line . starts_with (headline_start) ) . collect ();
+    . filter ( |line| without_viewnode_ids (line) . starts_with (headline_start) ) . collect ();
   assert_eq! ( lines . len (), 1, "one headline should start {:?}:\n{}",
                headline_start, buffer );
   buffer . replacen (
     lines [0],
-    &lines [0] . replacen ( "(node ",
-                            &format! ("(node (viewRequests {}) ", request), 1 ),
+    &lines [0] . replacen ( "node ",
+                            &format! ("node (viewRequests {}) ", request), 1 ),
     1 ) }
 
 //
@@ -208,7 +208,7 @@ async fn a_folder_request_draws_the_chain_under_its_members (
     *** m writeProtected
     "}, "{}", buffer );
   let saved : String = save_view (
-    &requesting_at (&buffer, "*** (skg (node (id m) (repo main) (rels",
+    &requesting_at (&buffer, "*** (skg node (gnid m) (skgRepos (nodeRepo main)) (rels",
                     "(folder containers)"),
     config, tantivy, &graph, &mut views_state, "view of d" ) . await ?;
   assert_eq! ( outline (&saved), indoc! {"
@@ -238,7 +238,7 @@ async fn a_request_on_a_chain_node_draws_a_containers_folder_under_it (
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, "view of r, again", &["r"] ) ?;
   let saved : String = save_view (
-    &requesting_at (&buffer, "**** (skg (node (id b) ", "(folder containers)"),
+    &requesting_at (&buffer, "**** (skg node (gnid b) ", "(folder containers)"),
     config, tantivy, &graph, &mut views_state, "view of r, again" ) . await ?;
   assert_eq! ( outline (&saved), indoc! {"
     * r

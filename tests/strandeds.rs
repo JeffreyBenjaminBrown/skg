@@ -143,7 +143,7 @@ fn a_privatizing_move_raises_an_inbound_relationship (
     open_view (&mut f, &["p"], &view_p) ?;
     let (response, collateral) : (SaveResponse, HashMap<String, String>) =
       save ( &mut f,
-             &buffer . replace ("(id m) (repo public)", "(id m) (repo private)"),
+             &buffer . replace ("(gnid m) (skgRepos (nodeRepo public))", "(gnid m) (skgRepos (nodeRepo private))"),
              &view_m, &StrandedsReview::NotReviewed ) ?;
     assert_eq! ( response . strandeds_confirmation, None,
                  "a raise asks nothing" );
@@ -154,7 +154,7 @@ fn a_privatizing_move_raises_an_inbound_relationship (
                 w . contains ("Raised the relationship by which p contains m") ),
               "{:?}", response . warnings );
     assert! ( collateral . get (&view_p . repr_in_client ()) . is_some_and (
-                |content| content . contains ("(id m) (repo private)") ),
+                |content| content . contains ("(gnid m) (skgRepos (nodeRepo private))") ),
               "the view of p rerenders: {:?}", collateral );
     Ok (( )) }) ();
   cleanup_test_tantivy ( Some (&f . config . tantivy_folder) ) ?;
@@ -168,11 +168,11 @@ fn a_publicizing_move_asks_about_a_relationship_recorded_outside_the_view (
     let view_n : ViewforestId = ViewforestId::ContentView ("n" . to_string ());
     let buffer : String = open_view (&mut f, &["n"], &view_n) ?;
     let moved : String =
-      buffer . replace ("(id n) (repo private)", "(id n) (repo public)");
+      buffer . replace ("(gnid n) (skgRepos (nodeRepo private))", "(gnid n) (skgRepos (nodeRepo public))");
     { // The first save asks, and changes nothing, consuming no request.
       let (response, _) : (SaveResponse, HashMap<String, String>) =
         save ( &mut f,
-               &moved . replace ("(repo public)", "(repo public) (diff (readyRequest all))"),
+               &moved . replace ("(skgRepos (nodeRepo public))", "(skgRepos (nodeRepo public)) (diff (readyRequest all))"),
                &view_n, &StrandedsReview::NotReviewed ) ?;
       let stranded = response . strandeds_confirmation
         . expect ("the move strands q's relationship to n");
@@ -207,7 +207,7 @@ fn a_reviewed_save_that_chooses_nothing_leaves_the_relationship_where_it_was (
     let buffer : String = open_view (&mut f, &["n"], &view_n) ?;
     let (response, _) : (SaveResponse, HashMap<String, String>) =
       save ( &mut f,
-             &buffer . replace ("(id n) (repo private)", "(id n) (repo public)"),
+             &buffer . replace ("(gnid n) (skgRepos (nodeRepo private))", "(gnid n) (skgRepos (nodeRepo public))"),
              &view_n, &StrandedsReview::Reviewed (HashSet::new ()) ) ?;
     assert_eq! ( response . strandeds_confirmation, None );
     assert_eq! ( home_of (&f, "n"), Some (SkgrepoName::from ("public")) );

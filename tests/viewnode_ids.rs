@@ -214,7 +214,7 @@ async fn a_copied_headline_gets_a_fresh_viewnode_id_and_the_original_keeps_its_o
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let p_line : &str = buffer . lines ()
-    . find ( |line| line . contains ("(node (id p) ") )
+    . find ( |line| line . contains ("node (gnid p) ") )
     . expect ("p is shown");
   let p_viewnode_id : String = viewnode_id_atom_of (p_line) . unwrap () . to_string ();
   let copied : String = // the copy a root after the buffer's last
@@ -222,7 +222,7 @@ async fn a_copied_headline_gets_a_fresh_viewnode_id_and_the_original_keeps_its_o
   let (saved, _) : (SaveResponse, Vec<String>) = save_view (
     &copied, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
   let p_viewnode_ids : Vec<String> =
-    viewnode_ids_of_lines_containing (&saved . saved_view, "(node (id p) ");
+    viewnode_ids_of_lines_containing (&saved . saved_view, "node (gnid p) ");
   assert_eq! ( p_viewnode_ids . len (), 2, "{}", saved . saved_view );
   assert_eq! ( p_viewnode_ids [0], p_viewnode_id,
                "the original keeps its viewnode ID:\n{}", saved . saved_view );
@@ -240,7 +240,7 @@ async fn a_moved_headline_keeps_its_viewnode_id (
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let b_line : &str = buffer . lines ()
-    . find ( |line| line . contains ("(node (id b) ") )
+    . find ( |line| line . contains ("node (gnid b) ") )
     . expect ("b is shown");
   let b_viewnode_id : String = viewnode_id_atom_of (b_line) . unwrap () . to_string ();
   let moved : String = // b, from first in a's content to last
@@ -250,9 +250,9 @@ async fn a_moved_headline_keeps_its_viewnode_id (
     &moved, config, tantivy, &graph, &mut views_state, VIEW_OF_A ) . await ?;
   let last_headline : &str = saved . saved_view . lines ()
     . filter ( |line| line . starts_with ('*') ) . last () . unwrap ();
-  assert! ( last_headline . contains ("(node (id b) "),
+  assert! ( last_headline . contains ("node (gnid b) "),
             "b moved to last:\n{}", saved . saved_view );
-  assert_eq! ( viewnode_id_of_line_containing (&saved . saved_view, "(node (id b) "),
+  assert_eq! ( viewnode_id_of_line_containing (&saved . saved_view, "node (gnid b) "),
                b_viewnode_id, "b keeps its viewnode ID:\n{}", saved . saved_view );
   Ok (( )) }
 
@@ -288,7 +288,7 @@ async fn an_unknown_viewnode_id_is_dropped (
   let buffer : String = open_view (
     config, tantivy, &graph, &mut views_state, VIEW_OF_A, "a" ) ?;
   let b_line : &str = buffer . lines ()
-    . find ( |line| line . contains ("(node (id b) ") )
+    . find ( |line| line . contains ("node (gnid b) ") )
     . expect ("b is shown");
   let b_viewnode_id_atom : String =
     viewnode_id_atom_of (b_line) . unwrap () . to_string ();

@@ -18,7 +18,7 @@ fn test_viewnode_to_text_no_metadata () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg (node (id test) (repo main))) Test Title\n" ); }
+  assert_metadata_eq! ( result, "* (skg node (gnid test) (skgRepos (nodeRepo main))) Test Title\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_body () {
@@ -33,7 +33,7 @@ fn test_viewnode_to_text_with_body () {
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "** (skg (node (id test) (repo main))) Test Title\nTest body content\n" ); }
+  assert_metadata_eq! ( result, "** (skg node (gnid test) (skgRepos (nodeRepo main))) Test Title\nTest body content\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_metadata () {
@@ -56,7 +56,7 @@ fn test_viewnode_to_text_with_skgid_metadata () {
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "*** (skg (node (id test123) (repo main) writeProtected)) Test Title\n" ); }
+  assert_metadata_eq! ( result, "*** (skg node (gnid test123) (skgRepos (nodeRepo main)) writeProtected) Test Title\n" ); }
 
 #[test]
 fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
@@ -80,7 +80,7 @@ fn skgrepo_name_with_whitespace_is_one_round_trippable_atom () {
     . expect ("UnrestrictedVognode rendering never fails");
   assert_eq! (
     rendered,
-    "* (skg (node (id cheese-node) (repo \"Mr Cheese\") (viewStats (homeRepoHerald \"⌂:Mr Cheese\")))) Cooking\n" );
+    "* (skg node (gnid cheese-node) (skgRepos (nodeRepo \"Mr Cheese\")) (viewStats (homeRepoHerald \"⌂:Mr Cheese\"))) Cooking\n" );
   let metadata = parse_metadata_to_viewnodemd (
     rendered
       . split_once (" Cooking")
@@ -105,7 +105,7 @@ fn test_metadata_ordering () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats cycle))) Test\n" ); }
+  assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (viewStats cycle)) Test\n" ); }
 
 #[test]
 fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
@@ -121,10 +121,10 @@ fn an_unwarranted_occurrence_says_noWarrant_and_the_parser_drops_it () {
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSkgrepos (HashMap::new ()) )
     . expect ("UnrestrictedVognode rendering never fails");
-  assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats noWarrant cycle))) Test\n" );
+  assert_metadata_eq! ( result, "* (skg node (gnid xyz) (skgRepos (nodeRepo main)) (viewStats noWarrant cycle)) Test\n" );
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd (
-      "(skg (node (id xyz) (repo main) (viewStats noWarrant cycle)))" )
+      "(skg node (gnid xyz) (skgRepos (nodeRepo main)) (viewStats noWarrant cycle))" )
     . expect ("noWarrant parses");
   assert_eq! ( metadata . viewStats . isWarranted, Warrant::ByGraph ); }
 
@@ -151,4 +151,4 @@ fn test_rel_heralds_emitted () {
             "rels not emitted verbatim: {}", with_rels );
   let neither : String = mk ( None );
   assert! ( ! neither . contains ("(rels ") );
-  assert_metadata_eq! ( neither, "* (skg (node (id n) (repo main))) N\n" ); }
+  assert_metadata_eq! ( neither, "* (skg node (gnid n) (skgRepos (nodeRepo main))) N\n" ); }

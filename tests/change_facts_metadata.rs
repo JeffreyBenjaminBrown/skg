@@ -79,7 +79,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
       facts ( Some (Existence::Added), Some (Existence::Removed),
               Some (&[DiffObject::Node, DiffObject::Rel]) ),
       request (true, &[DiffObject::All]) ),
-    "(node (id a) (repo main) (diff (node added) (rel removed) (ready node rel) (readyRequest all)))" );
+    "node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (rel removed) (ready node rel) (readyRequest all))" );
   // A readiness request is allowed on a write-protected occurrence.
   assert_round_trip (
     with_facts (
@@ -88,7 +88,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
         true ),
       facts ( None, Some (Existence::Added), Some (&[]) ),
       request (false, &[DiffObject::Rel]) ),
-    "(node (id b) (repo main) writeProtected (diff (rel added) (ready) (unreadyRequest rel)))" );
+    "node (gnid b) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (ready) (unreadyRequest rel))" );
   // A modified node: its other properties changed, and '(ready all)'
   // says every leaf it records is marked.
   assert_round_trip (
@@ -99,7 +99,7 @@ fn a_vognode_round_trips_its_change_readiness_and_request () {
       modified ( Some (Existence::Added),
                  Some (&[DiffObject::Rel, DiffObject::All]) ),
       request (false, &[DiffObject::Rel, DiffObject::All]) ),
-    "(node (id m) (repo main) writeProtected (diff (rel added) (properties changed) (ready rel all) (unreadyRequest rel all)))" ); }
+    "node (gnid m) (skgRepos (nodeRepo main)) writeProtected (diff (rel added) (properties changed) (ready rel all) (unreadyRequest rel all))" ); }
 
 #[test]
 fn ghosts_and_unknowns_round_trip_their_change_facts () {
@@ -111,14 +111,14 @@ fn ghosts_and_unknowns_round_trip_their_change_facts () {
           restoreNode_request : false, tombstone_request : false, } ))),
       facts ( Some (Existence::Removed), None, Some (&[DiffObject::Node]) ),
       request (false, &[DiffObject::Node]) ),
-    "(ghost (gnid d) (skgRepos (nodeRepo main)) (diff (node removed) (ready node) (unreadyRequest node)))" );
+    "ghost (gnid d) (skgRepos (nodeRepo main)) (diff (node removed) (ready node) (unreadyRequest node))" );
   assert_round_trip (
     with_facts (
       viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unknown ( Unknown {
           skgid : ID::from ("u"), relRepo : None, relationshipEditRequest : None, } ))),
       facts ( None, Some (Existence::Added), None ),
       request (true, &[]) ),
-    "(unknown (id u) (diff (rel added) (readyRequest)))" ); }
+    "unknown (gnid u) (diff (rel added) (readyRequest))" ); }
 
 #[test]
 fn property_leaves_round_trip_their_change_facts () {
@@ -159,7 +159,7 @@ fn the_leaves_fact_renders_and_parses_back_to_nothing () {
     change_facts, None );
   let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
   assert_eq! ( rendered,
-               "(node (id a) (repo main) (diff (rel added) (leaves 2 node rel) (ready rel)))" );
+               "node (gnid a) (skgRepos (nodeRepo main)) (diff (rel added) (leaves 2 node rel) (ready rel))" );
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) ) . unwrap ();
   assert_eq! ( metadata . change_facts,
@@ -182,7 +182,7 @@ fn each_part_of_the_diff_form_round_trips_together_and_alone () {
     change_facts, request (true, &[DiffObject::Rel]) );
   let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
   assert_eq! ( rendered,
-               "(node (id a) (repo main) (diff (node added) (rel added) (leaves 2 node rel) (ready node) (readyRequest rel)))" );
+               "node (gnid a) (skgRepos (nodeRepo main)) (diff (node added) (rel added) (leaves 2 node rel) (ready node) (readyRequest rel))" );
   let metadata : ViewnodeMetadata =
     parse_metadata_to_viewnodemd ( &format! ("(skg {})", rendered) ) . unwrap ();
   assert_eq! ( metadata . change_facts,
@@ -210,29 +210,29 @@ fn each_part_of_the_diff_form_round_trips_together_and_alone () {
 #[test]
 fn malformed_change_facts_are_refused () {
   for metadata in [
-    "(skg (diff (rel added)))",                       // top level, not a property
+    "(skg tombstone (diff (rel added)))",             // a tombstone carries none
     "(skg aliasFolder (diff (rel added)))",           // a folder's only fact is '(ready)'
     "(skg aliasFolder (diff (leaves 1)))",
     "(skg (aliasFolder changed) (diff (ready all)))", // its '(ready)' names no object
     "(skg (aliasFolder changed) (diff (readyRequest)))",
     "(skg (aliasFolder changed) (ready))",            // a folder's ready is in '(diff ...)'
     "(skg (aliasFolder sideways))",                   // a folder's form is '(KIND changed)'
-    "(skg (node (id a) (diff (node added) (node removed))))", // a part twice
-    "(skg (node (id a) (diff (rel added) (rel added))))",
-    "(skg (node (id a) (diff (properties changed) (properties changed))))",
-    "(skg (node (id a) (diff (node added removed))))",       // one existence
-    "(skg (node (id a) (diff (node))))",
-    "(skg (node (id a) (diff (rel sideways))))",
-    "(skg (node (id a) (diff (properties))))",               // only '(properties changed)'
-    "(skg (node (id a) (diff (properties added))))",
-    "(skg (node (id a) (diff (readyRequest) (unreadyRequest node))))", // two requests
-    "(skg (node (id a) (diff (readyRequest sideways))))",
+    "(skg node (gnid a) (diff (node added) (node removed)))", // a part twice
+    "(skg node (gnid a) (diff (rel added) (rel added)))",
+    "(skg node (gnid a) (diff (properties changed) (properties changed)))",
+    "(skg node (gnid a) (diff (node added removed)))",       // one existence
+    "(skg node (gnid a) (diff (node)))",
+    "(skg node (gnid a) (diff (rel sideways)))",
+    "(skg node (gnid a) (diff (properties)))",               // only '(properties changed)'
+    "(skg node (gnid a) (diff (properties added)))",
+    "(skg node (gnid a) (diff (readyRequest) (unreadyRequest node)))", // two requests
+    "(skg node (gnid a) (diff (readyRequest sideways)))",
     "(skg alias (ready))",                            // a property's ready is in '(diff ...)'
-    "(skg (node (id a) (ready node)))",               // so is a node's
-    "(skg (node (id a) (diff node)))",                // a part is a list
-    "(skg (node (id a) (diff (sideways))))",          // an unknown part
-    "(skg (node (id a) (diff (presence rel+))))",
-    "(skg (node (id a) (diff (ready)) (diff (rel added))))", ] { // two forms
+    "(skg node (gnid a) (ready node))",               // so is a node's
+    "(skg node (gnid a) (diff node))",                // a part is a list
+    "(skg node (gnid a) (diff (sideways)))",          // an unknown part
+    "(skg node (gnid a) (diff (presence rel+)))",
+    "(skg node (gnid a) (diff (ready)) (diff (rel added)))", ] { // two forms
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
               "should refuse {}", metadata ); }}
 

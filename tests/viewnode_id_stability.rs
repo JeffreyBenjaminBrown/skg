@@ -16,7 +16,7 @@
 use crate::git_fixture::{Fixture, OwnedSkgrepos, save_cleanly, with_git_fixture};
 use crate::git_fixture_helpers::mk_test_tcp_stream_pair;
 
-use skg::metadata_canon::viewnode_id_atom_of;
+use skg::metadata_canon::{viewnode_id_atom_of, without_viewnode_ids};
 use skg::serve::handlers::skgrepo_sets::handle_skgrepo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
 use skg::skgrepo_sets::SkgrepoRestriction;
@@ -57,20 +57,20 @@ fn viewnode_ids_survive_a_save_a_request_and_a_switch (
         saved };
       let requested : String = { // a folder request on r
         let with_request : String = typed . replacen (
-          "* (skg (node ", "* (skg (node (viewRequests (folder containers)) ", 1 );
+          "node (gnid r) ", "node (gnid r) (viewRequests (folder containers)) ", 1 );
         assert_ne! ( with_request, typed );
         let saved : String = save (f, &with_request) ?;
         assert_every_viewnode_id_kept ("a request", &typed, &saved, &[]);
         assert! ( headline_labels (&saved) . values ()
-                  . any ( |label| label == "*** (id x) x" ),
+                  . any ( |label| label == "*** (gnid x) x" ),
                   "the requested folder holds x:\n{}", saved );
         saved };
       let public : String = { // switch to "public"
         let switched : String = switch (f, &mut restriction, "public") ?;
         assert_every_viewnode_id_kept (
-          "a switch to public", &requested, &switched, &["(id s)"] );
+          "a switch to public", &requested, &switched, &["(gnid s)"] );
         let s_viewnode_id : String = headline_labels (&requested) . into_iter ()
-          . find ( |(_, label)| label . contains ("(id s)") )
+          . find ( |(_, label)| label . contains ("(gnid s)") )
           . map ( |(viewnode_id, _)| viewnode_id ) . unwrap ();
         assert_eq! ( headline_labels (&switched) . get (&s_viewnode_id)
                      . map (String::as_str),
@@ -173,6 +173,7 @@ fn headline_labels (
 fn label (
   line : &str,
 ) -> String {
+  let line : &str = &without_viewnode_ids (line);
   let depth : usize = line . chars () . take_while ( |c| *c == '*' ) . count ();
   let sexp_start : usize = line . find ("(skg") . unwrap ();
   let sexp_end : usize = { // past the parenthesis closing '(skg'
@@ -184,7 +185,7 @@ fn label (
                     if level == 0 { end = sexp_start + i + 1; break; }}}
     end };
   let sexp : &str = &line [sexp_start .. sexp_end];
-  let head : String = match sexp . find ("(id ") {
+  let head : String = match sexp . find ("(gnid ") {
     Some (i) => format! ( "{})", sexp [i ..] . split (')') . next () . unwrap () ),
     None => sexp ["(skg" . len () ..]
       . split ( |c : char| c == ' ' || c == ')' || c == '(' )

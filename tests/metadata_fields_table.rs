@@ -147,9 +147,9 @@ fn example_of_kind (
   atom : &str,
 ) -> String {
   match atom {
-    "node"                 => "(skg (node (id a) (repo r)))" . to_string (),
-    "ghost"                => "(skg (ghost (gnid a) (skgRepos (nodeRepo r))))" . to_string (),
-    "unknown"              => "(skg (unknown (id a)))" . to_string (),
+    "node"                 => "(skg node (gnid a) (skgRepos (nodeRepo r)))" . to_string (),
+    "ghost"                => "(skg ghost (gnid a) (skgRepos (nodeRepo r)))" . to_string (),
+    "unknown"              => "(skg unknown (gnid a))" . to_string (),
     "flag"                 => "(skg (flag noSearchMatching))" . to_string (),
     "oldText"              => "(skg (oldText title))" . to_string (),
     "homeSkgrepoMove" | "relRepoMove" =>
@@ -157,16 +157,14 @@ fn example_of_kind (
     "changesetMarker"      => "(skg (changesetMarker content))" . to_string (),
     _                      => format! ( "(skg {})", atom ), } }
 
-/// 'example' with 'field' inserted where the kind's fields sit:
-/// inside its form, the last list but one to close, or beside it.
+/// 'example' with 'field' inserted beside the kind, at the top level
+/// of its '(skg ...)', where every part stands.
 fn with_field (
   example   : &str,
-  fields_at : &str,
   field     : &str,
 ) -> String {
-  let closers : usize = if fields_at == "form" { 2 } else { 1 };
   let (opening, closing) : (&str, &str) =
-    example . split_at ( example . len () - closers );
+    example . split_at ( example . len () - 1 );
   format! ( "{} {}{}", opening, field, closing ) }
 
 /// The metadata 'sexp' parses, and becomes a viewnode without error.
@@ -240,11 +238,6 @@ fn fields_of (
 ) -> &Vec<Value> {
   kind ["fields"] . as_array () . unwrap () }
 
-fn fields_at (
-  kind : &Value,
-) -> &str {
-  kind ["fields_at"] . as_str () . unwrap () }
-
 #[test]
 fn the_table_names_every_kind_the_parser_knows () {
   let table : Value = metadata_fields_table ();
@@ -270,26 +263,25 @@ fn each_offered_value_parses_under_its_conditions_and_no_others () {
       . any ( |field| field ["name"] == "writeProtected" );
     for atom in strings_of (&kind ["atoms"]) {
       let example : String = example_of_kind (&atom);
-      let at : &str = fields_at (kind);
       for field in fields_of (kind) {
         for written in written_values (field) {
           let removed_member : bool =
             written . when . as_deref () == Some ("removedMember");
           let base : String =
             if removed_member {
-              with_field (&example, at, "(diff (rel removed))") }
+              with_field (&example, "(diff (rel removed))") }
             else { example . clone () };
-          let sexp : String = with_field (&base, at, &written . text);
+          let sexp : String = with_field (&base, &written . text);
           assert! ( parse_cleanly (&sexp) . is_ok (),
                     "{}: {:?}", sexp, parse_cleanly (&sexp) );
           if removed_member {
             let elsewhere : String =
-              with_field (&example, at, &written . text);
+              with_field (&example, &written . text);
             assert! ( parse_cleanly (&elsewhere) . is_err (),
                       "{} parsed without '(rel removed)'", elsewhere ); }
           if has_writeProtected && written . field_name != "writeProtected" {
             let write_protected : String =
-              with_field (&sexp, at, "writeProtected");
+              with_field (&sexp, "writeProtected");
             assert_eq! (
               parse_cleanly (&write_protected) . is_err (),
               written . when . as_deref () == Some ("editable"),
@@ -308,20 +300,17 @@ fn nothing_the_table_does_not_offer_parses () {
       fields_of (kind) . iter () . flat_map (written_values)
       . map ( |written| ( written . field_name, written . value ))
       . collect ();
-    let at : &str = fields_at (kind);
     for atom in strings_of (&kind ["atoms"]) {
       let example : String = example_of_kind (&atom);
       let bases : Vec<String> =
-        if at == "form" {
-          vec! [ example . clone (),
-                 with_field (&example, at, "(diff (rel removed))") ] }
-        else { vec! [ example . clone () ] };
+        vec! [ example . clone (),
+               with_field (&example, "(diff (rel removed))") ];
       for written in &every_written_value {
         if offered . contains ( &( written . field_name . clone (),
                                    written . value . clone () )) {
           continue; }
         for base in &bases {
-          let sexp : String = with_field (base, at, &written . text);
+          let sexp : String = with_field (base, &written . text);
           assert! ( parse_cleanly (&sexp) . is_err (),
                     "{} parsed, but the table does not offer {} {} there",
                     sexp, written . field_name, written . value ); } } } } }
@@ -390,9 +379,9 @@ fn each_node_value_parses_to_what_it_names () {
   assert! ( absent . view_requests . is_empty () );
   for field in fields_of (node) {
     for written in written_values (field) {
-      let base : String = with_field (&example, "form", "(diff (rel removed))");
+      let base : String = with_field (&example, "(diff (rel removed))");
       let parsed : ViewnodeMetadata =
-        parse_cleanly ( &with_field (&base, "form", &written . text) )
+        parse_cleanly ( &with_field (&base, &written . text) )
         . unwrap ();
       match written . field_name . as_str () {
         "writeProtected" => assert! ( parsed . writeProtected ),

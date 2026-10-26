@@ -13,12 +13,17 @@
 ///
 /// GRAMMAR (mirrored one-to-one by 'HeraldRule'; full display
 /// semantics are documented in skg-lens.el):
-///   RULE        ::= [STYLE] (INTERC-BODY | SIMPLE-BODY)
+///   RULE        ::= [STYLE] (INTERC-BODY | WHEN-BODY | SIMPLE-BODY)
 ///   INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
+///   WHEN-BODY   ::= WHEN LABEL... CHILDREN...
 ///   SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
 /// where each child is a literal string, the IT directive, or a
 /// nested RULE. The special label ANY matches any leaf; IT echoes
-/// the matched value(s).
+/// the matched value(s). A WHEN rule applies its children to the
+/// object it stands in when that object holds an element labeled
+/// one of its LABELs (an atom, or a list headed by one): the table
+/// keys a headline's parts on its kind atom, since every part
+/// stands beside the kind at the top level of '(skg ...)'.
 
 use crate::sexp_string::quote_sexp_string;
 use crate::types::nodes::complete::Flag;
@@ -71,6 +76,7 @@ pub enum RuleChild {
 pub struct HeraldRule {
   pub node_heralds_key : Option<&'static str>, // where 'node_heralds' gives the style
   pub interc   : Option<&'static str>, // Some(separator) makes this an INTERC rule
+  pub when     : Vec<&'static str>,    // nonempty makes this a WHEN rule, on these kinds
   pub label    : Option<&'static str>, // None only for unlabeled INTERC rules
   pub abut     : bool,                 // glue output to the preceding token
   pub children : Vec<RuleChild>,
@@ -97,7 +103,7 @@ fn rule (
   children : Vec<RuleChild>,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    node_heralds_key : None, interc : None, label : Some (label),
+    node_heralds_key : None, interc : None, when : vec! [], label : Some (label),
     abut : false, children } ) }
 
 /// (STYLE label children...), with STYLE from 'node_heralds' under the label
@@ -116,8 +122,18 @@ fn crule_styled_as (
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
     node_heralds_key : Some (node_heralds_key),
-    interc : None, label : Some (label),
+    interc : None, when : vec! [], label : Some (label),
     abut : false, children } ) }
+
+/// (WHEN kinds... children...): 'children' applied to a headline
+/// whose kind is one of 'kinds'.
+fn when (
+  kinds    : &[&'static str],
+  children : Vec<RuleChild>,
+) -> RuleChild {
+  RuleChild::Rule ( HeraldRule {
+    node_heralds_key : None, interc : None, when : kinds . to_vec (),
+    label : None, abut : false, children } ) }
 
 /// (STYLE label "text") -- a one-token leaf
 fn leaf (
@@ -160,7 +176,7 @@ fn leaf_abut (
   text  : &'static str,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    node_heralds_key : Some (label), interc : None, label : Some (label),
+    node_heralds_key : Some (label), interc : None, when : vec! [], label : Some (label),
     abut : true, children : vec! [ s (text) ] } ) }
 
 /// (STYLE label ABUT "text"), with STYLE from 'node_heralds' under
@@ -171,7 +187,7 @@ fn leaf_abut_styled_as (
   text             : &'static str,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    node_heralds_key : Some (node_heralds_key), interc : None,
+    node_heralds_key : Some (node_heralds_key), interc : None, when : vec! [],
     label : Some (label), abut : true, children : vec! [ s (text) ] } ) }
 
 /// (STYLE ANY ABUT "text"), with STYLE from 'node_heralds' under
@@ -181,7 +197,7 @@ fn any_abut_styled_as (
   text             : &'static str,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    node_heralds_key : Some (node_heralds_key), interc : None,
+    node_heralds_key : Some (node_heralds_key), interc : None, when : vec! [],
     label : Some ("ANY"), abut : true, children : vec! [ s (text) ] } ) }
 
 /// (STYLE ANY children...), with STYLE from 'node_heralds' under
@@ -191,7 +207,7 @@ fn any_styled_as (
   children         : Vec<RuleChild>,
 ) -> RuleChild {
   RuleChild::Rule ( HeraldRule {
-    node_heralds_key : Some (node_heralds_key), interc : None,
+    node_heralds_key : Some (node_heralds_key), interc : None, when : vec! [],
     label : Some ("ANY"), abut : false, children } ) }
 
 /// The diff view's properties, each a label. A ready one's ✓
@@ -369,9 +385,13 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     token with no space (used so the omitted-body glyph "B" sits
 ///     directly on the write-protected glyph "☮").
 ///
+///   * 'when' -- a headline's parts stand beside its kind atom, so a
+///     part that renders differently by kind ('(diff ...)' above all)
+///     has its rules under a WHEN on the kinds it renders for.
+///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
 ///
-///   * 'vac' rules (focused, folded, node's repo, ghost's gnid...)
+///   * 'vac' rules (focused, folded, a node's nodeRepo, a gnid...)
 ///     match and emit nothing. The engine would ignore the atoms
 ///     anyway; the vacuous rules document that the atom is known, and
 ///     let the conformance test demand that every emittable atom
@@ -379,22 +399,24 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 pub fn herald_rule_table () -> HeraldRule {
   HeraldRule {
-    node_heralds_key : None, interc : None, label : Some ("skg"),
+    node_heralds_key : None, interc : None, when : vec! [], label : Some ("skg"),
     abut : false,
     children : [ vec! [
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      vac ("vnid"), // the viewnode ID ends every wrapper
+      vac ("vnid"), // the viewnode ID starts every wrapper
       leaf (Folder::Alias . repr_in_client (), "aliases"),
       leaf ("alias", "alias"), // PropertyMember::Alias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
-      crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
-      rule ("editRequest", vec! [
-        crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
-          any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
+      when ( &[ "alias" ], vec! [
+        rule ("skgRepos", vec! [
+          crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
+        rule ("editRequest", vec! [
+          crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
+            any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]) ],
       // The write-protected folders carry ☮ ("cannot be changed
       // from here"); the editable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
@@ -442,33 +464,35 @@ pub fn herald_rule_table () -> HeraldRule {
       // The diff view's facts on a property leaf: + and - for
       // its existence in its folder, ✓ when ready; and a changed
       // folder's '(diff (ready))'.
-      change_fact_rules_for_one_object ("+", "-"),
+      vec! [ when ( &kinds_whose_diff_has_one_object (),
+                    change_fact_rules_for_one_object ("+", "-") ) ],
       vec! [
       crule ("tombstone", vec! [ s ("DELETED") ]),
-      crule ("unknown", vec! [
-        s ("Reference to unknown node."),
-        vac ("id"),
-        rule ("viewStats", vec! [
-          crule ("relRepo", vec! [
-            any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
-        rule ("editRequest", vec! [
-          crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
-            any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
-      rule ("unknown", change_fact_rules_for_one_object ("~+", "~-")),
+      when ( &[ "unknown" ], [
+        vec! [
+          leaf ("unknown", "Reference to unknown node."),
+          vac ("gnid"),
+          rule ("skgRepos", vec! [
+            crule ("relRepo", vec! [
+              any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
+          rule ("editRequest", vec! [
+            crule_styled_as ("editRequest_relRepo", "relRepo", vec! [
+              any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
+        change_fact_rules_for_one_object ("~+", "~-") ] . concat () ),
       // A ghost is write-protected; its two objects are
       // its existence (∃-) and its relationship to its viewparent.
-      crule_styled_as ("writeProtected", "ghost", vec! [
-        s ("☮"),
+      when ( &[ "ghost" ], [
+        vec! [
+          leaf_styled_as ("writeProtected", "ghost", "☮"),
+          vac ("gnid"),
+          rule ("skgRepos", vec! [ vac ("nodeRepo") ]),
+          // Its one edit request, beside its change facts.
+          rule ("editRequest", vec! [
+            leaf ("restoreNode", "restore node") ]) ],
+        change_fact_rules_for_two_objects () ] . concat () ),
+      when ( &[ "node" ], [ vec! [
+        vac ("node"),
         vac ("gnid"),
-        rule ("skgRepos", vec! [ vac ("nodeRepo") ]) ]),
-      rule ("ghost", [
-        // Its one edit request, beside its change facts.
-        vec! [ rule ("editRequest", vec! [
-          leaf ("restoreNode", "restore node") ]) ],
-        change_fact_rules_for_two_objects () ] . concat ()),
-      rule ("node", [ vec! [
-        vac ("id"),
-        vac ("repo"),
         // A child that does not claim membership carries the atom
         // 'noClaim'; it has no glyph of its own.
         vac ("noClaim"),
@@ -489,18 +513,21 @@ pub fn herald_rule_table () -> HeraldRule {
           // The graph does not relate the node to its viewparent as
           // its position implies (see 'Warrant').
           leaf ("noWarrant", "⊥"),
-          leaf ("cycle", "⟳"),
-          // overridesHere is displayed as a crucial ĥ inside the O token
-          // by the client relationship renderer. The atom's
-          // ID payload is load-bearing save metadata, never displayed.
-          vac ("overridesHere"),
+          leaf ("cycle", "⟳") ]),
+        // overridesHere is displayed as a crucial ĥ inside the O token
+        // by the client relationship renderer. The atom's
+        // ID payload is load-bearing save metadata, never displayed.
+        vac ("overridesHere"),
+        rule ("skgRepos", vec! [
+          vac ("nodeRepo"),
           // relRepo is a display fact, not a save request.  It
           // echoes its own value directly:
           // "~" + the skgrepo name, ugly, immediately before the ⌂
           // homeRepoHerald below (table order is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
-          crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+          crule ("relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
+        rule ("viewStats", vec! [
           crule ("homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]),
           // The skgrepo-changes buffer of the diff view: the
           // node's home skgrepo move, "-OLD +NEW", then "Δ⌂=a" when its
@@ -538,6 +565,27 @@ pub fn herald_rule_table () -> HeraldRule {
         change_fact_rules_for_two_objects () ] . concat ()) ] ] . concat (),
   }}
 
+/// The kinds whose '(diff ...)' renders a single diff object: the
+/// property members, the diff view's change viewnodes and the
+/// folders. A node's, a ghost's and an unknown's have rules of their
+/// own.
+fn kinds_whose_diff_has_one_object (
+) -> Vec<&'static str> {
+  let folders : [Folder; 15] = [
+    Folder::Alias, Folder::ID, Folder::flags (),
+    Folder::Subscribee, Folder::Subscriber,
+    Folder::Overridden, Folder::Overrider,
+    Folder::Hider, Folder::Hidden,
+    Folder::HiddenInSubscribee,
+    Folder::HiddenOutsideOfSubscribee,
+    Folder::Container, Folder::Mentioner,
+    Folder::AcquiredBy, Folder::Acquired ];
+  [ "alias", "id", "flag",
+    "oldText", "homeSkgrepoMove", "relRepoMove", "changesetMarker" ]
+    . into_iter ()
+    . chain ( folders . iter () . map ( |folder| folder . repr_in_client () ))
+    . collect () }
+
 //
 // Serialization
 //
@@ -559,6 +607,9 @@ fn serialize_rule (
   if let Some (sep) = rule . interc {
     parts . push ( "INTERC" . to_string () );
     parts . push ( quote_sexp_string (sep) ); }
+  if ! rule . when . is_empty () {
+    parts . push ( "WHEN" . to_string () );
+    parts . extend ( rule . when . iter () . map ( |kind| kind . to_string () )); }
   if let Some (label) = rule . label {
     parts . push ( label . to_string () ); }
   if rule . abut {
@@ -653,12 +704,12 @@ fn rules_in_rule_table () -> Vec<HeraldRule> {
 // Vocabulary enumeration, for the conformance test
 //
 
-/// Every match atom in the rule table (labels of rules, recursively),
-/// excluding the engine directives (ANY; IT is not a label) and the
-/// root label "skg".
+/// Every match atom in the rule table (labels of rules, recursively,
+/// and the kinds of WHEN rules), excluding the engine directives (ANY;
+/// IT is not a label) and the root label "skg".
 pub fn atoms_in_rule_table () -> std::collections::HashSet<&'static str> {
   rules_in_rule_table () . into_iter ()
-    . filter_map ( |rule| rule . label )
+    . flat_map ( |rule| rule . label . into_iter () . chain ( rule . when ))
     . filter ( |label| *label != "ANY" && *label != "skg" )
     . collect () }
 
@@ -674,14 +725,12 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   let mut atoms : Vec<&'static str> = vec! [
     // Bare buffer-position atoms, from org_to_text.rs:
     "focused", "folded", "bodyFolded",
-    // The viewnode ID that ends every wrapper; its value is value position.
+    // The viewnode ID that starts every wrapper; its value is value position.
     "vnid",
-    // Form heads, from org_to_text.rs:
+    // Kind atoms, from org_to_text.rs:
     "node", "unknown",
     "tombstone", "ghost",
-    // Keys inside node / unknown forms:
-    "id", "repo",
-    // Keys inside a ghost's form:
+    // The parts beside them:
     "gnid", "skgRepos", "nodeRepo",
     "writeProtected", "omittedBody",
     // The assembled relationship-herald atom, a payload of styled spans

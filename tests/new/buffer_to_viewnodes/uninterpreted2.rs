@@ -67,13 +67,13 @@ fn test_org_to_uninterpreted_nodes2() {
 fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let input: &str =
     indoc! {"
-            * (skg focused (node (id root))) root
+            * (skg focused node (gnid root)) root
             Root body content
-            ** (skg folded (node (id child1))) child1
+            ** (skg folded node (gnid child1)) child1
             Child1 body
-            * (skg (node noClaim writeProtected)) independent root node
+            * (skg node noClaim writeProtected) independent root node
             ParentIgnores body
-            * (skg (node (viewStats cycle))) cycling node
+            * (skg node (viewStats cycle)) cycling node
             This node has cycle flag
         "};
 
@@ -118,7 +118,7 @@ fn test_org_to_uninterpreted_nodes2_restrictedNode_is_refused() {
   // atom 'restrictedNode' is no longer part of the metadata, in either
   // of the forms it once took.
   for input in [ "* (skg restrictedNode)\n",
-                 "* (skg (restrictedNode (id hidden) (repo private)))\n" ] {
+                 "* (skg (restrictedNode (gnid hidden) (skgRepos (nodeRepo private))))\n" ] {
     let parsed = org_to_uninterpreted_nodes (input);
     let refused : bool = match &parsed {
       Err (_) => true,
@@ -199,7 +199,7 @@ fn test_org_to_uninterpreted_nodes2_body_spacing() {
 fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
   let input: &str =
     indoc! {"
-            * (skg (node (id afff132a-e822-46cb-aed4-5725b7d1b0c5) (repo public))) [#A] pressing*
+            * (skg node (gnid afff132a-e822-46cb-aed4-5725b7d1b0c5) (skgRepos (nodeRepo public))) [#A] pressing*
               * = org-roam transplant first needs
             ** dogfood it
         "};
@@ -223,7 +223,7 @@ fn test_org_to_uninterpreted_nodes2_indented_star_is_body_text() {
 fn test_org_to_uninterpreted_nodes2_basic_metadata() {
   let input: &str =
     indoc! {"
-            * (skg folded (node (id test))) simple node with metadata
+            * (skg folded node (gnid test)) simple node with metadata
             Node body
             * regular node without metadata
             Regular body
@@ -285,15 +285,15 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   let _input: &str =
     indoc! {"
             * (skg invalidKey:value) invalid key
-            * (skg (node invalidValue)) invalid value
+            * (skg node invalidValue) invalid value
             * (skg unknownFlag) unknown flag
         "};
 
   // Test invalid key in node
-  let input_invalid_key = "* (skg (node (invalidKey value))) invalid key";
+  let input_invalid_key = "* (skg node (invalidKey value)) invalid key";
   let result = org_to_uninterpreted_nodes (input_invalid_key);
   assert!(result . is_err());
-  assert!(result . unwrap_err() . contains ("Unknown node key: invalidKey"));
+  assert!(result . unwrap_err() . contains ("Unknown metadata key: invalidKey"));
 
   // Test invalid non-vognode value
   let input_invalid_value = "* (skg invalidAtom) invalid value";

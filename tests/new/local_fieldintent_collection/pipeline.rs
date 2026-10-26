@@ -111,23 +111,23 @@ async fn pipeline_basic_mixed_tree (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-            * (skg (node (id root) (repo main))) root
+            * (skg node (gnid root) (skgRepos (nodeRepo main))) root
             Root body
             ** (skg aliasFolder) aliases
             *** (skg alias) first alias
             *** (skg alias) second alias
-            ** (skg (node (id child) (repo main))) child
-            *** (skg (node (id grandchild) (repo main))) grandchild
-            ** (skg (node (id independent) (repo main) noClaim)) independent
+            ** (skg node (gnid child) (skgRepos (nodeRepo main))) child
+            *** (skg node (gnid grandchild) (skgRepos (nodeRepo main))) grandchild
+            ** (skg node (gnid independent) (skgRepos (nodeRepo main)) noClaim) independent
             ** (skg subscribeeFolder)
-            *** (skg (node (id s1) (repo main) writeProtected)) s1
+            *** (skg node (gnid s1) (skgRepos (nodeRepo main)) writeProtected) s1
             ** (skg overriddenFolder)
-            *** (skg (node (id o1) (repo main) writeProtected)) o1
-            * (skg (node (id explicit) (repo main))) explicit
+            *** (skg node (gnid o1) (skgRepos (nodeRepo main)) writeProtected) o1
+            * (skg node (gnid explicit) (skgRepos (nodeRepo main))) explicit
             ** (skg aliasFolder) aliases
             ** (skg subscribeeFolder)
             ** (skg overriddenFolder)
-            * (skg (node (id doomed) (repo main) (editRequest delete))) doomed
+            * (skg node (gnid doomed) (skgRepos (nodeRepo main)) (editRequest delete)) doomed
             "};
       let (plan, nodeMerge_acquisitions)
         : (NonmergeSavePlan, Vec<(ID, ID)>) =
@@ -173,10 +173,10 @@ async fn pipeline_subscribee_hiderels (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-            * (skg (node (id r) (repo owned))) r
+            * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
             ** (skg subscribeeFolder)
-            *** (skg (node (id e) (repo foreign))) subscribee-e
-            **** (skg (node (id e2) (repo foreign))) e2
+            *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) subscribee-e
+            **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
             "};
       let forest : ViewForest =
         placed_forest_from_org_with_disk (
@@ -202,12 +202,12 @@ async fn pipeline_write_protected_folder_member_edits (
   // write-protected folders (and their subtrees) save their own edits.
       let input : &str =
         indoc! {"
-            * (skg (node (id recorder) (repo main))) recorder
+            * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
             ** (skg subscriberFolder)
-            *** (skg (node (id intruder) (repo main))) intruder
-            **** (skg (node (id intruder-child) (repo main))) intruder child
+            *** (skg node (gnid intruder) (skgRepos (nodeRepo main))) intruder
+            **** (skg node (gnid intruder-child) (skgRepos (nodeRepo main))) intruder child
             ** (skg hiddenFolder)
-            *** (skg (node (id lurker) (repo main))) lurker
+            *** (skg node (gnid lurker) (skgRepos (nodeRepo main))) lurker
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
@@ -230,9 +230,9 @@ async fn pipeline_restricted_subtree (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-            * (skg (node (id root) (repo main))) root
+            * (skg node (gnid root) (skgRepos (nodeRepo main))) root
             ** (skg tombstone)
-            *** (skg (node (id stowaway) (repo main))) stowaway
+            *** (skg node (gnid stowaway) (skgRepos (nodeRepo main))) stowaway
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
@@ -255,9 +255,9 @@ async fn pipeline_phantom_subtree (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-            * (skg (node (id root) (repo main))) root
-            ** (skg (ghost (gnid fading) (skgRepos (nodeRepo main)))) fading
-            *** (skg (node (id survivor) (repo main))) survivor
+            * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+            ** (skg ghost (gnid fading) (skgRepos (nodeRepo main))) fading
+            *** (skg node (gnid survivor) (skgRepos (nodeRepo main))) survivor
             "};
       let forest : ViewForest = placed_forest_from_org (input);
       let (plan, _) =
@@ -279,10 +279,10 @@ async fn pipeline_nodeMerge_requests (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-            * (skg (node (id 1) (repo main) (editRequest (merge 2)))) 1
-            ** (skg (node (id 11) (repo main))) 11
-            ** (skg (node (id 12) (repo main))) 12
-            ** (skg (node (id overlap) (repo main))) overlap
+            * (skg node (gnid 1) (skgRepos (nodeRepo main)) (editRequest (merge 2))) 1
+            ** (skg node (gnid 11) (skgRepos (nodeRepo main))) 11
+            ** (skg node (gnid 12) (skgRepos (nodeRepo main))) 12
+            ** (skg node (gnid overlap) (skgRepos (nodeRepo main))) overlap
             "};
       let forest : ViewForest =
         placed_forest_from_org_with_disk (
@@ -309,10 +309,10 @@ async fn pipeline_rejects_text_claim_mismatch (
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
-            * (skg (node (id r) (repo owned))) r
+            * (skg node (gnid r) (skgRepos (nodeRepo owned))) r
             ** (skg subscribeeFolder)
-            *** (skg (node (id e) (repo foreign))) changed title
-            **** (skg (node (id e2) (repo foreign))) e2
+            *** (skg node (gnid e) (skgRepos (nodeRepo foreign))) changed title
+            **** (skg node (gnid e2) (skgRepos (nodeRepo foreign))) e2
             "};
       let forest : ViewForest =
         placed_forest_from_org_with_disk (

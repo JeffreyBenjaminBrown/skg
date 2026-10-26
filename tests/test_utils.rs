@@ -10,37 +10,37 @@ fn test_compare_headlines_modulo_skgid() {
 
   // Test headlines that differ only by ID
   assert!(compare_headlines_modulo_skgid(
-    "* (skg (node (id abc123))) Title",
-    "* (skg (node (id xyz789))) Title"
+    "* (skg node (gnid abc123)) Title",
+    "* (skg node (gnid xyz789)) Title"
   ));
 
   // Test headlines where one has ID and other doesn't - should be unequal
   assert!(!compare_headlines_modulo_skgid(
-    "* (skg (node (id abc123))) Title",
+    "* (skg node (gnid abc123)) Title",
     "* Title"
   ));
 
   // Test headlines with same other metadata but different IDs
   assert!(compare_headlines_modulo_skgid(
-    "* (skg (node (id abc))) Title",
-    "* (skg (node (id xyz))) Title"
+    "* (skg node (gnid abc)) Title",
+    "* (skg node (gnid xyz)) Title"
   ));
 
   // Test headlines that differ by title
   assert!(!compare_headlines_modulo_skgid(
-    "* (skg (node (id abc))) Title One",
-    "* (skg (node (id xyz))) Title Two"
+    "* (skg node (gnid abc)) Title One",
+    "* (skg node (gnid xyz)) Title Two"
   ));
 
   // Test headlines that differ by level
   assert!(!compare_headlines_modulo_skgid(
-    "* (skg (node (id abc))) Title",
-    "** (skg (node (id xyz))) Title"
+    "* (skg node (gnid abc)) Title",
+    "** (skg node (gnid xyz)) Title"
   ));
 
   // Test headlines that differ by other metadata
   assert!(!compare_headlines_modulo_skgid(
-    "* (skg (node (id abc))) Title",
+    "* (skg node (gnid abc)) Title",
     "* (skg alias) Title"
   ));
 
@@ -66,13 +66,13 @@ fn test_strip_org_comments() {
 
   // Test the example from the docs
   let input: &str = concat!(
-    "  * (skg (node (id 1))) title 1 # here's a comment\n",
+    "  * (skg node (gnid 1)) title 1 # here's a comment\n",
     "  Here's a body. # and a body comment\n",
-    "  ** (skg (node (id 2))) title 2 # here's another");
+    "  ** (skg node (gnid 2)) title 2 # here's another");
   let expected: &str = concat!(
-    "  * (skg (node (id 1))) title 1\n",
+    "  * (skg node (gnid 1)) title 1\n",
     "  Here's a body.\n",
-    "  ** (skg (node (id 2))) title 2");
+    "  ** (skg node (gnid 2)) title 2");
   assert_eq!(strip_org_comments (input), expected);
 
   // Test no comments

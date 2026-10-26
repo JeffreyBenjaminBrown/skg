@@ -19,9 +19,9 @@ use skg::types::env::SkgEnv;
 
 use std::error::Error;
 
-const MEMBER_A : &str = "**** (skg (node (id a) (repo main) writeProtected";
+const MEMBER_A : &str = "**** (skg node (gnid a) (skgRepos (nodeRepo main)) writeProtected";
 const GRAFT_P  : &str =
-  "***** (skg (node (id p) (repo main) noClaim writeProtected";
+  "***** (skg node (gnid p) (skgRepos (nodeRepo main)) noClaim writeProtected";
 
 /// A note under a member of a changed container folder survives, and
 /// the member's role tree is still shown around it, once.
@@ -35,7 +35,7 @@ fn a_note_under_a_changed_folders_member_survives (
       &insert_after_line_starting ( &buffer, MEMBER_A, &note (5, "a note under a") )) ?;
     assert! ( parent_line_of (&saved, "a note under a") . starts_with (MEMBER_A), "{}", saved );
     assert_lines_in_order (&saved, &[ MEMBER_A, " a note under a\n", GRAFT_P ]);
-    assert_eq! ( saved . matches (GRAFT_P) . count (), 1, "{}", saved );
+    assert_eq! ( without_viewnode_ids (&saved) . matches (GRAFT_P) . count (), 1, "{}", saved );
     Ok (( )) }) }
 
 /// A note under a historical phantom survives beside its old content,
@@ -46,9 +46,9 @@ fn a_note_under_a_changed_folders_member_survives (
 fn a_note_under_a_historical_phantom_survives (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let phantom : &str = "** (skg (ghost (gnid h)";
+    let phantom : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
-      "*** (skg (node (id m) (repo main) noClaim (diff (rel removed)";
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, phantom, &note (3, "a note under h") )) ?;
@@ -75,7 +75,7 @@ fn a_note_in_the_acquired_folder_survives (
       &insert_after_line_starting ( &buffer, folder, &note (3, "a placed note") )) ?;
     assert! ( parent_line_of (&saved, "a placed note") . starts_with (folder), "{}", saved );
     assert_lines_in_order (&saved, &[
-      folder, " a placed note\n", "*** (skg (ghost (gnid acqd)" ]);
+      folder, " a placed note\n", "*** (skg ghost (gnid acqd)" ]);
     Ok (( )) }) }
 
 /// A note under a removed member survives the member going stale:
@@ -85,7 +85,7 @@ fn a_note_in_the_acquired_folder_survives (
 fn a_note_under_a_removed_member_survives_it_going_stale (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let removed : &str = "** (skg (node (id x) (repo main) noClaim ";
+    let removed : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim ";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting ( &buffer, removed, &note (3, "a note under x") )) ?;
@@ -101,5 +101,5 @@ fn a_note_under_a_removed_member_survives_it_going_stale (
     assert! ( parent . starts_with (removed) && ! parent . contains ("(diff"),
               "the note stands under a plain non-member occurrence of x:\n{}", committed );
     assert_lines_in_order (&committed, &[
-      "* (skg (node (id b)", removed, " a note under x\n" ]);
+      "* (skg node (gnid b)", removed, " a note under x\n" ]);
     Ok (( )) }) }

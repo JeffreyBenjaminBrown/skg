@@ -3,8 +3,10 @@
 //!
 //! Metadata is an "unordered tree after the first element": in any
 //! metadata list the first element is a keyword that must come first,
-//! but the remaining siblings carry no order -- `(node (id x) (repo
-//! s))` means the same as `(node (repo s) (id x))`. This holds
+//! but the remaining siblings carry no order -- `(skg node (gnid x)
+//! (skgRepos (nodeRepo s)))` means the same as `(skg (skgRepos
+//! (nodeRepo s)) node (gnid x))`, the kind atom being one sibling
+//! among the parts. This holds
 //! recursively, to any depth: `(a (b c d) (e f g))` == `(a (e f g)
 //! (b c d))` == `(a (b d c) (e f g))`, but != `(a (c b d) (e f g))`
 //! (the inner head `b` is fixed) and != `(b a c ...)` (the outer head).
@@ -79,7 +81,7 @@ pub fn viewnode_id_atom_of (
   VIEWNODE_ID_ATOM . find (line)
     . map ( |found| found . as_str () . trim_start () ) }
 
-/// 'line' with 'viewnode_id_atom' put at the end of its '(skg ...)' wrapper,
+/// 'line' with 'viewnode_id_atom' put first in its '(skg ...)' wrapper,
 /// where the printer puts a viewnode ID. 'line' unchanged if it has no
 /// wrapper.
 pub fn with_viewnode_id_atom (
@@ -88,11 +90,11 @@ pub fn with_viewnode_id_atom (
 ) -> String {
   let Some (wrapper_start) : Option<usize> = line . find ("(skg") else {
     return line . to_string (); };
-  let Some (wrapper_len) : Option<usize> = sexp_byte_len ( &line [wrapper_start ..] ) else {
-    return line . to_string (); };
-  let wrapper_close : usize = wrapper_start + wrapper_len - 1;
-  format! ( "{} {}{}", &line [.. wrapper_close], viewnode_id_atom,
-            &line [wrapper_close ..] ) }
+  if sexp_byte_len ( &line [wrapper_start ..] ) . is_none () {
+    return line . to_string (); }
+  let after_head : usize = wrapper_start + "(skg" . len ();
+  format! ( "{} {}{}", &line [.. after_head], viewnode_id_atom,
+            &line [after_head ..] ) }
 
 /// Rewrite every `(skg ...)` sexp in `buffer` into canonical
 /// (tail-sorted) form, leaving all other text untouched. A `(skg ...)`
@@ -227,36 +229,36 @@ mod tests {
   #[test]
   fn buffer_reorders_only_skg_metadata_and_preserves_the_rest () {
     let a : &str =
-      "* (skg (node (id x) (repo main))) A title\nbody line\n";
+      "* (skg node (gnid x) (skgRepos (nodeRepo main))) A title\nbody line\n";
     let b : &str =
-      "* (skg (node (repo main) (id x))) A title\nbody line\n";
+      "* (skg node (skgRepos (nodeRepo main)) (gnid x)) A title\nbody line\n";
     assert_eq! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (b) );
     // a differing title (non-metadata text) is still caught
     let c : &str =
-      "* (skg (node (repo main) (id x))) DIFFERENT\nbody line\n";
+      "* (skg node (skgRepos (nodeRepo main)) (gnid x)) DIFFERENT\nbody line\n";
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (c) );
     // a differing id (metadata content) is still caught
     let d : &str =
-      "* (skg (node (repo main) (id y))) A title\nbody line\n";
+      "* (skg node (skgRepos (nodeRepo main)) (gnid y)) A title\nbody line\n";
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (d) ); }
 
   #[test]
   fn multiline_buffer_with_several_headlines () {
     let a : &str = concat! (
-      "* (skg (node (id 1) (repo main) noClaim)) one\n",
-      "** (skg (node (id 2) (repo main) writeProtected)) two\n" );
+      "* (skg node (gnid 1) (skgRepos (nodeRepo main)) noClaim) one\n",
+      "** (skg node (gnid 2) (skgRepos (nodeRepo main)) writeProtected) two\n" );
     let b : &str = concat! (
-      "* (skg (node noClaim (repo main) (id 1))) one\n",
-      "** (skg (node (repo main) writeProtected (id 2))) two\n" );
+      "* (skg node noClaim (skgRepos (nodeRepo main)) (gnid 1)) one\n",
+      "** (skg node (skgRepos (nodeRepo main)) writeProtected (gnid 2)) two\n" );
     assert_eq! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (b) );
     // bullets / depth are non-metadata and stay significant
     let c : &str = concat! (
-      "* (skg (node noClaim (repo main) (id 1))) one\n",
-      "*** (skg (node (repo main) writeProtected (id 2))) two\n" );
+      "* (skg node noClaim (skgRepos (nodeRepo main)) (gnid 1)) one\n",
+      "*** (skg node (skgRepos (nodeRepo main)) writeProtected (gnid 2)) two\n" );
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (c) ); }
 
@@ -265,7 +267,7 @@ mod tests {
     // The ⌂:LABEL homeRepoHerald and the ☮/⟳ glyphs must survive parse +
     // canon (bytes preserved, just possibly reordered).
     let s : &str =
-      "* (skg (node (id 1) (repo main) (viewStats cycle (homeRepoHerald ⌂:main)))) t\n";
+      "* (skg node (gnid 1) (skgRepos (nodeRepo main)) (viewStats cycle (homeRepoHerald ⌂:main))) t\n";
     let c : String = canonicalize_metadata_ordering (s);
     assert! ( c . contains ("⌂:main"), "got: {}", c );
     assert! ( c . contains ("cycle") ); }
@@ -274,19 +276,19 @@ mod tests {
   fn without_viewnode_ids_drops_each_viewnode_id_and_its_space () {
     assert_eq! (
       without_viewnode_ids ( concat! (
-        "* (skg (node (id 1) (repo main)) (vnid 0a)) one\n",
-        "** (skg folded aliasFolder (vnid 0b))\n" )),
+        "* (skg (vnid 0a) node (gnid 1) (skgRepos (nodeRepo main))) one\n",
+        "** (skg (vnid 0b) folded aliasFolder)\n" )),
       concat! (
-        "* (skg (node (id 1) (repo main))) one\n",
+        "* (skg node (gnid 1) (skgRepos (nodeRepo main))) one\n",
         "** (skg folded aliasFolder)\n" )); }
 
   #[test]
   fn a_viewnode_id_atom_moves_from_one_line_to_another () {
-    let original : &str = "** (skg (node (id 2) (repo main)) (vnid 1x)) two";
+    let original : &str = "** (skg (vnid 1x) node (gnid 2) (skgRepos (nodeRepo main))) two";
     let edited : String =
       without_viewnode_ids (original) . replace ("main", "other");
     assert_eq! ( with_viewnode_id_atom ( &edited, viewnode_id_atom_of (original) . unwrap () ),
-                 "** (skg (node (id 2) (repo other)) (vnid 1x)) two" ); }
+                 "** (skg (vnid 1x) node (gnid 2) (skgRepos (nodeRepo other))) two" ); }
 
   #[test]
   fn text_outside_any_skg_form_is_verbatim () {

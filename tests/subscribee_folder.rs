@@ -51,17 +51,17 @@ fn test_subscribee_folder_appears_for_subscribers(
     // the fixture records both relationships at exactly that default, no
     // (relRepo ...) override appears.
     let expected = indoc! {
-      "* (skg (node (id 1) (repo home) (rels (contains (out 4))) (viewStats (homeRepoHerald ⌂:home)))) 1
-      ** (skg (node (id 11) (repo home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribesTo (out 1)) (birth (contains in 1))))) 11
+      "* (skg node (gnid 1) (skgRepos (nodeRepo home)) (rels (contains (out 4))) (viewStats (homeRepoHerald ⌂:home))) 1
+      ** (skg node (gnid 11) (skgRepos (nodeRepo home)) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribesTo (out 1)) (birth (contains in 1)))) 11
       *** (skg subscribeeFolder)
-      **** (skg (node (id 11-sees) (repo away) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))) (viewStats (homeRepoHerald ⌂:away)))) 11-sees
-      *** (skg (node (id 111) (repo home) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 111
-      ** (skg (node (id 12) (repo home) (rels (contains (in 1 (ancestors 1))) (subscribesTo (out 1)) (birth (contains in 1))))) 12
+      **** (skg node (gnid 11-sees) (skgRepos (nodeRepo away)) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))) (viewStats (homeRepoHerald ⌂:away))) 11-sees
+      *** (skg node (gnid 111) (skgRepos (nodeRepo home)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 111
+      ** (skg node (gnid 12) (skgRepos (nodeRepo home)) (rels (contains (in 1 (ancestors 1))) (subscribesTo (out 1)) (birth (contains in 1)))) 12
       *** (skg subscribeeFolder)
-      **** (skg (node (id 12-sees) (repo away) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))) (viewStats (homeRepoHerald ⌂:away)))) 12-sees
-      ** (skg (node (id 13) (repo home) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
-      ** (skg (node (id 14) (repo home) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 14
-      *** (skg (node (id 141) (repo home) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 141
+      **** (skg node (gnid 12-sees) (skgRepos (nodeRepo away)) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))) (viewStats (homeRepoHerald ⌂:away))) 12-sees
+      ** (skg node (gnid 13) (skgRepos (nodeRepo home)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 13
+      ** (skg node (gnid 14) (skgRepos (nodeRepo home)) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1)))) 14
+      *** (skg node (gnid 141) (skgRepos (nodeRepo home)) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))) 141
 "};
     assert_metadata_eq!(result, expected,
       "Nodes with subscriptions should have SubscribeeFolder children");

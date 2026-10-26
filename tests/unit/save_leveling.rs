@@ -722,15 +722,14 @@ fn relrepo_requests_are_contextual_and_singular (
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
 
   assert! ( parse_metadata_to_viewnodemd (
-    "(skg alias (relRepo private) (editRequest (relRepo secret)))" )
+    "(skg alias (skgRepos (relRepo private)) (editRequest (relRepo secret)))" )
             . is_ok (),
             "Alias is the only non-vognode which carries a relRepo" );
   for malformed in [
-    "(skg (node (id n)) (editRequest (relRepo private)))",
-    "(skg id (relRepo private))",
-    "(skg (node (id n) (editRequest delete) (editRequest (relRepo private))))",
-    "(skg (unknown (id absent) (editRequest delete)))",
-    "(skg (unknown (id absent) (viewStats cycle)))",
+    "(skg id (skgRepos (relRepo private)))",
+    "(skg node (gnid n) (editRequest delete) (editRequest (relRepo private)))",
+    "(skg unknown (gnid absent) (editRequest delete))",
+    "(skg unknown (gnid absent) (viewStats cycle))",
   ] {
     assert! ( parse_metadata_to_viewnodemd (malformed) . is_err (),
               "malformed relRepo metadata was accepted: {}",
@@ -738,7 +737,7 @@ fn relrepo_requests_are_contextual_and_singular (
   }
   let (_, error, _) = crate::serve::parse_metadata_sexp::viewnode_from_metadata (
     &parse_metadata_to_viewnodemd (
-      "(skg (node (id n) (repo public) writeProtected (editRequest (relRepo private))))" )
+      "(skg node (gnid n) (skgRepos (nodeRepo public)) writeProtected (editRequest (relRepo private)))" )
     . unwrap (), "N" . to_string (), None );
   assert! ( error . is_none (),
             "a write-protected node's relRepo request is its view-parent's instruction, so parsing must accept it" );
@@ -781,10 +780,10 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
     assert_eq! (restriction . edit_request (), None); }
 
   for malformed in [
-    "(skg (node (id n) (editRequest (flag nope true))))",
-    "(skg (node (id n) (editRequest (flag noSearchMatching maybe))))",
-    "(skg (node (id n) (editRequest (flag hadId true))))",
-    "(skg (node (id n) (editRequest (flag wasOverloaded false))))",
+    "(skg node (gnid n) (editRequest (flag nope true)))",
+    "(skg node (gnid n) (editRequest (flag noSearchMatching maybe)))",
+    "(skg node (gnid n) (editRequest (flag hadId true)))",
+    "(skg node (gnid n) (editRequest (flag wasOverloaded false)))",
   ] {
     assert! ( parse_metadata_to_viewnodemd (malformed) . is_err (),
               "malformed/write-protected flag request was accepted: {}",
@@ -806,7 +805,7 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
   let rendered : String = viewnode_to_string (&unknown, &config) . unwrap ();
   assert! ( rendered . contains (
-    "(unknown (id absent-raw) (viewStats (relRepo private)) (editRequest (relRepo secret)))"),
+    "unknown (gnid absent-raw) (skgRepos (relRepo private)) (editRequest (relRepo secret))"),
             "Unknown facts and requests must serialize in stable order: {}", rendered );
   let parsed = parse_metadata_to_viewnodemd (
     &format! ("(skg {})", rendered) ) . unwrap ();

@@ -147,12 +147,12 @@ async fn test_writeProtected_relRepo_request_needs_an_editable_recorder (
 ) -> Result<(), Box<dyn Error>> {
   let input : &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) root
-      ** (skg (node (id collected) (repo main) writeProtected (editRequest (relRepo main)))) under an editable parent
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+      ** (skg node (gnid collected) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under an editable parent
       ** (skg subscribeeFolder)
-      *** (skg (node (id collected_subscribee) (repo main) writeProtected (editRequest (relRepo main)))) in an editable recorder's folder
-      ** (skg (node (id protected_parent) (repo main) writeProtected)) write-protected parent
-      *** (skg (node (id orphaned) (repo main) writeProtected (editRequest (relRepo main)))) under a write-protected parent
+      *** (skg node (gnid collected_subscribee) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) in an editable recorder's folder
+      ** (skg node (gnid protected_parent) (skgRepos (nodeRepo main)) writeProtected) write-protected parent
+      *** (skg node (gnid orphaned) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) under a write-protected parent
     "};
   let (viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -184,17 +184,17 @@ async fn test_find_buffer_errors_for_saving (
       // Test input with various validation errors
       let input_with_errors: &str =
         indoc! {"
-                * (skg (node (id root) (repo main))) Valid root node
+                * (skg node (gnid root) (skgRepos (nodeRepo main))) Valid root node
                 ** (skg aliasFolder) AliasFolder with body problem
                 This body should not exist on AliasFolder
-                *** (skg (node (id bad_child))) Child of AliasFolder with ID
+                *** (skg node (gnid bad_child)) Child of AliasFolder with ID
                 ** (skg alias) Alias with body problem and orphaned
                 This body should not exist on Alias
-                *** (skg (node (id alias_child))) Any child of Alias (bad)
+                *** (skg node (gnid alias_child)) Any child of Alias (bad)
                 ** (skg alias) Alias under non-AliasFolder parent
                 * (skg alias) Root level Alias (bad)
-                * (skg (node (id conflict) (repo main) (editRequest delete))) Node with deletion conflict
-                * (skg (node (id conflict) (repo main))) Same ID but no toDelete flag
+                * (skg node (gnid conflict) (skgRepos (nodeRepo main)) (editRequest delete)) Node with deletion conflict
+                * (skg node (gnid conflict) (skgRepos (nodeRepo main))) Same ID but no toDelete flag
             "};
 
       let (viewforest, parsing_errors, _warnings)
@@ -331,11 +331,11 @@ async fn test_find_buffer_errors_for_saving_valid_input (
       // Test input with no validation errors
       let valid_input: &str =
         indoc! {"
-                * (skg (node (id root) (repo main))) Valid root node
+                * (skg node (gnid root) (skgRepos (nodeRepo main))) Valid root node
                 ** (skg aliasFolder) AliasFolder without body
                 *** (skg alias) An alias
                 *** (skg alias) Another alias
-                ** (skg (node (id normal) (repo main))) Normal node with body
+                ** (skg node (gnid normal) (skgRepos (nodeRepo main))) Normal node with body
                 This body is allowed on normal nodes
             "};
 
@@ -368,7 +368,7 @@ async fn test_multiple_aliasfolders_in_children (
       // Test input with multiple AliasFolder children
       let input_with_multiple_aliasfolders: &str =
         indoc! {"
-                * (skg (node (id root) (repo main))) Node with multiple AliasFolder children
+                * (skg node (gnid root) (skgRepos (nodeRepo main))) Node with multiple AliasFolder children
                 ** (skg aliasFolder) First AliasFolder
                 *** (skg alias) First alias
                 ** (skg aliasFolder) Second AliasFolder
@@ -400,9 +400,9 @@ async fn test_duplicated_content_error (
       // Test input with duplicated Content children (same ID)
       let input_with_duplicated_content: &str =
         indoc! {"
-                * (skg (node (id root) (repo main))) Node with duplicated content
-                ** (skg (node (id 1))) 1
-                ** (skg (node (id 1))) 1
+                * (skg node (gnid root) (skgRepos (nodeRepo main))) Node with duplicated content
+                ** (skg node (gnid 1)) 1
+                ** (skg node (gnid 1)) 1
             "};
 
       let viewforest: MpViewForest =
@@ -434,9 +434,9 @@ async fn test_no_duplicated_content_error_when_different_skgids (
       // Test input with different Content children IDs (should be valid)
       let input_without_duplicated_content: &str =
         indoc! {"
-                * (skg (node (id root) (repo main))) Node with duplicated content
-                ** (skg (node (id 1))) 1
-                ** (skg (node (id 2))) 2
+                * (skg node (gnid root) (skgRepos (nodeRepo main))) Node with duplicated content
+                ** (skg node (gnid 1)) 1
+                ** (skg node (gnid 2)) 2
             "};
 
       let viewforest: MpViewForest =
@@ -462,9 +462,9 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
       // not a member of its parent.
       let input: &str =
         indoc! {"
-                * (skg (node (id root) (repo main))) parent
-                ** (skg (node (id 1) (repo main))) real child
-                ** (skg (ghost (gnid 1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed)))) phantom child
+                * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
+                ** (skg node (gnid 1) (skgRepos (nodeRepo main))) real child
+                ** (skg ghost (gnid 1) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed))) phantom child
             "};
 
       let viewforest: MpViewForest =
@@ -491,8 +491,8 @@ async fn test_root_without_skgrepo_validation (
       // root without skgrepo should be rejected
       let input: &str =
         indoc! {"
-                * (skg (node (id root1) (repo main))) Root with repo (valid)
-                * (skg (node (id root2))) Root without repo (invalid)
+                * (skg node (gnid root1) (skgRepos (nodeRepo main))) Root with repo (valid)
+                * (skg node (gnid root2)) Root without repo (invalid)
             "};
 
       let viewforest: MpViewForest =
@@ -523,9 +523,9 @@ async fn test_nonexistent_skgrepo_validation (
       { // Node with nonexistent skgrepo should be rejected
         let input: &str =
           indoc! {"
-                  * (skg (node (id root1) (repo main))) Root with valid repo
-                  ** (skg (node (id child1) (repo nonexistent))) Child with invalid repo
-                  * (skg (node (id root2) (repo invalid_repo))) Root with nonexistent repo
+                  * (skg node (gnid root1) (skgRepos (nodeRepo main))) Root with valid repo
+                  ** (skg node (gnid child1) (skgRepos (nodeRepo nonexistent))) Child with invalid repo
+                  * (skg node (gnid root2) (skgRepos (nodeRepo invalid_repo))) Root with nonexistent repo
               "};
         let viewforest: MpViewForest =
           org_to_uninterpreted_viewforest (input) . unwrap() . 0;
@@ -567,8 +567,8 @@ async fn test_empty_title_rejected_for_editable_node (
 ) -> Result<(), Box<dyn Error>> {
       let input: &str =
         indoc! {"
-                * (skg (node (id has-title) (repo main))) has a title
-                * (skg (node (id no-title) (repo main)))
+                * (skg node (gnid has-title) (skgRepos (nodeRepo main))) has a title
+                * (skg node (gnid no-title) (skgRepos (nodeRepo main)))
             "};
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap() . 0;
@@ -598,8 +598,8 @@ async fn test_empty_title_allowed_for_writeProtected_and_delete (
 ) -> Result<(), Box<dyn Error>> {
       let input: &str =
         indoc! {"
-                * (skg (node (id writeProtected) (repo main) writeProtected))
-                * (skg (node (id deleting) (repo main) (editRequest delete)))
+                * (skg node (gnid writeProtected) (skgRepos (nodeRepo main)) writeProtected)
+                * (skg node (gnid deleting) (skgRepos (nodeRepo main)) (editRequest delete))
             "};
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap() . 0;
@@ -628,10 +628,10 @@ async fn test_editable_view_request_on_an_editable_node_with_content_is_allowed 
   // So does a request on a write-protected node with shown children.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (repo main) (viewRequests editableView))) parent
-                ** (skg (node (id c) (repo main))) content child
-                * (skg (node (id other) (repo main) writeProtected (viewRequests editableView))) other
-                ** (skg (node (id d) (repo main) writeProtected)) shown child
+                * (skg node (gnid parent) (skgRepos (nodeRepo main)) (viewRequests editableView)) parent
+                ** (skg node (gnid c) (skgRepos (nodeRepo main))) content child
+                * (skg node (gnid other) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) other
+                ** (skg node (gnid d) (skgRepos (nodeRepo main)) writeProtected) shown child
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
@@ -651,8 +651,8 @@ async fn test_two_editable_view_requests_for_one_node_are_rejected (
   // A buffer carries at most one editable-view request per node.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent
-                * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent again
+                * (skg node (gnid parent) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) parent
+                * (skg node (gnid parent) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) parent again
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
@@ -679,7 +679,7 @@ async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected 
   // occurrences of a node, the requests move editability, and pass.
       for request in [ "writeProtectedView", "writeProtectedSubtreeView" ] {
         let contradictory : String = format! (
-          "* (skg (node (id parent) (repo main) (viewRequests editableView {}))) parent\n",
+          "* (skg node (gnid parent) (skgRepos (nodeRepo main)) (viewRequests editableView {})) parent\n",
           request );
         let errors : Vec<BufferValidationError> =
           find_buffer_errors_for_saving (
@@ -691,8 +691,8 @@ async fn test_writeProtect_and_editable_requests_on_one_occurrence_are_rejected 
             if skgid . 0 == "parent" ),
           "{}: {:?}", request, errors );
         let moving : String = format! (
-          "* (skg (node (id parent) (repo main) (viewRequests {}))) parent\n\
-           * (skg (node (id parent) (repo main) writeProtected (viewRequests editableView))) parent again\n",
+          "* (skg node (gnid parent) (skgRepos (nodeRepo main)) (viewRequests {})) parent\n\
+           * (skg node (gnid parent) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) parent again\n",
           request );
         let errors : Vec<BufferValidationError> =
           find_buffer_errors_for_saving (
@@ -710,8 +710,8 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   // clear message.
   let input_delete: &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (node (id phantom) (repo main) writeProtected (editRequest delete))) phantom child
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
+      ** (skg node (gnid phantom) (skgRepos (nodeRepo main)) writeProtected (editRequest delete)) phantom child
     "};
   let (_viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -729,8 +729,8 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   // Same error for (editRequest (merge X)) on a write-protected node.
   let input_merge: &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (node (id phantom) (repo main) writeProtected (editRequest (merge other)))) phantom child
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
+      ** (skg node (gnid phantom) (skgRepos (nodeRepo main)) writeProtected (editRequest (merge other))) phantom child
     "};
   let (_viewforest2, parsing_errors2, _warnings__viewforest2)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -748,8 +748,8 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   // An editable node with (editRequest delete) is legal -- no error.
   let input_editable: &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (node (id leaf) (repo main) (editRequest delete))) leaf
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
+      ** (skg node (gnid leaf) (skgRepos (nodeRepo main)) (editRequest delete)) leaf
     "};
   let (_viewforest3, parsing_errors3, _warnings__viewforest3)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -768,11 +768,11 @@ fn a_tombstone_holding_a_visible_child_passes_local_validation () {
   // preservation"), under a node or as a view root.
   let input : &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) parent
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
       ** (skg tombstone)
-      *** (skg (node (id child) (repo main))) visible child
+      *** (skg node (gnid child) (skgRepos (nodeRepo main))) visible child
       * (skg tombstone)
-      ** (skg (node (id other) (repo main))) another visible child
+      ** (skg node (gnid other) (skgRepos (nodeRepo main))) another visible child
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -803,8 +803,8 @@ fn a_tombstone_does_not_collide_with_content () {
   // when a visible child is the very node the tombstone stood for.
   let input : &str =
     indoc! {"
-      * (skg (node (id root) (repo main))) parent
-      ** (skg (node (id hidden) (repo main))) visible child
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) parent
+      ** (skg node (gnid hidden) (skgRepos (nodeRepo main))) visible child
       ** (skg tombstone)
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
@@ -829,13 +829,13 @@ fn duplicate_members_of_defining_folders_pass_validation () {
   // save.
   let input : &str =
     indoc! {"
-      * (skg (node (id recorder) (repo main))) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id dup) (repo main) writeProtected)) dup
-      *** (skg (node (id dup) (repo main) writeProtected)) dup
+      *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
+      *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
       ** (skg overriddenFolder)
-      *** (skg (node (id dup2) (repo main) writeProtected)) dup2
-      *** (skg (node (id dup2) (repo main) writeProtected)) dup2
+      *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
+      *** (skg node (gnid dup2) (skgRepos (nodeRepo main)) writeProtected) dup2
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -853,10 +853,10 @@ fn duplicate_members_of_defining_folders_pass_validation () {
 fn duplicate_members_of_write_protected_folders_are_still_rejected () {
   let input : &str =
     indoc! {"
-      * (skg (node (id recorder) (repo main))) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg hiddenFolder)
-      *** (skg (node (id dup) (repo main) writeProtected)) dup
-      *** (skg (node (id dup) (repo main) writeProtected)) dup
+      *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
+      *** (skg node (gnid dup) (skgRepos (nodeRepo main)) writeProtected) dup
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)

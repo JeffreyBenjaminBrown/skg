@@ -60,8 +60,8 @@ async fn merge_acquiree_as_independent_root_impl (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
-    * (skg (node (id b) (repo main))) b
-    * (skg (node (id d) (repo main) (editRequest (merge b)))) d
+    * (skg node (gnid b) (skgRepos (nodeRepo main))) b
+    * (skg node (gnid d) (skgRepos (nodeRepo main)) (editRequest (merge b))) d
   "};
 
   let graph : InRustGraphHandle =
@@ -96,7 +96,7 @@ async fn merge_acquiree_as_independent_root_impl (
        to its acquirer d by the preprocessing pass"
       . to_string() ); }
 
-  // 2. The first top-level headline should reference (id d).
+  // 2. The first top-level headline should reference (gnid d).
   //    (It was originally pid=b; preprocessing rewrote it.)
   let first_root : Option<&&str> =
     lines . iter () . find ( |l| l . starts_with ("* ") );
@@ -104,20 +104,20 @@ async fn merge_acquiree_as_independent_root_impl (
     None => failures . push (
       "no top-level headline found in rendered view" . to_string() ),
     Some (l) => {
-      if ! l . contains ("(id d)") {
+      if ! l . contains ("(gnid d)") {
         failures . push ( format! (
-          "first top-level headline does not reference (id d); \
+          "first top-level headline does not reference (gnid d); \
            got: {}", l ) ); } } }
 
-  // 3. Both top-level headlines should reference (id d): the
+  // 3. Both top-level headlines should reference (gnid d): the
   //    rewritten b-root and the original d-root.
   let d_root_count : usize =
     lines . iter ()
-    . filter ( |l| l . starts_with ("* ") && l . contains ("(id d)") )
+    . filter ( |l| l . starts_with ("* ") && l . contains ("(gnid d)") )
     . count ();
   if d_root_count != 2 {
     failures . push ( format! (
-      "expected 2 top-level (id d) headlines (rewritten b + \
+      "expected 2 top-level (gnid d) headlines (rewritten b + \
        original d); found {}", d_root_count )); }
 
   // 4. The MERGED: b preserver should appear in the view (under

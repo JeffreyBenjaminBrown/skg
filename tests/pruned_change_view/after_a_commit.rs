@@ -24,11 +24,11 @@ use skg::types::env::SkgEnv;
 
 use std::error::Error;
 
-const REMOVED_X_UNDER_E : &str = "** (skg (node (id x) (repo main) noClaim ";
+const REMOVED_X_UNDER_E : &str = "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim ";
 const REMOVED_X_UNDER_B : &str = // not c's x, under d: that one is x's container
-  "*** (skg (node (id x) (repo main) noClaim writeProtected (rels (contains (in 2) (out 1))";
+  "*** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (rels (contains (in 2) (out 1))";
 const RETAINED_X_UNDER_E : &str = // retained as non-member, still editable
-  "** (skg (node (id x) (repo main) noClaim (rels ";
+  "** (skg node (gnid x) (skgRepos (nodeRepo main)) noClaim (rels ";
 
 /// Commit everything, confirmed; the "all changes" buffer as the
 /// rerender stream that follows sends it.
@@ -71,10 +71,10 @@ fn a_commit_converts_what_the_diff_view_showed (
   with_fixture ("commit_leftovers", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     assert_lines_in_order (&buffer, &[
-      "* (skg (node (id e)", REMOVED_X_UNDER_E, "(containerFolder changed)",
-      "*** (skg (node (id xc) ",
-      "* (skg (ghost (gnid h)", "** (skg (node (id hm)",
-      "* (skg bodyFolded (node (id p)", "** (skg (node (id b)", REMOVED_X_UNDER_B ]);
+      "* (skg node (gnid e)", REMOVED_X_UNDER_E, "(containerFolder changed)",
+      "*** (skg node (gnid xc) ",
+      "* (skg ghost (gnid h)", "** (skg node (gnid hm)",
+      "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b)", REMOVED_X_UNDER_B ]);
     let x_under_e_before : &str = line_starting (&buffer, REMOVED_X_UNDER_E);
     let committed : String = committed (f) ?;
     let x_under_e : &str = line_starting (&committed, RETAINED_X_UNDER_E);
@@ -82,21 +82,21 @@ fn a_commit_converts_what_the_diff_view_showed (
     assert_eq! ( viewnode_id_on (x_under_e), viewnode_id_on (x_under_e_before),
                  "the removed member is kept, not made again:\n{}", committed );
     assert_lines_in_order (&committed, &[
-      "* (skg (node (id e) (repo main))) e\n",
+      "* (skg node (gnid e) (skgRepos (nodeRepo main))) e\n",
       RETAINED_X_UNDER_E, ") x\n",
-      "*** (skg (node (id xc) (repo main) writeProtected " ]);
+      "*** (skg node (gnid xc) (skgRepos (nodeRepo main)) writeProtected " ]);
     assert_lines_in_order (&committed, &[ // b, under p, holds nothing
-      "* (skg bodyFolded (node (id p)", "** (skg (node (id b) ", ") b\n* (skg (node (id s)" ]);
+      "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b) ", ") b\n* (skg node (gnid s)" ]);
     assert! ( ! committed . contains ("(gnid h)")
-              && ! committed . contains ("(id h)")
+              && ! committed . contains ("(gnid h)")
               && ! committed . contains ("tombstone"),
               "h's root is gone:\n{}", committed );
-    assert! ( ! committed . contains ("(id hm)"), "{}", committed );
+    assert! ( ! committed . contains ("(gnid hm)"), "{}", committed );
     assert! ( ! committed . contains ("containerFolder")
               && ! committed . contains ("subscriberFolder"),
               "the changed folders are gone:\n{}", committed );
     for fact in [ "(diff ", "changed)", "changesetMarker", "oldText",
-                  "(ghost ", "homeSkgrepoMove", "(ready" ] {
+                  " ghost (gnid ", "homeSkgrepoMove", "(ready" ] {
       assert! ( ! committed . contains (fact),
                 "no change fact {:?} remains:\n{}", fact, committed ); }
     let saved : String =
@@ -120,7 +120,7 @@ fn a_note_under_a_removed_member_survives_under_the_retained_member (
     assert! ( parent . starts_with (RETAINED_X_UNDER_E) && ! parent . contains ("(diff"),
               "{}", committed );
     assert_lines_in_order (&committed, &[
-      "* (skg (node (id e)", RETAINED_X_UNDER_E, " a note under x\n" ]);
+      "* (skg node (gnid e)", RETAINED_X_UNDER_E, " a note under x\n" ]);
     Ok (( )) }) }
 
 /// A note typed under a write-protected removed member keeps that
@@ -142,7 +142,7 @@ fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
     assert! ( parent_line_of (&committed, "a note under x") . starts_with (REMOVED_X_UNDER_B),
               "{}", committed );
     assert_lines_in_order (&committed, &[
-      "* (skg bodyFolded (node (id p)", "** (skg (node (id b)", REMOVED_X_UNDER_B,
+      "* (skg bodyFolded node (gnid p)", "** (skg node (gnid b)", REMOVED_X_UNDER_B,
       " a note under x\n" ]);
     Ok (( )) }) }
 
@@ -155,12 +155,12 @@ fn a_note_under_a_write_protected_removed_member_keeps_that_occurrence (
 fn a_pasted_write_protected_copy_under_a_stale_child_stays (
 ) -> Result<(), Box<dyn Error>> {
   with_fixture ("commit_leftovers", &["main"], |f| {
-    let copy : &str = "*** (skg (node (id s1) (repo main) noClaim writeProtected";
+    let copy : &str = "*** (skg node (gnid s1) (skgRepos (nodeRepo main)) noClaim writeProtected";
     let buffer : String = open_all_changes_buffer (f) ?;
     let saved : String = saved_and_rerendered ( f,
       &insert_after_line_starting (
         &buffer, REMOVED_X_UNDER_E,
-        "*** (skg (node (id s1) (repo main) noClaim writeProtected)) s1\n" )) ?;
+        "*** (skg node (gnid s1) (skgRepos (nodeRepo main)) noClaim writeProtected) s1\n" )) ?;
     let copy_before : &str = line_starting (&saved, copy);
     assert! ( headline_parent_of (&saved, copy_before) . starts_with (REMOVED_X_UNDER_E),
               "{}", saved );

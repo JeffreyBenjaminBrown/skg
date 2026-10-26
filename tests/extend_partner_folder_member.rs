@@ -44,7 +44,7 @@ fn subtree_for_node_in_folder (
   skgid : &str,
   enclosing_folder : &str,
 ) -> String {
-  let needle : String = format! ("(id {})", skgid);
+  let needle : String = format! ("(gnid {})", skgid);
   let lines : Vec<&str> = buf . lines () . collect ();
   let mut folder_stack : Vec<(usize, &str)> = Vec::new ();
   let mut matches : Vec<usize> = Vec::new ();
@@ -99,7 +99,7 @@ fn add_editable_view_requests_to_folder_members (
       folder_stack . last () . map ( |(_, folder)| *folder );
     if members . iter () . any ( |(skgid, folder)| {
       enclosing == Some (*folder)
-      && line . contains (&format! ("(id {})", skgid)) } )
+      && line . contains (&format! ("(gnid {})", skgid)) } )
     { output . push ( line . replace (
         " writeProtected ",
         " writeProtected (viewRequests editableView) " ) ); }
@@ -138,8 +138,8 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
           exotic, n_view ); }
 
       let requested_folders : String = n_view . replacen (
-        "(node ",
-        "(node (viewRequests (folder subscribesTo) \
+        "node ",
+        "node (viewRequests (folder subscribesTo) \
          (folder overrides) (folder hidesFromSubs))", 1 );
       let with_folders : String =
         save (&requested_folders, config, tantivy, &graph)
@@ -181,7 +181,7 @@ fn initial_and_as_such_editable_nodes_get_only_the_default_folders
          hidden-here folder:\n{}", saved );
       let subscriber_subtree : String =
         subtree_for_node_in_folder (&saved, "S", "subscriberFolder");
-      assert! ( subscriber_subtree . contains ("(id C)")
+      assert! ( subscriber_subtree . contains ("(gnid C)")
                 && subscriber_subtree . contains ("content of S"),
         "S's own content should appear on extension:\n{}", saved );
       assert! ( ! subscriber_subtree . contains ("hiddenInSubscribeeFolder")

@@ -46,11 +46,11 @@ async fn merge_container_into_content_impl (
   // The input buffer: a content view of 'a',
   // with aa requesting to merge a into itself.
   let input_org_text : &str = indoc! {"
-    * (skg (node (id a) (repo main))) a
-    ** (skg (node (id aa) (repo main) (editRequest (merge a)))) aa
-    *** (skg (node (id x) (repo main))) x
-    ** (skg (node (id b) (repo main))) b
-    ** (skg (node (id c) (repo main))) c
+    * (skg node (gnid a) (skgRepos (nodeRepo main))) a
+    ** (skg node (gnid aa) (skgRepos (nodeRepo main)) (editRequest (merge a))) aa
+    *** (skg node (gnid x) (skgRepos (nodeRepo main))) x
+    ** (skg node (gnid b) (skgRepos (nodeRepo main))) b
+    ** (skg node (gnid c) (skgRepos (nodeRepo main))) c
   "};
 
   let graph : InRustGraphHandle =
@@ -167,7 +167,7 @@ async fn merge_container_into_content_impl (
   if view . contains ("tombstone") {
     failures . push (
       "acquiree 'a' was entombstoned as deleted; expected the \
-       viewnode to have been rewritten to (id aa)"
+       viewnode to have been rewritten to (gnid aa)"
       . to_string() ); }
 
   // With the preprocessing pass, the root viewnode (originally
@@ -177,7 +177,7 @@ async fn merge_container_into_content_impl (
   let lines : Vec<&str> = view . lines() . collect();
   let aa_line_idx : Option<usize> =
     lines . iter() . position (
-      |line| line . starts_with ("* ") && line . contains ("(id aa)") );
+      |line| line . starts_with ("* ") && line . contains ("(gnid aa)") );
   if aa_line_idx . is_none() {
     failures . push (
       "aa should be the top-level headline in the rendered buffer"
@@ -193,10 +193,10 @@ async fn merge_container_into_content_impl (
 
     let b_under_aa : Option<&&str> =
       aa_children_lines . iter()
-      . find ( |line| line . contains ("(id b)") );
+      . find ( |line| line . contains ("(gnid b)") );
     let c_under_aa : Option<&&str> =
       aa_children_lines . iter()
-      . find ( |line| line . contains ("(id c)") );
+      . find ( |line| line . contains ("(gnid c)") );
     if b_under_aa . is_none() {
       failures . push (
         "b does not appear as a child of aa"

@@ -90,8 +90,8 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
         single_root_view (
           config, Some (tantivy), &ID::from ("S") ) ?;
       assert! ( a_view . contains ("subscribeeFolder")
-                && a_view . contains ("(id M)")
-                && a_view . contains ("(id N)"),
+                && a_view . contains ("(gnid M)")
+                && a_view . contains ("(gnid N)"),
         "view A should show M and N in S's subscribeeFolder:\n{}", a_view );
       views_state . open_views . register_view (
         &graph . load_full (), a_viewforest_id . clone (), a_vf, &a_pids );
@@ -101,15 +101,15 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
       let (b_view, b_pids, b_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("S") ) ?;
-      assert! ( b_view . contains ("(id M)")
-                && b_view . contains ("(id N)"),
+      assert! ( b_view . contains ("(gnid M)")
+                && b_view . contains ("(gnid N)"),
         "view B should show M and N in S's subscribeeFolder:\n{}", b_view );
       views_state . open_views . register_view (
         &graph . load_full (), b_viewforest_id . clone (), b_vf, &b_pids );
 
       // In view A, drop N from S's subscribeeFolder (subscribesTo -> [M])
       // and save A.
-      let edited_a : String = drop_member_line (&a_view, "(id N)");
+      let edited_a : String = drop_member_line (&a_view, "(gnid N)");
       let (_response, collateral_views) =
         save_and_read_collateral (
           &edited_a, &a_viewforest_id, config, tantivy, &graph,
@@ -122,9 +122,9 @@ fn collateral_editable_subscriber_subscribeeFolder_refreshes
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );
       let b_collateral : &str = &collateral_views[0];
-      assert! ( b_collateral . contains ("(id M)"),
+      assert! ( b_collateral . contains ("(gnid M)"),
         "M must remain in B's subscribeeFolder:\n{}", b_collateral );
-      assert! ( ! b_collateral . contains ("(id N)"),
+      assert! ( ! b_collateral . contains ("(gnid N)"),
         "N must be gone from B's subscribeeFolder collaterally \
          (editable subscriber must refresh from the graph):\n{}",
         b_collateral );

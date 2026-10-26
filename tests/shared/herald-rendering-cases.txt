@@ -15,119 +15,119 @@
 # before the first case are comments.
 
 ==== links: substantive fraction, both sides
-(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)))))
+(skg node (gnid x) (rels (linksTo (in 5 (substantive 2)) (out 3))))
 ---- text: 2/5L3
 ---- styles: high*1 medium*2 normal*2
 ==== links: no substantive mentioner
-(skg (node (id x) (rels (linksTo (in 5 (substantive 0)) (out 3)))))
+(skg node (gnid x) (rels (linksTo (in 5 (substantive 0)) (out 3))))
 ---- text: 5L3
 ---- styles: medium*1 normal*2
 ==== links: in-side only
-(skg (node (id x) (rels (linksTo (in 5 (substantive 2))))))
+(skg node (gnid x) (rels (linksTo (in 5 (substantive 2)))))
 ---- text: 2/5L
 ---- styles: high*1 medium*2 normal*1
 ==== links: out-side only
-(skg (node (id x) (rels (linksTo (out 3)))))
+(skg node (gnid x) (rels (linksTo (out 3))))
 ---- text: L3
 ---- styles: normal*2
 ==== links: every mentioner substantive
-(skg (node (id x) (rels (linksTo (in 5 (substantive 5))))))
+(skg node (gnid x) (rels (linksTo (in 5 (substantive 5)))))
 ---- text: 5/L
 ---- styles: high*1 medium*1 normal*1
 ==== links: the parent is the only, substantive mentioner
-(skg (node (id x) (rels (linksTo (in 1 (ancestors 1) (substantive 1 (ancestors 1)))))))
+(skg node (gnid x) (rels (linksTo (in 1 (ancestors 1) (substantive 1 (ancestors 1))))))
 ---- text: a/L
 ---- styles: high*1 medium*1 normal*1
 ==== links: the substantive parent and a grandparent
-(skg (node (id x) (rels (linksTo (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))
+(skg node (gnid x) (rels (linksTo (in 2 (ancestors 1 2) (substantive 1 (ancestors 1))))))
 ---- text: a/bL
 ---- styles: high*1 medium*2 normal*1
 ==== links: the substantive parent among five
-(skg (node (id x) (rels (linksTo (in 5 (ancestors 1) (substantive 1 (ancestors 1)))))))
+(skg node (gnid x) (rels (linksTo (in 5 (ancestors 1) (substantive 1 (ancestors 1))))))
 ---- text: a/5L
 ---- styles: high*1 medium*2 normal*1
 ==== links: one substantive mentioner, the parent among five
-(skg (node (id x) (rels (linksTo (in 5 (ancestors 1) (substantive 1))))))
+(skg node (gnid x) (rels (linksTo (in 5 (ancestors 1) (substantive 1)))))
 ---- text: 1/5aL
 ---- styles: high*1 medium*2 low*1 normal*1
 ==== links: the parent, not substantive
-(skg (node (id x) (rels (linksTo (in 1 (ancestors 1) (substantive 0))))))
+(skg node (gnid x) (rels (linksTo (in 1 (ancestors 1) (substantive 0)))))
 ---- text: aL
 ---- styles: medium*1 normal*1
 ==== links: links to the parent
-(skg (node (id x) (rels (linksTo (out 1 (ancestors 1))))))
+(skg node (gnid x) (rels (linksTo (out 1 (ancestors 1)))))
 ---- text: La
 ---- styles: normal*1 low*1
 ==== links: links to the parent and two more
-(skg (node (id x) (rels (linksTo (out 3 (ancestors 1))))))
+(skg node (gnid x) (rels (linksTo (out 3 (ancestors 1)))))
 ---- text: L3a
 ---- styles: normal*2 low*1
 ==== links: a generation beyond z
-(skg (node (id x) (rels (linksTo (in 1 (ancestors 27) (substantive 1 (ancestors 27)))))))
+(skg node (gnid x) (rels (linksTo (in 1 (ancestors 27) (substantive 1 (ancestors 27))))))
 ---- text: {27}/L
 ---- styles: high*4 medium*1 normal*1
 ==== contains: unintegrated fraction
-(skg (node (id x) (rels (contains (in 2) (out 8 (unintegrated 2))))))
+(skg node (gnid x) (rels (contains (in 2) (out 8 (unintegrated 2)))))
 ---- text: 2C2/8
 ---- styles: medium*1 normal*1 medium*1 normal*2
 ==== contains: nothing unintegrated
-(skg (node (id x) (rels (contains (out 8 (unintegrated 0))))))
+(skg node (gnid x) (rels (contains (out 8 (unintegrated 0)))))
 ---- text: C8
 ---- styles: normal*2
 ==== contains: everything unintegrated
-(skg (node (id x) (rels (contains (out 8 (unintegrated 8))))))
+(skg node (gnid x) (rels (contains (out 8 (unintegrated 8)))))
 ---- text: C8/
 ---- styles: normal*1 medium*1 normal*1
 ==== contains: no content
-(skg (node (id x) (rels (contains (in 2) (out 0 (unintegrated 0))))))
+(skg node (gnid x) (rels (contains (in 2) (out 0 (unintegrated 0)))))
 ---- text: 2C
 ---- styles: medium*1 normal*1
 ==== overrides: overrides-here beside an ancestor h
-(skg (node (id x) (rels (overrides (out 1 (ancestors 8)))) (viewStats (overridesHere y))))
+(skg node (gnid x) (overridesHere y) (rels (overrides (out 1 (ancestors 8)))))
 ---- text: Oĥh
 ---- styles: normal*1 crucial*1 medium*1
 ==== birth: links and overrides, an overriders folder's member
-(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1)) (birth (overrides out 2)))))
+(skg node (gnid x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (overrides (out 1)) (birth (overrides out 2))))
 ---- text: 2/5L3 O1
 ---- styles: high*1 medium*2 normal*2 -*1 low*1 medium*1
 ==== birth: contains
-(skg (node (id x) (rels (contains (in 1) (out 2)) (birth (contains in 1)))))
+(skg node (gnid x) (rels (contains (in 1) (out 2)) (birth (contains in 1))))
 ---- text: 1C2
 ---- styles: medium*1 low*1 normal*1
 ==== birth: linksTo, a mentioners folder's member
-(skg (node (id x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (birth (linksTo out 2)))))
+(skg node (gnid x) (rels (linksTo (in 5 (substantive 2)) (out 3)) (birth (linksTo out 2))))
 ---- text: 2/5L3
 ---- styles: high*1 medium*2 low*1 normal*1
 ==== birth: contains, unintegrated
-(skg (node (id x) (rels (contains (out 8 (unintegrated 2))) (birth (contains in 1)))))
+(skg node (gnid x) (rels (contains (out 8 (unintegrated 2))) (birth (contains in 1))))
 ---- text: C2/8
 ---- styles: low*1 medium*1 normal*2
 ==== birth: subscribesTo
-(skg (node (id x) (rels (subscribesTo (in 1) (out 2)) (birth (subscribesTo in 2)))))
+(skg node (gnid x) (rels (subscribesTo (in 1) (out 2)) (birth (subscribesTo in 2))))
 ---- text: 1S2
 ---- styles: high*1 low*1 medium*1
 ==== birth: overrides
-(skg (node (id x) (rels (overrides (in 1) (out 2)) (birth (overrides in 2)))))
+(skg node (gnid x) (rels (overrides (in 1) (out 2)) (birth (overrides in 2))))
 ---- text: 1O2
 ---- styles: low*2 medium*1
 ==== birth: hidesFromSubs
-(skg (node (id x) (rels (hidesFromSubs (in 1) (out 2)) (birth (hidesFromSubs in 2)))))
+(skg node (gnid x) (rels (hidesFromSubs (in 1) (out 2)) (birth (hidesFromSubs in 2))))
 ---- text: 1H2
 ---- styles: medium*1 low*1 normal*1
 ==== node: unwarranted, a cycle, a delete request, contained by the parent and another
-(skg (node (id 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats noWarrant cycle) (editRequest delete)))
+(skg node (gnid 123) noClaim (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats noWarrant cycle) (editRequest delete))
 ---- text: 2aC ⊥ ⟳ delete
 ---- styles: medium*1 low*2 -*1 crucial*1 -*1 medium*1 -*1 nonstandard*6
 ==== property counts: flags
-(skg (node (id 1) (rels (flags 2))))
+(skg node (gnid 1) (rels (flags 2)))
 ---- text: F2
 ---- styles: boring*2
 ==== view requests: a folder
-(skg (node (id 1) (viewRequests (folder aliases))))
+(skg node (gnid 1) (viewRequests (folder aliases)))
 ---- text: req:folder:aliases
 ---- styles: nonstandard*18
 ==== view requests: several
-(skg (node (id 4) (viewRequests (folder aliases) (folder containers) flags)))
+(skg node (gnid 4) (viewRequests (folder aliases) (folder containers) flags))
 ---- text: req:folder:aliases req:folder:containers req:flags
 ---- styles: nonstandard*18 -*1 nonstandard*21 -*1 nonstandard*9
 ==== flags: had ID before import
@@ -143,11 +143,11 @@
 ---- text: ☮ no search matching
 ---- styles: crucial*1 -*1 message*18
 ==== flag requests: no search matching
-(skg (node (id 1) (editRequest (flag noSearchMatching true))))
+(skg node (gnid 1) (editRequest (flag noSearchMatching true)))
 ---- text: request:no search matching
 ---- styles: nonstandard*26
 ==== flag requests: search matching
-(skg (node (id 1) (editRequest (flag noSearchMatching false))))
+(skg node (gnid 1) (editRequest (flag noSearchMatching false)))
 ---- text: request:search matching
 ---- styles: nonstandard*23
 ==== non-vognodes: alias folder
@@ -163,31 +163,31 @@
 ---- text: aliases
 ---- styles: message*7
 ==== carriers: two subscribers, one the parent
-(skg (node (id x) (rels (subscribesTo (in 2 (ancestors 1))))))
+(skg node (gnid x) (rels (subscribesTo (in 2 (ancestors 1)))))
 ---- text: 2aS
 ---- styles: high*1 low*1 normal*1
 ==== carriers: the parent is the only subscriber
-(skg (node (id x) (rels (subscribesTo (in 1 (ancestors 1))))))
+(skg node (gnid x) (rels (subscribesTo (in 1 (ancestors 1)))))
 ---- text: aS
 ---- styles: high*1 normal*1
 ==== birth-explained: the parent is the sole container
-(skg (node (id x) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))))
+(skg node (gnid x) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))
 ---- text: aC
 ---- styles: low*2
 ==== birth-explained: a subscribee whose subscriber is the grandparent
-(skg (node (id x) (rels (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2)))))
+(skg node (gnid x) (rels (subscribesTo (in 1 (ancestors 2))) (birth (subscribesTo in 2))))
 ---- text: bS
 ---- styles: medium*1 low*1
 ==== birth-explained: not when another node also contains it
-(skg (node (id x) (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))))
+(skg node (gnid x) (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))))
 ---- text: 2aC
 ---- styles: medium*1 low*2
 ==== write-protected: its contents are low
-(skg (node (id x) writeProtected (rels (contains (in 1) (out 3)))))
+(skg node (gnid x) writeProtected (rels (contains (in 1) (out 3))))
 ---- text: ☮ 1C3
 ---- styles: crucial*1 -*1 medium*1 normal*1 low*1
 ==== property counts: aliases, extra IDs and flags
-(skg (node (id x) (rels (aliases 3) (extraIds 1) (flags 2))))
+(skg node (gnid x) (rels (aliases 3) (extraIds 1) (flags 2)))
 ---- text: A3 I1 F2
 ---- styles: boring*2 -*1 boring*2 -*1 boring*2
 ==== folders: a write-protected folder
@@ -199,7 +199,7 @@
 ---- text: It subscribes to these.
 ---- styles: message*23
 ==== placeholders: unknown node
-(skg (unknown (id gone)))
+(skg unknown (gnid gone))
 ---- text: Reference to unknown node.
 ---- styles: message*26
 ==== placeholders: tombstone
@@ -207,43 +207,43 @@
 ---- text: DELETED
 ---- styles: message*7
 ==== node: write-protected with a hidden body
-(skg (node (id x) writeProtected omittedBody))
+(skg node (gnid x) writeProtected omittedBody)
 ---- text: ☮B
 ---- styles: crucial*1 high*1
 ==== node: a private relRepo and its home repo
-(skg (node (id x) (viewStats (relRepo priv) (homeRepoHerald ⌂:pub))))
+(skg node (gnid x) (skgRepos (relRepo priv)) (viewStats (homeRepoHerald ⌂:pub)))
 ---- text: ~priv ⌂pub
 ---- styles: ugly*5 -*1 normal*4
 ==== node: a merge request
-(skg (node (id x) (editRequest (merge y))))
+(skg node (gnid x) (editRequest (merge y)))
 ---- text: merge:y
 ---- styles: nonstandard*7
 ==== diff view: a request to restore a removed membership
-(skg (node (id x) noClaim writeProtected (viewStats noWarrant) (editRequest restoreRel) (diff (rel removed))))
+(skg node (gnid x) noClaim writeProtected (viewStats noWarrant) (editRequest restoreRel) (diff (rel removed)))
 ---- text: ☮ ⊥ restore membership ~-
 ---- styles: crucial*1 -*1 crucial*1 -*1 nonstandard*18 -*1 nonstandard*2
 ==== diff view: a request to restore a deleted node
-(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed) (rel removed))))
+(skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed) (rel removed)))
 ---- text: ☮ restore node ∃- ~-
 ---- styles: crucial*1 -*1 nonstandard*12 -*1 nonstandard*2 -*1 nonstandard*2
 ==== diff view: a new member whose node object is ready
-(skg (node (id x) (diff (node added) (rel added) (ready node))))
+(skg node (gnid x) (diff (node added) (rel added) (ready node)))
 ---- text: ∃+✓ ~+
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: a modified node
-(skg (node (id x) (diff (properties changed) (leaves 2 all))))
+(skg node (gnid x) (diff (properties changed) (leaves 2 all)))
 ---- text: M
 ---- styles: nonstandard*1
 ==== diff view: a modified node in a new relationship, every leaf it records ready
-(skg (node (id x) (diff (rel added) (properties changed) (leaves 3 rel all) (ready all))))
+(skg node (gnid x) (diff (rel added) (properties changed) (leaves 3 rel all) (ready all)))
 ---- text: M✓ ~+
 ---- styles: nonstandard*1 go*1 -*1 nonstandard*2
 ==== diff view: a modified folder member, every leaf it records ready
-(skg (node (id x) writeProtected (diff (properties changed) (leaves 1 all) (ready all))))
+(skg node (gnid x) writeProtected (diff (properties changed) (leaves 1 all) (ready all)))
 ---- text: ☮ M✓
 ---- styles: crucial*1 -*1 nonstandard*1 go*1
 ==== diff view: each ✓ follows its own object, whatever the raw order of the parts
-(skg (node (id x) (diff (ready rel node) (node added) (rel removed))))
+(skg node (gnid x) (diff (ready rel node) (node added) (rel removed)))
 ---- text: ∃+✓ ~-✓
 ---- styles: nonstandard*2 go*1 -*1 nonstandard*2 go*1
 ==== diff view: an added alias, ready
@@ -251,11 +251,11 @@
 ---- text: alias +✓
 ---- styles: message*5 -*1 nonstandard*1 go*1
 ==== diff view: a ghost with a request to unmark its existence
-(skg (ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (unreadyRequest node))))
+(skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (unreadyRequest node)))
 ---- text: ☮ ∃- ~- request:unready:node
 ---- styles: crucial*1 -*1 nonstandard*2 -*1 nonstandard*2 -*1 nonstandard*20
 ==== diff view: a request to mark both objects of a member
-(skg (node (id x) (diff (readyRequest node rel))))
+(skg node (gnid x) (diff (readyRequest node rel)))
 ---- text: request:ready:node request:ready:rel
 ---- styles: nonstandard*18 -*1 nonstandard*17
 ==== diff view: old title and body, ready
@@ -295,7 +295,7 @@
 ---- text: order-only change✓
 ---- styles: message*17 go*1
 ==== diff view: a ghost, its existence ready
-(skg (ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node))))
+(skg ghost (gnid x) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node)))
 ---- text: ☮ ∃-✓ ~-
 ---- styles: crucial*1 -*1 nonstandard*2 go*1 -*1 nonstandard*2
 ==== diff view: the acquired-by folder
@@ -319,10 +319,10 @@
 ---- text: its subscribees changed (this file)
 ---- styles: message*35
 ==== diff view: a node in the skgrepo-changes buffer whose home moved
-(skg (node (id x) (viewStats (homeSkgrepoMove (old pub) (new priv)))))
+(skg node (gnid x) (viewStats (homeSkgrepoMove (old pub) (new priv))))
 ---- text: -pub +priv
 ---- styles: normal*4 -*1 normal*5
 ==== diff view: a node that moved like its grandparent
-(skg (node (id x) (viewStats (homeSkgrepoMove (old pub) (new priv)) (movedLikeAncestor b))))
+(skg node (gnid x) (viewStats (homeSkgrepoMove (old pub) (new priv)) (movedLikeAncestor b)))
 ---- text: -pub +priv Δ⌂=b
 ---- styles: normal*4 -*1 normal*5 -*1 nonstandard*4

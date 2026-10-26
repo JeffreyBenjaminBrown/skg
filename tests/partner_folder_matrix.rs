@@ -135,9 +135,9 @@ async fn render_with_requested_relation_folders (
 ) -> Result<String, Box<dyn Error>> {
   let initial : String = render (root, config) . await ?;
   let request : String = initial . replacen (
-    "(node ",
+    "node ",
     &format! (
-      "(node (viewRequests (folder {}))", relation ), 1 );
+      "node (viewRequests (folder {}))", relation ), 1 );
   let response : SaveResponse =
     save (&request, config, tantivy, graph) . await ?;
   if ! response . errors . is_empty () {
@@ -168,7 +168,7 @@ fn intruder_with_child (
   let stars : usize =
     member_line . chars () . take_while ( |c| *c == '*' ) . count ();
   let line : String = format! (
-    "{} (skg (node (id {}) (repo public))) {}",
+    "{} (skg node (gnid {}) (skgRepos (nodeRepo public))) {}",
     "*" . repeat (stars), intruder_skgid, intruder_skgid );
   let child : String =
     format! ( "{} {}-child", "*" . repeat (stars + 1), intruder_skgid );
@@ -224,8 +224,8 @@ async fn write_protected_reorder (
     spec . recorder, spec . relation, config, tantivy, graph ) . await ?;
   let swapped : String = swap_lines (
     &buf,
-    &format! ("(id {})", spec . member_a),
-    &format! ("(id {})", spec . member_b) );
+    &format! ("(gnid {})", spec . member_a),
+    &format! ("(gnid {})", spec . member_b) );
   let resp : SaveResponse = match save (
     &swapped, config, tantivy, graph) . await {
     Ok (r) => r,
@@ -237,8 +237,8 @@ async fn write_protected_reorder (
   // Order preserved view-locally: member_b now before member_a.
   fails . want_before (
     &scenario, &resp . saved_view,
-    &format! ("(id {})", spec . member_b),
-    &format! ("(id {})", spec . member_a) );
+    &format! ("(gnid {})", spec . member_b),
+    &format! ("(gnid {})", spec . member_a) );
   // Reordering is not a repair.
   if resp . warnings . iter () . any (
     |w| w . contains (&format! ("Repaired {}", spec . atom)) ) {
@@ -255,7 +255,7 @@ async fn write_protected_insert (
   let buf : String = render_with_requested_relation_folders (
     spec . recorder, spec . relation, config, tantivy, graph ) . await ?;
   let member_b_line : String =
-    line_containing (&buf, &format! ("(id {})", spec . member_b))
+    line_containing (&buf, &format! ("(gnid {})", spec . member_b))
     . to_string ();
   let (intruder_line, child_line) : (String, String) =
     intruder_with_child ( &member_b_line, spec . intruder );
@@ -272,7 +272,7 @@ async fn write_protected_insert (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
   // The intruder is made a non-member (noClaim) in the rerendered view.
   { let intruder_after : &str = line_containing (
-      &resp . saved_view, &format! ("(id {})", spec . intruder) );
+      &resp . saved_view, &format! ("(gnid {})", spec . intruder) );
     if ! intruder_after . contains ("noClaim") {
       fails . record (&scenario, format! (
         "intruder must be made a non-member (noClaim): {}",
@@ -296,7 +296,7 @@ async fn write_protected_delete (
   let buf : String = render_with_requested_relation_folders (
     spec . recorder, spec . relation, config, tantivy, graph ) . await ?;
   let member_a_line : String =
-    line_containing (&buf, &format! ("(id {})", spec . member_a))
+    line_containing (&buf, &format! ("(gnid {})", spec . member_a))
     . to_string ();
   let edited : String =
     buf . replace ( &format! ("{}\n", member_a_line), "" );
@@ -311,7 +311,7 @@ async fn write_protected_delete (
   // The deleted member respawns (write-protected set).
   fails . want_contains (
     &scenario, &resp . saved_view,
-    &format! ("(id {})", spec . member_a) );
+    &format! ("(gnid {})", spec . member_a) );
   // ... with a reinstatement warning.
   if ! resp . warnings . iter () . any ( |w|
       w . contains (&format! ("Repaired {}", spec . atom))
@@ -434,7 +434,7 @@ async fn member_carries_its_chain (
     else { fails . record (&scenario, format! ("no {} in:\n{}", spec . atom, buf));
            return Ok (( )); };
   let folder_stars : usize = folder_member_stars (&buf, &format! ("(skg {}", spec . atom));
-  let member_fragment : String = format! ("(id {})", spec . member);
+  let member_fragment : String = format! ("(gnid {})", spec . member);
   let Some (member_index) : Option<usize> = lines . iter () . skip (folder_index)
     . position ( |line| line . contains (&member_fragment) )
     . map ( |offset| folder_index + offset )
@@ -443,7 +443,7 @@ async fn member_carries_its_chain (
   let chain_line = |offset : usize, skgid : &str| -> bool {
     lines . get (member_index + offset) . is_some_and ( |line|
       line . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1 + offset)))
-      && line . contains (&format! ("(id {})", skgid))
+      && line . contains (&format! ("(gnid {})", skgid))
       && line . contains ("noClaim") && line . contains ("writeProtected") ) };
   if ! ( lines [member_index] . starts_with (&format! ("{} ", "*" . repeat (folder_stars + 1)))
          && chain_line (1, "chain-c") && chain_line (2, "chain-cc") ) {
@@ -476,7 +476,7 @@ async fn roleTree_request_is_refused (
                 "subscriber" ] {
     let s : String = format! ("roleTree/{}", role);
     let buffer : String = format! (
-      "* (skg (node (id wOvr-owner) (repo public) (viewRequests (roleTree {})))) wOvr-owner\n",
+      "* (skg node (gnid wOvr-owner) (skgRepos (nodeRepo public)) (viewRequests (roleTree {}))) wOvr-owner\n",
       role );
     match save (&buffer, config, tantivy, graph) . await {
       Ok (resp) if resp . errors . is_empty () =>
@@ -510,7 +510,7 @@ async fn folder_request_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let request_buf = | recorder : &str, rel : &str | -> String {
     format! (
-      "* (skg (node (id {}) (repo public) (viewRequests (folder {})))) {}\n",
+      "* (skg node (gnid {}) (skgRepos (nodeRepo public)) (viewRequests (folder {}))) {}\n",
       recorder, rel, recorder ) };
   { // (folder overrides) on wSub-owner, which overrides nothing and is
     // overridden by nothing: the editable overriddenFolder appears empty
@@ -533,8 +533,8 @@ async fn folder_request_scenarios (
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
-    fails . want_contains (s, &resp . saved_view, "(id wOvr-a)");
-    fails . want_contains (s, &resp . saved_view, "(id wOvr-b)"); }
+    fails . want_contains (s, &resp . saved_view, "(gnid wOvr-a)");
+    fails . want_contains (s, &resp . saved_view, "(gnid wOvr-b)"); }
   { // (folder subscribesTo) on wSub-owner: subscribeeFolder populated (a,b,c).
     let s : &str = "folder-request/subscribes-populated";
     let resp : SaveResponse = save (
@@ -543,7 +543,7 @@ async fn folder_request_scenarios (
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
-    fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
+    fails . want_contains (s, &resp . saved_view, "(gnid wSub-a)"); }
   { // (folder hidesFromSubs) on wSub-owner, which neither hides nor is hidden:
     // both sides write-protected and empty, so nothing appears.
     let s : &str = "folder-request/hides-empty";
@@ -574,7 +574,7 @@ async fn saveplan_nodes (
 
 /// A fresh write-protected public member line at the given indentation.
 fn member_line ( stars : usize, skgid : &str ) -> String {
-  format! ( "{} (skg (node (id {}) (repo public) writeProtected)) {}",
+  format! ( "{} (skg node (gnid {}) (skgRepos (nodeRepo public)) writeProtected) {}",
             "*" . repeat (stars), skgid, skgid ) }
 
 fn folder_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
@@ -586,11 +586,11 @@ async fn editable_subscribeeFolder (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render ("wSub-owner", config) . await ?;
-  let stars : usize = folder_member_stars (&buf, "(id wSub-a)");
+  let stars : usize = folder_member_stars (&buf, "(gnid wSub-a)");
   { // reorder: [a,b,c] -> swap a,c -> [c,b,a]
     let s : &str = "subscribeeFolder/reorder";
     let reordered : String =
-      swap_lines (&buf, "(id wSub-a)", "(id wSub-c)");
+      swap_lines (&buf, "(gnid wSub-a)", "(gnid wSub-c)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, None) . await ?;
     match saved_node_by_skgid (&nodes, "wSub-owner") {
@@ -602,7 +602,7 @@ async fn editable_subscribeeFolder (
   { // delete one: remove b -> [a,c]
     let s : &str = "subscribeeFolder/delete";
     let b_line : String =
-      line_containing (&buf, "(id wSub-b)") . to_string ();
+      line_containing (&buf, "(gnid wSub-b)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", b_line), "");
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
@@ -615,7 +615,7 @@ async fn editable_subscribeeFolder (
   { // insert a member: add d -> [a,b,c,d]
     let s : &str = "subscribeeFolder/insert";
     let c_line : String =
-      line_containing (&buf, "(id wSub-c)") . to_string ();
+      line_containing (&buf, "(gnid wSub-c)") . to_string ();
     let edited : String = buf . replace (
       &c_line, &format! ("{}\n{}", c_line, member_line (stars, "wSub-d")) );
     let nodes : Vec<NodeInstruction> =
@@ -642,11 +642,11 @@ async fn editable_overriddenFolder (
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render_with_requested_relation_folders (
     "wOvr-owner", "overrides", config, tantivy, graph ) . await ?;
-  let stars : usize = folder_member_stars (&buf, "(id wOvr-a)");
+  let stars : usize = folder_member_stars (&buf, "(gnid wOvr-a)");
   { // reorder is harmless: order-free set unchanged
     let s : &str = "overriddenFolder/reorder";
     let reordered : String =
-      swap_lines (&buf, "(id wOvr-a)", "(id wOvr-b)");
+      swap_lines (&buf, "(gnid wOvr-a)", "(gnid wOvr-b)");
     let nodes : Vec<NodeInstruction> =
       saveplan_nodes (&reordered, config, None) . await ?;
     match saved_node_by_skgid (&nodes, "wOvr-owner") {
@@ -658,7 +658,7 @@ async fn editable_overriddenFolder (
   { // delete one: remove a -> [b]
     let s : &str = "overriddenFolder/delete";
     let a_line : String =
-      line_containing (&buf, "(id wOvr-a)") . to_string ();
+      line_containing (&buf, "(gnid wOvr-a)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", a_line), "");
     let nodes  : Vec<NodeInstruction> =
       saveplan_nodes (&edited, config, None) . await ?;
@@ -670,7 +670,7 @@ async fn editable_overriddenFolder (
   { // insert a member: add c -> {a,b,c}
     let s : &str = "overriddenFolder/insert";
     let b_line : String =
-      line_containing (&buf, "(id wOvr-b)") . to_string ();
+      line_containing (&buf, "(gnid wOvr-b)") . to_string ();
     let edited : String = buf . replace (
       &b_line, &format! ("{}\n{}", b_line, member_line (stars, "wOvr-c")) );
     let nodes : Vec<NodeInstruction> =
@@ -698,7 +698,7 @@ async fn hiddenFolder_delete_does_not_unhide (
   let buf : String = render_with_requested_relation_folders (
     "roHidden-owner", "hidesFromSubs", config, tantivy, graph ) . await ?;
   let a_line : String =
-    line_containing (&buf, "(id roHidden-a)") . to_string ();
+    line_containing (&buf, "(gnid roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");
   let nodes  : Vec<NodeInstruction> =
     saveplan_nodes (&edited, config, None) . await ?;
@@ -739,14 +739,14 @@ async fn omission_scenarios (
     let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_skgrepo_set (
         config, None, &[ID::from ("omWsub-owner")], &restriction ) ?;
-    fails . want_contains (s, &buf, "(id omWsub-active)");
+    fails . want_contains (s, &buf, "(gnid omWsub-active)");
     fails . want_absent (s, &buf, "omWsub-inactive");
     // Delete the only visible subscribee and save under the restricted
     // set: the weave must still preserve the invisible omWsub-inactive
     // (a restricted save cannot delete what it cannot see), while the
     // deleted unrestricted member is removed. So subscribesTo = [restricted].
     let unrestricted_line : String =
-      line_containing (&buf, "(id omWsub-active)") . to_string ();
+      line_containing (&buf, "(gnid omWsub-active)") . to_string ();
     let edited : String =
       buf . replace (&format! ("{}\n", unrestricted_line), "");
     let nodes : Vec<NodeInstruction> =
@@ -790,9 +790,9 @@ fn buffer_save_rejects_second_owned_overrider
       // mono-r1 already overrides mono-target on disk; this buffer
       // makes mono-r2 override it too.
       let buffer : &str = indoc! {"
-        * (skg (node (id mono-r2) (repo public))) mono-r2
+        * (skg node (gnid mono-r2) (skgRepos (nodeRepo public))) mono-r2
         ** (skg overriddenFolder)
-        *** (skg (node (id mono-target) (repo public) writeProtected)) mono-target
+        *** (skg node (gnid mono-target) (skgRepos (nodeRepo public)) writeProtected) mono-target
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =
         save (buffer, config, tantivy, &graph) . await;

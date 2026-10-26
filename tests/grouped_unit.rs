@@ -38,6 +38,9 @@ mod init_refusal;
 #[path = "metadata_fields_table.rs"]
 mod metadata_fields_table;
 
+#[path = "metadata_grammar.rs"]
+mod metadata_grammar;
+
 #[path = "multi_repo_errors.rs"]
 mod multi_skgrepo_errors;
 

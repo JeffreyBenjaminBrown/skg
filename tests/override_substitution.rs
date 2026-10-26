@@ -146,13 +146,13 @@ async fn de_novo_rendering_shows_the_overrider_marked (
       { let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
           "exactly one shown substitute for N:\n{}", view );
-        assert! ( marked [0] . contains ("(id R)"),
+        assert! ( marked [0] . contains ("(gnid R)"),
           "the substitute is R:\n{}", view ); }
       assert! ( view . lines () . any (
-                  |l| l . contains ("(id W)") ),
+                  |l| l . contains ("(gnid W)") ),
         "R's own content W is shown beneath it:\n{}", view );
       assert! ( view . lines () . any (
-                  |l| l . contains ("(id M)")
+                  |l| l . contains ("(gnid M)")
                       && ! l . contains ("overridesHere") ),
         "M, not overridden, is shown raw:\n{}", view );
       Ok (( )) }
@@ -201,9 +201,9 @@ async fn extraction_honors_overridesHere (
         // P's nodeInstruction entirely -- the round-trip in its
         // strongest form.
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
-          ** (skg (node (id M) (repo main) writeProtected)) M
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert! (
           opt_saved_node_by_skgid (
@@ -213,8 +213,8 @@ async fn extraction_honors_overridesHere (
            touches P" ); }
       { // Deleting the shown child deletes the original member.
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id M) (repo main) writeProtected)) M
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert_eq! (
           members_of ( & saved_node_by_skgid (
@@ -223,9 +223,9 @@ async fn extraction_honors_overridesHere (
           vec![ ID::from ("M") ] ); }
       { // Reordering the shown child positions the original.
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id M) (repo main) writeProtected)) M
-          ** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
+          ** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
         "};
         assert_eq! (
           members_of ( & saved_node_by_skgid (
@@ -234,11 +234,11 @@ async fn extraction_honors_overridesHere (
           vec![ ID::from ("M"), ID::from ("N") ] ); }
       { // Moving the shown child to another parent moves the original.
         let buffer = indoc! {"
-          * (skg (node (id Q) (repo main))) Q
-          ** (skg (node (id P) (repo main))) P
-          *** (skg (node (id M) (repo main) writeProtected)) M
-          ** (skg (node (id P2) (repo main))) P2
-          *** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
+          * (skg node (gnid Q) (skgRepos (nodeRepo main))) Q
+          ** (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          *** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
+          ** (skg node (gnid P2) (skgRepos (nodeRepo main))) P2
+          *** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
@@ -250,10 +250,10 @@ async fn extraction_honors_overridesHere (
           vec![ ID::from ("N") ] ); }
       { // Edits to the shown R save to R; N is untouched.
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id R) (repo main) (viewStats (overridesHere N)))) R-edited
-          *** (skg (node (id W) (repo main) writeProtected)) W
-          ** (skg (node (id M) (repo main) writeProtected)) M
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid R) (skgRepos (nodeRepo main)) (overridesHere N)) R-edited
+          *** (skg node (gnid W) (skgRepos (nodeRepo main)) writeProtected) W
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
@@ -269,9 +269,9 @@ async fn extraction_honors_overridesHere (
       { // A legacy buffer showing N raw still saves identically
         // (a noop, like the marked equivalent above).
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id N) (repo main) writeProtected)) N
-          ** (skg (node (id M) (repo main) writeProtected)) M
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid N) (skgRepos (nodeRepo main)) writeProtected) N
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected) M
         "};
         assert! (
           opt_saved_node_by_skgid (
@@ -279,8 +279,8 @@ async fn extraction_honors_overridesHere (
             "P" ) . is_none () ); }
       { // Tamper: a fact the server would not have rendered aborts.
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id M) (repo main) (viewStats (overridesHere W)) writeProtected)) M
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid M) (skgRepos (nodeRepo main)) writeProtected (overridesHere W)) M
         "};
         match node_instructions_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) => {
@@ -293,10 +293,10 @@ async fn extraction_honors_overridesHere (
       { // Subscribee-as-such: the visible-content signal speaks of
         // the original, so no phantom hide of N is inferred.
         let buffer = indoc! {"
-          * (skg (node (id S) (repo main))) S
+          * (skg node (gnid S) (skgRepos (nodeRepo main))) S
           ** (skg subscribeeFolder)
-          *** (skg (node (id E) (repo main))) E
-          **** (skg (node (id R) (repo main) (viewStats (overridesHere N)) writeProtected)) R
+          *** (skg node (gnid E) (skgRepos (nodeRepo main))) E
+          **** (skg node (gnid R) (skgRepos (nodeRepo main)) writeProtected (overridesHere N)) R
         "};
         let instructions : Vec<NodeInstruction> =
           node_instructions_from (buffer, config) . await ?;
@@ -319,7 +319,7 @@ async fn ownership_and_visibility_gate_substitution (
             &[ ID::from ("P1") ] ) ?;
         assert! ( marked_lines (&view, "N1") . is_empty (),
           "FR is foreign; N1 is shown raw:\n{}", view );
-        assert! ( view . contains ("(id N1)"), "{}", view ); }
+        assert! ( view . contains ("(gnid N1)"), "{}", view ); }
       let restriction : SkgrepoRestriction =
         SkgrepoRestriction::named (
           config, SkgrepoSetName ("main" . to_string ())) ?;
@@ -330,7 +330,7 @@ async fn ownership_and_visibility_gate_substitution (
             &[ ID::from ("P2") ], &restriction ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
           "R2's repo is restricted; N2 is shown raw:\n{}", view );
-        assert! ( view . contains ("(id N2)"), "{}", view ); }
+        assert! ( view . contains ("(gnid N2)"), "{}", view ); }
       { // The same overrider substitutes when its skgrepo is unrestricted.
         let (view, _pids, _tree) =
           multi_root_view (
@@ -338,16 +338,16 @@ async fn ownership_and_visibility_gate_substitution (
             &[ ID::from ("P2") ] ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
-        assert! ( marked [0] . contains ("(id R2)"), "{}", view ); }
+        assert! ( marked [0] . contains ("(gnid R2)"), "{}", view ); }
       { // Omission beats substitution: restricted original, unrestricted
         // overrider -> neither is shown.
         let (view, _pids, _tree) =
           multi_root_view_with_skgrepo_set (
             config, None,
             &[ ID::from ("P3") ], &restriction ) ?;
-        assert! ( ! view . contains ("(id N3)"),
+        assert! ( ! view . contains ("(gnid N3)"),
           "the restricted original is omitted:\n{}", view );
-        assert! ( ! view . contains ("(id R3)"),
+        assert! ( ! view . contains ("(gnid R3)"),
           "its overrider must not be shown in its place (the \
            fact would name a restricted node):\n{}", view ); }
       Ok (( )) }
@@ -402,7 +402,7 @@ async fn chain_half_visible_keeps_the_original (
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
           "one substitute for N under all:\n{}", view );
-        assert! ( marked [0] . contains ("(id D)"),
+        assert! ( marked [0] . contains ("(gnid D)"),
           "the chain end D is shown under all:\n{}", view ); }
       let main_set : SkgrepoRestriction =
         SkgrepoRestriction::named (
@@ -417,7 +417,7 @@ async fn chain_half_visible_keeps_the_original (
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
           "one substitute for N under main:\n{}", view );
-        assert! ( marked [0] . contains ("(id C)"),
+        assert! ( marked [0] . contains ("(gnid C)"),
           "the chain middle C is shown under main:\n{}", view );
         view };
       { // Saving the half-visible view accepts the middle carrier and
@@ -441,8 +441,8 @@ async fn chain_half_visible_keeps_the_original (
           p_file ); }
       { // A fact on a node not on N's chain is rejected.
         let buffer = indoc! {"
-          * (skg (node (id P) (repo main))) P
-          ** (skg (node (id D) (repo other) (viewStats (overridesHere P)) writeProtected)) D
+          * (skg node (gnid P) (skgRepos (nodeRepo main))) P
+          ** (skg node (gnid D) (skgRepos (nodeRepo other)) writeProtected (overridesHere P)) D
         "};
         match node_instructions_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) =>

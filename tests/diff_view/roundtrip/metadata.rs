@@ -149,7 +149,7 @@ fn a_ghost_round_trips () {
         leaves   : None,
         .. ChangeFacts::default () },
       request_all () ),
-    "(ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node) (readyRequest all)))" ); }
+    "ghost (gnid gone) (skgRepos (nodeRepo main)) (diff (node removed) (rel removed) (ready node) (readyRequest all))" ); }
 
 #[test]
 fn the_acquisition_folders_round_trip () {
@@ -166,8 +166,8 @@ fn the_acquisition_folders_round_trip () {
 fn the_birth_atom_is_refused () {
   assert_eq! (
     parse_metadata_to_viewnodemd (
-      "(skg (node (id g) (repo main) noClaim (birth roleGraft container) writeProtected))" ),
-    Err ( "Unknown node key: birth" . to_string () )); }
+      "(skg node (gnid g) (skgRepos (nodeRepo main)) noClaim (birth roleGraft container) writeProtected)" ),
+    Err ( "Unknown metadata key: birth" . to_string () )); }
 
 #[test]
 fn malformed_diff_view_metadata_is_refused () {
@@ -200,7 +200,7 @@ fn a_ghost_round_trips_with_its_restore_request () {
         leaves : None,
         .. ChangeFacts::default () },
       None ),
-    "(ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed)))" ); }
+    "ghost (gnid gone) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (node removed))" ); }
 
 /// A restoreRel request lives outside the editability, so an
 /// editable and a write-protected removed member both carry it.
@@ -220,9 +220,9 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
     false );
   for (node, expected) in [
     ( &mut editable,
-      "(node (id x) (repo main) (editRequest restoreRel) (diff (rel removed)))" ),
+      "node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (rel removed))" ),
     ( &mut write_protected,
-      "(node (id x) (repo main) noClaim writeProtected (editRequest restoreRel) (diff (rel removed)))" ), ] {
+      "node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (editRequest restoreRel) (diff (rel removed))" ), ] {
     if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut node . kind
     { t . relationshipEditRequest = Some (RelationshipEditRequest::RestoreRel); }
     assert_round_trip (
@@ -234,17 +234,17 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
 #[test]
 fn restore_requests_on_the_wrong_kind_are_refused () {
   for (metadata, message) in [
-    ( "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (node removed))))",
+    ( "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (node removed)))",
       RESTORE_REL_ON_A_DELETED_NODE ),
-    ( "(skg (node (id x) (repo main) (editRequest restoreNode) (diff (rel removed))))",
+    ( "(skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreNode) (diff (rel removed)))",
       RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
-    ( "(skg (unknown (id x) (editRequest restoreNode)))",
+    ( "(skg unknown (gnid x) (editRequest restoreNode))",
       RESTORE_NODE_ON_A_NODE_NOT_DELETED ),
-    ( "(skg (node (id x) (repo main) (editRequest restoreRel)))",
+    ( "(skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreRel))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
-    ( "(skg (node (id x) (repo main) (editRequest restoreRel) (diff (rel added))))",
+    ( "(skg node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (rel added)))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ),
-    ( "(skg (unknown (id x) (editRequest restoreRel) (diff (rel removed))))",
+    ( "(skg unknown (gnid x) (editRequest restoreRel) (diff (rel removed)))",
       RESTORE_REL_WITHOUT_A_REMOVED_MEMBERSHIP ), ] {
     assert_eq! ( parse_metadata_to_viewnodemd (metadata),
                  Err ( message . to_string () ),
@@ -254,9 +254,9 @@ fn restore_requests_on_the_wrong_kind_are_refused () {
 #[test]
 fn a_ghost_takes_no_other_edit_request () {
   for metadata in [
-    "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest delete)))",
-    "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (relRepo private))))",
-    "(skg (ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (editRequest restoreNode)))",
-    "(skg (node (id x) (editRequest restoreRel) (editRequest delete) (diff (rel removed))))", ] {
+    "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest delete))",
+    "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest (relRepo private)))",
+    "(skg ghost (gnid g) (skgRepos (nodeRepo main)) (editRequest restoreNode) (editRequest restoreNode))",
+    "(skg node (gnid x) (editRequest restoreRel) (editRequest delete) (diff (rel removed)))", ] {
     assert! ( parse_metadata_to_viewnodemd (metadata) . is_err (),
               "should refuse {}", metadata ); }}

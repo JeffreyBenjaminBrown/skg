@@ -435,8 +435,8 @@ mod tests {
   #[test]
   fn an_occurrence_that_agrees_with_the_graph_passes () {
     assert_eq! (errors_in (indoc! {"
-      * (skg (node (id root) (repo main))) root
-      ** (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+      ** (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       *** (skg aliasFolder)
       **** (skg alias) another name
       *** (skg flagsFolder)
@@ -447,9 +447,9 @@ mod tests {
   #[test]
   fn a_member_child_under_a_writeProtected_occurrence_is_refused () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg (node (id root) (repo main))) root
-      ** (skg (node (id recorder) (repo main) writeProtected)) recorder
-      *** (skg (node (id typed) (repo main))) typed
+      * (skg node (gnid root) (skgRepos (nodeRepo main))) root
+      ** (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
+      *** (skg node (gnid typed) (skgRepos (nodeRepo main))) typed
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
@@ -462,8 +462,8 @@ mod tests {
   fn a_member_child_under_a_requested_writeProtected_occurrence_is_refused () {
     // The editable-view request does not license the typed child.
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected (viewRequests editableView))) recorder
-      ** (skg (node (id typed) (repo main))) typed
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected (viewRequests editableView)) recorder
+      ** (skg node (gnid typed) (skgRepos (nodeRepo main))) typed
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::MemberChildOfWriteProtectedOccurrence {
@@ -475,16 +475,16 @@ mod tests {
   fn reordered_non_member_children_pass () {
     // The graph has c1 before c2; non-members are the user's own.
     assert_eq! (errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
-      ** (skg (node (id c2) (repo main) noClaim)) c2
-      ** (skg (node (id c1) (repo main) noClaim)) c1
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
+      ** (skg node (gnid c2) (skgRepos (nodeRepo main)) noClaim) c2
+      ** (skg node (gnid c1) (skgRepos (nodeRepo main)) noClaim) c1
     "}), vec! []);
   }
 
   #[test]
   fn a_changed_title_is_refused () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) changed
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) changed
     "});
     assert! (matches! (&errors[..],
       [BufferValidationError::EditedWriteProtectedOccurrence {
@@ -503,7 +503,7 @@ mod tests {
       "*** (skg alias) another name\n*** (skg alias) one more\n",
       "*** (skg alias (editRequest (relRepo main))) another name\n", ]
     { let text : String = format! (
-        "* (skg (node (id recorder) (repo main) writeProtected)) recorder\n** (skg aliasFolder)\n{}",
+        "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder\n** (skg aliasFolder)\n{}",
         differing);
       let errors : Vec<BufferValidationError> = errors_in (&text);
       assert! (matches! (&errors[..],
@@ -511,18 +511,18 @@ mod tests {
           changes, .. }] if changes == &vec! ["aliases differ from the graph's" . to_string ()]),
         "{}: {:?}", text, errors); }
     assert_eq! (errors_in (
-      "* (skg (node (id recorder) (repo main) writeProtected)) recorder\n"),
+      "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder\n"),
       vec! []);
   }
 
   #[test]
   fn a_subscribee_folder_with_an_extra_member_is_refused () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id sub) (repo main) writeProtected)) sub
-      *** (skg (node (id private_sub) (repo private) writeProtected)) private_sub
-      *** (skg (node (id c1) (repo main) writeProtected)) c1
+      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
+      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
+      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected) c1
     "});
     assert_eq! (refused_changes (&errors),
                 vec! ["changed subscriptions" . to_string ()]);
@@ -535,11 +535,11 @@ mod tests {
   #[test]
   fn a_subscribee_folder_with_an_extra_member_is_refused_in_a_diffView_buffer () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id sub) (repo main) writeProtected (diff (rel added)))) sub
-      *** (skg (node (id private_sub) (repo private) writeProtected)) private_sub
-      *** (skg (node (id c1) (repo main) writeProtected (diff (rel added)))) c1
+      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected (diff (rel added))) sub
+      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
+      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected (diff (rel added))) c1
     "});
     assert_eq! (refused_changes (&errors),
                 vec! ["changed subscriptions" . to_string ()]);
@@ -548,18 +548,18 @@ mod tests {
   #[test]
   fn a_partner_folder_that_matches_the_graph_passes_and_an_absent_one_passes () {
     assert_eq! (errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id private_sub) (repo private) writeProtected)) private_sub
-      *** (skg (node (id sub) (repo main) writeProtected)) sub
+      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
+      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
       ** (skg containerFolder)
-      *** (skg (node (id root) (repo main) writeProtected)) root
-      ** (skg (node (id c2) (repo main) noClaim)) a non-member
+      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
+      ** (skg node (gnid c2) (skgRepos (nodeRepo main)) noClaim) a non-member
     "}), vec! []);
     assert_eq! (errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg containerFolder)
-      *** (skg (node (id root) (repo main) writeProtected)) root
+      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
     "}), vec! []);
   }
 
@@ -569,11 +569,11 @@ mod tests {
   fn a_container_folder_that_differs_is_refused () {
     for members in [
       "",
-      "*** (skg (node (id root) (repo main) writeProtected)) root
-*** (skg (node (id c1) (repo main) writeProtected)) c1
+      "*** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
+*** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected) c1
 ", ]
     { let text : String = format! (
-        "* (skg (node (id recorder) (repo main) writeProtected)) recorder
+        "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
 ** (skg containerFolder)
 {}",
         members );
@@ -591,10 +591,10 @@ mod tests {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
     for shown in ["x2", "x"] {
       let text : String = format! (
-        "* (skg (node (id recorder) (repo main) writeProtected)) recorder
+        "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
 ** (skg subscribeeFolder)
-*** (skg (node (id {}) (repo main) writeProtected)) x
-*** (skg (unknown (id ghost)))
+*** (skg node (gnid {}) (skgRepos (nodeRepo main)) writeProtected) x
+*** (skg unknown (gnid ghost))
 ", shown );
       assert_eq! (
         errors_for_writeProtected_occurrences (
@@ -609,10 +609,10 @@ mod tests {
   fn an_unknown_member_is_compared_by_raw_id () {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
     let text_with = |unknown : &str| -> String { format! (
-      "* (skg (node (id recorder) (repo main) writeProtected)) recorder
+      "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
 ** (skg subscribeeFolder)
-*** (skg (node (id x) (repo main) writeProtected)) x
-*** (skg (unknown (id {})))
+*** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x
+*** (skg unknown (gnid {}))
 ", unknown ) };
     assert_eq! (
       errors_for_writeProtected_occurrences (
@@ -633,20 +633,20 @@ mod tests {
   fn an_unknown_phantom_whose_relationship_was_removed_is_not_counted () {
     let graph : InRustGraph = graph_listing_an_extra_id_and_a_dangling_id ();
     let text_with = |gone : &str| -> String { format! (
-      "* (skg (node (id recorder) (repo main) writeProtected)) recorder
+      "* (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
 ** (skg subscribeeFolder)
-*** (skg (node (id x) (repo main) writeProtected)) x
-*** (skg (unknown (id ghost)))
+*** (skg node (gnid x) (skgRepos (nodeRepo main)) writeProtected) x
+*** (skg unknown (gnid ghost))
 *** {}
 ", gone ) };
     assert_eq! (
       errors_for_writeProtected_occurrences (
-        &forest (&text_with ("(skg (unknown (id gone) (diff (rel removed))))")),
+        &forest (&text_with ("(skg unknown (gnid gone) (diff (rel removed)))")),
         &graph, &config (), None ),
       vec! [] );
     assert_eq! (
       refused_changes ( &errors_for_writeProtected_occurrences (
-        &forest (&text_with ("(skg (unknown (id gone)))")),
+        &forest (&text_with ("(skg unknown (gnid gone))")),
         &graph, &config (), None )),
       vec! ["changed subscriptions" . to_string ()] );
   }
@@ -674,11 +674,11 @@ mod tests {
   #[test]
   fn a_removed_member_is_not_counted () {
     assert_eq! (errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg containerFolder)
-      *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) noClaim writeProtected (diff (rel removed)))) c1
-      *** (skg (node (id c2) (repo main) writeProtected noClaim)) c2
+      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
+      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) noClaim writeProtected (diff (rel removed))) c1
+      *** (skg node (gnid c2) (skgRepos (nodeRepo main)) writeProtected noClaim) c2
     "}), vec! []);
   }
 
@@ -687,19 +687,19 @@ mod tests {
   #[test]
   fn a_member_marked_removed_is_counted () {
     assert_eq! (refused_changes (&errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg containerFolder)
-      *** (skg (node (id root) (repo main) writeProtected)) root
-      *** (skg (node (id c1) (repo main) writeProtected (diff (rel removed)))) c1
+      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected) root
+      *** (skg node (gnid c1) (skgRepos (nodeRepo main)) writeProtected (diff (rel removed))) c1
     "})), vec! ["changed containers" . to_string ()]);
   }
 
   #[test]
   fn a_partner_folder_member_with_a_relRepo_request_is_refused () {
     assert_eq! (refused_changes (&errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg containerFolder)
-      *** (skg (node (id root) (repo main) writeProtected (editRequest (relRepo main)))) root
+      *** (skg node (gnid root) (skgRepos (nodeRepo main)) writeProtected (editRequest (relRepo main))) root
     "})), vec! ["changed containers" . to_string ()]);
   }
 
@@ -715,28 +715,28 @@ mod tests {
       errors_for_writeProtected_occurrences (
         &forest (text), &graph (), &config (), Some (&restriction) ) };
     let without_hidden : &str = indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id sub) (repo main) writeProtected)) sub
+      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
     "};
     assert_eq! (errors_under_restriction (without_hidden), vec! []);
     assert_eq! (refused_changes (&errors_in (without_hidden)),
                 vec! ["changed subscriptions" . to_string ()]);
     assert_eq! (refused_changes (&errors_under_restriction (indoc! {"
-      * (skg (node (id recorder) (repo main) writeProtected)) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
       ** (skg subscribeeFolder)
-      *** (skg (node (id sub) (repo main) writeProtected)) sub
-      *** (skg (node (id private_sub) (repo private) writeProtected)) private_sub
+      *** (skg node (gnid sub) (skgRepos (nodeRepo main)) writeProtected) sub
+      *** (skg node (gnid private_sub) (skgRepos (nodeRepo private)) writeProtected) private_sub
     "})), vec! ["changed subscriptions" . to_string ()]);
   }
 
   #[test]
   fn an_editable_occurrence_is_not_judged_by_the_graph () {
     assert_eq! (errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main))) changed
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) changed
       ** (skg aliasFolder)
       *** (skg alias) other name
-      ** (skg (node (id typed) (repo main))) typed
+      ** (skg node (gnid typed) (skgRepos (nodeRepo main))) typed
     "}), vec! []);
   }
 
@@ -744,7 +744,7 @@ mod tests {
   fn body_on_an_writeProtected_occurrence_is_a_parse_error () {
     let (_forest, errors, _warnings) = org_to_uninterpreted_viewforest (
       indoc! {"
-        * (skg (node (id recorder) (repo main) writeProtected)) recorder
+        * (skg node (gnid recorder) (skgRepos (nodeRepo main)) writeProtected) recorder
         body that would otherwise disappear
       "}) . unwrap ();
     assert! (matches! (&errors[..],
@@ -756,7 +756,7 @@ mod tests {
   #[test]
   fn flags_surface_edits_report_recorder_identity_and_concrete_changes () {
     let errors : Vec<BufferValidationError> = errors_in (indoc! {"
-      * (skg (node (id recorder) (repo main))) recorder
+      * (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder
       ** (skg flagsFolder) edited folder headline
       added folder body
       *** (skg (flag noSearchMatching)) renamed
@@ -778,6 +778,6 @@ mod tests {
   #[test]
   fn an_absent_flags_folder_passes () {
     assert_eq! (errors_in (
-      "* (skg (node (id recorder) (repo main))) recorder\n"), vec! []);
+      "* (skg node (gnid recorder) (skgRepos (nodeRepo main))) recorder\n"), vec! []);
   }
 }

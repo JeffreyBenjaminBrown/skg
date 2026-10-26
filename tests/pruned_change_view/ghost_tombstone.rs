@@ -26,8 +26,8 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use std::collections::BTreeMap;
 use std::error::Error;
 
-const H_AS_A_ROOT : &str = "* (skg (ghost (gnid h)";
-const G_UNDER_Q : &str = "** (skg (ghost (gnid g)";
+const H_AS_A_ROOT : &str = "* (skg ghost (gnid h)";
+const G_UNDER_Q : &str = "** (skg ghost (gnid g)";
 
 /// 'buffer' with the tombstone request on its one line starting
 /// 'prefix', a ghost's, before that form's '(diff ...)'.
@@ -60,10 +60,10 @@ fn saved_leaving_the_graph (
 fn a_ghost_root_entombstoned_goes () -> Result<(), Box<dyn Error>> {
   with_fixture ("commit_leftovers", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
-    assert_lines_in_order (&buffer, &[ H_AS_A_ROOT, "** (skg (node (id hm)" ]);
+    assert_lines_in_order (&buffer, &[ H_AS_A_ROOT, "** (skg node (gnid hm)" ]);
     let saved : String = saved_leaving_the_graph ( f,
       &requesting_its_tombstone (&buffer, H_AS_A_ROOT) ) ?;
-    assert! ( ! saved . contains ("(gnid h)") && ! saved . contains ("(id hm)")
+    assert! ( ! saved . contains ("(gnid h)") && ! saved . contains ("(gnid hm)")
               && ! saved . contains ("tombstone"),
               "h and its old content are gone:\n{}", saved );
     saved_and_rerendered (f, &saved) ?;
@@ -75,9 +75,9 @@ fn a_ghost_root_entombstoned_goes () -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_note_under_an_entombstoned_ghost_stays () -> Result<(), Box<dyn Error>> {
   with_fixture ("users_notes", &["main"], |f| {
-    let ghost : &str = "** (skg (ghost (gnid h)";
+    let ghost : &str = "** (skg ghost (gnid h)";
     let old_member : &str =
-      "*** (skg (node (id m) (repo main) noClaim (diff (rel removed)";
+      "*** (skg node (gnid m) (skgRepos (nodeRepo main)) noClaim (diff (rel removed)";
     let buffer : String = open_all_changes_buffer (f) ?;
     let with_note : String =
       insert_after_line_starting (&buffer, ghost, &note (3, "a note under h"));
@@ -99,13 +99,13 @@ fn a_ghost_member_entombstoned_goes_from_its_container (
   with_fixture ("restore", &["main"], |f| {
     let buffer : String = open_all_changes_buffer (f) ?;
     let ghosts_of_g : usize =
-      without_viewnode_ids (&buffer) . matches ("(ghost (gnid g)") . count ();
+      without_viewnode_ids (&buffer) . matches ("ghost (gnid g)") . count ();
     let saved : String = saved_leaving_the_graph ( f,
       &requesting_its_tombstone (&buffer, G_UNDER_Q) ) ?;
     assert! ( ! saved . lines () . any ( |line|
                 without_viewnode_ids (line) . starts_with (G_UNDER_Q) ),
               "g is gone from under q:\n{}", saved );
-    assert_eq! ( without_viewnode_ids (&saved) . matches ("(ghost (gnid g)") . count (),
+    assert_eq! ( without_viewnode_ids (&saved) . matches ("ghost (gnid g)") . count (),
                  ghosts_of_g - 1, "g's other ghosts stay:\n{}", saved );
     assert! ( ! saved . contains ("tombstone"), "{}", saved );
     Ok (( )) }) }
