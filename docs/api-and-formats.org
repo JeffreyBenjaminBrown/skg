@@ -61,8 +61,8 @@ So far there are these endpoints:
 
   - Phase 1, immediate: Server sends LP =((response-type
     search-results) (content "ORG") (warnings ("..." ...)))=.
-    Results are ordinary write-protected non-content unrestricted vognodes (not
-    special non-vognode types). A no-match or error response has the same
+    Results are ordinary write-protected occurrences, the roots of the
+    search buffer (not special non-vognode kinds). A no-match or error response has the same
     response type and a single =content= field.
 
   - Every =search-results= is followed by exactly one
@@ -205,7 +205,9 @@ So far there are these endpoints:
        reported only where a list already drawn lacked a member, and a
        plain save reports nothing. The list is present and empty if
        none; a failed save's response has no =corrections=. A buffer
-       of the diff view reports none. Each client appends them to its
+       of the diff view reports its corrections too, but for its change
+       viewnodes, which describe the straddle and are recomputed at
+       every refresh. Each client appends them to its
        warnings buffer (see "Server warnings" below), under one level-1
        headline per view naming the view's buffer (or its view ID when
        no buffer shows it).
@@ -222,11 +224,11 @@ So far there are these endpoints:
        buffer makes a node's changes editable where it has an editable
        occurrence of it, in content or in a partner folder, or a
        ghost of it in content position: under the buffer
-       root or an unrestricted vognode, or in the old content of such a
-       phantom. The buffer is reconciled over the graph straddle, not
-       rebuilt: its roots, and every headline it holds editable, stay as
-       saved, and its change facts, changed folders, changeset markers and
-       removed members are recomputed. What it adds anew it adds by its pruned
+       root or an occurrence, or in the old content of such a
+       ghost. The buffer is refreshed over the graph straddle: its
+       roots, and every headline it holds editable, stay as saved, and
+       its change facts, change viewnodes and removed members are
+       recomputed. What it adds anew it adds by its pruned
        change view sets recomputed after the save: a new member in U is editable,
        with its content list, and any other new member is a
        write-protected member shown without its content. It
@@ -247,16 +249,18 @@ So far there are these endpoints:
     the warning =A readiness request names no current change; it was
     dropped.=, which names its headline as a subheadline.
   - A write-protected occurrence saves nothing of its own, so a save is
-    refused, before anything is written, if one differs from the graph:
-    in its title or home skgrepo, in its alias folder or a partner
-    folder when present, or by holding a child that affects it. A
-    partner folder's members are compared with the node's partners in
-    its relation as a set of node IDs, under the save's skgrepo
-    restriction, not counting a member the diff view shows as
-    removed; a member shown by an extra ID counts as its node, and an
-    unknown by its raw ID, as the folder reconciler matches
-    them; a member carrying a relRepo request differs. A present
-    flags folder, under any node, must likewise equal the node's flags.
+    refused, before anything is written, if one differs from the graph
+    ('errors_for_writeProtected_occurrences' in
+    'server/from_text/write_protected_edits.rs'): in its title or home
+    skgrepo, or in its alias folder, when present, by lacking or
+    reordering one of the node's aliases or by carrying a relRepo
+    request. Under a write-protected occurrence no child claims
+    membership, so anything else standing there -- an alias the node
+    lacks, a child, a folder's members -- is the user's note or the
+    diff view's, which the refresh shows unwarranted, and is not
+    checked. An ID folder, under any node, is refused only when it
+    lacks one of the node's IDs; and a present flags folder, under any
+    node, must equal the node's flags.
   - Before mutation, the server computes the update-relevant neighborhood of
     every prepared write/delete identity independently in the before and
     candidate graphs. Other registered views containing an affected unrestricted ID
@@ -475,16 +479,16 @@ since the command searches the current buffer.
     both halves from the disk the rebuilt live graph was read from. Saving such a buffer is ordinary (see "Save
     buffer"), and its response carries the readiness summary.
   - A rerender of such a buffer (after a save, collateral, or after a
-    commit) reconciles what it holds with a shallow model subtree from
-    the straddle: a viewnode the shallow model subtree also produces
-    is kept, with
-    its =folded= and =bodyFolded=, its kind and change facts updated in place
-    (a member that loses its relationship becomes a removed member, a
-    deleted node its ghost, and back); one it does not is
-    converted, and pruned once it holds nothing (the glossary's
-    "retain as non-member or tombstone, then prune"); the rest is
-    created.
-    The server sets a fold state only on a viewnode it creates: a
+    commit) is a refresh in diff-view mode (see
+    =docs/data-model_technical.org=, "The refresh: how a view follows
+    the graph", and =docs/diff-view.org=, "Rendering a buffer"): every
+    headline it holds is kept, with its =folded= and =bodyFolded=, and
+    re-kinded and re-tagged in place (a member that loses its
+    relationship becomes a removed member, a deleted node its ghost,
+    and back); a change viewnode whose change is gone becomes a
+    tombstone, pruned once it holds nothing; what the goals name and
+    the buffer lacks is drawn.
+    The server sets a fold state only on a viewnode it draws: a
     context node's body starts folded. A root stays until the
     buffer is closed, or until the user entombstones its ghost
     (=tombstone= under "View requests"); a ghost root whose node a
@@ -542,14 +546,17 @@ since the command searches the current buffer.
       diff view, or the rerender fails. The rerender stream is empty.
   - Logic: the graph straddle is brought up to date, and the buffer's
     pruned change view sets recomputed. Each node of U without an editable
-    occurrence becomes editable (its body from the live graph) at its
-    first content occurrence in level order, or if it has none at its
-    first partner folder occurrence. The buffer is then rerendered as
-    after a save, which extends the content list of each node made
-    editable. Last, each origin of D that the buffer shows nowhere is
-    appended as a root, at the end, in ID order, and completed; R is
-    deduplicated with the buffer's roots pinned, so that a changed
-    cycle that already has a root gains no second one.
+    occurrence becomes editable at its first content occurrence in
+    level order, its children claiming as the buffer read back would; a
+    node shown only as a write-protected folder member counts as shown
+    nowhere, since a folder's members stay write-protected. The buffer
+    is then refreshed as after a save, which gives each node made
+    editable its body and draws its content list. Last, each origin of
+    D that the buffer shows nowhere is appended as a root, at the end,
+    in ID order, and the buffer refreshed again; R is deduplicated with
+    the buffer's roots pinned, so that a changed cycle that already has
+    a root gains no second one. What the request draws is what the user
+    asked for, so it reports no correction.
     =server/serve/handlers/integrate_unshown_changes.rs=, =server/diff_view/pruned_change_view.rs=
     ('ensure_editableOccurrences_exist',
     'contentOrigins_missing_from_buffer'), and 'rerender_view' in
@@ -768,8 +775,9 @@ one automatically.
        rerendered, as in the save's =save-result= (see "Save buffer"
        above), and is present and empty if none. Every rerender stream
        ends with this message.
-  - Behavior: Re-renders every open view from server memory; a buffer
-    of the diff view is reconciled over the graph straddle.
+  - Behavior: Re-renders every open view from server memory, each a
+    refresh of what it holds; a buffer of the diff view is refreshed
+    over the graph straddle.
     Does not save or modify the graph. Refreshes all views without
     requiring a save.
   - All view text is prepared in memory before the release decision.
@@ -805,13 +813,14 @@ one automatically.
        =Content-Length: N\r\n\r\n(("response-type" "skgrepo-restriction") ("restriction" "NAME") ("content" "Skgrepo restriction: NAME"))=
     2. The rerender stream, as in "rerender all views":
        rerender-lock → rerender-view* → rerender-done. Each open view
-       is re-rendered in place under the new set: nodes whose skgrepo
-       became restricted are converted and pruned (a restricted node
-       with unrestricted viewchildren is retained, write-protected), an
-       unknown whose relRepo (else its recorder's home) became
-       restricted becomes a tombstone, pruned unless it holds something, and
-       PartnerFolders regenerate per the new set, so widening the set
-       reveals members and folders.
+       is re-rendered in place under the new set
+       ('convert_and_prune_for_skgrepo_switch', then the refresh): every
+       occurrence of a node the new set hides becomes a tombstone, which
+       keeps its viewchildren; an unknown whose relRepo (else its
+       recorder's home) became restricted becomes a tombstone too; a
+       tombstone is pruned unless it holds something; and the refresh
+       fills every folder per the new set, so widening the set reveals
+       members and folders.
   - Behavior: The skgrepo restriction is per Emacs TCP connection. It
     defaults from =skgconfig.toml=, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
@@ -940,17 +949,22 @@ save. A chain node carries no change facts.
 
 =(viewRequests ...)= carries client→server requests for viewbranches
 (unlike =(view ...)= and the stats below, which are server→client). On save
-the server fulfills each request during view completion and then drops
-the atom, so a request is transient. Request forms:
+the refresh fulfills each request and then drops the atom, so a
+request is transient (the request rung of the ladder, in
+=docs/data-model_technical.org=, "The refresh: how a view follows
+the graph"). Request forms:
 
-An editable node's default presentation includes its nonempty
-=subscribeeFolder=, but no other top-level relation folder. This applies both
-to ordinary positions and to nodes extended as members of relation folders.
-An editable subscribee-as-such additionally includes its nonempty
-=hiddenInSubscribeeFolder=; =hiddenOutsideOfSubscribeeFolder=, when nonempty,
-is part of the subscriber's =subscribeeFolder=. Use a folder request for the
-other relation folders; their potential contents remain advertised by the
-node's heralds.
+In a content view, an occurrence that an editable-view request
+extends -- a fresh view's roots, and the editable content the request
+draws or shows under them -- shows its nonempty =subscribeeFolder=, but
+no other top-level relation folder, unasked. This applies both to
+ordinary positions and to nodes extended as members of relation
+folders. An editable subscribee-as-such additionally includes its
+nonempty =hiddenInSubscribeeFolder=; =hiddenOutsideOfSubscribeeFolder=,
+when nonempty, is part of the subscriber's =subscribeeFolder=. Use a
+folder request for the other relation folders; their potential
+contents remain advertised by the node's heralds. The diff view draws
+no folder unasked but where something changed.
 
 - =(folder RELNAME)= — build both folders of the relation, populated from the
   graph. RELNAME is =aliases=, =overrides=,
@@ -963,37 +977,38 @@ node's heralds.
   node's content, or its links, shown without a folder.
   Under each member of a partner folder of any kind but the diff
   view's two acquisition folders hangs its containerward chain: the
-  member's containers as write-protected non-members, under each of
-  those its containers, breadth-first up to the roots or
+  member's containers as write-protected occurrences claiming nothing,
+  under each of those its containers, breadth-first up to the roots or
   =max_roleTree_depth=; a container met again on the way is drawn once
   more as a leaf. The member's partners in the folder's own role are
   not drawn below it; a folder request on the member draws them.
-  Nothing hangs under a phantom member. The folder's reconciler
-  reconciles each member's chain at every completion, so a member it
-  adds later gets its chain and a chain that stays keeps its headlines
-  and their fold state; a stale member's chain goes with it. No request
+  Nothing hangs under a ghost member. The refresh draws the chain
+  under a member it draws and never reinstates a chain node, so a
+  chain that stays keeps its headlines and their fold state, and a
+  member the user deletes takes its chain with it. No request
   extends a chain; a =(folder containers)= request on a chain node
   draws a containers folder under it. A fresh content view puts the
   =containers= request on each root. Emitted by the =C-c l= commands.
 - =editableView= — on a write-protected occurrence, make it the node's
   editable one (the occurrence that was editable is write-protected,
-  keeping its shown content, each member of which, there and below,
-  becomes a non-member); on an editable node, extend its content
-  editable, within =initial_node_limit= extensions. A buffer carries at
-  most one per node.
+  keeping its shown content, whose children claim nothing there); on
+  an editable node, extend its content editable: each member it shows
+  or draws whose node has no editable occurrence becomes editable,
+  within =initial_node_limit= extensions, and passes the request on. A
+  buffer carries at most one per node.
 - =writeProtectedView= — make the occurrence write-protected (its title
-  resynced from the graph) and each of its direct child vognodes a
-  non-member; the children keep their own editability and subtrees. The
-  edits the occurrence carries in the same save are saved first. On a
-  write-protected occurrence it does nothing. Emitted by =C-c s w=.
-- =writeProtectedSubtreeView= — the same for the occurrence and its whole
-  content subtree: every node in it becomes write-protected, and every
-  child under them a non-member. Emitted by =C-c s W=.
+  resynced from the graph); its children then claim nothing, and keep
+  their own editability and subtrees. The edits the occurrence carries
+  in the same save are saved first. On a write-protected occurrence it
+  does nothing. Emitted by =C-c s w=.
+- =writeProtectedSubtreeView= — the same for the occurrence and every
+  occurrence of its content subtree. Emitted by =C-c s W=.
   Either write-protect request together with =editableView= on one
   occurrence is refused; on two occurrences of a node they move
-  editability. An editable occurrence adopts a non-member child that
-  stands for an entry of its content list, where no member does, as
-  that entry's member, so moving editability back restores the content.
+  editability. The children of a write-protected occurrence carry no
+  =noClaim=, so when it becomes editable again each claims, and the
+  refresh marks =noClaim= on those its content list does not name:
+  moving editability back restores the content.
 - =flags= — add one write-protected =flagsFolder=, retained even when empty.
   Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
   =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;
@@ -1002,13 +1017,13 @@ node's heralds.
   edits within a retained folder are rejected rather than silently ignored.
 - =fork= — the explicit =skg-fork-node= gesture: clone this (owned)
   node into a private fork that overrides it. Consumed on the save path
-  at fork detection (not during view completion), then dropped. Emitted
+  at fork detection (the refresh leaves it alone), then dropped. Emitted
   by =skg-fork-node= (=C-c m f=).
 - =tombstone= — in the diff view, on a ghost only (the parser refuses
   it elsewhere, and refuses any other view request on a ghost): make
-  the ghost a tombstone, which keeps what the user put under it and
-  drops what the diff view drew there, and is pruned when that leaves
-  it childless. A ghost under a node that contained it at HEAD is drawn
+  the ghost a tombstone, which, as every tombstone does, keeps its
+  children (what the user put under it and what the diff view drew
+  there), and is pruned when it holds nothing. A ghost under a node that contained it at HEAD is drawn
   again by a later rerender of that node; a ghost root is not. Emitted
   by =skg-request-ghost-tombstone= (=C-c r t=) on the ghost at point
   and =skg-request-buffer-ghosts-tombstone= (=C-c r T=) on every ghost
@@ -1044,10 +1059,11 @@ one on a ghost:
   view-parent (or a writable folder's viewparent), so a write-protected headline
   may carry this request too; the save refuses it only when nothing editable
   writes that relationship, e.g. under a write-protected parent.
-  Alias and Unknown headlines likewise
-  expose a flat/nested display =relRepo= fact and put write requests only
-  under =editRequest=; copying a fact is harmless while copying a request
-  deliberately requests it at the destination.
+  An alias and an unknown likewise show their relationship's relRepo
+  in =(skgRepos (relRepo NAME))=, which the save does not read as a
+  request, and carry a request only in =(editRequest ...)=; copying the
+  fact is harmless, while copying a request deliberately requests it at
+  the destination.
 - =(flag noSearchMatching true|false)= — an idempotent
   save-only desired-state request. The provenance flags =hadId= and
   =wasOverloaded= are write-protected and rejected here. A successful save consumes
@@ -1068,7 +1084,7 @@ one on a ghost:
   local structure violation, "Only a removed membership can be
   restored"; one that stands where a removed member may but names no
   relationship HEAD records is dropped with a warning.
-- =(ghost ... (editRequest restoreNode))= — in the diff view, write
+- =restoreNode=, on a ghost — in the diff view, write
   back the node this ghost stands for, as HEAD had it.
   Herald "restore node". Written by =skg-restore-deleted-node=
   (=C-c s n=). The only edit request a ghost accepts; =restoreNode= on
@@ -1143,12 +1159,12 @@ that subform means the role does not apply. The numerator counts
 members not already directly contained or hidden by that
 occurrence's subscriber. Subset counts cannot exceed their side's
 total. The ancestors counted are the viewparent, or, for a folder
-member, the vognodes of the folder's required ancestry. A non-member
-under a subscribee-as-such -- content its subscriber hides, which the
-reconciler retains there as non-member when it holds a subtree --
-also counts the subscriber, three generations up, on its
-=hidesFromSubs= incoming side, as a =hiddenInSubscribeeFolder= member
-does.
+member, the vognodes of the folder's required ancestry. A child
+claiming nothing under a subscribee-as-such -- content its subscriber
+hides, which the refresh keeps there, unwarranted, while it holds a
+subtree or the user keeps it -- also counts the subscriber, three
+generations up, on its =hidesFromSubs= incoming side, as a
+=hiddenInSubscribeeFolder= member does.
 
 =(props (aliases K) (extraIds K) (flags K))= holds the property
 counts, each present only when nonzero; =(props ...)= is absent when
@@ -1159,7 +1175,11 @@ this occurrence, read from where it stands: for each, the side of
 this node it is on (=in= or =out=) and the ancestor generation it
 accounts for. =GEN= is omitted when no ancestor accounts for it, as
 for a node shown in place of a node it overrides, which carries
-=(overrides out)=. A non-member carries no other.
+=(overrides out)=. An occurrence that does not stand as a member of its
+viewparent carries none: where the viewparent's claims are read, one
+claiming nothing; in a write-protected folder, one the folder's
+relation does not warrant; under a write-protected occurrence, every
+child ('stands_as_member' in =server/update_buffer/viewnodestats.rs=).
 
 | Birth                            | Facts                                                        |
 |----------------------------------+--------------------------------------------------------------|
@@ -1209,29 +1229,31 @@ remove graph context.
 
 ** Override substitution and the overridesHere fact
 
-When view completion would create a viewnode for node N as
-recursive content, and an owned overrider R of N is visible
-under the skgrepo restriction, it shows R instead -- transitively (a
-owned chain D overrides C overrides N is legal and resolves to
-the last visible link), cycle-guarded, and never in the diff view.
-Ordinary completion does not rewrite an existing raw viewnode merely because
-an overrider is visible (closing and reopening normalizes). In a de-novo
-render, only content substitutes: PartnerFolder members, view roots, search
-results, chain nodes and phantoms begin as the raw node.
+Where a node N stands as content of an editable occurrence in a
+content view, and an owned overrider R of N is visible under the
+skgrepo restriction, the refresh shows R instead -- transitively (an
+owned chain D overrides C overrides N is legal and resolves to the
+last visible link), cycle-guarded, and never in the diff view
+('substitute_overriders' in =server/refresh/ladder.rs=). The refresh
+substitutes at every refresh, a member already shown raw included,
+since it decides from the buffer and the graph as they are now. Only
+content substitutes: partner folder members, view roots, search
+results, chain nodes and ghosts show the raw node.
 
 The buffer whose approved save creates a fork is the post-save exception. A
 root named by one of that save's exact =ForkSpec=s is rewritten from original F
 to clone K, and an existing recursive-content occurrence in the saved forest
 may likewise be replaced by its newly visible substitute. Both carry
-=(overridesHere F)=. The completed forest remains under the same view ID, and
+=(overridesHere F)=. The refreshed forest remains under the same view ID, and
 the open-view root index is recomputed from it, so that buffer is thereafter
-registered as rooted at K. Collateral rerenders do not perform these
-replacements; they retain their existing raw positions. A later independent
-single-root request for F still opens raw F.
+registered as rooted at K. Collateral rerenders do not replace roots;
+their content occurrences substitute as any refresh's do. A later
+independent single-root request for F still opens raw F.
 
 Moreover, the immediate children of any overridden node shown raw -- a
-PartnerFolder member, a view root, or the overridden-as-such (a member
-child of an overriddenFolder) -- are also shown raw: the user is looking at the
+partner folder member other than a subscribee, a view root, or the
+overridden-as-such (a member of an overriddenFolder) -- are also shown
+raw: the user is looking at the
 original, so its children are the original's, not the overrider's. This is one
 level deep -- substitution resumes at the grandchildren -- and it is strict:
 a node whose only overrider is invisible under the skgrepo restriction is
@@ -1254,7 +1276,10 @@ skgrepo-set switch that makes a
 shown substitute's skgrepo restricted turns it into a tombstone (the
 fact does not survive -- a tombstone says nothing of what stood
 there); the original it stood for is preserved in its container's
-contains by disk supplementation.
+contains by disk supplementation. When the override itself is gone,
+the refresh shows the overrider as itself, without the fact,
+unwarranted and so claiming nothing, and reinstates the original
+beside it.
 
 * skgconfig.toml
 
@@ -1478,15 +1503,20 @@ position atoms, =(gnid ID)=, =(skgRepos ...)=, =noClaim=,
 at every rendering and nobody reads back: everything in =(view ...)=
 (see "Stats metadata: the view facts" above) and in =(diff ...)=
 (see "Metadata of the diff view" below). The parser skips both forms
-whole. Each kind takes only its own declared parts:
+whole. KIND is a bare atom, but five kinds carry their parameter in a
+small form headed by the kind: =(flag F)=, =(oldText ASPECT)=,
+=(homeSkgrepoMove ...)=, =(relRepoMove ...)= and =(changesetMarker
+KIND)=. A headline whose metadata names no kind is a node: a client
+writes =(skg folded)= on a headline that has no metadata yet. Each kind
+takes only its own declared parts:
 #+begin_example
 node [(gnid ID)] [(skgRepos [(nodeRepo R)] [(relRepo R)])]
      [noClaim] [writeProtected] [(overridesHere ID)]
      [(editRequest [REQUEST] [READINESS])] [(viewRequests ...)]
      [(view ...)] [(diff ...)]
-ghost (gnid ID) (skgRepos (nodeRepo R))
+ghost (gnid ID) (skgRepos (nodeRepo R)) [noClaim]
       [(editRequest [restoreNode] [READINESS])]
-      [(viewRequests tombstone)] [(diff ...)]
+      [(viewRequests tombstone)] [(view ...)] [(diff ...)]
 unknown (gnid ID) [(skgRepos (relRepo R))] [noClaim]
         [(editRequest [(relRepo R)] [READINESS])] [(diff ...)]
 alias [(skgRepos (relRepo R))] [noClaim]
@@ -1503,10 +1533,16 @@ ghost or an unknown stands for, and =(skgRepos (nodeRepo REPO)
 [(relRepo REPO)])= its home skgrepo and the skgrepo recording its
 relationship to its viewparent, the relRepo written only when it
 differs from the default (a ghost has no relRepo; an unknown and an
-alias have only one). =noClaim= on a node, an alias, an ID or an
-unknown says the save does not read it as an entry of its
+alias have only one). =noClaim= on a node, a ghost, an alias, an ID
+or an unknown says the save does not read it as a member of its
 viewparent's list; a claimant carries nothing, and so does every
-child of a viewparent whose claims the save does not read.
+child of a viewparent whose claims the save does not read. A lost
+alias and a dangling partner the worktree lost (an unknown carrying
+=(rel removed)=) carry =noClaim= where their viewparent's claims are
+read, so that the save, which skips the =(diff ...)= saying they were
+lost, leaves them out of the list.
+=(editRequest ...)= holds at most two requests: one edit request and
+one readiness request, written after it.
 
 Every viewnode's metadata starts with its viewnode ID, =(vnid X)=, where
 X is one or more lowercase letters and digits: =(skg (vnid 0a) node
@@ -1514,7 +1550,7 @@ X is one or more lowercase letters and digits: =(skg (vnid 0a) node
 life of the buffer. The server assigns one, from the view's counter in
 base 36 (two characters at least, skipping any spelled like a number,
 such as =05= or =1e5=), to every viewnode that lacks one at the end of a
-completion, and never reassigns or reuses one: a headline keeps the
+refresh, and never reassigns or reuses one: a headline keeps the
 viewnode ID it carried through a save and a rerender, through a cut
 and paste, and through a skgrepo-set switch that does not hide it. A
 headline typed without one gets one; of two headlines carrying one
@@ -1531,9 +1567,10 @@ The parser refuses, with a message naming the grammar, the retired
 spellings: =(node ...)=, =(ghost ...)= and =(unknown ...)= as forms,
 =(deleted ...)=, =(historical ...)=, =(id ID)=, =(repo REPO)=, a
 top-level =(relRepo REPO)=, =(FOLDER changed)=, =(rels ...)=,
-=(viewStats ...)=, =omittedBody= or =(homeRepoHerald ...)= outside
-=(view ...)=, =(readyRequest ...)=, =(unreadyRequest ...)=,
-=nonMember= and =restrictedNode=.
+=(viewStats ...)=, =omittedBody= or the old home skgrepo herald
+outside =(view ...)=, =(readyRequest ...)=, =(unreadyRequest ...)=,
+and the old atoms of a child claiming nothing and of a hidden node's
+placeholder ('parse_metadata_sexp.rs' names each).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode.el=, whose rule table is
@@ -1550,14 +1587,15 @@ or, in the diff view only, =acquiredByFolder= or =acquiredFolder=.
 
 A tombstone is written =(skg (vnid X) tombstone)=: it has
 no ID, no change facts and no title (the parser discards text typed on
-its line), and holds only what stands below it. A reconciler
-makes one of a child the graph no longer warrants, an occurrence
-whose node a save deleted becomes one (in the diff view, its ghost
-instead, when HEAD has the node), and the prune
-removes it once it is childless, a view root included, so a buffer
-may end with no headlines (the glossary's "tombstone"
-and "retain as non-member or tombstone, then prune"). Herald
-"something stood here".
+its line), and holds only what stands below it. The refresh makes one
+of a headline that can stand where it is for nothing: an occurrence
+whose node a save deleted (in the diff view, its ghost instead, when
+HEAD has the node) or the skgrepo restriction hides, a descriptor
+whose position its kind forbids, a change viewnode whose change is
+gone, an empty folder nothing can be added to, a ghost on request.
+The refresh prunes it once it is childless, a view root included, so a
+buffer may end with no headlines (the glossary's "tombstone,
+entombstone"). Herald "something stood here".
 
 ** Metadata of the diff view
 
@@ -1566,7 +1604,9 @@ the forms below. The change facts are derived facts, which the
 parser skips; the readiness requests and the restore edit requests
 are declared parts, which the save consumes. Saving a buffer reads
 none of the new viewnodes, which are save-inert, but for a ghost's
-restore request.
+restore request and the gnid of a ghost that claims membership (one
+its viewparent's worktree list still names), which the save keeps in
+the list, as it keeps an unknown's.
 The glossary's "Terms a user meets in the diff view" and "Terms of
 the diff view's implementation" define the vocabulary.
 
@@ -1632,8 +1672,8 @@ carry one.
 *** Who writes each part, and who acts on it
 **** The server writes the change facts
 The server writes the =(diff ...)= form (=diff_form= in
-=server/org_to_text.rs=), and it writes =(ready ...)= and =(leaves
-...)= after completion (=set_ready_facts_in_viewforest=); see
+=server/org_to_text.rs=), and it sets =(ready ...)= and =(leaves
+...)= in the tail of the refresh (=set_ready_facts_in_viewforest=); see
 =docs/diff-view.org=, "Change facts on the wire". A rerender of a
 buffer of the diff view recomputes each kept viewnode's change facts
 in place from the graph straddle, and so does a save of such a
@@ -1687,9 +1727,13 @@ claims.
 It is a node HEAD has and the worktree lacks, with HEAD's title and
 body, drawn only in the diff view. Its ID is written =(gnid ID)= and
 its home skgrepo =(skgRepos (nodeRepo REPO))=, as a node's are. It
-may carry =(editRequest restoreNode)=
-(see "Edit requests: (editRequest ...)") and =(viewRequests
-tombstone)= (see "View requests: (viewRequests ...)").
+claims membership only where its viewparent's worktree list still
+names its gnid; elsewhere, where claims are read, it carries
+=noClaim=, and where nothing warrants it, =(view noWarrant)= (never
+=ghostWarrant=: the kind is its own herald). It may carry
+=(editRequest restoreNode)= (see "Edit requests: (editRequest ...)")
+and =(viewRequests tombstone)= (see "View requests: (viewRequests
+...)").
 **** =(oldText titleAndBody)=, =(oldText title)=, =(oldText body)= -- the node's text at HEAD
 It sits under a node whose text changed; its headline is the old
 title, its body the old body.
@@ -1702,7 +1746,7 @@ Each line is prefixed by a space, =-= or =+=.
 Under a ghost, an =acquiredByFolder= holds the node that acquired it
 by a nodeMerge; under an acquirer, an =acquiredFolder= holds the
 ghosts of the nodes it acquired. An =acquiredFolder= also accepts a
-non-member the user puts there.
+child the user puts there, which claims nothing.
 
 *** Changed folders
 A partner, alias, ID or flags folder is written as its bare atom,
@@ -1735,7 +1779,7 @@ A readiness gesture on such a folder acts on each changed membership.
 
 Under a restricted skgrepo-set, rendering omits nodes from restricted
 skgrepos (/hidden/ nodes) entirely -- content, subscribees, and every
-PartnerFolder's members alike. Omission is recursive: an omitted
+partner folder's members alike. Omission is recursive: an omitted
 container's whole branch is omitted, unrestricted descendants
 included (they stay reachable by search or direct visit).
 
