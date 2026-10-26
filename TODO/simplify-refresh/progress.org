@@ -264,3 +264,13 @@ Unrelated: "Directory not empty" at cleanup in the full run, as
 in slices 0 and 1; it passes alone.
 **** integration: import-md-and-org
 Unrelated and pre-existing, as in slices 0 and 1.
+** Orchestrator's corrections after slices 0 to 2 (2026-10-26)
+Inserted into the plan, not needing Jeff's decision: under
+slice 6, ⊥ returns to the front of a node's heralds (slice 0
+moved it) and the tombstone's label becomes "something stood
+here" (slice 2 showed "DELETED" false over a hidden node's
+children); under slice 8, 'Folder' gains 'is_editable' for the
+question slice 1 made 'goal_is_ordered' answer. Noted for the
+review: the alias saved outside the diff view (slice 1), the
+flaky "Directory not empty" cleanup in two tests under
+parallel runs, and 'import-md-and-org' failing before the plan.

@@ -7,7 +7,7 @@
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
 * Problems noticed while executing plan 04.1, slice 2 (2026-10-26)
-** A tombstone over a hidden node's children reads DELETED
+** FIX PLANNED: A tombstone over a hidden node's children reads DELETED
   Since slice 2 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
   a switch of the skgrepo restriction entombstones every occurrence
   of a now-hidden node, and the herald rule for a tombstone

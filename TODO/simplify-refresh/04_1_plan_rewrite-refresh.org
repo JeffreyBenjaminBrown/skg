@@ -924,6 +924,20 @@ its members. Both clients' renderers ('heralds-minor-mode.el',
 follow. Tests: the herald conformance test; the rendering
 cases in both clients; both client unit suites; the
 integration suite.
+*** Corrections carried from slices 0 and 2
+Two display facts the earlier slices left wrong, for this
+slice to set right with the rest of the table. First, ⊥ moved
+from the front of a node's heralds to after the relationship
+tokens when slice 0 put 'noWarrant' into '(viewStats ...)',
+which the lens draws after '(rels ...)'; the position glyphs
+(☮, ⊥, ĥ) will stand first again, as 'docs/heralds.org'
+lists them. Second, a tombstone's label reads "DELETED", which is
+false over a hidden node's children (slice 2;
+'TODO/problems.org', "A tombstone over a hidden node's
+children reads DELETED"); since there is one kind of tombstone
+and it says only that something stood here, its label will
+read "something stood here", styled as "DELETED" is today, and
+that problem entry moves to 'TODO/DONE/problems.org'.
 ** TODO Slice 7: the parser's twin goes
 The parse mints a gnid for a headline without one and gives a
 headline without a repo its nearest occurrence ancestor's as
@@ -955,6 +969,16 @@ output. If a rule of "The model" turns out to contradict
 another when written as code, that is the one stop this plan
 expects: record the two rules and the case in 'progress.org'
 and stop.
+*** Correction carried from slice 1
+Slice 1 replaced 'FolderPolicy' with 'goal_is_ordered' and,
+where the save asked "does the save read this folder's
+membership", made it ask 'goal_is_ordered' too, which answers
+the same on every folder today but is a different question.
+The ladder's claims step needs the real question (an editable
+folder is one whose membership the save reads: the subscribee,
+overridden, hidden-outside and alias folders), so this slice
+will give 'Folder' an 'is_editable' method and use it at the
+save's sites in place of 'goal_is_ordered'.
 ** TODO Slice 9: content views on it
 'render_initial_view' and 'rerender_view' call
 'refresh_viewforest' in content-view mode. The content-view
