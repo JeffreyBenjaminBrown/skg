@@ -321,4 +321,19 @@ assert_headline_titles(buf_a,
     { 2, 'member', 'c' } },
   'phase 5: buffer A after collateral update')
 
+print('=== PHASE 6: Verify the correction in the warnings buffer ===')
+-- Buffer A's editable a lacked c, which the save drew there: a
+-- correction of buffer A, shown under a headline naming buffer A.
+do
+  local warnings_name = require('skg.server_warnings').buffer_name
+  local warnings_buf = T.wait_for_buffer(warnings_name, 5)
+  T.check(warnings_buf, 'phase 6: the warnings buffer exists')
+  local text = T.buffer_text(warnings_buf)
+  print('Warnings buffer content: ' .. text)
+  T.check(text:find('\n?%* skg://a\n%*%* Drew what the graph says belongs here%.\n%*%*%* c\n') ~= nil,
+          'phase 6: the correction drawing c is under buffer A\'s headline')
+  T.check(text:find('%* skg://b\n') == nil,
+          'phase 6: the saved buffer B reported no correction')
+end
+
 T.pass('PASS: All phases completed successfully!')

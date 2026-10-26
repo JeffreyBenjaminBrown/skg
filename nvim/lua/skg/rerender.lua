@@ -10,6 +10,7 @@ local log = require('skg.log')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local save = require('skg.save')
+local server_warnings = require('skg.server_warnings')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -205,6 +206,8 @@ function M.register_rerender_stream_handlers ()
             messages.errors_and_warnings_to_org_string(
               errors, warnings))
         end
+        server_warnings.show_corrections(
+          payload.field(response, 'corrections'))
       end)
       if not ok then
         vim.notify('skg: rerender-done handler error: '

@@ -14,6 +14,7 @@ local messages = require('skg.messages')
 local metadata = require('skg.metadata')
 local payload = require('skg.payload')
 local readiness = require('skg.readiness')
+local server_warnings = require('skg.server_warnings')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -394,6 +395,7 @@ function M.handle_save_response (save_buf, response)
     M.show_save_errors_and_warnings(errors, warnings,
                                     content_text ~= nil)
   end
+  server_warnings.show_corrections(payload.field(response, 'corrections'))
   local summary = readiness.readiness_summary_from_response(response)
   if summary then -- the saved buffer is one of the diff view's
     vim.notify(readiness.readiness_summary_message(summary)) end

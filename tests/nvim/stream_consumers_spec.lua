@@ -217,6 +217,47 @@ describe('skg stream consumers', function ()
       :find('stale herald', 1, true))
   end)
 
+  it('appends the corrections on rerender-done to the server-warnings'
+     .. ' buffer', function ()
+    local server_warnings = require('skg.server_warnings')
+    wipe_named(server_warnings.buffer_name)
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('rerender all views', 1, true) then
+        respond(helpers.framed(
+          '((response-type rerender-lock) (lock-views ()))'))
+        respond(helpers.framed(
+          '((response-type rerender-done) (errors ()) (warnings ())'
+          .. ' (corrections ((content-view:3'
+          .. ' "Drew what the graph says belongs here.\\n*** new child\\n")'
+          .. ' ("search:two words"'
+          .. ' "Dropped a duplicate.\\n*** twin\\n"))))'))
+      end
+    end)
+    buffer.open_org_buffer_from_text(
+      '* (skg node (gnid a)) a', 'skg://corrected', 'content-view:3')
+    require('skg.messages').scratch_org_buffer(
+      server_warnings.buffer_name, '* an earlier startup warning')
+    rerender.request_rerender_all_views()
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10)
+    local found = nil
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_get_name(buf)
+         == server_warnings.buffer_name then found = buf end
+    end
+    assert.is_truthy(found)
+    assert.are.same({
+      '* an earlier startup warning',
+      '* skg://corrected',
+      '** Drew what the graph says belongs here.',
+      '*** new child',
+      '* search:two words',
+      '** Dropped a duplicate.',
+      '*** twin',
+    }, vim.api.nvim_buf_get_lines(found, 0, -1, false))
+    wipe_named(server_warnings.buffer_name)
+  end)
+
   it('switches the repo-set and rides the rerender stream',
      function ()
     local seen = nil

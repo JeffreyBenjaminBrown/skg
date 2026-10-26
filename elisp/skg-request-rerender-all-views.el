@@ -11,6 +11,7 @@
 (require 'skg-length-prefix)
 (require 'skg-request-save) ; for skg-replace-buffer-with-new-content, skg-big-nonfatal-message
 (require 'skg-buffer)       ; for skg-find-buffer-by-view-id
+(require 'skg-request-server-warnings) ; for skg-show-corrections-in-server-warnings
 (require 'skg-lock-buffers)
 
 (defvar skg--rerender-overPrivateText-retry nil
@@ -159,7 +160,7 @@ response a rerender stream follows."
      (skg--apply-streamed-view-update payload 'rerender "rerender-view"))
    nil) ;; non-one-shot: fires for each streamed view
   (skg-register-response-handler
-   ;; 3. Done message: clean up and show errors/warnings.
+   ;; 3. Done message: clean up and show errors/warnings and corrections.
    'rerender-done
    (lambda (_tcp-proc payload)
      (setq skg-response-handler-map
@@ -183,7 +184,9 @@ response a rerender stream follows."
                (t
                 "Rerender completed with warnings"))
               (skg-errors-and-warnings-to-org-string
-               errors-list warnings-list))))
+               errors-list warnings-list)))
+           (skg-show-corrections-in-server-warnings
+            (cadr (assoc 'corrections response))))
        (error
         (message "skg: rerender-done handler error: %S" err)))
      (let ((retry (and skg--rerender-overPrivateText-challenged

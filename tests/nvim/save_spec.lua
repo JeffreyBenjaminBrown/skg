@@ -378,6 +378,75 @@ describe('skg.save pipeline', function ()
     vim.api.nvim_buf_delete(found, { force = true })
   end)
 
+  describe('corrections on save-result', function ()
+    local server_warnings = require('skg.server_warnings')
+
+    local function warnings_buffer ()
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(buf)
+           == server_warnings.buffer_name then return buf end
+      end
+      return nil
+    end
+
+    local function wipe_warnings_buffer ()
+      local buf = warnings_buffer()
+      if buf then vim.api.nvim_buf_delete(buf, { force = true }) end
+    end
+
+    before_each(wipe_warnings_buffer)
+    after_each(wipe_warnings_buffer)
+
+    ---Save a view while a collateral view is open, the server ending
+    ---the save with a save-result whose tail is CORRECTIONS_TAIL.
+    local function save_with_corrections_tail (corrections_tail)
+      server = helpers.connect_to_fake_server(function (line, respond)
+        if line:find('save buffer', 1, true) then
+          respond(helpers.framed(
+            '((response-type save-lock) (lock-views ()))'))
+          respond(helpers.framed(
+            '((response-type save-result)'
+            .. ' (content "* (skg node (gnid a)) a")'
+            .. ' (errors ()) (warnings ())' .. corrections_tail
+            .. ' (point-lines-below-focused-headline 0))'))
+        end
+      end)
+      open_view('* (skg node (gnid b)) b', 'skg://collateral',
+                'content-view:7')
+      open_view('* (skg node (gnid a)) a', 'skg://saved',
+                'content-view:6')
+      save.request_save_buffer()
+      vim.wait(3000, function ()
+        return lock.stream_in_progress == nil end, 10)
+    end
+
+    it("puts a collateral view's correction under that view's buffer"
+       .. ' name', function ()
+      save_with_corrections_tail(
+        ' (corrections ((content-view:7'
+        .. ' "Drew what the graph says belongs here.\\n*** new child'
+        .. '\\n- viewnode ID: 0d. To find it: C-c g v 0d\\n")))')
+      local buf = warnings_buffer()
+      assert.is_truthy(buf)
+      assert.are.same({
+        '* skg://collateral',
+        '** Drew what the graph says belongs here.',
+        '*** new child',
+        '- viewnode ID: 0d. To find it: <localleader>gv 0d',
+      }, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+    end)
+
+    it('shows nothing when the corrections field is absent', function ()
+      save_with_corrections_tail('')
+      assert.is_nil(warnings_buffer())
+    end)
+
+    it('shows nothing when the corrections list is empty', function ()
+      save_with_corrections_tail(' (corrections ())')
+      assert.is_nil(warnings_buffer())
+    end)
+  end)
+
   it('names the Neovim bindings where a save error names C-c s d and C-c s w',
      function ()
     server = helpers.connect_to_fake_server(function (line, respond)

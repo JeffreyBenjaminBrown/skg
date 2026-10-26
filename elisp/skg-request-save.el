@@ -10,6 +10,13 @@
 (require 'skg-lock-buffers)
 (require 'skg-readiness) ; for skg--readiness-summary-message
 
+;; skg-request-server-warnings requires this file (for
+;; skg-big-nonfatal-message and the message helpers), so requiring it
+;; here would be circular. Autoload instead: the first save-result
+;; handled loads it, if nothing has loaded it already.
+(autoload 'skg-show-corrections-in-server-warnings
+  "skg-request-server-warnings")
+
 (defun skg-request-save-buffer (&optional approved-forks fork-skgrepos
                                           approved-hoist-pids
                                           text-approved-pids
@@ -975,7 +982,8 @@ Each message becomes its own headline."
 
 (defun skg-handle-save-sexp (sexp-string)
   "Parse and handle save response s-exp.
-Expected shape: ((content ...) (errors (...)) (warnings (...)))."
+Expected shape: ((content ...) (errors (...)) (warnings (...))
+\(corrections (...))), where corrections may be absent."
   (condition-case err
       (let* ((response (read sexp-string))
              (content-value (cadr (assoc 'content response)))
@@ -990,6 +998,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
                   (skg--message-list-nonempty-p warnings-list))
           (skg-show-save-errors-and-warnings
            errors-list warnings-list content-value))
+        (skg-show-corrections-in-server-warnings
+         (cadr (assoc 'corrections response)))
         (let ((summary (assq 'readiness-summary response)))
           (when summary ;; the saved buffer is one of the diff view's
             (message "%s" (skg--readiness-summary-message summary)))))
