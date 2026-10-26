@@ -33,10 +33,10 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::empty_in_ram_tantivy_index;
 use skg::refresh::{Truth, refresh_content_viewforest};
 use skg::refresh::buffer_corrections::BufferCorrectionPolicy;
-use skg::test_utils::{graph_from_config, prefer_owned_subdir, refresh_reaches_fixpoint};
+use skg::test_utils::{graph_from_config, main_skgrepo_config, refresh_reaches_fixpoint};
 use skg::types::env::RuntimeGeneration;
 use skg::skgrepo_sets::SkgrepoRestriction;
-use skg::types::misc::{Skgrepo, SkgrepoName, SkgrepoSetName};
+use skg::types::misc::{SkgrepoName, SkgrepoSetName};
 use skg::types::tree::forest::ViewForest;
 use skg::update_buffer::render_initial_view;
 
@@ -49,7 +49,7 @@ use skg::serve::handlers::diff_view::diffView_buffer;
 use skg::test_utils::cleanup_test_tantivy;
 use skg::types::views_state::DiffViewBufferKind;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -213,7 +213,7 @@ fn fixture_folders (
   found }
 
 /// The config a test reads 'folder' with: its 'skgconfig.toml', or
-/// else the one skgrepo 'main' there ('setup_test_tantivy').
+/// else the one skgrepo 'main' there ('main_skgrepo_config').
 fn fixture_config (
   folder : &Path,
 ) -> Option<SkgConfig> {
@@ -221,14 +221,8 @@ fn fixture_config (
   if toml . is_file () {
     return load_config_with_overrides (
       toml . to_str () ?, Some ("fixpoint"), &[] ) . ok (); }
-  let skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::from ([ (
-    SkgrepoName::from ("main"),
-    Skgrepo { name         : SkgrepoName::from ("main"),
-              abbreviation : None,
-              path         : prefer_owned_subdir (folder),
-              owned        : true, } ) ]);
-  Some ( SkgConfig::fromSkgreposAndTantivyFolder (
-    skgrepos, "/tmp/tantivy-test-fixpoint-unused" )) }
+  Some ( main_skgrepo_config (
+    folder, Path::new ("/tmp/tantivy-test-fixpoint-unused") )) }
 
 // The refresh is a fixpoint over every diff-view fixture too: for each
 // git fixture case (a folder whose owned skgrepos each hold a 'head'

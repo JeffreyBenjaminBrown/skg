@@ -225,18 +225,7 @@ impl SharedStoreSession {
         config . tantivy_folder = self . tantivy_folder . clone ();
         config
       } else {
-        let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
-          HashMap::new ();
-        skgrepos . insert (
-          SkgrepoName::from ("main"),
-          Skgrepo {
-            name         : SkgrepoName::from ("main"),
-            abbreviation : None,
-            path         : self . temp_fixtures . clone (),
-            owned        : true, });
-        SkgConfig::fromSkgreposAndTantivyFolder (
-          skgrepos,
-          self . tantivy_folder . to_str () . unwrap () ) }};
+        main_skgrepo_config (&self . temp_fixtures, &self . tantivy_folder) }};
     self . wipe_then_repopulate () }
 
   /// Like 'reset', but for sub-tests that prepare their own skgrepo
@@ -248,19 +237,8 @@ impl SharedStoreSession {
     skgrepo_path : &Path,
   ) -> Result<(), Box<dyn Error>> {
     println! ("-- sub-test: {}", subtest_name);
-    self . config = {
-      let mut skgrepos : HashMap<SkgrepoName, Skgrepo> =
-        HashMap::new ();
-      skgrepos . insert (
-        SkgrepoName::from ("main"),
-        Skgrepo {
-          name         : SkgrepoName::from ("main"),
-          abbreviation : None,
-          path         : skgrepo_path . to_path_buf (),
-          owned        : true, });
-      SkgConfig::fromSkgreposAndTantivyFolder (
-        skgrepos,
-        self . tantivy_folder . to_str () . unwrap () ) };
+    self . config =
+      main_skgrepo_config (skgrepo_path, &self . tantivy_folder);
     self . wipe_then_repopulate () }
 
   /// Like 'reset', but loads a (possibly multi-repo) config from a
@@ -549,22 +527,32 @@ pub fn prefer_owned_subdir (
   if owned . is_dir () { owned }
   else { root . to_path_buf () }}
 
+/// The config a test reads a fixture folder with when it holds no
+/// 'skgconfig.toml': the one owned skgrepo "main" at 'fixtures' (at
+/// its 'owned/' subfolder, if it has one: 'prefer_owned_subdir'),
+/// its search index at 'tantivy_folder'.
+pub fn main_skgrepo_config (
+  fixtures       : &Path,
+  tantivy_folder : &Path,
+) -> SkgConfig {
+  let skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::from ([ (
+    SkgrepoName::from ("main"),
+    Skgrepo {
+      name         : SkgrepoName::from ("main"),
+      abbreviation : None,
+      path         : prefer_owned_subdir (fixtures),
+      owned        : true, } ) ]);
+  SkgConfig::fromSkgreposAndTantivyFolder (
+    skgrepos, tantivy_folder . to_str () . unwrap () ) }
+
 /// Set up a test config and empty Tantivy index from copied fixtures.
 pub fn setup_test_tantivy (
   _test_name: &str,
   fixtures_folder: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut skgrepos : HashMap<SkgrepoName, Skgrepo> = HashMap::new();
-  skgrepos . insert (
-    SkgrepoName::from ("main"),
-    Skgrepo {
-      name         : SkgrepoName::from ("main"),
-      abbreviation : None,
-      path         : prefer_owned_subdir (Path::new (fixtures_folder)),
-      owned        : true, });
-  let config : SkgConfig = SkgConfig::fromSkgreposAndTantivyFolder (
-    skgrepos, tantivy_folder );
+  let config : SkgConfig = main_skgrepo_config (
+    Path::new (fixtures_folder), Path::new (tantivy_folder) );
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   Ok ((config, tantivy_index)) }
