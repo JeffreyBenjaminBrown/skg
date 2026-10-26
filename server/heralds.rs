@@ -735,6 +735,8 @@ fn change_fact_atoms () -> Vec<&'static str> {
       change : _,   // -> node, rel, properties, with DiffChange::EMITTABLE_ATOMS
       ready : _,    // -> ready, with the objects
       leaves : _,   // -> leaves, with the objects
+      home_skgrepo_move : _,   // -> the homeSkgrepoMove atom, in viewstats_atoms
+      moved_like_ancestor : _, // -> the movedLikeAncestor atom, in viewstats_atoms
     } = facts;
     match object { // compile error here = update DiffObject::ALL
       DiffObject::Node | DiffObject::Rel | DiffObject::All => () }}
@@ -762,8 +764,10 @@ fn graphstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [] }
 
-/// ViewnodeStats match atoms, from unrestrictedVognode_metadata_to_string's
-/// view_stats (org_to_text.rs). Birth and relationship facts are
+/// The match atoms of '(viewStats ...)', from
+/// unrestrictedVognode_metadata_to_string's view_stats (org_to_text.rs):
+/// ViewnodeStats's, the occurrence's 'overridesHere' and the two
+/// moves of its change facts. Birth and relationship facts are
 /// node-level '(rels ...)' data, not viewStats sub-forms.
 fn viewstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ViewnodeStats;
@@ -773,11 +777,8 @@ fn viewstats_atoms () -> Vec<&'static str> {
       homeSkgrepoAtBoundary : _, // -> the homeRepoHerald atom
       isWarranted : _,      // -> the noWarrant atom
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
-      overridesHere : _,    // keyed form (a viewStats sub-form)
       omitted_body : _,      // -> the node-level omittedBody atom
       relRepo : _,       // -> the relRepo display-fact atom and herald
-      home_skgrepo_move : _,   // -> the homeSkgrepoMove atom
-      moved_like_ancestor : _, // -> the movedLikeAncestor atom
     } = v; }
   let _ = guard;
   vec! [ "cycle", "homeRepoHerald", "noWarrant", "overridesHere", "relRepo",

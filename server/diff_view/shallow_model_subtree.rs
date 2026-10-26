@@ -291,7 +291,8 @@ pub fn give_model_facts_to (
   existing . change_facts = ChangeFacts {
     change   : model . change_facts . change,
     ready    : None,
-    leaves   : None };
+    leaves   : None,
+    .. ChangeFacts::default () };
   match ( &mut existing . kind, &model . kind ) {
     ( ViewnodeKind::Vognode (Vognode::Unrestricted (e)),
       ViewnodeKind::Vognode (Vognode::Unrestricted (f)) ) => {

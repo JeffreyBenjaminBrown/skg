@@ -35,7 +35,8 @@ fn facts (
 ) -> ChangeFacts {
   ChangeFacts { change : DiffChange { node, rel, properties : false },
                 ready  : ready . map (objects),
-                leaves : None } }
+                leaves : None,
+                .. ChangeFacts::default () } }
 
 /// The facts of a node in both graphs whose other properties changed.
 fn modified (

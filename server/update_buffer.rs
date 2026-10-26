@@ -351,7 +351,7 @@ fn replace_saved_view_fork_roots (
       if let Editability::Editable { body, .. } = &mut restriction . editability
       { *body = clone . body . clone (); }
       restriction . view_requests . remove (&ViewRequest::Fork);
-      restriction . viewStats . overridesHere = Some (original); }}
+      restriction . overridesHere = Some (original); }}
   Ok (())
 }
 

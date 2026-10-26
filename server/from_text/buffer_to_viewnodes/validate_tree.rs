@@ -194,7 +194,7 @@ fn overridesHere_fact_errors (
     let (carrier, original) : (Option<ID>, ID) =
       match &node_ref . value () . kind {
         MpViewnodeKind::Vognode (MpVognode::Unrestricted (t)) =>
-          match &t . viewStats . overridesHere {
+          match &t . overridesHere {
             Some (original) =>
               ( t . skgid . clone (), original . clone () ),
             None => continue },

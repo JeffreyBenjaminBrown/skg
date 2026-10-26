@@ -120,7 +120,7 @@ fn set_herald_strings_in_viewnode (
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     ( t . graphStats . clone (), t . claimsMembership,
-      t . viewStats . overridesHere . is_some () ) };
+      t . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
     None => return, }; // no stats -> no heralds

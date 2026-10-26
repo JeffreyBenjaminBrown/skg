@@ -34,7 +34,7 @@ use crate::types::misc::{ID, SkgConfig, SkgrepoChange};
 use crate::types::nodes::complete::Graphnode;
 use crate::types::tree::forest::{ViewForest, editable_occurrences, in_content_position};
 use crate::types::viewnode::{
-  Editability, FoldAndFocus, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
+  ChangeFacts, Editability, FoldAndFocus, PartnerFolder, Phantom, Viewnode, ViewnodeKind,
   Vognode, viewnode_of};
 use crate::types::views_state::{DiffViewBufferKind, ViewnodeIdRecord, pids_from_viewforest};
 use crate::diff_view::completion::complete_viewforest_with_graph_straddle;
@@ -274,11 +274,11 @@ pub fn set_homeSkgrepoMove_facts_in_viewforest (
       Some (( node . id (), home_skgrepo_move, moved_like_ancestor )) } )
     . collect ();
   for (treeid, home_skgrepo_move, moved_like_ancestor) in facts {
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
-      &mut viewforest . as_internal_tree_mut () . get_mut (treeid)
-      . unwrap () . value () . kind {
-      t . viewStats . home_skgrepo_move = home_skgrepo_move;
-      t . viewStats . moved_like_ancestor = moved_like_ancestor; }}}
+    let mut viewnode = // an unrestricted vognode, by the filter above
+      viewforest . as_internal_tree_mut () . get_mut (treeid) . unwrap ();
+    let facts : &mut ChangeFacts = &mut viewnode . value () . change_facts;
+    facts . home_skgrepo_move   = home_skgrepo_move;
+    facts . moved_like_ancestor = moved_like_ancestor; }}
 
 /// The ancestor generation (1 = viewparent, counting every viewnode
 /// between) and the home skgrepo move of the nearest unrestricted

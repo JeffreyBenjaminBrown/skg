@@ -27,6 +27,19 @@ pub struct ChangeFacts {
   pub ready    : Option<BTreeSet<DiffObject>>,
   /// None when the viewnode names no change-forest leaf.
   pub leaves   : Option<LeavesFact>,
+  /// Some(OLD to NEW) in the skgrepo-changes buffer of the diff
+  /// view, on an occurrence whose node's home skgrepo moved from OLD
+  /// to NEW since HEAD. The buffer's pass sets it after completion
+  /// ('set_homeSkgrepoMove_facts_in_viewforest'); the printer writes
+  /// it as '(homeSkgrepoMove (old OLD) (new NEW))' in '(viewStats ...)',
+  /// and the parser discards it. Herald "-OLD +NEW".
+  pub home_skgrepo_move   : Option<SkgrepoChange>,
+  /// Some(LETTER) beside 'home_skgrepo_move' when the nearest vognode
+  /// ancestor whose home moved moved the same way. LETTER names that
+  /// ancestor as the relationship heralds name ancestors: a for the
+  /// viewparent, b for the grandparent, and so on. Written, and
+  /// discarded, like 'home_skgrepo_move'. Herald "Δ⌂=LETTER".
+  pub moved_like_ancestor : Option<String>,
 }
 
 /// '(leaves N OBJECT...)': the change-forest leaves a readiness
@@ -303,6 +316,17 @@ pub struct UnrestrictedVognode_Generic < Id, Repo > {
   /// affect it, just as edits to itself do not affect it, regardless
   /// of what the children claim.
   pub claimsMembership : bool,
+  /// Some(N) means this viewnode is shown here in place of N,
+  /// which it (transitively) overrides. Herald pink "ĥ" after "O".
+  /// Load-bearing, unlike the view stats: save extraction
+  /// collects N (not this node's own ID) into the parent's lists
+  /// wherever this fact appears, so a substituted child
+  /// round-trips to the original ID instead of rewriting the
+  /// parent's contains. Serialized as the keyed form
+  /// '(overridesHere N)' in '(viewStats ...)'; tamper-checked at
+  /// buffer validation (the carrier's ID must equal the
+  /// visibility-ungated 'resolve_override (N).effective').
+  pub overridesHere    : Option<ID>,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphnodeStats,
@@ -398,17 +422,6 @@ pub struct ViewnodeStats {
   /// client parses this and decides all presentation (letters, colors,
   /// order). See 'docs/heralds.org'.
   pub rel_heralds           : Option<String>,
-  /// Some(N) means this viewnode is shown here in place of N,
-  /// which it (transitively) overrides. Herald pink "ĥ" after "O".
-  /// Load-bearing, unlike the other view stats: save extraction
-  /// collects N (not this node's own ID) into the parent's lists
-  /// wherever this fact appears, so a substituted child
-  /// round-trips to the original ID instead of rewriting the
-  /// parent's contains. Serialized as the keyed form
-  /// '(overridesHere N)'; tamper-checked at buffer validation
-  /// (the carrier's ID must equal the visibility-ungated
-  /// 'resolve_override (N).effective').
-  pub overridesHere         : Option<ID>,
   /// True iff the node is shown write-protected here while its graph
   /// node has a body -- a body the rendering hides. Herald "B",
   /// hugging the ☮. Display-only, like the assembled
@@ -435,18 +448,6 @@ pub struct ViewnodeStats {
   /// Herald: red "~NAME" immediately before the ⌂ homeRepoHerald
   /// (server/heralds.rs).
   pub relRepo            : Option<SkgrepoName>,
-  /// Some(OLD to NEW) in the skgrepo-changes buffer of the diff
-  /// view, for a node whose home skgrepo moved from OLD to NEW since
-  /// HEAD. Display-only; the buffer's pass sets it after completion
-  /// ('set_homeSkgrepoMove_facts_in_viewforest'), and the parser discards
-  /// it. Herald "-OLD +NEW".
-  pub home_skgrepo_move  : Option<SkgrepoChange>,
-  /// Some(LETTER) beside 'home_skgrepo_move' when the nearest vognode
-  /// ancestor whose home moved moved the same way. LETTER names that
-  /// ancestor as the relationship heralds name ancestors: a for the
-  /// viewparent, b for the grandparent, and so on. Display-only.
-  /// Herald "Δ⌂=LETTER".
-  pub moved_like_ancestor : Option<String>,
 }
 
 #[derive( Debug, Clone, PartialEq, Eq, Hash )]
@@ -697,7 +698,7 @@ impl UnrestrictedVognode {
   /// shown overrider round-trips to the original member instead of
   /// rewriting its parent's contains.
   pub fn collected_skgid (&self) -> ID {
-    self . viewStats . overridesHere . clone ()
+    self . overridesHere . clone ()
     . unwrap_or_else ( || self . skgid . clone () ) }
 }
 
@@ -705,7 +706,7 @@ impl MpUnrestrictedVognode {
   /// As 'UnrestrictedVognode::collected_id', for the maybe-placed stage (the
   /// node might not have an ID yet; a marker, if present, wins).
   pub fn collected_skgid (&self) -> Option<ID> {
-    self . viewStats . overridesHere . clone ()
+    self . overridesHere . clone ()
     . or_else ( || self . skgid . clone () ) }
 }
 
@@ -1206,11 +1207,8 @@ impl Default for ViewnodeStats {
       homeSkgrepoAtBoundary  : false,
       isWarranted       : Warrant::ByGraph,
       rel_heralds       : None,
-      overridesHere     : None,
       omitted_body      : false,
       relRepo        : None,
-      home_skgrepo_move : None,
-      moved_like_ancestor : None,
     }} }
 
 //
@@ -1229,6 +1227,7 @@ pub fn default_unrestrictedVognode (
     skgid,
     home_skgrepo: skgrepo,
     claimsMembership : true,
+    overridesHere    : None,
     graphStats     : GraphnodeStats::default(),
     viewStats      : ViewnodeStats::default(),
     relationshipEditRequest : None,

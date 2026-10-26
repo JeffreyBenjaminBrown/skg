@@ -416,6 +416,7 @@ fn unrestrictedVognode_metadata_to_string (
       unrestrictedVognode . viewStats . rel_heralds . clone () }
     fn view_stats (
       unrestrictedVognode : & UnrestrictedVognode,
+      facts     : & ChangeFacts,
       config    : & SkgConfig,
     ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
@@ -424,7 +425,7 @@ fn unrestrictedVognode_metadata_to_string (
       if unrestrictedVognode . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
       if let Some (ref original) =
-        unrestrictedVognode . viewStats . overridesHere {
+        unrestrictedVognode . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
       if let Some (ref skgrepo) =
@@ -439,13 +440,13 @@ fn unrestrictedVognode_metadata_to_string (
             metadata_value_atom (
               & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
       if let Some (home_skgrepo_move) =
-        &unrestrictedVognode . viewStats . home_skgrepo_move {
+        &facts . home_skgrepo_move {
         parts . push ( format! (
           "(homeSkgrepoMove (old {}) (new {}))",
           metadata_value_atom (&home_skgrepo_move . old),
           metadata_value_atom (&home_skgrepo_move . new) )); }
       if let Some (letter) =
-        &unrestrictedVognode . viewStats . moved_like_ancestor {
+        &facts . moved_like_ancestor {
         parts . push ( format! (
           "(movedLikeAncestor {})", metadata_value_atom (letter) )); }
       if parts . is_empty () { None }
@@ -494,7 +495,7 @@ fn unrestrictedVognode_metadata_to_string (
         parts . push ( "omittedBody" . to_string () ); }}
     if let Some (s) = rels_herald (unrestrictedVognode)
     { parts . push (s); }
-    if let Some (s) = view_stats (unrestrictedVognode, config)
+    if let Some (s) = view_stats (unrestrictedVognode, facts, config)
     { parts . push (s); }
     if let Some (s) = edit_request (unrestrictedVognode)
     { parts . push (s); }

@@ -343,7 +343,7 @@ fn replace_raw_content_children_with_visible_overriders (
       let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
         &child . value () . kind else { continue; };
       if ! restriction . claimsMembership
-         || restriction . viewStats . overridesHere . is_some ()
+         || restriction . overridesHere . is_some ()
       { continue; }
       let original : ID = restriction . skgid . clone ();
       let effective : ID = resolve_override (
@@ -368,7 +368,7 @@ fn replace_raw_content_children_with_visible_overriders (
         restriction . title = overrider . title . clone ();
         if let Editability::Editable { body, .. } = &mut restriction . editability
         { *body = overrider . body . clone (); }
-        restriction . viewStats . overridesHere = Some (original);
+        restriction . overridesHere = Some (original);
       }) . map_err (|e| -> Box<dyn Error> { e . into () }) ?;
   }
   Ok (())
@@ -465,7 +465,7 @@ fn is_overridden_shown_raw (
       |vn : &Viewnode| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Unrestricted (t))
           => ( Some (t . skgid . clone ()),
-               t . viewStats . overridesHere . is_some () ),
+               t . overridesHere . is_some () ),
         _ => ( None, false ) } ) ?;
   let skgid : ID = match skgid { Some (skgid) => skgid, None => return Ok (false) };
   if has_overridesHere { return Ok (false); }
@@ -647,7 +647,7 @@ fn complete_content_children (
                   d . title . clone(), d . body . clone() );
               if let ViewnodeKind::Vognode (
                 Vognode::Unrestricted (ref mut t)) = vn . kind
-              { t . viewStats . overridesHere =
+              { t . overridesHere =
                   Some ( skgid . clone() ); }
               vn }},
         ContentReality::Restricted =>

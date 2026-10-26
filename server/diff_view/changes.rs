@@ -813,7 +813,8 @@ fn entry_viewnode (
     change_facts : ChangeFacts {
       change : DiffChange { rel : existence, .. DiffChange::default () },
       ready    : None,
-      leaves   : None },
+      leaves   : None,
+      .. ChangeFacts::default () },
     .. viewnode_of ( ViewnodeKind::Property (property) ) } }
 
 /// Under 'treeid', a folder 'kind' holding 'entries'.

@@ -112,7 +112,8 @@ pub fn mk_historical_viewnode (
       change : DiffChange { node : Some (Existence::Removed), rel,
                             properties : false },
       ready    : None,
-      leaves   : None },
+      leaves   : None,
+      .. ChangeFacts::default () },
     .. viewnode_of ( ViewnodeKind::Vognode ( Vognode::Phantom (
       Phantom::Historical ( PhantomHistorical {
         skgid        : pid . clone (),

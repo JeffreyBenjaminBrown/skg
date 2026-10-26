@@ -83,6 +83,7 @@ pub struct ViewnodeMetadata {
   pub writeProtected: bool,
   pub graphStats: GraphnodeStats,
   pub viewStats: ViewnodeStats,
+  pub overridesHere: Option<ID>,
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<SkgrepoName>,
   pub view_requests: HashSet<ViewRequest>,
@@ -120,6 +121,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     writeProtected: false,
     graphStats: GraphnodeStats::default(),
     viewStats: ViewnodeStats::default(),
+    overridesHere: None,
     edit_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
@@ -329,6 +331,7 @@ pub fn viewnode_from_metadata (
             skgid            : metadata . skgid . clone (),
             home_skgrepo     : metadata . home_skgrepo . clone (),
             claimsMembership : metadata . claimsMembership,
+            overridesHere    : metadata . overridesHere . clone (),
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
             relationshipEditRequest,
@@ -715,7 +718,9 @@ fn parse_node_sexp (
           // regenerates them.
           "rels" => {},
           "viewStats" => {
-            parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
+            parse_viewstats_sexp (
+              &subitems[1..], &mut metadata . viewStats,
+              &mut metadata . overridesHere ) ?; },
           "editRequest" => {
             if metadata . edit_request . is_some ()
                || metadata . relRepo_request . is_some () {
@@ -777,9 +782,10 @@ fn parse_unknownnode_sexp (
             if metadata . unknown_relRepo . is_some () {
               return Err ( "unknown viewStats may appear only once" . to_string () ); }
             let mut stats : ViewnodeStats = ViewnodeStats::default ();
-            parse_viewstats_sexp ( &subitems[1..], &mut stats ) ?;
+            let mut overridesHere : Option<ID> = None;
+            parse_viewstats_sexp ( &subitems[1..], &mut stats, &mut overridesHere ) ?;
             if stats . relRepo . is_none ()
-               || stats . cycle || stats . overridesHere . is_some () {
+               || stats . cycle || overridesHere . is_some () {
               return Err ( "Unknown viewStats supports only relRepo"
                            . to_string () ); }
             metadata . unknown_relRepo = stats . relRepo; },
@@ -900,8 +906,9 @@ fn parse_deleted_sexp (
 /// 'homeSkgrepoMove' / 'movedLikeAncestor' sub-forms. Relationship stats are semantic display-only '(rels ...)'
 /// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
-  items : &[Sexp],
-  stats : &mut ViewnodeStats
+  items         : &[Sexp],
+  stats         : &mut ViewnodeStats,
+  overridesHere : &mut Option<ID>, // an occurrence's, which it carries outside its stats
 ) -> Result<(), String> {
   for element in items {
     match element {
@@ -929,7 +936,7 @@ fn parse_viewstats_sexp (
             // extraction round-trips the original ID through it.
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            stats . overridesHere = Some ( ID::from (value)); },
+            *overridesHere = Some ( ID::from (value)); },
           "relRepo" => {
             // Display-only skgrepo fact.  A save request must instead
             // appear as (editRequest (relRepo REPO)).

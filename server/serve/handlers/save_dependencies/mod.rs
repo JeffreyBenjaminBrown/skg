@@ -141,7 +141,7 @@ fn dependencies_from_uninterpreted (
     match &node . value () . kind {
       MpViewnodeKind::Vognode (MpVognode::Unrestricted (restriction)) => {
         result . extend (restriction . skgid . iter () . cloned ());
-        result . extend (restriction . viewStats . overridesHere . iter () . cloned ());
+        result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability
@@ -167,7 +167,7 @@ fn dependencies_from_registered (
     match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
         result . insert (restriction . skgid . clone ());
-        result . extend (restriction . viewStats . overridesHere . iter () . cloned ());
+        result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &restriction . editability

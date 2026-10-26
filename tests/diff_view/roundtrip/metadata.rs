@@ -22,7 +22,8 @@ fn ready (
 ) -> ChangeFacts {
   ChangeFacts { change   : DiffChange::default (),
                 ready    : Some ( objects . iter () . copied () . collect () ),
-                leaves   : None } }
+                leaves   : None,
+                .. ChangeFacts::default () } }
 
 fn request_all () -> Option<ReadinessRequest> {
   Some ( ReadinessRequest {
@@ -109,7 +110,8 @@ fn removed_aliases_and_ids_round_trip () {
   let removed : ChangeFacts = ChangeFacts {
     change   : DiffChange { rel : Some (Existence::Removed), .. DiffChange::default () },
     ready    : Some (BTreeSet::new ()),
-    leaves   : None };
+    leaves   : None,
+    .. ChangeFacts::default () };
   assert_round_trip (
     property ( Property::RemovedAlias { text : "an old alias" . into () },
                removed . clone (), None ),
@@ -133,7 +135,8 @@ fn a_historical_phantom_round_trips () {
                                 rel  : Some (Existence::Removed),
                                 properties : false },
         ready    : Some ( [ DiffObject::Node ] . into_iter () . collect () ),
-        leaves   : None },
+        leaves   : None,
+        .. ChangeFacts::default () },
       request_all () ),
     "(historical (id gone) (repo main) (diff (node removed) (rel removed) (ready node) (readyRequest all)))" ); }
 
@@ -183,7 +186,8 @@ fn a_historical_phantom_round_trips_with_its_restore_request () {
                               rel  : None,
                               properties : false },
         ready  : None,
-        leaves : None },
+        leaves : None,
+        .. ChangeFacts::default () },
       None ),
     "(historical (id gone) (repo main) (editRequest restoreNode) (diff (node removed)))" ); }
 
@@ -196,7 +200,8 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
                           rel  : Some (Existence::Removed),
                           properties : false },
     ready  : None,
-    leaves : None };
+    leaves : None,
+    .. ChangeFacts::default () };
   let mut editable : Viewnode = mk_editable_viewnode (
     ID::from ("x"), SkgrepoName::from ("main"), "x" . into (), None );
   let mut write_protected : Viewnode = mk_writeProtected_viewnode (
