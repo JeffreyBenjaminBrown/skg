@@ -1075,6 +1075,14 @@ vanish where slice 1 left them in comments. Tests: the suite;
 both client suites; the integration suite; a grep showing the
 retired words gone from 'server/', 'tests/', 'elisp/' and
 'nvim/' outside git history.
+*** Correction carried from slice 7
+'org_to_viewforest' takes the graph to resolve IDs and inherit
+repos, and two kinds of caller (the dirty-view dependency scan
+and tests of fully written text) pass an empty graph to mean
+"resolve nothing". That is a boolean in disguise. This slice
+gives the choice a name, an enum parameter such as
+'IdResolution { ThroughGraph (&InRustGraph), AsWritten }', and
+no caller constructs an empty graph for the purpose.
 ** TODO Slice 13: docs and the two-question check
 'docs/glossary.org' (every entry that says phantom,
 non-member, entry, filter folder, save input, display fact,

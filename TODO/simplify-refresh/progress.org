@@ -736,3 +736,10 @@ Expected fixture adaptation (above). Then 'bash/nextest.sh':
 931 of 931 passed. No file under elisp/, nvim/ or shared/
 changed, and no buffer text, so the client and integration
 suites were not run.
+** Orchestrator's correction after slice 7 (2026-10-27)
+Inserted under slice 12: the parse's "resolve IDs through the
+graph or read them as written" choice becomes an explicit
+parameter instead of an empty graph. Noted for the review: the
+'SkgrepoName::not_found' sentinel for a headline nothing can
+give a repo.
+
