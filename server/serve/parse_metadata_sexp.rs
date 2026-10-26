@@ -64,7 +64,7 @@ use crate::types::viewnode::{
   Editability, RelationshipEditRequest, ViewnodeId, Warrant,
 };
 use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, UnrestrictedVognode,
+    Viewnode, ViewnodeKind, Occurrence,
     Vognode, viewnode_of,
 };
 
@@ -85,7 +85,7 @@ pub struct ViewnodeMetadata {
   pub viewnode_id: Option<ViewnodeId>,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<ViewnodeKind>,
-  // UnrestrictedVognode fields (ignored if non-vognode is Some)
+  // Occurrence fields (ignored if non-vognode is Some)
   pub gnid: Option<ID>,
   pub home_skgrepo: Option<SkgrepoName>,
   // False when the headline carries 'noClaim': on a node, an alias,
@@ -285,7 +285,7 @@ pub fn viewnode_from_metadata (
           other => other . clone () };
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
-      // UnrestrictedVognode
+      // Occurrence
       { let relationshipEditRequest : Option<RelationshipEditRequest> =
           // lives outside 'Editability'
           if matches! ( metadata . edit_request,
@@ -322,7 +322,7 @@ pub fn viewnode_from_metadata (
             . map ( |gnid| BufferValidationError::EditRequestOnWriteProtectedOccurrence (
                       gnid, headline . clone () )) }
           else { None };
-        let t : UnrestrictedVognode = UnrestrictedVognode {
+        let t : Occurrence = Occurrence {
             title,
             gnid            : metadata . gnid . clone ()
                                . unwrap_or_else ( || ID (
@@ -337,7 +337,7 @@ pub fn viewnode_from_metadata (
             view_requests    : metadata . view_requests . clone (),
             editability, };
         let node_kind : ViewnodeKind =
-          ViewnodeKind::Vognode ( Vognode::Unrestricted (t) );
+          ViewnodeKind::Vognode ( Vognode::Occurrence (t) );
         ( node_kind,
           error, None ) }
     };
@@ -707,12 +707,12 @@ fn misplaced_restore_request_message (
 
 /// A ghost carries no edit request but restoreNode, and no view
 /// request but tombstone, which nothing else carries; restoreRel sits
-/// only on an unrestricted vognode, and the save checks its position.
+/// only on an occurrence, and the save checks its position.
 /// The other requests keep the places their own checks give them.
 fn check_where_the_edit_request_sits (
   metadata : &ViewnodeMetadata,
 ) -> Result<(), String> {
-  let is_unrestricted_vognode : bool =
+  let is_occurrence : bool =
     metadata . names_an_occurrence ();
   if metadata . view_requests . contains (&ViewRequest::Tombstone)
      && ! metadata . is_ghost
@@ -725,7 +725,7 @@ fn check_where_the_edit_request_sits (
   match &metadata . edit_request {
     Some (NodeEditRequest::RestoreNode) if metadata . is_ghost =>
       Ok (( )),
-    Some (NodeEditRequest::RestoreRel) if is_unrestricted_vognode =>
+    Some (NodeEditRequest::RestoreRel) if is_occurrence =>
       Ok (( )),
     request @ Some (NodeEditRequest::RestoreNode | NodeEditRequest::RestoreRel) =>
       Err ( misplaced_restore_request_message (

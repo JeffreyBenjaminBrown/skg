@@ -87,7 +87,7 @@ describe('skg.metadata commands', function ()
       '(skg node (editRequest delete))'))
   end)
 
-  it('delete_recursive skips non-unrestrictedNode descendants', function ()
+  it('delete_recursive skips non-occurrence descendants', function ()
     buffer_with(table.concat({
       '* (skg node (gnid root)) root',
       '** (skg node (gnid child)) child',

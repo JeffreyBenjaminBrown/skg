@@ -23,8 +23,8 @@ use crate::types::misc::{ID, SkgrepoName};
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::viewnode::{
   ChangeFacts, Editability, Ghost, NodeEditRequest, PropertyMember, RelationshipEditRequest,
-  Unknown, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode, Warrant,
-  default_unrestrictedVognode};
+  Unknown, Occurrence, Viewnode, ViewnodeKind, Vognode, Warrant,
+  default_occurrence};
 use crate::update_buffer::completion_mode::CompletionMode;
 
 use ego_tree::{NodeId, NodeMut, Tree};
@@ -84,7 +84,7 @@ impl EditRequests {
     vognode : &Vognode,
   ) -> EditRequests {
     match vognode {
-      Vognode::Unrestricted (occurrence) => EditRequests {
+      Vognode::Occurrence (occurrence) => EditRequests {
         node_edit_request         : occurrence . edit_request () . cloned (),
         relationship_edit_request : occurrence . relationshipEditRequest . clone (),
         restore_node              : false, },
@@ -117,7 +117,7 @@ pub(crate) fn rekind_vognode (
     _ => return Ok (( )), };
   let gnid : ID = vognode . gnid () . clone ();
   match ( id_rule (&gnid, parent_goal, walk), vognode ) {
-    ( IdRuleAnswer::Occurrence (pid), Vognode::Unrestricted (occurrence) ) =>
+    ( IdRuleAnswer::Occurrence (pid), Vognode::Occurrence (occurrence) ) =>
       refresh_occurrence_in_place (tree, child, occurrence, &pid, walk) ?,
     ( IdRuleAnswer::Occurrence (pid), other ) => {
       let requests : EditRequests = EditRequests::of (&other);
@@ -126,12 +126,12 @@ pub(crate) fn rekind_vognode (
         _ => true, };
       let editable : bool =
         drawn_occurrence_is_editable (tree, parent, &pid, walk);
-      let occurrence : UnrestrictedVognode =
+      let occurrence : Occurrence =
         occurrence_from_truth (&pid, editable, claims, walk) ?;
-      let occurrence : UnrestrictedVognode = UnrestrictedVognode {
+      let occurrence : Occurrence = Occurrence {
         relationshipEditRequest : requests . relationship_edit_request . clone (),
         .. occurrence };
-      set_vognode_keeping_readiness (tree, child, Vognode::Unrestricted (occurrence));
+      set_vognode_keeping_readiness (tree, child, Vognode::Occurrence (occurrence));
       if editable {
         walk . editable_gnids . insert (pid . clone ());
         walk . drawn_editable . insert (child); }
@@ -144,7 +144,7 @@ pub(crate) fn rekind_vognode (
       let requests : EditRequests = EditRequests::of (&other);
       forget_editable_occurrence (&other, child, walk);
       let carried_claim : bool = match &other {
-        Vognode::Unrestricted (occurrence) => occurrence . claimsMembership,
+        Vognode::Occurrence (occurrence) => occurrence . claimsMembership,
         Vognode::Unknown (unknown) => unknown . claimsMembership,
         Vognode::Ghost (ghost) => ghost . claimsMembership, };
       let named_by_the_list : bool =
@@ -238,7 +238,7 @@ fn entombstone_reporting_requests_only (
 fn refresh_occurrence_in_place (
   tree       : &mut Tree<Viewnode>,
   child      : NodeId,
-  occurrence : UnrestrictedVognode,
+  occurrence : Occurrence,
   pid        : &ID,
   walk       : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
@@ -251,7 +251,7 @@ fn refresh_occurrence_in_place (
     if walk . editable_gnids . contains (pid) {
       write_protect_occurrence (tree, child, walk); }
     else { walk . editable_gnids . insert (pid . clone ()); }}
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
   { occurrence . gnid        = pid . clone ();
     occurrence . title        = node . title . clone ();
@@ -284,15 +284,15 @@ pub(crate) fn occurrence_from_truth (
   editable : bool,
   claims   : bool,
   walk     : &Walk,
-) -> Result<UnrestrictedVognode, Box<dyn Error>> {
+) -> Result<Occurrence, Box<dyn Error>> {
   let node : &GraphnodeInRust = walk . truth . graph . get (pid)
     . ok_or ("occurrence_from_truth: the truth lacks the node") ?;
-  Ok ( UnrestrictedVognode {
+  Ok ( Occurrence {
     claimsMembership : claims,
     editability      : if editable {
       Editability::Editable { body : node . body . clone (), edit_request : None }
     } else { Editability::WriteProtected },
-    .. default_unrestrictedVognode (
+    .. default_occurrence (
       pid . clone (), node . home_skgrepo . clone (), node . title . clone () ) } ) }
 
 /// The ghost of 'pid', from HEAD. None outside the diff view, or if
@@ -322,7 +322,7 @@ fn forget_editable_occurrence (
   treeid  : NodeId,
   walk    : &mut Walk,
 ) {
-  if let Vognode::Unrestricted (occurrence) = vognode {
+  if let Vognode::Occurrence (occurrence) = vognode {
     if ! occurrence . is_writeProtected () {
       walk . editable_gnids . remove (&occurrence . gnid);
       walk . drawn_editable . remove (&treeid); }}}

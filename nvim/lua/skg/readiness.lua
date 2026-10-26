@@ -271,7 +271,7 @@ end
 ---@param sexp any|nil
 ---@return boolean is it a node that is not write-protected?
 local function editable_node_p (sexp)
-  return metadata.unrestrictedNode_sexp_p(sexp)
+  return metadata.occurrence_sexp_p(sexp)
          and not metadata.node_write_protected_p(sexp)
 end
 

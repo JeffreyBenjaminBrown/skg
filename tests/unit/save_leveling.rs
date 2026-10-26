@@ -687,16 +687,16 @@ fn relrepo_fact_and_request_round_trip_separately (
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::viewnode::{
-    default_unrestrictedVognode, RelationshipEditRequest, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode,
+    default_occurrence, RelationshipEditRequest, Occurrence, Viewnode, ViewnodeKind, Vognode,
     viewnode_of };
 
-  let mut t : UnrestrictedVognode =
-    default_unrestrictedVognode (
+  let mut t : Occurrence =
+    default_occurrence (
       ID::new ("n"), SkgrepoName::from ("public"), "N" . to_string () );
   t . viewStats . relRepo = Some ( SkgrepoName::from ("private") );
   t . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("secret") ));
   let viewnode : Viewnode =
-    viewnode_of ( ViewnodeKind::Vognode ( Vognode::Unrestricted (t) ));
+    viewnode_of ( ViewnodeKind::Vognode ( Vognode::Occurrence (t) ));
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let rendered : String =
@@ -750,11 +750,11 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::nodes::complete::Flag;
   use crate::types::viewnode::{
-    default_unrestrictedVognode, UnrestrictedVognode, NodeEditRequest, Viewnode,
+    default_occurrence, Occurrence, NodeEditRequest, Viewnode,
     ViewnodeKind, Vognode, viewnode_of};
 
   for value in [false, true] {
-    let mut restriction : UnrestrictedVognode = default_unrestrictedVognode (
+    let mut restriction : Occurrence = default_occurrence (
       ID::new ("n"), SkgrepoName::from ("public"), "N" . to_string () );
     if let crate::types::viewnode::Editability::Editable {
       edit_request, .. } = &mut restriction . editability
@@ -764,7 +764,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
     else { unreachable! (); }
     let mut node : Viewnode =
       viewnode_of ( ViewnodeKind::Vognode (
-        Vognode::Unrestricted (restriction) ));
+        Vognode::Occurrence (restriction) ));
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (
@@ -775,7 +775,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
       Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching, value }) );
     node . consume_edit_request_after_save ();
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &node . kind
+    let ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) = &node . kind
       else { unreachable! (); };
     assert_eq! (restriction . edit_request (), None); }
 

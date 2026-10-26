@@ -508,7 +508,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
       . expect ("the buffer is not empty") . viewforest;
     let m_under_h = |viewforest : &ViewForest| -> Option<NodeId> {
       viewforest . nodes () . find_map ( |node| match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Occurrence (t))
           if t . gnid == ID::from ("m")
           && node . parent () . is_some_and ( |parent| matches! (
                &parent . value () . kind,
@@ -522,7 +522,7 @@ fn the_occurrences_made_editable_include_a_member_under_a_historical_phantom (
     assert_eq! ( m_under_h_is_editable (&viewforest), Some (true),
                  "m is editable under h" );
     let m : NodeId = m_under_h (&viewforest) . unwrap ();
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       &mut viewforest . get_mut (m) . unwrap () . value () . kind {
       t . write_protect (); }
     assert_eq! ( m_under_h_is_editable (&viewforest), Some (false) );

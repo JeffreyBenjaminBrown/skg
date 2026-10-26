@@ -300,27 +300,27 @@ async fn test_find_buffer_errors_for_saving (
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_NonVognode error for alias"); }
 
-      // View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts.
-      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*unrestrictedVognode.*ghost") . unwrap();
+      // View roots must be Occurrences, tombstones, unknowns or ghosts.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*occurrence.*ghost") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(|e| matches!(e, BufferValidationError::Other (msg)
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts' error"); }
+                   "Should find 1 'View roots must be Occurrences, tombstones, unknowns or ghosts' error"); }
 
-      // UnrestrictedVognode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
-      { let unrestrictedVognode_children_re =
-          Regex::new(r"(?i)unrestrictedVognode.*child.*belongs.*elsewhere") . unwrap();
-        let unrestrictedVognode_children_errors: Vec<&BufferValidationError> =
+      // Occurrence child belongs elsewhere (root has Alias children directly, not via AliasFolder)
+      { let occurrence_children_re =
+          Regex::new(r"(?i)occurrence.*child.*belongs.*elsewhere") . unwrap();
+        let occurrence_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
         . filter( |e| matches!( e,
                                 BufferValidationError::LocalStructureViolation(msg, _, _)
-                               if unrestrictedVognode_children_re . is_match (msg)))
+                               if occurrence_children_re . is_match (msg)))
           . collect();
-        assert_eq!(unrestrictedVognode_children_errors . len(), 1,
-                   "Should find 1 misplaced UnrestrictedVognode child error"); }
+        assert_eq!(occurrence_children_errors . len(), 1,
+                   "Should find 1 misplaced Occurrence child error"); }
 
       // "Alias with body problem" fails two checks (no children + AliasFolder parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.

@@ -114,7 +114,7 @@
          nil
          (test-skg-readable-ids--titles-payload
           test-skg-readable-ids--id-unrestricted
-          "Unrestricted Title"))
+          "Public Title"))
         (should (= 1 (test-skg-readable-ids--after-string-count)))
         (should (= 0 (test-skg-readable-ids--after-string-count-at-id
                       test-skg-readable-ids--id-restricted)))

@@ -52,14 +52,14 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Editable] . into_iter () . collect () );
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (node)) = &mut restriction . kind {
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (node)) = &mut restriction . kind {
     node . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )); }
   restriction . readiness_request = Some (ReadinessRequest {
     ready : true, objects : [DiffObject::All] . into_iter () . collect () });
   restriction . consume_edit_request_after_save ();
   assert_eq! (restriction . readiness_request, None);
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) = &restriction . kind
-  else { panic! ("expected unrestricted node"); };
+  let ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) = &restriction . kind
+  else { panic! ("expected an occurrence"); };
   assert_eq! (restriction . relationshipEditRequest, None);
   assert_eq! (restriction . edit_request (), None);
   assert! (restriction . view_requests . contains (&ViewRequest::Editable));
@@ -117,19 +117,19 @@ fn write_protect_drops_the_editable_request_and_keeps_membership () {
       body : Some ("body" . into ()),
       edit_request : Some (NodeEditRequest::Delete) },
     [ ViewRequest::Editable, ViewRequest::Flags ] . into_iter () . collect () );
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut viewnode . kind
-  else { panic! ("expected unrestricted node"); };
+  let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = &mut viewnode . kind
+  else { panic! ("expected an occurrence"); };
   t . write_protect ();
   assert_eq! (t . editability, Editability::WriteProtected);
   assert_eq! ( t . view_requests,
                [ ViewRequest::Flags ] . into_iter () . collect () );
   assert_eq! (t . claimsMembership, false); }
 
-// 'editable_occurrences' collects the IDs of the editable unrestricted
-// vognodes at any depth, and no write-protected one, phantom or
+// 'editable_occurrences' collects the IDs of the editable
+// occurrences at any depth, and no write-protected one, phantom or
 // folder.
 #[test]
-fn editable_occurrences_are_the_editable_unrestricted_vognodes () {
+fn editable_occurrences_are_those_not_write_protected () {
   let mut viewforest : ViewForest = ViewForest::new ();
   let buffer_root : ego_tree::NodeId = viewforest . internal_root_gnid ();
   let tree : &mut ego_tree::Tree<Viewnode> = viewforest . as_internal_tree_mut ();

@@ -84,7 +84,7 @@ pub fn set_metadata_relationships_in_node_recursive (
 ) {
   let new_stats : Option < GraphnodeStats > =
     { match & tree . get (treeid) . unwrap () . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Occurrence (t))
           => { let graphnode_opt : Option<Graphnode>
                  = graphnode_graphFirst_by_pid_and_skgrepo (
                      graph, config, &t . gnid, &t . home_skgrepo
@@ -94,7 +94,7 @@ pub fn set_metadata_relationships_in_node_recursive (
         _ => None }};
   match new_stats {
     Some (gs) =>
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
         &mut tree . get_mut (treeid) . unwrap () . value () . kind
         { t . graphStats = gs; },
     None => {} }

@@ -51,7 +51,7 @@ impl EnrichmentProvenance {
     gnid_minted       : bool,
     skgrepo_inherited : bool,
   ) {
-    let Some (gnid) : Option<&ID> = viewnode . unrestricted_gnid ()
+    let Some (gnid) : Option<&ID> = viewnode . occurrence_gnid ()
       else { return; };
     if gnid_minted {
       self . new_nodes . insert (gnid . clone ()); }
@@ -156,7 +156,7 @@ fn skgrepo_of_nearest_occurrence_ancestor (
 ) -> Option<SkgrepoName> {
   for ancestor in once (node) . chain (node . ancestors ()) {
     match &ancestor . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (at)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (at)) =>
         return Some ( if at . is_writeProtected () {
           writeProtected_skgrepos_after_save . get (&at . gnid) . cloned ()
           . unwrap_or_else ( || at . home_skgrepo . clone () )
@@ -183,7 +183,7 @@ pub fn viewparent_makes_aliases (
 pub fn make_occurrence_an_alias (
   viewnode : &mut Viewnode,
 ) {
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &viewnode . kind
+  let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = &viewnode . kind
     else { return; };
   viewnode . kind = ViewnodeKind::PropertyMember (
     PropertyMember::alias (

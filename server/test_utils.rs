@@ -650,13 +650,13 @@ fn compare_two_viewnode_branches_recursively_modulo_gnid (
   let n1 : &Viewnode = node1 . value();
   let n2 : &Viewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
-    ( ViewnodeKind::Vognode (Vognode::Unrestricted (_)),
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t2)) ) =>
+    ( ViewnodeKind::Vognode (Vognode::Occurrence (_)),
+      ViewnodeKind::Vognode (Vognode::Occurrence (t2)) ) =>
     { // Copy the ID from one to the other, then compare.
       let id2 : ID = t2 . gnid . clone ();
       let mut n1_copy : Viewnode =
         n1 . clone();
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut n1_copy . kind
+      if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = &mut n1_copy . kind
         { t . gnid = id2; }
       if n1_copy != *n2 { return false; }}
     ( ViewnodeKind::Folder (_)

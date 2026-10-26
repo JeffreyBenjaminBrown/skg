@@ -313,7 +313,7 @@ fn expected_change_viewnodes (
     return Vec::new (); };
   let node : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
   match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
       if ! occurrence . is_writeProtected () => {
       let pid : &ID = &occurrence . gnid;
       let in_c : bool = sets (walk) . is_some_and ( |sets| sets . c . contains (pid) );
@@ -340,7 +340,7 @@ fn expected_change_viewnodes (
         . collect () },
     ViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. }) => {
       let Some (pid) = node . parent () . and_then ( |owner| match &owner . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           Some ( occurrence . gnid . clone () ),
         _ => None, } ) else { return Vec::new (); };
       match ( straddle . before . get (&pid), straddle . after . get (&pid) ) {
@@ -423,7 +423,7 @@ pub(crate) fn tag_children (
     { let mut child_mut : NodeMut<Viewnode> = tree . get_mut (child) . unwrap ();
       let viewnode : &mut Viewnode = child_mut . value ();
       let change : Option<DiffChange> = match &viewnode . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           if chain { Some (DiffChange::default ()) }
           else { Some ( straddle . node_change (&occurrence . gnid, rel) ) },
         ViewnodeKind::Vognode (Vognode::Ghost (_)) =>

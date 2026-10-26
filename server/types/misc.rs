@@ -19,7 +19,7 @@ use crate::consts::{DEFAULT_INITIAL_NODE_LIMIT, DEFAULT_PORT};
 /// "should be this value" (even if empty).
 ///
 /// ELABORATION:
-/// When a user saves an UnrestrictedVognode, its non-ignored UnrestrictedVognode children
+/// When a user saves an Occurrence, its non-ignored Occurrence children
 /// always define its contents, so MSV does not apply there.
 /// But other fields -- e.g. aliases --
 /// the user is likely not to mention (in particular,
@@ -265,11 +265,11 @@ impl SkgConfig {
 pub struct SkgrepoName ( pub String );
 
 impl SkgrepoName {
-  /// Reserved sentinel skgrepo for a *non-Unrestricted* viewnode (e.g. a
+  /// Reserved sentinel skgrepo for a viewnode *not an occurrence* (e.g. a
   /// historical phantom) whose skgrepo could not be determined. It renders like
   /// any other skgrepo -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
-  /// (see the glossary's "unknown node, dangling ID"). Unrestricted-vognode skgrepo failures are caught by
+  /// (see the glossary's "unknown node, dangling ID"). An occurrence's skgrepo failures are caught by
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {

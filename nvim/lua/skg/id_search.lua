@@ -102,7 +102,7 @@ function M.metadata_sexp_contains_id_p (sexp)
 end
 
 ---The kinds whose headline bears an id and a skgrepo: an
----UnrestrictedVognode and a ghost. Each keeps its id in '(gnid X)' and
+---Occurrence and a ghost. Each keeps its id in '(gnid X)' and
 ---its skgrepo in '(skgRepos (nodeRepo R))', beside its kind atom.
 local id_bearing_kinds = { 'node', 'ghost' }
 
@@ -126,7 +126,7 @@ local function first_atom_at_path_of_id_bearing_kind (sexp, path)
   return nil
 end
 
----The id from SEXP, accepting the UnrestrictedVognode and ghost
+---The id from SEXP, accepting the occurrence and ghost
 ---shapes. Nil when absent.
 ---@param sexp any
 ---@return string|nil

@@ -8,7 +8,7 @@ use crate::dbs::node_lookup::opt_graphnode_by_gnid;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Folder, PropertyMember, ViewRequest};
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
-use crate::types::viewnode::{Vognode, UnrestrictedVognode};
+use crate::types::viewnode::{Vognode, Occurrence};
 use crate::types::tree::forest::ViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use crate::types::errors::{BufferValidationError, HeadlineName, with_org_subheadlines};
@@ -108,7 +108,7 @@ pub fn find_buffer_errors_for_saving (
 
 /// Removing an ID from an idFolder aborts the save (see the
 /// glossary's "write-protected set"): for each present idFolder whose
-/// parent is an UnrestrictedVognode with an ID, every ID of the
+/// parent is an Occurrence with an ID, every ID of the
 /// recorder (its pid and extra_ids) must stand beneath it. The order
 /// is view-local (the rerender keeps it). The idFolder is
 /// write-protected, so no ID there claims membership: an ID beyond
@@ -117,7 +117,7 @@ pub fn find_buffer_errors_for_saving (
 /// it unwarranted. The message names the escape hatch (edit the .skg
 /// file directly). An absent idFolder means no opinion, as for other
 /// folders. Shapes that other validations reject (an idFolder without
-/// an UnrestrictedVognode parent, a parent without an ID) are skipped
+/// an Occurrence parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
 fn idFolder_membership_errors (
@@ -136,7 +136,7 @@ fn idFolder_membership_errors (
     let (recorder, recorder_headline) : (ID, HeadlineName) =
       match node_ref . parent ()
         . map ( |p| (p . value (), &p . value () . kind) ) {
-        Some ((parent, ViewnodeKind::Vognode (Vognode::Unrestricted (t))))
+        Some ((parent, ViewnodeKind::Vognode (Vognode::Occurrence (t))))
           => (t . gnid . clone (), parent . headline_name ()),
         _ => continue };
     let mut buffer_gnids : Vec<ID> =
@@ -188,7 +188,7 @@ fn overridesHere_fact_errors (
     let Edge::Open (node_ref) = edge else { continue; };
     let (carrier, original) : (ID, ID) =
       match &node_ref . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
           match &t . overridesHere {
             Some (original) =>
               ( t . gnid . clone (), original . clone () ),
@@ -247,13 +247,13 @@ fn validate_view_roots (
   for root in viewforest . roots () {
     if ! matches! (
       &root . value () . kind,
-        ViewnodeKind::Vognode (Vognode::Unrestricted (_))
+        ViewnodeKind::Vognode (Vognode::Occurrence (_))
         | ViewnodeKind::Tombstone // e.g. a root the skgrepo restriction hides, kept for its children (the API doc's "Restricted-skgrepo nodes")
         | ViewnodeKind::Vognode (Vognode::Unknown (_))
         | ViewnodeKind::Vognode (Vognode::Ghost (_)))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be UnrestrictedVognodes, tombstones, unknowns or ghosts."
+          "View roots must be Occurrences, tombstones, unknowns or ghosts."
           . to_string () )); }}}
 
 /// No two nodes with the same ID may carry editable view requests,
@@ -278,10 +278,10 @@ fn validate_editable_view_requests (
   { if let Edge::Open (node_ref) = edge
     { let viewnode : &Viewnode =
         node_ref . value();
-      // Only an Unrestricted node carries view_requests; a phantom never can,
-      // so the Editable-request validations below apply to Unrestricted only.
+      // Only an occurrence carries view_requests; a phantom never can,
+      // so the Editable-request validations below apply to occurrences only.
       if let ViewnodeKind::Vognode (
-        Vognode::Unrestricted (t))
+        Vognode::Occurrence (t))
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Editable)
         { { let gnid : &ID = &t . gnid;
@@ -290,7 +290,7 @@ fn validate_editable_view_requests (
           { errors . push( BufferValidationError::WriteProtectAndEditableViewRequestsOnOneOccurrence(
             gnid . clone(), viewnode . headline_name () )); }} }}} }}
 
-/// For each ID some Unrestricted occurrence of which carries
+/// For each ID some occurrence of which carries
 /// 'request', in buffer order of first appearance: the names of those
 /// occurrences, in buffer order.
 fn occurrences_requesting (
@@ -302,7 +302,7 @@ fn occurrences_requesting (
     HashMap::new ();
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & node_ref . value () . kind else { continue; };
     if ! t . view_requests . contains (request) { continue; }
     let gnid : &ID = & t . gnid;
@@ -333,7 +333,7 @@ fn writeProtected_relRepo_request_errors (
 ) {
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       &node_ref . value () . kind else { continue; };
     if t . is_writeProtected ()
        && RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some ()
@@ -345,38 +345,38 @@ fn writeProtected_relRepo_request_errors (
           t . gnid . 0 ),
         &[ headline ] ))); }} }
 
-/// Whether save reads the relRepo request on this Unrestricted node:
+/// Whether save reads the relRepo request on this occurrence:
 /// the node is a member of its view-parent, and the relationship's
 /// writer is save-eligible. That writer is the view-parent, or, when the
 /// view-parent is a writable PartnerFolder, the folder's view-parent.
 fn relRepo_request_is_collected (
   node_ref : NodeRef<Viewnode>,
-  t        : &UnrestrictedVognode,
+  t        : &Occurrence,
 ) -> bool {
   let is_member : bool =
     t . claimsMembership;
   is_member
   && match node_ref . parent () {
     Some (parent) => match &parent . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
-        is_saveEligible_unrestricted_vognode (parent),
+      ViewnodeKind::Vognode (Vognode::Occurrence (_)) =>
+        is_saveEligible_occurrence (parent),
       ViewnodeKind::Folder (
         Folder::Subscribee | Folder::Overridden ) =>
         parent . parent ()
-        . map ( is_saveEligible_unrestricted_vognode )
+        . map ( is_saveEligible_occurrence )
         . unwrap_or (false),
       _ => false },
     None => false } }
 
 /// As the save-eligibility of
 /// 'from_text/local_fieldintent_collection/traverse.rs', at the
-/// tree validation stage: an editable Unrestricted node, not marked for
+/// tree validation stage: an editable occurrence, not marked for
 /// deletion, not in subscribee-as-such position.
 #[allow(non_snake_case)]
-fn is_saveEligible_unrestricted_vognode (
+fn is_saveEligible_occurrence (
   node_ref : NodeRef<Viewnode>,
 ) -> bool {
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &node_ref . value () . kind else { return false; };
   let is_subscribee_as_such : bool =
     t . claimsMembership

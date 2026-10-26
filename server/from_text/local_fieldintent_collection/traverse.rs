@@ -28,21 +28,21 @@
 /// validation precludes, it stays total, emitting nothing rather
 /// than erroring.
 /// .
-/// DEFINITION: a vognode is *save-eligible* iff it is Unrestricted,
+/// DEFINITION: a vognode is *save-eligible* iff it is an occurrence,
 /// editable, lacks a Delete edit request, and is not in
 /// subscribee-as-such position. (Its position may be anywhere else --
 /// including as a member of a write-protected folder, where it is
 /// save-eligible for itself but invisible to the folder's recorder.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an Unrestricted member direct child of a SubscribeeFolder.
+/// is an occurrence member direct child of a SubscribeeFolder.
 /// A non-member child of a SubscribeeFolder is not a member of the
 /// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer that stands there as a non-member.
 
 use crate::from_text::local_fieldintent_collection::predicates::{
-  unrestricted_child_counts_as_content,
-  unrestricted_child_counts_as_visible_content,
+  occurrence_child_counts_as_content,
+  occurrence_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use crate::from_text::local_fieldintent_collection::types::{
   CollectedFieldIntents, DefiningFolderRecorder, LocalContext, FieldIntent,
@@ -51,7 +51,7 @@ use crate::types::errors::HeadlineName;
 use crate::types::misc::{ID, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{RelationshipEditRequest, 
-  NodeEditRequest, PropertyMember, Folder, UnrestrictedVognode, Viewnode,
+  NodeEditRequest, PropertyMember, Folder, Occurrence, Viewnode,
   ViewnodeKind, Vognode };
 
 use ego_tree::NodeRef;
@@ -72,8 +72,8 @@ fn visit (
   collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
   match &node_ref . value() . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-      visit_unrestricted_vognode (node_ref, t, context, collected),
+    ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
+      visit_occurrence (node_ref, t, context, collected),
     ViewnodeKind::Vognode (vognode @ ( Vognode::Ghost (_) | Vognode::Unknown (_) )) =>
       recurse_under_vognode (
         node_ref,
@@ -123,9 +123,9 @@ fn visit (
       recurse_with_uniform_context (
         node_ref, &LocalContext::UnderWriteProtectedFolder, collected), }}
 
-fn visit_unrestricted_vognode (
+fn visit_occurrence (
   node_ref  : NodeRef<Viewnode>,
-  t         : &UnrestrictedVognode,
+  t         : &Occurrence,
   context   : &LocalContext,
   collected : &mut CollectedFieldIntents,
 ) -> Result<(), String> {
@@ -355,7 +355,7 @@ fn visit_hiddenOutside_folder (
       let mut members : Vec<ID> = Vec::new ();
       for child in node_ref . children() {
         match &child . value() . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          ViewnodeKind::Vognode (Vognode::Occurrence (t))
             if member_counts_for_partnerFolder (t) => {
               if RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
@@ -411,7 +411,7 @@ fn dedup_members_by_gnid (
       result . push ((gnid, skgrepo)); }}
   result }
 
-/// This returns the members of an OverriddenFolder: its Unrestricted
+/// This returns the members of an OverriddenFolder: its occurrence
 /// children that pass the PartnerFolder membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
@@ -426,7 +426,7 @@ fn partnerFolder_members (
   let mut members : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
@@ -441,7 +441,7 @@ fn partnerFolder_members (
       _ => {}, }}
   dedup_members_by_gnid (members) }
 
-/// This returns the members of a SubscribeeFolder: its Unrestricted children
+/// This returns the members of a SubscribeeFolder: its occurrence children
 /// that pass the PartnerFolder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
 /// the same reason), a tombstone contributes nothing:
@@ -456,7 +456,7 @@ fn subscribeeFolder_members (
   let mut members : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . gnid . clone(),
                            RelationshipEditRequest::relRepo_of (&t . relationshipEditRequest) . cloned ())),
@@ -471,7 +471,7 @@ fn subscribeeFolder_members (
       _ => {}, }}
   dedup_members_by_gnid (members) }
 
-/// This returns the content of an editable vognode: its Unrestricted
+/// This returns the content of an editable vognode: its occurrence
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
 /// already guarantees distinctness. Each member is paired with its
@@ -492,8 +492,8 @@ fn content_members (
   let mut contents : Vec<(ID, Option<SkgrepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
-        if unrestricted_child_counts_as_content (t) {
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) => {
+        if occurrence_child_counts_as_content (t) {
           contents . push ((
             // collected_id, not id: a shown overrider stands for
             // the original member it is shown in place of.
@@ -525,8 +525,8 @@ fn visible_content_members (
   let mut visible : Vec<ID> = Vec::new();
   for child in node_ref . children() {
     match &child . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
-        if unrestricted_child_counts_as_visible_content (t) => {
+      ViewnodeKind::Vognode (Vognode::Occurrence (t))
+        if occurrence_child_counts_as_visible_content (t) => {
         visible . push (
           // collected_id: a shown overrider presents the original,
           // so hide/unhide inference must speak of the original.

@@ -187,7 +187,7 @@ fn describe (
     Warrant::ByHead  => Some ( "ᗣ" . to_string () ),
     Warrant::No      => Some ( "⊥" . to_string () ), } };
   match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) => {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
       parts . push ( format! ("node {}", occurrence . gnid) );
       if occurrence . is_writeProtected () { parts . push ("wp" . into ()); }
       if ! occurrence . claimsMembership { parts . push ("noClaim" . into ()); }

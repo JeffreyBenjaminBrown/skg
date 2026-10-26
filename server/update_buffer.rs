@@ -153,17 +153,17 @@ pub fn update_views_after_save (
   // one boundary before completion can echo any of them into the response.
   // `viewRequests` remain: those are fulfilled by completion below.
   saved_view_mut . consume_edit_requests_after_save ();
-  // Gate the forests' existing unrestricted nodes before rendering, so even a
+  // Gate the occurrences already in the forests before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by completion.
   if let Some (restriction) = skgrepo_restriction {
     let mut input_candidates : Vec<ID> =
-      unrestricted_gnids_in_viewforest (&saved_view_mut);
+      occurrence_gnids_in_viewforest (&saved_view_mut);
     for viewforest_id in &collateral_viewforest_ids {
       if let Some (viewforest) = views_state . open_views
           . viewforest_id_to_view (viewforest_id) {
         input_candidates . extend (
-          unrestricted_gnids_in_viewforest (viewforest) ); }}
+          occurrence_gnids_in_viewforest (viewforest) ); }}
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &input_candidates,
       &context . graph_snap, text_approved_pids );
@@ -201,10 +201,10 @@ pub fn update_views_after_save (
   // Everything textual is now staged in memory. Decide before changing the
   // open-view registry or streaming the first view.
   let mut release_candidates : Vec<ID> =
-    unrestricted_gnids_in_viewforest (&saved_view_mut);
+    occurrence_gnids_in_viewforest (&saved_view_mut);
   for collateral in &collateral_views {
     release_candidates . extend (
-      unrestricted_gnids_in_viewforest (&collateral . viewforest) ); }
+      occurrence_gnids_in_viewforest (&collateral . viewforest) ); }
   if let Some (restriction) = skgrepo_restriction {
     let release : TextReleaseDecision = decide (
       "save-rerender", restriction, &release_candidates,
@@ -257,12 +257,12 @@ pub fn update_views_after_save (
     readiness_summary,
     corrections, } ) }
 
-fn unrestricted_gnids_in_viewforest (
+fn occurrence_gnids_in_viewforest (
   viewforest : &ViewForest,
 ) -> Vec<ID> {
   viewforest . nodes ()
     .filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) =>
         Some ( restriction . gnid . clone () ),
       _ => None,
     } )
@@ -284,7 +284,7 @@ fn replace_saved_view_fork_roots (
     let original : Option<ID> =
       viewforest . get (root_gnid) . and_then (|root| match
         &root . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =>
+          ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) =>
             Some (restriction . gnid . clone ()),
           _ => None, });
     let Some (original) = original else { continue; };
@@ -294,7 +294,7 @@ fn replace_saved_view_fork_roots (
     let clone = & spec . clone . 0;
     let mut root = viewforest . get_mut (root_gnid)
       . ok_or ("replace_saved_view_fork_roots: root not found") ?;
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) =
       &mut root . value () . kind
     { restriction . gnid = clone . pid . clone ();
       restriction . home_skgrepo = clone . home_skgrepo . clone ();
@@ -385,7 +385,7 @@ pub(crate) fn stub_of_fresh_content_view (
           let mut root : Viewnode = mk_editable_viewnode (
             node . pid . clone (), node . home_skgrepo . clone (),
             node . title . clone (), node . body . clone () );
-          if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+          if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
             &mut root . kind
           { occurrence . view_requests . insert (
               ViewRequest::Folder (FolderRelation::Containers) );

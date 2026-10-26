@@ -225,7 +225,7 @@ fn keys_in_forest (
 /// viewnode that carries them. An object is ready when it names some
 /// leaf of 'forest' and every leaf it names is marked at its current
 /// fingerprint ('store'); the order-only marker is always ready. The
-/// '(leaves ...)' fact is 'leaves_fact_at'. On an unrestricted vognode
+/// '(leaves ...)' fact is 'leaves_fact_at'. On an occurrence
 /// whose leaves fact lists 'all', '(ready ...)' names 'all' when every
 /// leaf its node records is marked. A ready changeset marker's '(ready
 /// ...)' names 'all'; any other ready viewnode with a single object
@@ -248,10 +248,10 @@ pub fn set_ready_facts_in_viewforest (
       let ready : Option<BTreeSet<DiffObject>> =
         match &node . value () . kind {
           ViewnodeKind::Vognode (
-            vognode @ ( Vognode::Unrestricted (_)
+            vognode @ ( Vognode::Occurrence (_)
                         | Vognode::Ghost (_) )) => {
             let all_is_listed : bool =
-              matches! ( vognode, Vognode::Unrestricted (_) )
+              matches! ( vognode, Vognode::Occurrence (_) )
               && leaves . as_ref () . is_some_and ( |leaves|
                 leaves . objects . contains (&DiffObject::All) );
             let objects : BTreeSet<DiffObject> =
@@ -284,9 +284,9 @@ pub fn set_ready_facts_in_viewforest (
     change_facts . leaves = leaves; }}
 
 /// The '(leaves N OBJECT...)' fact of 'node', from 'leaves_named_at':
-/// on an unrestricted vognode whose node's other properties changed
+/// on an occurrence whose node's other properties changed
 /// (modified), 'all', beside 'rel' when that names a leaf of 'forest'; on any
-/// other unrestricted vognode or a historical phantom, each of 'node'
+/// other occurrence or a historical phantom, each of 'node'
 /// and 'rel' that names a leaf, or else 'all' if its node records any
 /// leaf; on anything else, 'all' when a bare request names a commit
 /// readiness aggregate (a changeset marker), else no object. N is how many
@@ -300,14 +300,14 @@ fn leaves_fact_at (
   let names_some_leaf = |objects : &[DiffObject]| -> bool {
     ! keys_named_at (node, objects, forest, pid_of) . is_empty () };
   let objects : BTreeSet<DiffObject> = match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (_))
+    ViewnodeKind::Vognode (Vognode::Occurrence (_))
       if node . value () . change_facts . change . properties =>
       [ DiffObject::Rel ] . into_iter ()
       . filter ( |object| names_some_leaf (&[ *object ]) )
       . chain ([ DiffObject::All ])
       . collect (),
     ViewnodeKind::Vognode (
-      Vognode::Unrestricted (_)
+      Vognode::Occurrence (_)
       | Vognode::Ghost (_) ) => {
       let one_leaf_each : BTreeSet<DiffObject> =
         [ DiffObject::Node, DiffObject::Rel ] . into_iter ()

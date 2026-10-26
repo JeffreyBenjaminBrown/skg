@@ -27,8 +27,8 @@ use std::collections::{HashMap, HashSet};
 use std::iter::once;
 
 /// For every foreign vognode in the view, the skgrepo of its nearest
-/// vognode ancestor, recorded iff that ancestor is an owned Unrestricted
-/// vognode. A fork's clone C must live in an owned skgrepo; the foreign
+/// vognode ancestor, recorded iff that ancestor is an owned
+/// occurrence. A fork's clone C must live in an owned skgrepo; the foreign
 /// node N's own repo is write-protected, so C inherits from N's immediate
 /// container context -- the nearest vognode ancestor reached by skipping
 /// only non-vognodes (folders, etc.). The walk stops at that nearest vognode
@@ -51,13 +51,13 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
 ) -> HashMap<ID, SkgrepoName> {
   let mut map : HashMap<ID, SkgrepoName> = HashMap::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = & node . value () . kind
       else { continue; };
     if config . skgrepo_is_owned (& t . home_skgrepo) { continue; } // not foreign
     let mut current = node;
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (pt)) => {
+        ViewnodeKind::Vognode (Vognode::Occurrence (pt)) => {
           // N's nearest vognode ancestor: record its skgrepo iff owned,
           // then stop -- never walk past it.
           let ancestor_skgrepo : &SkgrepoName =
@@ -84,8 +84,8 @@ pub fn owned_ancestor_skgrepos_for_foreign_vognodes (
 /// contains, which forks the parent, and the new node belongs in the
 /// clone's skgrepo, exactly as a new node under an owned parent lands
 /// in that parent's skgrepo. This maps each such new node to the pid
-/// of the foreign node whose fork it rides: its nearest Unrestricted
-/// vognode ancestor that is not itself such a new node (a chain of
+/// of the foreign node whose fork it rides: its nearest
+/// occurrence ancestor that is not itself such a new node (a chain of
 /// new headlines climbs to the first non-new node), skipping
 /// non-vognodes. No entry is recorded when the anchor is missing,
 /// Restricted, or (impossibly, since the skgrepo was inherited down the
@@ -100,7 +100,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
 ) -> HashMap<ID, ID> {
   let mut map : HashMap<ID, ID> = HashMap::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = & node . value () . kind
       else { continue; };
     if ! new_nodes_with_inherited_skgrepos . contains (& t . gnid)
       { continue; }
@@ -109,7 +109,7 @@ pub fn new_foreign_nodes_adopting_clone_skgrepos (
     let mut current = node;
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (pt)) => {
+        ViewnodeKind::Vognode (Vognode::Occurrence (pt)) => {
           if new_nodes_with_inherited_skgrepos . contains (& pt . gnid) {
             // Another new headline in the same chain: keep climbing.
             current = parent;
@@ -177,7 +177,7 @@ pub fn fork_spec_from_buffer_node (
 /// already said where this material belongs, so the clone of the
 /// foreign parent goes there too and the confirmation flow does not
 /// ask again. Per foreign node N, this records the one owned skgrepo
-/// its new explicit-repo immediate Unrestricted children agree on;
+/// its new explicit-repo immediate occurrence children agree on;
 /// nothing is recorded when they disagree (ambiguous -- the flow then
 /// asks) or when there are none. 'new_nodes_with_explicit_repos' is
 /// enrichment's new-nodes set minus its inherited-repo set: only a
@@ -190,12 +190,12 @@ pub fn explicit_new_child_skgrepos_for_foreign_vognodes (
   let mut map       : HashMap<ID, SkgrepoName> = HashMap::new ();
   let mut ambiguous : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = & node . value () . kind
       else { continue; };
     if config . skgrepo_is_owned (& t . home_skgrepo)
       { continue; } // only a foreign node forks
     for child in node . children () {
-      let ViewnodeKind::Vognode (Vognode::Unrestricted (ct))
+      let ViewnodeKind::Vognode (Vognode::Occurrence (ct))
         = & child . value () . kind
         else { continue; };
       if ! new_nodes_with_explicit_skgrepos . contains (& ct . gnid)

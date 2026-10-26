@@ -83,7 +83,7 @@ async fn test_provenance_records_what_the_parse_invented (
   let gnid_of = |title : &str| -> ID {
     viewforest . nodes ()
     . find_map ( |node_ref| match &node_ref . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Occurrence (t))
           if t . title == title => Some (t . gnid . clone ()),
         _ => None } )
     . expect (title) };
@@ -109,14 +109,14 @@ fn new_note_skgrepo_and_membership (
 ) -> (SkgrepoName, bool) {
   viewforest . nodes ()
     . find_map ( |node_ref| match &node_ref . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Occurrence (t))
           if t . title == "new note"
           => Some (( t . home_skgrepo . clone (), t . claimsMembership )),
         _ => None } )
     . expect ("the new note should be in the forest") }
 
 /// A headline without '(skgRepos (nodeRepo NAME))' inherits the skgrepo of its
-/// nearest ancestor that is an unrestricted vognode, through a
+/// nearest ancestor that is an occurrence, through a
 /// historical phantom or a partner folder. A non-member note in a
 /// folder stays a non-member. Below a write-protected occurrence the
 /// skgrepo is the one its ID will have after the save, as for a
@@ -168,7 +168,7 @@ async fn test_new_headline_at_top_level_is_refused (
     find_buffer_errors_for_saving (&viewforest, config) ?;
   assert! ( errors . iter () . any ( |error| matches! (
               error, BufferValidationError::LocalStructureViolation (message, _, _)
-              if message == "UnrestrictedVognode must have a repo that exists in the config." )),
+              if message == "Occurrence must have a repo that exists in the config." )),
             "{:?}", errors );
   Ok (( )) }
 
@@ -198,7 +198,7 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
     let new_child_skgrepo : SkgrepoName =
       viewforest . nodes ()
       . find_map ( |node_ref| match &node_ref . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+          ViewnodeKind::Vognode (Vognode::Occurrence (t))
             if t . title == "new child"
             => Some (t . home_skgrepo . clone ()),
           _ => None } )
@@ -212,11 +212,11 @@ async fn test_child_of_writeProtected_occurrence_inherits_its_gnid_skgrepo (
 /// Regression: a subscribee
 /// pasted from the link stack arrives as a bare id under a
 /// 'subscribeeFolder' non-vognode, with no skgrepo.
-/// 'inherit_skgrepo_from_nearest_unrestricted_ancestor_if_possible'
+/// 'inherit_skgrepo_from_nearest_occurrence_ancestor_if_possible'
 /// would give it the recorder's skgrepo; enrichment must resolve the
 /// node's own from the graph by id instead.
 /// Before the fix this node stayed repoless and the save was refused
-/// with "UnrestrictedVognode must have a repo that exists in the config".
+/// with "Occurrence must have a repo that exists in the config".
 async fn test_repoless_folder_member_gets_graph_skgrepo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -236,7 +236,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
   let folder   = recorder . first_child() . unwrap();
   let member = folder . first_child() . unwrap();
   match &member . value() . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+    ViewnodeKind::Vognode (Vognode::Occurrence (t)) => {
       assert_eq! (
         t . home_skgrepo, SkgrepoName::from ("main"),
         "Repoless folder member should inherit its repo from the \
@@ -246,7 +246,7 @@ async fn test_repoless_folder_member_gets_graph_skgrepo (
         t . gnid . 0, "root-pid",
         "The referenced id 'root' should have resolved to its pid \
          'root-pid'." ); }
-    _ => panic! ("expected an UnrestrictedVognode subscribee member") }
+    _ => panic! ("expected an Occurrence subscribee member") }
   Ok (( )) }
 
 async fn test_add_missing_info_comprehensive (
@@ -299,7 +299,7 @@ async fn test_add_missing_info_logic (
   { let actual_root : &Viewnode =
       after_adding_missing_info . root() . first_child() . unwrap() . value();
     let actual_root_gnid : &ID =
-      actual_root . unrestricted_gnid () . unwrap ();
+      actual_root . occurrence_gnid () . unwrap ();
     assert_eq!(
       actual_root_gnid . 0,
       "root-pid",

@@ -60,7 +60,7 @@ fn set_viewnodestats_recursive (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let opt_pid : Option<ID> =
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     { let node_pid : ID = t . gnid . clone ();
       detect_and_mark_cycle_v2 (
@@ -97,7 +97,7 @@ fn set_viewnodestats_recursive (
     if let Some ( ref pid ) = opt_pid
     { ancestor_gnids . remove (pid); } } }
 
-/// Whether the unrestricted vognode at 'treeid' stands as a member of
+/// Whether the occurrence at 'treeid' stands as a member of
 /// its viewparent, for the facts its membership explains (its birth,
 /// its relRepo). Where the viewparent reads its children's claims
 /// ('parent_reads_claims'), that is its claim. Under any other parent
@@ -109,7 +109,7 @@ fn stands_as_member (
   treeid   : NodeId,
 ) -> bool {
   let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &node . value () . kind
+  let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = &node . value () . kind
     else { return false; };
   let Some (parent) = node . parent () else { return t . claimsMembership; };
   if parent_reads_claims (tree, parent . id ()) {
@@ -119,19 +119,19 @@ fn stands_as_member (
     ViewnodeKind::Folder (_) => t . viewStats . isWarranted == Warrant::ByGraph,
     _ => false, } }
 
-/// What the unrestricted vognode at treeid is born of, and which ancestors to
+/// What the occurrence at treeid is born of, and which ancestors to
 /// flag. The viewparent is at ancestor generation 1 (a non-vognode folder
 /// carries no flag); a folder member additionally flags the folder's
 /// required-ancestry vognodes (recorder = the last entry) at their tree-gen
 /// distances.
 enum ParentKind {
-  Vognode (ID),                 // an Unrestricted vognode parent
+  Vognode (ID),                 // an occurrence parent
   Folder (Folder, NodeId),   // a partner folder parent (its treeid)
   Other,
 }
 
 /// Compute and store semantic relationship and birth facts for
-/// the unrestricted vognode at treeid.
+/// the occurrence at treeid.
 fn set_herald_strings_in_viewnode (
   tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
@@ -144,7 +144,7 @@ fn set_herald_strings_in_viewnode (
 ) {
   let (gstats, overridesHere)
     : (GraphnodeStats, bool) = {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     ( t . graphStats . clone (), t . overridesHere . is_some () ) };
@@ -204,7 +204,7 @@ fn set_herald_strings_in_viewnode (
   let rel_heralds : RelationshipHeralds = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_facts, unintegrated );
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
 
@@ -220,8 +220,8 @@ fn subscriber_above_subscribee_viewparent (
   if ! matches! ( &folder . value () . kind,
                   ViewnodeKind::Folder (Folder::Subscribee) )
   { return None; }
-  unrestricted_vognode_pid (tree, subscribee . id ()) ?;
-  unrestricted_vognode_pid (tree, folder . parent () ? . id ()) }
+  occurrence_pid_at (tree, subscribee . id ()) ?;
+  occurrence_pid_at (tree, folder . parent () ? . id ()) }
 
 fn parent_kind_of (
   tree   : &Tree<Viewnode>,
@@ -230,7 +230,7 @@ fn parent_kind_of (
   let parent_ref = match tree . get (treeid) . unwrap () . parent () {
     Some (p) => p, None => return ParentKind::Other, };
   match & parent_ref . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
       ParentKind::Vognode ( t . gnid . clone () ),
     ViewnodeKind::Folder (folder) if ! folder . members_are_properties () =>
       ParentKind::Folder ( folder . clone (), parent_ref . id () ),
@@ -253,19 +253,19 @@ fn tracked_ancestors (
       loop {
         match required_ancestor_of (tree, *folder_treeid, i) {
           Some (anc_gnid) => {
-            if let Some (pid) = unrestricted_vognode_pid (tree, anc_gnid) {
+            if let Some (pid) = occurrence_pid_at (tree, anc_gnid) {
               out . push ( (pid, i + 2) ); }
             i += 1; }
           _ => break, } }
       out }
     ParentKind::Other => Vec::new (), } }
 
-fn unrestricted_vognode_pid (
+fn occurrence_pid_at (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<ID> {
   match & tree . get (treeid) ? . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some ( t . gnid . clone () ),
+    ViewnodeKind::Vognode (Vognode::Occurrence (t)) => Some ( t . gnid . clone () ),
     _ => None, } }
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
@@ -395,7 +395,7 @@ fn birth_facts_for_folder (
     // 'ParentKind::Folder' holds partner folders only.
     Folder::Alias | Folder::ID | Folder::Flags { .. } => Vec::new (), } }
 
-/// Sets omitted_body on the unrestricted vognode at treeid: true iff the node
+/// Sets omitted_body on the occurrence at treeid: true iff the node
 /// is shown WRITE_PROTECTED here while its graphnode has a body -- one
 /// the rendering hides. Herald "B" on the ☮. False
 /// without a graph handle (some tests): better no B than a wrong one.
@@ -406,7 +406,7 @@ fn set_omitted_body (
   graph    : Option<&InRustGraph>,
 ) {
   let omitted_body : bool = {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . is_writeProtected ()
@@ -415,11 +415,11 @@ fn set_omitted_body (
              . unwrap_or_else ( || node_pid . clone () );
            g . nodes . get (&pid)
              . map_or ( false, |n| n . body . is_some () ) } ) };
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . omitted_body = omitted_body; }}
 
-/// Sets relRepo on the unrestricted vognode at treeid (see
+/// Sets relRepo on the occurrence at treeid (see
 /// 'ViewnodeStats::relRepo' for the full contract).
 /// Computes the (recorder, relation, target) triple that identifies the
 /// binding relationship this position represents -- contains for an ordinary
@@ -444,7 +444,7 @@ fn set_relRepo (
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
     let node_pid : ID = {
-      let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
       t . collected_gnid () };
@@ -463,7 +463,7 @@ fn set_relRepo (
           else { break 'compute None; }; // compound partner folders
           let Some (anchor_pid) =
             tree . get (folder_treeid) . unwrap () . parent ()
-            . and_then ( |p| unrestricted_vognode_pid (tree, p . id ()) )
+            . and_then ( |p| occurrence_pid_at (tree, p . id ()) )
           else { break 'compute None; };
           if role . is_first_role () {
             // This position's own node owns the outbound relationship (e.g.
@@ -489,7 +489,7 @@ fn set_relRepo (
           config . default_relRepo (&a, &b),
         _ => break 'compute None, }};
     if skgrepo == default { None } else { Some (skgrepo) } };
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . relRepo = relRepo; }}
 
@@ -546,7 +546,7 @@ mod relationship_default_tests {
 
     set_relRepo (
       &mut tree, member_treeid, true, Some (&graph), &config );
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (rendered_member)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be unrestricted"); };
     assert_eq! ( rendered_member . viewStats . relRepo, None,
@@ -554,31 +554,31 @@ mod relationship_default_tests {
   }
 }
 
-/// Sets repoBoundary on the unrestricted vognode at treeid.
-/// True if no unrestricted vognode ancestor exists (i.e. a root),
-/// or if the nearest unrestricted vognode ancestor has a different skgrepo.
+/// Sets repoBoundary on the occurrence at treeid.
+/// True if no occurrence ancestor exists (i.e. a root),
+/// or if the nearest occurrence ancestor has a different skgrepo.
 fn set_skgrepo_at_boundary (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
 ) {
   let node_skgrepo : SkgrepoName = {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . home_skgrepo . clone () };
   let ancestor_skgrepo : Option<SkgrepoName> =
-    nearest_unrestrictedVognode_ancestor_skgrepo (tree, treeid);
+    nearest_occurrence_ancestor_skgrepo (tree, treeid);
   let at_boundary : bool =
     match ancestor_skgrepo {
       None => true,
       Some (s) => s != node_skgrepo };
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . repoBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
-/// the nearest unrestricted vognode ancestor's skgrepo.
-fn nearest_unrestrictedVognode_ancestor_skgrepo (
+/// the nearest occurrence ancestor's skgrepo.
+fn nearest_occurrence_ancestor_skgrepo (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<SkgrepoName> {
@@ -586,7 +586,7 @@ fn nearest_unrestrictedVognode_ancestor_skgrepo (
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if let ViewnodeKind::Vognode (Vognode::Occurrence (t))
         = & parent_ref . value () . kind
         { return Some ( t . home_skgrepo . clone () ); }}
   None }
@@ -599,6 +599,6 @@ fn detect_and_mark_cycle_v2 (
   node_pid        : &ID,
   ancestor_gnids : &HashSet<ID>,
 ) {
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . cycle = ancestor_gnids . contains (node_pid); } }

@@ -7,7 +7,7 @@
 (require 'skg-shared)
 
 (defconst test--node-kind (skg-shared-metadata-kind "node")
-  "The unrestricted node's kind from 'shared/metadata-fields.json'.")
+  "The occurrence's kind from 'shared/metadata-fields.json'.")
 
 ;;
 ;; skg-metadata-fields-kind-of-sexp
@@ -16,8 +16,8 @@
 (ert-deftest test-kind-of-sexp ()
   "A metadata sexp's kind is that of its first atom the table names,
 bare or heading a list, after any marker; nil for no kind."
-  (dolist (case '(((skg node (gnid abc) (skgRepos (nodeRepo jeff))) . "unrestricted node")
-                  ((skg focused node (gnid abc)) . "unrestricted node")
+  (dolist (case '(((skg node (gnid abc) (skgRepos (nodeRepo jeff))) . "occurrence")
+                  ((skg focused node (gnid abc)) . "occurrence")
                   ((skg ghost (gnid g) (skgRepos (nodeRepo r))) . "ghost")
                   ((skg alias (skgRepos (relRepo r))) . "alias")
                   ((skg (flag noSearchMatching)) . "flag")
@@ -44,7 +44,7 @@ bare or heading a list, after any marker; nil for no kind."
 ;;
 
 (ert-deftest test-fillIn-minimal-sexp ()
-  "Filling in a minimal UnrestrictedVognode inserts all default fields."
+  "Filling in a minimal occurrence inserts all default fields."
   (let* ((sexp '(skg node (gnid abc) (skgRepos (nodeRepo jeff))))
          (org-text (sexp-to-org sexp))
          (filledIn (skg-metadata-fields-fillIn-defaults-in-org org-text test--node-kind))

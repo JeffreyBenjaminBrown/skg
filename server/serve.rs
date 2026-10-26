@@ -407,8 +407,8 @@ fn enrich_search_buffer_snapshot (
     viewforest . nodes ()
     . filter_map ( |node| match &node . value () . kind {
       crate::types::viewnode::ViewnodeKind::Vognode (
-        crate::types::viewnode::Vognode::Unrestricted (unrestricted_node)) =>
-          Some (unrestricted_node . gnid . clone ()),
+        crate::types::viewnode::Vognode::Occurrence (occurrence)) =>
+          Some (occurrence . gnid . clone ()),
       _ => None, } )
     . collect ();
   let approved : std::collections::HashSet<_> =

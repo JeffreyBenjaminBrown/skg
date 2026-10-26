@@ -168,7 +168,7 @@ fn a_hit_shows_the_nodes_it_overrides_in_a_folder (
     find_child ( folders [0], "F" )
     . expect ("F (the node U overrides) is in the folder");
   assert! ( matches! ( &f . value () . kind,
-                       ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+                       ViewnodeKind::Vognode (Vognode::Occurrence (t))
                        if t . is_writeProtected () ),
             "F is a write-protected member" );
   assert! ( f . children () . next () . is_none (), "F holds nothing" );
@@ -210,18 +210,18 @@ fn find_result_root<'a> (
   gnid   : &str,
 ) -> Option<NodeRef<'a, Viewnode>> {
   tree . root () . children ()
-    . find ( |c| unrestricted_gnid_is (*c, gnid) ) }
+    . find ( |c| occurrence_gnid_is (*c, gnid) ) }
 
 fn find_child<'a> (
   parent : NodeRef<'a, Viewnode>,
   gnid     : &str,
 ) -> Option<NodeRef<'a, Viewnode>> {
-  parent . children () . find ( |c| unrestricted_gnid_is (*c, gnid) ) }
+  parent . children () . find ( |c| occurrence_gnid_is (*c, gnid) ) }
 
-fn unrestricted_gnid_is (
+fn occurrence_gnid_is (
   node : NodeRef<Viewnode>,
   gnid   : &str,
 ) -> bool {
   matches! ( &node . value () . kind,
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+    ViewnodeKind::Vognode (Vognode::Occurrence (t))
       if t . gnid == ID::from (gnid) ) }

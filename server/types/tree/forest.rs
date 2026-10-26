@@ -41,7 +41,7 @@ pub fn editable_occurrences (
     . collect () }
 
 /// Whether 'node' stands where content does: its parent is the buffer
-/// root, an unrestricted vognode, or a historical phantom that is
+/// root, an occurrence, or a historical phantom that is
 /// itself in content position. (Whether it is a member there, its
 /// 'membership', is a separate question.)
 pub fn in_content_position (
@@ -50,7 +50,7 @@ pub fn in_content_position (
   match node . parent () {
     Some (parent) => match &parent . value () . kind {
       ViewnodeKind::BufferRoot
-        | ViewnodeKind::Vognode (Vognode::Unrestricted (_)) => true,
+        | ViewnodeKind::Vognode (Vognode::Occurrence (_)) => true,
       ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
         in_content_position (parent),
       _ => false, },
@@ -65,14 +65,14 @@ pub fn in_content_position (
 pub fn holds_containerward_chain (
   node : NodeRef<Viewnode>,
 ) -> bool {
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &node . value () . kind else { return false; };
   if ! occurrence . is_writeProtected () { return false; }
   match node . parent () {
     Some (parent) => match &parent . value () . kind {
       ViewnodeKind::Folder (folder) =>
         folder . members_carry_containerward_chain (),
-      ViewnodeKind::Vognode (Vognode::Unrestricted (_)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (_)) =>
         holds_containerward_chain (parent),
       _ => false, },
     None => false, }}

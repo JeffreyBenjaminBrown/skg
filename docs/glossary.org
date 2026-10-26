@@ -1491,7 +1491,7 @@ model subtree still produces and converts the rest
 **** per-visit step
 
 What the diff view does at an editable occurrence's visit, after the
-content reconciler ('process_unrestrictedVognode_changes' in
+content reconciler ('process_occurrence_changes' in
 'server/diff_view/changes.rs'): it tags the members with the three
 kinds of change, adds the removed members, and for a node in C adds
 its change viewnodes.

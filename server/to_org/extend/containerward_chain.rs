@@ -76,7 +76,7 @@ pub fn attach_containerward_chains_under_members (
     . filter_map ( |member|
       tree . get (*member) . and_then ( |node|
         match &node . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+          ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
             Some (( *member, t . gnid . clone () )),
           _ => None, } ))
     . collect ();
@@ -139,7 +139,7 @@ fn prepend_containerward_chain_node (
         { return Ok (None); }} }
     let parent_gnid : Option<ID> =
       tree . get (parent) . and_then ( |node| match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => Some (t . gnid . clone ()),
+        ViewnodeKind::Vognode (Vognode::Occurrence (t)) => Some (t . gnid . clone ()),
         _ => None, } );
     if let Some (parent_gnid) = parent_gnid {
       let relationship_unrestricted : bool =

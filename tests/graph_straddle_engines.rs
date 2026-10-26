@@ -81,7 +81,7 @@ fn children_with_change (
   node . children ()
     . filter_map ( |child| {
       let gnid : &ID = match &child . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => &t . gnid,
+        ViewnodeKind::Vognode (Vognode::Occurrence (t)) => &t . gnid,
         ViewnodeKind::Vognode (Vognode::Unknown (u)) => &u . gnid,
         ViewnodeKind::Vognode (Vognode::Ghost (h)) => &h . gnid,
         _ => return None, };

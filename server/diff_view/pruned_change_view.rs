@@ -242,11 +242,11 @@ pub fn set_diffView_facts_in_viewforest (
   if diffView_buffer_kind == DiffViewBufferKind::SkgrepoChanges {
     set_homeSkgrepoMove_facts_in_viewforest (viewforest, straddle ); }}
 
-/// On each unrestricted vognode whose home skgrepo moved: the move,
+/// On each occurrence whose home skgrepo moved: the move,
 /// and, when the nearest vognode ancestor whose home moved moved the
 /// same way, that ancestor's letter. Computed like
 /// 'repoBoundary', against the nearest moved ancestor. On
-/// every other unrestricted vognode, neither (a rerender may follow
+/// every other occurrence, neither (a rerender may follow
 /// a commit that made a move part of HEAD).
 pub fn set_homeSkgrepoMove_facts_in_viewforest (
   viewforest : &mut ViewForest,
@@ -255,7 +255,7 @@ pub fn set_homeSkgrepoMove_facts_in_viewforest (
   let facts : Vec<(NodeId, Option<SkgrepoChange>, Option<String>)> =
     viewforest . nodes ()
     . filter_map ( |node| {
-      let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+      let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
         &node . value () . kind else { return None; };
       let home_skgrepo_move : Option<SkgrepoChange> =
         straddle . node_changes (&t . gnid) . home;
@@ -267,7 +267,7 @@ pub fn set_homeSkgrepoMove_facts_in_viewforest (
       Some (( node . id (), home_skgrepo_move, moved_like_ancestor )) } )
     . collect ();
   for (treeid, home_skgrepo_move, moved_like_ancestor) in facts {
-    let mut viewnode = // an unrestricted vognode, by the filter above
+    let mut viewnode = // an occurrence, by the filter above
       viewforest . as_internal_tree_mut () . get_mut (treeid) . unwrap ();
     let facts : &mut ChangeFacts = &mut viewnode . value () . change_facts;
     facts . home_skgrepo_move   = home_skgrepo_move;
@@ -282,7 +282,7 @@ fn nearest_moved_vognode_ancestor (
 ) -> Option<(usize, SkgrepoChange)> {
   node . ancestors () . enumerate ()
     . find_map ( |(index, ancestor)| match &ancestor . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
         straddle . node_changes (&t . gnid) . home
         . map ( |home_skgrepo_move| (index + 1, home_skgrepo_move) ),
       _ => None, } ) }
@@ -446,7 +446,7 @@ pub fn ensure_editableOccurrences_exist (
   let occurrences : Vec<NodeId> =
     content_occurrences_in_level_order (viewforest);
   for treeid in occurrences {
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut viewforest . get_mut (treeid) . unwrap () . value () . kind
     { if ! u . contains (&occurrence . gnid)
          || editable . contains (&occurrence . gnid) { continue; }
@@ -458,7 +458,7 @@ pub fn ensure_editableOccurrences_exist (
       . map ( |child| child . id () ) . collect ();
     for child in children {
       match &mut viewforest . get_mut (child) . unwrap () . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           occurrence . claimsMembership = true,
         ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
           unknown . claimsMembership = true,
@@ -466,7 +466,7 @@ pub fn ensure_editableOccurrences_exist (
           ghost . claimsMembership = true,
         _ => {}, }}}}
 
-/// The viewforest's unrestricted vognodes in content position
+/// The viewforest's occurrences in content position
 /// ('in_content_position') that are roots, members or removed members
 /// there, in level order. The walk passes through a historical
 /// phantom in content position, to its old content, the removed
@@ -480,13 +480,13 @@ fn content_occurrences_in_level_order (
   while let Some (node) = queue . pop_front () {
     if ! in_content_position (node) { continue; }
     match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => {
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) => {
         let is_root_or_member : bool =
           t . claimsMembership
           || node . parent () . is_some_and ( |parent| match parent . value () . kind {
                ViewnodeKind::BufferRoot => true,
                ViewnodeKind::Vognode (
-                 Vognode::Unrestricted (_)
+                 Vognode::Occurrence (_)
                  | Vognode::Ghost (_) ) =>
                  node . value () . change_facts . change . rel
                  == Some (Existence::Removed),

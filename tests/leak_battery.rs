@@ -54,7 +54,7 @@ fn true_child_gnids (
 ) -> BTreeSet<ID> {
   tree . get (parent_gnid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
+      ViewnodeKind::Vognode ( Vognode::Occurrence (node) )
         => Some (node . gnid . clone ()),
       _ => None, })
     . collect () }
@@ -281,7 +281,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           // early-return before the ancestor flags (its "no stats ->
           // no heralds" guard). Zero counts render no tokens of
           // their own, so any token present comes from a flag.
-          if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+          if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
             &mut value . kind {
             t . graphStats . rels =
               Some ( RelationCounts::default () ); }}
@@ -295,9 +295,9 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         let c_treeid : NodeId = first_child_gnid (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();
-        let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =
+        let ViewnodeKind::Vognode (Vognode::Occurrence (t)) =
           & s_ref . value () . kind
-        else { return Err ("S is not an Unrestricted vognode" . into ()); };
+        else { return Err ("S is not an occurrence" . into ()); };
         Ok ( t . viewStats . rel_heralds . rels . clone () ) };
       // In the semantic wire the subscription shows as a `subscribes`
       // relation; gated out at public, present under `all`. (S's only

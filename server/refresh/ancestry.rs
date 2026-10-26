@@ -21,7 +21,7 @@ use std::mem::discriminant;
 /// the actual ancestor at that depth.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExpectedAncestor {
-  /// An occurrence ('Vognode::Unrestricted').
+  /// An occurrence ('Vognode::Occurrence').
   Occurrence,
   /// A folder of this kind (a flags folder, whatever its text).
   Folder (Folder),
@@ -96,7 +96,7 @@ pub fn matches_expected (
 ) -> bool {
   match expected {
     ExpectedAncestor::Occurrence =>
-      matches! ( actual, ViewnodeKind::Vognode (Vognode::Unrestricted (_)) ),
+      matches! ( actual, ViewnodeKind::Vognode (Vognode::Occurrence (_)) ),
     ExpectedAncestor::Folder (required) =>
       matches! ( actual, ViewnodeKind::Folder (folder)
                          if discriminant (folder) == discriminant (required) ),
@@ -104,7 +104,7 @@ pub fn matches_expected (
       matches! ( actual, ViewnodeKind::Vognode (Vognode::Ghost (_)) ),
     ExpectedAncestor::OccurrenceOrGhost =>
       matches! ( actual, ViewnodeKind::Vognode (
-        Vognode::Unrestricted (_) | Vognode::Ghost (_) )),
+        Vognode::Occurrence (_) | Vognode::Ghost (_) )),
     ExpectedAncestor::OldText =>
       matches! ( actual, ViewnodeKind::ChangeViewnode (
         ChangeViewnode::OldText { .. } )), } }
@@ -145,7 +145,7 @@ pub fn parent_reads_claims (
   parent : NodeId,
 ) -> bool {
   match &tree . get (parent) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       ! occurrence . is_writeProtected (),
     ViewnodeKind::Folder (folder) if folder . is_editable () => {
       let anchor_depth : usize = // the node the folder describes

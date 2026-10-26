@@ -8,7 +8,7 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_gnid, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SkgrepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, UnrestrictedVognode, Editability, viewforest_root_viewnode, viewnode_of, default_unrestrictedVognode};
+use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, Occurrence, Editability, viewforest_root_viewnode, viewnode_of, default_occurrence};
 use skg::types::nodes::complete::Graphnode;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::graphnode_from_pid_and_skgrepo;
@@ -27,14 +27,14 @@ fn mk_test_viewnode (
   gnid        : &str,
   edit_request : Option<NodeEditRequest>,
 ) -> Viewnode {
-  let t : UnrestrictedVognode = UnrestrictedVognode {
+  let t : Occurrence = Occurrence {
     editability : Editability::Editable {
       body         : None,
       edit_request },
-    .. default_unrestrictedVognode ( ID::from (gnid),
+    .. default_occurrence ( ID::from (gnid),
                           SkgrepoName::from ("main"),
                           title . to_string() ) };
-  viewnode_of (ViewnodeKind::Vognode (Vognode::Unrestricted (t))) }
+  viewnode_of (ViewnodeKind::Vognode (Vognode::Occurrence (t))) }
 
 #[test]
 fn all_tests

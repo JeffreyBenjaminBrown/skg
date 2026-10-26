@@ -3,7 +3,7 @@
   "kinds_comment": "A kind is known by its atom in '(skg ...)', bare or, for a kind with a parameter, as the head of a list ('(flag noSearchMatching)'). Its fields stand beside it at the top level of '(skg ...)' ('(skg node (gnid X) writeProtected)', '(skg alias (editRequest ...))'). A kind with no fields shows what the headline carries. The kinds that take a readiness request list none: the readiness commands set it.",
   "fields_comment": "Each field has a 'shape': 'atom', a bare atom, present or absent; 'one', a form holding one value; or 'some', a form holding any number of values. Its 'default' is what its absence means; the editors show it as 'DEFAULT (default)' and strip it. Its 'values' are what its cycle runs through after the default. A value with 'arguments' prompts for each when chosen and is written as a list, '(VALUE ARG...)'; an argument is 'of' an id (a link is accepted), 'of' a skgrepo, or 'one_of' a fixed list. A value with 'when' is offered only when the headline is 'editable' (not write-protected) or a 'removedMember' (its metadata carries '(diff (rel removed))'; where it stands the save checks).",
   "kinds": [
-    { "kind": "unrestricted node", "atoms": [ "node" ],
+    { "kind": "occurrence", "atoms": [ "node" ],
       "fields": [
         { "name": "writeProtected", "shape": "atom", "default": "false",
           "values": [ { "value": "true" } ] },

@@ -2,7 +2,7 @@
 /// These check structural flags of individual nodes
 /// without requiring global context.
 
-use crate::types::viewnode::{Viewnode, ViewnodeKind, UnrestrictedVognode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Occurrence};
 use crate::types::viewnode::{Vognode};
 use crate::types::viewnode::{RelationshipEditRequest, NodeEditRequest, Editability, Folder, PropertyMember, ChangeViewnode};
 use crate::types::viewnode::ChangesetMarkerKind;
@@ -22,7 +22,7 @@ use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashSet;
 
 /// Error from local structure validation.
-/// Contains the error message, the ID of the nearest UnrestrictedVognode ancestor,
+/// Contains the error message, the ID of the nearest Occurrence ancestor,
 /// and the name of the headline in violation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalStructureError {
@@ -45,8 +45,8 @@ pub fn validate_local_structure (
 
   let errors : Vec<String> =
     match &node_ref . value() . kind
-    { ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
-        validate_unrestrictedVognode(tree, treeid, t, config),
+    { ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
+        validate_occurrence(tree, treeid, t, config),
       ViewnodeKind::BufferRoot =>
         Vec::new (),
       ViewnodeKind::PropertyMember (PropertyMember::Alias { .. }) =>
@@ -148,8 +148,8 @@ fn validate_aliasfolder (
     tree, treeid, -1, false,
     |node| matches!(&node . kind,
                     ViewnodeKind::Vognode (
-                      Vognode::Unrestricted (_) )))
-    { errors . push("AliasFolder must have an UnrestrictedVognode parent." . to_string()); }
+                      Vognode::Occurrence (_) )))
+    { errors . push("AliasFolder must have an Occurrence parent." . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
@@ -190,8 +190,8 @@ fn validate_flags_folder (
   if ! generation_exists_and_includes (
     tree, treeid, -1, false,
     |node| matches! (&node . kind,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (_))))
-  { errors . push ("FlagsFolder must have an UnrestrictedVognode parent."
+      ViewnodeKind::Vognode (Vognode::Occurrence (_))))
+  { errors . push ("FlagsFolder must have an Occurrence parent."
                    . to_string ()); }
   if ! siblings_cannot_include (
     tree, treeid,
@@ -212,7 +212,7 @@ fn validate_hiddenInSubscribee_folder (
     tree, treeid, -1, false,
     |node| node . is_occurrence ())
     { errors . push(
-        "HiddenInSubscribeeFolder must have an UnrestrictedVognode parent (the subscribee)"
+        "HiddenInSubscribeeFolder must have an Occurrence parent (the subscribee)"
         . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
@@ -220,18 +220,18 @@ fn validate_hiddenInSubscribee_folder (
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::Unknown (_)) )))
     { errors . push(
-        "HiddenInSubscribeeFolder's children can only be UnrestrictedVognodes or Unknown phantoms (to hide)."
+        "HiddenInSubscribeeFolder's children can only be Occurrences or Unknown phantoms (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t))
         => t . claimsMembership,
       ViewnodeKind::Vognode (Vognode::Unknown (_))
         => true,
       _ => false, }) )
     { errors . push(
-        "HiddenInSubscribeeFolder UnrestrictedVognode children must be members (no noClaim)."
+        "HiddenInSubscribeeFolder Occurrence children must be members (no noClaim)."
       . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
@@ -242,7 +242,7 @@ fn validate_hiddenInSubscribee_folder (
                     . to_string()); }
   if !partnerFolder_children_have_distinct_gnids(tree, treeid)
     { errors . push(
-      "HiddenInSubscribeeFolder must not have duplicate UnrestrictedVognode children."
+      "HiddenInSubscribeeFolder must not have duplicate Occurrence children."
         . to_string() ); }
   errors }
 
@@ -264,17 +264,17 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tombstone_or (|node| node . is_occurrence ()
            || matches! ( &node . kind,
                          ViewnodeKind::Vognode (Vognode::Unknown (_)) )))
-    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only UnrestrictedVognodes or Unknown phantoms." . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only Occurrences or Unknown phantoms." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t))
         => t . claimsMembership,
       ViewnodeKind::Vognode (Vognode::Unknown (_))
         => true,
       _ => false, }) )
     { errors . push(
-        "HiddenOutsideOfSubscribeeFolder UnrestrictedVognode children must be members (no noClaim)."
+        "HiddenOutsideOfSubscribeeFolder Occurrence children must be members (no noClaim)."
         . to_string()); }
   if !siblings_cannot_include(
     tree, treeid,
@@ -286,7 +286,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
         . to_string()); }
   if !partnerFolder_children_have_distinct_gnids(tree, treeid)
     { errors . push(
-        "HiddenOutsideOfSubscribeeFolder must not have duplicate UnrestrictedVognode children."
+        "HiddenOutsideOfSubscribeeFolder must not have duplicate Occurrence children."
         . to_string() ); }
   errors }
 
@@ -298,7 +298,7 @@ fn validate_subscribeefolder (
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| node . is_occurrence ())
-    { errors . push("SubscribeeFolder must have an UnrestrictedVognode parent." . to_string()); }
+    { errors . push("SubscribeeFolder must have an Occurrence parent." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_occurrence ()
@@ -307,11 +307,11 @@ fn validate_subscribeefolder (
                       | ViewnodeKind::Vognode (Vognode::Ghost (_)) // a former member, in the diff view; save-inert
                       | ViewnodeKind::Folder (
                           Folder::HiddenOutsideOfSubscribee) )))
-    { errors . push( "SubscribeeFolder's children must include only UnrestrictedVognodes, tombstones, Unknown or historical vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
+    { errors . push( "SubscribeeFolder's children must include only Occurrences, tombstones, Unknown or historical vognodes, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
         t . claimsMembership,
       ViewnodeKind::Vognode (Vognode::Unknown (_)) =>
         true,
@@ -321,7 +321,7 @@ fn validate_subscribeefolder (
         Folder::HiddenOutsideOfSubscribee)
         => true,
       _ => false, }) )
-    { errors . push("SubscribeeFolder UnrestrictedVognode children must be members (no noClaim)."
+    { errors . push("SubscribeeFolder Occurrence children must be members (no noClaim)."
                     . to_string() ); }
   // There is no duplicate-member check here: SubscribeeFolder is a
   // defining folder, and duplicate members of defining folders are
@@ -341,7 +341,7 @@ fn validate_relation_folder (
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| node . is_occurrence ())
-    { errors . push(format!("{} must have an UnrestrictedVognode parent.", label)); }
+    { errors . push(format!("{} must have an Occurrence parent.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| node . is_occurrence ()
@@ -350,11 +350,11 @@ fn validate_relation_folder (
                               ViewnodeKind::Vognode (Vognode::Unknown (_)) ))
            || matches!(&node . kind, // a former member, in the diff view; save-inert
                        ViewnodeKind::Vognode (Vognode::Ghost (_)))))
-    { errors . push(format!("{}'s children must include only UnrestrictedVognodes, tombstones, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
+    { errors . push(format!("{}'s children must include only Occurrences, tombstones, historical phantoms, or (for OverriddenFolder) Unknown phantoms.", label)); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t))
         => t . claimsMembership,
       ViewnodeKind::Vognode (Vognode::Unknown (_))
         if *partnerFolder == Folder::Overridden => true,
@@ -362,7 +362,7 @@ fn validate_relation_folder (
         => true,
       _ => false, }) )
     { errors . push(format!(
-        "{} UnrestrictedVognode children must be members (no noClaim).", label)); }
+        "{} Occurrence children must be members (no noClaim).", label)); }
   if !siblings_cannot_include(
     tree, treeid,
     |node| matches!(&node . kind,
@@ -375,7 +375,7 @@ fn validate_relation_folder (
     // write-protected roles keep the check.
     && !partnerFolder_children_have_distinct_gnids(tree, treeid) {
     errors . push(format!(
-      "{} must not have duplicate UnrestrictedVognode children.", label)); }
+      "{} must not have duplicate Occurrence children.", label)); }
   errors }
 
 // The diff view's viewnodes are save-inert: these checks only
@@ -412,7 +412,7 @@ fn validate_acquiredBy_folder (
                     ViewnodeKind::Vognode (Vognode::Ghost (_))),
     |node| matches!(&node . kind,
                     ViewnodeKind::Vognode (
-                      Vognode::Unrestricted (_)
+                      Vognode::Occurrence (_)
                       | Vognode::Unknown (_)))) }
 
 fn validate_acquired_folder (
@@ -422,13 +422,13 @@ fn validate_acquired_folder (
   validate_acquisition_folder (
     tree, treeid, "acquiredFolder",
     |node| matches!(&node . kind,
-                    ViewnodeKind::Vognode (Vognode::Unrestricted (_))),
+                    ViewnodeKind::Vognode (Vognode::Occurrence (_))),
     // An acquiree's ghost, or a note the user put there: the folder
     // is write-protected, so whatever an occurrence there carries, it
     // claims nothing.
     |node| matches!(&node . kind,
                     ViewnodeKind::Vognode (
-                      Vognode::Ghost (_) | Vognode::Unrestricted (_)))) }
+                      Vognode::Ghost (_) | Vognode::Occurrence (_)))) }
 
 /// The checks shared by the two derived acquisition folders: which
 /// parent, which children, one per parent.
@@ -539,7 +539,7 @@ fn validate_idFolder (
   if !generation_exists_and_includes(
     tree, treeid, -1, false,
     |node| node . is_occurrence ())
-    { errors . push("IDFolder must have an UnrestrictedVognode parent." . to_string()); }
+    { errors . push("IDFolder must have an Occurrence parent." . to_string()); }
   if !generation_includes_only(
     tree, treeid, 1, true,
     tombstone_or (|node| matches!(&node . kind,
@@ -568,15 +568,15 @@ fn validate_id_property (
     { errors . push("ID property must have an IDFolder parent." . to_string()); }
   errors }
 
-/// The identity + child-structure checks shared by an UnrestrictedVognode and a phantom:
+/// The identity + child-structure checks shared by an Occurrence and a phantom:
 /// id present, no
-/// wrong-structure child, and distinct content-child ids. `label` ("UnrestrictedVognode"
+/// wrong-structure child, and distinct content-child ids. `label` ("Occurrence"
 /// / "Phantom") is woven into the messages so each kind reports itself.
 /// Repo validity is not checked here: skgrepo is load-bearing only for a
-/// UnrestrictedVognode (it is the node's .skg file path), so validate_unrestrictedVognode adds that
+/// Occurrence (it is the node's .skg file path), so validate_occurrence adds that
 /// check; a phantom writes nothing and is ignored at save, so its skgrepo --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
-/// save-inert and goes unchecked. (validate_unrestrictedVognode also appends the
+/// save-inert and goes unchecked. (validate_occurrence also appends the
 /// editable-title check; a phantom is title-exempt, being write-protected.)
 fn validate_vognode_identity_and_structure (
   tree       : &Tree<Viewnode>,
@@ -605,17 +605,17 @@ fn validate_vognode_identity_and_structure (
     errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
   errors }
 
-fn validate_unrestrictedVognode (
+fn validate_occurrence (
   tree    : &Tree<Viewnode>,
   treeid  : NodeId,
-  t       : &UnrestrictedVognode,
+  t       : &Occurrence,
   config  : &SkgConfig,
 ) -> Vec<String> {
   let mut errors : Vec<String> =
     validate_vognode_identity_and_structure (
-      tree, treeid, true, "UnrestrictedVognode" );
+      tree, treeid, true, "Occurrence" );
   if !has_valid_skgrepo (t, config) {
-    errors . push("UnrestrictedVognode must have a repo that exists in the config."
+    errors . push("Occurrence must have a repo that exists in the config."
                   . to_string()); }
   if has_empty_title (t) {
     errors . push("Editable node has an empty title." . to_string()); }
@@ -634,7 +634,7 @@ fn validate_unrestrictedVognode (
 fn restoreRel_stands_where_it_may (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
-  t      : &UnrestrictedVognode,
+  t      : &Occurrence,
 ) -> bool {
   let Some (node) : Option<NodeRef<Viewnode>> = tree . get (treeid)
     else { return false; };
@@ -662,16 +662,16 @@ fn cannot_be_child_of_vognode (
        && matches!(&node . kind,
             ViewnodeKind::Folder (Folder::HiddenInSubscribee)) ) }
 
-/// Check if an UnrestrictedVognode has a skgrepo and it exists in the config.
+/// Check if an Occurrence has a skgrepo and it exists in the config.
 pub fn has_valid_skgrepo (
-  t      : &UnrestrictedVognode,
+  t      : &Occurrence,
   config : &SkgConfig,
 ) -> bool {
   config . skgrepos . contains_key (&t . home_skgrepo) }
 
 /// An editable node (not marked for deletion) must have a non-empty title.
 /// Nodes that are write-protected or carry a delete request are exempt.
-fn has_empty_title ( t : &UnrestrictedVognode ) -> bool {
+fn has_empty_title ( t : &Occurrence ) -> bool {
   let is_editable : bool =
     matches! ( &t . editability, Editability::Editable { .. } );
   let is_delete : bool =
@@ -701,7 +701,7 @@ pub fn nonignored_children_have_distinct_gnids (
       // legitimately appear twice when it stands for two distinct
       // originals.
       match &child . value() . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Occurrence (t))
           if t . claimsMembership
           => Some (t . collected_gnid ()),
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>
@@ -732,7 +732,7 @@ fn partnerFolder_children_have_distinct_gnids (
   for child in node_ref . children() {
     let Some (gnid) =
       (match &child . value() . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+        ViewnodeKind::Vognode (Vognode::Occurrence (t))
           if t . claimsMembership =>
           Some (t . gnid . clone()),
         ViewnodeKind::Vognode (Vognode::Unknown (u)) =>

@@ -7,7 +7,7 @@ use crate::types::errors::{BufferValidationError, HeadlineName};
 use crate::types::misc::{ID, SkgrepoName, members_of};
 use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, UnrestrictedVognode, Viewnode, ViewnodeKind, Vognode};
+use crate::types::viewnode::{RelationshipEditRequest, Folder, PropertyMember, Occurrence, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::types::nodes::complete::flag_is_true;
@@ -31,7 +31,7 @@ pub fn errors_for_writeProtected_occurrences (
   let mut errors : Vec<BufferValidationError> =
     flags_surface_errors_against_graph (viewforest, graph);
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &node . value () . kind else { continue; };
     if ! occurrence . is_writeProtected () { continue; }
     if let Some (graphnode) = graphnode_from_graph (graph, &occurrence . gnid) {
@@ -49,7 +49,7 @@ pub fn errors_for_writeProtected_occurrences (
 /// What the occurrence says that the graph does not.
 fn writeProtected_differences_from_graph (
   node                : NodeRef<Viewnode>,
-  occurrence          : &UnrestrictedVognode,
+  occurrence          : &Occurrence,
   graphnode           : &Graphnode,
 ) -> Vec<String> {
   let mut differences : Vec<String> = Vec::new ();
@@ -117,7 +117,7 @@ fn collect_flags_surfaces (
   node   : NodeRef<Viewnode>,
   result : &mut Vec<LocatedFlagsSurface>,
 ) {
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (recorder)) = &node . value () . kind {
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (recorder)) = &node . value () . kind {
     let folders : Vec<FlagsFolderSurface> = node . children ()
       . filter_map (|child| {
         let ViewnodeKind::Folder (Folder::Flags {

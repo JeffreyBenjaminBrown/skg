@@ -47,7 +47,7 @@ function M.edit_metadata ()
   if kind then
     org_text = fields.fillIn_defaults_in_org(
       org_text, kind, nil,
-      metadata.unrestrictedNode_sexp_p(sexp) and split.title or nil) end
+      metadata.occurrence_sexp_p(sexp) and split.title or nil) end
   M.open_edit_buffer(org_text, source_buf, line_number,
                      #split.stars, #split.metadata, kind)
   M.goto_field_value('nodeRepo')
@@ -354,10 +354,10 @@ end
 
 ---Whether the save can give the headline at LINE_NUMBER a skgrepo by
 ---inheritance, as the server's walk rootward decides
----('skgrepo_of_nearest_unrestricted_ancestor'): it passes through
+---('skgrepo_of_nearest_occurrence_ancestor'): it passes through
 ---unknowns, ghosts and folders, and through headlines without
 ---metadata, which inherit the same way; the first other ancestor must
----be an unrestricted vognode. A root cannot inherit, nor can a
+---be an occurrence. A root cannot inherit, nor can a
 ---headline whose walk ends at a tombstone or a property.
 ---Mirrors skg--headline-can-inherit-skgrepo-p.
 ---@param line_number integer

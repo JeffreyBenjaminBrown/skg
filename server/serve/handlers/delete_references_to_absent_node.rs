@@ -136,7 +136,7 @@ mod tests {
 
   fn gnid (text : &str) -> ID { ID::from (text) }
 
-  fn unrestricted_view (pid : &str) -> ViewForest {
+  fn view_with_occurrence (pid : &str) -> ViewForest {
     let mut view : ViewForest = ViewForest::new ();
     view . append_root (mk_editable_viewnode (
       gnid (pid), SkgrepoName::from ("main"), pid . to_string (), None ));
@@ -144,7 +144,7 @@ mod tests {
   }
 
   fn view_with_unknown (raw_gnid : &str) -> ViewForest {
-    let mut view : ViewForest = unrestricted_view ("unrelated-owner");
+    let mut view : ViewForest = view_with_occurrence ("unrelated-owner");
     let root = view . first_root () . unwrap () . id ();
     view . get_mut (root) . unwrap () . append (mk_unknown_viewnode (gnid (raw_gnid)));
     view
@@ -154,13 +154,13 @@ mod tests {
   fn absent_reference_cleanup_selects_only_affected_recorder_or_raw_unknown () {
     let recorders : HashSet<ID> = HashSet::from ([gnid ("changed-owner")]);
     assert! (view_can_display_absent_reference_change (
-      &unrestricted_view ("changed-owner"), &gnid ("gone"), &recorders),
+      &view_with_occurrence ("changed-owner"), &gnid ("gone"), &recorders),
       "an open recorder can display its rewritten relationship" );
     assert! (view_can_display_absent_reference_change (
       &view_with_unknown ("gone"), &gnid ("gone"), &recorders),
       "Unknowns are absent from the PID index but still need removal" );
     assert! (! view_can_display_absent_reference_change (
-      &unrestricted_view ("unrelated-owner"), &gnid ("gone"), &recorders),
+      &view_with_occurrence ("unrelated-owner"), &gnid ("gone"), &recorders),
       "an unrelated view must receive neither a lock nor a replacement" );
   }
 }

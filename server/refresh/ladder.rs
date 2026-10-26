@@ -51,7 +51,7 @@ use crate::types::misc::ID;
 use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::moves::{move_after, move_to_first_child, move_to_last_child};
 use crate::types::viewnode::{
-  Editability, Folder, FolderRelation, Ghost, PropertyMember, Unknown, UnrestrictedVognode,
+  Editability, Folder, FolderRelation, Ghost, PropertyMember, Unknown, Occurrence,
   ViewRequest, Viewnode, ViewnodeKind, ViewnodeStats, Vognode, Warrant, viewnode_of};
 use crate::update_buffer::completion_mode::CompletionMode;
 
@@ -103,12 +103,12 @@ fn extend_requested_content (
   { return; }
   for child in children_of (tree, parent) {
     let gnid : ID = match &tree . get (child) . unwrap () . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
         if occurrence . is_writeProtected () && occurrence . claimsMembership =>
         occurrence . gnid . clone (),
       _ => continue, };
     if ! drawn_occurrence_is_editable (tree, parent, &gnid, walk) { continue; }
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { occurrence . editability = Editability::Editable { // the re-kind gives it its body
         body : None, edit_request : None }; }
@@ -228,8 +228,8 @@ fn merge_into (
     let survivor_viewnode : &mut Viewnode = survivor_mut . value ();
     if other_viewnode . foldAndFocus . focused {
       survivor_viewnode . foldAndFocus . focused = true; }
-    if let ( ViewnodeKind::Vognode (Vognode::Unrestricted (kept)),
-             ViewnodeKind::Vognode (Vognode::Unrestricted (merged)) )
+    if let ( ViewnodeKind::Vognode (Vognode::Occurrence (kept)),
+             ViewnodeKind::Vognode (Vognode::Occurrence (merged)) )
       = ( &mut survivor_viewnode . kind, &other_viewnode . kind )
     { kept . view_requests . extend ( merged . view_requests . iter () . copied () );
       if ! merged . is_writeProtected () {
@@ -300,7 +300,7 @@ pub(crate) fn set_warrant (
   warrant : Warrant,
 ) {
   match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       occurrence . viewStats . isWarranted = warrant,
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       ghost . isWarranted = warrant,
@@ -346,7 +346,7 @@ fn claims_membership (
   viewnode : &Viewnode,
 ) -> Option<bool> {
   match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       Some (occurrence . claimsMembership),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       Some (unknown . claimsMembership),
@@ -364,7 +364,7 @@ pub(crate) fn set_claim (
   claims : bool,
 ) {
   match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       occurrence . claimsMembership = claims,
     ViewnodeKind::Vognode (Vognode::Unknown (unknown)) =>
       unknown . claimsMembership = claims,
@@ -476,10 +476,10 @@ fn draw_item (
       IdRuleAnswer::Occurrence (pid) => {
         let editable : bool =
           drawn_occurrence_is_editable (tree, parent, &pid, walk);
-        let occurrence : UnrestrictedVognode =
+        let occurrence : Occurrence =
           occurrence_from_truth (&pid, editable, claims, walk) ?;
         let mut viewnode : Viewnode = viewnode_of ( ViewnodeKind::Vognode (
-          Vognode::Unrestricted ( UnrestrictedVognode {
+          Vognode::Occurrence ( Occurrence {
             viewStats : ViewnodeStats { isWarranted : item . warrant,
                                         .. ViewnodeStats::default () },
             .. occurrence } )));
@@ -596,7 +596,7 @@ fn substitute_overriders (
   for child in children_of (tree, parent) {
     let (gnid, overridesHere, warrant) : (ID, Option<ID>, Warrant) =
       match &tree . get (child) . unwrap () . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           ( occurrence . gnid . clone (), occurrence . overridesHere . clone (),
             occurrence . viewStats . isWarranted ),
         _ => continue, };
@@ -633,7 +633,7 @@ fn show_overrider (
     . ok_or ("show_overrider: the truth lacks the overrider") ?;
   let was_editable_as : Option<ID> =
     tree . get (child) . unwrap () . value () . editable_gnid () . cloned ();
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
   { occurrence . gnid         = shown . clone ();
     occurrence . title         = node . title . clone ();
@@ -659,7 +659,7 @@ fn stop_substituting (
   goal     : &Goal,
   walk     : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
   { occurrence . overridesHere = None; }
   let warrant : Warrant = warrant_of_child (
@@ -698,7 +698,7 @@ fn is_overridden_and_shown_raw (
         ! folder . members_are_properties ()
         && ! matches! ( folder, Folder::Subscribee ),
       _ => false, } );
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &node . value () . kind else { return false; };
   raw_position
   && occurrence . overridesHere . is_none ()
@@ -724,7 +724,7 @@ fn fulfill_view_requests (
   for child in children_of (tree, parent) {
     let requests : Vec<ViewRequest> =
       match &tree . get (child) . unwrap () . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           occurrence . view_requests . iter () . copied ()
           . filter ( |request| *request != ViewRequest::Fork )
           . collect (),
@@ -748,7 +748,7 @@ fn fulfill_view_requests (
         ViewRequest::Flags => folders . push (Folder::flags ()),
         ViewRequest::Editable | ViewRequest::Fork | ViewRequest::Tombstone => {}, }}
     add_folders (tree, child, &folders, walk);
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { occurrence . view_requests . retain ( |request| *request == ViewRequest::Fork ); }}
   Ok (( )) }

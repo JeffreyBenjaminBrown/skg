@@ -5,7 +5,7 @@ local bijection = require('skg.sexpr.org_bijection')
 local fields = require('skg.sexpr.metadata_fields')
 local shared = require('skg.shared')
 
----The unrestricted node's kind from 'shared/metadata-fields.json'.
+---The occurrence's kind from 'shared/metadata-fields.json'.
 local node_kind = shared.metadata_kind('node')
 
 ---Find a headline with text TEXT among HEADLINES; returns its index.
@@ -41,8 +41,8 @@ end
 describe('skg.sexpr.metadata_fields.kind_of_sexp', function ()
   it('finds the kind of the first atom the table names', function ()
     for sexp_text, kind_name in pairs({
-        ['(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'] = 'unrestricted node',
-        ['(skg focused node (gnid abc))'] = 'unrestricted node',
+        ['(skg node (gnid abc) (skgRepos (nodeRepo jeff)))'] = 'occurrence',
+        ['(skg focused node (gnid abc))'] = 'occurrence',
         ['(skg ghost (gnid g) (skgRepos (nodeRepo r)))'] = 'ghost',
         ['(skg alias (skgRepos (relRepo r)))'] = 'alias',
         ['(skg (flag noSearchMatching))'] = 'flag',
@@ -66,7 +66,7 @@ describe('skg.sexpr.metadata_fields.headlines_to_org', function ()
 end)
 
 describe('skg.sexpr.metadata_fields filling in', function ()
-  it('inserts all default fields into a minimal UnrestrictedVognode', function ()
+  it('inserts all default fields into a minimal occurrence', function ()
     local headlines =
       filledIn_headlines('(skg node (gnid abc) (skgRepos (nodeRepo jeff)))')
     -- skg, node, gnid/abc, skgRepos/nodeRepo/jeff, writeProtected/false,

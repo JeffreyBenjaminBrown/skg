@@ -75,6 +75,6 @@ pub fn gnids_that_can_have_graphnodestats (
   for edge in tree . root () . traverse () {
     if let Edge::Open (node_ref) = edge {
       if let Some (gnid) =
-        node_ref . value () . unrestricted_gnid ()
+        node_ref . value () . occurrence_gnid ()
       { gnids . push ( gnid . clone () ); }}}
   gnids }

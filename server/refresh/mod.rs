@@ -233,7 +233,7 @@ fn fulfill_editableView_requests (
   let requested : Vec<(NodeId, ID)> =
     tree . root () . descendants ()
     . filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
         if occurrence . view_requests . contains (&ViewRequest::Editable) =>
         Some (( node . id (), occurrence . gnid . clone () )),
       _ => None, } )
@@ -247,7 +247,7 @@ fn fulfill_editableView_requests (
       . collect ();
     for other in others {
       write_protect_occurrence (tree, other, walk); }
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut tree . get_mut (treeid) . unwrap () . value () . kind
     { occurrence . view_requests . remove (&ViewRequest::Editable);
       if occurrence . is_writeProtected () {
@@ -265,7 +265,7 @@ pub(crate) fn write_protect_occurrence (
 ) {
   let (gnid, dropped) : (Option<ID>, bool) =
     match &mut tree . get_mut (treeid) . unwrap () . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
         if ! occurrence . is_writeProtected () => {
         let dropped : bool = occurrence . edit_request () . is_some ();
         occurrence . write_protect ();

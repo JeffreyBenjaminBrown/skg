@@ -36,7 +36,7 @@ pub struct OpenViews {
 /// Direct viewforest mutation would make pids stale.
 pub struct ViewState {
   pub viewforest : ViewForest,
-  pub pids       : HashSet<ID>, // the Unrestricted vognodes in the buffer (the
+  pub pids       : HashSet<ID>, // the occurrences in the buffer (the
                             // kind this view renders meaningfully; see
                             // pids_from_viewforest)
   pub diffView_buffer_kind : Option<DiffViewBufferKind>, // Some for a buffer of the diff view
@@ -336,7 +336,7 @@ impl ViewnodeIdRecord {
 //
 
 /// The pids a view "contains" for collateral detection (views_containing): the
-/// primary ids of its Unrestricted vognodes -- the only kind backed by a
+/// primary ids of its occurrences -- the only kind backed by a
 /// real, current graphnode that this view renders meaningfully. A tombstone
 /// standing for a hidden node shows nothing about the node, so a save
 /// touching that node need not re-render this view (its unrestricted
@@ -350,7 +350,7 @@ pub fn pids_from_viewforest (
 ) -> HashSet<ID> {
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
         Some ( t . gnid . clone () ),
       _ => None } )
     . collect () }
@@ -367,7 +367,7 @@ fn root_gnids_from_viewforest (
 ) -> HashSet<ID> {
   let mut gnids : HashSet<ID> = HashSet::new ();
   for child in viewforest . roots () {
-    if let Some (root_gnid) = child . value () . unrestricted_gnid () {
+    if let Some (root_gnid) = child . value () . occurrence_gnid () {
       gnids . insert ( root_gnid . clone () );
       if let Some (pid) = graph . pid_of ( root_gnid ) {
           if let Some (node) = graph . nodes . get (&pid) {

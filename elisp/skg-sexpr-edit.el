@@ -290,10 +290,10 @@ buffer.  (The full metadata view is reserved for an explicit
 (defun skg--headline-can-inherit-skgrepo-p ()
   "Whether the save can give the headline at point a skgrepo by
 inheritance, as the server's walk rootward decides
-('skgrepo_of_nearest_unrestricted_ancestor'): it passes through
+('skgrepo_of_nearest_occurrence_ancestor'): it passes through
 ghosts, unknowns and folders, and through headlines without
 metadata, which inherit the same way; the first other ancestor must
-be an unrestricted vognode.  A root cannot inherit, nor can a headline whose
+be an occurrence.  A root cannot inherit, nor can a headline whose
 walk ends at a tombstone or a property."
   (save-excursion
     (catch 'answer
@@ -372,7 +372,7 @@ Kill the buffer to cancel without saving."
                            (if kind
                                (skg-metadata-fields-fillIn-defaults-in-org
                                 sexp-as-org kind nil
-                                (when (skg--unrestrictedNode-sexp-p sexp)
+                                (when (skg--occurrence-sexp-p sexp)
                                   title))
                              sexp-as-org)) ))
           (skg-sexp-edit--open-edit-buffer

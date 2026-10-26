@@ -60,7 +60,7 @@ fn convert_now_restricted_phantoms (
     tree . get_mut (phantom) . unwrap () . value ()
       . replace_kind (ViewnodeKind::Tombstone); }}
 
-/// The home skgrepo of the unrestricted vognode that records the
+/// The home skgrepo of the occurrence that records the
 /// relationship an unknown phantom without a relRepo stands in: its
 /// viewparent, or, in a folder, the folder's viewparent.
 fn recorder_home_skgrepo (
@@ -72,7 +72,7 @@ fn recorder_home_skgrepo (
       parent . parent () ?,
     _ => parent, };
   match &recorder . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
       Some ( t . home_skgrepo . clone () ),
     _ => None, }}
 

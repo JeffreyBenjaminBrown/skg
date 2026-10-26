@@ -59,7 +59,7 @@ fn treeid_of (
 ) -> NodeId {
   tree . root () . descendants ()
     . find ( |node| matches! ( &node . value () . kind,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . gnid . 0 == gnid ))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) if t . gnid . 0 == gnid ))
     . unwrap_or_else ( || panic! ("no vognode {} in the view", gnid) )
     . id () }
 

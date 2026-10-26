@@ -4,7 +4,7 @@ use crate::types::misc::{SkgConfig, SkgrepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ChangeFacts, FoldAndFocus, ReadinessRequest,
-  Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, UnrestrictedVognode,
+  Viewnode, ViewnodeKind, Vognode, PropertyMember, ChangeViewnode, Occurrence,
   Ghost, Unknown, NodeEditRequest,
   RelationshipEditRequest,
   Warrant,
@@ -206,9 +206,9 @@ fn viewnode_to_string_without_viewnode_id (
     ViewnodeKind::Tombstone =>
       Ok ( tombstone_metadata_to_string (
         viewnode . foldAndFocus )),
-    ViewnodeKind::Vognode (Vognode::Unrestricted (unrestrictedVognode)) =>
-      Ok ( unrestrictedVognode_metadata_to_string (
-        viewnode . foldAndFocus, unrestrictedVognode, claims_are_read, facts, request )),
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+      Ok ( occurrence_metadata_to_string (
+        viewnode . foldAndFocus, occurrence, claims_are_read, facts, request )),
     ViewnodeKind::Vognode (Vognode::Unknown (unknown_node)) =>
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . foldAndFocus, unknown_node, claims_are_read, facts, request )),
@@ -405,37 +405,37 @@ fn diff_form (
   ( ! parts . is_empty () ) . then ( || format! (
     "(diff {})", parts . join (" ") )) }
 
-/// Render metadata for an UnrestrictedVognode:
+/// Render metadata for an Occurrence:
 ///   [focused] [folded] [bodyFolded] node (gnid X)
 ///   (skgRepos (nodeRepo R) [(relRepo R)]) [noClaim] [writeProtected]
 ///   [(overridesHere X)] [(editRequest ...)] [(viewRequests ...)]
 ///   [(view [omittedBody] [(rels ...)] [(props ...)] [(birth ...)]
 ///          [noWarrant] [cycle] [repoBoundary])]
 ///   [(diff ...)]
-fn unrestrictedVognode_metadata_to_string (
+fn occurrence_metadata_to_string (
   foldAndFocus    : FoldAndFocus,
-  unrestrictedVognode : & UnrestrictedVognode,
+  occurrence : & Occurrence,
   claims_are_read     : bool,
   facts               : & ChangeFacts,
   request             : & Option<ReadinessRequest>,
 ) -> String {
   fn node_parts (
-    unrestrictedVognode : & UnrestrictedVognode,
+    occurrence : & Occurrence,
     claims_are_read     : bool,
     facts     : & ChangeFacts,
     request   : & Option<ReadinessRequest>,
   ) -> Vec < String > {
     fn view_facts (
-      unrestrictedVognode : & UnrestrictedVognode,
+      occurrence : & Occurrence,
     ) -> Vec < String > {
-      let stats = &unrestrictedVognode . viewStats;
+      let stats = &occurrence . viewStats;
       let atoms = |atoms : Vec<(bool, &str)>| -> Vec<String> {
         atoms . into_iter ()
           . filter ( |(carried, _)| *carried )
           . map ( |(_, atom)| atom . to_string () )
           . collect () };
       [ // The rendering is hiding a body (herald "B" on the ☮).
-        atoms ( vec! [ ( unrestrictedVognode . is_writeProtected ()
+        atoms ( vec! [ ( occurrence . is_writeProtected ()
                          && stats . omitted_body, "omittedBody" ) ] ),
         // The semantic (rels ...), (props ...) and (birth ...) sexps,
         // assembled in the viewnodestats pass
@@ -446,11 +446,11 @@ fn unrestrictedVognode_metadata_to_string (
                        ( stats . cycle,                       "cycle" ),
                        ( stats . repoBoundary,                "repoBoundary" ) ] ) ]
         . concat () }
-    fn edit_request ( unrestrictedVognode : & UnrestrictedVognode
+    fn edit_request ( occurrence : & Occurrence
                     ) -> Option < String > {
-      if let Some (request) = &unrestrictedVognode . relationshipEditRequest {
+      if let Some (request) = &occurrence . relationshipEditRequest {
         return Some ( relationshipEditRequest_element (request) ); }
-      unrestrictedVognode . edit_request () . map ( | edit_req | {
+      occurrence . edit_request () . map ( | edit_req | {
         match edit_req {
           NodeEditRequest::NodeMerge (gnid) => format! ( "(merge {})", gnid . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
@@ -460,11 +460,11 @@ fn unrestrictedVognode_metadata_to_string (
           // Parsed into fields outside 'Editability', never kept here.
           NodeEditRequest::RestoreNode => "restoreNode" . to_string (),
           NodeEditRequest::RestoreRel  => "restoreRel" . to_string () } } ) }
-    fn view_requests ( unrestrictedVognode : & UnrestrictedVognode
+    fn view_requests ( occurrence : & Occurrence
                      ) -> Option < String > {
-      if unrestrictedVognode . view_requests . is_empty () { return None; }
+      if occurrence . view_requests . is_empty () { return None; }
       let mut request_strings : Vec < String > =
-        unrestrictedVognode . view_requests . iter ()
+        occurrence . view_requests . iter ()
           . map ( | req | req . to_string () )
           . collect ();
       request_strings . sort ();
@@ -472,28 +472,28 @@ fn unrestrictedVognode_metadata_to_string (
                        request_strings . join (" ") )) }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    parts . push ( format! ( "(gnid {})", unrestrictedVognode . gnid . 0 ));
+    parts . push ( format! ( "(gnid {})", occurrence . gnid . 0 ));
     parts . extend ( skgRepos_form (
-      Some (&unrestrictedVognode . home_skgrepo),
-      unrestrictedVognode . viewStats . relRepo . as_ref () ));
-    parts . extend ( noClaim_atom (unrestrictedVognode . claimsMembership, claims_are_read) );
-    if unrestrictedVognode . is_writeProtected () {
+      Some (&occurrence . home_skgrepo),
+      occurrence . viewStats . relRepo . as_ref () ));
+    parts . extend ( noClaim_atom (occurrence . claimsMembership, claims_are_read) );
+    if occurrence . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () ); }
     if let Some (ref original) =
-      unrestrictedVognode . overridesHere {
+      occurrence . overridesHere {
       parts . push ( format! ("(overridesHere {})",
                                original . 0 )); }
     parts . extend ( editRequest_form (
-      edit_request (unrestrictedVognode), request ));
-    parts . extend ( view_requests (unrestrictedVognode) );
-    parts . extend ( view_form ( view_facts (unrestrictedVognode) ));
+      edit_request (occurrence), request ));
+    parts . extend ( view_requests (occurrence) );
+    parts . extend ( view_form ( view_facts (occurrence) ));
     parts . extend ( diff_form (facts) );
     parts }
   let mut parts : Vec < String > = foldAndFocus_atoms (foldAndFocus);
-  parts . extend ( node_parts (unrestrictedVognode, claims_are_read, facts, request));
+  parts . extend ( node_parts (occurrence, claims_are_read, facts, request));
   parts . join (" ") }
 
 /// Render metadata for a ghost:

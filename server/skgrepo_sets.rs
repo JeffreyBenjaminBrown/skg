@@ -93,7 +93,7 @@ pub fn entombstone_hidden_occurrences (
   let hidden : Vec<NodeId> =
     viewforest . root () . descendants ()
     . filter ( |n| match &n . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+        ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
           graph . gnid_presence_gated (&t . gnid, Some (restriction))
           == GnidPresence::Hidden,
         _ => false } )

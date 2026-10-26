@@ -65,7 +65,7 @@ impl GraphStraddle {
   /// shows it ('(properties changed)', herald M): both graphs have it
   /// and it records at least one change-forest leaf
   /// ('ChangeLeaves::leaves_under'). Every site that tags an
-  /// unrestricted vognode in content position, a folder member or a
+  /// occurrence in content position, a folder member or a
   /// root asks this and 'node_existence'.
   pub fn node_properties_changed (
     &self,

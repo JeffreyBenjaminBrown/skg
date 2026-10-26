@@ -143,14 +143,14 @@ the other parts are kept, in their order."
            '(skg alias noClaim))))
 
 (ert-deftest test-strip-heralds-does-not-fabricate-node ()
-  "A non-UnrestrictedVognode sexp (no (node ...)) is returned unchanged, so it
+  "A non-occurrence sexp (no (node ...)) is returned unchanged, so it
 never gains a fabricated (node ...) and never matches (skg node)."
   (let ((stripped (skg-strip-heralds-from-sexp '(skg (gnid x)))))
     (should (equal stripped '(skg (gnid x))))
     (should-not (skg-sexp-subtree-p stripped '(skg node)))))
 
-(ert-deftest test-strip-heralds-unrestrictedNode-without-stats-unchanged ()
-  "An UnrestrictedVognode lacking derived facts keeps exactly its fields
+(ert-deftest test-strip-heralds-occurrence-without-stats-unchanged ()
+  "An occurrence lacking derived facts keeps exactly its fields
 -- no fabricated '(view ...)'."
   (should (equal
            (skg-strip-heralds-from-sexp '(skg node (gnid x) (skgRepos (nodeRepo y))))

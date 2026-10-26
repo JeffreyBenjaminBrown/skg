@@ -248,7 +248,7 @@ fn true_child_gnids (
 ) -> BTreeSet<ID> {
   tree . get (parent_gnid) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewnodeKind::Vognode ( Vognode::Unrestricted (node) )
+      ViewnodeKind::Vognode ( Vognode::Occurrence (node) )
         => Some (node . gnid . clone ()),
       _ => None, })
     . collect () }
@@ -547,7 +547,7 @@ async fn the_containerward_chain_stops_before_a_restricted_container (
       assert! (
         ! rendered . contains ("private-container"),
         "restricted container should not render as a placeholder or \
-         UnrestrictedVognode: {}",
+         Occurrence: {}",
         rendered );
       assert! (
         ! rendered . contains ("active-root-after-private"),

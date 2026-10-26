@@ -10,7 +10,7 @@
 
 (defun skg-delete (&optional recursive)
   "Mark the headline at point for deletion.
-With a prefix argument RECURSIVE, also mark every unrestrictedNode
+With a prefix argument RECURSIVE, also mark every occurrence
 viewdescendant (equivalent to `skg-delete-recursive').
 Edits the metadata to include `delete` in the `editRequest` section.
 Does not save; call `skg-request-save-buffer' afterward."
@@ -22,8 +22,8 @@ Does not save; call `skg-request-save-buffer' afterward."
     (message "This change will only be applied when you save the buffer.")))
 
 (defun skg-delete-recursive ()
-  "Mark the headline at point, and every unrestrictedNode viewdescendant of it,
-for deletion. Descendent headlines that are not unrestrictedNodes (ghosts,
+  "Mark the headline at point, and every occurrence viewdescendant of it,
+for deletion. Descendent headlines that are not occurrences (ghosts,
 unknowns, aliasFolder, id-folder, etc.) are skipped. Does not save;
 call `skg-request-save-buffer' afterward."
   (interactive)
@@ -97,7 +97,7 @@ If there is no active region, do nothing."
     (read metadata-str)))
 
 (defun skg--current-node-repo ()
-  "Return the repo string for the UnrestrictedVognode headline at point."
+  "Return the repo string for the occurrence headline at point."
   (let* ((sexp (skg--current-headline-metadata-sexp))
          (repo-values (skg-sexp-cdr-at-path sexp '(skg skgRepos nodeRepo))))
     (unless repo-values
@@ -112,7 +112,7 @@ If there is no active region, do nothing."
         (string-empty-p (cadr split)))))
 
 (defun skg--populate-minimal-node-metadata ()
-  "Write minimal UnrestrictedVognode metadata onto the metadata-less headline at point.
+  "Write minimal occurrence metadata onto the metadata-less headline at point.
 Prompts for an owned repo (no prompt when only one repo is owned)
 and inserts (skg node (skgRepos (nodeRepo REPO))).  Returns the chosen repo.
 Reuses `skg-edit-metadata-at-point', which formats and spaces the sexp
@@ -226,15 +226,15 @@ Returns a plist (:recorder RECORDER-ID :member MEMBER-ID :relation NAME):
 for a content child, the viewparent contains the node at point; for
 a writable-folder member, the folder's anchor (the folder's viewparent) owns
 the folder's relation toward the node at point. Signals `user-error'
-when point represents no writable relationship: not on an unrestrictedNode or Unknown
+when point represents no writable relationship: not on an occurrence or Unknown
 headline, on a root headline (no viewparent, so no relationship), on a
 member of a write-protected folder, or with an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
-    (unless (or (skg--unrestrictedNode-sexp-p member-sexp)
+    (unless (or (skg--occurrence-sexp-p member-sexp)
                 (skg--unknown-headline-p member-sexp))
-      (user-error "Not on an unrestrictedNode or Unknown headline"))
+      (user-error "Not on an occurrence or Unknown headline"))
     (let ((member-gnid (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)
@@ -273,7 +273,7 @@ member of a write-protected folder, or with an ID missing."
             (list :recorder anchor-gnid
                   :member member-gnid
                   :relation (cdr writable-folder))))
-         ((skg--unrestrictedNode-sexp-p parent-sexp)
+         ((skg--occurrence-sexp-p parent-sexp)
           (let ((parent-gnid (skg--node-id parent-sexp)))
             (unless parent-gnid
               (user-error "No id in the parent headline's metadata"))
@@ -302,9 +302,9 @@ member of a write-protected folder, or with an ID missing."
       (format "%s" (car values)))))
 
 (defun skg--node-edit-request-at-point-p ()
-  "Whether the Unrestricted headline at point already requests delete or merge."
+  "Whether the occurrence headline at point already requests delete or merge."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
-         (values (and (skg--unrestrictedNode-sexp-p metadata)
+         (values (and (skg--occurrence-sexp-p metadata)
                       (skg-sexp-cdr-at-path metadata '(skg editRequest)))))
     (and values
          (not (and (consp (car values))
@@ -427,7 +427,7 @@ floor check (see `apply_sticky_relRepos') is what validates each one.
 The walk starts at the node at point (inclusive: its own relationship to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: member
-unrestrictedNodes and writable folders. It prunes below write-protected nodes
+occurrences and writable folders. It prunes below write-protected nodes
 and subscribee-as-such members (their viewchildren's relationships are not
 collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
@@ -559,7 +559,7 @@ command, but does not edit anything."
           (root-meta (skg--metadata-sexp-at-point-or-nil)))
       (when (skg--relationship-kind-matches-p kind)
         (push (copy-marker (line-beginning-position)) targets))
-      (when (or (and (skg--unrestrictedNode-sexp-p root-meta)
+      (when (or (and (skg--occurrence-sexp-p root-meta)
                      (not (skg--relRepo-prune-below-p root-meta)))
                 (skg--writable-folder-sexp-p root-meta))
         (outline-next-heading)
@@ -567,7 +567,7 @@ command, but does not edit anything."
                     (> (org-outline-level) start-level))
           (let ((meta (skg--metadata-sexp-at-point-or-nil)))
             (cond
-             ((skg--unrestrictedNode-sexp-p meta)
+             ((skg--occurrence-sexp-p meta)
               (if (not (skg--node-member-p meta))
                   (skg--goto-next-headline-after-subtree)
                 (when (skg--relationship-kind-matches-p kind)
@@ -586,23 +586,23 @@ command, but does not edit anything."
       (nreverse targets))))
 
 (defun skg--relationship-kind-matches-p (kind)
-  "Non-nil iff the headline at point is a true unrestrictedNode or Unknown whose
+  "Non-nil iff the headline at point is a true occurrence or Unknown whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `content', the view-parent must be a
-editable unrestrictedNode not in subscribee-as-such position (an
+editable occurrence not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relRepo request under one would be
 inert); for `subscribee' and `overridden', the viewparent must be
 the matching writable folder with a editable anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-    (and (or (and (skg--unrestrictedNode-sexp-p meta)
+    (and (or (and (skg--occurrence-sexp-p meta)
                   (skg--node-member-p meta))
              (skg--unknown-headline-p meta))
          (save-excursion
            (and (org-up-heading-safe)
                 (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
                   (cond
-                   ((skg--unrestrictedNode-sexp-p parent-sexp)
+                   ((skg--occurrence-sexp-p parent-sexp)
                     (and (eq kind 'content)
                          (not (skg--node-write-protected-p parent-sexp))
                          (not (skg--subscribee-as-such-at-point-p))))
@@ -617,7 +617,7 @@ the matching writable folder with a editable anchor."
                    (t nil))))))))
 
 (defun skg--relRepo-prune-below-p (metadata-sexp)
-  "Non-nil iff the walk should not descend below the unrestrictedNode
+  "Non-nil iff the walk should not descend below the occurrence
 headline at point (with METADATA-SEXP its parsed metadata): an
 write-protected node's contains is not collected at save, and a
 subscribee-as-such member's viewchildren are hide/unhide signals,
@@ -627,9 +627,9 @@ not writable relationships."
 
 (defun skg--subscribee-as-such-at-point-p ()
   "Non-nil iff the headline at point sits in subscribee-as-such
-position: an true unrestrictedNode member of a subscribeeFolder."
+position: an true occurrence member of a subscribeeFolder."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-    (and (skg--unrestrictedNode-sexp-p meta)
+    (and (skg--occurrence-sexp-p meta)
          (skg--node-member-p meta)
          (save-excursion
            (and (org-up-heading-safe)
@@ -638,14 +638,14 @@ position: an true unrestrictedNode member of a subscribeeFolder."
                  'subscribeeFolder))))))
 
 (defun skg--folder-anchor-editable-p ()
-  "Non-nil iff the folder headline at point has a editable unrestrictedNode
+  "Non-nil iff the folder headline at point has an editable occurrence
 anchor (its viewparent). A write-protected anchor's writable folders are
 not collected at save (the folder recorder is not save-eligible), so
 atoms on their members have no effect."
   (save-excursion
     (and (org-up-heading-safe)
          (let ((anchor-sexp (skg--metadata-sexp-at-point-or-nil)))
-           (and (skg--unrestrictedNode-sexp-p anchor-sexp)
+           (and (skg--occurrence-sexp-p anchor-sexp)
                 (not (skg--node-write-protected-p anchor-sexp)))))))
 
 (defun skg--non-vognode-atom-present-p (metadata-sexp atom)
@@ -724,11 +724,11 @@ Does not save; call `skg-request-save-buffer' afterward."
     (message "Restore request set. Save to apply.")))
 
 (defun skg--removed-membership-p (metadata-sexp)
-  "Non-nil when METADATA-SEXP is an UnrestrictedVognode whose
+  "Non-nil when METADATA-SEXP is an occurrence whose
 '(diff ...)' says its relationship was removed. Whether a restoreRel
 may sit on it depends also on where it stands
 (`skg--restoreRel-position-at-point-p')."
-  (and (skg--unrestrictedNode-sexp-p metadata-sexp)
+  (and (skg--occurrence-sexp-p metadata-sexp)
        (equal (skg-sexp-cdr-at-path metadata-sexp '(skg diff rel))
               '(removed))))
 
@@ -760,7 +760,7 @@ server/to_org/extend/containerward_chain.rs)."
       (while t
         (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
           (unless (and (skg--vognode-sexp-p metadata)
-                       (or (not (skg--unrestrictedNode-sexp-p metadata))
+                       (or (not (skg--occurrence-sexp-p metadata))
                            (not (skg--node-member-p metadata))))
             (throw 'answer nil))
           (unless (and (org-up-heading-safe)
@@ -916,7 +916,7 @@ that is not write-protected, or a folder 'shared/herald-styles.json'
 does not list as write-protected whose anchor is such a node."
   (let ((editable-node-p
          (lambda (sexp)
-           (and (skg--unrestrictedNode-sexp-p sexp)
+           (and (skg--occurrence-sexp-p sexp)
                 (not (skg--node-write-protected-p sexp)))))
         (folder (skg--folder-atom parent-sexp)))
     (if folder
@@ -980,10 +980,10 @@ or nil when it has none or it does not read."
             (car (read-from-string (substring text 0 end)))))))))
 
 (defun skg--vognode-sexp-p (metadata-sexp)
-  "Non-nil iff METADATA-SEXP is a vognode's: an UnrestrictedVognode,
+  "Non-nil iff METADATA-SEXP is a vognode's: an occurrence,
 a ghost or an unknown."
   (and (consp metadata-sexp)
-       (or (skg--unrestrictedNode-sexp-p metadata-sexp)
+       (or (skg--occurrence-sexp-p metadata-sexp)
            (skg--ghost-sexp-p metadata-sexp)
            (skg--unknown-headline-p metadata-sexp))))
 
@@ -1052,7 +1052,7 @@ their repo edits take effect even under a write-protected parent."
 (defun skg--do-at-recursive-repo-move-occurrences (old-skgrepo fn)
   "Call FN, with point on each headline a recursive repo move from
 the headline at point covers: that root, and every viewdescendant
-reached through member UnrestrictedVognodes whose repo is
+reached through member occurrences whose repo is
 OLD-REPO. Restores point afterward."
   (save-excursion
     (let ((start-level (org-outline-level)))
@@ -1061,7 +1061,7 @@ OLD-REPO. Restores point afterward."
       (while (and (not (eobp))
                   (> (org-outline-level) start-level))
         (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-          (if (not (and (skg--unrestrictedNode-sexp-p metadata-sexp)
+          (if (not (and (skg--occurrence-sexp-p metadata-sexp)
                         (skg--node-member-p metadata-sexp)))
               (skg--goto-next-headline-after-subtree)
             (when (equal (skg--node-repo metadata-sexp) old-skgrepo)
@@ -1086,8 +1086,8 @@ OLD-REPO. Restores point afterward."
                  (not (string-empty-p metadata-str)))
         (read metadata-str)))))
 
-(defun skg--unrestrictedNode-sexp-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP describes an UnrestrictedVognode."
+(defun skg--occurrence-sexp-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP describes an occurrence."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg node))))
 
@@ -1112,8 +1112,8 @@ headline's kind, or nil."
 
 (defun skg--node-id (metadata-sexp)
   "Return METADATA-SEXP's node ID as a string, or nil (also when
-METADATA-SEXP is not an UnrestrictedVognode's)."
-  (and (skg--unrestrictedNode-sexp-p metadata-sexp)
+METADATA-SEXP is not an occurrence's)."
+  (and (skg--occurrence-sexp-p metadata-sexp)
        (skg--metadata-gnid metadata-sexp)))
 
 (defun skg--unknown-headline-p (metadata-sexp)
@@ -1122,8 +1122,8 @@ METADATA-SEXP is not an UnrestrictedVognode's)."
        (skg-sexp-subtree-p metadata-sexp '(skg unknown))))
 
 (defun skg--relationship-member-id (metadata-sexp)
-  "Return the raw member ID for an UnrestrictedVognode or Unknown headline."
-  (and (or (skg--unrestrictedNode-sexp-p metadata-sexp)
+  "Return the raw member ID for an occurrence or Unknown headline."
+  (and (or (skg--occurrence-sexp-p metadata-sexp)
            (skg--unknown-headline-p metadata-sexp))
        (skg--metadata-gnid metadata-sexp)))
 
@@ -1134,7 +1134,7 @@ METADATA-SEXP is not an UnrestrictedVognode's)."
       (skg--metadata-gnid metadata))))
 
 (defun skg--node-write-protected-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has the bare UnrestrictedVognode writeProtected atom."
+  "Return non-nil if METADATA-SEXP has the bare occurrence writeProtected atom."
   (skg-sexp-subtree-p metadata-sexp '(skg node writeProtected)))
 
 (defun skg--change-repo-at-point (new-skgrepo)

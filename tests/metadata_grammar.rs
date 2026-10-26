@@ -27,7 +27,7 @@ fn node_with_its_declared_parts (
   let mut viewnode : Viewnode =
     mk_editable_viewnode ( ID::from ("n"), SkgrepoName::from ("main"),
                            "n" . into (), None );
-  if let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
     = &mut viewnode . kind {
     occurrence . viewStats . relRepo = Some ( SkgrepoName::from ("pub") );
     occurrence . overridesHere = Some ( ID::from ("o") ); }

@@ -274,7 +274,7 @@ aliasFolder also becomes =Tombstone=; its leaf child
 which the postorder pass detaches. So aliasFolder and its
 alias disappear entirely.
 
-subee is an UnrestrictedVognode under the (now =Tombstone=)
+subee is an Occurrence under the (now =Tombstone=)
 subscribeeFolder. =complete_viewtree= completes it normally,
 adding subee-1 as a real child. This is the "tricky" line.
 
@@ -283,7 +283,7 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
  (3 . "")             ;; Tombstone (was subscribeeFolder)
- (4 . "subee")        ;; UnrestrictedVognode, completed
+ (4 . "subee")        ;; Occurrence, completed
  (5 . "subee-1")      ;; child from completion
  (5 . "")             ;; Tombstone (was hiddenInSubscribeeFolder)
  (6 . "subee-1")      ;; hidden node preserved
@@ -302,7 +302,7 @@ disappear entirely.
 
 Tombstone has no title (renders as empty). The assertion
 should check for the presence of the right number of
-empty-titled headlines at the right depths, and the UnrestrictedVognode
+empty-titled headlines at the right depths, and the Occurrence
 titles at the right depths.
 
 * Phase 4: Add subee-2 from buffer 1
@@ -329,7 +329,7 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode, still present
  (3 . "")             ;; Tombstone
- (4 . "subee")        ;; UnrestrictedVognode, completed
+ (4 . "subee")        ;; Occurrence, completed
  (5 . "subee-1")      ;; existing child
  (5 . "subee-2")      ;; new child (now has UUID + metadata)
  (5 . "")             ;; Tombstone
@@ -347,7 +347,7 @@ After fixing =build_child_creation_data= (see Rust code fix
 section below), the collateral update for buffer 2 succeeds.
 =complete_viewtree= re-processes =subee=, reads the updated
 =subee.skg= (which now lists =subee-2= in =contains=), and
-creates subee-2 as a new UnrestrictedVognode child.
+creates subee-2 as a new Occurrence child.
 
 Expected headline-titles:
 #+begin_example
@@ -380,8 +380,8 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
  (3 . "")             ;; Tombstone
- (4 . "subee")        ;; UnrestrictedVognode (writeProtected)
- (4 . "new-root")     ;; new UnrestrictedVognode (now has UUID)
+ (4 . "subee")        ;; Occurrence (writeProtected)
+ (4 . "new-root")     ;; new Occurrence (now has UUID)
  (4 . "")             ;; Tombstone
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unchanged
@@ -535,7 +535,7 @@ expects =(skg node ...)= structure.
 
 The prompt uses shorthand throughout: =** (deleted)= means a
 =DeletedNode=, =*** (tombstone)= means =Tombstone=,
-=* (writeProtected) 11= means a write-protected UnrestrictedVognode, etc. None of these
+=* (writeProtected) 11= means a write-protected Occurrence, etc. None of these
 are the literal org-mode rendering.
 
 The actual rendering would be:
@@ -574,7 +574,7 @@ Fix: add a =home_from_disk= fallback to
 After the fix, the collateral update succeeds: =complete_viewtree=
 processes =subee=, reads the updated =subee.skg=, finds =subee-2=
 in =contains=, looks up its repo from disk, and creates it as
-a new UnrestrictedVognode child. Buffer 2 gains =subee-2= under =subee=.
+a new Occurrence child. Buffer 2 gains =subee-2= under =subee=.
 
 This also fixes the known limitation in the
 =save_collateral_add_content_and_modify_text= test. After applying

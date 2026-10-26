@@ -42,7 +42,7 @@ pub(crate) fn extent_of_parent (
   let node : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
   let all : bool = match &node . value () . kind {
     ViewnodeKind::Folder (_) => true,
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       ! occurrence . is_writeProtected (),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       walk . is_diff_view ()
@@ -71,7 +71,7 @@ pub(crate) fn children_are_editable_content (
   walk   : &Walk,
 ) -> bool {
   match &tree . get (parent) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       ! occurrence . is_writeProtected (),
     ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
       extent_of_parent (tree, parent, walk) == Extent::All,
@@ -108,7 +108,7 @@ pub(crate) fn settle_budget_at_visit (
   walk   : &mut Walk,
 ) {
   let pid : ID = match &tree . get (parent) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
       if ! occurrence . is_writeProtected () => occurrence . gnid . clone (),
     _ => return, };
   let charged : bool = walk . mode . charges_node_budget (

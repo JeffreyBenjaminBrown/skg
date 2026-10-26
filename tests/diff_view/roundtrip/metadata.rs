@@ -249,7 +249,7 @@ fn a_removed_membership_round_trips_with_its_restore_request () {
       "node (gnid x) (skgRepos (nodeRepo main)) (editRequest restoreRel) (diff (rel removed))" ),
     ( &mut write_protected,
       "node (gnid x) (skgRepos (nodeRepo main)) noClaim writeProtected (editRequest restoreRel) (diff (rel removed))" ), ] {
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = &mut node . kind
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = &mut node . kind
     { t . relationshipEditRequest = Some (RelationshipEditRequest::RestoreRel); }
     assert_round_trip (
       with_facts (node . clone (), removed_rel . clone (), None ),

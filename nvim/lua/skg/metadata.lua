@@ -245,8 +245,8 @@ function M.current_headline_metadata_sexp ()
 end
 
 ---@param metadata_sexp any
----@return boolean does METADATA_SEXP describe an UnrestrictedVognode?
-function M.unrestrictedNode_sexp_p (metadata_sexp)
+---@return boolean does METADATA_SEXP describe an occurrence?
+function M.occurrence_sexp_p (metadata_sexp)
   return metadata_sexp ~= nil
          and compare.subtree_p(metadata_sexp, { SKG, NODE })
 end
@@ -279,7 +279,7 @@ end
 ---@param metadata_sexp any
 ---@return string|nil the node's skgrepo, if METADATA_SEXP is a node's
 function M.node_repo (metadata_sexp)
-  if not M.unrestrictedNode_sexp_p(metadata_sexp) then return nil end
+  if not M.occurrence_sexp_p(metadata_sexp) then return nil end
   local values = M.sexp_cdr_at_path(metadata_sexp,
                                     { 'skg', 'skgRepos', 'nodeRepo' })
   if values and values[1] ~= nil then
@@ -290,7 +290,7 @@ end
 ---@param metadata_sexp any
 ---@return string|nil the node's id, if METADATA_SEXP is a node's
 function M.node_id (metadata_sexp)
-  if not M.unrestrictedNode_sexp_p(metadata_sexp) then return nil end
+  if not M.occurrence_sexp_p(metadata_sexp) then return nil end
   local values = M.sexp_cdr_at_path(metadata_sexp, { 'skg', 'gnid' })
   if values and values[1] ~= nil then
     return sexpr.atom_text(values[1]) end
@@ -402,8 +402,8 @@ function M.delete ()
     'This change will only be applied when you save the buffer.')
 end
 
----Mark the headline at point, and every unrestrictedNode viewdescendant,
----for deletion. Non-unrestrictedNode descendants (phantoms, folders, ...) are
+---Mark the headline at point, and every occurrence viewdescendant,
+---for deletion. Non-occurrence descendants (phantoms, folders, ...) are
 ---skipped. Does not save.
 function M.delete_recursive ()
   if not M.at_headline_p() then error('Not on a headline') end
@@ -414,7 +414,7 @@ function M.delete_recursive ()
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local meta = M.metadata_sexp_at_line_or_nil(line)
-    if meta and M.unrestrictedNode_sexp_p(meta) then
+    if meta and M.occurrence_sexp_p(meta) then
       M.edit_metadata_at_line(line, edits) end
     line = M.next_headline_line(line)
   end
@@ -463,7 +463,7 @@ function M.strip_metadata_from_org_text (org_text)
   return table.concat(lines, '\n')
 end
 
----Write minimal UnrestrictedVognode metadata onto the metadata-less headline
+---Write minimal occurrence metadata onto the metadata-less headline
 ---at point, prompting for an owned skgrepo (no prompt when only one).
 ---@return string|nil the chosen skgrepo
 function M.populate_minimal_node_metadata ()
@@ -592,7 +592,7 @@ function M.change_repo_recursive (old_skgrepo, new_skgrepo)
   local line = M.next_headline_line(start_line)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
-    if not (M.unrestrictedNode_sexp_p(metadata)
+    if not (M.occurrence_sexp_p(metadata)
             and M.node_member_p(metadata)) then
       line = M.next_headline_after_subtree(line)
     else
@@ -657,11 +657,11 @@ function M.ghost_sexp_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it an UnrestrictedVognode whose '(diff ...)' says
+---@return boolean is it an occurrence whose '(diff ...)' says
 ---its relationship was removed? Whether a restoreRel may sit on it
 ---depends also on where it stands (M.restoreRel_position_p).
 function M.removed_membership_p (metadata_sexp)
-  return M.unrestrictedNode_sexp_p(metadata_sexp)
+  return M.occurrence_sexp_p(metadata_sexp)
          and M.relationship_removed_p(metadata_sexp)
 end
 
@@ -701,11 +701,11 @@ function M.partner_folder_atom (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean is it a vognode's: an UnrestrictedVognode, an unknown
+---@return boolean is it a vognode's: an occurrence, an unknown
 ---phantom or a ghost?
 function M.vognode_sexp_p (metadata_sexp)
   if not sexpr.is_list(metadata_sexp) then return false end
-  if M.unrestrictedNode_sexp_p(metadata_sexp) then return true end
+  if M.occurrence_sexp_p(metadata_sexp) then return true end
   for _, head in ipairs({ 'unknown', 'ghost' }) do
     if compare.subtree_p(metadata_sexp,
                          { SKG, sexpr.symbol(head) }) then
@@ -734,7 +734,7 @@ function M.containerward_chain_node_p (line_number)
   while true do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if not (M.vognode_sexp_p(metadata)
-            and (not M.unrestrictedNode_sexp_p(metadata)
+            and (not M.occurrence_sexp_p(metadata)
                  or not M.node_member_p(metadata))) then
       return false end
     local parent = parent_line(line)

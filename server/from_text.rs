@@ -340,7 +340,7 @@ fn explicit_fork_specs_from_viewforest (
   let mut specs  : Vec<ForkSpec> = Vec::new ();
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for node in viewforest . nodes () {
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Occurrence (t)) = & node . value () . kind
       else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let pid : &ID = & t . gnid;

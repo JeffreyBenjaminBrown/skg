@@ -138,7 +138,7 @@ fn dependencies_from_uninterpreted (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
+      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) => {
         result . insert (restriction . gnid . clone ());
         result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {
@@ -162,7 +162,7 @@ fn dependencies_from_registered (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (restriction)) => {
+      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) => {
         result . insert (restriction . gnid . clone ());
         result . extend (restriction . overridesHere . iter () . cloned ());
         if let Editability::Editable {

@@ -42,8 +42,8 @@ pub enum LocalContext {
 pub struct DefiningFolderRecorder {
   pub gnid              : ID,
   pub headline        : HeadlineName, // the recorder's occurrence, which emits the folder's fieldIntents
-  pub is_editable     : bool, // True iff the recorder is Unrestricted and editable.
-  pub is_saveEligible : bool, // True iff the recorder is editable, Unrestricted, carries no Delete request, and is not in subscribee-as-such position.
+  pub is_editable     : bool, // True iff the recorder is an editable occurrence.
+  pub is_saveEligible : bool, // True iff the recorder is an editable occurrence, carries no Delete request, and is not in subscribee-as-such position.
 }
 
 /// A FieldIntent is what one visit can emit. Each emission

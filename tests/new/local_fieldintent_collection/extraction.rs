@@ -1049,7 +1049,7 @@ async fn ordinary_same_gnid_occurrence_keeps_contains_edit_when_also_as_subscrib
       Ok (()) }
 
 #[test]
-fn idfolder_resident_unrestrictedVognode_saves_itself_but_is_not_content (
+fn idfolder_resident_occurrence_saves_itself_but_is_not_content (
 ) {
   let input : &str =
     indoc! {"
@@ -1238,7 +1238,7 @@ fn test_parse_mints_a_gnid_for_a_headline_without_one() {
     org_to_viewnode_tree (input, &InRustGraph::new ()) . unwrap() . 0;
   let gnids : Vec<ID> =
     viewforest . root () . children ()
-    . filter_map ( |root| root . value () . unrestricted_gnid () . cloned () )
+    . filter_map ( |root| root . value () . occurrence_gnid () . cloned () )
     . collect ();
   assert_eq!(gnids . len (), 2);
   assert_eq!(gnids [0], ID::from ("good_node"));

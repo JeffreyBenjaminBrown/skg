@@ -164,8 +164,8 @@ pub fn exclude_overPrivateText_nodes_from_viewforest (
     let should_convert : bool =
       viewforest . get (treeid)
       . and_then ( |node| match &node . value () . kind {
-        ViewnodeKind::Vognode (Vognode::Unrestricted (unrestricted_node)) =>
-          graph . pid_of (&unrestricted_node . gnid),
+        ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+          graph . pid_of (&occurrence . gnid),
         _ => None, } )
       . and_then ( |pid| graph . get (&pid) )
       . map ( |node| node . overPrivateText_telescope )

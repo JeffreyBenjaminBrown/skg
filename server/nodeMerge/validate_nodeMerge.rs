@@ -1,5 +1,5 @@
 /// Validation rules:
-///   - Both merge partners must be UnrestrictedVognodes with IDs.
+///   - Both merge partners must be Occurrences with IDs.
 ///     - Those two IDs must represent distinct nodes.
 ///     - Those two IDs must already be in the DB.
 ///   - Neither merge partner can be marked for deletion.
@@ -8,7 +8,7 @@
 ///     - No node can be involved in more than one merge.
 
 use crate::types::viewnode::NodeEditRequest;
-use crate::types::viewnode::{Viewnode, ViewnodeKind, UnrestrictedVognode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Occurrence};
 use crate::types::viewnode::Vognode;
 use crate::types::misc::ID;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -33,8 +33,8 @@ pub fn validate_nodeMerge_requests(
   let nodeMerge_validation_data : NodeMergeValidationData =
     collect_nodeMerge_validation_data (viewforest);
   for node in nodeMerge_validation_data . acquirer_viewnodes {
-    let t : &UnrestrictedVognode = match &node . kind {
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) => t,
+    let t : &Occurrence = match &node . kind {
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) => t,
       _ => { errors . push(format!( "Acquirer must be a vognode that exists: {:?}",
                                      node . kind));
              continue; }};
@@ -65,7 +65,7 @@ fn collect_nodeMerge_validation_data<'a>(
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
       let viewnode : &Viewnode = node_ref . value();
-      if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+      if let ViewnodeKind::Vognode (Vognode::Occurrence (t))
         = &viewnode . kind
       { { let gnid : &ID = &t . gnid;
           if matches!(t . edit_request (),

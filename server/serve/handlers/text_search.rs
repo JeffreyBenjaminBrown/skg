@@ -378,7 +378,7 @@ pub fn enrich_search_viewforest (
   let hits : Vec<NodeId> =
     viewforest . roots ()
     . filter ( |root| matches! ( &root . value () . kind,
-                 ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence))
+                 ViewnodeKind::Vognode (Vognode::Occurrence (occurrence))
                    if search_results . contains (&occurrence . gnid) ))
     . map ( |root| root . id () )
     . collect ();
@@ -415,7 +415,7 @@ fn stub_root_of_hit (
 ) {
   let gnid : ID = {
     let mut node : NodeMut<Viewnode> = viewforest . get_mut (hit) . unwrap ();
-    let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+    let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut node . value () . kind
       else { return; };
     occurrence . write_protect ();

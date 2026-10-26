@@ -293,7 +293,7 @@ fn first_streamed_view_content (
         &message [ message . find ('(') . unwrap () .. ], "content" )
       . expect ("the streamed view has content") ) }
 
-/// The lines of 'buffer' that show an unrestricted vognode of 'node',
+/// The lines of 'buffer' that show an occurrence of 'node',
 /// without their viewnode IDs.
 pub fn node_lines (
   buffer : &str,

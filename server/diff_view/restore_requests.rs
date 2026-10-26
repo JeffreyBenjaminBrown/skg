@@ -43,7 +43,7 @@ pub fn viewforest_has_restore_requests (
     |node| match &node . value () . kind {
       ViewnodeKind::Vognode (Vognode::Ghost (h)) =>
         h . restoreNode_request,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) =>
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) =>
         t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel),
       _ => false, } ) }
 
@@ -232,7 +232,7 @@ fn restoreRel_requests (
     live . pid_of (gnid) . unwrap_or_else ( || gnid . clone () ) };
   viewforest . root () . descendants ()
     . filter ( |node| matches! ( &node . value () . kind,
-      ViewnodeKind::Vognode (Vognode::Unrestricted (t)) if t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) ))
+      ViewnodeKind::Vognode (Vognode::Occurrence (t)) if t . relationshipEditRequest == Some (RelationshipEditRequest::RestoreRel) ))
     . map ( |node : NodeRef<_>| {
       let headline : HeadlineName = node . value () . headline_name ();
       let key : Option<RelationshipKey> =

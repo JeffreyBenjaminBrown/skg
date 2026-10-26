@@ -109,8 +109,8 @@ outline heuristic, not a precise graph-content query."
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
-existing UnrestrictedVognode with an ID.  Its viewparent must be a editable
-UnrestrictedVognode whose repo is owned by the user.  The whole org subtree
+existing occurrence with an ID.  Its viewparent must be a editable
+occurrence whose repo is owned by the user.  The whole org subtree
 at point is replaced by a same-level headline whose title is an
 org id link to the former root, then the buffer is saved."
   (interactive)
@@ -130,9 +130,9 @@ org id link to the former root, then the buffer is saved."
   "Replace the leaf at point with content linked from that leaf.
 Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
-viewdescendants, and a editable UnrestrictedVognode viewparent whose repo
+viewdescendants, and an editable occurrence viewparent whose repo
 is owned by the user.  The link must be an id link.  The leaf is
-replaced by a write-protected same-level UnrestrictedVognode for the link
+replaced by a write-protected same-level occurrence for the link
 target, then the buffer is saved."
   (interactive)
   (org-back-to-heading t)
@@ -148,12 +148,12 @@ target, then the buffer is saved."
     (skg-request-save-buffer)))
 
 (defun skg--content-link-replacement-node-data ()
-  "Return plist data for the UnrestrictedVognode headline at point."
+  "Return plist data for the occurrence headline at point."
   (let* ((headline-text (skg-get-current-headline-text))
          (split (skg-split-as-stars-metadata-title headline-text))
          (metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-    (unless (skg--unrestrictedNode-sexp-p metadata-sexp)
-      (user-error "Cannot replace this branch with a link: it is not an unrestrictedNode"))
+    (unless (skg--occurrence-sexp-p metadata-sexp)
+      (user-error "Cannot replace this branch with a link: it is not an occurrence"))
     (let ((gnid (skg--node-id metadata-sexp)))
       (unless gnid
         (user-error "Cannot replace this branch with a link: node has no ID"))
@@ -166,8 +166,8 @@ target, then the buffer is saved."
     (unless (org-up-heading-safe)
       (user-error "Cannot replace this branch with a link: node has no container"))
     (let ((metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
-      (unless (skg--unrestrictedNode-sexp-p metadata-sexp)
-        (user-error "Cannot replace this branch with a link: container is not an unrestrictedNode"))
+      (unless (skg--occurrence-sexp-p metadata-sexp)
+        (user-error "Cannot replace this branch with a link: container is not an occurrence"))
       metadata-sexp)))
 
 (defun skg--check-content-link-replacement-container (metadata-sexp)
@@ -248,7 +248,7 @@ one link is not an id link."
     (nreverse links)))
 
 (defun skg--replace-current-leaf-with-linked-content (link)
-  "Replace the current leaf with a write-protected UnrestrictedVognode for LINK."
+  "Replace the current leaf with a write-protected occurrence for LINK."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
          (gnid (plist-get link :id))

@@ -122,7 +122,7 @@ pub(crate) fn member_of_child (
   viewnode : &Viewnode,
 ) -> Option<GoalMember> {
   match &viewnode . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       Some ( GoalMember::Gnid ( occurrence . collected_gnid () )),
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
       Some ( GoalMember::Gnid ( ghost . gnid . clone () )),
@@ -146,7 +146,7 @@ pub(crate) fn goal_of_parent (
 ) -> Option<Goal> {
   let node : NodeRef<Viewnode> = tree . get (parent) ?;
   match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) => {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
       let pid : &ID = &occurrence . gnid;
       Some ( if is_chain_parent (tree, parent) {
                chain_goal (pid, walk)
@@ -221,7 +221,7 @@ pub(crate) fn subscriber_of_subscribee_as_such (
   treeid : NodeId,
 ) -> Option<ID> {
   let node : NodeRef<Viewnode> = tree . get (treeid) ?;
-  let ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &node . value () . kind else { return None; };
   if occurrence . viewStats . isWarranted != Warrant::ByGraph { return None; }
   let folder : NodeRef<Viewnode> = node . parent () ?;
@@ -395,6 +395,6 @@ pub(crate) fn occurrence_pid (
   node : NodeRef<Viewnode>,
 ) -> Option<ID> {
   match &node . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Unrestricted (occurrence)) =>
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
       Some ( occurrence . gnid . clone () ),
     _ => None, } }

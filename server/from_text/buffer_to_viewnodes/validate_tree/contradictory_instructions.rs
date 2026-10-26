@@ -75,7 +75,7 @@ fn collect_instructions(
       HashMap<ID, Vec<HeadlineName>>
   ) {
     let viewnode : &Viewnode = node_ref . value();
-    if let ViewnodeKind::Vognode (Vognode::Unrestricted (t))
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (t))
       = &viewnode . kind
     { { let gnid : &ID = &t . gnid;
         if ! t . is_writeProtected () { // write-protected nodes contribute no instructions

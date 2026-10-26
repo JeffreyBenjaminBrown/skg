@@ -32,7 +32,7 @@ use std::net::TcpStream;
 
 /// Add (viewRequests editableView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request an editable view.
-/// Subscribees are UnrestrictedVognode children of SubscribeeFolders.
+/// Subscribees are Occurrence children of SubscribeeFolders.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
 /// That's easier than navigating the org-tree's topoogy.

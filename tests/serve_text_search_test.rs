@@ -88,7 +88,7 @@ fn test_text_search_org_format (
         result . lines () . collect ();
 
       // Parse each line with headline_to_triple.
-      // Collect level-1 UnrestrictedVognode headlines and alias groups.
+      // Collect level-1 Occurrence headlines and alias groups.
       let mut level1_headlines : Vec < (String, String) > =
         Vec::new ();
       let mut aliases_under_current : Vec < String > =
@@ -386,7 +386,7 @@ fn private_alias_documents_are_filtered_before_grouping (
         assert! ( ! matches_by_gnid . contains_key (
                     &ID::new ("id_leveled")),
                   "private alias doc leaked into a main-only search" ); }
-      { // Unrestricted (None): the alias matches.
+      { // No restriction (None): the alias matches.
         let ( best_matches, searcher ) =
           search_index ( &tantivy_index, "zanzibar",
                          &SearchOptions::default () ) ?;

@@ -920,7 +920,7 @@ fn graphstats_atoms () -> Vec<&'static str> {
   vec! [] }
 
 /// The match atoms of ViewnodeStats, from
-/// unrestrictedVognode_metadata_to_string (org_to_text.rs): the
+/// occurrence_metadata_to_string (org_to_text.rs): the
 /// facts of '(view ...)', the relRepo of '(skgRepos ...)', and the
 /// occurrence's 'overridesHere'; and the property members' warrant
 /// atoms. The relationship facts are the forms named in

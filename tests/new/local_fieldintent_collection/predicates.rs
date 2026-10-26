@@ -3,26 +3,26 @@
 /// There is one test per condition each predicate encodes.
 
 use skg::from_text::local_fieldintent_collection::predicates::{
-  unrestricted_child_counts_as_content,
-  unrestricted_child_counts_as_visible_content,
+  occurrence_child_counts_as_content,
+  occurrence_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use skg::types::misc::{ID, SkgrepoName};
 use skg::types::viewnode::{
-  default_unrestrictedVognode, NodeEditRequest, Editability,
-  UnrestrictedVognode };
+  default_occurrence, NodeEditRequest, Editability,
+  Occurrence };
 
-fn base_unrestrictedVognode (
-) -> UnrestrictedVognode {
-  default_unrestrictedVognode (
+fn base_occurrence (
+) -> Occurrence {
+  default_occurrence (
     ID::from ("n"),
     SkgrepoName::from ("main"),
     "n" . to_string() ) }
 
 fn with_edit_request (
   edit_request : NodeEditRequest,
-) -> UnrestrictedVognode {
-  let mut t : UnrestrictedVognode =
-    base_unrestrictedVognode ();
+) -> Occurrence {
+  let mut t : Occurrence =
+    base_occurrence ();
   t . editability = Editability::Editable {
     body         : None,
     edit_request : Some (edit_request) };
@@ -31,9 +31,9 @@ fn with_edit_request (
 #[test]
 fn relation_folder_membership_conditions () {
   assert!( member_counts_for_partnerFolder (
-    &base_unrestrictedVognode () ));
+    &base_occurrence () ));
   { // a non-member excludes.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
+    let mut t : Occurrence = base_occurrence ();
     t . claimsMembership = false;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
@@ -46,29 +46,29 @@ fn relation_folder_membership_conditions () {
 fn content_membership_coincides_with_relation_folder_membership () {
   // The two predicates encode one condition today; if they ever
   // diverge, this test should be split per condition.
-  let cases : Vec<UnrestrictedVognode> = {
-    let mut cases : Vec<UnrestrictedVognode> =
-      vec![ base_unrestrictedVognode (),
+  let cases : Vec<Occurrence> = {
+    let mut cases : Vec<Occurrence> =
+      vec![ base_occurrence (),
             with_edit_request (NodeEditRequest::Delete),
             with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ];
-    { let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
+    { let mut t : Occurrence = base_occurrence ();
       t . claimsMembership = false;
       cases . push (t); }
     cases };
   for t in &cases {
-    assert_eq!( unrestricted_child_counts_as_content (t),
+    assert_eq!( occurrence_child_counts_as_content (t),
                 member_counts_for_partnerFolder (t) ); }}
 
 #[test]
 fn visible_content_membership_conditions () {
-  assert!( unrestricted_child_counts_as_visible_content (
-    &base_unrestrictedVognode () ));
+  assert!( occurrence_child_counts_as_visible_content (
+    &base_occurrence () ));
   { // a non-member excludes.
-    let mut t : UnrestrictedVognode = base_unrestrictedVognode ();
+    let mut t : Occurrence = base_occurrence ();
     t . claimsMembership = false;
-    assert!( ! unrestricted_child_counts_as_visible_content (&t) ); }
+    assert!( ! occurrence_child_counts_as_visible_content (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
-  assert!( ! unrestricted_child_counts_as_visible_content (
+  assert!( ! occurrence_child_counts_as_visible_content (
     &with_edit_request (NodeEditRequest::Delete) ));
-  assert!( unrestricted_child_counts_as_visible_content (
+  assert!( occurrence_child_counts_as_visible_content (
     &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) )); }

@@ -3,7 +3,7 @@
 //
 // The rule under test ('owned_ancestor_repos_for_foreign_vognodes'):
 // a foreign node's clone inherits the skgrepo of its nearest vognode
-// ancestor, recorded only if that ancestor is an owned Unrestricted vognode.
+// ancestor, recorded only if that ancestor is an owned occurrence.
 // The walk skips non-vognodes (folders) but stops at the first vognode -- it
 // never passes a foreign or restricted ancestor to reach a distant owned
 // one.
