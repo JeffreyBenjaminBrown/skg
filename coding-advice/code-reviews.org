@@ -59,6 +59,13 @@ amended by later plans, and name the test that asserts each, or say
 none does. Check the fixtures and helpers for copies. Sample the
 tests for naming and for assertions on raw text where a structural
 check would be clearer.
+** Probes
+Against an isolated server on the final tree (the verify skill
+says how), drive each behavior of the model end to end: a save
+and its collateral rerender, a merge of siblings, a repo-set
+switch, a search, a buffer of the diff view; record what was
+sent and received. In plan 04.1 the one real defect passed every
+suite and was caught by a probe.
 ** Performance
 Measure what the work does on the real data, read-only: the costs
 that scale with the graph (a full comparison after every save, a
@@ -87,6 +94,26 @@ what to do next as TODO items for the human. The human replies in
 the document under the '[Jeff]' protocol of 'org-discussions.org';
 the planner answers each reply, marks mere agreements DONE without
 replying, and turns the settled items into a plan.
+
+* The per-plan review
+The review written when a plan's last slice is DONE (for 04.1,
+'TODO/simplify-refresh/05_review.org') has a fixed shape:
+- a verdict;
+- what the reviewer checked itself: the launches and the record,
+  the central code read in full, the docs' statement of the
+  model, the suites by the record;
+- results: the run, the durations, the counts, the commit rule,
+  the problems file, what the record lost;
+- what each slice did beyond the plan's words;
+- the churn ledger within the plan, and the cost;
+- what the user sees differently, by decision and by accident;
+- the reviewers' reports: the questions above, one agent each,
+  the reports kept beside the review;
+- the open questions, each self-contained;
+- Decide: the items for Jeff, each opening with its state, in
+  sentences, the present tense for what is true now and would
+  or will for what would change;
+- suggestions for this advice.
 
 * When to do it
 A short check after every plan (two questions: what terms did this

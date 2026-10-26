@@ -41,6 +41,19 @@ dangerous; plan 04 then deleted them. Keep one list of decisions
 (the discussion document's resolved items are that list) and read it
 before writing each plan.
 
+* "What stays" names the user-visible defaults
+The "What stays as it is" section also enumerates the behaviors
+a user sees without asking for them (default folders, override
+substitution, the fold state of new members), each marked kept
+or changed. Plan 04.1 never mentioned default folders, and the
+rewritten module drew none until a correction restored them.
+
+* Define a report channel by its negatives too
+Whenever a plan adds a warning, a correction or a log, say what
+it must not report. Plan 04.1 defined corrections and said
+nothing about what is not one; slice 9 then reported every
+drawn child, and the definition had to be narrowed afterwards.
+
 * Prefer deleting a mechanism to adding a rule
 When a mechanism misbehaves, the first proposal is usually a rule to
 tame it: a refusal, a special case, a comparison with history. In the
@@ -60,6 +73,13 @@ runs first and reorders, a map rebuilt every rerender, a request that
 cascades). After it was introduced, no executing agent chose a design
 that the reviewer later rejected; before it, four did. Write it from
 the code, not from memory.
+
+A pitfall of the form "only X reads Y" lists every reader. Plan
+04.1 said the save alone read the claim under write-protected
+parents; three other readers did, and slice 0 stopped. Before
+writing such a pitfall, grep every reader of the field or atom
+and name them; a one-reader claim is the commonest false belief
+about existing code.
 
 * Order slices so a rule lands with the mechanism it depends on
 Plan 08 put "a member child under a write-protected occurrence is
@@ -111,6 +131,14 @@ is present, what you propose is "would" or "should".
   otherwise for the conditions in 'when-to-stop.org'.
 - Say where deviations go ('progress.org' beside the plan, under a
   headline naming the plan).
+- Check the vocabulary section's words against the glossary and
+  the code before the run ('names.org', "Check a plan's words
+  before the run"): a plan's coinage spreads through every slice.
+
+* Running a plan
+One agent per slice, triage between slices, corrections carried
+into the plan, the record in 'progress.org', and the review at
+the end: see [[file:orchestration.org]].
 
 * After each plan, before the next
 Run a short review with two questions, by one agent: what terms did

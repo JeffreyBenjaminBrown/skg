@@ -6,8 +6,56 @@
   When a plan or a settled discussion decides how an entry will be
   fixed, prefix its headline with 'FIX PLANNED: ' and leave it here
   until the fix lands; then move it as above.
+* Problems found while planning plan 06 (2026-10-26)
+** FIX PLANNED: A save under a restriction unhides a restricted member
+  Found by the experiment 'TODO/simplify-refresh/
+  06_1_prepass-experiment.org' (run). Under a narrowed skgrepo
+  restriction, a hidden-outside folder submitted empty deletes
+  from the subscriber's 'hidesFromSubs' a hide whose member the
+  restriction keeps out of view: 'apply_hiddenoutside_edits'
+  ('server/from_text/local_fieldintent_collection/
+  resolve_visibility.rs', lines 134 and 144) judges a hide
+  replaceable by its relRepo alone, so a hide recorded in public
+  of a member homed in private counts as replaceable. Today the
+  skgrepo switch's entombstone-and-prune phase prunes such a
+  folder before the user can save it, which masks the bug; the
+  suite has no test of a save after a switch. Fix: a hide is
+  replaceable only when the restriction holds the member's home
+  too; a regression test (switch, save, check 'hidesFromSubs').
+  Plan 06, slice 1.
+** An unknown recorded in a visible skgrepo vanishes under a restriction
+  Seen by the same experiment, with and without the phase: the
+  unknown 'missing-pub' of its fixture, recorded by r in public,
+  is drawn under "all" and gone under "public". Not explained.
+  Plan 06, slice 1, finds the cause and records it.
 * Problems noticed while executing plan 04.1, slice 6 (2026-10-26)
-** A relRepo request renders as "request~:NAME" in Emacs
+** FIX PLANNED: The refresh's merge drops the editable twin's claim
+  Found by the review of plan 04.1 ('TODO/simplify-refresh/05_review.org',
+  Decide 1; 'TODO/simplify-refresh/05_1_review-reports/probes.org',
+  probe b). 'merge_into' ('server/refresh/ladder.rs') passes the
+  merged sibling's editability to the surviving first sibling but
+  not its claim. Validation lets one sibling claim, so when the
+  claimant is not first the survivor keeps the first's 'noClaim',
+  is warranted, and is a pending detachment; saving the buffer back
+  unchanged removed the node from its parent's file. Every suite was
+  green over it. Fix: the survivor claims if any sibling did, and a
+  unit test in 'tests/refresh/merge.rs'.
+** FIX PLANNED: Emacs: a readiness request blocks skg-set-relRepo
+  Found by the same review ('05_1_review-reports/duplication.org',
+  finding 2; run in emacs --batch). 'skg--node-edit-request-at-point-p'
+  ('elisp/skg-metadata.el') treats anything in '(editRequest ...)'
+  but relRepo as a pending delete or merge, and since plan 04.1 the
+  readiness requests live in that form, so a node marked ready
+  refuses 'skg-set-relRepo'. Fix: skip the readiness parts there
+  ('skg--readiness-request-p' already knows them).
+** FIX PLANNED: Flaky "Directory not empty" at a test's cleanup under the parallel run
+  During plan 04.1 one Rust test per full run (a different one each
+  time: 'rebuild::complete_aliasfolder', 'save::id_folder_outside_diff_view',
+  'dangling_reference_renders_unknown_node') failed at cleanup with
+  "Directory not empty" and passed alone. Fixed per-test temp paths
+  collide under nextest's parallelism. Fix: a per-test unique
+  directory, or a serialized cleanup.
+** FIX PLANNED: A relRepo request renders as "request~:NAME" in Emacs
   The herald rule '(editRequest (relRepo (ANY "request:~" IT)))'
   ('server/heralds.rs') makes the lens token "request:~:priv", and
   Emacs's 'heralds--strip-structural-colons' consumes the colon
@@ -20,7 +68,7 @@
   'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org' taught the
   stripping to keep the colon of "⌂:LABEL"; left as it was.
 * Problems noticed while executing plan 04.1, slice 3 (2026-10-26)
-** A dismissed ghost under its former container comes back
+** FIX PLANNED: A dismissed ghost under its former container comes back
   Slice 3 of 'TODO/simplify-refresh/04_1_plan_rewrite-refresh.org'
   adds the view request '(viewRequests tombstone)', which
   entombstones a ghost ('docs/diff-view.org', "Dismissing a
@@ -109,7 +157,7 @@ gap too. Details, options and questions:
   ("Import preview cannot be applied"), while the test expects that
   line to be imported as escaped body text. Either the fixture or the
   test's expectation is stale.
-** Intermittent 'DirectoryNotEmpty' in Rust test cleanup
+** FIX PLANNED: Intermittent 'DirectoryNotEmpty' in Rust test cleanup
   In full 'bash/nextest.sh' runs, a different save test fails now and
   then with 'Os { code: 39, kind: DirectoryNotEmpty }' (seen in
   'save::none_node_fields_are_noops' and

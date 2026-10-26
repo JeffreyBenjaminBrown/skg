@@ -54,6 +54,17 @@ references. An org example inside a '#+begin_example' block has
 every line indented two spaces, so that Emacs does not read its stars
 as headlines. Do not commit planning files during discussion rounds;
 Jeff stages and commits them himself.
+** Two conventions that worked, and one rule
+When a later decision changes what an earlier section says, add
+a child 'TODO UPDATED [Claude] ...' to the earlier section rather
+than editing it, so that Jeff meets the change where he reads.
+While Jeff edits the main document, Claude answers in a
+sidechannel file beside it ('temp-for-claude-to-edit.org') into
+which Jeff copies the threads; Claude then edits only the
+sidechannel, even to apply a change Jeff approved there, and a
+change to the main document waits until Jeff says it is free.
+Jeff sometimes closes a heading by prefixing 'DONE AGREED : ';
+it closes like DONE.
 ** Clarity
 Every sentence should have a subject and a verb.
 Every new term should be introduced/defined before it is used.

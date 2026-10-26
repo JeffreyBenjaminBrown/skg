@@ -61,7 +61,8 @@ change crosses graph, storage, server, or client boundaries.
 ** Reviews and plans
 Read [[file:plans.org]] before writing an execution plan for an unattended
 agent, and [[file:code-reviews.org]] before reviewing a finished body of
-work; [[file:jeff-should-do.org]] holds the habits directed at Jeff.
+work, and [[file:orchestration.org]] before running a plan slice by
+slice; [[file:jeff-should-do.org]] holds the habits directed at Jeff.
 Read [[file:org-discussions.org]] for how discussions in Org files mark
 authorship and what needs attention.
 Read [[file:architecture.md]] for architectural work and [[file:when-to-stop.org]]

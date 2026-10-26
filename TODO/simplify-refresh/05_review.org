@@ -1,0 +1,1914 @@
+#+title: Review of the refresh rewrite (plan 04.1)
+#+TODO: TODO ONGOING AWAITS | DONE
+
+* Verdict
+The rewrite landed whole and is sound. One refresh now draws
+every buffer: content views, the search enrichment and the
+diff view's four buffers run through 'refresh_viewforest'; the
+old walk, about 8,000 lines across three directories, is gone;
+the model is stated in 'docs/data-model_technical.org' as
+built; every suite is green but one pre-existing integration
+test; every slice's last commit builds clean; and the fixpoint
+holds over 345 fresh content views, 36 diff-view buffers and
+every unit test's own output. Fourteen slices ran in nine
+hours of wall clock with about half an hour of your attention,
+no slice stopped for a question of yours, and the churn within
+the run was staging the plan had accepted, not redesign.
+What needs work. One defect: the merge rung drops the editable
+twin's claim, so a buffer with a non-claiming first copy of a
+node, saved back, detaches the node; one line and a test (item
+1). Four decisions of yours: the dismissed ghost, the nested
+tombstones, the alias-found hit, and a headline typed under a
+non-claiming parent becoming a node on disk (items 3 to 6).
+Housekeeping that the six reports locate to the line: the
+refresh's own parts still live under the dead walk's
+directories; "hidden", "ladder", "merge" and "extent" collide
+with older words, three of them mine; the two clients' metadata
+editors drifted; the users' docs lack the corrections, the
+search enrichment and the ghost commands' true behavior; a few
+cheap tests are missing; one Emacs command is blocked by a
+readiness request. A corrective slice of about a day would take
+the defect and the cheap items (item 2); the module moves and
+the rename are a short plan after it.
+
+* What I checked myself
+** The launches and the record
+I launched one Opus agent per slice, read each report, read
+'progress.org' as it grew, and before each launch triaged the
+slice: a correction a slice could take went into the plan as
+a "corrections carried from slice N" item (nine such edits,
+each committed as "Plan 04.1: corrections carried into ...");
+a question that changed the design went to you (three did).
+Every launch's brief is recorded in my memory and summarized
+under "The run" below.
+** The central code
+I read 'server/refresh/mod.rs', 'id_rule.rs', 'ladder.rs',
+'extent.rs' and 'tail.rs' in full against the model as the
+plan states it and as 'docs/data-model_technical.org' now
+states it. The entry point does what the plan says and no
+more: it asserts one editable occurrence per gnid rather than
+re-checking, fulfils editable-view requests before the walk,
+walks in level order, and hands the tail the derived facts,
+the prune and the vnids. The ID rule is the four questions in
+the agreed order (occurrence, ghost, unknown, tombstone), with
+the one recorded refinement (a gnid a nodeMerge made an extra
+ID stays its ghost in the diff view). The ladder's eight rungs
+are each a function under a numbered banner, in the agreed
+order, and each does what its rung says; the merge marks a
+moved child 'noClaim' unless the truth warrants it under the
+survivor, as you asked. The extent and the budget keep today's
+unit (an occurrence whose content is drawn charges once) and
+the diff view's exception (only extensions outside U). The
+tail prunes childless tombstones, roots included. I found the
+code readable, and I found no rule of the model unimplemented
+or inverted.
+** The docs' statement of the model
+I read the new section of 'docs/data-model_technical.org' in
+full. It states the model as built, deviations included, and
+every function it names exists where it says.
+** The suites, by the record
+I did not rerun the suites myself; slice 13 ran
+'bash/all-tests.sh' on the final tree and I read its
+'tests/results/ALL.org': build, ERT, plenary, nextest (956)
+and doctests pass; the integration suite passes 68 of 70, the
+two failures being 'import-md-and-org' in each client, which
+failed before the plan began. One of the review agents built
+every slice's last commit and ran probes against an isolated
+server; its findings are under "The reviewers' reports".
+
+* Results
+** The run
+Fourteen slices, 0 to 13, all DONE, in 57 commits from
+afe1da82 (2026-10-25 23:50 UTC) to 098d61bf (2026-10-26
+~08:50 UTC): 46 slice commits and 11 of mine (nine plan
+corrections, two notes). One agent per slice, Opus 5.5 at high
+effort, each started with the runner's prompt plus a paragraph
+of context carried from earlier slices and the suites to run.
+No agent stopped for a question of yours; one stopped at the
+stop the plan named (slice 8, on a correction of mine, which I
+withdrew), and one stopped one rule short (slice 0, deferred
+by my decision to slice 9). The run paused once for your
+restart, after slice 6, and once lost its session during slice
+9; the old session finished that slice and handed over.
+** Durations, launched to report, in minutes
+Slice 0: 23. Slice 1: 39. Slice 2: 21. Slice 3: 35. Slice 4:
+41 and a wait. Slice 5: 45. Slice 6: 31. Slice 7: 17. Slice 8:
+50. Slice 9: about 60, across two sessions. Slice 10: 22.
+Slice 11: 44. Slice 12: 25. Slice 13: 40. About 8.3 hours of
+agent time; about 7.0 million agent tokens by the harness's
+counts (from 300 thousand for slice 12 to 764 thousand for the
+first attempt at slice 9).
+** Counts
+541 files changed, 25,456 insertions and 24,147 deletions over
+the range. The walk's modules: 'server/update_buffer/' 4,255
+lines to 1,059; 'server/to_org/' 2,705 to 494;
+'server/diff_view/' 3,770 to 2,362; 'server/refresh/' 0 to
+2,907 (plus 1,567 lines of its unit suite under
+'tests/refresh/'). Tests: 300 files touched, 10,675 insertions,
+7,842 deletions. Docs: 10 files, 899 insertions, 758
+deletions. Both clients: 58 files, 2,616 insertions, 1,147
+deletions. The Rust suite grew from 910 tests to 956; the
+Emacs suite from 394 to 414; the Neovim suite from 377 to 403.
+** The commit rule
+Every slice's last code commit carries its docs, its
+'progress.org' entry and its DONE keyword, as the plan asked;
+the agents amended when something was left over. Slice 10's
+agent re-split two commits so each compiled alone. Slice 0's
+agent committed once without running '/verify' first and said
+so; every later commit had it.
+** The problems file
+Closed by the run (moved to 'TODO/DONE/problems.org'): the
+restricted placeholder lingering after a switch back; the
+confirmation buffer's raw skgrepo name; 'fork.rs''s dead
+'parentOverrides' atom; the tombstone reading "DELETED" over a
+hidden node's children. Opened by the run: "A dismissed ghost
+under its former container comes back"; "A relRepo request
+renders as 'request~:NAME' in Emacs" (pre-existing, found).
+** What the record lost
+'bash/all-tests.sh' begins with 'rm -rf tests/results', so
+slice 13's final run deleted every earlier slice's logs and
+conversion scripts, which 'progress.org' cites by path. The
+suite counts in this review come from the agents' reports and
+from 'ALL.org'; the scripts that converted the fixtures are
+gone. Nothing of the code or the tests is affected.
+
+* DONE Know: what the run did beyond the plan's words
+Each slice's deviations from the plan's "how", from
+'progress.org', with my judgment of each. "Sound" means the
+deviation follows the model and needs nothing; "for Decide"
+points to an item below.
+** DONE Slice 0: the claim and the warrant
+The printer rule "no 'noClaim' under a write-protected parent"
+could not land: three readers besides the save keyed on the
+atom there ('MemberChildOfWriteProtectedOccurrence' and the
+folder comparison in 'write_protected_edits.rs',
+'is_in_containerward_chain', both clients' readiness walks),
+and a throwaway run showed 55 failures. I deferred the rule to
+slice 9, where the ladder replaced those readers; sound, and
+the plan's pitfall "the save reads claims only under editable
+parents" was a false belief about the existing code: true of
+'traverse.rs', false of 'write_protected_edits.rs'. ⊥ moved
+behind the relationship tokens (slice 6 moved it back).
+Property members computed a warrant with nowhere to store it
+(slice 5 gave them one).
+** DONE Slice 1: regroup the types
+The plan named the wrong pair of moves; the agent moved the
+two the stats held. A removed alias or ID became an alias or
+ID member with a ghost warrant read from '(rel removed)'
+(interim until slice 11). 'goal_is_ordered' took over the
+question "does the save read this folder", which it answered
+correctly by coincidence; I had slice 8 give that question its
+own method ('Folder::is_editable'). A ghost alias saved as a
+content view now goes rather than lingers; sound.
+** DONE Slice 2: hidden means tombstone
+The hidden-members save test was written first and passed on
+the old code: disk supplementation already covered a member
+with no headline. One shared pass asks the graph's new
+presence answer; two converters the plan did not name were
+found; a tombstone may be a root. Sound.
+** DONE Slice 3: one ghost, in the diff view only
+Vanished means absent from the graph, by the presence answer;
+the extra-ID case became a tombstone beside a new unknown
+rather than an unknown in place (I asked slice 8 to re-kind in
+place; slice 8 showed it needs state the model forbids and I
+withdrew it: sound as the agent did it). A ghost in a content
+view was left alone (slice 9 entombstones it). The dismissed
+ghost comes back at the next rerender: for Decide. The two
+client commands were built as planned.
+*** DONE jeff : what is the presence answer?
+**** DONE Claude: one of three words for a gnid
+'gnid_presence_gated'
+('server/dbs/in_rust_graph/relation_accessors.rs'), added in
+slice 2. Asked about a gnid, the graph answers 'Present' (it
+has the node and the restriction shows the node's home
+skgrepo), 'Hidden' (it has the node but the restriction hides
+its home) or 'Absent' (no node answers to the gnid). The ID
+rule's first question is "Present?"; "vanished means absent"
+says that slice 3 judged a node gone by this answer rather than
+by the deleted set, which it removed. The answer exists so that
+the refresh can tell a hidden node from a vanished one without
+knowing the restriction's rules: a hidden node's occurrence
+becomes a tombstone, a vanished node's becomes a tombstone (or
+an unknown, or in the diff view a ghost) by the rule. The
+vocabulary review notes that "hidden" here collides with
+hides-from-subscriptions; Decide 7 in '05_review.org' proposes
+'Restricted' for this sense.
+***** DONE jeff : when would a vanished node's occurrence become a tombstone?
+****** DONE Claude says: nearly always, in a content view
+A vanished node's occurrence becomes a tombstone whenever no
+list its parent's goal reads still names any of the node's
+IDs. After a deletion through skg that is the usual case: the
+save's strip pass ('apply_delete_propagation_cleanup',
+'server/save.rs') removes the node's pid and its extra IDs from
+the four outbound lists of every owned node that referenced
+it, so no owned list names it afterwards. The occurrence
+becomes an unknown instead only when a list the deletion may
+not rewrite still names it: a foreign skgrepo's list, which
+delete propagation deliberately leaves alone, or data edited
+outside skg. In the diff view the answer differs: until the
+deletion is committed, HEAD has the node, so the occurrence is
+a ghost; after the commit it is a tombstone there too. A
+childless tombstone is pruned, so most vanished nodes simply
+disappear from a content view.
+*** DONE jeff : what is the extra-id case?
+**** DONE Claude: a deleted node whose extra ID a list names
+Node P has the extra ID X (a nodeMerge gave it X, once another
+node's ID), and some list, say M's contents, still names X. A
+buffer shows M with P's occurrence under it, standing for the
+gnid P. Then P is deleted.
+#+begin_example
+  // jeff's interpretation
+  * M
+  ** (named via extra id X) P // P then gets deleted
+#+end_example
+At the occurrence the ID rule asks:
+does the truth have P? No. Does M's list name P? No, it names
+X, which now resolves to nothing. So the occurrence becomes a
+tombstone, holding whatever stood under it, and the goal, which
+names X, draws an unknown X beside the tombstone. The old walk
+turned the occurrence into the unknown X in place, because the
+deleted set remembered that X had been P's. After slice 3 I
+asked slice 8 to do the same; slice 8 showed that once P is
+gone nothing the refresh is given records that X was P's, so
+re-kinding in place would need the state the model forbids, and
+I withdrew the correction. The user sees a tombstone next to an
+unknown. The case needs a nodeMerge, then a deletion of the
+acquirer while a list still names the acquired ID: rare.
+***** DONE jeff
+Why is extra id any different here?
+When P is deleted, shouldn't all references to any of its IDs,
+not just its PID, be removed from its partners?
+****** DONE Claude says: yes; the extra ID changes nothing
+It makes no difference, and the deletion already does what you
+say: the strip pass's 'deleted_id_set' holds the pid and every
+extra ID of each deleted node ('server/save.rs', the comment on
+'apply_delete_propagation_cleanup'), and a test covers it
+('test_strip_pass_handles_extra_ids' in
+'tests/delete_strips_references_from_neighbors.rs'). So after
+an owned referencer is rewritten, no list names P under any of
+its IDs, and the occurrence becomes a tombstone, pruned if
+childless. The case the record calls "the extra-ID case" needs
+a referencer the deletion may not rewrite: a foreign skgrepo's
+list (delete propagation "never modifies a foreign telescope
+write") or data edited outside skg. Such a list may name the
+pid or an extra ID; both give an unknown beside a tombstone. The
+old walk treated the extra ID specially only because its
+deleted set remembered which pid the extra ID had belonged to,
+and used that to re-kind the occurrence in place; the
+stateless refresh has no such memory and treats pid and extra
+ID alike. I have corrected the review's wording accordingly
+('05_review.org', slice 3).
+** DONE Slice 4: the grammar's shape
+Five kinds keep their parameter in a small form; a headline
+with no kind atom is a node (the clients write '(skg folded)'
+before any metadata); 'overridesHere' moved to the top level;
+both clients' lens engines gained the directive WHEN, since
+flat parts left the lens unable to tell a node's '(diff ...)'
+from a property's. All sound; the first three are documented
+by slice 13, WHEN by slice 6.
+** DONE Slice 5: the grammar's facts
+A lost alias, ID or unknown carries 'noClaim' (the save could
+no longer see '(rel removed)' once the parser skips
+'(diff ...)'). The parser no longer checks 'restoreRel'
+against '(rel removed)'; the save checks the position. The
+changed folder's label, its displayed text, became the
+clients' to compute. The clients' edit-request commands
+dropped a pending readiness request (slice 6 fixed it). Sound.
+*** DONE jeff : define "lost"
+**** DONE Claude says: the diff view's word for a removed member
+"Lost" is the diff view's word, from before this run: an alias,
+ID or flag that HEAD's list holds and the worktree's does not.
+'docs/diff-view.org' ("aliases, IDs and flags") defines it: "A
+lost alias or ID is an alias or ID member with a ghost warrant
+('Warrant::ByHead', written 'ghostWarrant'), claiming nothing
+('noClaim'), so the save never reads it." The alias or ID folder
+draws the union of the two lists, each member tagged '(rel
+added)' or '(rel removed)'; the lost ones are the removed ones,
+and the folder keeps them so the user can restore them. The
+code says it the same way ('server/types/viewnode.rs', "In the
+diff view an alias, ID or flag the worktree lost since HEAD").
+The sentence you asked about says: before slice 5 the save knew
+a lost member by its '(rel removed)'; once the parser skips
+'(diff ...)' it cannot, so the member carries 'noClaim' outright
+and the save ignores it for that reason. A "dangling partner
+the worktree lost" is the same idea for a contents list: an
+unknown with '(rel removed)'. I did not coin "lost".
+*** DONE jeff : please elaborate on
+"The parser no longer checks 'restoreRel' against '(rel removed)'; the save checks the position"
+What was happening before, and what happens now?
+**** DONE Claude says: one gate, moved from parser to save
+A 'restoreRel' request, '(editRequest restoreRel)', asks the
+next save to re-add a relationship that the worktree dropped
+since HEAD: a node's membership in its container's list, or a
+partner folder member's relationship to the folder's node. It
+belongs only on a headline standing for such a removed
+relationship, which the diff view marks '(diff (rel removed))'.
+Before slice 5 that gate stood twice. The parser refused a
+'restoreRel' on any headline not carrying '(rel removed)'
+('check_where_the_edit_request_sits' at 96f0ff20, matching
+the parsed change fact 'Existence::Removed'), and the save then
+checked where the headline stood ('restoreRel_stands_where_it_
+may', 'local.rs'), since a removed member and a folder member
+are told apart by their parents. Slice 5 made the parser skip
+'(diff ...)' wholesale, so it can no longer see '(rel removed)';
+it now accepts a 'restoreRel' on any occurrence, refusing it
+only on a ghost or a non-occurrence. The save's position check
+stayed and became the only gate: the headline must be a
+partner folder member, or a child claiming no membership (the
+declared 'noClaim', or a parent that reads no claims) under an
+occurrence outside the containerward chain. A request on a
+claiming member, or on a root, is refused there now, with the
+message the parser used to give. A request that passes but
+names no relationship HEAD records is dropped with a warning
+('restore_requests.rs'), as before. Both clients' commands
+still require '(diff (rel removed))' at point before they
+write the request, so a user reaches the save's refusal only
+by editing the metadata by hand.
+*** DONE jeff : please elaborate on
+"The changed folder's label became the clients' to compute."
+Which label?
+**** DONE Claude says: a changed folder's displayed text
+A property or partner folder that the diff view draws because
+some member's relationship to the folder's node changed is a
+"changed folder". Its headline shows, in place of the folder's
+ordinary label ("aliases", "containers"), a label naming the
+change: "its aliases changed (this file)", "its containers
+changed (other files)", and so on, with ☮ before it when the
+folder is write-protected and ✓ after it when every such
+change is ready. Before slice 5 the server wrote the folder's
+metadata as '(aliasFolder changed)' plus '(diff (ready))', and
+the rule table held one rule per folder giving the label text
+('changed_folder_rules' at 96f0ff20). Now the server writes a
+folder as its bare atom, with no '(diff ...)' at all, since
+whether a folder is changed and ready follows from its members.
+Each client decides that by looking at the members, and draws
+the label itself in place of the lens's output
+('heralds--changed-folder-text' in 'heralds-minor-mode.el',
+'changed_folder_chunks' in 'nvim/lua/skg/heralds.lua'). Slice
+6 moved the label texts out of the rule table into
+'changed_labels' under 'folder_heralds' in
+'shared/herald-styles.json', which both clients read and the
+server checks at startup. So "label" here is the folder's
+displayed text, as in the heralds doc, not the skgrepo label
+of the 'repoBoundary' question. The user sees the same thing
+as before.
+***** DONE jeff : So the same type is used
+for both, say, an alias folder in the content view,
+and an alias folder with changes in the diff view?
+And its label -- the text after the metadata on the headline --
+is determined by the client based on the combination of
+its kind and whether it has diff content?
+****** DONE Claude says: yes, one type; the text is the herald
+Yes. 'Folder' ('server/types/viewnode.rs') is the one type, and
+'Folder::Alias' is the alias folder in both views; its kind
+atom 'aliasFolder' is written the same in both, and since
+slice 5 the folder's own metadata carries no change fact.
+One correction to the picture: a folder headline has no text
+after its metadata. The server writes it as, for instance,
+'** (skg (vnid 0b) folded aliasFolder)' and nothing more; only
+the flags folder has a title and body, which are the user's.
+What you read there, "aliases" or "its aliases changed (this
+file)", is the herald: the colored overlay each client draws
+over the metadata. In the content view the lens renders the
+atom by the rule table ('aliasFolder' gives "aliases"). Before
+the lens runs, the client asks the folder's members (its child
+headlines) whether any carries a change of its relationship
+to the folder's node ('skg--folder-change-readiness' in
+'elisp/skg-metadata.el': a member whose '(diff ...)' has a
+'(rel ...)', or that has a '(relRepoMove ...)' child). If one
+does, the client skips the lens and draws the changed label
+from 'changed_labels', with ☮ before it when the folder is
+write-protected and ✓ after it when every such change is
+ready. So the text follows from the kind and from the
+members' diff content, as you say; the folder itself carries
+none. A content view's members never carry '(diff ...)', so
+the one rule covers both views.
+** DONE Slice 6: the heralds
+WHEN stays, documented and tested. The label reaches the lens
+as '(repoBoundary LABEL)'; the pending detachment is an atom
+the clients synthesize; the changed folder's labels live in
+'shared/herald-styles.json'. Sound. Found and left:
+"request~:NAME" in Emacs, pre-existing.
+*** DONE jeff : define the label
+**** DONE Claude says: a skgrepo's short name in the heralds
+The label is the text the heralds show for a skgrepo: its
+'abbreviation' from 'skgconfig.toml', or its name when it has
+none ('Skgrepo::herald_label', 'server/types/misc.rs'). The
+'repoBoundary' herald marks a node whose home skgrepo differs
+from its occurrence ancestor's and reads "⌂:LABEL". Before
+slice 6 the server wrote the rendered label into the metadata;
+now the metadata carries only the atom 'repoBoundary', the
+server serves the table '(skgrepoLabels ("REPO" "LABEL")...)'
+once per connection beside the herald rules, and the client
+rewrites the atom as '(repoBoundary LABEL)' before the lens
+sees it, so the rule can print the label. "Label" is the code's
+word ('herald_label', 'skgrepoLabels'); so is "the changed
+folder's label", the text "its X changed (this file)" that
+'shared/herald-styles.json' holds under 'folder_heralds'.
+***** DONE jeff : is this just called "the label" in code?
+That would be terribly ambiguous.
+It should be "the skgrepo label".
+(But where it's already in a sexp that indicates
+we're talking about skgrepos, it's fine.)
+****** DONE Claude says: no; the code qualifies it, I did not
+In code it is never bare. The server has
+'Skgrepo::herald_label' (a method on the skgrepo, so the
+receiver says which label) and 'skgrepo_labels_sexp', which
+writes the wire form '(skgrepoLabels ("REPO" "LABEL")...)';
+Emacs has 'heralds--skgrepo-labels' and
+'heralds-install-skgrepo-labels'; Neovim has 'skgrepo_labels'
+and 'get_skgrepo_labels'. The changed folder's are
+'changed_labels' in the JSON and 'heralds--changed-folder-
+label'. The bare word appears only as the placeholder LABEL
+inside those sexps and in '(repoBoundary LABEL)', and in
+prose on lines that also say skgrepo, repoBoundary, ⌂ or
+folder: a grep of the herald code in all three languages and
+of the five docs that mention labels finds no line with
+"label" and none of those words. The ambiguity was mine: the
+review's slice 5 and slice 6 sentences use "label" in the
+two senses three lines apart. When '05_review.org' is mine to
+edit I would reword them to "skgrepo label" and "changed
+folder's label", and I will say "skgrepo label" from here on.
+******* DONE jeff : sounds good, please do
+******** DONE Claude says: done, in the review
+'05_review.org' now says, in slice 5, "the changed folder's
+label, its displayed text, became the clients' to compute",
+and in slice 6 "the skgrepo label reaches the lens". The copy
+of the slice 6 text at the top of this file is as it was.
+*** DONE jeff : define the lens
+**** DONE Claude says: the engine that renders metadata
+The lens is 'skg-transform-sexp-flat' in
+'elisp/skg-sexpr/skg-lens.el', ported as
+'nvim/lua/skg/sexpr/lens.lua': a pattern-matching engine that
+rewrites one s-expression under a table of rules into another,
+with no side effects. The heralds use it to turn a headline's
+'(skg ...)' metadata into the short colored text shown in its
+place. The rules are the herald rule table in
+'server/heralds.rs', fetched once per connection over the
+"herald rules" endpoint and handed to the engine unchanged; the
+server never interprets them. "Lens" is the file's own name;
+the review borrowed it from 'server/heralds.rs' ("the lens
+engine") and 'docs/heralds.org' ("The lens engines").
+*** DONE jeff : define "pending detachment"
+**** DONE Claude says: a noClaim child the graph still warrants
+A pending detachment is a child under an editable parent that
+the user marked 'noClaim' and that the truth still warrants:
+the parent's list still holds it, and the next save will take
+it out. 'docs/data-model_technical.org' names it ("a child the
+user marked noClaim to detach it is warranted and claims
+nothing (a pending detachment, herald 'detach')"), and both
+clients compute it ('skg--pending-detachment-p' in
+'elisp/skg-metadata.el', 'pending_detachment_p' in
+'nvim/lua/skg/readiness.lua'): the headline carries 'noClaim',
+its '(view ...)' has neither 'noWarrant' nor 'ghostWarrant', its
+'(diff ...)' has no '(rel removed)', and its parent is editable.
+It is the mirror of a note: a note claims and is unwarranted; a
+pending detachment is warranted and claims nothing. The term
+is one I coined in the plan: '02_jeff_de-novo.org' spoke of
+"a user's detachment" being "pending" (your question "what's a
+user's detachment?"), and the plan's slice 6 named the state
+"pending detachment" and the atom 'pendingDetachment'; the
+docs and both clients took it from there.
+***** DONE jeff : is "note" a term used in the codebase?
+Is a "note" the standard way a user creates content --
+under an editable node they insert a headline,
+which initially is unwarranted
+and is making a claim, and after save it is now warranted
+and still making the claim?
+****** DONE Claude says: a docs word, mine, for a narrower case
+"Note" is in the docs, not the code: the glossary (three
+places) and 'COMMANDS.org' say "a child typed under one is a
+note, which the refresh shows unwarranted (⊥)", "one" being a
+write-protected occurrence, and the glossary says the same of
+a child put inside a write-protected set. No identifier names
+it. The word is mine, from the de novo discussion ("'a note'
+is the informal word for one the user typed"), where it named
+any unwarranted child the user typed; the docs narrowed it to
+the child typed under a parent whose claims the save does not
+read: a write-protected occurrence, a ghost, a tombstone, a
+write-protected folder. Such a child stays unwarranted for
+good, since no save can put it in that parent's list; it is
+still created as a node on disk, contained by nothing (Decide
+6 of the review). The path you describe is the ordinary one,
+and the docs do not call its child a note. Under an editable
+node the user inserts a headline; it carries no 'noClaim', so
+it claims, and the truth does not yet warrant it. No ⊥ shows
+meanwhile: the headline has no metadata yet, and a view with
+unsaved edits is left out of the rerender another save
+triggers (the 'exclude-view-ids' of "rerender all views"), so
+the refresh first sees the child at the user's own save, by
+which time the save has put it in the list: warranted, and
+still claiming. If you want one word for both, "note" could
+name any headline the user typed that the truth does not
+warrant, and "retained note" the one under a parent that
+reads no claims (the de novo discussion used "a retained
+note" once). I would keep the narrow sense, which names a
+lasting state, and leave the ordinary new child unnamed,
+since nothing ever shows it in that state.
+******* DONE jeff : I think it's too confusible.
+"Note" is fairly common knowledge graph terminology for a node.
+We can afford to say something as long as
+"new, as-yet unregistered viewnode" when talking about that,
+or "a viewnode the user just typed, before saving".
+I think it really does need that much qualification.
+******** DONE Claude says: agreed; retire it
+Agreed. The word lives in four doc sentences, nowhere in code:
+'docs/glossary.org' (the editable-occurrence entry, the claim
+entry, the skgrepo-set entry) and 'docs/COMMANDS.org' (the
+write-protected occurrence paragraph), plus the review's
+Decide 6 ("notes under a non-claimant become nodes on disk"),
+which I would reword when the review is mine. All four doc
+uses mean the lasting case, so the replacement is a
+description of it, not of the just-typed one: "a child the
+user typed under it, which stays unwarranted, since no save
+reads claims there". For the just-typed case, where a doc
+ever needs it, "a headline the user typed and has not yet
+saved", close to your second phrase; "viewnode" is right but
+the user docs say "headline". Both go in the tidy slice's
+docs item.
+***** DONE jeff : so a pending detachment
+is, while pending, warranted but making no claim;
+once saved, it is no longer pending, and no longer warranted?
+****** DONE Claude says: yes
+Yes. The save leaves a non-claimant out of the parent's list,
+so after it the truth no longer warrants the child; the
+rerender writes '(view noWarrant)' on it, and ⊥ replaces
+"detach". The child stays in the buffer, unwarranted and
+claiming nothing, until the user deletes its line: the refresh
+removes nothing but a childless tombstone. A fresh request of
+the view does not draw it, since the view is drawn from the
+goal. The node itself is untouched; only the relationship
+went.
+*** DONE jeff : what atom is it?
+**** DONE Claude says: 'pendingDetachment', client-added
+The atom is 'pendingDetachment'. Nothing in the child's own
+metadata says the graph warrants it under an editable parent,
+since the warrant's absence is what is written and the parent's
+editability is the parent's, so the client decides and adds the
+atom to the sexp it hands the lens ('heralds-from-metadata' in
+'elisp/heralds-minor-mode.el', 'sexp_for_lens' in
+'nvim/lua/skg/heralds.lua'). The rule renders it "detach" in
+the request style ('pending_detachment_rule',
+'server/heralds.rs'). The server does not write it and the
+parser never sees it; the conformance test lists it under
+'client_computed_atoms' so the rule table may render it.
+***** DONE jeff : let's make it like toDelete
+If in fact toDelete is the atom that indicates
+something is to be deleted, toDetach seems appropriate.
+These detachment requests flow through the same channels
+as other edit requests, I assume? I don't see why they shouldn't.
+****** DONE Claude says: 'delete', not 'toDelete'; I would do it
+The atom is 'delete': '(editRequest delete)', parsed to
+'NodeEditRequest::Delete'. 'toDelete' survives only as a field
+of the save's instructions and in two comments ('traverse.rs',
+'contradictory_instructions.rs'). The request atoms are bare
+verbs ('delete', 'restoreNode', 'restoreRel', '(merge ID)',
+'(relRepo R)'), so the fitting name is 'detach'.
+Today a detachment flows through no request channel. It is a
+declared state: the user writes 'noClaim' by hand, through the
+metadata editor (C-c v m; 'shared/metadata-fields.json' offers
+the atom), since neither client has a detach command; the
+save reads the state (a non-claimant is left out of the list);
+and the "detach" herald is a display fact each client computes
+from the state and the parent and adds to the sexp as
+'pendingDetachment', which the server never writes. The de
+novo discussion settled only that the pending state should
+look like a request.
+As a request, '(editRequest detach)', it would flow as the
+others do: the parser gives it a variant (beside 'restoreRel'
+in 'RelationshipEditRequest', since it concerns the
+relationship to the viewparent, not the node); the save, on
+reading it, leaves the child out of the list as it does a
+non-claimant; the rerender after the save then marks the
+child 'noClaim', as it marks every kept child the truth no
+longer warrants, so the state after is exactly today's; and
+the rule table renders the atom "detach" as it renders
+"delete". Gone with it: the clients' synthesis,
+'client_computed_atoms' and the rendering cases'
+'pendingDetachment' context line. Each client gains a command
+that writes the request and keeps the readiness request
+beside it, as the merge command does. One detail for the
+plan: the refresh reports "Marked noClaim a child..." when it
+marks a claiming child, and must not for a child whose detach
+the save just fulfilled; the save knows which, as it does for
+a fulfilled 'restoreRel'.
+One choice remains: whether the metadata editor still offers
+'noClaim'. I would withdraw it from the editor and keep it as
+the server's word for the state, which the save must go on
+honoring (the refresh writes it on detached children). Then
+there is one gesture and one state. The 'editRequest' slot
+holds one request, so a detach excludes a relRepo request on
+the same headline; the two conflict anyway. I would make this
+its own slice of the tidy plan: parser, save, rule table,
+both clients, 'metadata-fields.json', the docs ('heralds.org',
+'data-model_technical.org', the glossary, both COMMANDS) and
+the rendering cases.
+******* DONE jeff : more uniformity yet, we could have,
+by replacing 'restoreNode' with 'restore' and 'restoreRel' with 'reattach'.
+******** DONE Claude says: I would keep the two restore names
+'restoreNode' and 'restoreRel' are a pair: both live only in
+the diff view, both undo a change since HEAD, and both are
+checked against HEAD (a 'restoreRel' naming no relationship
+HEAD records is dropped with a warning). 'restoreRel' is not
+the inverse of a detachment. It re-adds the relationship as
+HEAD recorded it, at HEAD's index and in HEAD's relRepo, and
+it works on a member of a write-protected partner folder,
+say a container the worktree dropped, where it writes the
+container's list, which no claim from this side can do.
+The inverse of a detachment already exists and needs no
+request: clearing 'noClaim' makes the child claim again, and
+the next save puts it back in the list. So "reattach" would
+name the HEAD-relative request after the worktree-side
+gesture it is not. "Restore" alone for 'restoreNode' would
+read fine on a ghost, since nothing else of a ghost can be
+restored, but it would unpair the two. If you want the
+renames anyway they are cheap: the atoms, two enum variants,
+two heralds ("restore node", "restore membership"), the two
+Emacs commands ('skg-restore-deleted-node',
+'skg-restore-removed-membership'), the Neovim twins, the
+rendering cases and 'docs/diff-view.org' ("Restoring what a
+change removed").
+********* DONE jeff : no, I agree
+So restoreNode and restoreRel for restoring from HEAD.
+But the user needs commands to dodge hand-editing metadata.
+Let's use detach and attach in those commands.
+(Of course they can also detach by simply cutting,
+and they can attach by pasting the node via 'C-c o n',
+but there are situations in which single commands for
+detach and attach would be more convenient.)
+********** DONE Claude says: agreed; what the two commands do
+Detach writes 'noClaim' on the headline at point; attach
+removes it. Both are meaningful only under a parent that reads
+claims, an editable occurrence or an editable folder of one;
+elsewhere no child claims whatever it carries, so the commands
+refuse there with a message, as the restore commands do at a
+wrong position, and attach on a child already claiming says
+so. After detach the headline shows "detach" (the pending
+herald the clients already draw) until the save, then ⊥.
+After attach it claims and is still unwarranted, so it keeps
+its ⊥ until the save, then shows nothing. The server does not
+change. The difference from cutting and pasting: both commands
+leave the headline and its subtree where they stand and flip
+one bit, while cutting takes the subtree out of the buffer
+and 'C-c o n' draws a fresh write-protected copy with an
+editable view request. "Attach" has no precedent as a user
+word (the code uses it in other senses, as in
+'attach_containerward_chains_under_members'), so the glossary
+would introduce the pair under "claims membership". For the
+tidy plan: a command and a key in each client, the two
+COMMANDS docs, the glossary.
+******* DONE jeff : I didn't follow about the metadata editor.
+noClaim would still be part of the metadata format, right?
+Some things are editable in the metadata view, and others not --
+ID, for instance, isn't.
+We could just do that.
+
+But deeper, I didn't understand: Why would we not want the user
+to edit noClaim by hand?
+******** DONE Claude says: you are right; I change my advice
+Yes: 'noClaim' stays in the format whatever we do. The server
+writes it on every kept child the truth does not warrant, the
+parser reads it, the save honors it. "Withdraw it from the
+editor" meant what you say: leave it out of the editor's
+fields, as the gnid is left out ('shared/metadata-fields.json'
+lists per kind the fields the editor offers; a field absent
+there is not offered, though the text can always be edited by
+hand).
+
+Why I wanted that: with a 'detach' request carrying the
+herald, a hand-set 'noClaim' would be a second way to detach,
+pending with no herald unless the clients kept today's
+synthesis. But your question shows what I missed. The atom
+goes both ways: clearing it is how the user re-attaches a
+detached child, and that gesture must stay available, so the
+editor must keep offering 'noClaim'. Then a request covers
+one direction and a state edit the other, and the two paths
+to detaching remain. That is a worse shape than today's.
+So I withdraw my earlier "I would do it". The claim is one
+declared bit with two directions, and one toggle serves both:
+I would keep 'noClaim' as the gesture, keep the clients'
+synthesized "detach" herald for the pending state, and add
+the thing that is actually missing, a command in each client
+that toggles the atom on the headline at point (today the
+only way is the metadata editor). Nothing in the server
+changes. If you still prefer a request for the sake of
+uniformity with 'delete' and 'merge', it works as I described,
+with 'noClaim' kept editable and the synthesis kept, at the
+cost of the second path.
+*** DONE jeff : what is request~:NAME?
+**** DONE Claude says: a pre-existing relRepo display bug
+It is a display bug, in 'TODO/problems.org' ("A relRepo request
+renders as 'request~:NAME' in Emacs"). An edit request to set a
+relationship's skgrepo, written '(editRequest (relRepo NAME))',
+has the rule '(ANY "request:~" IT)', which should read
+"request:~NAME", as 'docs/heralds.org' promises. The lens makes
+the token "request:~:NAME", and Emacs's
+'heralds--strip-structural-colons' eats the colon before "~"
+together with the "~", leaving "request~:NAME". Slice 6 found
+it while teaching that stripping to keep the colon of
+"⌂:LABEL", confirmed it in batch Emacs, and left it, since it
+predates the run and the plan did not cover it. No rendering
+case covers a relRepo request, which is why the suite does not
+see it. A one-line fix plus a case: a candidate for the tidy
+slice.
+***** DONE jeff : sure
+
+****** DONE Claude says: noted for the tidy slice
+It goes in with Decide 2's cheap items.
+** DONE Slice 7: the parser's twin goes
+'add_missing_info.rs' stays as the parse's helpers; a headline
+nothing can place gets the 'not_found' skgrepo sentinel and is
+refused as before; callers with no graph passed an empty graph
+(slice 12 made that an 'IdResolution' parameter). Sound.
+*** DONE jeff : please define "a headline nothing can place"
+
+**** DONE Claude says: an occurrence that can get no skgrepo
+Every occurrence has a home skgrepo. The parse finds one for a
+headline in three ways ('complete_occurrence_skgrepo' in
+'add_missing_info.rs'): the metadata names it ('(skgRepos
+(nodeRepo R))'); for a write-protected headline whose gnid the
+graph knows, the graph's home for that node (this is how a
+bare reference typed into a folder takes the skgrepo of the
+node it names); or else the nearest occurrence ancestor's,
+which a new headline typed under an occurrence inherits, the
+walk passing through ghosts, unknowns and folders. A headline
+for which all three fail is what the review calls one nothing
+can place: in practice a bare headline typed at top level, or
+under a tombstone or a property, with no nodeRepo of its own.
+The parse gives it the sentinel 'SkgrepoName::not_found' (the
+string "NOT_FOUND", chosen to stand out if it ever reached a
+user), and validation refuses the save with "Occurrence must
+have a repo that exists in the config." Its children inherit
+the sentinel and are refused alike. Slice 7 kept that
+behavior as it was; the review's "Smaller" vocabulary
+findings add that the sentinel's comment says the opposite of
+its use. "Place" was my word for "find a skgrepo for"; the
+code says "complete".
+** DONE Slice 8: the refresh module, unwired
+The one stop the plan expected, on my own correction (above).
+The agent read nine ambiguities of the model and recorded each
+reading; I agree with all but one, which is for Decide: it
+drew no default folders, which the plan had not mentioned, and
+I had slice 9 keep today's default folders. Its 71 unit tests
+each check the fixpoint on their own output.
+** DONE Slice 9: content views on it
+The deferred printer rule landed with the removal of its
+readers. Default folders ride on the editable-view request
+rather than a '(folder subscribesTo)' request, which would
+have drawn the subscriber folder too: sound, and better than my
+correction. The save's ID check and alias reader read no claim
+where none is written. Six regressions in the module were
+found by the fixtures and fixed. A deleted node's folders
+leave their members under two nested tombstones in other
+views: for Decide. Every drawn child was reported as a
+correction (slice 10 fixed it).
+** DONE Slice 10: the search buffer, and the corrections channel
+Corrections are tagged with the view ID (the server knows no
+buffer names); a save without a view ID reports none; the
+search stub keeps the override folders so suppressed hits
+still reappear; the enrichment thread stays but only writes a
+payload. A hit found by an alias shows the node's title after
+enrichment: for Decide.
+*** DONE jeff : does the user have a way to get to a buffer by its ID?
+**** DONE Claude says: not by the ID; by the buffer's name
+The user never meets the ID when the buffer is open. Each
+client turns the view ID into the buffer's name before it
+writes the warnings headline ('skg--corrected-view-name' in
+'skg-request-server-warnings.el', 'corrected_view_name' in
+'nvim/lua/skg/server_warnings.lua'), both by searching the
+buffer list for the one whose 'skg-view-id' matches
+('skg-find-buffer-by-view-id'); then the user switches to it
+by name as to any buffer. The raw ID appears only when no
+buffer carries it any more, say a view closed between the
+save and the report, and then there is nothing to get to.
+What is missing is a jump: the headline is plain text, not a
+link, and no command takes a view ID or a headline to its
+buffer ('skg-find-buffer-by-view-id' is a function, not a
+command). Cheap, in both clients: a key in the warnings
+buffer that visits the buffer the headline at point names. I
+would add it to the tidy plan's client items.
+***** DONE jeff : let's not even bother with the command
+*** DONE jeff : "the enrichment thread stays but only writes a payload" --
+what else might we have expected in place of only writing a payload?
+**** DONE Claude says: before, the thread did the enrichment
+Before the run the thread was the enrichment's engine. It
+computed, for every hit, the containerward role trees and the
+graph stats ('containerward_role_trees_by_skgid_from_skgids',
+bounded by 'max_roleTree_depth'), and wrote that structured
+result into the slot as the payload; the idle loop then asked
+the client for the buffer snapshot, and
+'render_enriched_search_buffer.rs' drew the buffer by hand
+from the two. Now the enrichment is a refresh: when the
+snapshot arrives, 'enrich_search_viewforest' refreshes it as a
+stub whose roots are the hits, each a write-protected
+occurrence asking for its containers folder, and the
+ordinary refresh draws the folders. The thread kept only the
+messenger's part: it locks the slot, checks the cancellation
+flag under the lock, and writes the search's inputs (terms,
+hit IDs, runtime, the overPrivateText decision) for the idle
+loop to find, which is what triggers the snapshot request.
+"Only" marks that the thread lost its computation, not that
+anything is missing. What one might expect instead is no
+thread at all: a write that takes no time needs none, and
+the plan had the thread stay only because the two-phase
+protocol was to be kept. I left it because the cancellation
+check under the lock is what 'cancel_search_enrichment'
+relies on, and I did not trace whether an inline write keeps
+that race closed. A tidy item if you want it; small either
+way.
+***** DONE oh, this reverses something
+that I wrote in "*** The search enrichment thread".
+If enrichment happens via a refresh, it seems like the user gets
+all the benfit they used to get from backgrounded enrichment:
+They can see the search results before those containerward forests are attached.
+Am I right? Please run some tests to see how a substantial search
+(e.g. for the word "something" in my data)
+fares in both setups. If there's no big performance difference,
+we can expunge the enrichment thread completely, which is great.
+We should leave a note explaining that the refresh strategy
+has the important advantage of
+making the buffer available before containerward forests are attached.
+****** DONE Claude says: half right; and the numbers are in
+Half right. The user sees the hits before the forests, but
+that comes from the two-phase protocol (results at once, then
+the snapshot exchange, then the enrichment), not from the
+refresh, and not from the thread, which in either build only
+makes the second phase possible. If the enrichment moved into
+the first reply, the refresh would not keep the early buffer.
+So the note you want should say: the two phases give the
+early buffer; the refresh gives the enrichment the same code
+as every other view, instead of a renderer of its own.
+I measured both builds on a copy of your data, on an isolated
+port; the report is 'bench-search-enrichment.org' beside this
+file, and the driver is 'bash/bench-search-enrichment.py'.
+Debug builds, medians of five runs, "something".
+******* DONE title-only: 286 hits, enriched buffer 1090 lines
+Results after 31 ms (old build 27 ms); then 105 ms until the
+server asks for the snapshot (old 102); then the enrichment,
+86 ms (old 79); about 222 ms in all to the enriched buffer
+(old 208).
+******* DONE with bodies: 724 hits, enriched buffer 2794 lines
+Results after 61 ms (old 56); then 104 ms until the snapshot
+request (old 104); then the enrichment, 209 ms (old 177);
+about 374 ms in all (old 337).
+******* DONE what the numbers say
+There is no big difference between the builds: the refresh
+costs 8 to 31 ms more than the old hand drawing, because the
+old thread's work (24 to 52 ms, hidden inside the wait) now
+happens in the enrichment step. The surprise is the middle
+number: in both builds about 100 ms of every search is the
+connection loop's idle poll ('set_read_timeout' of 100 ms in
+'server/serve.rs'), which is how long the server waits before
+it looks in the slot and asks for the snapshot. Nothing is
+computed during it.
+******* DONE what follows, for your decision
+The thread can go either way,
+since writing the payload takes no time. The real question is
+whether to keep the two phases at all. With one phase (the
+search refreshes the stub built from the hits and replies
+once; no thread, no slot, no cancellation flag, no snapshot
+exchange, no stream guard in either client, no contentless
+'search-enrichment'), the enriched buffer would arrive in
+about 117 ms title-only and 270 ms with bodies, sooner than
+the 222 and 374 ms of today, and the buffer would never be
+replaced under the user or locked read-only meanwhile. The
+cost is the first paint: 31 and 61 ms today against those
+117 and 270 ms, that is a wait of a tenth to a quarter of a
+second for a search of this size, in a debug build. The
+refresh scales at about 0.3 ms per hit here, so a search
+with 3,000 hits would wait about a second for anything,
+where today it waits about 0.1 s for the hits and over a
+second for the forests. If that case matters to you, the two
+phases earn their keep, and then the cheap gain is the poll:
+a 10 ms timeout would cut 90 ms from every search. I would
+take the one-phase design, bury the thread and slot as you
+asked (the protocol's other half lives in both clients, so
+the burial holds only the server's part; git has the rest),
+and give the search refresh the node budget if a giant search
+ever bites.
+******** DONE jeff : sure, rip it all out
+270 ms is pretty fast.
+********* DONE Claude says: one phase it is; the scope
+Settled: the search will answer in one phase, refreshing the
+stub built from the hits and replying once. With the thread
+will go the slot and its payload type, the cancellation flag,
+the idle loop's look into the slot, the 'request-snapshot'
+and 'snapshot response' messages, the contentless
+'search-enrichment', and in both clients the stream guard,
+the read-only lock during the exchange and the handlers for
+those messages. The protocol doc's "Text search" section will
+describe one reply and carry the note you asked for. I read
+"rip it all out" as superseding the burial under '_burying/'
+from your cleanup tree, since git keeps the code; say if you
+still want a copy there. It is a slice of its own, since it
+crosses the server, both clients and the protocol doc. Decide
+15 below now says settled.
+** DONE Slice 11: the diff view on it
+The old walk went, about 8,000 lines, with residue beyond
+slice 9's list. 'Ghost' gained a stored claim and warrant.
+Change viewnodes are not corrections in the diff view. The
+integrate request makes occurrences editable directly and
+refreshes twice when it appends roots. A fulfilled 'restoreRel'
+leaves its headline claiming. Five regressions found by the
+fixtures and fixed. Sound.
+** DONE Slice 12: the renames
+"phantom" split by sense into ghost and unknown;
+'types/phantom.rs' became 'types/disk_home.rs'; the clients'
+kind labels changed; 36 comment lines still named folders by
+old type names (slice 13 took them). Sound.
+** DONE Slice 13: docs and the two-question check
+The model's home is the technical data model; the docs follow
+the code where the plan's text differed; the two-question check
+found twelve new identifier families, three colliding with
+existing words ("ladder", bare "merge", "claim"), now qualified
+in the glossary, and no citation of 'TODO/' left in code. Left:
+46 comments that still say "completion", "reconcile" or "the
+walk", and two naming slips. All for the housekeeping item
+below.
+*** DONE jeff : yes please
+**** DONE Claude says: in the tidy slice
+They are the stale-comments item of Decide 2; the duplication
+report's item 16 and slice 13's record in 'progress.org'
+locate them.
+* The churn ledger
+What this plan built and then removed or rewrote within
+itself, with the reason and a cause class.
+** 'server/update_buffer/warrant.rs' and its test, 352 lines
+Added in slice 0 (401e8a5c) to compute the warrant in the
+stats pass; deleted in slice 11 (4673e07f) when the ladder set
+every warrant. Cause: a mechanism the plan put in the wrong
+place because the module that would own it did not exist yet;
+staging, not error.
+** The warrant's and the moves' interim homes
+'noWarrant' lived in '(viewStats ...)' from slice 0 to slice 5;
+'overridesHere' and the two stats moves in '(viewStats ...)'
+from slice 1 to slices 4 and 5; a ghost warrant was read from
+'(rel removed)' from slice 1 to slice 11. Cause: the plan's
+order (types before grammar before module), accepted in the
+plan itself.
+** The adapter 'claims_as_the_old_walk_reads_them'
+Added in slice 9, deleted in slice 11: it restored the claims
+the old diff walk expected after a content-view refresh.
+Cause: the plan's order again; named in the plan as temporary.
+** 'folder_goal_is_ordered'
+The refresh's own copy from slice 8, merged into
+'Folder::goal_is_ordered' in slice 11, because changing the
+shared one broke the old walk's 'partner_folder_matrix'.
+Cause: the same.
+** Every drawn child reported as a correction
+Slice 9's corrections reported each drawn child as
+"reinstated"; slice 10 excluded extent. Cause: a requirement
+the plan got wrong (it did not define what a correction is not).
+** The extra-ID re-kind correction
+Mine, inserted after slice 3, withdrawn at slice 8's stop.
+Cause: the reviewer (me) chose a rule the model cannot state.
+Cost: one stop, no code.
+** Totals
+Code built and removed within the run: about 350 lines in one
+module, and small in-file adapters; nothing of the design was
+redesigned. Compared with the diff view effort of October
+(five plans, three redesigns of the membership model), this
+run's churn is staging, which the plan accepted in advance.
+
+* Cost
+** Your time
+About ten short messages during the run: the launch, two rules
+for the orchestrator, the restart, three "continue" or status
+questions, and your answers were not needed for any slice. I
+estimate twenty to thirty minutes of your attention over nine
+hours of wall clock.
+** The machine's time
+About 8.3 hours of agent time across fourteen slices and about
+7 million tokens, plus six review agents. The wall clock from
+first commit to last was about nine hours, including a pause
+of fifty minutes for your restart and about thirty minutes
+lost to the two-session episode during slice 9.
+
+* What the user sees differently
+Gestures and views that changed, by decision or by accident,
+as far as the record and the probes show.
+** By decision
+The restricted placeholder is gone: a hidden node's occurrence
+is a tombstone, pruned when childless. The tombstone reads
+"something stood here". A deleted node's occurrence in a
+content view is a tombstone, not a lingering "DELETED" phantom
+with its text; in the diff view it is a ghost with HEAD's text.
+⊥ marks an unwarranted child, not a non-claimant; children of
+a write-protected node no longer all carry ⊥. A pending
+detachment reads "detach". Corrections of every view, the
+collateral ones included, appear in the warnings buffer under a
+headline per view, and a plain save or a fresh view reports
+nothing. The "yield" rule is gone: an editable non-claimant
+keeps its editability. A childless detached child stays, with
+'noClaim' and ⊥, rather than vanishing. Two commands dismiss a
+ghost (but see Decide). The metadata on every headline has a
+new shape, which the metadata editors follow.
+** By accident, or unforeseen
+A search hit found by an alias shows the node's title after
+enrichment (Decide). A deleted node's drawn folders leave their
+members under nested tombstones in other views (Decide). A
+ghost alias saved outside the diff view goes rather than
+lingers. A subscribee folder is drawn only when the node
+subscribes to something the restriction shows (as before, but
+by a new path). The clients' kind labels say "occurrence" and
+"unknown".
+
+* DONE The three questions still open for you
+** DONE AGREED : Claude says: a dismissed ghost comes back
+A ghost entombstoned under a node that held it at HEAD is
+drawn again at the node's next rerender, since the diff view's
+goal reinstates every HEAD-warranted item; only a ghost root
+stays dismissed. Slice 3 built the request and both clients'
+commands as planned, and tests assert only the refresh that
+carries the request. My recommendation stands: drop the
+'tombstone' request and the two commands; in the diff view a
+ghost is a pending change, shown until it is restored or
+committed, and the stateless rule leaves no honest place to
+remember a dismissal. Alternatives: remember dismissals per
+view for the session; or skip a HEAD-only goal item whose
+ghost is gone, which also hides a real change.
+** DONE Claude says: nested tombstones after a deletion
+Deleting a node whose folders were drawn leaves, in every
+other open view, the folders' members under two tombstones:
+the occurrence's, then the unsayable folder's. The model gives
+this; the old walk dropped those members. I would let a
+tombstone whose only children are tombstones absorb them, so
+one tombstone holds the members: one level less, nothing lost,
+a small rule in the tail. Alternatives: keep the rule (the user
+prunes by hand); or drop the members of an unsayable folder as
+the old walk did, which loses what the user typed under them.
+*** DONE jeff : don't worry about it
+Two levels of intermediate tombstones is fine.
+Collapsing them could confuse the user.
+Maybe leave a note in the code explaining that it's fine.
+**** DONE Claude says: kept as the model has it, with a note
+Settled: the tail keeps every tombstone that has children, so
+the folders' members stay under two. The note goes on
+'prune_childless_tombstones' in 'server/refresh/tail.rs',
+saying that nested tombstones after a deletion are by design
+and that collapsing them was considered and rejected, and the
+technical data model's tombstone paragraph gets a sentence.
+Both in the tidy slice; Decide 4 below now says settled.
+** DONE Claude says: an alias-found search hit's title
+The refresh titles an occurrence from the graph, so a hit whose
+match was an alias shows the alias in phase 1 and the node's
+title after enrichment; the old enrichment kept the alias. I
+would show the node's title in both phases and the matching
+alias as a member of the hit's alias folder, so the two phases
+agree and the alias is still seen. The alternative, letting the
+search stub mark the hit's title as the alias, needs a kind the
+model lacks.
+*** DONE jeff : agreed
+Just to be clear I understand:
+Any search that finds a hit through an alias will render that hit
+with its title, but also with its alias folder,
+so the alias is visible. Correct?
+**** DONE Claude says: correct, with two details
+Correct in substance. First, the alias folder is drawn under a
+hit only when the hit was found through an alias. Today phase
+1 draws it only for a hit with more than one match, to hold
+the matches it buried, so a hit found by one alias alone
+shows the alias as its title and gets no folder, and after
+enrichment the alias vanishes; under the proposal the folder
+is drawn whenever a match was an alias. After enrichment the
+refresh fills it from the graph with all of the node's
+aliases, since it is a property folder, so the matching alias
+stands among the others with nothing marking it: the model
+has no "matched" fact, and the user knows the terms. Second,
+everything the refresh draws under a hit is folded, so that a
+hit shows collapsed, and the alias folder with it; the alias
+is in the buffer but seen only on unfolding. I would leave
+the alias folder unfolded for a hit found by an alias, in
+both phases, so the alias shows at a glance. Decide 5 below
+says so.
+* The reviewers' reports
+Six Opus agents read the range, each with one question of
+'code-reviews.org', and wrote a report of about 200 lines to
+'05_1_review-reports/' (copied there from 'tests/results/',
+which 'all-tests.sh' wipes). I read each in full; what follows
+is my synthesis, ranked within each question, with my
+judgment of the fix. The reports hold the file:line detail.
+** Duplication ('duplication.org', 16 findings)
+*** The skgrepo switch keeps its own entombstone-and-prune pass
+'convert_and_prune_for_skgrepo_switch' predates the refresh
+and does what the ID rule, the ancestry table and the tail now
+do, except that it also prunes an editable folder it emptied.
+Cheap after a check: run 'tests/unit/repo_switch.rs' through
+the refresh alone, then drop the pass. Traced, not run.
+*** A client bug: a readiness request blocks relRepo in Emacs
+'skg--node-edit-request-at-point-p' takes anything in
+'(editRequest ...)' but relRepo as a pending delete or merge,
+so a node marked ready refuses 'skg-set-relRepo'. Run and
+confirmed by the reviewer. Cheap; a regression of slice 5.
+*** Both clients keep an old alist parser only tests call
+It loses the wrapper of a one-element '(view noWarrant)' on the
+round trip. Cheap: delete the chain and its tests.
+*** The subscribee-as-such and its unintegrated content, twice
+The goal and the stats pass compute them from different
+inputs, so the herald count can disagree with what is drawn.
+Cheap: the stats pass calls the goal's function.
+*** Front change viewnodes are built as subtrees and cut off
+The body diff and the acquired folder's ghosts are each
+computed twice. Cheap: return a list.
+*** The chain: drawn by the old builder, redone by the ID rule
+A container only HEAD has may be drawn as an unknown and
+re-kinded to a ghost, with a spurious correction (not run).
+Costly to unify fully; the spurious correction is worth a test.
+*** "Does the restriction hide this gnid", nine times
+They differ for a gnid on disk but not in the graph. Cheap: one
+resolver.
+*** Smaller
+Two rerender loops over open views with identical structs; two
+save-side member collectors with identical bodies and one ghost
+arm pasted four times; three fixpoint harnesses and four
+spellings of the test config that disagree; dead code in the
+server, the tests and the clients; two dozen comments that
+still describe the deleted walk. All cheap.
+** Vocabulary and reification ('vocabulary.org', 19 findings)
+*** "hidden" now means two things
+The plan (my word) made the restriction's verb a noun:
+'GnidPresence::Hidden', 'omit_hidden',
+'entombstone_hidden_occurrences'. The older sense is
+hidesFromSubs ('Folder::Hidden'), and both meet in one
+function. The older word for the restriction is "restricted".
+Moderate: say "restricted" for the restriction sense.
+*** extent, extension, extend: a three-way private split
+'names.org' forbids exactly this; "extent" also meant a sexp's
+span in the clients. Cheap in docs: keep "extend" and "the node
+budget" and say "how far a goal is drawn".
+*** "detach": the tree in one sentence, the list in the next
+Cheap: the refresh "never removes a child".
+*** Five accessors for the gnid of an occurrence; two identical
+Cheap: keep 'occurrence_gnid' and 'is_occurrence'.
+*** Modules still named for retired words
+'update_buffer/reconcile/', 'to_org/complete/',
+'to_org/extend/', 'diff_view/completion.rs', 'CompletionMode';
+47 comments; three false ones. Moderate: move under
+'server/refresh/' (the readability report says the same).
+*** Bare "merge" and bare "marker" in the new code
+'CorrectionKind::Merged', "2. merge:", 'ChangeKey::Marker'.
+Cheap: "merge of siblings", 'ChangesetMarker'. My coinage.
+*** "ladder" against the privacy ladder
+Told apart only by a parenthesis. Moderate: "the refresh's
+rungs" or always "the correction ladder"; 'ladder.rs' also
+holds the visit, so 'visit.rs'. My coinage.
+*** The warrant's shape
+'isWarranted' names a three-valued enum like a flag; it lives
+in three structs; 'ByGraph' doubles as "no relationship
+implied" on roots. Cheap rename; a 'ChildFlags' struct for the
+model's two flags would be the honest reification (costly).
+*** Vestigial variants and a kind as a string
+'NodeEditRequest::RestoreNode/RestoreRel' are parse-only now;
+'Rekinded (&'static str)' carries "node" where everything else
+says occurrence. Cheap.
+*** Wire spellings of skgrepo disagree
+'skgRepos' beside 'skgrepoLabels' and 'homeSkgrepoMove';
+'nodeRepo' a third name for the home skgrepo. Renaming
+'skgRepos' is costly (fixtures); the rest cheap.
+*** Smaller
+'Truth' against "gated graph" and "live graph"; "fact" for a
+declared part; bare "anchor" and ancestor lookups by index;
+'newborn_folders' beside 'added_folders'; 'editable_gnids'
+kept by eight scattered inserts and removes (the retired
+'EditableMap' as an unnamed protocol); 'not_found''s comment
+says the opposite of its use; nine 'restriction' bindings
+holding occurrences. All cheap.
+** Readability and arrangement ('readability.org', 16 findings)
+*** The refresh's own parts live under the dead walk's names
+Its goal computers, chain, mode and stats passes sit in
+directories named for the deleted walk; 'reconcile/' has no
+reconciler, 'to_org/render/content_view.rs' renders nothing. A
+coder reading one goal visits five directories. Moderate and
+mechanical: move them into 'server/refresh/', delete 'to_org/'.
+*** 24 of 46 sampled doc comments are stale
+Most name reconcilers or completion; one cites a deleted doc
+section. Cheap.
+*** Positional booleans
+'Goal::new (items, true|false)' at sixteen sites;
+'occurrence_from_truth (pid, editable, claims, ..)';
+'mk_writeProtected_from_viewnode (v, false)'. Cheap: named
+constructors.
+*** The readiness store rides beside the mode
+It is None exactly when the mode is a content view, and the
+tail fails at run time otherwise. Cheap: put it inside
+'CompletionMode::DiffView'.
+*** A compound folder's anchors are found by magic depths
+In three files. Cheap: name the roles once.
+*** The two clients' metadata editors diverge
+Two fill-in algorithms, helpers one client lacks, a new
+'(editRequest ...)' placed differently in each and in the
+printer. Costly: a shared case file under 'tests/shared/',
+then align.
+*** The WHEN grammar is stated three ways
+Neovim would misread a styled WHEN; none is styled today.
+Cheap: one grammar.
+*** 'ViewnodeMetadata' spreads the kind over four fields
+A 180-line if-chain in 'viewnode_from_metadata'. Moderate.
+*** Smaller
+'viewnodestats' threads an 'Option' that is always 'Some' and a
+parameter named for the wrong notion; 'RerenderAfterSaveContext'
+keeps a copy of the graph and a straddle slot that is always
+None; 'SaveResponse' spelled three times; formatting breaks
+(untyped lets, callees before callers); the search renders
+twice. All cheap. Found clean: every algorithm is described in
+its own file; each file of 'server/refresh/' does what its name
+says.
+** User documentation ('user-docs.org', 15 findings)
+*** The ghost-tombstone commands are misdescribed
+Both COMMANDS docs and the elisp header say the tombstone drops
+what the diff view drew under the ghost; it keeps everything
+(a test asserts it). Neither mentions that the ghost returns
+at the container's next refresh. Cheap, and moot if you drop
+the commands.
+*** The corrections and the warnings buffer have no user doc
+Neither COMMANDS doc mentions the buffer, the six messages, or
+that a reconnect with startup warnings erases the corrections
+gathered so far, and that save warnings go to another buffer.
+Cheap; the erasure is a small client bug.
+*** A headline under a non-claiming parent becomes a node on disk
+A headline typed under a write-protected occurrence, a ghost
+or a tombstone, which the docs call "a note" (a word under
+review in the slice 6 thread), is saved as a new node
+contained by nothing. Documenting it is cheap; whether such
+headlines should be saved at all is yours (Decide).
+*** Search enrichment and what a save does to other views
+Neither has a user-facing description; the alias-found hit is
+the open question. Cheap to document.
+*** Smaller
+The ghost's herald misquoted in both COMMANDS docs; the
+skgrepo-set switch's tombstones and lost unsaved edits
+undocumented; the tombstone legend lists two of seven causes;
+the "close view" request has no section; retired words in two
+user docs and one server message ("historical vognodes");
+about twenty undefined glossary terms and eleven inconsistent
+entries. Counts: Emacs 92 commands, 91 documented, 5
+misdocumented; Neovim 85 commands and 90 keys, all documented,
+4 misdocumented; 27 requests, 26 documented.
+** Tests against the agreed behavior ('tests.org')
+The reviewer listed every behavior of the model as built, 92
+of them, and named the test for each: 76 asserted, 6 partly
+or indirectly, 10 not at all (one by choice). Most are in the
+module's own suite (79 tests, 72 of them checking the fixpoint
+on their output) and the rest in the older suites; the
+fixpoint sweep covers 345 fresh content views over 48 fixture
+folders and 36 diff-view buffers over 27 cases. Untested, by
+the cost of a regression: a gone change viewnode's tombstone
+keeping what the user typed; the claim a re-kinded ghost keeps
+(the refresh side); the edit request dropped on three of the
+four paths; the order of the editable ordered folders; the
+deep ancestry rows and "an occurrence is never unsayable"; the
+sweep under a restriction and over the enrichment. All cheap.
+Copies: three new fixpoint harnesses and one older, four tests
+that hand-roll a refresh, five parse helpers, three save-back
+helpers. Names: a bare "merge" in a test file name; harness
+names that hide an assertion; one name promising more than
+its test. Raw-text assertions where a field would be clearer
+in about eight places; the raw-line matches in the diff view's
+suite are the clients' contract and should stay.
+** Builds, probes and timing ('probes.org')
+*** Every slice's last commit builds clean
+'cargo check --all-targets' at all fourteen: zero warnings.
+*** Five of six probes pass; one found a defect
+Against an isolated server with scratch data, through the real
+TCP surface: a tombstone keeps a headline typed under a
+write-protected occurrence and childless copies vanish (pass);
+override substitution ends with the overrider 'noClaim' and
+the original reinstated beside it (pass); the diff view's ghost
+shows HEAD's text and 'restoreNode' brings the node back in
+place with its children (pass); both views' buffers saved back
+unchanged return byte-identical text with no corrections
+(pass); a save under a restriction keeps the hidden member and
+its anchor (pass). The merge probe passes as specified and
+then shows the defect below.
+*** The defect: the merge drops the editable twin's claim
+'merge_into' ('server/refresh/ladder.rs') moves editability to
+the surviving first sibling but not the claim. Validation lets
+only one sibling claim, so when the claimant is not first the
+survivor keeps the first sibling's 'noClaim', is warranted,
+and so is a pending detachment; saving that buffer back
+unchanged removed the node from its parent's file. This breaks
+"the refresh never detaches a child and sets no claim but a
+root's", and every suite was green over it. The fix is one
+line (the survivor claims if any sibling did) and a unit test
+in 'tests/refresh/merge.rs'.
+*** Three oddities, none a defect
+A user's own delete is reported as a correction
+("Entombstoned ..."); deleting a view's own root leaves the
+chain nodes under its tombstone as plain content; widening the
+restriction reports the revealed member as "reinstated". The
+first and third want a narrower definition of a correction
+(what the user asked for, or what the truth changed under the
+user, is not a correction); the second follows the model.
+*** Timing: the refresh is linear, its tail is quadratic
+A rerender of every view of the largest fixture (68 files, 56
+views) takes about 70 milliseconds on a debug build. On a
+synthetic parent of 4,000 children the walk takes 38
+milliseconds and the tail 3.5 seconds, nearly all in
+'InRustGraph::relRepo', which 'set_relRepo' calls once per
+child and which clones and scans the parent's whole contains
+list each time. That predates this work (it is the same at
+96f0ff20); a relRepo map built once per parent would cut the
+4,000-child case from 3.7 seconds to about 0.6.
+
+* DONE Claude says: Decide
+Each item is a decision for you, and my recommendation leads.
+Each opens with its state. I would run items 1 and 2 as one
+corrective slice before anything else is built on the
+refresh.
+** DONE Claude says: 1. fix the merge's claim, now
+This item is open. It is the one defect the review found.
+When the refresh merges two occurrences of one node that
+stand under one parent, 'merge_into' in
+'server/refresh/ladder.rs' passes the merged twin's
+editability to the surviving twin but not its claim of
+membership, so a node whose claiming occurrence was not the
+first in position comes out of the merge claiming nothing,
+and a save of that buffer, even unchanged, removes the node
+from its parent's list. The entry is also in
+'TODO/problems.org'. The fix would be one line, the survivor
+claiming if any twin did, and a unit test in
+'tests/refresh/merge.rs'. I would run it together with item
+2 as one corrective slice before anything else is built on
+the refresh. The explanation you asked for follows.
+*** DONE UPDATED [Claude] the viewnode merge, as settled below
+The thread under this item widened the fix into the viewnode
+merge rule, and the slice will take all of it: duplicate
+viewnode siblings (siblings standing for one gnid under one
+parent) merge into one viewnode with a fresh vnid, folded only
+if all were, with its body folded only if all were, editable
+if any was, claiming if any did, holding every sibling's
+children, with the union of their view requests and whichever
+edit and relationship requests they carried; the warrant is
+recomputed after the merge, as now. "Survivor" goes from
+'merge_into', 'merge_siblings' and their comments, from the
+data model's step 2 and from the glossary, whose entry "merge
+of siblings" becomes "viewnode merge" and defines the
+subjects. Validation gains a check that refuses a save in
+which two headlines name one change leaf with contradictory
+readiness requests, naming the vnids, beside the deletion
+check of 'contradictory_instructions.rs'. Tests:
+'tests/refresh/merge.rs' for the rule and one for the check.
+*** DONE jeff : please explain in detail, defining all terms
+**** DONE Claude says: the defect, term by term
+A node is what the graph holds: a file in a skgrepo, named by
+its gnid, its graph node ID. An occurrence is a headline in a
+buffer that stands for a node; a node may have several
+occurrences, in one buffer or in many. An occurrence is
+editable when a save reads its text and its children as the
+node's, and write-protected ('writeProtected' in its
+metadata) when a save ignores them; a buffer may hold at
+most one editable occurrence of a node. The viewparent of a
+headline is the headline above it. Under an editable
+occurrence, a child headline claims membership when the save
+will read it as a member of its viewparent's list, and the
+bare atom 'noClaim' says it does not; without the atom it
+claims. A child is warranted when the graph already relates
+it to its viewparent as its position implies, here when the
+parent's contains list names it; the refresh recomputes that
+at every pass and writes 'noWarrant' in '(view ...)' when it
+does not hold. Under an editable parent at rest the two
+agree: what claims is warranted. They differ only for what
+the user changed since the last save: a new child claims and
+is not yet warranted, and a child the user marked 'noClaim'
+is warranted and claims nothing, which the docs call a
+pending detachment, since the next save will take it out of
+the list.
+
+Validation refuses two claiming children that stand for one
+node under one parent (its message says that non-ignored
+content children must be unique), so when a buffer shows two
+occurrences of one node side by side under one parent, which
+I call twins here, all but one carry 'noClaim'.
+The refresh runs a fixed sequence of steps at each parent.
+Its second step, 'merge_siblings' in
+'server/refresh/ladder.rs', unifies twins: the first in
+position survives, keeping its vnid and fold state; it is
+editable if any twin was; the other twins' children move
+under it; and the others are removed. The survivor takes the
+merged twin's editability, but 'merge_into' does not take
+its claim. When the claiming twin is not the first, the
+survivor is the twin that carried 'noClaim', and it keeps
+it. The survivor is warranted, since the parent's list names
+the node, so after the merge it is a pending detachment that
+the user never asked for.
+The probe showed it. Under an editable M whose list holds X,
+the buffer held a write-protected X carrying 'noClaim' and
+holding C2, and below it the editable X holding C1 and C4.
+After the save, one X remained, first in position, editable,
+holding C2, C1 and C4, and marked 'noClaim'. Saving that
+result back unchanged removed X from M's file, and the next
+rerender showed X with 'noClaim (view noWarrant)'. That
+breaks the model's rule, "the refresh never detaches a child
+and sets no claim but a root's", and every test suite was
+green over it.
+The fix is one line in 'merge_into': the survivor claims when
+any twin did. A unit test in 'tests/refresh/merge.rs' would
+put the claiming twin second and assert that the survivor
+claims.
+***** DONE jeff : let's rewrite that 'non-ignored' language
+That's another way to talk about claims;
+we just want one word per concept.
+****** DONE Claude says: agreed; it means "claiming"
+"Non-ignored" is the save's old word for a child that claims
+membership: 'nonignored_children_have_distinct_gnids' in
+'server/from_text/buffer_to_viewnodes/local.rs' says so in its
+comment ("'Non-ignored' means one that claims membership"), and
+the tree helpers it rests on call the same thing
+'skip_non_content'. The word reaches the user in six validation
+messages of 'local.rs': "X's non-ignored content children must
+be unique (no two sharing the same ID)", "Alias must have no
+(non-ignored) children", "AliasFolder's (non-ignored) children
+must include only Aliases", "Flag must have no (non-ignored)
+children", "IDFolder's (non-ignored) children can only be ID
+properties" and "ID property must have no (non-ignored)
+children". Three comments cite it too, two of them by a name
+the function no longer has ('nonignored_children_have_
+distinct_ids', in 'predicates.rs' and 'traverse.rs'). I would
+rename the function 'claiming_children_have_distinct_gnids',
+the helpers' flag 'skip_non_claimants', and say "claiming" in
+the messages: "Two claiming children of X stand for one node;
+only one may claim", "An alias may have no claiming children",
+and so on. The glossary's "claims membership" entry would then
+be the one definition. A vocabulary item for the tidy slice; I
+would add it to Decide 2 when the review is mine.
+***** DONE jeff : let's use boolean functions of mergees
+If twins are merged, the result is unfolded if any of them were;
+it's only folded if they all were.
+Similarly, if any were editable, the merger is.
+If any were claimed, the merger is.
+If any were warranted, the merger is.
+
+Is any of that problematic?
+****** DONE Claude says: none problematic; two are already so
+Nothing in it is problematic, and two of the four hold today.
+The fold would change. Today the survivor keeps its own fold
+state; focus is already the "any" of the twins. Folded as the
+"all" of the twins, and unfolded if any was, is right, since
+every twin's children end up under the survivor, so what the
+user had open stays open; the same rule would cover
+'bodyFolded'.
+Editability already is the "any": the survivor is editable if
+any twin was, with one exception the code keeps, for a node
+and its shown overrider, which stand for one gnid: the
+survivor takes the editability only when no other occurrence
+of the node in the buffer is already the editable one, since a
+buffer may hold at most one.
+The claim as the "any" is exactly the fix of Decide 1, and
+since validation lets only one twin claim, "any" means "the
+one claim, if there is one".
+The warrant needs no rule. It is derived, not carried: the
+refresh recomputes it at the next step from the parent's goal,
+and twins stand for one gnid under one parent, so they have
+one warrant between them by definition.
+
+One more field the merge drops today, which the same rule
+would cover: the merged twin's edit request and readiness
+request are not carried (only its view requests are, as the
+union). After a save they are mostly spent, so the loss is
+rare; "the survivor's, else the merged twin's" would close it
+at no cost. The words: the code says "survivor" and "the
+merged copy" ('merge_into', 'merge_siblings' in 'ladder.rs');
+"twins" was mine in the explanation above, and "mergee" and
+"merger" have no precedent in the code or docs. The rule
+would go into 'merge_into', its doc comment, the merge step
+in 'docs/data-model_technical.org' ("the first surviving with
+its viewnode ID and fold state, editable if any was"), and
+'tests/refresh/merge.rs', as part of Decide 1's corrective
+slice.
+******* DONE jeff
+Really there's no sense in which one survives and another doesn't.
+It's confusing to think one does. Let's just say they are merged,
+but be clear that it is a viewnode merge, distinct from a graphnode
+merge. The result can have a new vnid, just to be explicit.
+The things merged are "duplicate viewnode siblings".
+
+Since at mst one of them is editable, it is safe to merge edit requests.
+They are all commit-readiness-markable, though, so if those marks
+conflict, we have to refuse the save, naming the disagreement by vnids.
+******** DONE Claude says: agreed on all four; what each touches
+The words. The glossary already keeps bare "merge" out and has
+an entry "merge of siblings", which says the siblings "are
+unified into the first, which keeps its viewnode ID"; the
+graphnode merge is "nodeMerge" there. I would retitle the entry
+"viewnode merge", define its subjects as duplicate viewnode
+siblings (siblings standing for one gnid under one parent),
+and drop "survivor" from the entry, from the data model's step
+2 ("the first surviving with its viewnode ID"), from the doc
+comment of 'merge_siblings' and from 'merge_into', whose
+'survivor' and 'other' would become the merged siblings and
+the result. Neither "duplicate viewnode siblings" nor
+"viewnode merge" has a precedent in code or docs; both are
+built from words the glossary defines, so I would just say so
+at the entry.
+
+The new vnid costs nothing. The tail already mints a vnid for
+every viewnode that lacks one, so the merge would clear the
+vnid of the result and the tail would do the rest. Nothing
+keys on a vnid across refreshes: fold state rides in the
+metadata, the clients restore point by the focused headline,
+and the readiness store keys by something else (below). Only
+the corrections name headlines by vnid, so the "merged"
+correction would name the new vnid and could list the old
+ones.
+
+Edit requests are safe to merge, as you say, and for the
+reason you give: a 'NodeEditRequest' lives only in
+'Editability::Editable', so at most one duplicate carries one.
+The relationship requests ('relRepo', 'restoreRel') sit on any
+occurrence, but validation lets only one position carry each
+(a 'relRepo' request is read only on the claiming member, a
+'restoreRel' only on a non-claiming one), and the merge runs
+in the refresh after the save has consumed them, so what it
+meets is spent; the union is right and free.
+
+Readiness: The store keys its marks by the change-forest leaf
+('LeafKey' in 'readiness_store.rs': a node's aspect or a
+relationship's), not by the headline, so two duplicates name
+the same leaves, their stored marks cannot disagree, and a new
+vnid loses no mark. Their requests can disagree within one
+buffer: one duplicate carrying '(ready rel)', the other
+'(unready rel)'. Today the save collects a buffer's readiness
+requests in buffer order and applies them in sequence
+('consume_readiness_requests'), and I see no check for two
+naming one leaf, so the later would win silently (traced, not
+run). Your rule, refusing the save and naming the disagreement
+by vnids, belongs beside 'contradictory_instructions.rs', which
+already refuses a buffer where two occurrences of one node
+disagree about deletion and names the headlines. One widening:
+two headlines anywhere in a buffer can name one leaf, not only
+duplicate siblings (a node and a relationship to it can stand
+in two subtrees), so the check should run per leaf over the
+whole buffer, naming the vnids of all its claimants.
+All of it fits Decide 1's corrective slice, which already
+rewrites 'merge_into': the rule, the words, the vnid, the
+glossary and data-model entries, 'tests/refresh/merge.rs', and
+the readiness check with a test of its own. I would extend
+Decide 1 so when the review is mine.
+********* DONE jeff : perfect
+********** DONE Claude says: Decide 1 extended
+Folded into "TODO UPDATED [Claude] the viewnode merge" at the
+top of item 1.
+** DONE Claude says: 2. the tidy slice, '06_plan_tidy-refresh'
+This item is open as a whole, and most of its contents are
+settled. The slice would take about a day of agent time, and
+I would write it as '06_plan_tidy-refresh.org' from the six
+reports, which hold every file and line. From the reports it
+would take: the Emacs bug that lets a readiness request block
+'skg-set-relRepo'; the old alist parser that both clients
+keep; the startup-warnings handler that erases the
+corrections; the eight untested behaviors; the copies of the
+fixpoint and parse helpers; named constructors for the
+positional booleans; the readiness store that rides inside
+the diff-view mode; the stale comments, both the 46 that
+still say "completion", "reconcile" or "the walk", which you
+accepted in slice 13's thread, and the stale ones the
+readability report sampled; the dead code of the duplication
+report's item 15; the bare "merge" and "marker"; the five
+accessors for one gnid; the 'restriction' bindings; the
+vestigial 'NodeEditRequest' variants; the WHEN grammar, to
+be stated once; the user docs for the corrections, the
+search enrichment, the ghost commands and the ghost's
+herald; the tombstone legend; a section for the "close view"
+request; and the misquoted refusal texts. From the threads
+above it would take: the detach and attach commands in both
+clients, which would set and clear 'noClaim' (slice 6's
+thread); the word "note", to be retired from the four doc
+sentences (slice 6); the "request~:NAME" display bug, with a
+rendering case (slice 6); the code note on nested tombstones
+(item 4); and the alias folder of an alias-found hit, to be
+left unfolded (item 5). It would not take a jump from the
+warnings headline to its buffer, which you dropped in slice
+10's thread.
+*** DONE UPDATED [Claude] three entries added, one moved out
+From the threads since this item was written, the slice also
+takes: "non-ignored" replaced by "claiming" in the six
+validation messages, the helper's name and the three comments
+(item 1's thread); the save's warning that a headline typed
+under a parent that reads no claims became an orphan (item
+6); and 'all-tests.sh' leaving 'tests/results/<plan>/' alone
+(item 13). The alignment of the clients' metadata editors
+(item 12) is a plan of its own and not in this slice.
+*** DONE jeff : What remains undecided?
+**** DONE Claude says: four things, none inside the list
+First, whether the slice runs at all, and when: I would run
+it with item 1 before anything else is built on the refresh.
+Second, which of the open items join it: 7, 9, 11 and 13 are
+cheap and would fit; 6 and 10 need your answer first; 8 and
+15 would be slices of their own, in the same plan or after
+it; 12 and 14 are not for it. Third, whether every listed
+item is wanted: you may strike any. Fourth, the plan's shape:
+one slice per report, or one per layer (server, Emacs,
+Neovim, docs), which I would choose so that each agent runs
+one suite. Nothing inside the list is undecided; each entry
+names a fix the reports located.
+***** DONE jeff : so each open item
+is stated outside of the ancestry of this org-node,
+marked TODO in a place I will get to, yes?
+That is, I can stop processing this ancestry without fearing
+that I'll miss something it states that nothing else does?
+****** DONE Claude says: yes; two things live only here
+Yes for the decisions. Every open item has its own TODO heading
+under "Decide" (1, 3, and 6 to 15), and the settled ones (4, 5)
+say where you settled them. Whether item 2 runs, and when, is
+item 2's own heading, which is TODO. The vocabulary item from
+the thread above ("non-ignored" to "claiming") and the merge
+rule's extra fields are stated only in that thread, under my
+TODO replies there, which you will reach on the way to item 1.
+Two things live only here, and neither needs an answer now.
+First, the entries of item 2's list: they are named nowhere
+else as decisions, only in the six reports and the threads as
+findings, and the plan draft will restate each as a step you
+can strike then. Second, the plan's shape, one slice per report
+or per layer: I will choose per layer unless you object. So
+you can stop here and close this ancestry.
+** DONE AGREED : Claude says: 3. the dismissed ghost
+This item is open. Today a ghost the user dismissed with the
+'tombstone' request comes back at its former container's
+next refresh, because the diff view's goal includes HEAD's
+list. I would drop the 'tombstone' request and the two
+client commands: in the diff view a ghost is a pending
+change, shown until it is restored or committed. If you keep
+them, the command docs should say that the ghost returns,
+and a test should assert it.
+** DONE Claude says: 4. nested tombstones: settled, keep them
+You settled this item under "nested tombstones after a
+deletion": the two levels of tombstones stay, since
+collapsing them could confuse the user, and a note in the
+code will say so (item 2).
+** DONE AGREED : Claude says: 5. the alias-found hit: settled, one detail
+You settled this item under "an alias-found search hit's
+title": a hit will show the node's title in both phases,
+with the matching alias in the hit's alias folder. My answer
+there adds one detail. That folder is folded after
+enrichment, like everything under a hit, so I would leave it
+unfolded for a hit found by an alias. Say if you disagree;
+otherwise it goes into item 2.
+** Claude says: 6. a headline typed under a non-claimant
+This item is open. Today a headline typed under a
+write-protected occurrence, a ghost or a tombstone is saved
+as a node contained by nothing, and the model never spoke to
+it. We could keep that and document it, which is cheap; or
+refuse to save a headline whose parent reads no claim and
+that has no gnid, a validation rule of moderate cost; or
+save it but contain it somewhere. I lean to documenting it:
+the user typed a node and gets one.
+*** jeff
+Let's keep the behavior but add to their warnings that they created an orphan.
+**** Claude says: settled; the warning and the word
+The behavior stays and the save will warn. The save's
+field-intent collection already knows when a new headline's
+parent reads no claims (a write-protected occurrence, a
+ghost, a tombstone, a write-protected folder), so it would
+add one warning per such node to the save-result's warnings,
+which the clients show in the save warnings buffer: the node
+was created, and nothing contains it, with the headline. The
+word "orphan" has one precedent in the user docs
+('docs/COMMANDS.org', "the old node might become an orphan")
+and none in the glossary, so the glossary would define it, a
+node that no list contains, and the warning would use it. The
+docs' sentence for this case follows. Added to item 2.
+***** DONE jeff : we should also note in the glossary that orphan and "content root" (or "containerward root" -- do we say that?) are synonyms.
+In general I am against synonyms, but here they do serve a purpose:
+We use 'orphan' for a content root that the user may not have intended as such.
+** DONE AGREED : Claude says: 7. "hidden" should be "restricted"
+This item is open. "Hidden" is my word from the plan for a
+node the skgrepo restriction hides, and it collides with
+hides-from-subscriptions in one function. I would say
+"restricted" for the restriction sense:
+'GnidPresence::Restricted', 'omit_restricted',
+'entombstone_restricted_occurrences', and the glossary. The
+change is moderate and mechanical, and it would belong in
+the tidy slice if you agree.
+** DONE AGREE : Claude says: 8. move the refresh's parts under refresh/
+This item is open, and your cleanup tree at the end of this
+document asks for it. The goal computers, the chain, the mode
+and the stats passes live under the deleted walk's
+directories. They would move under 'server/refresh/', and
+'to_org/' and 'update_buffer/' would go as names. With the
+move, 'CompletionMode' would become 'RefreshMode',
+'ladder.rs' would become 'visit.rs', since it holds the
+visit, and "the refresh's rungs" would replace the word that
+collides with the privacy ladder. The change is moderate and
+mechanical, and I would make it a slice of its own, after
+the tidy one.
+** DONE AGREE : Claude says: 9. drop the skgrepo switch's own prepass
+This item is open. The skgrepo switch keeps a prepass of its
+own that repeats what the ID rule, the ancestry table and
+the tail do. I would check 'tests/unit/repo_switch.rs'
+through the refresh alone and then delete the prepass; it is
+cheap after the check.
+** DONE AGREE : Claude says: 10. what is not a correction
+This item is open. Today a user's own delete, and a member
+the truth revealed by widening the restriction, are reported
+as corrections. The definition should exclude what the user
+asked for and what the truth changed under the user, keeping
+only what the buffer got wrong. The change is small, and it
+is worth settling before the warnings buffer trains the user
+to ignore it.
+** DONE AGREE : Claude says: 11. the quadratic stats pass
+This item is open. The stats pass is pre-existing, not the
+rewrite's, but it is now the only slow part of a refresh:
+'set_relRepo' scans the parent's contains list once per
+child. A map built once per parent would fix it; the change
+is cheap and measurable.
+** DONE Claude says: 12. the clients' metadata editors
+This item is open. The two clients' metadata editors have two
+fill-in algorithms, helpers that one client lacks, and the
+new '(editRequest ...)' placed differently in each and in
+the printer. Aligning them would be costly: one shared case
+file under 'tests/shared/', then the alignment. It would be
+a plan of its own, or we accept the drift. The detach and
+attach commands of item 2 would not touch the editors.
+*** DONE jeff : please do align them
+**** DONE Claude says: a plan of its own, after the tidy one
+I would write it as '07_plan_align-metadata-editors.org' once
+the tidy slice is in, since nothing else depends on it and it
+is the costliest item here. Its shape: one shared case file,
+'tests/shared/metadata-editor-cases.txt', modeled on the
+herald rendering cases, giving for each kind of headline the
+fill-in, the strip, where a new '(editRequest ...)' and the
+readiness request go (the printer's order is the reference),
+and the corrections display; then each client made to pass
+every case, with the helpers one client lacks ported and the
+names aligned ('root-index' against 'container_index'). The
+readability report's finding 6 locates every difference.
+** DONE Claude says: 13. 'all-tests.sh' wipes the slice logs
+This item is open. 'all-tests.sh' begins with 'rm -rf
+tests/results', which deleted every slice's logs and
+conversion scripts that 'progress.org' cites. Either a plan's
+logs would live under 'tests/results/<plan>/' and the script
+would exempt that directory, or the script would wipe only
+its own files. The change is cheap.
+*** DONE jeff : the former please
+**** DONE Claude says: settled; in the tidy slice
+A plan's agents will keep their logs under
+'tests/results/<plan>/', and 'all-tests.sh' will wipe
+'tests/results/' except such subdirectories. 'tests/USAGE.md'
+now states the convention and says that the script still wipes
+everything until the slice lands. Added to item 2.
+** DONE Claude says: 14. the flaky cleanup
+This item is open. "Directory not empty" at cleanup hit one
+test in most full runs and passed alone: the fixed per-test
+temp paths collide under the parallel run. It is filed in
+'TODO/problems.org'.
+*** DONE jeff : do you see a fix?
+**** DONE Claude says: yes, in two parts; the cause is traced
+The error "Directory not empty" from 'remove_dir_all' means a
+file appeared in the directory between its listing and its
+removal, so something was still writing when the cleanup ran.
+The harness copies each test's fixtures to
+'/tmp/<test name>-fixtures' ('server/test_utils.rs') and
+removes that directory at the end; the Tantivy index lives
+under it, and Tantivy commits on a background writer, which
+the comment there already names as the historical flake
+family. Under nextest each test is its own process, so the
+remaining race is inside the test: the writer finishing a
+commit while the directory is being removed. I did not run it
+down to the file, so this is traced, not run. The fix would
+be two parts: cleanup drops the index and waits for its writer
+before removing the directory, with a short retry on this one
+error as a backstop; and the path takes the process ID, so no
+two processes can share it even when two binaries name a test
+alike. Then the full suite run ten times should show none.
+Cheap; for the tidy slice.
+** DONE Claude says: 15. the search: one phase or two
+You settled this item under slice 10 ("sure, rip it all
+out"): the search will answer in one phase. Today the hits
+arrive first and the enrichment follows a snapshot exchange;
+the measurements in 'bench-search-enrichment.org' show the
+enrichment costing 86 ms for 286 hits and 209 ms for 724 in
+a debug build, with about 100 ms of every search spent in
+the connection loop's idle poll. With one phase the enriched
+buffer will arrive sooner for searches of hundreds of hits,
+and the thread, the slot, the cancellation flag, the
+snapshot exchange and both clients' stream guard will go;
+the first paint will come later, by a tenth to a quarter of
+a second at that size. My reply under slice 10 lists the
+scope. The note you asked for will go in
+'docs/api-and-formats.org', "Text search". This is a slice
+of its own in the tidy plan.
+* Suggestions for coding-advice/
+Things this run taught that the advice does not yet say.
+** DONE jeff : I agree with all of these.
+*** DONE Claude says: applied
+'coding-advice/plans.org' has the three additions (the pitfall
+that lists every reader, the report channel's negatives, the
+user-visible defaults in "What stays") and points to the new
+'orchestration.org'; 'code-reviews.org' states the per-plan
+review's shape and adds probes to the questions; 'names.org'
+says to check a plan's words before the run; 'org-discussions.
+org' records the two conventions and the sidechannel rule;
+'tests/USAGE.md' says where a run's logs live. The new
+'orchestration.org' is the next reply. 'ORIENTATION.org'
+points to it.
+** plans.org: a pitfall "only X reads Y" lists every reader
+The plan said the save alone read the claim under
+write-protected parents; three other readers did, and slice 0
+stopped. Before writing such a pitfall, grep every reader of
+the field or atom and name them; a one-reader claim is the
+commonest false belief about existing code.
+** plans.org: define a report channel by its negatives too
+The plan defined corrections and said nothing about what is
+not one; slice 9 then reported every drawn child. Whenever a
+plan adds a warning, a correction or a log, say what it must
+not report.
+** plans.org: "What stays" names the user-visible defaults
+The plan never mentioned default folders, and the module drew
+none. The section should enumerate the behaviors a user sees
+without asking (default folders, substitution, the fold of new
+members), each marked kept or changed.
+** plans.org: a section "Running a plan", for the orchestrator
+What this run did and the advice does not say: one agent per
+slice with the runner's prompt plus a "context carried forward"
+paragraph and the suites to run; a fixed report shape (commits,
+suites with counts, deviations, fixtures changed and why,
+unfinished, DONE); triage before each launch, with corrections
+inserted into the plan as "corrections carried from slice N"
+and committed, design questions going to Jeff; the
+orchestrator's notes in 'progress.org' under a headline per
+slice; pre-existing failures (here 'import-md-and-org') listed
+in the plan's pitfalls so no agent re-investigates them; and
+after a session break, 'ps' and 'ListAgents' before resuming an
+agent, since two live sessions can both orchestrate.
+*** DONE jeff : this deserves a separate doc, 'orchestration.org'.
+**** DONE Claude says: written
+'coding-advice/orchestration.org': the brief an agent gets, the
+report shape, triage before each launch and where corrections
+go, the notes in 'progress.org', pre-existing failures in the
+pitfalls, logs under 'tests/results/<plan>/', the session-break
+check, and the cost record. 'plans.org' keeps one line pointing
+to it.
+** code-reviews.org: the per-plan review's shape, and probes
+The per-plan review is described in one sentence. The shape
+this review and '20_review.org' use would be worth stating:
+verdict; what the reviewer checked (the launches, the central
+code, the docs' statement of the model); results (the run, the
+durations, the counts, the commit rule, the problems file);
+each slice beyond the plan's words; the churn ledger and the
+cost; what the user sees differently; the reviewers' reports;
+Decide. And one addition to the question list: probes against
+an isolated server on the final tree, each a behavior of the
+model driven end to end. The one real defect this review found
+passed every suite and was caught by a probe.
+** names.org: run the vocabulary check on the plan's words
+"hidden", "ladder", "merge" and "extent" were coined or
+overloaded in the plan's own text, and the agents followed it.
+The two-question check after a plan cannot undo a plan's word;
+checking the plan's "Words this plan uses" against the glossary
+and the code before the run would.
+** org-discussions.org: two conventions that worked
+"TODO UPDATED [Claude]" subheadlines where a later decision
+changes an earlier section, and the sidechannel file for a
+reply while Jeff edits the main document. Both kept the two of
+us off one file at once; both are worth a sentence. One rule
+learned the hard way: while the sidechannel is in use, Claude
+edits only it, even to apply a change Jeff approved there; a
+change to the main document waits until Jeff says it is free.
+** docker.org or tests/USAGE.md: where a run keeps its logs
+A plan's agents wrote under 'tests/results/sliceN/' and the
+full suite's script wiped them. Say where a run's logs live, or
+change the script.
+* DONE jeff
+** DONE Let's clean up dead code.
+We just replaced refresh wholesale.
+We should be able to delete all the old refresh code.
+*** DONE Claude says: the walk is gone; what is left is live
+Slice 11 deleted the old walk, about 8,000 lines, from
+'server/update_buffer/' and 'server/to_org/'. What those two
+directories still hold, about 1,900 lines, the refresh calls:
+the goal computers ('update_buffer/reconcile/', whose header
+now says so), the containerward chain
+('to_org/extend/containerward_chain.rs'), the mode
+('completion_mode.rs'), the stats passes ('graphnodestats.rs',
+'viewnodestats.rs'), the content-view printer
+('to_org/render/content_view.rs') and the skgrepo switch's
+prepass ('skgrepo_switch.rs'). So the remaining work is a move,
+not a deletion: Decide 8 proposes moving them under
+'server/refresh/' and retiring 'to_org/' and 'update_buffer/'
+as names, and Decide 9 proposes dropping the switch prepass
+once a check shows the refresh alone passes its tests. The
+truly dead code is small and listed in the duplication
+report's item 15: three server functions, two test helpers
+and a handful of client functions, all for Decide 2's slice.
+*** DONE The search enrichment thread
+had the purpose of making search results show up fast:
+First the hits are shown, and only thereafter are their containerward forests
+attached. If search turns out to be slow, I'll want to resurrect it,
+so let's not delete it -- instead, let's move that code to
+_burying/not_using/obsolete/search-enrichment/
+**** DONE Claude says: see the measurements under slice 10
+The numbers and the choice are in my reply under "oh, this
+reverses something": the early hits come from the two-phase
+protocol, not from the thread, and one phase would deliver
+the enriched buffer sooner for searches of hundreds of hits.
+If you keep two phases, the thread is a messenger that writes
+one payload and can be an inline write; if you go to one
+phase, it goes with the slot, the snapshot exchange and the
+clients' stream guard, and the burial would hold the server's
+part of that.
+** DONE Organize.
+*** DONE Claude says: Decide 8 is the proposal
+The refresh's parts move under 'server/refresh/', the old
+directory names go, and 'CompletionMode', 'ladder.rs' and
+"ladder" are renamed with them; a slice of its own after the
+tidy one.

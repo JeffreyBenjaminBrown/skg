@@ -16,3 +16,7 @@ There are three kinds of tests.
 Note that `tests/nvim/` holds the Neovim client's tests.
 
 The Docker container includes Emacs and Neovim (see `coding-advice/docker.org`), so all tests can run inside it.
+
+## Where a plan run keeps its logs
+
+Agents executing a plan write their logs and one-time scripts under `tests/results/<plan>/sliceN/`. `bash/all-tests.sh` currently wipes all of `tests/results/` at its start; it is to leave those subdirectories alone (Decide 13 of `TODO/simplify-refresh/05_review.org`), and until it does, copy what `progress.org` cites before a full run.

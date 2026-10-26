@@ -1,0 +1,74 @@
+#+title: Running a plan: the orchestrator's habits
+
+How Claude runs an execution plan slice by slice, one agent per
+slice, as it did for plans 17 and 19 of the total diff view and
+plan 04.1 of the refresh rewrite (October 2026). The plan's own
+form is in 'plans.org'; this is what happens once it is written.
+
+* One agent per slice
+Launch one Opus agent per slice, at high effort, and wait for
+its report before launching the next. Its brief is the agent's
+only context; it does not see the discussion that produced the
+plan and should not need to. The brief holds:
+- the runner's prompt: the plan's path, the slice number, the
+  progress file, the commit rule;
+- a "context carried forward" paragraph the orchestrator writes:
+  what earlier slices built that this one relies on, names that
+  changed since the plan was written, pitfalls found since;
+- the suites to run, each named with its command.
+
+* The report shape
+The agent ends with a report of fixed shape, and the same shape
+goes into 'progress.org' under a headline per slice:
+- the commits, hash and one line each;
+- the suites run, with counts, and every failure classified:
+  expected fixture adaptation, pre-existing, unrelated flake, or
+  new;
+- deviations from the plan's "how", each with its reason;
+- fixtures changed, and why;
+- what was left unfinished;
+- whether the slice's headline is DONE.
+
+* Triage before each launch
+Read the report and the diff before launching the next agent.
+A small correction that needs no decision of Jeff's becomes a
+stage inserted into the plan under the next slice, headed
+"Corrections carried from slice N", and committed before the
+launch; 'when-to-stop.org' says which corrections need Jeff. A
+design question goes to Jeff, and the run stops there when the
+next slice depends on the answer. The orchestrator's own notes
+go into 'progress.org' under "Orchestrator's notes after slice
+N", dated.
+
+* Pre-existing failures belong in the pitfalls
+A failure that predates the plan (in 04.1, the 'import-md-and-org'
+integration test) is listed in the plan's pitfalls by name, so
+that no agent investigates it again; each report then cites it
+as pre-existing.
+
+* Where a run keeps its logs
+Agents write their logs and one-time conversion scripts under
+'tests/results/<plan>/sliceN/'. 'bash/all-tests.sh' wipes
+'tests/results/' at its start; it is to leave such subdirectories
+alone, and until it does, copy what 'progress.org' cites before
+a full run. The review keeps the reviewers' reports beside it
+('05_1_review-reports/' next to '05_review.org') for the same
+reason.
+
+* After a session break
+The harness can report a session ended while its agent still
+works. Before resuming a run, check 'ps' for the old session and
+'ListAgents' for its agents: two live sessions can both
+orchestrate, and they collide on the plan and the progress file.
+Hand over by messaging the old session rather than relaunching
+its slice.
+
+* The cost record
+Record each slice's launch and report times in 'progress.org',
+so that the review can give durations per slice and the next
+plan can be budgeted.
+
+* The review
+When the last slice is DONE, write the per-plan review as
+'code-reviews.org' describes, from the record, the diff, the
+reviewers' reports and the probes.

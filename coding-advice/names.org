@@ -48,6 +48,15 @@ can see: a qualifier that says which thing is meant ("org-fold",
 convention attached. The same applies to "fresh" versus "current",
 "drawn" versus "shown", and any other pair whose difference a
 newcomer could not guess.
+* Check a plan's words before the run
+A plan's vocabulary section lists the words it uses. Before the
+run, check each against the glossary and the code. "Hidden",
+"ladder", "merge" and "extent" were coined or overloaded in plan
+04.1's own text, and the agents followed it; the two-question
+check after a plan cannot undo a plan's word. Coining a word is
+fine when the plan says so at first use; reusing one that means
+something else is not.
+
 * Please report any synonyms you encounter.
 There's no need to go specifically looking for them,
 but if you encounter them in the course of whatever you're doing,
