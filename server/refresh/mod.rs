@@ -39,7 +39,7 @@ use crate::types::views_state::ViewnodeIdRecord;
 use crate::update_buffer::completion_mode::CompletionMode;
 use buffer_corrections::{BufferCorrectionPolicy, BufferCorrection, BufferCorrectionKind, BufferCorrectionLog};
 
-use ego_tree::{NodeId, Tree};
+use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 
@@ -254,7 +254,7 @@ fn keep_the_first_editable_occurrence_of_each_node (
   let mut queue : VecDeque<NodeId> =
     VecDeque::from ([ tree . root () . id () ]);
   while let Some (treeid) = queue . pop_front () {
-    let node = tree . get (treeid) . unwrap ();
+    let node : NodeRef<Viewnode> = tree . get (treeid) . unwrap ();
     if let Some (gnid) = node . value () . editable_gnid () {
       let pid : ID = match walk . truth . graph . gnid_presence_gated (
                              gnid, walk . truth . restriction ) {

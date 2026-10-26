@@ -132,7 +132,8 @@ fn add_default_folders (
   walk   : &mut Walk,
 ) {
   if walk . is_diff_view () { return; }
-  let Some (pid) = tree . get (parent) . unwrap () . value () . editable_gnid () . cloned ()
+  let Some (pid) : Option<ID> =
+    tree . get (parent) . unwrap () . value () . editable_gnid () . cloned ()
     else { return; };
   if walk . had_editableView_request . contains (&parent)
      && partnerFolder_members_in_graph (
@@ -220,7 +221,7 @@ fn duplicate_viewnode_siblings (
   let mut groups : Vec<Vec<NodeId>> = Vec::new ();
   let mut group_of_gnid : HashMap<ID, usize> = HashMap::new ();
   for child in children_of (tree, parent) {
-    let Some (GoalMember::Gnid (gnid)) =
+    let Some (GoalMember::Gnid (gnid)) : Option<GoalMember> =
       vognode_member (tree . get (child) . unwrap () . value ())
       else { continue; };
     match group_of_gnid . get (&gnid) {
@@ -324,11 +325,11 @@ fn merge_editability (
   sibling_viewnode : &Viewnode,
   walk             : &mut Walk,
 ) {
-  let ViewnodeKind::Vognode (Vognode::Occurrence (merged)) = &sibling_viewnode . kind
-    else { return; };
+  let ViewnodeKind::Vognode (Vognode::Occurrence (merged)) : &ViewnodeKind =
+    &sibling_viewnode . kind else { return; };
   if merged . is_writeProtected () { return; }
   let mut result_mut : NodeMut<Viewnode> = tree . get_mut (result) . unwrap ();
-  let ViewnodeKind::Vognode (Vognode::Occurrence (result_occurrence)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (result_occurrence)) : &mut ViewnodeKind =
     &mut result_mut . value () . kind
     else { return; };
   walk . release_editability (&merged . gnid);
@@ -421,7 +422,7 @@ fn mark_claims (
   let claims_are_read : bool = parent_reads_claims (tree, parent);
   for child in children_of (tree, parent) {
     let viewnode : &Viewnode = tree . get (child) . unwrap () . value ();
-    let Some (claims) = claims_membership (viewnode) else { continue; };
+    let Some (claims) : Option<bool> = claims_membership (viewnode) else { continue; };
     if is_root {
       if viewnode . is_occurrence () { set_claim (tree, child, true); }}
     else if claims_are_read {
@@ -495,7 +496,7 @@ fn reinstate (
     . last ();
   for item in &goal . items {
     if present . contains (&item . member) { continue; }
-    let Some (drawn) = draw_item (tree, parent, item, goal, walk) ?
+    let Some (drawn) : Option<Viewnode> = draw_item (tree, parent, item, goal, walk) ?
       else { continue; };
     if let Some (member) = member_of_child (&drawn) {
       // In the diff view two items can name one node: a list entry
@@ -681,7 +682,7 @@ fn substitute_overriders (
   goal   : Option<&Goal>,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let Some (goal) = goal else { return Ok (( )); };
+  let Some (goal) : Option<&Goal> = goal else { return Ok (( )); };
   if walk . is_diff_view ()
      || tree . get (parent) . unwrap () . value () . editable_gnid () . is_none ()
      || is_overridden_and_shown_raw (tree, parent, walk)
@@ -752,7 +753,7 @@ fn stop_substituting (
   let stands : bool = tree . get (parent) . unwrap () . children ()
     . any ( |sibling| member_of_child (sibling . value ()) . as_ref () == Some (&member) );
   if stands { return Ok (( )); }
-  let Some (item) = goal . item_for (&member) else { return Ok (( )); };
+  let Some (item) : Option<&GoalItem> = goal . item_for (&member) else { return Ok (( )); };
   let item : GoalItem = item . clone ();
   if let Some (drawn) = draw_item (tree, parent, &item, goal, walk) ? {
     let treeid : NodeId = tree . get_mut (parent) . unwrap () . append (drawn) . id ();
@@ -776,7 +777,7 @@ fn is_overridden_and_shown_raw (
         ! folder . members_are_properties ()
         && ! matches! ( folder, Folder::Subscribee ),
       _ => false, } );
-  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return false; };
   raw_position
   && occurrence . overridesHere . is_none ()
@@ -881,7 +882,7 @@ fn add_folders (
         added . push (new);
         walk . added_folders . insert (new);
         new }, };
-    let hides_outside_its_subscribees = || -> bool {
+    let hides_outside_its_subscribees : &dyn Fn () -> bool = &|| -> bool {
       tree . get (treeid) . unwrap () . value () . occurrence_gnid ()
         . is_some_and ( |subscriber|
           ! hidden_outside_of_subscribees (&subscriber, walk) . is_empty () ) };

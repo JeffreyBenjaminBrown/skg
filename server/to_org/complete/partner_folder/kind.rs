@@ -16,7 +16,9 @@ impl Folder {
   /// The role its members play in the relation the folder shows, of
   /// which the node it describes plays the other; None for a folder that shows no
   /// one relation.
-  pub fn relation_member_role (&self) -> Option<RelationRole> {
+  pub fn relation_member_role (
+    &self,
+  ) -> Option<RelationRole> {
     match self {
       Folder::Subscribee =>
         Some (RelationRole::new (

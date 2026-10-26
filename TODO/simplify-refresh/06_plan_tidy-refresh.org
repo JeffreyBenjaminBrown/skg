@@ -891,7 +891,7 @@ parser's refusals of retired atoms:
   rg -n 'survivor' server tests docs --glob '!target'
 #+end_example
 
-** TODO Slice 3: the server's copies and shapes
+** DONE Slice 3: the server's copies and shapes
 Each item cites its report finding; read it first.
 *** Corrections carried from slice 2
 Two findings of slice 2's agent, both cheap: 'parent_is_editable'

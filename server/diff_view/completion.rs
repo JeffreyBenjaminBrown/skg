@@ -71,7 +71,7 @@ pub fn rerender_diffView_buffer (
   viewnode_id_record : &mut ViewnodeIdRecord,
 ) -> Result<Refreshed, Box<dyn Error>> {
   let DiffViewRerender { buffer_kind : diffView_buffer_kind,
-                         integrate_unshown_changes } = rerender;
+                         integrate_unshown_changes } : DiffViewRerender = rerender;
   let runtime : &RuntimeGeneration = &context . runtime;
   let restriction : Option<&SkgrepoRestriction> = context . skgrepo_restriction;
   let buffer_correction_policy : &BufferCorrectionPolicy =

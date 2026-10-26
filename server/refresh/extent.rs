@@ -33,27 +33,6 @@ pub(crate) enum Extent {
   None,
 }
 
-/// The extent of the parent at 'parent'.
-pub(crate) fn extent_of_parent (
-  tree   : &Tree<Viewnode>,
-  parent : NodeId,
-  walk   : &Walk,
-) -> Extent {
-  let node : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
-  let all : bool = match &node . value () . kind {
-    ViewnodeKind::Folder (_) => true,
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      ! occurrence . is_writeProtected (),
-    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
-      walk . is_diff_view ()
-      && in_content_position (node)
-      && ! node . ancestors () . any ( |ancestor| matches! (
-           &ancestor . value () . kind,
-           ViewnodeKind::Vognode (Vognode::Ghost (above))
-             if above . gnid == ghost . gnid )),
-    _ => false, };
-  if all { Extent::All } else { Extent::None } }
-
 /// Whether the vognode children of the occurrence at 'treeid' are the
 /// containerward chain ('holds_containerward_chain').
 pub(crate) fn is_chain_parent (
@@ -61,21 +40,6 @@ pub(crate) fn is_chain_parent (
   treeid : NodeId,
 ) -> bool {
   holds_containerward_chain ( tree . get (treeid) . unwrap () ) }
-
-/// Whether the children of 'parent' are editable content: those of
-/// an editable occurrence, and in the diff view the old content of a
-/// ghost where content stands.
-pub(crate) fn children_are_editable_content (
-  tree   : &Tree<Viewnode>,
-  parent : NodeId,
-  walk   : &Walk,
-) -> bool {
-  match &tree . get (parent) . unwrap () . value () . kind {
-    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
-      ! occurrence . is_writeProtected (),
-    ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
-      extent_of_parent (tree, parent, walk) == Extent::All,
-    _ => false, } }
 
 /// Whether an occurrence of 'pid' the refresh draws under 'parent' is
 /// editable: its parent's children are editable content, no other
@@ -97,6 +61,42 @@ pub(crate) fn drawn_occurrence_is_editable (
         . contains (pid)
       || ( walk . had_editableView_request . contains (&parent)
            && walk . node_budget > 0 ), } }
+
+/// Whether the children of 'parent' are editable content: those of
+/// an editable occurrence, and in the diff view the old content of a
+/// ghost where content stands.
+pub(crate) fn children_are_editable_content (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  walk   : &Walk,
+) -> bool {
+  match &tree . get (parent) . unwrap () . value () . kind {
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+      ! occurrence . is_writeProtected (),
+    ViewnodeKind::Vognode (Vognode::Ghost (_)) =>
+      extent_of_parent (tree, parent, walk) == Extent::All,
+    _ => false, } }
+
+/// The extent of the parent at 'parent'.
+pub(crate) fn extent_of_parent (
+  tree   : &Tree<Viewnode>,
+  parent : NodeId,
+  walk   : &Walk,
+) -> Extent {
+  let node : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
+  let all : bool = match &node . value () . kind {
+    ViewnodeKind::Folder (_) => true,
+    ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+      ! occurrence . is_writeProtected (),
+    ViewnodeKind::Vognode (Vognode::Ghost (ghost)) =>
+      walk . is_diff_view ()
+      && in_content_position (node)
+      && ! node . ancestors () . any ( |ancestor| matches! (
+           &ancestor . value () . kind,
+           ViewnodeKind::Vognode (Vognode::Ghost (above))
+             if above . gnid == ghost . gnid )),
+    _ => false, };
+  if all { Extent::All } else { Extent::None } }
 
 /// At the visit of an editable occurrence, before its content is
 /// drawn: one the refresh drew editable, when the budget is spent and

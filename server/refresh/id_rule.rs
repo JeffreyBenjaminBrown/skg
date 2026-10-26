@@ -326,7 +326,7 @@ pub(crate) fn ghost_from_head (
   pid  : &ID,
   walk : &Walk,
 ) -> Option<Ghost> {
-  let CompletionMode::DiffView { straddle, .. } = walk . mode
+  let CompletionMode::DiffView { straddle, .. } : CompletionMode = walk . mode
     else { return None; };
   match mk_historical_viewnode (straddle, pid, None) ? . kind {
     ViewnodeKind::Vognode (Vognode::Ghost (ghost)) => Some (ghost),

@@ -53,37 +53,9 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::mem::{Discriminant, discriminant};
 
-/// The straddle and the buffer, in the diff view.
-fn diff_view_of<'a> (
-  walk : &Walk<'a>,
-) -> Option<(&'a GraphStraddle, DiffViewBufferKind)> {
-  match walk . mode {
-    CompletionMode::DiffView { straddle, buffer_kind, .. } => Some ((straddle, buffer_kind)),
-    CompletionMode::ContentView => None, } }
-
-fn sets<'a> (
-  walk : &Walk<'a>,
-) -> Option<&'a PrunedChangeViewSets> {
-  let (straddle, buffer_kind) : (&GraphStraddle, DiffViewBufferKind) =
-    diff_view_of (walk) ?;
-  Some ( prunedChangeView_sets_of_buffer (straddle, buffer_kind) ) }
-
 //
 // The goal's HEAD part
 //
-
-/// The goal item of a partner over the straddle: warranted by the
-/// truth when the worktree's list holds it, else by HEAD.
-fn partner_item (
-  partner : &Partner,
-) -> GoalItem {
-  GoalItem {
-    member  : GoalMember::Gnid ( partner . id . clone () ),
-    warrant : if partner . existence == Some (Existence::Removed) {
-                Warrant::ByHead } else { Warrant::ByGraph },
-    relRepo : None,
-    rel     : partner . existence,
-    partner : Some ( partner . clone () ), } }
 
 /// An occurrence's content over the straddle. Of what the worktree
 /// holds, a subscribee as such keeps what 'unintegrated' keeps. A
@@ -163,7 +135,8 @@ pub(crate) fn property_goal (
   let (straddle, _) : (&GraphStraddle, DiffViewBufferKind) = diff_view_of (walk) ?;
   let before : Option<&GraphnodeInRust> = straddle . before . get (pid);
   let after  : Option<&GraphnodeInRust> = straddle . after . get (pid);
-  let item = |member : GoalMember, existence : Option<Existence>| -> GoalItem {
+  let item : &dyn Fn (GoalMember, Option<Existence>) -> GoalItem =
+    &|member : GoalMember, existence : Option<Existence>| -> GoalItem {
     GoalItem {
       warrant : if existence == Some (Existence::Removed) {
                   Warrant::ByHead } else { Warrant::ByGraph },
@@ -171,13 +144,15 @@ pub(crate) fn property_goal (
       .. GoalItem::by_graph (member) } };
   Some ( match kind {
     Folder::Alias => {
-      let texts = |node : Option<&GraphnodeInRust>| -> Vec<String> {
+      let texts : &dyn Fn (Option<&GraphnodeInRust>) -> Vec<String> =
+        &|node : Option<&GraphnodeInRust>| -> Vec<String> {
         node . map ( |node| node . alias_texts () ) . unwrap_or_default () };
       let relRepos_after : HashMap<String, Option<SkgrepoName>> =
         after . map ( |node| node . aliases_with_relRepo_unless_home ()
                              . into_iter () . collect () )
         . unwrap_or_default ();
-      let relRepo_after = |text : &String| -> Option<SkgrepoName> {
+      let relRepo_after : &dyn Fn (&String) -> Option<SkgrepoName> =
+        &|text : &String| -> Option<SkgrepoName> {
         relRepos_after . get (text) . cloned () . flatten () };
       Goal::ordered (
         union_with_existence ( &texts (before), &texts (after) ) . into_iter ()
@@ -186,14 +161,16 @@ pub(crate) fn property_goal (
           .. item ( GoalMember::Alias (text), existence ) } )
         . collect () ) },
     Folder::ID => {
-      let ids = |node : Option<&GraphnodeInRust>| -> Vec<ID> {
+      let ids : &dyn Fn (Option<&GraphnodeInRust>) -> Vec<ID> =
+        &|node : Option<&GraphnodeInRust>| -> Vec<ID> {
         node . map (GraphnodeInRust::ids) . unwrap_or_default () };
       Goal::unordered (
         union_with_existence ( &ids (before), &ids (after) ) . into_iter ()
         . map ( |(id, existence)| item ( GoalMember::Id (id), existence ) )
         . collect () ) },
     _ => {
-      let has = |node : Option<&GraphnodeInRust>, flag : &Flag| -> bool {
+      let has : &dyn Fn (Option<&GraphnodeInRust>, &Flag) -> bool =
+        &|node : Option<&GraphnodeInRust>, flag : &Flag| -> bool {
         node . is_some_and ( |node| node . flags . contains (flag) ) };
       Goal::unordered (
         Flag::ALL . into_iter ()
@@ -233,6 +210,19 @@ pub(crate) fn acquisition_goal (
       . map ( |acquirer| GoalItem::by_graph ( GoalMember::Gnid (acquirer) ))
       . collect () ), } ) }
 
+/// The goal item of a partner over the straddle: warranted by the
+/// truth when the worktree's list holds it, else by HEAD.
+fn partner_item (
+  partner : &Partner,
+) -> GoalItem {
+  GoalItem {
+    member  : GoalMember::Gnid ( partner . id . clone () ),
+    warrant : if partner . existence == Some (Existence::Removed) {
+                Warrant::ByHead } else { Warrant::ByGraph },
+    relRepo : None,
+    rel     : partner . existence,
+    partner : Some ( partner . clone () ), } }
+
 //
 // The change viewnodes
 //
@@ -248,19 +238,6 @@ enum ChangeKey {
   ChangesetMarker (ChangesetMarkerKind),
   Folder (Discriminant<Folder>),
 }
-
-fn change_key (
-  viewnode : &Viewnode,
-) -> Option<ChangeKey> {
-  match &viewnode . kind {
-    ViewnodeKind::ChangeViewnode (change) => Some ( match change {
-      ChangeViewnode::OldText { .. }         => ChangeKey::OldText,
-      ChangeViewnode::BodyDiff { .. }        => ChangeKey::BodyDiff,
-      ChangeViewnode::HomeSkgrepoMove { .. } => ChangeKey::HomeSkgrepoMove,
-      ChangeViewnode::RelRepoMove { .. }     => ChangeKey::RelRepoMove,
-      ChangeViewnode::ChangesetMarker { kind } => ChangeKey::ChangesetMarker (*kind), } ),
-    ViewnodeKind::Folder (folder) => Some ( ChangeKey::Folder (discriminant (folder)) ),
-    _ => None, } }
 
 /// Whether the change viewnode, or acquisition folder, at 'child' no
 /// longer stands for a change: always outside the diff view; in it,
@@ -281,7 +258,8 @@ pub(crate) fn change_is_gone (
     _ => false, };
   if ! is_derived { return false; }
   if ! walk . is_diff_view () { return true; }
-  let Some (parent) = node . parent () else { return true; };
+  let Some (parent) : Option<NodeRef<Viewnode>> = node . parent ()
+    else { return true; };
   let key : Option<ChangeKey> = change_key (node . value ());
   ! expected_change_viewnodes (tree, parent . id (), walk) . iter ()
     . any ( |expected| change_key (expected) == key ) }
@@ -297,7 +275,8 @@ fn expected_change_viewnodes (
   parent : NodeId,
   walk   : &Walk,
 ) -> Vec<Viewnode> {
-  let Some ((straddle, buffer_kind)) = diff_view_of (walk) else {
+  let Some ((straddle, buffer_kind)) : Option<(&GraphStraddle, DiffViewBufferKind)> =
+    diff_view_of (walk) else {
     return Vec::new (); };
   let node : NodeRef<Viewnode> = tree . get (parent) . unwrap ();
   match &node . value () . kind {
@@ -314,7 +293,8 @@ fn expected_change_viewnodes (
           in_c,
           order_only : buffer_kind == DiffViewBufferKind::OrderOnlyChanges
                        && straddle . order_only_pids () . contains (pid) } );
-      let is_marker = |viewnode : &Viewnode| -> bool {
+      let is_marker : &dyn Fn (&Viewnode) -> bool =
+        &|viewnode : &Viewnode| -> bool {
         matches! ( change_key (viewnode), Some (ChangeKey::ChangesetMarker (_)) ) };
       let partner_folders : Vec<Viewnode> =
         if in_c { changed_partner_folder_kinds (&aspects) . into_iter ()
@@ -326,7 +306,7 @@ fn expected_change_viewnodes (
         . chain ( fronts . iter () . filter ( |viewnode| is_marker (viewnode) ) . cloned () )
         . collect () },
     ViewnodeKind::ChangeViewnode (ChangeViewnode::OldText { .. }) => {
-      let Some (pid) = node . parent () . and_then ( |owner| match &owner . value () . kind {
+      let Some (pid) : Option<ID> = node . parent () . and_then ( |owner| match &owner . value () . kind {
         ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
           Some ( occurrence . gnid . clone () ),
         _ => None, } ) else { return Vec::new (); };
@@ -379,6 +359,20 @@ pub(crate) fn draw_change_viewnodes (
     tree, parent, &order, &created ) ?;
   Ok (( )) }
 
+/// The key of a change viewnode, or of a folder, among its siblings.
+fn change_key (
+  viewnode : &Viewnode,
+) -> Option<ChangeKey> {
+  match &viewnode . kind {
+    ViewnodeKind::ChangeViewnode (change) => Some ( match change {
+      ChangeViewnode::OldText { .. }         => ChangeKey::OldText,
+      ChangeViewnode::BodyDiff { .. }        => ChangeKey::BodyDiff,
+      ChangeViewnode::HomeSkgrepoMove { .. } => ChangeKey::HomeSkgrepoMove,
+      ChangeViewnode::RelRepoMove { .. }     => ChangeKey::RelRepoMove,
+      ChangeViewnode::ChangesetMarker { kind } => ChangeKey::ChangesetMarker (*kind), } ),
+    ViewnodeKind::Folder (folder) => Some ( ChangeKey::Folder (discriminant (folder)) ),
+    _ => None, } }
+
 //
 // Tagging
 //
@@ -398,7 +392,8 @@ pub(crate) fn tag_children (
   goal   : Option<&Goal>,
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
-  let Some ((straddle, _)) = diff_view_of (walk) else { return Ok (( )); };
+  let Some ((straddle, _)) : Option<(&GraphStraddle, DiffViewBufferKind)> =
+    diff_view_of (walk) else { return Ok (( )); };
   let is_root : bool = matches! ( tree . get (parent) . unwrap () . value () . kind,
                                   ViewnodeKind::BufferRoot );
   let chain : bool = is_chain_parent (tree, parent);
@@ -465,3 +460,23 @@ pub(crate) fn fold_body_of_drawn_occurrence (
 ) {
   if let Some (sets) = sets (walk) {
     viewnode . foldAndFocus . bodyFolded = ! sets . c . contains (pid); }}
+
+//
+// The mode
+//
+
+/// The pruned change view's sets of the buffer, in the diff view.
+fn sets<'a> (
+  walk : &Walk<'a>,
+) -> Option<&'a PrunedChangeViewSets> {
+  let (straddle, buffer_kind) : (&GraphStraddle, DiffViewBufferKind) =
+    diff_view_of (walk) ?;
+  Some ( prunedChangeView_sets_of_buffer (straddle, buffer_kind) ) }
+
+/// The straddle and the buffer, in the diff view.
+fn diff_view_of<'a> (
+  walk : &Walk<'a>,
+) -> Option<(&'a GraphStraddle, DiffViewBufferKind)> {
+  match walk . mode {
+    CompletionMode::DiffView { straddle, buffer_kind, .. } => Some ((straddle, buffer_kind)),
+    CompletionMode::ContentView => None, } }

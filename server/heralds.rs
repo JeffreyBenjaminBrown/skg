@@ -875,7 +875,7 @@ fn property_and_change_kind_atoms () -> Vec<&'static str> {
         | ChangeViewnode::RelRepoMove { .. } | ChangeViewnode::ChangesetMarker { .. }
         => () }}
   let _ = changeViewnode_guard;
-  let no_change = || -> SkgrepoChange { SkgrepoChange { old : SkgrepoName::from (""),
+  let no_change : &dyn Fn () -> SkgrepoChange = &|| -> SkgrepoChange { SkgrepoChange { old : SkgrepoName::from (""),
                                      new : SkgrepoName::from ("") } };
   [ PropertyMember::Alias { text : String::new (), relRepo : None,
                             relationshipEditRequest : None,

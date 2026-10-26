@@ -59,56 +59,6 @@ const ANC_OLD_TEXT : &[ExpectedAncestor] =
   &[ ExpectedAncestor::OldText ];
 const ANC_NONE : &[ExpectedAncestor] = &[];
 
-/// The required ancestry of a kind, nearest first. A vognode, a
-/// tombstone and the buffer root require none.
-pub fn required_ancestry (
-  kind : &ViewnodeKind,
-) -> &'static [ExpectedAncestor] {
-  match kind {
-    ViewnodeKind::Folder (folder) => match folder {
-      Folder::Alias | Folder::ID | Folder::Flags { .. }
-        | Folder::Subscribee | Folder::Subscriber
-        | Folder::Overridden | Folder::Overrider
-        | Folder::Hider | Folder::Hidden
-        | Folder::Container | Folder::Mentioner
-        | Folder::Acquired => ANC_OCCURRENCE,
-      Folder::AcquiredBy => ANC_GHOST,
-      Folder::HiddenOutsideOfSubscribee => ANC_HIDDEN_OUTSIDE,
-      Folder::HiddenInSubscribee => ANC_HIDDEN_IN, },
-    ViewnodeKind::PropertyMember (member) => match member {
-      PropertyMember::Alias { .. } => ANC_ALIAS_FOLDER,
-      PropertyMember::ID { .. }    => ANC_ID_FOLDER,
-      PropertyMember::Flag { .. }  => ANC_FLAGS_FOLDER, },
-    ViewnodeKind::ChangeViewnode (change) => match change {
-      ChangeViewnode::BodyDiff { .. } => ANC_OLD_TEXT,
-      ChangeViewnode::OldText { .. }
-        | ChangeViewnode::HomeSkgrepoMove { .. }
-        | ChangeViewnode::RelRepoMove { .. }
-        | ChangeViewnode::ChangesetMarker { .. } => ANC_OCCURRENCE_OR_GHOST, },
-    ViewnodeKind::Vognode (_)
-      | ViewnodeKind::BufferRoot
-      | ViewnodeKind::Tombstone => ANC_NONE, } }
-
-/// Whether 'actual' is what 'expected' requires.
-pub fn matches_expected (
-  actual   : &ViewnodeKind,
-  expected : &ExpectedAncestor,
-) -> bool {
-  match expected {
-    ExpectedAncestor::Occurrence =>
-      matches! ( actual, ViewnodeKind::Vognode (Vognode::Occurrence (_)) ),
-    ExpectedAncestor::Folder (required) =>
-      matches! ( actual, ViewnodeKind::Folder (folder)
-                         if discriminant (folder) == discriminant (required) ),
-    ExpectedAncestor::Ghost =>
-      matches! ( actual, ViewnodeKind::Vognode (Vognode::Ghost (_)) ),
-    ExpectedAncestor::OccurrenceOrGhost =>
-      matches! ( actual, ViewnodeKind::Vognode (
-        Vognode::Occurrence (_) | Vognode::Ghost (_) )),
-    ExpectedAncestor::OldText =>
-      matches! ( actual, ViewnodeKind::ChangeViewnode (
-        ChangeViewnode::OldText { .. } )), } }
-
 /// Whether the headline at 'treeid' is unsayable where it stands:
 /// some ancestor its kind's row requires is of another kind, or
 /// missing.
@@ -170,8 +120,8 @@ pub fn described_node (
   tree   : &Tree<Viewnode>,
   folder : NodeId,
 ) -> Option<NodeId> {
-  let ViewnodeKind::Folder (kind) = &tree . get (folder) ? . value () . kind
-    else { return None; };
+  let ViewnodeKind::Folder (kind) : &ViewnodeKind =
+    &tree . get (folder) ? . value () . kind else { return None; };
   let index : usize = match compound_folder_parties (kind) {
     Some (parties) => parties . subscribee . unwrap_or (parties . subscriber),
     None => 0, };
@@ -194,3 +144,53 @@ pub fn parent_reads_claims (
         . and_then ( |described| tree . get (described) )
         . is_some_and ( |described| described . value () . editable_gnid () . is_some () ),
     _ => false, } }
+
+/// The required ancestry of a kind, nearest first. A vognode, a
+/// tombstone and the buffer root require none.
+pub fn required_ancestry (
+  kind : &ViewnodeKind,
+) -> &'static [ExpectedAncestor] {
+  match kind {
+    ViewnodeKind::Folder (folder) => match folder {
+      Folder::Alias | Folder::ID | Folder::Flags { .. }
+        | Folder::Subscribee | Folder::Subscriber
+        | Folder::Overridden | Folder::Overrider
+        | Folder::Hider | Folder::Hidden
+        | Folder::Container | Folder::Mentioner
+        | Folder::Acquired => ANC_OCCURRENCE,
+      Folder::AcquiredBy => ANC_GHOST,
+      Folder::HiddenOutsideOfSubscribee => ANC_HIDDEN_OUTSIDE,
+      Folder::HiddenInSubscribee => ANC_HIDDEN_IN, },
+    ViewnodeKind::PropertyMember (member) => match member {
+      PropertyMember::Alias { .. } => ANC_ALIAS_FOLDER,
+      PropertyMember::ID { .. }    => ANC_ID_FOLDER,
+      PropertyMember::Flag { .. }  => ANC_FLAGS_FOLDER, },
+    ViewnodeKind::ChangeViewnode (change) => match change {
+      ChangeViewnode::BodyDiff { .. } => ANC_OLD_TEXT,
+      ChangeViewnode::OldText { .. }
+        | ChangeViewnode::HomeSkgrepoMove { .. }
+        | ChangeViewnode::RelRepoMove { .. }
+        | ChangeViewnode::ChangesetMarker { .. } => ANC_OCCURRENCE_OR_GHOST, },
+    ViewnodeKind::Vognode (_)
+      | ViewnodeKind::BufferRoot
+      | ViewnodeKind::Tombstone => ANC_NONE, } }
+
+/// Whether 'actual' is what 'expected' requires.
+pub fn matches_expected (
+  actual   : &ViewnodeKind,
+  expected : &ExpectedAncestor,
+) -> bool {
+  match expected {
+    ExpectedAncestor::Occurrence =>
+      matches! ( actual, ViewnodeKind::Vognode (Vognode::Occurrence (_)) ),
+    ExpectedAncestor::Folder (required) =>
+      matches! ( actual, ViewnodeKind::Folder (folder)
+                         if discriminant (folder) == discriminant (required) ),
+    ExpectedAncestor::Ghost =>
+      matches! ( actual, ViewnodeKind::Vognode (Vognode::Ghost (_)) ),
+    ExpectedAncestor::OccurrenceOrGhost =>
+      matches! ( actual, ViewnodeKind::Vognode (
+        Vognode::Occurrence (_) | Vognode::Ghost (_) )),
+    ExpectedAncestor::OldText =>
+      matches! ( actual, ViewnodeKind::ChangeViewnode (
+        ChangeViewnode::OldText { .. } )), } }

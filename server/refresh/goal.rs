@@ -202,12 +202,12 @@ fn content_goal (
   let graph : &InRustGraph = walk . truth . graph;
   let restriction : Option<&SkgrepoRestriction> = walk . truth . restriction;
   let subscriber : Option<ID> = subscriber_of_subscribee_as_such (tree, parent);
-  let unintegrated = |contents : Vec<ID>| -> Vec<ID> {
+  let unintegrated : &dyn Fn (Vec<ID>) -> Vec<ID> = &|contents : Vec<ID>| -> Vec<ID> {
     match &subscriber {
       None => contents,
       Some (subscriber) => less_what_the_subscriber_integrates (
         graph, restriction, subscriber, &contents ), } };
-  if let Some (goal) = diff_view::content_goal (pid, &unintegrated, walk) {
+  if let Some (goal) = diff_view::content_goal (pid, unintegrated, walk) {
     return goal; }
   let members : Vec<RelPartner<RelationshipMemberKey>> =
     graph . outbound_member_keys_for_relation_gated (
@@ -264,7 +264,7 @@ pub(crate) fn subscriber_of_subscribee_as_such (
   treeid : NodeId,
 ) -> Option<ID> {
   let node : NodeRef<Viewnode> = tree . get (treeid) ?;
-  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) : &ViewnodeKind =
     &node . value () . kind else { return None; };
   if occurrence . viewStats . warrant != Warrant::ByGraph { return None; }
   let folder : NodeRef<Viewnode> = node . parent () ?;
@@ -281,12 +281,15 @@ fn folder_goal (
   walk   : &Walk,
 ) -> Option<Goal> {
   let graph : &InRustGraph = walk . truth . graph;
-  let occurrence_pid_of = |treeid : NodeId| -> Option<ID> {
-    tree . get (treeid) ? . value () . occurrence_gnid () . cloned () };
-  let party_pid = |index : usize| -> Option<ID> {
-    occurrence_pid_of ( required_ancestor_of (tree, folder, index) ? ) };
-  let described_pid = || -> Option<ID> {
-    occurrence_pid_of ( described_node (tree, folder) ? ) };
+  let occurrence_pid_of : &dyn Fn (NodeId) -> Option<ID> =
+    &|treeid : NodeId| -> Option<ID> {
+      tree . get (treeid) ? . value () . occurrence_gnid () . cloned () };
+  let party_pid : &dyn Fn (usize) -> Option<ID> =
+    &|index : usize| -> Option<ID> {
+      occurrence_pid_of ( required_ancestor_of (tree, folder, index) ? ) };
+  let described_pid : &dyn Fn () -> Option<ID> =
+    &|| -> Option<ID> {
+      occurrence_pid_of ( described_node (tree, folder) ? ) };
   match kind {
     Folder::Alias | Folder::ID | Folder::Flags { .. } =>
       property_goal (kind, &described_pid () ?, walk),

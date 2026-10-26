@@ -14,7 +14,7 @@ use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::pids_from_viewforest;
 use crate::skgrepo_sets::SkgrepoRestriction;
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::init::empty_in_ram_tantivy_index;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_skgrepos;
@@ -91,7 +91,7 @@ pub fn multi_root_view_via_env (
     &runtime, root_gnids, skgrepo_restriction ) }
 
 pub(crate) fn multi_root_view_via_runtime (
-  runtime            : &crate::types::env::RuntimeGeneration,
+  runtime            : &RuntimeGeneration,
   root_gnids        : &[ID],
   skgrepo_restriction : Option<&SkgrepoRestriction>,
 ) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {

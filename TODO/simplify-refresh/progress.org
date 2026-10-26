@@ -2118,3 +2118,161 @@ slice 5 fixes describe. Suites: nextest 967 of 967, Emacs
 slice and the one changed integration test passed alone with
 both clients.
 
+
+** Slice 3
+*** The commits
+**** 41ae0f6d
+The corrections carried from slice 2: 'mark_claims' names its
+bool 'claims_are_read'; the two identical dependency collectors
+are one, 'dependencies_from_viewforest'.
+**** 4b1e0948
+No positional booleans: 'Goal::ordered', 'Goal::unordered' and
+'Goal::with_order'; 'EditabilityAndClaim'; 'mk_writeProtected_
+noClaim_from_viewnode'; 'model_of_front_change_viewnodes' takes
+'FrontChangeViewnodeConditions' and returns a list, each helper
+making one viewnode (duplication item 4).
+**** e275ff31
+The readiness store rides in 'CompletionMode::DiffView';
+'refresh_content_viewforest' and 'Truth::of_runtime'.
+**** fa8fa979
+The WHEN grammar stated once, in Rust and both lens engines; a
+conformance test and a test per client.
+**** b29ff075
+The stats pass takes '&InRustGraph'; 'stands_as_member_here';
+"stands as a member" in the glossary; one graphnode stats
+function; 'detect_and_mark_cycle'.
+**** a4c1734f
+'RerenderPassContext' without 'graph_snap'; 'RerenderOptions'
+an enum with 'DiffViewRerender'; 'SaveResponse' constructors;
+'rerender_open_view' and 'RerenderedView' for both loops
+(duplication item 7).
+**** 49a0e1d3
+The stats pass asks the goal: 'subscriber_of_subscribee_as_
+such' and 'content_goal_gnids' (duplication item 3).
+**** d27d203d
+'InRustGraph::restriction_keeps_out', the one render-side
+answer, from the graph alone (duplication item 6).
+**** cd4c29e8
+'point_occurrence_at' for the ID rule and 'show_overrider', with
+a fix and its test (duplication item 8).
+**** 7c2cbc24
+'partnerFolder_members' serves both folders;
+'claiming_unknown_or_ghost_member' (duplication item 9).
+**** b8137c3a
+'Folder::all', 'from_client_string' over it, the kind atoms from
+'repr_in_client'; 'GraphnodeInRust::ids' and
+'aliases_with_relRepo_unless_home' (duplication item 14).
+**** 8de27880
+Dead code: 'is_property_folder', 'find_child_by_gnid',
+'run_with_test_stores_from_config', 'read_lp_messages_until'.
+**** the formatting commit
+Every let in 'server/refresh/' typed; callees after callers in
+'refresh/diff_view.rs', 'extent.rs', 'ancestry.rs'; one signature
+broken, one path unqualified. It carries this record and the
+slice's DONE.
+*** The suites
+**** cargo check --all-targets
+Clean, no warnings.
+**** bash/nextest.sh
+969 of 969 passed (slice 2's 967, plus
+'no_herald_rule_WHEN_is_styled' and
+'an_overrider_editable_elsewhere_is_shown_write_protected').
+**** the one failure met, classified
+After the stats pass first asked the goal, two tests failed,
+'pruned_change_view::restore::restoring_a_deleted_node' and
+'both_requests_in_one_save', on the assertion "numerator <=
+counts . contents" ('server/herald_tokens.rs'): new, this
+slice's own regression. The goal's list keeps a dangling member
+as its raw ID, the contents count counts nodes only; the stats
+pass now counts the nodes of the goal's list. Fixed before its
+commit; nothing else failed at any point, and no flake showed.
+**** bash/emacs-tests.sh
+411 of 411 passed (one new test), run after the lens change,
+the slice's only client edit.
+**** bash/nvim-tests.sh
+401 passed, 0 failed, 0 errors (one new spec).
+**** bash/integration-tests.sh
+34 of 35 passed. The one failure, 'import-md-and-org', is
+pre-existing, as the plan says; not investigated.
+**** the fixpoint sweeps
+'tests/idempotence.rs' passes unchanged in what it asserts; its
+content-view sweep calls 'refresh_content_viewforest', since
+'refresh_viewforest' lost its store argument.
+*** Deviations from the plan's "how"
+**** the content-view helper takes the truth
+'refresh_content_viewforest' takes a 'Truth', not the runtime:
+the search enrichment holds a graph and a config but no runtime
+generation, and its test entry points build none.
+'Truth::of_runtime' gives the other callers the runtime's form.
+**** the diff-view rerender takes its case and the context
+'RerenderOptions' is an enum, so what reaches
+'rerender_diffView_buffer' whole is its diff-view case,
+'DiffViewRerender'. It also takes the pass's context, which held
+five of its eight parameters.
+**** one rerender loop, one message
+'rerender_open_view' names a view it could not rerender
+"View X: ..."; the save's collateral loop said "Collateral view
+X: ...". No test or client reads the wording.
+**** an unwarranted subscribee counts nothing
+Asking the goal's predicate, the stats pass no longer gives the
+unintegrated count, nor the hides flag of its retained children,
+to a subscribee the truth does not warrant (one the subscriber
+no longer subscribes to); the goal does not treat it as a
+subscribee as such either.
+**** the disk rule: the graph alone
+The graph holds every node on disk, so the render side no longer
+consults the disk ('graph_skgrepo',
+'find_skgrepo_with_optional_tantivy' and two 'home_from_disk'
+fallbacks went). Under a restriction other than 'all', a gnid
+the graph lacks is kept out, as the goal's omission did; the
+chain's gate kept one the disk lacked too, but its containers
+come from the graph's own lists, so all resolve. The save side's
+disk lookups (the weave, strandeds, supplementation, titles)
+stay: they serve the save.
+**** a latent bug in 'show_overrider'
+It released the overrider's editability after the occurrence
+took the overrider's gnid, so write-protecting it freed another
+occurrence's hold, and a later occurrence of the overrider was
+drawn editable too: two editable occurrences of one node. A
+probe confirmed it (the second refresh of the fixpoint tripped
+the input check); 'point_occurrence_at' releases first, as the
+ID rule's copy did, and the probe is now
+'an_overrider_editable_elsewhere_is_shown_write_protected'.
+**** the kind atoms from sample values
+'property_and_change_kind_atoms' applies 'repr_in_client' to one
+value of each property member and change viewnode, guarded by
+the exhaustive matches that guarded the old constant.
+**** the stats bool and the glossary
+'stands_as_member' stays distinct from claim and warrant (a
+warranted member of a write-protected folder claims nothing but
+stands; a warranted child marked 'noClaim' does not), so the
+glossary gains "stands as a member" now; slice 10 makes the
+entries one voice.
+**** formatting a little beyond the list
+The report's line numbers drifted, so every untyped let in
+'server/refresh/' is typed, and in 'refresh/diff_view.rs'
+'partner_item', 'change_key' and 'sets' follow their callers
+too. Closures are typed as '&dyn Fn'.
+**** smaller choices
+'model_of_front_change_viewnodes' keeps its name; the
+round-trip view test builds the old text's body diff and the
+acquired folder's ghosts itself. 'parent_is_editable' is
+'claims_are_read', since the function's own name would shadow
+it. The WHEN change has a test in each client.
+*** Fixtures changed
+None of the fixture data. Tests adapted to signatures: the
+refresh's unit tests and 'tests/graph_straddle_engines.rs' (the
+store in the mode), 'tests/idempotence.rs' (the content-view
+helper), 'tests/diff_view/roundtrip/view.rs' (the one-viewnode
+helpers).
+*** Left unfinished
+Nothing of slice 3. Noticed:
+**** another dead lookup
+'SkgEnv::find_skgrepo_in_generation' ('server/types/env.rs'),
+with Tantivy and disk fallbacks, has no caller; the plan's
+dead-code list does not name it.
+**** callee order elsewhere in 'ancestry.rs'
+'described_node' still follows 'compound_folder_parties', which
+it calls; the report named only the ancestry rows' order.
+*** Headline
+DONE.
