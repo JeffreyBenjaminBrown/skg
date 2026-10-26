@@ -281,7 +281,8 @@ fn graphnode_from_section_tree (
   tree  : &SectionTree,
   lines : &[String],
 ) -> Graphnode {
-  // All sections have IDs after assign_missing_ids pre-pass.
+  // All sections have IDs after the phase that assigns missing IDs
+  // ('assign_missing_ids').
   let id_str : &str =
     tree . section . id . as_ref() . unwrap();
   let contained_gnids : Vec<ID> =
