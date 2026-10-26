@@ -272,8 +272,8 @@ fn occurrence_gnids_in_viewforest (
 ) -> Vec<ID> {
   viewforest . nodes ()
     .filter_map ( |node| match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) =>
-        Some ( restriction . gnid . clone () ),
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+        Some ( occurrence . gnid . clone () ),
       _ => None,
     } )
     .collect ()
@@ -294,8 +294,8 @@ fn replace_saved_view_fork_roots (
     let original : Option<ID> =
       viewforest . get (root_gnid) . and_then (|root| match
         &root . value () . kind {
-          ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) =>
-            Some (restriction . gnid . clone ()),
+          ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =>
+            Some (occurrence . gnid . clone ()),
           _ => None, });
     let Some (original) = original else { continue; };
     let Some (spec) = fork_specs . iter ()
@@ -304,15 +304,15 @@ fn replace_saved_view_fork_roots (
     let clone = & spec . clone . 0;
     let mut root = viewforest . get_mut (root_gnid)
       . ok_or ("replace_saved_view_fork_roots: root not found") ?;
-    if let ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) =
+    if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
       &mut root . value () . kind
-    { restriction . gnid = clone . pid . clone ();
-      restriction . home_skgrepo = clone . home_skgrepo . clone ();
-      restriction . title = clone . title . clone ();
-      if let Editability::Editable { body, .. } = &mut restriction . editability
+    { occurrence . gnid = clone . pid . clone ();
+      occurrence . home_skgrepo = clone . home_skgrepo . clone ();
+      occurrence . title = clone . title . clone ();
+      if let Editability::Editable { body, .. } = &mut occurrence . editability
       { *body = clone . body . clone (); }
-      restriction . view_requests . remove (&ViewRequest::Fork);
-      restriction . overridesHere = Some (original); }}
+      occurrence . view_requests . remove (&ViewRequest::Fork);
+      occurrence . overridesHere = Some (original); }}
   Ok (())
 }
 

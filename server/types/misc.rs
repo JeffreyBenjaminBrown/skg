@@ -265,12 +265,11 @@ impl SkgConfig {
 pub struct SkgrepoName ( pub String );
 
 impl SkgrepoName {
-  /// Reserved sentinel skgrepo for a viewnode *not an occurrence* (e.g. a
-  /// ghost) whose skgrepo could not be determined. It renders like
-  /// any other skgrepo -- the all-caps name alone flags it to the user --
-  /// so that one unresolvable reference does not abort an entire render
-  /// (see the glossary's "unknown node, dangling ID"). An occurrence's skgrepo failures are caught by
-  /// validation (pre-save) or are catastrophic (post-save), never this.
+  /// Reserved sentinel skgrepo for an occurrence whose skgrepo
+  /// nothing supplies: the parse gives it to a headline that names
+  /// none where 'complete_occurrence_skgrepo' finds none either (a new
+  /// headline at top level, say), and validation refuses it
+  /// ('viewnode_from_metadata', 'find_buffer_errors_for_saving').
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {
     SkgrepoName ( Self::NOT_FOUND_STR . to_string () ) } }

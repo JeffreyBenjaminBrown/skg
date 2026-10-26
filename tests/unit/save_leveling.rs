@@ -754,17 +754,17 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
     ViewnodeKind, Vognode, viewnode_of};
 
   for value in [false, true] {
-    let mut restriction : Occurrence = default_occurrence (
+    let mut occurrence : Occurrence = default_occurrence (
       ID::new ("n"), SkgrepoName::from ("public"), "N" . to_string () );
     if let crate::types::viewnode::Editability::Editable {
-      edit_request, .. } = &mut restriction . editability
+      edit_request, .. } = &mut occurrence . editability
     { *edit_request = Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching,
         value, }); }
     else { unreachable! (); }
     let mut node : Viewnode =
       viewnode_of ( ViewnodeKind::Vognode (
-        Vognode::Occurrence (restriction) ));
+        Vognode::Occurrence (occurrence) ));
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (
@@ -775,9 +775,9 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
       Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching, value }) );
     node . consume_edit_request_after_save ();
-    let ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) = &node . kind
+    let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &node . kind
       else { unreachable! (); };
-    assert_eq! (restriction . edit_request (), None); }
+    assert_eq! (occurrence . edit_request (), None); }
 
   for malformed in [
     "(skg node (gnid n) (editRequest (flag nope true)))",

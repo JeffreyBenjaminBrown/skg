@@ -225,7 +225,7 @@ impl VognodeKind {
 #[derive( Debug, Clone, PartialEq )]
 pub struct Unknown {
   pub gnid                 : ID,
-  /// Display-only fact about this occurrence's binding relationship.
+  /// Display-only fact about this unknown's binding relationship.
   pub relRepo         : Option<SkgrepoName>,
   /// A pending request about this reference's relationship to its
   /// viewparent (only a relRepo change: the parser refuses
@@ -1072,12 +1072,12 @@ impl Viewnode {
     let restored = |request : &Option<RelationshipEditRequest>| -> bool {
       matches! ( request, Some (RelationshipEditRequest::RestoreRel) ) };
     match &mut self . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) => {
-        if restored (&restriction . relationshipEditRequest) {
-          restriction . claimsMembership = true; }
-        restriction . relationshipEditRequest = None;
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
+        if restored (&occurrence . relationshipEditRequest) {
+          occurrence . claimsMembership = true; }
+        occurrence . relationshipEditRequest = None;
         if let Editability::Editable { edit_request, .. } =
-          &mut restriction . editability
+          &mut occurrence . editability
         { *edit_request = None; }},
       ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
         if restored (&unknown . relationshipEditRequest) {

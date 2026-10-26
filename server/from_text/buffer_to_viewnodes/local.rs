@@ -575,8 +575,8 @@ fn validate_id_property (
 /// Repo validity is not checked here: skgrepo is load-bearing only for a
 /// Occurrence (it is the node's .skg file path), so validate_occurrence adds that
 /// check; a ghost writes nothing and is ignored at save, so its skgrepo --
-/// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
-/// save-inert and goes unchecked. (validate_occurrence also appends the
+/// empty when its headline names none -- is save-inert and goes
+/// unchecked. (validate_occurrence also appends the
 /// editable-title check; a ghost is title-exempt, being write-protected.)
 fn validate_vognode_identity_and_structure (
   tree       : &Tree<Viewnode>,

@@ -45,24 +45,24 @@ fn folder_kind_rules () {
 
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
-  let mut restriction : Viewnode = mk_viewnode (
+  let mut viewnode : Viewnode = mk_viewnode (
     ID::from ("unrestricted"), SkgrepoName::from ("public"), "unrestricted" . into (),
     true,
     Editability::Editable {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Editable] . into_iter () . collect () );
-  if let ViewnodeKind::Vognode (Vognode::Occurrence (node)) = &mut restriction . kind {
+  if let ViewnodeKind::Vognode (Vognode::Occurrence (node)) = &mut viewnode . kind {
     node . relationshipEditRequest = Some ( RelationshipEditRequest::RelRepo ( SkgrepoName::from ("private") )); }
-  restriction . readiness_request = Some (ReadinessRequest {
+  viewnode . readiness_request = Some (ReadinessRequest {
     ready : true, objects : [DiffObject::All] . into_iter () . collect () });
-  restriction . consume_edit_request_after_save ();
-  assert_eq! (restriction . readiness_request, None);
-  let ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) = &restriction . kind
+  viewnode . consume_edit_request_after_save ();
+  assert_eq! (viewnode . readiness_request, None);
+  let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) = &viewnode . kind
   else { panic! ("expected an occurrence"); };
-  assert_eq! (restriction . relationshipEditRequest, None);
-  assert_eq! (restriction . edit_request (), None);
-  assert! (restriction . view_requests . contains (&ViewRequest::Editable));
+  assert_eq! (occurrence . relationshipEditRequest, None);
+  assert_eq! (occurrence . edit_request (), None);
+  assert! (occurrence . view_requests . contains (&ViewRequest::Editable));
 
   let mut unknown : Viewnode = Viewnode {
     readiness_request : Some (ReadinessRequest {

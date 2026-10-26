@@ -112,7 +112,7 @@ fn extend_requested_content (
       &mut tree . get_mut (child) . unwrap () . value () . kind
     { occurrence . editability = Editability::Editable { // the re-kind gives it its body
         body : None, edit_request : None }; }
-    walk . editable_gnids . insert (gnid);
+    walk . hold_editability (&gnid);
     walk . drawn_editable . insert (child);
     walk . had_editableView_request . insert (child); }}
 
@@ -159,7 +159,7 @@ fn add_default_folders (
         . id ();
       move_to_first_child (tree, parent, folder)
         . expect ("add_default_folders: the folder was just added");
-      walk . newborn_folders . insert (folder);
+      walk . added_compound_folders . insert (folder);
       walk . added_folders . insert (folder); }}}
 
 //
@@ -329,13 +329,13 @@ fn merge_editability (
   let ViewnodeKind::Vognode (Vognode::Occurrence (result_occurrence)) =
     &mut result_mut . value () . kind
     else { return; };
-  walk . editable_gnids . remove (&merged . gnid);
+  walk . release_editability (&merged . gnid);
   let takes_it : bool = result_occurrence . is_writeProtected ()
     && ! walk . editable_gnids . contains (&result_occurrence . gnid);
   if takes_it {
     result_occurrence . editability = merged . editability . clone (); }
   if ! result_occurrence . is_writeProtected () {
-    walk . editable_gnids . insert ( result_occurrence . gnid . clone () ); }
+    walk . hold_editability (&result_occurrence . gnid); }
   if walk . drawn_editable . remove (&merged_sibling) && takes_it {
     walk . drawn_editable . insert (result); }
   if walk . had_editableView_request . remove (&merged_sibling) && takes_it {
@@ -509,8 +509,9 @@ fn reinstate (
     after_drawing (tree, parent, treeid, walk) ?; }
   Ok (( )) }
 
-/// Book what a drawn child is: an editable occurrence claims its
-/// node's editability; a folder member carries its chain. Then
+/// Book what a drawn child is: an editable occurrence holds its
+/// node's editability ('Walk::hold_editability'); a folder member
+/// carries its chain. Then
 /// report it, unless drawing it is extent ('Walk::record_drawn').
 fn after_drawing (
   tree   : &mut Tree<Viewnode>,
@@ -519,7 +520,7 @@ fn after_drawing (
   walk   : &mut Walk,
 ) -> Result<(), Box<dyn Error>> {
   if let Some (gnid) = tree . get (treeid) . unwrap () . value () . editable_gnid () . cloned () {
-    walk . editable_gnids . insert (gnid);
+    walk . hold_editability (&gnid);
     walk . drawn_editable . insert (treeid);
     if walk . had_editableView_request . contains (&parent) {
       // The request extends the content it draws, as it extends the
@@ -538,7 +539,7 @@ fn after_drawing (
     attach_containerward_chains_under_members (
       tree, &[treeid], walk . truth . graph, walk . truth . config,
       walk . truth . restriction, partners ) ?; }
-  if walk . newborn_folders . contains (&parent) {
+  if walk . added_compound_folders . contains (&parent) {
     // A folder's collapse lives on its members.
     tree . get_mut (treeid) . unwrap () . value () . foldAndFocus . folded = true; }
   walk . record_drawn (tree, parent, treeid);
@@ -730,10 +731,9 @@ fn show_overrider (
     if let Editability::Editable { body, .. } = &mut occurrence . editability
     { *body = node . body . clone (); }}
   if let Some (was) = was_editable_as {
-    walk . editable_gnids . remove (&was);
-    if walk . editable_gnids . contains (shown) {
-      write_protect_occurrence (tree, child, walk);
-    } else { walk . editable_gnids . insert ( shown . clone () ); }}
+    walk . release_editability (&was);
+    if ! walk . hold_editability (shown) {
+      write_protect_occurrence (tree, child, walk); }}
   Ok (( )) }
 
 /// The override that 'child' stood for is gone: it shows itself, is
@@ -874,7 +874,7 @@ fn folders_of_relation (
 /// its other children, in the order given. A subscribee folder holds
 /// the compound folder of what the subscriber hides outside its
 /// subscribees, when the subscriber hides something there; new, its
-/// members are drawn folded ('Walk::newborn_folders').
+/// members are drawn folded ('Walk::added_compound_folders').
 fn add_folders (
   tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
@@ -901,7 +901,7 @@ fn add_folders (
     { let hidden_outside : NodeId = tree . get_mut (folder_treeid) . unwrap ()
         . append ( viewnode_of (
           ViewnodeKind::Folder (Folder::HiddenOutsideOfSubscribee) )) . id ();
-      walk . newborn_folders . insert (hidden_outside);
+      walk . added_compound_folders . insert (hidden_outside);
       walk . added_folders . insert (hidden_outside); }}
   for folder_treeid in added . into_iter () . rev () {
     move_to_first_child (tree, treeid, folder_treeid)

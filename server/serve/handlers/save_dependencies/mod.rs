@@ -159,12 +159,12 @@ fn dependencies_from_uninterpreted (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) => {
-        result . insert (restriction . gnid . clone ());
-        result . extend (restriction . overridesHere . iter () . cloned ());
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
+        result . insert (occurrence . gnid . clone ());
+        result . extend (occurrence . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
-        } = &restriction . editability
+        } = &occurrence . editability
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
         result . insert (unknown . gnid . clone ()); }
@@ -183,12 +183,12 @@ fn dependencies_from_registered (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      ViewnodeKind::Vognode (Vognode::Occurrence (restriction)) => {
-        result . insert (restriction . gnid . clone ());
-        result . extend (restriction . overridesHere . iter () . cloned ());
+      ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) => {
+        result . insert (occurrence . gnid . clone ());
+        result . extend (occurrence . overridesHere . iter () . cloned ());
         if let Editability::Editable {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
-        } = &restriction . editability
+        } = &occurrence . editability
         { result . insert (target . clone ()); }}
       ViewnodeKind::Vognode (Vognode::Unknown (unknown)) => {
         result . insert (unknown . gnid . clone ()); }

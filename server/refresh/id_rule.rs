@@ -133,7 +133,7 @@ pub(crate) fn rekind_vognode (
         .. occurrence };
       set_vognode_keeping_readiness (tree, child, Vognode::Occurrence (occurrence));
       if editable {
-        walk . editable_gnids . insert (pid . clone ());
+        walk . hold_editability (&pid);
         walk . drawn_editable . insert (child); }
       if requests . restore_node {
         walk . buffer_corrections . record (tree, child, BufferCorrectionKind::EditRequestDropped); }
@@ -261,10 +261,9 @@ fn refresh_occurrence_in_place (
   if occurrence . gnid != *pid && ! occurrence . is_writeProtected () {
     // A gnid that became an extra ID: the node it now names may have
     // its editable occurrence elsewhere.
-    walk . editable_gnids . remove (&occurrence . gnid);
-    if walk . editable_gnids . contains (pid) {
-      write_protect_occurrence (tree, child, walk); }
-    else { walk . editable_gnids . insert (pid . clone ()); }}
+    walk . release_editability (&occurrence . gnid);
+    if ! walk . hold_editability (pid) {
+      write_protect_occurrence (tree, child, walk); }}
   if let ViewnodeKind::Vognode (Vognode::Occurrence (occurrence)) =
     &mut tree . get_mut (child) . unwrap () . value () . kind
   { occurrence . gnid        = pid . clone ();
@@ -337,7 +336,7 @@ fn forget_editable_occurrence (
 ) {
   if let Vognode::Occurrence (occurrence) = vognode {
     if ! occurrence . is_writeProtected () {
-      walk . editable_gnids . remove (&occurrence . gnid);
+      walk . release_editability (&occurrence . gnid);
       walk . drawn_editable . remove (&treeid); }}}
 
 /// Set the vognode at 'treeid' to 'vognode', keeping its fold state,

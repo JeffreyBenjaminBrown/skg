@@ -109,12 +109,12 @@ pub(crate) struct Walk<'a> {
   /// The compound folders this refresh added. Their members are drawn
   /// folded: in the clients' encoding a folder's collapse lives on its
   /// members, since 'folded' on a headline hides it in its parent.
-  pub newborn_folders : HashSet<NodeId>,
+  pub added_compound_folders : HashSet<NodeId>,
   /// The folders this refresh added, on request or by default, or
   /// drew as change viewnodes. Their members are extent
   /// ('Walk::record_drawn').
   pub added_folders  : HashSet<NodeId>,
-  pub buffer_corrections    : BufferCorrectionLog,
+  pub buffer_corrections : BufferCorrectionLog,
   pub buffer_correction_policy : &'a BufferCorrectionPolicy,
   /// The headlines entombstoned without a buffer correction
   /// ('BufferCorrectionPolicy'). What their entombstoning makes
@@ -133,15 +133,30 @@ impl<'a> Walk<'a> {
            editable_gnids           : HashSet::new (),
            drawn_editable           : HashSet::new (),
            had_editableView_request : HashSet::new (),
-           newborn_folders          : HashSet::new (),
+           added_compound_folders   : HashSet::new (),
            added_folders            : HashSet::new (),
-           buffer_corrections              : BufferCorrectionLog::default (),
+           buffer_corrections       : BufferCorrectionLog::default (),
            quiet_tombstones         : HashSet::new (), } }
 
   pub fn is_diff_view (
     &self,
   ) -> bool {
     matches! ( self . mode, CompletionMode::DiffView { .. } ) }
+
+  /// Let an occurrence of 'gnid' hold the gnid's one editability,
+  /// unless another already does ('editable_gnids'). Whether it may.
+  pub fn hold_editability (
+    &mut self,
+    gnid : &ID,
+  ) -> bool {
+    self . editable_gnids . insert ( gnid . clone () ) }
+
+  /// No occurrence of 'gnid' holds its editability now.
+  pub fn release_editability (
+    &mut self,
+    gnid : &ID,
+  ) {
+    self . editable_gnids . remove (gnid); }
 
   /// Whether this refresh draws what stands under 'parent' for the
   /// first time: the content of an occurrence it extends first (one
@@ -287,7 +302,7 @@ pub(crate) fn write_protect_occurrence (
     walk . buffer_corrections . record (
       tree, treeid, BufferCorrectionKind::EditRequestDropped ); }
   if let Some (gnid) = gnid {
-    walk . editable_gnids . remove (&gnid);
+    walk . release_editability (&gnid);
     walk . drawn_editable . remove (&treeid); }}
 
 #[cfg(test)]
